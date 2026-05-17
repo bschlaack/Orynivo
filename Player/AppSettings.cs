@@ -8,4 +8,5 @@ public sealed class AppSettings
     public string? SelectedDriverName { get; set; }
     public string? SelectedWasapiDeviceId { get; set; }
     public string? SelectedWasapiDeviceName { get; set; }
+    public List<string> LibraryPaths { get; set; } = [];
 }

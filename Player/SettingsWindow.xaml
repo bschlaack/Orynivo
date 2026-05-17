@@ -2,63 +2,159 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Einstellungen"
-        Height="340"
-        Width="460"
-        MinHeight="340"
-        MinWidth="460">
-    <Grid Margin="20">
+        Width="720"
+        Height="500"
+        MinWidth="600"
+        MinHeight="400"
+        ResizeMode="CanResize">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="170" />
+            <ColumnDefinition Width="1" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <StackPanel>
-            <TextBlock Text="Ausgabeart"
-                       FontSize="14"
-                       FontWeight="SemiBold" />
-            <ComboBox x:Name="OutputBackendComboBox"
-                      Margin="0,8,0,16"
-                      Height="30"
-                      SelectionChanged="OutputBackendComboBox_OnSelectionChanged" />
+        <!-- Linke Navigation -->
+        <ListBox x:Name="NavListBox"
+                 Grid.Column="0"
+                 Grid.Row="0"
+                 Background="#F4F4F4"
+                 BorderThickness="0"
+                 Padding="0,8,0,0"
+                 SelectionChanged="NavListBox_OnSelectionChanged">
 
-            <TextBlock x:Name="DeviceLabelTextBlock"
-                       Text="ASIO-Ausgabegerät"
-                       FontSize="14"
-                       FontWeight="SemiBold" />
-            <ComboBox x:Name="DriverComboBox"
-                      Margin="0,8,0,8"
-                      Height="30"
-                      SelectionChanged="DriverComboBox_OnSelectionChanged" />
-            <Button x:Name="DeviceInfoButton"
-                    Width="130"
-                    Height="28"
-                    HorizontalAlignment="Left"
-                    Click="DeviceInfoButton_OnClick"
-                    Content="Geräteinfo"
-                    Visibility="Collapsed" />
-        </StackPanel>
+            <!-- Oberpunkt: Wiedergabe -->
+            <ListBoxItem IsHitTestVisible="False"
+                         Focusable="False"
+                         Padding="12,10,0,4"
+                         FontSize="10"
+                         FontWeight="Bold"
+                         Foreground="#888888">
+                WIEDERGABE
+            </ListBoxItem>
+            <ListBoxItem Tag="AudioDevice"
+                         Padding="22,5,8,5"
+                         FontSize="13">
+                Ausgabegerät
+            </ListBoxItem>
 
-        <TextBlock x:Name="StatusTextBlock"
-                   Grid.Row="1"
-                   Margin="0,16,0,0"
-                   TextWrapping="Wrap"
-                   Foreground="#555" />
+            <!-- Oberpunkt: Bibliothek -->
+            <ListBoxItem IsHitTestVisible="False"
+                         Focusable="False"
+                         Padding="12,14,0,4"
+                         FontSize="10"
+                         FontWeight="Bold"
+                         Foreground="#888888">
+                BIBLIOTHEK
+            </ListBoxItem>
+            <ListBoxItem Tag="Library"
+                         Padding="22,5,8,5"
+                         FontSize="13">
+                Verzeichnisse
+            </ListBoxItem>
+        </ListBox>
 
-        <StackPanel Grid.Row="2"
-                    Margin="0,18,0,0"
-                    Orientation="Horizontal"
-                    HorizontalAlignment="Right"
-                    VerticalAlignment="Center">
-            <Button Width="90"
-                    Height="30"
-                    Margin="0,0,10,0"
-                    Click="CancelButton_OnClick"
-                    Content="Abbrechen" />
-            <Button Width="90"
-                    Height="30"
-                    Click="SaveButton_OnClick"
-                    Content="Speichern" />
-        </StackPanel>
+        <!-- Vertikale Trennlinie -->
+        <Rectangle Grid.Column="1"
+                   Grid.Row="0"
+                   Fill="#DDDDDD" />
+
+        <!-- Rechter Inhaltsbereich -->
+        <ScrollViewer Grid.Column="2"
+                      Grid.Row="0"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <Grid Margin="28,24,28,16">
+
+                <!-- Panel: Ausgabegerät -->
+                <StackPanel x:Name="AudioDevicePanel"
+                            Visibility="Collapsed">
+                    <TextBlock Text="Ausgabegerät"
+                               FontSize="15"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,20" />
+
+                    <TextBlock Text="Ausgabeart"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6" />
+                    <ComboBox x:Name="OutputBackendComboBox"
+                              Height="30"
+                              Margin="0,0,0,18"
+                              SelectionChanged="OutputBackendComboBox_OnSelectionChanged" />
+
+                    <TextBlock x:Name="DeviceLabelTextBlock"
+                               Text="ASIO-Ausgabegerät"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6" />
+                    <ComboBox x:Name="DriverComboBox"
+                              Height="30"
+                              Margin="0,0,0,8"
+                              SelectionChanged="DriverComboBox_OnSelectionChanged" />
+                    <Button x:Name="DeviceInfoButton"
+                            Width="130"
+                            Height="28"
+                            HorizontalAlignment="Left"
+                            Click="DeviceInfoButton_OnClick"
+                            Content="Geräteinfo"
+                            Visibility="Collapsed" />
+
+                    <TextBlock x:Name="StatusTextBlock"
+                               Margin="0,12,0,0"
+                               TextWrapping="Wrap"
+                               Foreground="#555555" />
+                </StackPanel>
+
+                <!-- Panel: Verzeichnisse -->
+                <StackPanel x:Name="LibraryPanel"
+                            Visibility="Collapsed">
+                    <TextBlock Text="Verzeichnisse"
+                               FontSize="15"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,20" />
+
+                    <ScrollViewer MaxHeight="320"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel x:Name="DirectoriesPanel" />
+                    </ScrollViewer>
+
+                    <Button x:Name="AddDirectoryButton"
+                            Width="180"
+                            Height="28"
+                            HorizontalAlignment="Left"
+                            Margin="0,10,0,0"
+                            Content="+ Verzeichnis hinzufügen"
+                            Click="AddDirectoryButton_OnClick" />
+                </StackPanel>
+
+            </Grid>
+        </ScrollViewer>
+
+        <!-- Untere Leiste: Speichern / Abbrechen -->
+        <Border Grid.Column="0"
+                Grid.ColumnSpan="3"
+                Grid.Row="1"
+                BorderThickness="0,1,0,0"
+                BorderBrush="#DDDDDD"
+                Padding="16,10">
+            <StackPanel Orientation="Horizontal"
+                        HorizontalAlignment="Right">
+                <Button Width="90"
+                        Height="30"
+                        Margin="0,0,10,0"
+                        Click="CancelButton_OnClick"
+                        Content="Abbrechen" />
+                <Button Width="90"
+                        Height="30"
+                        Click="SaveButton_OnClick"
+                        Content="Speichern" />
+            </StackPanel>
+        </Border>
     </Grid>
 </Window>

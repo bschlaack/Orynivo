@@ -51,7 +51,15 @@
         "net8.0-windows7.0": {
           "targetAlias": "net8.0-windows",
           "dependencies": {
+            "Microsoft.Data.Sqlite": {
+              "target": "Package",
+              "version": "[9.0.5, )"
+            },
             "NAudio": {
+              "target": "Package",
+              "version": "[2.3.0, )"
+            },
+            "TagLibSharp": {
               "target": "Package",
               "version": "[2.3.0, )"
             }
