@@ -1,0 +1,178 @@
+<Window x:Class="Player.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Player" Height="680" Width="760"
+        MinHeight="680" MinWidth="760">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid Margin="20">
+            <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+        <DockPanel Margin="0,0,0,18">
+            <Button DockPanel.Dock="Right"
+                    Width="120"
+                    Height="30"
+                    Margin="10,0,0,0"
+                    Click="SettingsButton_OnClick"
+                    Content="Einstellungen" />
+            <StackPanel>
+                <TextBlock Text="Aktives ASIO-Gerät"
+                           FontSize="14"
+                           FontWeight="SemiBold" />
+                <TextBlock x:Name="SelectedDriverTextBlock"
+                           Margin="0,8,0,0"
+                           Text="Kein Gerät ausgewählt." />
+            </StackPanel>
+        </DockPanel>
+
+        <StackPanel Grid.Row="1">
+            <TextBlock Text="Audiodatei"
+                       FontSize="14"
+                       FontWeight="SemiBold" />
+            <DockPanel Margin="0,8,0,18">
+                <Button DockPanel.Dock="Right"
+                        Width="130"
+                        Height="30"
+                        Margin="10,0,0,0"
+                        Click="ChooseFolderButton_OnClick"
+                        Content="Ordner wählen" />
+                <Button DockPanel.Dock="Right"
+                        Width="110"
+                        Height="30"
+                        Margin="10,0,0,0"
+                        Click="ChooseFileButton_OnClick"
+                        Content="Datei wählen" />
+                <TextBox x:Name="FilePathTextBox"
+                         Height="30"
+                         IsReadOnly="True"
+                         VerticalContentAlignment="Center" />
+            </DockPanel>
+        </StackPanel>
+
+        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal">
+            <Button x:Name="PlayButton"
+                    Width="110"
+                    Height="32"
+                    Margin="0,0,10,0"
+                    Click="PlayButton_OnClick"
+                    Content="Abspielen" />
+            <Button x:Name="StopButton"
+                    Width="110"
+                    Height="32"
+                    Click="StopButton_OnClick"
+                    Content="Stop"
+                    IsEnabled="False" />
+            <Button x:Name="PauseButton"
+                    Width="110"
+                    Height="32"
+                    Margin="10,0,0,0"
+                    Click="PauseButton_OnClick"
+                    Content="Pause"
+                    IsEnabled="False" />
+        </StackPanel>
+
+        <DataGrid x:Name="PlaylistDataGrid"
+                  Grid.Row="3"
+                  Margin="0,18,0,0"
+                  MaxHeight="220"
+                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  SelectionMode="Single"
+                  MouseDoubleClick="PlaylistDataGrid_OnMouseDoubleClick">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Titel"
+                                    Binding="{Binding FileName}"
+                                    Width="2*" />
+                <DataGridTextColumn Header="Ordner"
+                                    Binding="{Binding Folder}"
+                                    Width="3*" />
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <Grid Grid.Row="4"
+              Margin="0,18,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="CurrentTimeTextBlock"
+                       VerticalAlignment="Center"
+                       Text="00:00" />
+            <Slider x:Name="PositionSlider"
+                    Grid.Column="1"
+                    Margin="12,0"
+                    Minimum="0"
+                    Maximum="1"
+                    IsEnabled="False"
+                    PreviewMouseLeftButtonDown="PositionSlider_OnPreviewMouseLeftButtonDown"
+                    PreviewMouseLeftButtonUp="PositionSlider_OnPreviewMouseLeftButtonUp"
+                    ValueChanged="PositionSlider_OnValueChanged" />
+            <TextBlock x:Name="DurationTextBlock"
+                       Grid.Column="2"
+                       VerticalAlignment="Center"
+                       Text="00:00" />
+        </Grid>
+
+        <Grid Grid.Row="5"
+              Margin="0,14,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="220" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock VerticalAlignment="Center"
+                       Text="Lautstärke" />
+            <Slider x:Name="VolumeSlider"
+                    Grid.Column="1"
+                    Margin="12,0"
+                    Minimum="0"
+                    Maximum="1"
+                    Value="1"
+                    ValueChanged="VolumeSlider_OnValueChanged" />
+            <TextBlock x:Name="VolumeValueTextBlock"
+                       Grid.Column="2"
+                       VerticalAlignment="Center"
+                       Text="100 %" />
+        </Grid>
+
+        <Border Grid.Row="6"
+                Margin="0,18,0,0"
+                Padding="12"
+                Background="#F4F4F4"
+                CornerRadius="8">
+            <TextBlock x:Name="FileInfoTextBlock"
+                       Text="Noch keine Datei ausgewählt."
+                       TextWrapping="Wrap" />
+        </Border>
+
+        </Grid>
+
+        <Border Grid.Row="1"
+                Padding="12,8"
+                BorderBrush="#DDDDDD"
+                BorderThickness="1,1,0,0"
+                Background="#F7F7F7">
+            <TextBlock x:Name="StatusTextBlock"
+                       TextWrapping="Wrap"
+                       Foreground="#555" />
+        </Border>
+    </Grid>
+</Window>
