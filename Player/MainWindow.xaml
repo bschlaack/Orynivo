@@ -1,6 +1,7 @@
 <Window x:Class="Player.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:Player.Controls"
         Title="Player" Height="760" Width="1100"
         MinHeight="600" MinWidth="800">
     <Window.Resources>
@@ -126,6 +127,35 @@
             </Setter>
         </Style>
 
+        <!-- Back navigation button -->
+        <Style x:Key="HeaderIconButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#DDDDF5"/>
+            <Setter Property="Foreground" Value="#4B4B78"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#D1D1F0"/>
+                                <Setter Property="Foreground" Value="#13142A"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#C5C5EA"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Dark slider (transport bar) -->
         <Style x:Key="DarkSliderStyle" TargetType="Slider">
             <Setter Property="IsMoveToPointEnabled" Value="True"/>
@@ -232,6 +262,39 @@
             </Setter>
         </Style>
 
+        <!-- Segmentierter Ansichtsumschalter -->
+        <Style x:Key="ViewModeRadioStyle" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="#666688"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="18,7"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#6C63FF"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsMouseOver" Value="True"/>
+                                    <Condition Property="IsChecked" Value="False"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="Bd" Property="Background" Value="#DDDDF5"/>
+                            </MultiTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
     </Window.Resources>
 
     <Grid>
@@ -272,7 +335,8 @@
                      BorderThickness="0"
                      Padding="0,8,0,8"
                      FontSize="13"
-                     SelectionChanged="NavListBox_OnSelectionChanged">
+                     SelectionChanged="NavListBox_OnSelectionChanged"
+                     PreviewMouseLeftButtonUp="NavListBox_OnPreviewMouseLeftButtonUp">
 
                 <ListBoxItem IsHitTestVisible="False" Focusable="False"
                              Foreground="#44445A" FontSize="10" FontWeight="Bold"
@@ -321,16 +385,60 @@
                     Padding="24,16">
                 <Grid>
                     <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
+                    <Button x:Name="BackButton"
+                            Width="34"
+                            Height="30"
+                            Margin="0,0,12,0"
+                            Visibility="Collapsed"
+                            Style="{StaticResource HeaderIconButtonStyle}"
+                            Click="BackButton_OnClick"
+                            ToolTip="Zurück">
+                        <Path Data="M 12 6 L 6 12 L 12 18"
+                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                              StrokeThickness="2.2"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round"
+                              StrokeLineJoin="Round"
+                              Width="18"
+                              Height="18"
+                              Stretch="Uniform"/>
+                    </Button>
                     <TextBlock x:Name="ContentTitleTextBlock"
+                               Grid.Column="1"
                                FontSize="18" FontWeight="SemiBold" Foreground="#13142A"
                                VerticalAlignment="Center"/>
                     <TextBlock x:Name="ContentCountTextBlock"
-                               Grid.Column="1"
+                               Grid.Column="2"
                                FontSize="12" Foreground="#9999BB"
                                VerticalAlignment="Center"/>
+                    <Border x:Name="AlbumViewModeBorder"
+                            Grid.Column="3"
+                            Margin="20,0,0,0"
+                            Padding="3"
+                            Background="#E1E1F0"
+                            CornerRadius="9"
+                            Visibility="Collapsed">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton x:Name="AlbumTableViewRadioButton"
+                                         GroupName="AlbumViewMode"
+                                         Style="{StaticResource ViewModeRadioStyle}"
+                                         MinWidth="88"
+                                         Content="Tabelle"
+                                         IsChecked="True"
+                                         Checked="AlbumViewModeRadioButton_OnChecked"/>
+                            <RadioButton x:Name="AlbumArtworkViewRadioButton"
+                                         GroupName="AlbumViewMode"
+                                         Style="{StaticResource ViewModeRadioStyle}"
+                                         MinWidth="88"
+                                         Content="Artwork"
+                                         Checked="AlbumViewModeRadioButton_OnChecked"/>
+                        </StackPanel>
+                    </Border>
                 </Grid>
             </Border>
 
@@ -360,6 +468,64 @@
                       VirtualizingStackPanel.VirtualizationMode="Recycling"
                       ScrollViewer.CanContentScroll="True"
                       MouseDoubleClick="FolderTreeView_OnMouseDoubleClick"/>
+
+            <!-- Album-Artworkansicht -->
+            <ListBox x:Name="AlbumArtworkListBox"
+                     Grid.Row="1"
+                     Visibility="Collapsed"
+                     Background="#F2F2FA"
+                     BorderThickness="0"
+                     ScrollViewer.CanContentScroll="True"
+                     ScrollViewer.IsDeferredScrollingEnabled="True"
+                     VirtualizingPanel.IsVirtualizing="True"
+                     VirtualizingPanel.VirtualizationMode="Recycling"
+                     MouseDoubleClick="AlbumArtworkListBox_OnMouseDoubleClick">
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <controls:VirtualizingWrapPanel Margin="16"
+                                                        ItemWidth="196"
+                                                        ItemHeight="270"/>
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="Padding" Value="0"/>
+                        <Setter Property="BorderThickness" Value="0"/>
+                        <EventSetter Event="Loaded" Handler="AlbumArtworkItem_OnLoaded"/>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Border Width="180"
+                                Margin="8"
+                                Padding="10"
+                                Background="#F8F8FD"
+                                CornerRadius="8">
+                            <StackPanel>
+                                <Border Width="160"
+                                        Height="160"
+                                        Background="#E4E4F0"
+                                        CornerRadius="6">
+                                    <Image Source="{Binding Artwork}"
+                                           Stretch="UniformToFill"/>
+                                </Border>
+                                <TextBlock Text="{Binding Title}"
+                                           Margin="0,10,0,0"
+                                           FontWeight="SemiBold"
+                                           TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Text="{Binding Artist}"
+                                           Margin="0,3,0,0"
+                                           Foreground="#666688"
+                                           TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Text="{Binding Year}"
+                                           Margin="0,3,0,0"
+                                           Foreground="#9999BB"/>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
         </Grid>
 
         <!-- ═══ TRANSPORT BAR ═══ -->

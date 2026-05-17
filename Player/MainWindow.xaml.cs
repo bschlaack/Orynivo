@@ -4,6 +4,8 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using Binding = System.Windows.Data.Binding;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using System.Collections.ObjectModel;
 using Player.Audio;
@@ -23,6 +25,13 @@ public partial class MainWindow : Window
     private AppSettings _settings = new();
     private readonly DispatcherTimer _transportTimer;
     private bool _isSeekingWithSlider;
+    private bool _showAlbumArtworkView;
+    private long? _currentPlayHistoryId;
+    private long? _activeAlbumFilterId;
+    private string? _activeAlbumFilterTitle;
+    private long? _activeArtistFilterId;
+    private string? _activeArtistFilterName;
+    private readonly Stack<NavigationState> _navigationStack = [];
 
     private readonly ObservableCollection<PlaylistItem> _queue = [];
     private int _queueIndex = -1;
@@ -35,10 +44,12 @@ public partial class MainWindow : Window
     };
 
     private sealed record FolderTag(bool IsFile, string FilePath, string FolderPath);
+    private sealed record NavigationState(string View, long? SelectedId, long? ArtistFilterId, string? ArtistFilterName);
 
     private sealed class ContentRow
     {
         public string? Nr          { get; init; }
+        public long? Id            { get; init; }
         public string? Title       { get; init; }
         public string? Artist      { get; init; }
         public string? Album       { get; init; }
@@ -46,6 +57,8 @@ public partial class MainWindow : Window
         public string? Year        { get; init; }
         public string? Genre       { get; init; }
         public string? Folder      { get; init; }
+        public byte[]? ArtworkData { get; init; }
+        public ImageSource? Artwork { get; set; }
         public string  Duration    { get; init; } = "";
         public string? Format      { get; init; }
         public string  FilePath    { get; init; } = "";
@@ -127,6 +140,36 @@ public partial class MainWindow : Window
         if (NavListBox.SelectedItem is not ListBoxItem { Tag: string tag })
             return;
 
+        ResetDrilldownState();
+        await ShowTopLevelViewAsync(tag);
+    }
+
+    private async void NavListBox_OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject) is not { Tag: string tag, IsSelected: true })
+            return;
+
+        // Beim erneuten Klick auf den bereits markierten Hauptpunkt feuert kein SelectionChanged.
+        // Trotzdem soll die ungefilterte Top-Level-Ansicht wiederhergestellt werden.
+        if (_activeAlbumFilterId is null && _activeArtistFilterId is null && _navigationStack.Count == 0)
+            return;
+
+        ResetDrilldownState();
+        await ShowTopLevelViewAsync(tag);
+    }
+
+    private void ResetDrilldownState()
+    {
+        _activeAlbumFilterId = null;
+        _activeAlbumFilterTitle = null;
+        _activeArtistFilterId = null;
+        _activeArtistFilterName = null;
+        _navigationStack.Clear();
+        BackButton.Visibility = Visibility.Collapsed;
+    }
+
+    private async Task ShowTopLevelViewAsync(string tag)
+    {
         ContentTitleTextBlock.Text = tag switch
         {
             "Artists" => "Künstler",
@@ -137,12 +180,14 @@ public partial class MainWindow : Window
         };
 
         ContentDataGrid.ItemsSource = null;
+        AlbumArtworkListBox.ItemsSource = null;
         ContentCountTextBlock.Text  = "";
-
+        AlbumViewModeBorder.Visibility = tag == "Albums" ? Visibility.Visible : Visibility.Collapsed;
         if (tag == "Folders")
         {
             ContentDataGrid.Visibility = Visibility.Collapsed;
             FolderTreeView.Visibility  = Visibility.Visible;
+            AlbumArtworkListBox.Visibility = Visibility.Collapsed;
 
             var tracks = await Task.Run(() =>
             {
@@ -155,14 +200,31 @@ public partial class MainWindow : Window
         }
         else
         {
-            ContentDataGrid.Visibility = Visibility.Visible;
+            ContentDataGrid.Visibility = tag == "Albums" && _showAlbumArtworkView
+                ? Visibility.Collapsed
+                : Visibility.Visible;
             FolderTreeView.Visibility  = Visibility.Collapsed;
+            AlbumArtworkListBox.Visibility = tag == "Albums" && _showAlbumArtworkView
+                ? Visibility.Visible
+                : Visibility.Collapsed;
 
             var rows = await Task.Run(() => QueryRows(tag));
             ApplyColumns(tag);
             ContentDataGrid.ItemsSource = rows;
+            AlbumArtworkListBox.ItemsSource = tag == "Albums" ? rows : null;
             ContentCountTextBlock.Text  = rows.Count == 1 ? "1 Eintrag" : $"{rows.Count:N0} Einträge";
         }
+    }
+
+    private static T? FindAncestor<T>(DependencyObject? current) where T : DependencyObject
+    {
+        while (current is not null)
+        {
+            if (current is T match)
+                return match;
+            current = VisualTreeHelper.GetParent(current);
+        }
+        return null;
     }
 
     private string GetPlaylistName(string tag)
@@ -205,33 +267,32 @@ public partial class MainWindow : Window
                 }).ToList();
             }
 
-            var tracks = db.GetAll().ToList();
-
             return view switch
             {
-                "Artists" => tracks
-                    .GroupBy(t => t.Artist ?? "")
-                    .OrderBy(g => string.IsNullOrEmpty(g.Key) ? "\xFF" : g.Key, StringComparer.CurrentCultureIgnoreCase)
-                    .Select(g => new ContentRow
+                "Artists" => db.GetArtistsLite()
+                    .Select(a => new ContentRow
                     {
-                        Title    = string.IsNullOrEmpty(g.Key) ? "(Unbekannt)" : g.Key,
+                        Id       = a.Id,
+                        Title    = string.IsNullOrEmpty(a.Artist) ? "(Unbekannt)" : a.Artist,
                         FilePath = ""
                     }).ToList(),
 
-                "Albums" => tracks
-                    .GroupBy(t => (Album: t.Album ?? "", AlbumArtist: t.AlbumArtist ?? t.Artist ?? ""))
-                    .OrderBy(g => string.IsNullOrEmpty(g.Key.AlbumArtist) ? "\xFF" : g.Key.AlbumArtist, StringComparer.CurrentCultureIgnoreCase)
-                    .ThenBy(g => string.IsNullOrEmpty(g.Key.Album) ? "\xFF" : g.Key.Album, StringComparer.CurrentCultureIgnoreCase)
-                    .Select(g => new ContentRow
+                "Albums" => (_activeArtistFilterId is long artistId
+                        ? db.GetAlbumsByArtist(artistId, _showAlbumArtworkView)
+                        : db.GetAlbumsLite(_showAlbumArtworkView))
+                    .Select(a => new ContentRow
                     {
-                        Title    = string.IsNullOrEmpty(g.Key.Album)       ? "(Unbekannt)" : g.Key.Album,
-                        Artist   = string.IsNullOrEmpty(g.Key.AlbumArtist) ? null          : g.Key.AlbumArtist,
-                        Year     = g.Max(t => t.Year)?.ToString(),
+                        Title    = string.IsNullOrEmpty(a.Album) ? "(Unbekannt)" : a.Album,
+                        Id       = a.Id,
+                        Artist   = string.IsNullOrEmpty(a.DisplayArtist) ? null : a.DisplayArtist,
+                        Year     = a.Year?.ToString(),
+                        ArtworkData = a.CoverData,
                         FilePath = ""
                     }).ToList(),
 
-                _ => tracks  // "Tracks" und Fallback
-                    .OrderBy(t => t.SortTitle ?? t.Title ?? t.FileName)
+                _ => (_activeAlbumFilterId is long albumId
+                        ? db.GetTrackListByAlbum(albumId)
+                        : db.GetTrackList())  // "Tracks" und Fallback
                     .Select(t => new ContentRow
                     {
                         Title    = t.Title ?? t.FileName,
@@ -247,11 +308,60 @@ public partial class MainWindow : Window
         catch { return []; }
     }
 
+    private static ImageSource? CreateArtworkImage(byte[]? data)
+    {
+        if (data is null || data.Length == 0)
+            return null;
+        try
+        {
+            using var stream = new MemoryStream(data);
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.StreamSource = stream;
+            image.DecodePixelWidth = 320;
+            image.EndInit();
+            image.Freeze();
+            return image;
+        }
+        catch { return null; }
+    }
+
+    private static void EnsureArtworkHydrated(ContentRow row)
+    {
+        if (row.Artwork is null)
+            row.Artwork = CreateArtworkImage(row.ArtworkData);
+    }
+
     private static string FormatSeconds(double? seconds)
     {
         if (seconds is null) return "";
         var ts = TimeSpan.FromSeconds(seconds.Value);
         return ts.TotalHours >= 1 ? ts.ToString(@"h\:mm\:ss") : ts.ToString(@"m\:ss");
+    }
+
+    private async void AlbumViewModeRadioButton_OnChecked(object sender, RoutedEventArgs e)
+    {
+        if (!IsLoaded)
+            return;
+
+        _showAlbumArtworkView = AlbumArtworkViewRadioButton.IsChecked == true;
+        if (NavListBox.SelectedItem is not ListBoxItem { Tag: "Albums" })
+            return;
+
+        ContentDataGrid.Visibility = _showAlbumArtworkView ? Visibility.Collapsed : Visibility.Visible;
+        AlbumArtworkListBox.Visibility = _showAlbumArtworkView ? Visibility.Visible : Visibility.Collapsed;
+
+        var rows = await Task.Run(() => QueryRows("Albums"));
+        ContentDataGrid.ItemsSource = rows;
+        AlbumArtworkListBox.ItemsSource = rows;
+        ContentCountTextBlock.Text = rows.Count == 1 ? "1 Eintrag" : $"{rows.Count:N0} Einträge";
+    }
+
+    private void AlbumArtworkItem_OnLoaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is ListBoxItem { DataContext: ContentRow row })
+            EnsureArtworkHydrated(row);
     }
 
     private void ApplyColumns(string view)
@@ -458,7 +568,34 @@ public partial class MainWindow : Window
 
     private async void ContentDataGrid_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
-        if (ContentDataGrid.SelectedItem is not ContentRow row || string.IsNullOrEmpty(row.FilePath))
+        if (ContentDataGrid.SelectedItem is not ContentRow row)
+            return;
+        await HandleContentRowDoubleClickAsync(row);
+    }
+
+    private async void AlbumArtworkListBox_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (AlbumArtworkListBox.SelectedItem is not ContentRow row)
+            return;
+        await HandleContentRowDoubleClickAsync(row);
+    }
+
+    private async Task HandleContentRowDoubleClickAsync(ContentRow row)
+    {
+
+        if (ContentTitleTextBlock.Text == "Künstler" && row.Id is long artistId)
+        {
+            await ShowArtistAlbumsAsync(artistId, row.Title ?? "(Unbekannt)");
+            return;
+        }
+
+        if (AlbumViewModeBorder.Visibility == Visibility.Visible && row.Id is long albumId)
+        {
+            await ShowAlbumTracksAsync(albumId, row.Title ?? "(Unbekannt)");
+            return;
+        }
+
+        if (string.IsNullOrEmpty(row.FilePath))
             return;
 
         // Alle Zeilen als Queue laden
@@ -472,6 +609,102 @@ public partial class MainWindow : Window
         try { await StartPlaybackAsync(row.FilePath); }
         catch (OperationCanceledException) { StatusTextBlock.Text = "Wiedergabe gestoppt."; }
         catch (Exception ex) { StopPlayback(); StatusTextBlock.Text = ex.Message; }
+    }
+
+    private async Task ShowAlbumTracksAsync(long albumId, string albumTitle)
+    {
+        _navigationStack.Push(new NavigationState("Albums", albumId, _activeArtistFilterId, _activeArtistFilterName));
+        _activeAlbumFilterId = albumId;
+        _activeAlbumFilterTitle = albumTitle;
+        ContentTitleTextBlock.Text = $"Tracks · {albumTitle}";
+        AlbumViewModeBorder.Visibility = Visibility.Collapsed;
+        ContentDataGrid.Visibility = Visibility.Visible;
+        AlbumArtworkListBox.Visibility = Visibility.Collapsed;
+        FolderTreeView.Visibility = Visibility.Collapsed;
+
+        var rows = await Task.Run(() => QueryRows("Tracks"));
+        ApplyColumns("Tracks");
+        ContentDataGrid.ItemsSource = rows;
+        ContentCountTextBlock.Text = rows.Count == 1 ? "1 Titel" : $"{rows.Count:N0} Titel";
+        BackButton.Visibility = Visibility.Visible;
+    }
+
+    private async Task ShowArtistAlbumsAsync(long artistId, string artistName)
+    {
+        _navigationStack.Push(new NavigationState("Artists", artistId, null, null));
+        _activeArtistFilterId = artistId;
+        _activeArtistFilterName = artistName;
+        _activeAlbumFilterId = null;
+        _activeAlbumFilterTitle = null;
+        ContentTitleTextBlock.Text = $"Alben · {artistName}";
+        AlbumViewModeBorder.Visibility = Visibility.Visible;
+        ContentDataGrid.Visibility = _showAlbumArtworkView ? Visibility.Collapsed : Visibility.Visible;
+        AlbumArtworkListBox.Visibility = _showAlbumArtworkView ? Visibility.Visible : Visibility.Collapsed;
+        FolderTreeView.Visibility = Visibility.Collapsed;
+
+        var rows = await Task.Run(() => QueryRows("Albums"));
+        ApplyColumns("Albums");
+        ContentDataGrid.ItemsSource = rows;
+        AlbumArtworkListBox.ItemsSource = rows;
+        ContentCountTextBlock.Text = rows.Count == 1 ? "1 Eintrag" : $"{rows.Count:N0} Einträge";
+        BackButton.Visibility = Visibility.Visible;
+    }
+
+    private async void BackButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (_navigationStack.Count == 0)
+            return;
+
+        var state = _navigationStack.Pop();
+        _activeArtistFilterId = state.ArtistFilterId;
+        _activeArtistFilterName = state.ArtistFilterName;
+        _activeAlbumFilterId = null;
+        _activeAlbumFilterTitle = null;
+
+        switch (state.View)
+        {
+            case "Artists":
+                ContentTitleTextBlock.Text = "Künstler";
+                AlbumViewModeBorder.Visibility = Visibility.Collapsed;
+                ContentDataGrid.Visibility = Visibility.Visible;
+                AlbumArtworkListBox.Visibility = Visibility.Collapsed;
+                var artists = await Task.Run(() => QueryRows("Artists"));
+                ApplyColumns("Artists");
+                ContentDataGrid.ItemsSource = artists;
+                ContentCountTextBlock.Text = artists.Count == 1 ? "1 Eintrag" : $"{artists.Count:N0} Einträge";
+                RestoreSelection(artists, state.SelectedId);
+                break;
+
+            case "Albums":
+                ContentTitleTextBlock.Text = _activeArtistFilterId is long
+                    ? $"Alben · {_activeArtistFilterName}"
+                    : "Alben";
+                AlbumViewModeBorder.Visibility = Visibility.Visible;
+                ContentDataGrid.Visibility = _showAlbumArtworkView ? Visibility.Collapsed : Visibility.Visible;
+                AlbumArtworkListBox.Visibility = _showAlbumArtworkView ? Visibility.Visible : Visibility.Collapsed;
+                var albums = await Task.Run(() => QueryRows("Albums"));
+                ApplyColumns("Albums");
+                ContentDataGrid.ItemsSource = albums;
+                AlbumArtworkListBox.ItemsSource = albums;
+                ContentCountTextBlock.Text = albums.Count == 1 ? "1 Eintrag" : $"{albums.Count:N0} Einträge";
+                RestoreSelection(albums, state.SelectedId);
+                break;
+        }
+
+        BackButton.Visibility = _navigationStack.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void RestoreSelection(List<ContentRow> rows, long? selectedId)
+    {
+        if (selectedId is not long id)
+            return;
+        var row = rows.FirstOrDefault(r => r.Id == id);
+        if (row is null)
+            return;
+        ContentDataGrid.SelectedItem = row;
+        ContentDataGrid.ScrollIntoView(row);
+        AlbumArtworkListBox.SelectedItem = row;
+        AlbumArtworkListBox.ScrollIntoView(row);
     }
 
     // ------------------------------------------------------------------
@@ -554,10 +787,24 @@ public partial class MainWindow : Window
 
         PlayButton.Content = "▶";
 
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            _currentPlayHistoryId = db.RecordPlaybackStart(
+                filePath,
+                db.GetTrackIdByPath(filePath),
+                player.Duration.TotalSeconds > 0 ? player.Duration.TotalSeconds : null);
+        }
+        catch
+        {
+            _currentPlayHistoryId = null;
+        }
+
         await player.WaitForCompletionAsync();
 
         if (_player == player)
         {
+            RecordPlaybackEnd(completed: true);
             if (!await TryPlayNextAsync())
             {
                 StopPlayback();
@@ -574,6 +821,7 @@ public partial class MainWindow : Window
 
     private void StopPlayback()
     {
+        RecordPlaybackEnd(completed: false);
         _playbackCts?.Cancel();
         _playbackCts?.Dispose();
         _playbackCts = null;
@@ -591,6 +839,22 @@ public partial class MainWindow : Window
         NowPlayingTitleBlock.Text  = "";
         NowPlayingArtistBlock.Text = "";
         FileInfoTextBlock.Text     = "";
+    }
+
+    private void RecordPlaybackEnd(bool completed)
+    {
+        if (_currentPlayHistoryId is not long historyId)
+            return;
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            db.RecordPlaybackEnd(historyId, _player?.Position.TotalSeconds ?? 0, completed);
+        }
+        catch { }
+        finally
+        {
+            _currentPlayHistoryId = null;
+        }
     }
 
     private async Task<bool> TryPlayNextAsync()

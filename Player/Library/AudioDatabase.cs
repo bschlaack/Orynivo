@@ -1,13 +1,32 @@
 using System.IO;
+using System.Security.Cryptography;
 using Microsoft.Data.Sqlite;
 
 namespace Player.Library;
 
-/// <summary>Distinct-Künstler-Eintrag.</summary>
-public sealed record ArtistInfo(string Artist, int TrackCount);
+/// <summary>Distinct-Künstler-Eintrag – absichtlich nur der Künstlername.</summary>
+public sealed record ArtistInfo(long Id, string Artist);
 
-/// <summary>Distinct-Album-Eintrag (ohne Cover-Art-BLOB).</summary>
-public sealed record AlbumInfo(string Album, string? DisplayArtist, int? Year, int TrackCount);
+/// <summary>Distinct-Album-Eintrag für die Albumansichten.</summary>
+public sealed record AlbumInfo(
+    long Id,
+    string Album,
+    string? DisplayArtist,
+    int? Year,
+    byte[]? CoverData,
+    string? CoverMimeType);
+
+/// <summary>Schlanker Track-Datensatz für die Haupt-Trackliste.</summary>
+public sealed record TrackListInfo(
+    string Path,
+    string FileName,
+    string? Title,
+    string? Artist,
+    string? Album,
+    string? Genre,
+    string? Format,
+    double? Duration,
+    string? SortTitle);
 
 /// <summary>Schlanker Track-Datensatz für listenbasierte Ansichten (kein Cover, keine Texte).</summary>
 public sealed record TrackLite(
@@ -57,7 +76,13 @@ public sealed class AudioDatabase : IDisposable
 
     public void Upsert(TrackRecord track)
     {
+        using var tx = _conn.BeginTransaction();
+        var artistId  = EnsureArtist(track.Artist, tx);
+        var artworkId = EnsureArtwork(track.CoverData, track.CoverMimeType, tx);
+        var albumId   = EnsureAlbum(track.Album, track.AlbumArtist ?? track.Artist, track.Year, artistId, artworkId, tx);
+
         using var cmd = _conn.CreateCommand();
+        cmd.Transaction = tx;
         cmd.CommandText = """
             INSERT INTO tracks (
                 path, file_name, file_size, modified_at, added_at,
@@ -73,7 +98,8 @@ public sealed class AudioDatabase : IDisposable
                 replay_gain_track, replay_gain_album,
                 musicbrainz_track_id, musicbrainz_release_id,
                 musicbrainz_artist_id, acoustid_fingerprint,
-                has_cover, cover_mime_type, cover_data
+                has_cover, cover_mime_type, cover_data,
+                artist_id, album_id
             ) VALUES (
                 $path, $file_name, $file_size, $modified_at, $added_at,
                 $format, $duration, $sample_rate, $bit_depth, $channels,
@@ -88,7 +114,8 @@ public sealed class AudioDatabase : IDisposable
                 $replay_gain_track, $replay_gain_album,
                 $musicbrainz_track_id, $musicbrainz_release_id,
                 $musicbrainz_artist_id, $acoustid_fingerprint,
-                $has_cover, $cover_mime_type, $cover_data
+                $has_cover, $cover_mime_type, $cover_data,
+                $artist_id, $album_id
             )
             ON CONFLICT(path) DO UPDATE SET
                 file_name           = excluded.file_name,
@@ -140,11 +167,16 @@ public sealed class AudioDatabase : IDisposable
                 acoustid_fingerprint    = excluded.acoustid_fingerprint,
                 has_cover           = excluded.has_cover,
                 cover_mime_type     = excluded.cover_mime_type,
-                cover_data          = excluded.cover_data;
+                cover_data          = excluded.cover_data,
+                artist_id           = excluded.artist_id,
+                album_id            = excluded.album_id;
             """;
 
         BindTrack(cmd, track);
+        Add(cmd, "$artist_id", artistId);
+        Add(cmd, "$album_id", albumId);
         cmd.ExecuteNonQuery();
+        tx.Commit();
     }
 
     // ------------------------------------------------------------------
@@ -167,6 +199,327 @@ public sealed class AudioDatabase : IDisposable
         using var reader = cmd.ExecuteReader();
         while (reader.Read())
             yield return MapRow(reader);
+    }
+
+    /// <summary>Nur distinct artist – ohne Trackzeilen, BLOBs oder weitere Metadaten.</summary>
+    public List<ArtistInfo> GetArtistsLite()
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, name
+            FROM artists
+            ORDER BY CASE WHEN name = '' THEN 1 ELSE 0 END,
+                     name COLLATE NOCASE;
+            """;
+        using var reader = cmd.ExecuteReader();
+        var result = new List<ArtistInfo>();
+        while (reader.Read())
+            result.Add(new ArtistInfo(reader.GetInt64(0), reader.GetString(1)));
+        return result;
+    }
+
+    /// <summary>
+    /// Nur die für Albumlisten benötigten Felder; pro Album wird genau ein repräsentatives Cover geladen.
+    /// </summary>
+    public List<AlbumInfo> GetAlbumsLite(bool includeArtwork = false)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = includeArtwork ? """
+            SELECT
+                MIN(al.id) AS id,
+                al.title,
+                ar.name,
+                CASE WHEN al.year = 0 THEN NULL ELSE al.year END AS year,
+                aw.data,
+                aw.mime_type
+            FROM albums al
+            LEFT JOIN artists ar ON ar.id = al.artist_id
+            LEFT JOIN artworks aw ON aw.id = (
+                SELECT al2.artwork_id
+                FROM albums al2
+                WHERE al2.title = al.title
+                  AND al2.artist_id IS al.artist_id
+                  AND al2.year = al.year
+                  AND al2.artwork_id IS NOT NULL
+                LIMIT 1
+            )
+            GROUP BY al.title, al.artist_id, al.year
+            ORDER BY
+                CASE WHEN al.title = '' THEN 1 ELSE 0 END,
+                al.title COLLATE NOCASE,
+                ar.name COLLATE NOCASE;
+            """ : """
+            SELECT
+                MIN(al.id) AS id,
+                al.title,
+                ar.name,
+                CASE WHEN al.year = 0 THEN NULL ELSE al.year END AS year,
+                NULL AS data,
+                NULL AS mime_type
+            FROM albums al
+            LEFT JOIN artists ar ON ar.id = al.artist_id
+            GROUP BY al.title, al.artist_id, al.year
+            ORDER BY
+                CASE WHEN al.title = '' THEN 1 ELSE 0 END,
+                al.title COLLATE NOCASE,
+                ar.name COLLATE NOCASE;
+            """;
+        using var reader = cmd.ExecuteReader();
+        var result = new List<AlbumInfo>();
+        while (reader.Read())
+            result.Add(new AlbumInfo(
+                reader.GetInt64(0),
+                reader.GetString(1),
+                reader.IsDBNull(2) ? null : reader.GetString(2),
+                reader.IsDBNull(3) || reader.GetInt32(3) == 0 ? null : reader.GetInt32(3),
+                reader.IsDBNull(4) ? null : (byte[])reader.GetValue(4),
+                reader.IsDBNull(5) ? null : reader.GetString(5)));
+        return result;
+    }
+
+    public void RebuildAlbumsFromAlbumArtists()
+    {
+        using var tx = _conn.BeginTransaction();
+        var existingArtworkByAlbumKey = LoadExistingAlbumArtworkMap(tx);
+        ExecuteInTransaction(tx, "UPDATE tracks SET album_id = NULL;");
+        ExecuteInTransaction(tx, "DELETE FROM albums;");
+
+        using var select = _conn.CreateCommand();
+        select.Transaction = tx;
+        select.CommandText = """
+            SELECT id, album_artist, album, year, artist_id
+            FROM tracks;
+            """;
+        using var reader = select.ExecuteReader();
+        var rows = new List<(long Id, string? AlbumArtist, string? Album, int? Year, long? ArtistId)>();
+        while (reader.Read())
+            rows.Add((
+                reader.GetInt64(0),
+                reader.IsDBNull(1) ? null : reader.GetString(1),
+                reader.IsDBNull(2) ? null : reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetInt32(3),
+                reader.IsDBNull(4) ? null : reader.GetInt64(4)));
+        reader.Close();
+
+        foreach (var row in rows)
+        {
+            var key = MakeAlbumKey(row.Album, row.AlbumArtist, row.Year);
+            existingArtworkByAlbumKey.TryGetValue(key, out var artworkId);
+            var albumId = EnsureAlbum(row.Album, row.AlbumArtist, row.Year, row.ArtistId, artworkId, tx);
+            using var update = _conn.CreateCommand();
+            update.Transaction = tx;
+            update.CommandText = "UPDATE tracks SET album_id = $album_id WHERE id = $id;";
+            Add(update, "$album_id", albumId);
+            Add(update, "$id", row.Id);
+            update.ExecuteNonQuery();
+        }
+
+        tx.Commit();
+    }
+
+    public List<(long AlbumId, string Path)> GetAlbumsMissingArtworkSamplePaths()
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT al.id, MIN(t.path) AS sample_path
+            FROM albums al
+            JOIN tracks t ON t.album_id = al.id
+            WHERE al.artwork_id IS NULL
+            GROUP BY al.id;
+            """;
+        using var reader = cmd.ExecuteReader();
+        var result = new List<(long AlbumId, string Path)>();
+        while (reader.Read())
+            result.Add((reader.GetInt64(0), reader.GetString(1)));
+        return result;
+    }
+
+    public void AttachArtworkToAlbum(long albumId, byte[] data, string? mimeType)
+    {
+        using var tx = _conn.BeginTransaction();
+        var artworkId = EnsureArtwork(data, mimeType, tx);
+        using var cmd = _conn.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = """
+            UPDATE albums
+            SET artwork_id = COALESCE(artwork_id, $artwork_id)
+            WHERE id = $album_id;
+            """;
+        Add(cmd, "$artwork_id", artworkId);
+        Add(cmd, "$album_id", albumId);
+        cmd.ExecuteNonQuery();
+        tx.Commit();
+    }
+
+    public List<AlbumInfo> GetAlbumsByArtist(long artistId, bool includeArtwork = false)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = includeArtwork ? """
+            SELECT
+                MIN(al.id) AS id,
+                al.title,
+                ar.name,
+                CASE WHEN al.year = 0 THEN NULL ELSE al.year END AS year,
+                aw.data,
+                aw.mime_type
+            FROM albums al
+            LEFT JOIN artists ar ON ar.id = al.artist_id
+            LEFT JOIN artworks aw ON aw.id = (
+                SELECT al2.artwork_id
+                FROM albums al2
+                WHERE al2.title = al.title
+                  AND al2.artist_id IS al.artist_id
+                  AND al2.year = al.year
+                  AND al2.artwork_id IS NOT NULL
+                LIMIT 1
+            )
+            WHERE al.id IN (
+                SELECT DISTINCT album_id
+                FROM tracks
+                WHERE artist_id = $artist_id
+                  AND album_id IS NOT NULL
+            )
+            GROUP BY al.title, al.artist_id, al.year
+            ORDER BY
+                CASE WHEN al.title = '' THEN 1 ELSE 0 END,
+                al.title COLLATE NOCASE;
+            """ : """
+            SELECT
+                MIN(al.id) AS id,
+                al.title,
+                ar.name,
+                CASE WHEN al.year = 0 THEN NULL ELSE al.year END AS year,
+                NULL AS data,
+                NULL AS mime_type
+            FROM albums al
+            LEFT JOIN artists ar ON ar.id = al.artist_id
+            WHERE al.id IN (
+                SELECT DISTINCT album_id
+                FROM tracks
+                WHERE artist_id = $artist_id
+                  AND album_id IS NOT NULL
+            )
+            GROUP BY al.title, al.artist_id, al.year
+            ORDER BY
+                CASE WHEN al.title = '' THEN 1 ELSE 0 END,
+                al.title COLLATE NOCASE;
+            """;
+        Add(cmd, "$artist_id", artistId);
+        using var reader = cmd.ExecuteReader();
+        var result = new List<AlbumInfo>();
+        while (reader.Read())
+            result.Add(new AlbumInfo(
+                reader.GetInt64(0),
+                reader.GetString(1),
+                reader.IsDBNull(2) ? null : reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetInt32(3),
+                reader.IsDBNull(4) ? null : (byte[])reader.GetValue(4),
+                reader.IsDBNull(5) ? null : reader.GetString(5)));
+        return result;
+    }
+
+    public long? GetTrackIdByPath(string path)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = "SELECT id FROM tracks WHERE path = $path LIMIT 1;";
+        cmd.Parameters.AddWithValue("$path", path);
+        var value = cmd.ExecuteScalar();
+        return value is null || value is DBNull ? null : Convert.ToInt64(value);
+    }
+
+    public long RecordPlaybackStart(string path, long? trackId, double? durationSeconds)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO play_history (track_id, path, started_at, duration_seconds)
+            VALUES ($track_id, $path, $started_at, $duration_seconds)
+            RETURNING id;
+            """;
+        Add(cmd, "$track_id", trackId);
+        Add(cmd, "$path", path);
+        Add(cmd, "$started_at", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        Add(cmd, "$duration_seconds", durationSeconds);
+        return (long)cmd.ExecuteScalar()!;
+    }
+
+    public void RecordPlaybackEnd(long historyId, double positionSeconds, bool completed)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            UPDATE play_history
+            SET ended_at = $ended_at,
+                position_seconds = $position_seconds,
+                completed = $completed
+            WHERE id = $id;
+            """;
+        Add(cmd, "$ended_at", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        Add(cmd, "$position_seconds", positionSeconds);
+        Add(cmd, "$completed", completed ? 1 : 0);
+        Add(cmd, "$id", historyId);
+        cmd.ExecuteNonQuery();
+    }
+
+    public void Optimize()
+    {
+        Execute("PRAGMA wal_checkpoint(TRUNCATE);");
+        Execute("VACUUM;");
+        Execute("ANALYZE;");
+    }
+
+    /// <summary>Nur die Spalten, die die Trackliste tatsächlich rendert – keine BLOBs, keine Texte.</summary>
+    public List<TrackListInfo> GetTrackList()
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT
+                path, file_name, title, artist, album, genre, format, duration, sort_title
+            FROM tracks
+            ORDER BY COALESCE(sort_title, title, file_name) COLLATE NOCASE;
+            """;
+        using var reader = cmd.ExecuteReader();
+        var result = new List<TrackListInfo>();
+        while (reader.Read())
+            result.Add(new TrackListInfo(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.IsDBNull(2) ? null : reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetString(3),
+                reader.IsDBNull(4) ? null : reader.GetString(4),
+                reader.IsDBNull(5) ? null : reader.GetString(5),
+                reader.IsDBNull(6) ? null : reader.GetString(6),
+                reader.IsDBNull(7) ? null : reader.GetDouble(7),
+                reader.IsDBNull(8) ? null : reader.GetString(8)));
+        return result;
+    }
+
+    public List<TrackListInfo> GetTrackListByAlbum(long albumId)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT
+                path, file_name, title, artist, album, genre, format, duration, sort_title
+            FROM tracks
+            WHERE album_id = $album_id
+            ORDER BY
+                COALESCE(disc_number, 0),
+                COALESCE(track_number, 0),
+                file_name COLLATE NOCASE;
+            """;
+        Add(cmd, "$album_id", albumId);
+        using var reader = cmd.ExecuteReader();
+        var result = new List<TrackListInfo>();
+        while (reader.Read())
+            result.Add(new TrackListInfo(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.IsDBNull(2) ? null : reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetString(3),
+                reader.IsDBNull(4) ? null : reader.GetString(4),
+                reader.IsDBNull(5) ? null : reader.GetString(5),
+                reader.IsDBNull(6) ? null : reader.GetString(6),
+                reader.IsDBNull(7) ? null : reader.GetDouble(7),
+                reader.IsDBNull(8) ? null : reader.GetString(8)));
+        return result;
     }
 
     /// <summary>Nur path/file_name/title/disc_number/track_number – kein BLOB, keine Texte.</summary>
@@ -328,7 +681,9 @@ public sealed class AudioDatabase : IDisposable
                 -- Cover Art
                 has_cover               INTEGER NOT NULL DEFAULT 0,
                 cover_mime_type         TEXT,
-                cover_data              BLOB
+                cover_data              BLOB,
+                artist_id               INTEGER REFERENCES artists(id),
+                album_id                INTEGER REFERENCES albums(id)
             );
 
             CREATE INDEX IF NOT EXISTS idx_tracks_artist         ON tracks (artist);
@@ -340,6 +695,73 @@ public sealed class AudioDatabase : IDisposable
             CREATE INDEX IF NOT EXISTS idx_tracks_format         ON tracks (format);
             CREATE INDEX IF NOT EXISTS idx_tracks_modified_at    ON tracks (modified_at);
             """);
+
+        EnsureColumn("tracks", "artist_id", "INTEGER REFERENCES artists(id)");
+        EnsureColumn("tracks", "album_id", "INTEGER REFERENCES albums(id)");
+
+        Execute("""
+            CREATE TABLE IF NOT EXISTS artists (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                name        TEXT NOT NULL UNIQUE COLLATE NOCASE
+            );
+
+            CREATE TABLE IF NOT EXISTS artworks (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                content_hash TEXT NOT NULL UNIQUE,
+                mime_type    TEXT,
+                data         BLOB NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS albums (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                title       TEXT NOT NULL,
+                artist_id   INTEGER REFERENCES artists(id),
+                year        INTEGER,
+                artwork_id  INTEGER REFERENCES artworks(id),
+                UNIQUE(title, artist_id, year)
+            );
+
+            CREATE TABLE IF NOT EXISTS favorites (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                target_type TEXT NOT NULL CHECK(target_type IN ('track','artist','album')),
+                target_id   INTEGER NOT NULL,
+                created_at  INTEGER NOT NULL,
+                UNIQUE(target_type, target_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS play_history (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                track_id         INTEGER REFERENCES tracks(id) ON DELETE SET NULL,
+                path             TEXT NOT NULL,
+                started_at       INTEGER NOT NULL,
+                ended_at         INTEGER,
+                duration_seconds REAL,
+                position_seconds REAL,
+                completed        INTEGER NOT NULL DEFAULT 0
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_albums_artist        ON albums (artist_id);
+            CREATE INDEX IF NOT EXISTS idx_tracks_artist_id     ON tracks (artist_id);
+            CREATE INDEX IF NOT EXISTS idx_tracks_album_id      ON tracks (album_id);
+            CREATE INDEX IF NOT EXISTS idx_play_history_track   ON play_history (track_id, started_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_play_history_started ON play_history (started_at DESC);
+
+            CREATE TABLE IF NOT EXISTS app_meta (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+            """);
+
+        if (!string.Equals(GetMeta("normalized_library_v1"), "done", StringComparison.Ordinal))
+        {
+            MigrateNormalizedLibrary();
+            SetMeta("normalized_library_v1", "done");
+        }
+        if (!string.Equals(GetMeta("album_artist_rebuild_v1"), "done", StringComparison.Ordinal))
+        {
+            RebuildAlbumsFromAlbumArtists();
+            SetMeta("album_artist_rebuild_v1", "done");
+        }
 
         Execute("""
             CREATE TABLE IF NOT EXISTS playlists (
@@ -552,6 +974,175 @@ public sealed class AudioDatabase : IDisposable
         cmd.ExecuteNonQuery();
     }
 
+    private void ExecuteInTransaction(SqliteTransaction tx, string sql)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = sql;
+        cmd.ExecuteNonQuery();
+    }
+
+    private Dictionary<string, long?> LoadExistingAlbumArtworkMap(SqliteTransaction tx)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = """
+            SELECT al.title, ar.name, al.year, al.artwork_id
+            FROM albums al
+            LEFT JOIN artists ar ON ar.id = al.artist_id
+            WHERE al.artwork_id IS NOT NULL;
+            """;
+        using var reader = cmd.ExecuteReader();
+        var result = new Dictionary<string, long?>(StringComparer.OrdinalIgnoreCase);
+        while (reader.Read())
+        {
+            var key = MakeAlbumKey(
+                reader.IsDBNull(0) ? null : reader.GetString(0),
+                reader.IsDBNull(1) ? null : reader.GetString(1),
+                reader.IsDBNull(2) ? null : reader.GetInt32(2));
+            result[key] = reader.IsDBNull(3) ? null : reader.GetInt64(3);
+        }
+        return result;
+    }
+
+    private static string MakeAlbumKey(string? title, string? albumArtist, int? year) =>
+        $"{title?.Trim() ?? string.Empty}\u001F{albumArtist?.Trim() ?? string.Empty}\u001F{year ?? 0}";
+
+    private string? GetMeta(string key)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = "SELECT value FROM app_meta WHERE key = $key LIMIT 1;";
+        Add(cmd, "$key", key);
+        return cmd.ExecuteScalar() as string;
+    }
+
+    private void SetMeta(string key, string value)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO app_meta (key, value) VALUES ($key, $value)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+            """;
+        Add(cmd, "$key", key);
+        Add(cmd, "$value", value);
+        cmd.ExecuteNonQuery();
+    }
+
+    private void EnsureColumn(string table, string column, string definition)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = $"PRAGMA table_info({table});";
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+            if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase))
+                return;
+        Execute($"ALTER TABLE {table} ADD COLUMN {column} {definition};");
+    }
+
+    private void MigrateNormalizedLibrary()
+    {
+        using var tx = _conn.BeginTransaction();
+        using var cmd = _conn.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = """
+            SELECT id, artist, album_artist, album, year, cover_data, cover_mime_type
+            FROM tracks
+            WHERE artist_id IS NULL OR album_id IS NULL OR cover_data IS NOT NULL;
+            """;
+        using var reader = cmd.ExecuteReader();
+        var rows = new List<(long Id, string? Artist, string? AlbumArtist, string? Album, int? Year, byte[]? Cover, string? Mime)>();
+        while (reader.Read())
+            rows.Add((
+                reader.GetInt64(0),
+                reader.IsDBNull(1) ? null : reader.GetString(1),
+                reader.IsDBNull(2) ? null : reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetString(3),
+                reader.IsDBNull(4) ? null : reader.GetInt32(4),
+                reader.IsDBNull(5) ? null : (byte[])reader.GetValue(5),
+                reader.IsDBNull(6) ? null : reader.GetString(6)));
+        reader.Close();
+
+        foreach (var row in rows)
+        {
+            var artistId  = EnsureArtist(row.Artist, tx);
+            var artworkId = EnsureArtwork(row.Cover, row.Mime, tx);
+            var albumId   = EnsureAlbum(row.Album, row.AlbumArtist ?? row.Artist, row.Year, artistId, artworkId, tx);
+            using var update = _conn.CreateCommand();
+            update.Transaction = tx;
+            update.CommandText = """
+                UPDATE tracks
+                SET artist_id = $artist_id,
+                    album_id = $album_id,
+                    cover_data = NULL
+                WHERE id = $id;
+                """;
+            Add(update, "$artist_id", artistId);
+            Add(update, "$album_id", albumId);
+            Add(update, "$id", row.Id);
+            update.ExecuteNonQuery();
+        }
+
+        tx.Commit();
+    }
+
+    private long? EnsureArtist(string? name, SqliteTransaction tx)
+    {
+        var normalized = string.IsNullOrWhiteSpace(name) ? "" : name.Trim();
+        using var cmd = _conn.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = """
+            INSERT INTO artists (name) VALUES ($name)
+            ON CONFLICT(name) DO NOTHING;
+            SELECT id FROM artists WHERE name = $name COLLATE NOCASE LIMIT 1;
+            """;
+        Add(cmd, "$name", normalized);
+        return Convert.ToInt64(cmd.ExecuteScalar());
+    }
+
+    private long? EnsureArtwork(byte[]? data, string? mimeType, SqliteTransaction tx)
+    {
+        if (data is null || data.Length == 0)
+            return null;
+        var hash = Convert.ToHexString(SHA256.HashData(data));
+        using var cmd = _conn.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = """
+            INSERT INTO artworks (content_hash, mime_type, data)
+            VALUES ($hash, $mime, $data)
+            ON CONFLICT(content_hash) DO NOTHING;
+            SELECT id FROM artworks WHERE content_hash = $hash LIMIT 1;
+            """;
+        Add(cmd, "$hash", hash);
+        Add(cmd, "$mime", mimeType);
+        Add(cmd, "$data", data);
+        return Convert.ToInt64(cmd.ExecuteScalar());
+    }
+
+    private long? EnsureAlbum(string? title, string? displayArtist, int? year, long? fallbackArtistId, long? artworkId, SqliteTransaction tx)
+    {
+        var normalizedTitle = string.IsNullOrWhiteSpace(title) ? "" : title.Trim();
+        var normalizedYear  = year ?? 0;
+        var albumArtistId = EnsureArtist(displayArtist, tx);
+        using var cmd = _conn.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = """
+            INSERT INTO albums (title, artist_id, year, artwork_id)
+            VALUES ($title, $artist_id, $year, $artwork_id)
+            ON CONFLICT(title, artist_id, year) DO UPDATE SET
+                artwork_id = COALESCE(albums.artwork_id, excluded.artwork_id);
+            SELECT id FROM albums
+            WHERE title = $title
+              AND artist_id IS $artist_id
+              AND year IS $year
+            LIMIT 1;
+            """;
+        Add(cmd, "$title", normalizedTitle);
+        Add(cmd, "$artist_id", albumArtistId);
+        Add(cmd, "$year", normalizedYear);
+        Add(cmd, "$artwork_id", artworkId);
+        return Convert.ToInt64(cmd.ExecuteScalar());
+    }
+
     private static void BindTrack(SqliteCommand cmd, TrackRecord t)
     {
         Add(cmd, "$path",                   t.Path);
@@ -605,7 +1196,8 @@ public sealed class AudioDatabase : IDisposable
         Add(cmd, "$acoustid_fingerprint",   (object?)t.AcoustIdFingerprint ?? DBNull.Value);
         Add(cmd, "$has_cover",              t.HasCover ? 1 : 0);
         Add(cmd, "$cover_mime_type",        (object?)t.CoverMimeType ?? DBNull.Value);
-        Add(cmd, "$cover_data",             (object?)t.CoverData ?? DBNull.Value);
+        // Artwork wird dedupliziert in `artworks` gespeichert; in `tracks` bleibt kein Duplikat.
+        Add(cmd, "$cover_data",             DBNull.Value);
     }
 
     private static TrackRecord MapRow(SqliteDataReader r)

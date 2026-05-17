@@ -20,6 +20,11 @@ public static class LibraryScanner
         CancellationToken cancellationToken = default)
         => Task.Run(() => Scan(rootPath, progress, cancellationToken), cancellationToken);
 
+    public static Task<int> RepairMissingAlbumArtworkAsync(
+        IProgress<ScanProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+        => Task.Run(() => RepairMissingAlbumArtwork(progress, cancellationToken), cancellationToken);
+
     private static ScanResult Scan(
         string rootPath,
         IProgress<ScanProgress>? progress,
@@ -144,6 +149,39 @@ public static class LibraryScanner
         }
 
         return record;
+    }
+
+    private static int RepairMissingAlbumArtwork(IProgress<ScanProgress>? progress, CancellationToken ct)
+    {
+        using var db = AudioDatabase.OpenDefault();
+        var albums = db.GetAlbumsMissingArtworkSamplePaths();
+        var repaired = 0;
+
+        for (var i = 0; i < albums.Count; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+            var (albumId, path) = albums[i];
+            progress?.Report(new ScanProgress(i + 1, albums.Count, path));
+
+            try
+            {
+                using var tagFile = TagLib.File.Create(path);
+                var pic = tagFile.Tag.Pictures?.FirstOrDefault(p => p.Type == PictureType.FrontCover)
+                       ?? tagFile.Tag.Pictures?.FirstOrDefault();
+                var data = pic?.Data?.Data;
+                if (data is null || data.Length == 0)
+                    continue;
+
+                db.AttachArtworkToAlbum(albumId, data, NullIfEmpty(pic?.MimeType));
+                repaired++;
+            }
+            catch
+            {
+                // Defekte oder nicht lesbare Dateien überspringen; Rest der Reparatur läuft weiter.
+            }
+        }
+
+        return repaired;
     }
 
     private static string? NullIfEmpty(string? s)

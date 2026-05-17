@@ -329,6 +329,52 @@ public partial class SettingsWindow : Window
         return outer;
     }
 
+    private async void OptimizeDatabaseButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        OptimizeDatabaseButton.IsEnabled = false;
+        DatabaseMaintenanceStatusTextBlock.Text = "Datenbank wird optimiert …";
+        try
+        {
+            await Task.Run(() =>
+            {
+                using var db = AudioDatabase.OpenDefault();
+                db.Optimize();
+            });
+            DatabaseMaintenanceStatusTextBlock.Text = "Optimierung abgeschlossen.";
+        }
+        catch (Exception ex)
+        {
+            DatabaseMaintenanceStatusTextBlock.Text = $"Optimierung fehlgeschlagen: {ex.Message}";
+        }
+        finally
+        {
+            OptimizeDatabaseButton.IsEnabled = true;
+        }
+    }
+
+    private async void RepairAlbumArtworkButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        RepairAlbumArtworkButton.IsEnabled = false;
+        DatabaseMaintenanceStatusTextBlock.Text = "Album-Cover werden repariert …";
+        var progress = new Progress<ScanProgress>(p =>
+            DatabaseMaintenanceStatusTextBlock.Text =
+                $"Album-Cover werden repariert … {p.Current}/{p.Total} – {Path.GetFileName(p.CurrentFile)}");
+        try
+        {
+            var repaired = await LibraryScanner.RepairMissingAlbumArtworkAsync(progress);
+            DatabaseMaintenanceStatusTextBlock.Text =
+                repaired == 1 ? "1 Album-Cover repariert." : $"{repaired:N0} Album-Cover repariert.";
+        }
+        catch (Exception ex)
+        {
+            DatabaseMaintenanceStatusTextBlock.Text = $"Cover-Reparatur fehlgeschlagen: {ex.Message}";
+        }
+        finally
+        {
+            RepairAlbumArtworkButton.IsEnabled = true;
+        }
+    }
+
     // ------------------------------------------------------------------
     // Dialog
     // ------------------------------------------------------------------
