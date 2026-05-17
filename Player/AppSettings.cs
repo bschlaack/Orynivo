@@ -9,4 +9,14 @@ public sealed class AppSettings
     public string? SelectedWasapiDeviceId { get; set; }
     public string? SelectedWasapiDeviceName { get; set; }
     public List<string> LibraryPaths { get; set; } = [];
+    public string LastMainView { get; set; } = "Tracks";
+    public bool AlbumArtworkView { get; set; }
+    public AppTheme Theme { get; set; } = AppTheme.Dark;
+    public Localization.Language Language { get; set; } = Localization.Language.German;
+}
+
+public enum AppTheme
+{
+    Light,
+    Dark
 }

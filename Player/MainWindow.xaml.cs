@@ -8,8 +8,15 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Player.Audio;
 using Player.Library;
+using Player.Localization;
+using Button = System.Windows.Controls.Button;
+using WpfImage = System.Windows.Controls.Image;
+using WpfCursors = System.Windows.Input.Cursors;
 
 namespace Player;
 
@@ -46,7 +53,7 @@ public partial class MainWindow : Window
     private sealed record FolderTag(bool IsFile, string FilePath, string FolderPath);
     private sealed record NavigationState(string View, long? SelectedId, long? ArtistFilterId, string? ArtistFilterName);
 
-    private sealed class ContentRow
+    private sealed class ContentRow : INotifyPropertyChanged
     {
         public string? Nr          { get; init; }
         public long? Id            { get; init; }
@@ -57,11 +64,35 @@ public partial class MainWindow : Window
         public string? Year        { get; init; }
         public string? Genre       { get; init; }
         public string? Folder      { get; init; }
-        public byte[]? ArtworkData { get; init; }
-        public ImageSource? Artwork { get; set; }
+        public string? ArtworkPath { get; init; }
+        public string? ThumbnailPath { get; init; }
+        private ImageSource? _artwork;
+        private ImageSource? _thumbnail;
+        public ImageSource? Artwork
+        {
+            get => _artwork;
+            set => SetField(ref _artwork, value);
+        }
+        public ImageSource? Thumbnail
+        {
+            get => _thumbnail;
+            set => SetField(ref _thumbnail, value);
+        }
+        public bool IsFavorite { get; set; }
+        public string FavoriteGlyph => IsFavorite ? "♥" : "♡";
         public string  Duration    { get; init; } = "";
         public string? Format      { get; init; }
         public string  FilePath    { get; init; } = "";
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        private void SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
+        {
+            if (EqualityComparer<T>.Default.Equals(field, value))
+                return;
+            field = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
     }
 
     // ------------------------------------------------------------------
@@ -71,6 +102,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        SourceInitialized += (_, _) => ApplyWindowTitleBarColors();
         _transportTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         _transportTimer.Tick += (_, _) => RefreshTransport();
         // Register with handledEventsToo=true so our handler fires even after
@@ -81,13 +113,68 @@ public partial class MainWindow : Window
             handledEventsToo: true);
         LoadSettings();
         LoadNavPlaylists();
-        NavListBox.SelectedIndex = 2; // Tracks als Standard
+        _showAlbumArtworkView = _settings.AlbumArtworkView;
+        AlbumArtworkViewRadioButton.IsChecked = _showAlbumArtworkView;
+        AlbumTableViewRadioButton.IsChecked = !_showAlbumArtworkView;
+        SelectInitialView();
     }
+
+    private void ApplyWindowTitleBarColors()
+    {
+        try
+        {
+            var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            if (handle == IntPtr.Zero)
+                return;
+
+            const int DwmwaCaptionColor = 35;
+            const int DwmwaTextColor = 36;
+            var captionColor = ColorRef(0x13, 0x14, 0x2A);
+            var textColor = ColorRef(0xFF, 0xFF, 0xFF);
+            _ = DwmSetWindowAttribute(handle, DwmwaCaptionColor, ref captionColor, sizeof(int));
+            _ = DwmSetWindowAttribute(handle, DwmwaTextColor, ref textColor, sizeof(int));
+        }
+        catch
+        {
+            // Ältere Windows-Versionen oder nicht unterstützte Shells behalten die Standard-Titelleiste.
+        }
+    }
+
+    private static int ColorRef(byte r, byte g, byte b) => r | (g << 8) | (b << 16);
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(
+        IntPtr hwnd,
+        int dwAttribute,
+        ref int pvAttribute,
+        int cbAttribute);
 
     protected override void OnClosed(EventArgs e)
     {
+        PersistViewState();
         StopPlayback();
         base.OnClosed(e);
+    }
+
+    private void SelectInitialView()
+    {
+        var tag = _settings.LastMainView;
+        var item = NavListBox.Items
+            .OfType<ListBoxItem>()
+            .FirstOrDefault(i => string.Equals(i.Tag as string, tag, StringComparison.Ordinal));
+        NavListBox.SelectedItem = item
+            ?? NavListBox.Items.OfType<ListBoxItem>().FirstOrDefault(i => string.Equals(i.Tag as string, "Tracks", StringComparison.Ordinal));
+    }
+
+    private void PersistViewState()
+    {
+        if (NavListBox.SelectedItem is ListBoxItem { Tag: string tag } &&
+            tag is "Artists" or "Albums" or "Tracks" or "Folders")
+        {
+            _settings.LastMainView = tag;
+        }
+        _settings.AlbumArtworkView = _showAlbumArtworkView;
+        _settingsStore.Save(_settings);
     }
 
     private void LoadSettings()
@@ -141,6 +228,8 @@ public partial class MainWindow : Window
             return;
 
         ResetDrilldownState();
+        if (tag is "Artists" or "Albums" or "Tracks" or "Folders")
+            _settings.LastMainView = tag;
         await ShowTopLevelViewAsync(tag);
     }
 
@@ -172,10 +261,10 @@ public partial class MainWindow : Window
     {
         ContentTitleTextBlock.Text = tag switch
         {
-            "Artists" => "Künstler",
-            "Albums"  => "Alben",
-            "Tracks"  => "Tracks",
-            "Folders" => "Ordnerstruktur",
+            "Artists" => LocalizationManager.Current.Artists,
+            "Albums"  => LocalizationManager.Current.Albums,
+            "Tracks"  => LocalizationManager.Current.Tracks,
+            "Folders" => LocalizationManager.Current.FolderStructure,
             _         => tag.StartsWith("Playlist:") ? GetPlaylistName(tag) : tag
         };
 
@@ -273,7 +362,8 @@ public partial class MainWindow : Window
                     .Select(a => new ContentRow
                     {
                         Id       = a.Id,
-                        Title    = string.IsNullOrEmpty(a.Artist) ? "(Unbekannt)" : a.Artist,
+                        Title    = string.IsNullOrEmpty(a.Artist) ? LocalizationManager.Current.Unknown : a.Artist,
+                        IsFavorite = a.IsFavorite,
                         FilePath = ""
                     }).ToList(),
 
@@ -282,11 +372,13 @@ public partial class MainWindow : Window
                         : db.GetAlbumsLite(_showAlbumArtworkView))
                     .Select(a => new ContentRow
                     {
-                        Title    = string.IsNullOrEmpty(a.Album) ? "(Unbekannt)" : a.Album,
+                        Title    = string.IsNullOrEmpty(a.Album) ? LocalizationManager.Current.Unknown : a.Album,
                         Id       = a.Id,
                         Artist   = string.IsNullOrEmpty(a.DisplayArtist) ? null : a.DisplayArtist,
                         Year     = a.Year?.ToString(),
-                        ArtworkData = a.CoverData,
+                        ArtworkPath = a.ArtworkPath,
+                        ThumbnailPath = a.ThumbnailPath,
+                        IsFavorite = a.IsFavorite,
                         FilePath = ""
                     }).ToList(),
 
@@ -296,30 +388,31 @@ public partial class MainWindow : Window
                     .Select(t => new ContentRow
                     {
                         Title    = t.Title ?? t.FileName,
+                        Id       = t.Id,
                         Artist   = t.Artist,
                         Album    = t.Album,
                         Duration = FormatSeconds(t.Duration),
                         Genre    = t.Genre,
                         Format   = t.Format?.ToUpperInvariant(),
                         FilePath = t.Path
+                        ,IsFavorite = t.IsFavorite
                     }).ToList()
             };
         }
         catch { return []; }
     }
 
-    private static ImageSource? CreateArtworkImage(byte[]? data)
+    private static ImageSource? CreateArtworkImage(string? path, int decodeWidth)
     {
-        if (data is null || data.Length == 0)
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
             return null;
         try
         {
-            using var stream = new MemoryStream(data);
             var image = new BitmapImage();
             image.BeginInit();
             image.CacheOption = BitmapCacheOption.OnLoad;
-            image.StreamSource = stream;
-            image.DecodePixelWidth = 320;
+            image.UriSource = new Uri(path, UriKind.Absolute);
+            image.DecodePixelWidth = decodeWidth;
             image.EndInit();
             image.Freeze();
             return image;
@@ -330,7 +423,15 @@ public partial class MainWindow : Window
     private static void EnsureArtworkHydrated(ContentRow row)
     {
         if (row.Artwork is null)
-            row.Artwork = CreateArtworkImage(row.ArtworkData);
+            row.Artwork = CreateArtworkImage(row.ArtworkPath, 320);
+        if (row.Thumbnail is null)
+            row.Thumbnail = CreateArtworkImage(row.ThumbnailPath, 96);
+    }
+
+    private static void EnsureThumbnailHydrated(ContentRow row)
+    {
+        if (row.Thumbnail is null)
+            row.Thumbnail = CreateArtworkImage(row.ThumbnailPath, 96);
     }
 
     private static string FormatSeconds(double? seconds)
@@ -346,6 +447,7 @@ public partial class MainWindow : Window
             return;
 
         _showAlbumArtworkView = AlbumArtworkViewRadioButton.IsChecked == true;
+        _settings.AlbumArtworkView = _showAlbumArtworkView;
         if (NavListBox.SelectedItem is not ListBoxItem { Tag: "Albums" })
             return;
 
@@ -364,33 +466,43 @@ public partial class MainWindow : Window
             EnsureArtworkHydrated(row);
     }
 
+    private void ContentDataGrid_OnLoadingRow(object sender, DataGridRowEventArgs e)
+    {
+        if (e.Row.Item is ContentRow row && AlbumViewModeBorder.Visibility == Visibility.Visible)
+            EnsureThumbnailHydrated(row);
+    }
+
     private void ApplyColumns(string view)
     {
         ContentDataGrid.Columns.Clear();
         switch (view)
         {
             case "Artists":
-                Add("Künstler", nameof(ContentRow.Title), 0, star: true);
+                AddFavorite();
+                Add(LocalizationManager.Current.Artist, nameof(ContentRow.Title), 0, star: true);
                 break;
             case "Albums":
-                Add("Album",          nameof(ContentRow.Title),  0,   star: true);
-                Add("Album-Künstler", nameof(ContentRow.Artist), 220);
-                Add("Jahr",           nameof(ContentRow.Year),   60,  right: true);
+                AddFavorite();
+                AddThumbnail();
+                Add(LocalizationManager.Current.Album,       nameof(ContentRow.Title),  0,   star: true);
+                Add(LocalizationManager.Current.AlbumArtist, nameof(ContentRow.Artist), 220);
+                Add(LocalizationManager.Current.Year,        nameof(ContentRow.Year),   60,  right: true);
                 break;
             case string s when s.StartsWith("Playlist:"):
                 Add("#",        nameof(ContentRow.Nr),     44,  right: true);
-                Add("Titel",    nameof(ContentRow.Title),  0,   star: true);
-                Add("Künstler", nameof(ContentRow.Artist), 180);
-                Add("Album",    nameof(ContentRow.Album),  160);
-                Add("Dauer",    nameof(ContentRow.Duration), 70, right: true);
+                Add(LocalizationManager.Current.Title,    nameof(ContentRow.Title),  0,   star: true);
+                Add(LocalizationManager.Current.Artist,   nameof(ContentRow.Artist), 180);
+                Add(LocalizationManager.Current.Album,    nameof(ContentRow.Album),  160);
+                Add(LocalizationManager.Current.Duration, nameof(ContentRow.Duration), 70, right: true);
                 break;
             default: // Tracks
-                Add("Titel",    nameof(ContentRow.Title),  0,   star: true);
-                Add("Künstler", nameof(ContentRow.Artist), 180);
-                Add("Album",    nameof(ContentRow.Album),  160);
-                Add("Genre",    nameof(ContentRow.Genre),  100);
-                Add("Dauer",    nameof(ContentRow.Duration), 70, right: true);
-                Add("Format",   nameof(ContentRow.Format), 70);
+                AddFavorite();
+                Add(LocalizationManager.Current.Title,    nameof(ContentRow.Title),  0,   star: true);
+                Add(LocalizationManager.Current.Artist,   nameof(ContentRow.Artist), 180);
+                Add(LocalizationManager.Current.Album,    nameof(ContentRow.Album),  160);
+                Add(LocalizationManager.Current.Genre,    nameof(ContentRow.Genre),  100);
+                Add(LocalizationManager.Current.Duration, nameof(ContentRow.Duration), 70, right: true);
+                Add(LocalizationManager.Current.Format,   nameof(ContentRow.Format), 70);
                 break;
         }
 
@@ -412,6 +524,50 @@ public partial class MainWindow : Window
                 };
             }
             ContentDataGrid.Columns.Add(col);
+        }
+
+        void AddFavorite()
+        {
+            var buttonFactory = new FrameworkElementFactory(typeof(Button));
+            buttonFactory.SetBinding(ContentControl.ContentProperty, new Binding(nameof(ContentRow.FavoriteGlyph)));
+            buttonFactory.SetBinding(FrameworkElement.TagProperty, new Binding("."));
+            buttonFactory.AddHandler(Button.ClickEvent, new RoutedEventHandler(FavoriteButton_OnClick));
+            buttonFactory.SetValue(Button.BackgroundProperty, System.Windows.Media.Brushes.Transparent);
+            buttonFactory.SetValue(Button.BorderThicknessProperty, new Thickness(0));
+            buttonFactory.SetValue(Button.ForegroundProperty, new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x6C, 0x63, 0xFF)));
+            buttonFactory.SetValue(Button.CursorProperty, WpfCursors.Hand);
+            buttonFactory.SetValue(Button.FontSizeProperty, 16d);
+
+            ContentDataGrid.Columns.Add(new DataGridTemplateColumn
+            {
+                Header = "",
+                Width = new DataGridLength(42),
+                CellTemplate = new DataTemplate { VisualTree = buttonFactory }
+            });
+        }
+
+        void AddThumbnail()
+        {
+            var imageFactory = new FrameworkElementFactory(typeof(WpfImage));
+            imageFactory.SetBinding(WpfImage.SourceProperty, new Binding(nameof(ContentRow.Thumbnail)));
+            imageFactory.SetValue(FrameworkElement.WidthProperty, 32d);
+            imageFactory.SetValue(FrameworkElement.HeightProperty, 32d);
+            imageFactory.SetValue(WpfImage.StretchProperty, Stretch.UniformToFill);
+            ContentDataGrid.Columns.Add(new DataGridTemplateColumn
+            {
+                Header = "",
+                Width = new DataGridLength(64),
+                CellTemplate = new DataTemplate { VisualTree = imageFactory },
+                CellStyle = new Style(typeof(DataGridCell))
+                {
+                    Setters =
+                    {
+                        new Setter(DataGridCell.PaddingProperty, new Thickness(0)),
+                        new Setter(DataGridCell.HorizontalContentAlignmentProperty, System.Windows.HorizontalAlignment.Center),
+                        new Setter(DataGridCell.VerticalContentAlignmentProperty, System.Windows.VerticalAlignment.Center)
+                    }
+                }
+            });
         }
     }
 
@@ -558,7 +714,7 @@ public partial class MainWindow : Window
 
             await StartPlaybackAsync(filePath);
         }
-        catch (OperationCanceledException) { StatusTextBlock.Text = "Wiedergabe gestoppt."; }
+        catch (OperationCanceledException) { StatusTextBlock.Text = LocalizationManager.Current.PlaybackStopped; }
         catch (Exception ex) { StopPlayback(); StatusTextBlock.Text = ex.Message; }
     }
 
@@ -607,7 +763,7 @@ public partial class MainWindow : Window
         _queueIndex = _queue.IndexOf(_queue.FirstOrDefault(p => p.FilePath == row.FilePath) ?? _queue[0]);
 
         try { await StartPlaybackAsync(row.FilePath); }
-        catch (OperationCanceledException) { StatusTextBlock.Text = "Wiedergabe gestoppt."; }
+        catch (OperationCanceledException) { StatusTextBlock.Text = LocalizationManager.Current.PlaybackStopped; }
         catch (Exception ex) { StopPlayback(); StatusTextBlock.Text = ex.Message; }
     }
 
@@ -707,6 +863,25 @@ public partial class MainWindow : Window
         AlbumArtworkListBox.ScrollIntoView(row);
     }
 
+    private void FavoriteButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: ContentRow row } || row.Id is not long id)
+            return;
+
+        row.IsFavorite = !row.IsFavorite;
+        using var db = AudioDatabase.OpenDefault();
+        if (ContentTitleTextBlock.Text == "Künstler")
+            db.SetArtistFavorite(id, row.IsFavorite);
+        else if (AlbumViewModeBorder.Visibility == Visibility.Visible)
+            db.SetAlbumFavorite(id, row.IsFavorite);
+        else
+            db.SetTrackFavorite(id, row.IsFavorite);
+
+        ContentDataGrid.Items.Refresh();
+        AlbumArtworkListBox.Items.Refresh();
+        e.Handled = true;
+    }
+
     // ------------------------------------------------------------------
     // Wiedergabe
     // ------------------------------------------------------------------
@@ -715,11 +890,11 @@ public partial class MainWindow : Window
     {
         if (string.IsNullOrWhiteSpace(_currentFilePath))
         {
-            StatusTextBlock.Text = "Bitte zuerst einen Track doppelklicken.";
+            StatusTextBlock.Text = LocalizationManager.Current.SelectTrackFirst;
             return;
         }
         try { await StartPlaybackAsync(_currentFilePath); }
-        catch (OperationCanceledException) { StatusTextBlock.Text = "Wiedergabe gestoppt."; }
+        catch (OperationCanceledException) { StatusTextBlock.Text = LocalizationManager.Current.PlaybackStopped; }
         catch (Exception ex) { StopPlayback(); StatusTextBlock.Text = ex.Message; }
     }
 
@@ -737,7 +912,7 @@ public partial class MainWindow : Window
         {
             if (string.IsNullOrWhiteSpace(_settings.SelectedDriverName))
             {
-                StatusTextBlock.Text = "Bitte zuerst ein ASIO-Gerät in den Einstellungen auswählen.";
+                StatusTextBlock.Text = LocalizationManager.Current.SelectAsioDevice;
                 return;
             }
             if (ext.Equals(".dsf", StringComparison.OrdinalIgnoreCase))
@@ -751,14 +926,14 @@ public partial class MainWindow : Window
         {
             if (string.IsNullOrWhiteSpace(_settings.SelectedWasapiDeviceId))
             {
-                StatusTextBlock.Text = "Bitte zuerst ein WASAPI-Gerät in den Einstellungen auswählen.";
+                StatusTextBlock.Text = LocalizationManager.Current.SelectWasapiDevice;
                 return;
             }
             (player, info) = await WasapiAudioPlayer.CreateAsync(filePath, _settings.SelectedWasapiDeviceId, _playbackCts.Token);
         }
         else
         {
-            StatusTextBlock.Text = $"{_settings.OutputBackend} ist noch nicht implementiert.";
+            StatusTextBlock.Text = string.Format(LocalizationManager.Current.NotImplemented, _settings.OutputBackend);
             return;
         }
 
@@ -780,6 +955,16 @@ public partial class MainWindow : Window
             : info.IsDsd
                 ? $"DSD → PCM  ·  {info.OutputSampleRate:N0} Hz"
                 : $"{info.CodecName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz  ·  {info.Channels} ch";
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            NowPlayingArtworkImage.Source =
+                CreateArtworkImage(db.GetArtworkPathsByTrackPath(filePath)?.Thumb96Path, 96);
+        }
+        catch
+        {
+            NowPlayingArtworkImage.Source = null;
+        }
 
         StatusTextBlock.Text = _settings.OutputBackend == OutputBackend.Asio
             ? $"Wiedergabe über {_settings.SelectedDriverName}"
@@ -808,7 +993,7 @@ public partial class MainWindow : Window
             if (!await TryPlayNextAsync())
             {
                 StopPlayback();
-                StatusTextBlock.Text = "Wiedergabe beendet.";
+                StatusTextBlock.Text = LocalizationManager.Current.PlaybackFinished;
             }
         }
     }
@@ -816,7 +1001,7 @@ public partial class MainWindow : Window
     private void StopButton_OnClick(object sender, RoutedEventArgs e)
     {
         StopPlayback();
-        StatusTextBlock.Text = "Wiedergabe gestoppt.";
+        StatusTextBlock.Text = LocalizationManager.Current.PlaybackStopped;
     }
 
     private void StopPlayback()
@@ -839,6 +1024,7 @@ public partial class MainWindow : Window
         NowPlayingTitleBlock.Text  = "";
         NowPlayingArtistBlock.Text = "";
         FileInfoTextBlock.Text     = "";
+        NowPlayingArtworkImage.Source = null;
     }
 
     private void RecordPlaybackEnd(bool completed)
@@ -946,19 +1132,23 @@ public partial class MainWindow : Window
             _settings.SelectedWasapiDeviceId = window.SelectedWasapiDeviceId;
             _settings.SelectedWasapiDeviceName = window.SelectedWasapiDeviceName;
             _settings.LibraryPaths           = window.SelectedLibraryPaths.ToList();
+            _settings.Theme                  = window.SelectedTheme;
+            _settings.Language               = window.SelectedLanguage;
             _settingsStore.Save(_settings);
+            ThemeManager.Apply(_settings.Theme);
+            LocalizationManager.Apply(_settings.Language);
             RefreshSelectedDriverText();
             LoadNavPlaylists();
 
             StatusTextBlock.Text = _settings.OutputBackend switch
             {
                 OutputBackend.Asio when string.IsNullOrWhiteSpace(_settings.SelectedDriverName) =>
-                    "Bitte ein ASIO-Gerät in den Einstellungen auswählen.",
+                    LocalizationManager.Current.SelectAsioDevice,
                 OutputBackend.Wasapi when string.IsNullOrWhiteSpace(_settings.SelectedWasapiDeviceId) =>
-                    "Bitte ein WASAPI-Gerät in den Einstellungen auswählen.",
+                    LocalizationManager.Current.SelectWasapiDevice,
                 OutputBackend.KernelStreaming =>
-                    "KernelStreaming ist noch nicht implementiert.",
-                _ => "Einstellungen gespeichert."
+                    string.Format(LocalizationManager.Current.NotImplemented, "KernelStreaming"),
+                _ => LocalizationManager.Current.SettingsSaved
             };
         }
     }

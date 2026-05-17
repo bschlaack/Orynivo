@@ -5,7 +5,10 @@
         Height="420"
         Width="560"
         MinHeight="360"
-        MinWidth="480">
+        MinWidth="480"
+        Background="{DynamicResource AppContentBrush}"
+        Foreground="{DynamicResource AppPrimaryTextBrush}"
+        SourceInitialized="DeviceInfoWindow_OnSourceInitialized">
     <ScrollViewer Padding="20">
         <StackPanel>
             <TextBlock x:Name="DriverNameTextBlock"

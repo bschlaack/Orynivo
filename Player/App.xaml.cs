@@ -1,5 +1,6 @@
 using System.Windows;
 using Player.Library;
+using Player.Localization;
 
 namespace Player;
 
@@ -15,6 +16,9 @@ public partial class App : System.Windows.Application
         try
         {
             startup.Status = "Bibliothek wird vorbereitet …";
+            var settings = new SettingsStore().Load();
+            ThemeManager.Apply(settings.Theme);
+            LocalizationManager.Apply(settings.Language);
             await Task.Run(() =>
             {
                 using var db = AudioDatabase.OpenDefault();

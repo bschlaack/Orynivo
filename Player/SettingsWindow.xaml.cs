@@ -6,6 +6,9 @@ using Button = System.Windows.Controls.Button;
 using Color  = System.Windows.Media.Color;
 using Player.Audio;
 using Player.Library;
+using Player.Localization;
+using UiLanguage = Player.Localization.Language;
+using System.Runtime.InteropServices;
 
 namespace Player;
 
@@ -23,6 +26,10 @@ public partial class SettingsWindow : Window
         _onLibraryPathsChanged = onLibraryPathsChanged;
         OutputBackendComboBox.ItemsSource = Enum.GetValues<OutputBackend>();
         OutputBackendComboBox.SelectedItem = settings.OutputBackend;
+        ThemeComboBox.ItemsSource = Enum.GetValues<AppTheme>();
+        ThemeComboBox.SelectedItem = settings.Theme;
+        LanguageComboBox.ItemsSource = Enum.GetValues<UiLanguage>();
+        LanguageComboBox.SelectedItem = settings.Language;
         _libraryPaths.AddRange(settings.LibraryPaths);
         RebuildDirectoryList();
         LoadDrivers();
@@ -39,6 +46,10 @@ public partial class SettingsWindow : Window
             ? backend
             : OutputBackend.Asio;
     public IReadOnlyList<string> SelectedLibraryPaths => _libraryPaths.AsReadOnly();
+    public AppTheme SelectedTheme =>
+        ThemeComboBox.SelectedItem is AppTheme theme ? theme : AppTheme.Dark;
+    public UiLanguage SelectedLanguage =>
+        LanguageComboBox.SelectedItem is UiLanguage language ? language : UiLanguage.German;
 
     protected override void OnClosed(EventArgs e)
     {
@@ -46,6 +57,33 @@ public partial class SettingsWindow : Window
             cts.Cancel();
         base.OnClosed(e);
     }
+
+    private void SettingsWindow_OnSourceInitialized(object sender, EventArgs e)
+    {
+        try
+        {
+            var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            if (handle == IntPtr.Zero)
+                return;
+
+            const int DwmwaCaptionColor = 35;
+            const int DwmwaTextColor = 36;
+            var captionColor = _settings.Theme == AppTheme.Dark
+                ? ColorRef(0x13, 0x14, 0x2A)
+                : ColorRef(0xEA, 0xEA, 0xF5);
+            var textColor = _settings.Theme == AppTheme.Dark
+                ? ColorRef(0xFF, 0xFF, 0xFF)
+                : ColorRef(0x13, 0x14, 0x2A);
+            _ = DwmSetWindowAttribute(handle, DwmwaCaptionColor, ref captionColor, sizeof(int));
+            _ = DwmSetWindowAttribute(handle, DwmwaTextColor, ref textColor, sizeof(int));
+        }
+        catch { }
+    }
+
+    private static int ColorRef(byte r, byte g, byte b) => r | (g << 8) | (b << 16);
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int dwAttribute, ref int pvAttribute, int cbAttribute);
 
     // ------------------------------------------------------------------
     // Navigation
@@ -58,6 +96,7 @@ public partial class SettingsWindow : Window
 
         AudioDevicePanel.Visibility = tag == "AudioDevice" ? Visibility.Visible : Visibility.Collapsed;
         LibraryPanel.Visibility     = tag == "Library"      ? Visibility.Visible : Visibility.Collapsed;
+        AppearancePanel.Visibility  = tag == "Appearance"   ? Visibility.Visible : Visibility.Collapsed;
     }
 
     // ------------------------------------------------------------------
@@ -78,8 +117,8 @@ public partial class SettingsWindow : Window
                     ?? devices.FirstOrDefault();
                 DeviceLabelTextBlock.Text = "WASAPI-Ausgabegerät";
                 StatusTextBlock.Text = devices.Count == 0
-                    ? "Keine aktiven WASAPI-Ausgabegeräte gefunden."
-                    : "Gerät auswählen und speichern.";
+                    ? LocalizationManager.Current.NoWasapiDevices
+                    : LocalizationManager.Current.SelectAndSave;
             }
             else
             {
@@ -95,8 +134,8 @@ public partial class SettingsWindow : Window
                     ? "ASIO-Ausgabegerät"
                     : "Ausgabegerät";
                 StatusTextBlock.Text = drivers.Count == 0
-                    ? "Keine ASIO-Treiber gefunden."
-                    : "Gerät auswählen und speichern.";
+                    ? LocalizationManager.Current.NoAsioDrivers
+                    : LocalizationManager.Current.SelectAndSave;
             }
         }
         catch (DllNotFoundException)
@@ -142,7 +181,7 @@ public partial class SettingsWindow : Window
         }
         catch (Exception ex)
         {
-            StatusTextBlock.Text = $"Geräteinfo konnte nicht gelesen werden: {ex.Message}";
+            StatusTextBlock.Text = string.Format(LocalizationManager.Current.DeviceInfoFailed, ex.Message);
         }
     }
 
@@ -231,7 +270,8 @@ public partial class SettingsWindow : Window
             Content = "Scannen",
             Width = 80,
             Height = 26,
-            Margin = new Thickness(0, 0, 4, 0)
+            Margin = new Thickness(0, 0, 4, 0),
+            Style = (Style)FindResource("SettingsButtonStyle")
         };
         Grid.SetColumn(scanBtn, 2);
 
@@ -241,7 +281,8 @@ public partial class SettingsWindow : Window
             Width = 26,
             Height = 26,
             FontSize = 14,
-            ToolTip = "Verzeichnis entfernen"
+            ToolTip = "Verzeichnis entfernen",
+            Style = (Style)FindResource("SettingsButtonStyle")
         };
         Grid.SetColumn(removeBtn, 3);
 
@@ -274,7 +315,7 @@ public partial class SettingsWindow : Window
             if (!Directory.Exists(path))
             {
                 statusBlock.Visibility = Visibility.Visible;
-                statusBlock.Text = "Verzeichnis nicht gefunden.";
+                statusBlock.Text = LocalizationManager.Current.FolderNotFound;
                 return;
             }
 
@@ -282,7 +323,7 @@ public partial class SettingsWindow : Window
             _activeScans[path] = cts;
             scanBtn.Content = "Abbrechen";
             statusBlock.Visibility = Visibility.Visible;
-            statusBlock.Text = "Scan läuft…";
+            statusBlock.Text = LocalizationManager.Current.ScanRunning;
 
             var progress = new Progress<ScanProgress>(p =>
                 statusBlock.Text = $"{p.Current}/{p.Total} – {Path.GetFileName(p.CurrentFile)}");
@@ -296,7 +337,7 @@ public partial class SettingsWindow : Window
             }
             catch (OperationCanceledException)
             {
-                statusBlock.Text = "Scan abgebrochen.";
+                statusBlock.Text = LocalizationManager.Current.ScanCanceled;
             }
             catch (Exception ex)
             {
@@ -332,7 +373,7 @@ public partial class SettingsWindow : Window
     private async void OptimizeDatabaseButton_OnClick(object sender, RoutedEventArgs e)
     {
         OptimizeDatabaseButton.IsEnabled = false;
-        DatabaseMaintenanceStatusTextBlock.Text = "Datenbank wird optimiert …";
+        DatabaseMaintenanceStatusTextBlock.Text = LocalizationManager.Current.DatabaseOptimizing;
         try
         {
             await Task.Run(() =>
@@ -340,11 +381,11 @@ public partial class SettingsWindow : Window
                 using var db = AudioDatabase.OpenDefault();
                 db.Optimize();
             });
-            DatabaseMaintenanceStatusTextBlock.Text = "Optimierung abgeschlossen.";
+            DatabaseMaintenanceStatusTextBlock.Text = LocalizationManager.Current.DatabaseOptimized;
         }
         catch (Exception ex)
         {
-            DatabaseMaintenanceStatusTextBlock.Text = $"Optimierung fehlgeschlagen: {ex.Message}";
+            DatabaseMaintenanceStatusTextBlock.Text = string.Format(LocalizationManager.Current.DatabaseOptimizeFailed, ex.Message);
         }
         finally
         {
@@ -355,19 +396,19 @@ public partial class SettingsWindow : Window
     private async void RepairAlbumArtworkButton_OnClick(object sender, RoutedEventArgs e)
     {
         RepairAlbumArtworkButton.IsEnabled = false;
-        DatabaseMaintenanceStatusTextBlock.Text = "Album-Cover werden repariert …";
+        DatabaseMaintenanceStatusTextBlock.Text = LocalizationManager.Current.AlbumArtworkRepairing;
         var progress = new Progress<ScanProgress>(p =>
             DatabaseMaintenanceStatusTextBlock.Text =
-                $"Album-Cover werden repariert … {p.Current}/{p.Total} – {Path.GetFileName(p.CurrentFile)}");
+                $"{LocalizationManager.Current.AlbumArtworkRepairing} {p.Current}/{p.Total} – {Path.GetFileName(p.CurrentFile)}");
         try
         {
             var repaired = await LibraryScanner.RepairMissingAlbumArtworkAsync(progress);
             DatabaseMaintenanceStatusTextBlock.Text =
-                repaired == 1 ? "1 Album-Cover repariert." : $"{repaired:N0} Album-Cover repariert.";
+                string.Format(LocalizationManager.Current.AlbumArtworkRepaired, repaired);
         }
         catch (Exception ex)
         {
-            DatabaseMaintenanceStatusTextBlock.Text = $"Cover-Reparatur fehlgeschlagen: {ex.Message}";
+            DatabaseMaintenanceStatusTextBlock.Text = string.Format(LocalizationManager.Current.AlbumArtworkRepairFailed, ex.Message);
         }
         finally
         {

@@ -8,7 +8,7 @@
 
         <!-- Sidebar nav item -->
         <Style x:Key="NavItemStyle" TargetType="ListBoxItem">
-            <Setter Property="Foreground" Value="#9999BB" />
+            <Setter Property="Foreground" Value="{DynamicResource AppNavTextBrush}" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Padding" Value="0" />
             <Setter Property="BorderThickness" Value="0" />
@@ -26,17 +26,17 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#252640" />
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AppNavSelectedBrush}" />
                                 <Setter TargetName="Bd" Property="BorderBrush" Value="#6C63FF" />
-                                <Setter Property="Foreground" Value="#FFFFFF" />
+                                <Setter Property="Foreground" Value="{DynamicResource AppNavSelectedTextBrush}" />
                             </Trigger>
                             <MultiTrigger>
                                 <MultiTrigger.Conditions>
                                     <Condition Property="IsMouseOver" Value="True" />
                                     <Condition Property="IsSelected" Value="False" />
                                 </MultiTrigger.Conditions>
-                                <Setter TargetName="Bd" Property="Background" Value="#1F2038" />
-                                <Setter Property="Foreground" Value="#CCCCEE" />
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AppNavHoverBrush}" />
+                                <Setter Property="Foreground" Value="{DynamicResource AppNavHoverTextBrush}" />
                             </MultiTrigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -105,7 +105,7 @@
         <!-- Settings button -->
         <Style x:Key="SidebarBtnStyle" TargetType="Button">
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Foreground" Value="#7777AA" />
+            <Setter Property="Foreground" Value="{DynamicResource AppNavTextBrush}" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="HorizontalContentAlignment" Value="Left" />
             <Setter Property="Cursor" Value="Hand" />
@@ -118,8 +118,8 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#1F2038"/>
-                                <Setter Property="Foreground" Value="#CCCCEE"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AppNavHoverBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AppNavHoverTextBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -207,41 +207,41 @@
 
         <!-- DataGrid column header -->
         <Style TargetType="DataGridColumnHeader">
-            <Setter Property="Background" Value="#EAEAF5"/>
-            <Setter Property="Foreground" Value="#7777AA"/>
+            <Setter Property="Background" Value="{DynamicResource AppColumnHeaderBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppMutedTextBrush}"/>
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Padding" Value="14,9"/>
             <Setter Property="BorderThickness" Value="0,0,0,1"/>
-            <Setter Property="BorderBrush" Value="#D8D8EE"/>
-            <Setter Property="SeparatorBrush" Value="#D8D8EE"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppGridLineBrush}"/>
+            <Setter Property="SeparatorBrush" Value="{DynamicResource AppGridLineBrush}"/>
         </Style>
 
         <!-- DataGrid row -->
         <Style TargetType="DataGridRow">
-            <Setter Property="Background" Value="#F8F8FD"/>
+            <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Foreground" Value="#1A1A2E"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#EAEAFF"/>
+                    <Setter Property="Background" Value="{DynamicResource AppSurfaceHoverBrush}"/>
                 </Trigger>
                 <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#DDDDF5"/>
+                    <Setter Property="Background" Value="{DynamicResource AppSurfaceSelectedBrush}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
 
         <!-- TreeView item -->
         <Style TargetType="TreeViewItem">
-            <Setter Property="Foreground" Value="#1A1A2E"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
             <Setter Property="Padding"    Value="4,5"/>
             <Style.Triggers>
                 <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#DDDDF5"/>
+                    <Setter Property="Background" Value="{DynamicResource AppSurfaceSelectedBrush}"/>
                 </Trigger>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#EAEAFF"/>
+                    <Setter Property="Background" Value="{DynamicResource AppSurfaceHoverBrush}"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -257,6 +257,45 @@
                                 Background="Transparent">
                             <ContentPresenter VerticalAlignment="Center"/>
                         </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Theme ScrollBar -->
+        <Style TargetType="ScrollBar">
+            <Setter Property="Width" Value="12"/>
+            <Setter Property="Background" Value="{DynamicResource AppScrollbarTrackBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Grid Background="{TemplateBinding Background}">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}" Opacity="0"/>
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb>
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border x:Name="Bd"
+                                                        Margin="2"
+                                                        Background="{DynamicResource AppScrollbarThumbBrush}"
+                                                        CornerRadius="5"/>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AppScrollbarThumbHoverBrush}"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}" Opacity="0"/>
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -308,7 +347,7 @@
         </Grid.RowDefinitions>
 
         <!-- ═══ SIDEBAR ═══ -->
-        <Grid Grid.Column="0" Grid.Row="0" Background="#13142A">
+        <Grid Grid.Column="0" Grid.Row="0" Background="{DynamicResource AppSidebarBrush}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
@@ -341,17 +380,17 @@
                 <ListBoxItem IsHitTestVisible="False" Focusable="False"
                              Foreground="#44445A" FontSize="10" FontWeight="Bold"
                              Padding="24,12,0,4">
-                    LOKALE BIBLIOTHEK
+                    <TextBlock Text="{DynamicResource L_LocalLibrary}"/>
                 </ListBoxItem>
-                <ListBoxItem Tag="Artists"  Style="{StaticResource NavItemStyle}">Künstler</ListBoxItem>
-                <ListBoxItem Tag="Albums"   Style="{StaticResource NavItemStyle}">Alben</ListBoxItem>
-                <ListBoxItem Tag="Tracks"   Style="{StaticResource NavItemStyle}">Tracks</ListBoxItem>
-                <ListBoxItem Tag="Folders"  Style="{StaticResource NavItemStyle}">Ordnerstruktur</ListBoxItem>
+                <ListBoxItem Tag="Artists"  Style="{StaticResource NavItemStyle}"><TextBlock Text="{DynamicResource L_Artists}"/></ListBoxItem>
+                <ListBoxItem Tag="Albums"   Style="{StaticResource NavItemStyle}"><TextBlock Text="{DynamicResource L_Albums}"/></ListBoxItem>
+                <ListBoxItem Tag="Tracks"   Style="{StaticResource NavItemStyle}"><TextBlock Text="{DynamicResource L_Tracks}"/></ListBoxItem>
+                <ListBoxItem Tag="Folders"  Style="{StaticResource NavItemStyle}"><TextBlock Text="{DynamicResource L_FolderStructure}"/></ListBoxItem>
 
                 <ListBoxItem IsHitTestVisible="False" Focusable="False"
                              Foreground="#44445A" FontSize="10" FontWeight="Bold"
                              Padding="24,16,0,4">
-                    PLAYLISTS
+                    <TextBlock Text="{DynamicResource L_Playlists}"/>
                 </ListBoxItem>
                 <!-- Playlist-Einträge werden per Code ergänzt (Index 6+) -->
             </ListBox>
@@ -369,19 +408,19 @@
                     FontSize="13"
                     Style="{StaticResource SidebarBtnStyle}"
                     Click="SettingsButton_OnClick"
-                    Content="⚙   Einstellungen"/>
+                    Content="{DynamicResource L_Settings}"/>
         </Grid>
 
         <!-- ═══ CONTENT ═══ -->
-        <Grid Grid.Column="1" Grid.Row="0" Background="#F2F2FA">
+        <Grid Grid.Column="1" Grid.Row="0" Background="{DynamicResource AppContentBrush}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
             <!-- Header -->
-            <Border Background="#EAEAF5"
-                    BorderThickness="0,0,0,1" BorderBrush="#D8D8EE"
+            <Border Background="{DynamicResource AppHeaderBrush}"
+                    BorderThickness="0,0,0,1" BorderBrush="{DynamicResource AppHeaderBorderBrush}"
                     Padding="24,16">
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -410,17 +449,17 @@
                     </Button>
                     <TextBlock x:Name="ContentTitleTextBlock"
                                Grid.Column="1"
-                               FontSize="18" FontWeight="SemiBold" Foreground="#13142A"
+                               FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource AppPrimaryTextBrush}"
                                VerticalAlignment="Center"/>
                     <TextBlock x:Name="ContentCountTextBlock"
                                Grid.Column="2"
-                               FontSize="12" Foreground="#9999BB"
+                               FontSize="12" Foreground="{DynamicResource AppMutedTextBrush}"
                                VerticalAlignment="Center"/>
                     <Border x:Name="AlbumViewModeBorder"
                             Grid.Column="3"
                             Margin="20,0,0,0"
                             Padding="3"
-                            Background="#E1E1F0"
+                            Background="#252640"
                             CornerRadius="9"
                             Visibility="Collapsed">
                         <StackPanel Orientation="Horizontal">
@@ -428,14 +467,14 @@
                                          GroupName="AlbumViewMode"
                                          Style="{StaticResource ViewModeRadioStyle}"
                                          MinWidth="88"
-                                         Content="Tabelle"
+                                         Content="{DynamicResource L_Table}"
                                          IsChecked="True"
                                          Checked="AlbumViewModeRadioButton_OnChecked"/>
                             <RadioButton x:Name="AlbumArtworkViewRadioButton"
                                          GroupName="AlbumViewMode"
                                          Style="{StaticResource ViewModeRadioStyle}"
                                          MinWidth="88"
-                                         Content="Artwork"
+                                         Content="{DynamicResource L_Artwork}"
                                          Checked="AlbumViewModeRadioButton_OnChecked"/>
                         </StackPanel>
                     </Border>
@@ -445,22 +484,23 @@
             <!-- Content DataGrid -->
             <DataGrid x:Name="ContentDataGrid"
                       Grid.Row="1"
-                      Background="#F2F2FA"
+                      Background="{DynamicResource AppContentBrush}"
                       BorderThickness="0"
                       RowHeight="38"
                       GridLinesVisibility="Horizontal"
-                      HorizontalGridLinesBrush="#E4E4F0"
+                      HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
                       AutoGenerateColumns="False"
                       IsReadOnly="True"
                       SelectionMode="Single"
                       FontSize="13"
                       CanUserResizeRows="False"
+                      LoadingRow="ContentDataGrid_OnLoadingRow"
                       MouseDoubleClick="ContentDataGrid_OnMouseDoubleClick"/>
 
             <!-- Folder TreeView (nur für Ordnerstruktur) -->
             <TreeView x:Name="FolderTreeView"
                       Grid.Row="1"
-                      Background="#F2F2FA"
+                      Background="{DynamicResource AppContentBrush}"
                       BorderThickness="0"
                       FontSize="13"
                       Visibility="Collapsed"
@@ -473,7 +513,7 @@
             <ListBox x:Name="AlbumArtworkListBox"
                      Grid.Row="1"
                      Visibility="Collapsed"
-                     Background="#F2F2FA"
+                     Background="{DynamicResource AppContentBrush}"
                      BorderThickness="0"
                      ScrollViewer.CanContentScroll="True"
                      ScrollViewer.IsDeferredScrollingEnabled="True"
@@ -500,7 +540,7 @@
                         <Border Width="180"
                                 Margin="8"
                                 Padding="10"
-                                Background="#F8F8FD"
+                                Background="{DynamicResource AppSurfaceBrush}"
                                 CornerRadius="8">
                             <StackPanel>
                                 <Border Width="160"
@@ -516,11 +556,21 @@
                                            TextTrimming="CharacterEllipsis"/>
                                 <TextBlock Text="{Binding Artist}"
                                            Margin="0,3,0,0"
-                                           Foreground="#666688"
+                                               Foreground="{DynamicResource AppSecondaryTextBrush}"
                                            TextTrimming="CharacterEllipsis"/>
                                 <TextBlock Text="{Binding Year}"
                                            Margin="0,3,0,0"
-                                           Foreground="#9999BB"/>
+                                               Foreground="{DynamicResource AppMutedTextBrush}"/>
+                                <Button Content="{Binding FavoriteGlyph}"
+                                        Tag="{Binding}"
+                                        Margin="0,6,0,0"
+                                        HorizontalAlignment="Left"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Foreground="#6C63FF"
+                                        FontSize="16"
+                                        Cursor="Hand"
+                                        Click="FavoriteButton_OnClick"/>
                             </StackPanel>
                         </Border>
                     </DataTemplate>
@@ -530,8 +580,8 @@
 
         <!-- ═══ TRANSPORT BAR ═══ -->
         <Border Grid.Column="0" Grid.ColumnSpan="2" Grid.Row="1"
-                Background="#13142A"
-                BorderThickness="0,1,0,0" BorderBrush="#1E1F38"
+                Background="{DynamicResource AppTransportBrush}"
+                BorderThickness="0,1,0,0" BorderBrush="{DynamicResource AppTransportBorderBrush}"
                 Padding="20,14">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -541,17 +591,26 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- Now playing -->
-                <StackPanel VerticalAlignment="Center" Margin="0,0,16,0">
+                <Grid VerticalAlignment="Center" Margin="0,0,16,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="52"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Width="42" Height="42" Background="{DynamicResource AppArtworkPlaceholderBrush}" CornerRadius="5">
+                        <Image x:Name="NowPlayingArtworkImage" Stretch="UniformToFill"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
                     <TextBlock x:Name="NowPlayingTitleBlock"
-                               Foreground="White" FontSize="13" FontWeight="SemiBold"
-                               TextTrimming="CharacterEllipsis"/>
-                    <TextBlock x:Name="NowPlayingArtistBlock"
-                               Foreground="#6666AA" FontSize="11" Margin="0,2,0,0"
-                               TextTrimming="CharacterEllipsis"/>
-                    <TextBlock x:Name="FileInfoTextBlock"
-                               Foreground="#44445A" FontSize="10" Margin="0,2,0,0"
-                               TextTrimming="CharacterEllipsis"/>
-                </StackPanel>
+                                   Foreground="{DynamicResource AppTransportPrimaryTextBrush}" FontSize="13" FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <TextBlock x:Name="NowPlayingArtistBlock"
+                                   Foreground="#6666AA" FontSize="11" Margin="0,2,0,0"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <TextBlock x:Name="FileInfoTextBlock"
+                                   Foreground="#44445A" FontSize="10" Margin="0,2,0,0"
+                                   TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                </Grid>
 
                 <!-- Controls -->
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">

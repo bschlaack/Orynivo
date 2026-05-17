@@ -88,3 +88,4 @@ X:\projects\c#\player\Player\obj\Debug\net8.0-windows\StartupWindow.baml
 X:\projects\c#\player\Player\obj\Debug\net8.0-windows\StartupWindow.g.cs
 X:\projects\c#\player\Player\obj\Debug\net8.0-windows\GeneratedInternalTypeHelper.g.cs
 X:\projects\c#\player\Player\obj\Debug\net8.0-windows\Player_MarkupCompile.lref
+X:\projects\c#\player\Player\obj\Debug\net8.0-windows\App.baml

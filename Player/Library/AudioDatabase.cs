@@ -5,7 +5,7 @@ using Microsoft.Data.Sqlite;
 namespace Player.Library;
 
 /// <summary>Distinct-Künstler-Eintrag – absichtlich nur der Künstlername.</summary>
-public sealed record ArtistInfo(long Id, string Artist);
+public sealed record ArtistInfo(long Id, string Artist, bool IsFavorite);
 
 /// <summary>Distinct-Album-Eintrag für die Albumansichten.</summary>
 public sealed record AlbumInfo(
@@ -13,11 +13,12 @@ public sealed record AlbumInfo(
     string Album,
     string? DisplayArtist,
     int? Year,
-    byte[]? CoverData,
-    string? CoverMimeType);
+    string? ArtworkPath,
+    string? ThumbnailPath,
+    bool IsFavorite);
 
 /// <summary>Schlanker Track-Datensatz für die Haupt-Trackliste.</summary>
-public sealed record TrackListInfo(
+    public sealed record TrackListInfo(
     string Path,
     string FileName,
     string? Title,
@@ -26,7 +27,11 @@ public sealed record TrackListInfo(
     string? Genre,
     string? Format,
     double? Duration,
-    string? SortTitle);
+    string? SortTitle,
+    long Id,
+    bool IsFavorite);
+
+public sealed record ArtworkPaths(string? OriginalPath, string? Thumb96Path, string? Thumb320Path);
 
 /// <summary>Schlanker Track-Datensatz für listenbasierte Ansichten (kein Cover, keine Texte).</summary>
 public sealed record TrackLite(
@@ -206,7 +211,7 @@ public sealed class AudioDatabase : IDisposable
     {
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = """
-            SELECT id, name
+            SELECT id, name, is_favorite
             FROM artists
             ORDER BY CASE WHEN name = '' THEN 1 ELSE 0 END,
                      name COLLATE NOCASE;
@@ -214,7 +219,7 @@ public sealed class AudioDatabase : IDisposable
         using var reader = cmd.ExecuteReader();
         var result = new List<ArtistInfo>();
         while (reader.Read())
-            result.Add(new ArtistInfo(reader.GetInt64(0), reader.GetString(1)));
+            result.Add(new ArtistInfo(reader.GetInt64(0), reader.GetString(1), reader.GetInt32(2) != 0));
         return result;
     }
 
@@ -230,8 +235,9 @@ public sealed class AudioDatabase : IDisposable
                 al.title,
                 ar.name,
                 CASE WHEN al.year = 0 THEN NULL ELSE al.year END AS year,
-                aw.data,
-                aw.mime_type
+                aw.thumb_320_path,
+                aw.thumb_96_path,
+                al.is_favorite
             FROM albums al
             LEFT JOIN artists ar ON ar.id = al.artist_id
             LEFT JOIN artworks aw ON aw.id = (
@@ -254,10 +260,12 @@ public sealed class AudioDatabase : IDisposable
                 al.title,
                 ar.name,
                 CASE WHEN al.year = 0 THEN NULL ELSE al.year END AS year,
-                NULL AS data,
-                NULL AS mime_type
+                aw.thumb_320_path,
+                aw.thumb_96_path,
+                al.is_favorite
             FROM albums al
             LEFT JOIN artists ar ON ar.id = al.artist_id
+            LEFT JOIN artworks aw ON aw.id = al.artwork_id
             GROUP BY al.title, al.artist_id, al.year
             ORDER BY
                 CASE WHEN al.title = '' THEN 1 ELSE 0 END,
@@ -272,8 +280,9 @@ public sealed class AudioDatabase : IDisposable
                 reader.GetString(1),
                 reader.IsDBNull(2) ? null : reader.GetString(2),
                 reader.IsDBNull(3) || reader.GetInt32(3) == 0 ? null : reader.GetInt32(3),
-                reader.IsDBNull(4) ? null : (byte[])reader.GetValue(4),
-                reader.IsDBNull(5) ? null : reader.GetString(5)));
+                reader.IsDBNull(4) ? null : reader.GetString(4),
+                reader.IsDBNull(5) ? null : reader.GetString(5),
+                reader.GetInt32(6) != 0));
         return result;
     }
 
@@ -360,8 +369,9 @@ public sealed class AudioDatabase : IDisposable
                 al.title,
                 ar.name,
                 CASE WHEN al.year = 0 THEN NULL ELSE al.year END AS year,
-                aw.data,
-                aw.mime_type
+                aw.thumb_320_path,
+                aw.thumb_96_path,
+                al.is_favorite
             FROM albums al
             LEFT JOIN artists ar ON ar.id = al.artist_id
             LEFT JOIN artworks aw ON aw.id = (
@@ -389,8 +399,9 @@ public sealed class AudioDatabase : IDisposable
                 al.title,
                 ar.name,
                 CASE WHEN al.year = 0 THEN NULL ELSE al.year END AS year,
-                NULL AS data,
-                NULL AS mime_type
+                aw.thumb_320_path,
+                aw.thumb_96_path,
+                al.is_favorite
             FROM albums al
             LEFT JOIN artists ar ON ar.id = al.artist_id
             WHERE al.id IN (
@@ -413,8 +424,9 @@ public sealed class AudioDatabase : IDisposable
                 reader.GetString(1),
                 reader.IsDBNull(2) ? null : reader.GetString(2),
                 reader.IsDBNull(3) ? null : reader.GetInt32(3),
-                reader.IsDBNull(4) ? null : (byte[])reader.GetValue(4),
-                reader.IsDBNull(5) ? null : reader.GetString(5)));
+                reader.IsDBNull(4) ? null : reader.GetString(4),
+                reader.IsDBNull(5) ? null : reader.GetString(5),
+                reader.GetInt32(6) != 0));
         return result;
     }
 
@@ -472,7 +484,7 @@ public sealed class AudioDatabase : IDisposable
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = """
             SELECT
-                path, file_name, title, artist, album, genre, format, duration, sort_title
+                path, file_name, title, artist, album, genre, format, duration, sort_title, id, is_favorite
             FROM tracks
             ORDER BY COALESCE(sort_title, title, file_name) COLLATE NOCASE;
             """;
@@ -488,7 +500,9 @@ public sealed class AudioDatabase : IDisposable
                 reader.IsDBNull(5) ? null : reader.GetString(5),
                 reader.IsDBNull(6) ? null : reader.GetString(6),
                 reader.IsDBNull(7) ? null : reader.GetDouble(7),
-                reader.IsDBNull(8) ? null : reader.GetString(8)));
+                reader.IsDBNull(8) ? null : reader.GetString(8),
+                reader.GetInt64(9),
+                reader.GetInt32(10) != 0));
         return result;
     }
 
@@ -497,7 +511,7 @@ public sealed class AudioDatabase : IDisposable
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = """
             SELECT
-                path, file_name, title, artist, album, genre, format, duration, sort_title
+                path, file_name, title, artist, album, genre, format, duration, sort_title, id, is_favorite
             FROM tracks
             WHERE album_id = $album_id
             ORDER BY
@@ -518,8 +532,35 @@ public sealed class AudioDatabase : IDisposable
                 reader.IsDBNull(5) ? null : reader.GetString(5),
                 reader.IsDBNull(6) ? null : reader.GetString(6),
                 reader.IsDBNull(7) ? null : reader.GetDouble(7),
-                reader.IsDBNull(8) ? null : reader.GetString(8)));
+                reader.IsDBNull(8) ? null : reader.GetString(8),
+                reader.GetInt64(9),
+                reader.GetInt32(10) != 0));
         return result;
+    }
+
+    public void SetTrackFavorite(long id, bool value) => SetFavorite("tracks", id, value);
+    public void SetArtistFavorite(long id, bool value) => SetFavorite("artists", id, value);
+    public void SetAlbumFavorite(long id, bool value) => SetFavorite("albums", id, value);
+
+    public ArtworkPaths? GetArtworkPathsByTrackPath(string path)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT aw.original_path, aw.thumb_96_path, aw.thumb_320_path
+            FROM tracks t
+            LEFT JOIN albums al ON al.id = t.album_id
+            LEFT JOIN artworks aw ON aw.id = al.artwork_id
+            WHERE t.path = $path
+            LIMIT 1;
+            """;
+        Add(cmd, "$path", path);
+        using var reader = cmd.ExecuteReader();
+        return reader.Read()
+            ? new ArtworkPaths(
+                reader.IsDBNull(0) ? null : reader.GetString(0),
+                reader.IsDBNull(1) ? null : reader.GetString(1),
+                reader.IsDBNull(2) ? null : reader.GetString(2))
+            : null;
     }
 
     /// <summary>Nur path/file_name/title/disc_number/track_number – kein BLOB, keine Texte.</summary>
@@ -683,7 +724,8 @@ public sealed class AudioDatabase : IDisposable
                 cover_mime_type         TEXT,
                 cover_data              BLOB,
                 artist_id               INTEGER REFERENCES artists(id),
-                album_id                INTEGER REFERENCES albums(id)
+                album_id                INTEGER REFERENCES albums(id),
+                is_favorite             INTEGER NOT NULL DEFAULT 0
             );
 
             CREATE INDEX IF NOT EXISTS idx_tracks_artist         ON tracks (artist);
@@ -698,18 +740,23 @@ public sealed class AudioDatabase : IDisposable
 
         EnsureColumn("tracks", "artist_id", "INTEGER REFERENCES artists(id)");
         EnsureColumn("tracks", "album_id", "INTEGER REFERENCES albums(id)");
+        EnsureColumn("tracks", "is_favorite", "INTEGER NOT NULL DEFAULT 0");
 
         Execute("""
             CREATE TABLE IF NOT EXISTS artists (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                name        TEXT NOT NULL UNIQUE COLLATE NOCASE
+                name        TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                is_favorite INTEGER NOT NULL DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS artworks (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
                 content_hash TEXT NOT NULL UNIQUE,
                 mime_type    TEXT,
-                data         BLOB NOT NULL
+                data         BLOB NOT NULL,
+                original_path TEXT,
+                thumb_96_path TEXT,
+                thumb_320_path TEXT
             );
 
             CREATE TABLE IF NOT EXISTS albums (
@@ -718,6 +765,7 @@ public sealed class AudioDatabase : IDisposable
                 artist_id   INTEGER REFERENCES artists(id),
                 year        INTEGER,
                 artwork_id  INTEGER REFERENCES artworks(id),
+                is_favorite INTEGER NOT NULL DEFAULT 0,
                 UNIQUE(title, artist_id, year)
             );
 
@@ -751,6 +799,11 @@ public sealed class AudioDatabase : IDisposable
                 value TEXT NOT NULL
             );
             """);
+        EnsureColumn("artists", "is_favorite", "INTEGER NOT NULL DEFAULT 0");
+        EnsureColumn("albums", "is_favorite", "INTEGER NOT NULL DEFAULT 0");
+        EnsureColumn("artworks", "original_path", "TEXT");
+        EnsureColumn("artworks", "thumb_96_path", "TEXT");
+        EnsureColumn("artworks", "thumb_320_path", "TEXT");
 
         if (!string.Equals(GetMeta("normalized_library_v1"), "done", StringComparison.Ordinal))
         {
@@ -761,6 +814,11 @@ public sealed class AudioDatabase : IDisposable
         {
             RebuildAlbumsFromAlbumArtists();
             SetMeta("album_artist_rebuild_v1", "done");
+        }
+        if (!string.Equals(GetMeta("artwork_files_v1"), "done", StringComparison.Ordinal))
+        {
+            MigrateArtworkFiles();
+            SetMeta("artwork_files_v1", "done");
         }
 
         Execute("""
@@ -1028,6 +1086,49 @@ public sealed class AudioDatabase : IDisposable
         cmd.ExecuteNonQuery();
     }
 
+    private void SetFavorite(string table, long id, bool value)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = $"UPDATE {table} SET is_favorite = $value WHERE id = $id;";
+        Add(cmd, "$value", value ? 1 : 0);
+        Add(cmd, "$id", id);
+        cmd.ExecuteNonQuery();
+    }
+
+    private void MigrateArtworkFiles()
+    {
+        using var select = _conn.CreateCommand();
+        select.CommandText = """
+            SELECT id, content_hash, mime_type, data
+            FROM artworks
+            WHERE data IS NOT NULL
+              AND (original_path IS NULL OR thumb_96_path IS NULL OR thumb_320_path IS NULL);
+            """;
+        using var reader = select.ExecuteReader();
+        var rows = new List<(long Id, string Hash, string? Mime, byte[] Data)>();
+        while (reader.Read())
+            rows.Add((reader.GetInt64(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2), (byte[])reader.GetValue(3)));
+        reader.Close();
+
+        foreach (var row in rows)
+        {
+            var files = ArtworkCache.EnsureFiles(row.Hash, row.Data, row.Mime);
+            using var update = _conn.CreateCommand();
+            update.CommandText = """
+                UPDATE artworks
+                SET original_path = $original,
+                    thumb_96_path = $thumb96,
+                    thumb_320_path = $thumb320
+                WHERE id = $id;
+                """;
+            Add(update, "$original", files.OriginalPath);
+            Add(update, "$thumb96", files.Thumb96Path);
+            Add(update, "$thumb320", files.Thumb320Path);
+            Add(update, "$id", row.Id);
+            update.ExecuteNonQuery();
+        }
+    }
+
     private void EnsureColumn(string table, string column, string definition)
     {
         using var cmd = _conn.CreateCommand();
@@ -1104,17 +1205,23 @@ public sealed class AudioDatabase : IDisposable
         if (data is null || data.Length == 0)
             return null;
         var hash = Convert.ToHexString(SHA256.HashData(data));
+        var files = ArtworkCache.EnsureFiles(hash, data, mimeType);
         using var cmd = _conn.CreateCommand();
         cmd.Transaction = tx;
         cmd.CommandText = """
-            INSERT INTO artworks (content_hash, mime_type, data)
-            VALUES ($hash, $mime, $data)
-            ON CONFLICT(content_hash) DO NOTHING;
+            INSERT INTO artworks (content_hash, mime_type, data, original_path, thumb_96_path, thumb_320_path)
+            VALUES ($hash, $mime, NULL, $original, $thumb96, $thumb320)
+            ON CONFLICT(content_hash) DO UPDATE SET
+                original_path = COALESCE(artworks.original_path, excluded.original_path),
+                thumb_96_path = COALESCE(artworks.thumb_96_path, excluded.thumb_96_path),
+                thumb_320_path = COALESCE(artworks.thumb_320_path, excluded.thumb_320_path);
             SELECT id FROM artworks WHERE content_hash = $hash LIMIT 1;
             """;
         Add(cmd, "$hash", hash);
         Add(cmd, "$mime", mimeType);
-        Add(cmd, "$data", data);
+        Add(cmd, "$original", files.OriginalPath);
+        Add(cmd, "$thumb96", files.Thumb96Path);
+        Add(cmd, "$thumb320", files.Thumb320Path);
         return Convert.ToInt64(cmd.ExecuteScalar());
     }
 

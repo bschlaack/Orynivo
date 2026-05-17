@@ -3,6 +3,60 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:Player">
     <Application.Resources>
-         
+        <SolidColorBrush x:Key="AppSidebarBrush" Color="#13142A"/>
+        <SolidColorBrush x:Key="AppHeaderBrush" Color="#13142A"/>
+        <SolidColorBrush x:Key="AppHeaderBorderBrush" Color="#1E1F38"/>
+        <SolidColorBrush x:Key="AppContentBrush" Color="#18192E"/>
+        <SolidColorBrush x:Key="AppSurfaceBrush" Color="#20213A"/>
+        <SolidColorBrush x:Key="AppSurfaceHoverBrush" Color="#292B47"/>
+        <SolidColorBrush x:Key="AppSurfaceSelectedBrush" Color="#343654"/>
+        <SolidColorBrush x:Key="AppNavHoverBrush" Color="#1F2038"/>
+        <SolidColorBrush x:Key="AppNavSelectedBrush" Color="#252640"/>
+        <SolidColorBrush x:Key="AppNavTextBrush" Color="#9999BB"/>
+        <SolidColorBrush x:Key="AppNavHoverTextBrush" Color="#CCCCEE"/>
+        <SolidColorBrush x:Key="AppNavSelectedTextBrush" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="AppPrimaryTextBrush" Color="#F7F7FF"/>
+        <SolidColorBrush x:Key="AppSecondaryTextBrush" Color="#A0A0C8"/>
+        <SolidColorBrush x:Key="AppMutedTextBrush" Color="#7777AA"/>
+        <SolidColorBrush x:Key="AppGridLineBrush" Color="#2A2C46"/>
+        <SolidColorBrush x:Key="AppColumnHeaderBrush" Color="#20213A"/>
+        <SolidColorBrush x:Key="AppTransportBrush" Color="#13142A"/>
+        <SolidColorBrush x:Key="AppTransportBorderBrush" Color="#1E1F38"/>
+        <SolidColorBrush x:Key="AppTransportPrimaryTextBrush" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="AppArtworkPlaceholderBrush" Color="#252640"/>
+        <SolidColorBrush x:Key="AppScrollbarTrackBrush" Color="#20213A"/>
+        <SolidColorBrush x:Key="AppScrollbarThumbBrush" Color="#343654"/>
+        <SolidColorBrush x:Key="AppScrollbarThumbHoverBrush" Color="#45486B"/>
+        <SolidColorBrush x:Key="AppButtonBrush" Color="#252640"/>
+        <SolidColorBrush x:Key="AppButtonHoverBrush" Color="#343654"/>
+        <SolidColorBrush x:Key="AppButtonPressedBrush" Color="#3E4162"/>
+        <SolidColorBrush x:Key="AppButtonTextBrush" Color="#F7F7FF"/>
+        <SolidColorBrush x:Key="AppButtonBorderBrush" Color="#343654"/>
+        <SolidColorBrush x:Key="AppInputBrush" Color="#20213A"/>
+        <SolidColorBrush x:Key="AppInputBorderBrush" Color="#343654"/>
+        <SolidColorBrush x:Key="AppDsdSupportedBrush" Color="#F7F7FF"/>
+        <SolidColorBrush x:Key="AppDsdUnsupportedBrush" Color="#5B5D79"/>
+        <sys:String x:Key="L_LocalLibrary" xmlns:sys="clr-namespace:System;assembly=mscorlib">LOKALE BIBLIOTHEK</sys:String>
+        <sys:String x:Key="L_Artists" xmlns:sys="clr-namespace:System;assembly=mscorlib">Künstler</sys:String>
+        <sys:String x:Key="L_Albums" xmlns:sys="clr-namespace:System;assembly=mscorlib">Alben</sys:String>
+        <sys:String x:Key="L_Tracks" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tracks</sys:String>
+        <sys:String x:Key="L_FolderStructure" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ordnerstruktur</sys:String>
+        <sys:String x:Key="L_Playlists" xmlns:sys="clr-namespace:System;assembly=mscorlib">PLAYLISTS</sys:String>
+        <sys:String x:Key="L_Settings" xmlns:sys="clr-namespace:System;assembly=mscorlib">⚙   Einstellungen</sys:String>
+        <sys:String x:Key="L_Table" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tabelle</sys:String>
+        <sys:String x:Key="L_Artwork" xmlns:sys="clr-namespace:System;assembly=mscorlib">Artwork</sys:String>
+        <sys:String x:Key="L_Appearance" xmlns:sys="clr-namespace:System;assembly=mscorlib">Darstellung</sys:String>
+        <sys:String x:Key="L_ColorScheme" xmlns:sys="clr-namespace:System;assembly=mscorlib">Farbschema</sys:String>
+        <sys:String x:Key="L_Language" xmlns:sys="clr-namespace:System;assembly=mscorlib">Sprache</sys:String>
+        <sys:String x:Key="L_Playback" xmlns:sys="clr-namespace:System;assembly=mscorlib">WIEDERGABE</sys:String>
+        <sys:String x:Key="L_OutputDevice" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ausgabegerät</sys:String>
+        <sys:String x:Key="L_Library" xmlns:sys="clr-namespace:System;assembly=mscorlib">BIBLIOTHEK</sys:String>
+        <sys:String x:Key="L_Directories" xmlns:sys="clr-namespace:System;assembly=mscorlib">Verzeichnisse</sys:String>
+        <sys:String x:Key="L_AddDirectory" xmlns:sys="clr-namespace:System;assembly=mscorlib">+ Verzeichnis hinzufügen</sys:String>
+        <sys:String x:Key="L_DatabaseMaintenance" xmlns:sys="clr-namespace:System;assembly=mscorlib">Datenbankwartung</sys:String>
+        <sys:String x:Key="L_OptimizeDatabase" xmlns:sys="clr-namespace:System;assembly=mscorlib">Datenbank optimieren</sys:String>
+        <sys:String x:Key="L_RepairAlbumArtwork" xmlns:sys="clr-namespace:System;assembly=mscorlib">Album-Cover reparieren</sys:String>
+        <sys:String x:Key="L_Save" xmlns:sys="clr-namespace:System;assembly=mscorlib">Speichern</sys:String>
+        <sys:String x:Key="L_Cancel" xmlns:sys="clr-namespace:System;assembly=mscorlib">Abbrechen</sys:String>
     </Application.Resources>
 </Application>

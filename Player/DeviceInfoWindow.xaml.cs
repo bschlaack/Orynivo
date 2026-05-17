@@ -1,6 +1,8 @@
 using System.Windows;
 using System.Windows.Controls;
 using Player.Audio;
+using System.Runtime.InteropServices;
+using WpfApplication = System.Windows.Application;
 
 namespace Player;
 
@@ -27,7 +29,8 @@ public partial class DeviceInfoWindow : Window
             {
                 Text = dsdRate.ToString(),
                 Margin = new Thickness(0, 0, 12, 0),
-                Foreground = supported ? System.Windows.Media.Brushes.Black : System.Windows.Media.Brushes.LightGray
+                Foreground = (System.Windows.Media.Brush)FindResource(
+                    supported ? "AppDsdSupportedBrush" : "AppDsdUnsupportedBrush")
             });
         }
 
@@ -43,6 +46,31 @@ public partial class DeviceInfoWindow : Window
                 ? "Nicht unterstützt."
                 : "Konnte nicht eindeutig geprüft werden — Gerät wird möglicherweise von einer anderen Anwendung verwendet.";
     }
+
+    private void DeviceInfoWindow_OnSourceInitialized(object sender, EventArgs e)
+    {
+        try
+        {
+            var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+            if (handle == IntPtr.Zero)
+                return;
+
+            const int DwmwaCaptionColor = 35;
+            const int DwmwaTextColor = 36;
+            var dark = WpfApplication.Current.Resources["AppHeaderBrush"] is System.Windows.Media.SolidColorBrush b &&
+                       b.Color == System.Windows.Media.Color.FromRgb(0x13, 0x14, 0x2A);
+            var captionColor = dark ? ColorRef(0x13, 0x14, 0x2A) : ColorRef(0xEA, 0xEA, 0xF5);
+            var textColor = dark ? ColorRef(0xFF, 0xFF, 0xFF) : ColorRef(0x13, 0x14, 0x2A);
+            _ = DwmSetWindowAttribute(handle, DwmwaCaptionColor, ref captionColor, sizeof(int));
+            _ = DwmSetWindowAttribute(handle, DwmwaTextColor, ref textColor, sizeof(int));
+        }
+        catch { }
+    }
+
+    private static int ColorRef(byte r, byte g, byte b) => r | (g << 8) | (b << 16);
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int dwAttribute, ref int pvAttribute, int cbAttribute);
 
     public DeviceInfoWindow(WasapiDeviceCapabilities info)
     {
@@ -60,7 +88,7 @@ public partial class DeviceInfoWindow : Window
         DsdRatesPanel.Children.Add(new TextBlock
         {
             Text = "Nicht relevant für WASAPI in diesem Player.",
-            Foreground = System.Windows.Media.Brushes.Gray
+            Foreground = (System.Windows.Media.Brush)FindResource("AppDsdUnsupportedBrush")
         });
 
         PcmFormatsTextBlock.Text = info.ExclusivePcmFormats.Count == 0
