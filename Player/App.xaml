@@ -36,6 +36,37 @@
         <SolidColorBrush x:Key="AppInputBorderBrush" Color="#343654"/>
         <SolidColorBrush x:Key="AppDsdSupportedBrush" Color="#F7F7FF"/>
         <SolidColorBrush x:Key="AppDsdUnsupportedBrush" Color="#5B5D79"/>
+
+        <Style TargetType="DataGrid">
+            <Setter Property="Background" Value="{DynamicResource AppContentBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppGridLineBrush}"/>
+            <Setter Property="HeadersVisibility" Value="Column"/>
+            <Setter Property="RowBackground" Value="{DynamicResource AppContentBrush}"/>
+            <Setter Property="AlternatingRowBackground" Value="{DynamicResource AppSurfaceBrush}"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="{DynamicResource AppGridLineBrush}"/>
+            <Setter Property="VerticalGridLinesBrush" Value="{DynamicResource AppGridLineBrush}"/>
+        </Style>
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="{DynamicResource AppColumnHeaderBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppGridLineBrush}"/>
+        </Style>
+        <Style TargetType="DataGridCell">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppGridLineBrush}"/>
+        </Style>
+        <Style TargetType="ListBox">
+            <Setter Property="Background" Value="{DynamicResource AppContentBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppGridLineBrush}"/>
+        </Style>
+        <Style TargetType="TreeView">
+            <Setter Property="Background" Value="{DynamicResource AppContentBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppGridLineBrush}"/>
+        </Style>
         <sys:String x:Key="L_LocalLibrary" xmlns:sys="clr-namespace:System;assembly=mscorlib">LOKALE BIBLIOTHEK</sys:String>
         <sys:String x:Key="L_Artists" xmlns:sys="clr-namespace:System;assembly=mscorlib">Künstler</sys:String>
         <sys:String x:Key="L_Albums" xmlns:sys="clr-namespace:System;assembly=mscorlib">Alben</sys:String>

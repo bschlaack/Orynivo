@@ -17,6 +17,8 @@ using Player.Localization;
 using Button = System.Windows.Controls.Button;
 using WpfImage = System.Windows.Controls.Image;
 using WpfCursors = System.Windows.Input.Cursors;
+using WpfBrush = System.Windows.Media.Brush;
+using WpfCheckBox = System.Windows.Controls.CheckBox;
 
 namespace Player;
 
@@ -39,6 +41,12 @@ public partial class MainWindow : Window
     private long? _activeArtistFilterId;
     private string? _activeArtistFilterName;
     private readonly Stack<NavigationState> _navigationStack = [];
+    private readonly DispatcherTimer _searchTimer;
+    private bool _trackFavoritesOnly;
+    private readonly HashSet<string> _selectedTrackGenres = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _selectedTrackFormats = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<int> _selectedTrackBitrates = [];
+    private readonly HashSet<string> _expandedTrackFilterSections = new(StringComparer.Ordinal);
 
     private readonly ObservableCollection<PlaylistItem> _queue = [];
     private int _queueIndex = -1;
@@ -51,7 +59,12 @@ public partial class MainWindow : Window
     };
 
     private sealed record FolderTag(bool IsFile, string FilePath, string FolderPath);
-    private sealed record NavigationState(string View, long? SelectedId, long? ArtistFilterId, string? ArtistFilterName);
+    private sealed record NavigationState(
+        string View,
+        long? SelectedId,
+        long? ArtistFilterId,
+        string? ArtistFilterName,
+        string? SearchQuery = null);
 
     private sealed class ContentRow : INotifyPropertyChanged
     {
@@ -105,6 +118,12 @@ public partial class MainWindow : Window
         SourceInitialized += (_, _) => ApplyWindowTitleBarColors();
         _transportTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         _transportTimer.Tick += (_, _) => RefreshTransport();
+        _searchTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+        _searchTimer.Tick += async (_, _) =>
+        {
+            _searchTimer.Stop();
+            await ShowSearchResultsAsync(SearchTextBox.Text);
+        };
         // Register with handledEventsToo=true so our handler fires even after
         // IsMoveToPointEnabled marks PreviewMouseLeftButtonDown as handled.
         PositionSlider.AddHandler(
@@ -114,9 +133,11 @@ public partial class MainWindow : Window
         LoadSettings();
         LoadNavPlaylists();
         _showAlbumArtworkView = _settings.AlbumArtworkView;
+        VolumeSlider.Value = Math.Clamp(_settings.Volume, 0, 1);
         AlbumArtworkViewRadioButton.IsChecked = _showAlbumArtworkView;
         AlbumTableViewRadioButton.IsChecked = !_showAlbumArtworkView;
         SelectInitialView();
+        RestoreLastTrackState();
     }
 
     private void ApplyWindowTitleBarColors()
@@ -174,6 +195,8 @@ public partial class MainWindow : Window
             _settings.LastMainView = tag;
         }
         _settings.AlbumArtworkView = _showAlbumArtworkView;
+        _settings.Volume = VolumeSlider.Value;
+        _settings.LastTrackPath = File.Exists(_currentFilePath) ? _currentFilePath : null;
         _settingsStore.Save(_settings);
     }
 
@@ -181,6 +204,36 @@ public partial class MainWindow : Window
     {
         _settings = _settingsStore.Load();
         RefreshSelectedDriverText();
+    }
+
+    private void RestoreLastTrackState()
+    {
+        var path = _settings.LastTrackPath;
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            return;
+
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            var track = db.GetByPath(path);
+            if (track is null)
+                return;
+
+            _currentFilePath = path;
+            NowPlayingTitleBlock.Text = track.Title ?? Path.GetFileNameWithoutExtension(path);
+            NowPlayingArtistBlock.Text = track.Artist ?? string.Empty;
+            NowPlayingArtworkImage.Source =
+                CreateArtworkImage(db.GetArtworkPathsByTrackPath(path)?.Thumb96Path, 96);
+            PlayButton.IsEnabled = true;
+            SetPlayPauseIcon(isPlaying: false);
+        }
+        catch
+        {
+            _currentFilePath = string.Empty;
+            NowPlayingTitleBlock.Text = string.Empty;
+            NowPlayingArtistBlock.Text = string.Empty;
+            NowPlayingArtworkImage.Source = null;
+        }
     }
 
     private void RefreshSelectedDriverText()
@@ -270,8 +323,11 @@ public partial class MainWindow : Window
 
         ContentDataGrid.ItemsSource = null;
         AlbumArtworkListBox.ItemsSource = null;
+        SearchResultsScrollViewer.Visibility = Visibility.Collapsed;
         ContentCountTextBlock.Text  = "";
         AlbumViewModeBorder.Visibility = tag == "Albums" ? Visibility.Visible : Visibility.Collapsed;
+        TrackFilterButton.Visibility = tag == "Tracks" ? Visibility.Visible : Visibility.Collapsed;
+        TrackFilterPopup.IsOpen = false;
         if (tag == "Folders")
         {
             ContentDataGrid.Visibility = Visibility.Collapsed;
@@ -297,7 +353,9 @@ public partial class MainWindow : Window
                 ? Visibility.Visible
                 : Visibility.Collapsed;
 
-            var rows = await Task.Run(() => QueryRows(tag));
+            var rows = tag == "Tracks"
+                ? await Task.Run(GetFilteredTrackRows)
+                : await Task.Run(() => QueryRows(tag));
             ApplyColumns(tag);
             ContentDataGrid.ItemsSource = rows;
             AlbumArtworkListBox.ItemsSource = tag == "Albums" ? rows : null;
@@ -332,7 +390,7 @@ public partial class MainWindow : Window
     // DB-Abfragen
     // ------------------------------------------------------------------
 
-    private List<ContentRow> QueryRows(string view)
+    private List<ContentRow> QueryRows(string view, string? searchQuery = null)
     {
         try
         {
@@ -358,6 +416,10 @@ public partial class MainWindow : Window
 
             return view switch
             {
+                "Search" => db.GetTrackListByIds(TrackSearchIndex.Search(searchQuery ?? string.Empty))
+                    .Select(ToTrackContentRow)
+                    .ToList(),
+
                 "Artists" => db.GetArtistsLite()
                     .Select(a => new ContentRow
                     {
@@ -385,21 +447,318 @@ public partial class MainWindow : Window
                 _ => (_activeAlbumFilterId is long albumId
                         ? db.GetTrackListByAlbum(albumId)
                         : db.GetTrackList())  // "Tracks" und Fallback
-                    .Select(t => new ContentRow
-                    {
-                        Title    = t.Title ?? t.FileName,
-                        Id       = t.Id,
-                        Artist   = t.Artist,
-                        Album    = t.Album,
-                        Duration = FormatSeconds(t.Duration),
-                        Genre    = t.Genre,
-                        Format   = t.Format?.ToUpperInvariant(),
-                        FilePath = t.Path
-                        ,IsFavorite = t.IsFavorite
-                    }).ToList()
+                    .Select(ToTrackContentRow)
+                    .ToList()
             };
         }
         catch { return []; }
+    }
+
+    private List<ContentRow> GetFilteredTrackRows()
+    {
+        using var db = AudioDatabase.OpenDefault();
+        var facets = db.GetTrackFacets();
+        var ids = facets
+            .Where(f => MatchesTrackFilters(f))
+            .Select(f => f.Id)
+            .ToList();
+        return db.GetTrackListFiltered(ids)
+            .Select(ToTrackContentRow)
+            .ToList();
+    }
+
+    private static ContentRow ToTrackContentRow(TrackListInfo t) => new()
+    {
+        Title = t.Title ?? t.FileName,
+        Id = t.Id,
+        Artist = t.Artist,
+        Album = t.Album,
+        Duration = FormatSeconds(t.Duration),
+        Genre = t.Genre,
+        Format = t.Format?.ToUpperInvariant(),
+        FilePath = t.Path,
+        IsFavorite = t.IsFavorite
+    };
+
+    private async void TrackFilterButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        await RefreshTrackFilterPopupAsync();
+        TrackFilterPopup.IsOpen = !TrackFilterPopup.IsOpen;
+    }
+
+    private async Task RefreshTrackFilterPopupAsync()
+    {
+        var facets = await Task.Run(() =>
+        {
+            try
+            {
+                using var db = AudioDatabase.OpenDefault();
+                return db.GetTrackFacets();
+            }
+            catch
+            {
+                return [];
+            }
+        });
+
+        TrackFilterPanel.Children.Clear();
+        AddTrackFilterCheckBox(
+            TrackFilterPanel,
+            LocalizationManager.Current.Favorites,
+            facets.Count(f => f.IsFavorite && MatchesTrackFilters(f, ignoredDimension: "favorite")),
+            _trackFavoritesOnly,
+            isChecked => _trackFavoritesOnly = isChecked);
+
+        var genreSection = AddTrackFilterSection(LocalizationManager.Current.Genre);
+        foreach (var option in BuildGenreFacetCounts(facets))
+            AddTrackFilterCheckBox(
+                genreSection,
+                option.Key,
+                option.Value,
+                _selectedTrackGenres.Contains(option.Key),
+                isChecked => ToggleSelection(_selectedTrackGenres, option.Key, isChecked));
+
+        var audioTypeSection = AddTrackFilterSection(LocalizationManager.Current.AudioTypes);
+        foreach (var option in BuildStringFacetCounts(facets, f => f.Format, "format"))
+            AddTrackFilterCheckBox(
+                audioTypeSection,
+                option.Key.ToUpperInvariant(),
+                option.Value,
+                _selectedTrackFormats.Contains(option.Key),
+                isChecked => ToggleSelection(_selectedTrackFormats, option.Key, isChecked));
+
+        var bitrateSection = AddTrackFilterSection(LocalizationManager.Current.Bitrate);
+        foreach (var option in BuildBitrateFacetCounts(facets))
+            AddTrackFilterCheckBox(
+                bitrateSection,
+                $"{option.Key:N0} kbps",
+                option.Value,
+                _selectedTrackBitrates.Contains(option.Key),
+                isChecked => ToggleSelection(_selectedTrackBitrates, option.Key, isChecked));
+    }
+
+    private StackPanel AddTrackFilterSection(string title)
+    {
+        var content = new StackPanel();
+        var expander = new Expander
+        {
+            Header = title,
+            Content = content,
+            IsExpanded = _expandedTrackFilterSections.Contains(title),
+            Margin = TrackFilterPanel.Children.Count == 0 ? new Thickness(0, 0, 0, 0) : new Thickness(0, 8, 0, 0),
+            Style = (Style)FindResource("TrackFilterExpanderStyle")
+        };
+        expander.Expanded += (_, _) => _expandedTrackFilterSections.Add(title);
+        expander.Collapsed += (_, _) => _expandedTrackFilterSections.Remove(title);
+        TrackFilterPanel.Children.Add(expander);
+        return content;
+    }
+
+    private void AddTrackFilterCheckBox(StackPanel section, string label, int count, bool isChecked, Action<bool> update)
+    {
+        var content = new Grid();
+        content.Margin = new Thickness(8, 0, 0, 0);
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        content.Children.Add(new TextBlock
+        {
+            Text = label,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            Foreground = (WpfBrush)FindResource("AppPrimaryTextBrush")
+        });
+        var countText = new TextBlock
+        {
+            Text = count.ToString("N0"),
+            Margin = new Thickness(16, 0, 0, 0),
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+            Foreground = (WpfBrush)FindResource("AppMutedTextBrush")
+        };
+        Grid.SetColumn(countText, 1);
+        content.Children.Add(countText);
+
+        var checkBox = new WpfCheckBox
+        {
+            Content = content,
+            IsChecked = isChecked,
+            Margin = new Thickness(0, 6, 0, 6),
+            Foreground = (WpfBrush)FindResource("AppPrimaryTextBrush"),
+            HorizontalContentAlignment = System.Windows.HorizontalAlignment.Stretch,
+            MinWidth = 590
+        };
+        checkBox.Checked += async (_, _) => await OnTrackFilterChangedAsync(update, true);
+        checkBox.Unchecked += async (_, _) => await OnTrackFilterChangedAsync(update, false);
+        section.Children.Add(checkBox);
+    }
+
+    private async Task OnTrackFilterChangedAsync(Action<bool> update, bool isChecked)
+    {
+        update(isChecked);
+        var rows = await Task.Run(GetFilteredTrackRows);
+        ContentDataGrid.ItemsSource = rows;
+        ContentCountTextBlock.Text = rows.Count == 1 ? "1 Eintrag" : $"{rows.Count:N0} Einträge";
+        await RefreshTrackFilterPopupAsync();
+    }
+
+    private static void ToggleSelection<T>(HashSet<T> values, T value, bool isChecked)
+    {
+        if (isChecked)
+            values.Add(value);
+        else
+            values.Remove(value);
+    }
+
+    private bool MatchesTrackFilters(TrackFacetInfo facet, string? ignoredDimension = null)
+    {
+        if (ignoredDimension != "favorite" && _trackFavoritesOnly && !facet.IsFavorite)
+            return false;
+        if (ignoredDimension != "genre" && _selectedTrackGenres.Count > 0 &&
+            !SplitGenres(facet.Genre).Any(_selectedTrackGenres.Contains))
+            return false;
+        if (ignoredDimension != "format" && _selectedTrackFormats.Count > 0 &&
+            (string.IsNullOrWhiteSpace(facet.Format) || !_selectedTrackFormats.Contains(facet.Format)))
+            return false;
+        if (ignoredDimension != "bitrate" && _selectedTrackBitrates.Count > 0 &&
+            (!facet.Bitrate.HasValue || !_selectedTrackBitrates.Contains(facet.Bitrate.Value)))
+            return false;
+        return true;
+    }
+
+    private IEnumerable<KeyValuePair<string, int>> BuildGenreFacetCounts(IEnumerable<TrackFacetInfo> facets)
+    {
+        var counts = facets
+            .Where(f => MatchesTrackFilters(f, "genre"))
+            .SelectMany(f => SplitGenres(f.Genre))
+            .GroupBy(g => g, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+        foreach (var selected in _selectedTrackGenres)
+            counts.TryAdd(selected, 0);
+        return counts
+            .Select(x => new KeyValuePair<string, int>(x.Key, x.Value))
+            .OrderBy(x => x.Key, StringComparer.CurrentCultureIgnoreCase);
+    }
+
+    private IEnumerable<KeyValuePair<string, int>> BuildStringFacetCounts(
+        IEnumerable<TrackFacetInfo> facets,
+        Func<TrackFacetInfo, string?> selector,
+        string ignoredDimension)
+    {
+        var counts = facets
+            .Where(f => MatchesTrackFilters(f, ignoredDimension))
+            .Select(selector)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .GroupBy(value => value!, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+        foreach (var selected in _selectedTrackFormats)
+            counts.TryAdd(selected, 0);
+        return counts
+            .Select(x => new KeyValuePair<string, int>(x.Key, x.Value))
+            .OrderBy(x => x.Key, StringComparer.CurrentCultureIgnoreCase);
+    }
+
+    private IEnumerable<KeyValuePair<int, int>> BuildBitrateFacetCounts(IEnumerable<TrackFacetInfo> facets)
+    {
+        var counts = facets
+            .Where(f => MatchesTrackFilters(f, "bitrate"))
+            .Where(f => f.Bitrate.HasValue)
+            .GroupBy(f => f.Bitrate!.Value)
+            .ToDictionary(g => g.Key, g => g.Count());
+        foreach (var selected in _selectedTrackBitrates)
+            counts.TryAdd(selected, 0);
+        return counts
+            .Select(x => new KeyValuePair<int, int>(x.Key, x.Value))
+            .OrderBy(x => x.Key);
+    }
+
+    private static IEnumerable<string> SplitGenres(string? genre)
+        => string.IsNullOrWhiteSpace(genre)
+            ? []
+            : genre.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    private void SearchTextBox_OnTextChanged(object sender, TextChangedEventArgs e)
+    {
+        _searchTimer.Stop();
+        _searchTimer.Start();
+    }
+
+    private async Task ShowSearchResultsAsync(string query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            if (NavListBox.SelectedItem is ListBoxItem { Tag: string tag })
+                await ShowTopLevelViewAsync(tag);
+            return;
+        }
+
+        ResetDrilldownState();
+        ContentTitleTextBlock.Text = LocalizationManager.Current.Search;
+        AlbumViewModeBorder.Visibility = Visibility.Collapsed;
+        TrackFilterButton.Visibility = Visibility.Collapsed;
+        ContentDataGrid.Visibility = Visibility.Collapsed;
+        FolderTreeView.Visibility = Visibility.Collapsed;
+        AlbumArtworkListBox.Visibility = Visibility.Collapsed;
+        SearchResultsScrollViewer.Visibility = Visibility.Visible;
+
+        var result = await Task.Run(() =>
+        {
+            var ids = TrackSearchIndex.Search(query);
+            using var db = AudioDatabase.OpenDefault();
+            return (
+                Tracks: db.GetTrackListByIds(ids).Select(ToTrackContentRow).ToList(),
+                Albums: db.GetAlbumsByTrackIds(ids).Select(ToAlbumContentRow).ToList(),
+                Artists: db.GetArtistsByTrackIds(ids).Select(ToArtistContentRow).ToList());
+        });
+
+        ApplySearchColumns();
+        SearchTracksDataGrid.ItemsSource = result.Tracks;
+        SearchAlbumsDataGrid.ItemsSource = result.Albums;
+        SearchArtistsDataGrid.ItemsSource = result.Artists;
+        ContentCountTextBlock.Text =
+            $"{result.Tracks.Count:N0} Titel · {result.Albums.Count:N0} Alben · {result.Artists.Count:N0} Künstler";
+    }
+
+    private static ContentRow ToAlbumContentRow(AlbumInfo a) => new()
+    {
+        Id = a.Id,
+        Title = string.IsNullOrEmpty(a.Album) ? LocalizationManager.Current.Unknown : a.Album,
+        Artist = string.IsNullOrEmpty(a.DisplayArtist) ? null : a.DisplayArtist,
+        Year = a.Year?.ToString(),
+        ArtworkPath = a.ArtworkPath,
+        ThumbnailPath = a.ThumbnailPath,
+        IsFavorite = a.IsFavorite
+    };
+
+    private static ContentRow ToArtistContentRow(ArtistInfo a) => new()
+    {
+        Id = a.Id,
+        Title = string.IsNullOrEmpty(a.Artist) ? LocalizationManager.Current.Unknown : a.Artist,
+        IsFavorite = a.IsFavorite
+    };
+
+    private void ApplySearchColumns()
+    {
+        ConfigureSearchGrid(SearchTracksDataGrid,
+            (LocalizationManager.Current.Title, nameof(ContentRow.Title), 240),
+            (LocalizationManager.Current.Artist, nameof(ContentRow.Artist), 180),
+            (LocalizationManager.Current.Album, nameof(ContentRow.Album), 220),
+            (LocalizationManager.Current.Duration, nameof(ContentRow.Duration), 90));
+        ConfigureSearchGrid(SearchAlbumsDataGrid,
+            (LocalizationManager.Current.Album, nameof(ContentRow.Title), 260),
+            (LocalizationManager.Current.AlbumArtist, nameof(ContentRow.Artist), 220),
+            (LocalizationManager.Current.Year, nameof(ContentRow.Year), 90));
+        ConfigureSearchGrid(SearchArtistsDataGrid,
+            (LocalizationManager.Current.Artist, nameof(ContentRow.Title), 320));
+    }
+
+    private static void ConfigureSearchGrid(DataGrid grid, params (string Header, string Binding, double Width)[] columns)
+    {
+        grid.Columns.Clear();
+        foreach (var column in columns)
+            grid.Columns.Add(new DataGridTextColumn
+            {
+                Header = column.Header,
+                Binding = new Binding(column.Binding),
+                Width = new DataGridLength(column.Width)
+            });
     }
 
     private static ImageSource? CreateArtworkImage(string? path, int decodeWidth)
@@ -711,6 +1070,7 @@ public partial class MainWindow : Window
                 if (string.Equals(_queue[i].FilePath, filePath, StringComparison.OrdinalIgnoreCase))
                 { _queueIndex = i; break; }
             }
+            RefreshQueueNavigationButtons();
 
             await StartPlaybackAsync(filePath);
         }
@@ -736,6 +1096,33 @@ public partial class MainWindow : Window
         await HandleContentRowDoubleClickAsync(row);
     }
 
+    private async void SearchTracksDataGrid_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (SearchTracksDataGrid.SelectedItem is not ContentRow row)
+            return;
+
+        var allRows = (SearchTracksDataGrid.ItemsSource as IEnumerable<ContentRow>)?.ToList() ?? [];
+        await PlayTrackFromRowsAsync(row, allRows);
+    }
+
+    private async void SearchAlbumsDataGrid_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (SearchAlbumsDataGrid.SelectedItem is ContentRow { Id: long albumId } row)
+        {
+            _navigationStack.Push(new NavigationState("Search", albumId, null, null, SearchTextBox.Text));
+            await ShowAlbumTracksAsync(albumId, row.Title ?? LocalizationManager.Current.Unknown);
+        }
+    }
+
+    private async void SearchArtistsDataGrid_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (SearchArtistsDataGrid.SelectedItem is ContentRow { Id: long artistId } row)
+        {
+            _navigationStack.Push(new NavigationState("Search", artistId, null, null, SearchTextBox.Text));
+            await ShowArtistAlbumsAsync(artistId, row.Title ?? LocalizationManager.Current.Unknown);
+        }
+    }
+
     private async Task HandleContentRowDoubleClickAsync(ContentRow row)
     {
 
@@ -754,13 +1141,21 @@ public partial class MainWindow : Window
         if (string.IsNullOrEmpty(row.FilePath))
             return;
 
-        // Alle Zeilen als Queue laden
         var allRows = (ContentDataGrid.ItemsSource as IEnumerable<ContentRow>)?.ToList() ?? [];
+        await PlayTrackFromRowsAsync(row, allRows);
+    }
+
+    private async Task PlayTrackFromRowsAsync(ContentRow row, List<ContentRow> allRows)
+    {
+        if (string.IsNullOrEmpty(row.FilePath))
+            return;
+
         _queue.Clear();
         foreach (var r in allRows.Where(r => !string.IsNullOrEmpty(r.FilePath)))
             _queue.Add(new PlaylistItem(r.FilePath));
 
         _queueIndex = _queue.IndexOf(_queue.FirstOrDefault(p => p.FilePath == row.FilePath) ?? _queue[0]);
+        RefreshQueueNavigationButtons();
 
         try { await StartPlaybackAsync(row.FilePath); }
         catch (OperationCanceledException) { StatusTextBlock.Text = LocalizationManager.Current.PlaybackStopped; }
@@ -769,7 +1164,8 @@ public partial class MainWindow : Window
 
     private async Task ShowAlbumTracksAsync(long albumId, string albumTitle)
     {
-        _navigationStack.Push(new NavigationState("Albums", albumId, _activeArtistFilterId, _activeArtistFilterName));
+        if (_navigationStack.Count == 0 || _navigationStack.Peek().View != "Search")
+            _navigationStack.Push(new NavigationState("Albums", albumId, _activeArtistFilterId, _activeArtistFilterName));
         _activeAlbumFilterId = albumId;
         _activeAlbumFilterTitle = albumTitle;
         ContentTitleTextBlock.Text = $"Tracks · {albumTitle}";
@@ -777,6 +1173,7 @@ public partial class MainWindow : Window
         ContentDataGrid.Visibility = Visibility.Visible;
         AlbumArtworkListBox.Visibility = Visibility.Collapsed;
         FolderTreeView.Visibility = Visibility.Collapsed;
+        SearchResultsScrollViewer.Visibility = Visibility.Collapsed;
 
         var rows = await Task.Run(() => QueryRows("Tracks"));
         ApplyColumns("Tracks");
@@ -787,7 +1184,8 @@ public partial class MainWindow : Window
 
     private async Task ShowArtistAlbumsAsync(long artistId, string artistName)
     {
-        _navigationStack.Push(new NavigationState("Artists", artistId, null, null));
+        if (_navigationStack.Count == 0 || _navigationStack.Peek().View != "Search")
+            _navigationStack.Push(new NavigationState("Artists", artistId, null, null));
         _activeArtistFilterId = artistId;
         _activeArtistFilterName = artistName;
         _activeAlbumFilterId = null;
@@ -797,6 +1195,7 @@ public partial class MainWindow : Window
         ContentDataGrid.Visibility = _showAlbumArtworkView ? Visibility.Collapsed : Visibility.Visible;
         AlbumArtworkListBox.Visibility = _showAlbumArtworkView ? Visibility.Visible : Visibility.Collapsed;
         FolderTreeView.Visibility = Visibility.Collapsed;
+        SearchResultsScrollViewer.Visibility = Visibility.Collapsed;
 
         var rows = await Task.Run(() => QueryRows("Albums"));
         ApplyColumns("Albums");
@@ -804,6 +1203,57 @@ public partial class MainWindow : Window
         AlbumArtworkListBox.ItemsSource = rows;
         ContentCountTextBlock.Text = rows.Count == 1 ? "1 Eintrag" : $"{rows.Count:N0} Einträge";
         BackButton.Visibility = Visibility.Visible;
+    }
+
+    private async void SearchCoverButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: ContentRow row })
+            return;
+
+        await OpenCoverSearchAsync(row);
+    }
+
+    private async void DeleteCoverMenuItem_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: ContentRow { Id: long albumId } })
+            return;
+
+        using (var db = AudioDatabase.OpenDefault())
+            db.ClearArtworkFromAlbum(albumId);
+
+        await ReloadAlbumRowsAsync();
+    }
+
+    private async void ReassignCoverMenuItem_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: ContentRow row })
+            return;
+
+        await OpenCoverSearchAsync(row);
+    }
+
+    private async Task OpenCoverSearchAsync(ContentRow row)
+    {
+        if (row.Id is not long albumId)
+            return;
+
+        var dialog = new CoverSearchWindow(row.Title ?? string.Empty) { Owner = this };
+        if (dialog.ShowDialog() != true || dialog.SelectedResult is not { } selected)
+            return;
+
+        using (var db = AudioDatabase.OpenDefault())
+            db.AttachArtworkToAlbum(albumId, selected.ImageData, selected.MimeType);
+
+        await ReloadAlbumRowsAsync();
+    }
+
+    private async Task ReloadAlbumRowsAsync()
+    {
+        var rows = await Task.Run(() => QueryRows("Albums"));
+        ApplyColumns("Albums");
+        ContentDataGrid.ItemsSource = rows;
+        AlbumArtworkListBox.ItemsSource = rows;
+        ContentCountTextBlock.Text = rows.Count == 1 ? "1 Eintrag" : $"{rows.Count:N0} Einträge";
     }
 
     private async void BackButton_OnClick(object sender, RoutedEventArgs e)
@@ -819,6 +1269,11 @@ public partial class MainWindow : Window
 
         switch (state.View)
         {
+            case "Search":
+                SearchTextBox.Text = state.SearchQuery ?? string.Empty;
+                await ShowSearchResultsAsync(state.SearchQuery ?? string.Empty);
+                return;
+
             case "Artists":
                 ContentTitleTextBlock.Text = "Künstler";
                 AlbumViewModeBorder.Visibility = Visibility.Collapsed;
@@ -888,6 +1343,21 @@ public partial class MainWindow : Window
 
     private async void PlayButton_OnClick(object sender, RoutedEventArgs e)
     {
+        if (_player is not null)
+        {
+            if (_player.IsPaused)
+            {
+                _player.Resume();
+                SetPlayPauseIcon(isPlaying: true);
+            }
+            else
+            {
+                _player.Pause();
+                SetPlayPauseIcon(isPlaying: false);
+            }
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(_currentFilePath))
         {
             StatusTextBlock.Text = LocalizationManager.Current.SelectTrackFirst;
@@ -940,8 +1410,9 @@ public partial class MainWindow : Window
         _player        = player;
         _player.Volume = (float)VolumeSlider.Value;
         PlayButton.IsEnabled   = false;
-        StopButton.IsEnabled   = true;
-        PauseButton.IsEnabled  = true;
+        PlayButton.IsEnabled   = true;
+        SetPlayPauseIcon(isPlaying: true);
+        RefreshQueueNavigationButtons();
         PositionSlider.IsEnabled = player.CanSeek;
         DurationTextBlock.Text = FormatTime(player.Duration);
         _transportTimer.Start();
@@ -970,8 +1441,6 @@ public partial class MainWindow : Window
             ? $"Wiedergabe über {_settings.SelectedDriverName}"
             : $"Wiedergabe über {_settings.SelectedWasapiDeviceName}";
 
-        PlayButton.Content = "▶";
-
         try
         {
             using var db = AudioDatabase.OpenDefault();
@@ -998,10 +1467,30 @@ public partial class MainWindow : Window
         }
     }
 
-    private void StopButton_OnClick(object sender, RoutedEventArgs e)
+    private async void PreviousButton_OnClick(object sender, RoutedEventArgs e)
     {
-        StopPlayback();
-        StatusTextBlock.Text = LocalizationManager.Current.PlaybackStopped;
+        if (_queueIndex <= 0 || _queueIndex >= _queue.Count)
+            return;
+
+        _queueIndex--;
+        RefreshQueueNavigationButtons();
+
+        try { await StartPlaybackAsync(_queue[_queueIndex].FilePath); }
+        catch (OperationCanceledException) { StatusTextBlock.Text = LocalizationManager.Current.PlaybackStopped; }
+        catch (Exception ex) { StopPlayback(); StatusTextBlock.Text = ex.Message; }
+    }
+
+    private async void NextButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (_queueIndex < 0 || _queueIndex + 1 >= _queue.Count)
+            return;
+
+        _queueIndex++;
+        RefreshQueueNavigationButtons();
+
+        try { await StartPlaybackAsync(_queue[_queueIndex].FilePath); }
+        catch (OperationCanceledException) { StatusTextBlock.Text = LocalizationManager.Current.PlaybackStopped; }
+        catch (Exception ex) { StopPlayback(); StatusTextBlock.Text = ex.Message; }
     }
 
     private void StopPlayback()
@@ -1014,10 +1503,8 @@ public partial class MainWindow : Window
         _player = null;
 
         PlayButton.IsEnabled   = true;
-        PlayButton.Content     = "▶";
-        StopButton.IsEnabled   = false;
-        PauseButton.IsEnabled  = false;
-        PauseButton.Content    = "⏸";
+        SetPlayPauseIcon(isPlaying: false);
+        RefreshQueueNavigationButtons();
         PositionSlider.IsEnabled = false;
         _transportTimer.Stop();
 
@@ -1049,28 +1536,27 @@ public partial class MainWindow : Window
             return false;
 
         _queueIndex++;
+        RefreshQueueNavigationButtons();
         try { await StartPlaybackAsync(_queue[_queueIndex].FilePath); return true; }
         catch { return false; }
+    }
+
+    private void RefreshQueueNavigationButtons()
+    {
+        PreviousButton.IsEnabled = _queueIndex > 0 && _queueIndex < _queue.Count;
+        NextButton.IsEnabled = _queueIndex >= 0 && _queueIndex + 1 < _queue.Count;
+    }
+
+    private void SetPlayPauseIcon(bool isPlaying)
+    {
+        PlayPauseIcon.Data = Geometry.Parse(isPlaying
+            ? "M 4 2 H 7 V 14 H 4 Z M 9 2 H 12 V 14 H 9 Z"
+            : "M 4 2 L 14 8 L 4 14 Z");
     }
 
     // ------------------------------------------------------------------
     // Pause / Seek / Volume
     // ------------------------------------------------------------------
-
-    private void PauseButton_OnClick(object sender, RoutedEventArgs e)
-    {
-        if (_player is null) return;
-        if (_player.IsPaused)
-        {
-            _player.Resume();
-            PauseButton.Content = "⏸";
-        }
-        else
-        {
-            _player.Pause();
-            PauseButton.Content = "▶";
-        }
-    }
 
     private async void PositionSlider_OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
@@ -1107,6 +1593,7 @@ public partial class MainWindow : Window
         if (VolumeValueTextBlock is null) return;
         VolumeValueTextBlock.Text = $"{Math.Round(VolumeSlider.Value * 100):N0} %";
         if (_player is not null) _player.Volume = (float)VolumeSlider.Value;
+        _settings.Volume = VolumeSlider.Value;
     }
 
     private static string FormatTime(TimeSpan value) =>
@@ -1151,5 +1638,10 @@ public partial class MainWindow : Window
                 _ => LocalizationManager.Current.SettingsSaved
             };
         }
+    }
+
+    private void AboutButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        new AboutWindow { Owner = this }.ShowDialog();
     }
 }

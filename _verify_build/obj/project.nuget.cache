@@ -1,0 +1,32 @@
+{
+  "version": 2,
+  "dgSpecHash": "JQ2CSaYgda0=",
+  "success": true,
+  "projectFilePath": "X:\\projects\\c#\\player\\_verify_build\\probe.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\bschl\\.nuget\\packages\\j2n\\2.1.0\\j2n.2.1.0.nupkg.sha512",
+    "C:\\Users\\bschl\\.nuget\\packages\\lucene.net\\4.8.0-beta00017\\lucene.net.4.8.0-beta00017.nupkg.sha512",
+    "C:\\Users\\bschl\\.nuget\\packages\\lucene.net.analysis.common\\4.8.0-beta00017\\lucene.net.analysis.common.4.8.0-beta00017.nupkg.sha512",
+    "C:\\Users\\bschl\\.nuget\\packages\\lucene.net.queries\\4.8.0-beta00017\\lucene.net.queries.4.8.0-beta00017.nupkg.sha512",
+    "C:\\Users\\bschl\\.nuget\\packages\\lucene.net.queryparser\\4.8.0-beta00017\\lucene.net.queryparser.4.8.0-beta00017.nupkg.sha512",
+    "C:\\Users\\bschl\\.nuget\\packages\\lucene.net.sandbox\\4.8.0-beta00017\\lucene.net.sandbox.4.8.0-beta00017.nupkg.sha512",
+    "C:\\Users\\bschl\\.nuget\\packages\\microsoft.data.sqlite\\9.0.5\\microsoft.data.sqlite.9.0.5.nupkg.sha512",
+    "C:\\Users\\bschl\\.nuget\\packages\\microsoft.data.sqlite.core\\9.0.5\\microsoft.data.sqlite.core.9.0.5.nupkg.sha512",
+    "C:\\Users\\bschl\\.nuget\\packages\\microsoft.extensions.configuration.abstractions\\8.0.0\\microsoft.extensions.configuration.abstractions.8.0.0.nupkg.sha512",
+    "C:\\Users\\bschl\\.nuget\\packages\\microsoft.extensions.primitives\\8.0.0\\microsoft.extensions.primitives.8.0.0.nupkg.sha512",
+    "C:\\Users\\bschl\\.nuget\\packages\\naudio\\2.3.0\\naudio.2.3.0.nupkg.sha512",
+    "C:\\Users\\bschl\\.nuget\\packages\\naudio.asio\\2.3.0\\naudio.asio.2.3.0.nupkg.sha512",
+    "C:\\Users\\bschl\\.nuget\\packages\\naudio.core\\2.3.0\\naudio.core.2.3.0.nupkg.sha512",
+    "C:\\Users\\bschl\\.nuget\\packages\\naudio.midi\\2.3.0\\naudio.midi.2.3.0.nupkg.sha512",
+    "C:\\Users\\bschl\\.nuget\\packages\\naudio.wasapi\\2.3.0\\naudio.wasapi.2.3.0.nupkg.sha512",
+    "C:\\Users\\bschl\\.nuget\\packages\\naudio.winforms\\2.3.0\\naudio.winforms.2.3.0.nupkg.sha512",
+    "C:\\Users\\bschl\\.nuget\\packages\\naudio.winmm\\2.3.0\\naudio.winmm.2.3.0.nupkg.sha512",
+    "C:\\Users\\bschl\\.nuget\\packages\\sqlitepclraw.bundle_e_sqlite3\\2.1.10\\sqlitepclraw.bundle_e_sqlite3.2.1.10.nupkg.sha512",
+    "C:\\Users\\bschl\\.nuget\\packages\\sqlitepclraw.core\\2.1.10\\sqlitepclraw.core.2.1.10.nupkg.sha512",
+    "C:\\Users\\bschl\\.nuget\\packages\\sqlitepclraw.lib.e_sqlite3\\2.1.10\\sqlitepclraw.lib.e_sqlite3.2.1.10.nupkg.sha512",
+    "C:\\Users\\bschl\\.nuget\\packages\\sqlitepclraw.provider.e_sqlite3\\2.1.10\\sqlitepclraw.provider.e_sqlite3.2.1.10.nupkg.sha512",
+    "C:\\Users\\bschl\\.nuget\\packages\\system.memory\\4.5.3\\system.memory.4.5.3.nupkg.sha512",
+    "C:\\Users\\bschl\\.nuget\\packages\\taglibsharp\\2.3.0\\taglibsharp.2.3.0.nupkg.sha512"
+  ],
+  "logs": []
+}

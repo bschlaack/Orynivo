@@ -10,11 +10,11 @@ none
 false
 TRACE;DEBUG;NET;NET8_0;NETCOREAPP;WINDOWS;WINDOWS7_0;NET5_0_OR_GREATER;NET6_0_OR_GREATER;NET7_0_OR_GREATER;NET8_0_OR_GREATER;NETCOREAPP3_0_OR_GREATER;NETCOREAPP3_1_OR_GREATER;WINDOWS7_0_OR_GREATER
 X:\projects\c#\player\Player\App.xaml
-4535620322
+6-1098256591
 
-34244069479
-2191246729610
-DeviceInfoWindow.xaml;MainWindow.xaml;SettingsWindow.xaml;StartupWindow.xaml;
+38956305643
+2271590074031
+AboutWindow.xaml;CoverSearchWindow.xaml;DeviceInfoWindow.xaml;MainWindow.xaml;SettingsWindow.xaml;StartupWindow.xaml;
 
 False
 

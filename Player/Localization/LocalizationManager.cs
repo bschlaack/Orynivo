@@ -21,8 +21,14 @@ public static class LocalizationManager
         resources["L_Albums"] = Current.Albums;
         resources["L_Tracks"] = Current.Tracks;
         resources["L_FolderStructure"] = Current.FolderStructure;
+        resources["L_Search"] = Current.Search;
         resources["L_Playlists"] = Current.Playlists;
+        resources["L_About"] = Current.About;
         resources["L_Settings"] = Current.Settings;
+        resources["L_Filter"] = Current.Filter;
+        resources["L_Favorites"] = Current.Favorites;
+        resources["L_AudioTypes"] = Current.AudioTypes;
+        resources["L_Bitrate"] = Current.Bitrate;
         resources["L_Table"] = Current.Table;
         resources["L_Artwork"] = Current.Artwork;
         resources["L_Appearance"] = Current.Appearance;
@@ -36,15 +42,34 @@ public static class LocalizationManager
         resources["L_DatabaseMaintenance"] = Current.DatabaseMaintenance;
         resources["L_OptimizeDatabase"] = Current.OptimizeDatabase;
         resources["L_RepairAlbumArtwork"] = Current.RepairAlbumArtwork;
+        resources["L_DownloadMissingArtwork"] = Current.DownloadMissingArtwork;
+        resources["L_DownloadMissingArtworkHint"] = Current.DownloadMissingArtworkHint;
+        resources["L_CoverNotFound"] = Current.CoverNotFound;
+        resources["L_SearchCover"] = Current.SearchCover;
+        resources["L_CoverSearchTitle"] = Current.CoverSearchTitle;
+        resources["L_CoverSearchRunning"] = Current.CoverSearchRunning;
+        resources["L_CoverSearchNoResults"] = Current.CoverSearchNoResults;
+        resources["L_CoverSearchQuery"] = Current.CoverSearchQuery;
+        resources["L_SearchAgain"] = Current.SearchAgain;
+        resources["L_UseSelectedCover"] = Current.UseSelectedCover;
+        resources["L_DeleteCover"] = Current.DeleteCover;
+        resources["L_ReassignCover"] = Current.ReassignCover;
+        resources["L_Author"] = Current.Author;
+        resources["L_Licenses"] = Current.Licenses;
         resources["L_Save"] = Current.Save;
         resources["L_Cancel"] = Current.Cancel;
     }
 
     private static readonly LocalizedStrings German = new(
-        "LOKALE BIBLIOTHEK", "Künstler", "Alben", "Tracks", "Ordnerstruktur", "PLAYLISTS", "⚙   Einstellungen",
+        "LOKALE BIBLIOTHEK", "Künstler", "Alben", "Tracks", "Ordnerstruktur", "Suche", "PLAYLISTS", "Über", "Einstellungen",
+        "Filter", "Favoriten", "Audiotypen", "Bitrate",
         "Kein Gerät ausgewählt.", "Darstellung", "Farbschema", "Sprache", "WIEDERGABE", "Ausgabegerät",
         "BIBLIOTHEK", "Verzeichnisse", "+ Verzeichnis hinzufügen", "Datenbankwartung",
-        "Datenbank optimieren", "Album-Cover reparieren", "Speichern", "Abbrechen", "Tabelle", "Artwork",
+        "Datenbank optimieren", "Album-Cover reparieren", "Fehlende Cover-Artworks herunterladen",
+        "Automatischer Download findet nur Cover, wenn eine MusicBrainz-ID gesetzt ist. Für freiere Suchen nutze die Schaltfläche direkt in der Albumansicht.",
+        "Cover nicht gefunden", "Herunterladen", "Cover suchen", "Suche nach passenden Covern …",
+        "Keine Cover gefunden.", "Suchbegriff", "Erneut suchen", "Ausgewähltes Cover übernehmen",
+        "Cover löschen", "Cover neu zuordnen", "Autor", "Lizenzen", "Speichern", "Abbrechen", "Tabelle", "Artwork",
         "(Unbekannt)", "Album-Künstler", "Jahr", "Titel", "Künstler", "Album", "Genre", "Dauer", "Format",
         "{0:N0} Einträge", "{0:N0} Titel",
         "Bitte zuerst einen Track doppelklicken.", "Wiedergabe gestoppt.", "Wiedergabe beendet.",
@@ -53,13 +78,20 @@ public static class LocalizationManager
         "Keine aktiven WASAPI-Ausgabegeräte gefunden.", "Keine ASIO-Treiber gefunden.", "Gerät auswählen und speichern.",
         "Scan läuft…", "Verzeichnis nicht gefunden.", "Scan abgebrochen.", "Datenbank wird optimiert …",
         "Optimierung abgeschlossen.", "Optimierung fehlgeschlagen: {0}", "Album-Cover werden repariert …",
-        "{0:N0} Album-Cover repariert.", "Cover-Reparatur fehlgeschlagen: {0}");
+        "{0:N0} Album-Cover repariert.", "Cover-Reparatur fehlgeschlagen: {0}",
+        "Fehlende Cover-Artworks werden heruntergeladen …", "{0:N0} fehlende Cover-Artworks heruntergeladen.",
+        "Cover-Download fehlgeschlagen: {0}");
 
     private static readonly LocalizedStrings English = new(
-        "LOCAL LIBRARY", "Artists", "Albums", "Tracks", "Folder structure", "PLAYLISTS", "⚙   Settings",
+        "LOCAL LIBRARY", "Artists", "Albums", "Tracks", "Folder structure", "Search", "PLAYLISTS", "About", "Settings",
+        "Filter", "Favorites", "Audio types", "Bitrate",
         "No device selected.", "Appearance", "Color scheme", "Language", "PLAYBACK", "Output device",
         "LIBRARY", "Directories", "+ Add directory", "Database maintenance",
-        "Optimize database", "Repair album artwork", "Save", "Cancel", "Table", "Artwork",
+        "Optimize database", "Repair album artwork", "Download missing artwork",
+        "Automatic download only finds covers when a MusicBrainz ID is present. For freer searches, use the button directly in the album view.",
+        "Cover not found", "Download", "Search cover", "Searching for matching covers …",
+        "No covers found.", "Search term", "Search again", "Use selected cover",
+        "Delete cover", "Reassign cover", "Author", "Licenses", "Save", "Cancel", "Table", "Artwork",
         "(Unknown)", "Album artist", "Year", "Title", "Artist", "Album", "Genre", "Duration", "Format",
         "{0:N0} entries", "{0:N0} tracks",
         "Please double-click a track first.", "Playback stopped.", "Playback finished.",
@@ -68,13 +100,20 @@ public static class LocalizationManager
         "No active WASAPI output devices found.", "No ASIO drivers found.", "Select a device and save.",
         "Scanning…", "Directory not found.", "Scan canceled.", "Optimizing database …",
         "Optimization completed.", "Optimization failed: {0}", "Repairing album artwork …",
-        "{0:N0} album covers repaired.", "Artwork repair failed: {0}");
+        "{0:N0} album covers repaired.", "Artwork repair failed: {0}",
+        "Downloading missing artwork …", "{0:N0} missing artworks downloaded.",
+        "Artwork download failed: {0}");
 
     private static readonly LocalizedStrings French = new(
-        "BIBLIOTHÈQUE LOCALE", "Artistes", "Albums", "Titres", "Arborescence", "PLAYLISTS", "⚙   Paramètres",
+        "BIBLIOTHÈQUE LOCALE", "Artistes", "Albums", "Titres", "Arborescence", "Recherche", "PLAYLISTS", "À propos", "Paramètres",
+        "Filtre", "Favoris", "Types audio", "Débit",
         "Aucun appareil sélectionné.", "Apparence", "Thème", "Langue", "LECTURE", "Périphérique de sortie",
         "BIBLIOTHÈQUE", "Dossiers", "+ Ajouter un dossier", "Maintenance de la base",
-        "Optimiser la base", "Réparer les pochettes", "Enregistrer", "Annuler", "Tableau", "Pochettes",
+        "Optimiser la base", "Réparer les pochettes", "Télécharger les pochettes manquantes",
+        "Le téléchargement automatique ne trouve des pochettes que si un identifiant MusicBrainz est présent. Pour une recherche plus libre, utilisez le bouton directement dans la vue des albums.",
+        "Pochette introuvable", "Télécharger", "Rechercher une pochette", "Recherche de pochettes correspondantes …",
+        "Aucune pochette trouvée.", "Terme de recherche", "Relancer la recherche", "Utiliser la pochette sélectionnée",
+        "Supprimer la pochette", "Réattribuer la pochette", "Auteur", "Licences", "Enregistrer", "Annuler", "Tableau", "Pochettes",
         "(Inconnu)", "Artiste de l’album", "Année", "Titre", "Artiste", "Album", "Genre", "Durée", "Format",
         "{0:N0} entrées", "{0:N0} titres",
         "Veuillez d’abord double-cliquer sur un titre.", "Lecture arrêtée.", "Lecture terminée.",
@@ -83,5 +122,7 @@ public static class LocalizationManager
         "Aucun périphérique de sortie WASAPI actif trouvé.", "Aucun pilote ASIO trouvé.", "Sélectionnez un périphérique puis enregistrez.",
         "Analyse en cours…", "Dossier introuvable.", "Analyse annulée.", "Optimisation de la base …",
         "Optimisation terminée.", "Échec de l’optimisation : {0}", "Réparation des pochettes …",
-        "{0:N0} pochettes réparées.", "Échec de la réparation des pochettes : {0}");
+        "{0:N0} pochettes réparées.", "Échec de la réparation des pochettes : {0}",
+        "Téléchargement des pochettes manquantes …", "{0:N0} pochettes manquantes téléchargées.",
+        "Échec du téléchargement des pochettes : {0}");
 }

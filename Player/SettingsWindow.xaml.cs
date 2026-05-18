@@ -416,6 +416,30 @@ public partial class SettingsWindow : Window
         }
     }
 
+    private async void DownloadMissingArtworkButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        DownloadMissingArtworkButton.IsEnabled = false;
+        DatabaseMaintenanceStatusTextBlock.Text = LocalizationManager.Current.MissingArtworkDownloading;
+        var progress = new Progress<ScanProgress>(p =>
+            DatabaseMaintenanceStatusTextBlock.Text =
+                $"{LocalizationManager.Current.MissingArtworkDownloading} {p.Current}/{p.Total}");
+        try
+        {
+            var downloaded = await LibraryScanner.DownloadMissingAlbumArtworkAsync(progress);
+            DatabaseMaintenanceStatusTextBlock.Text =
+                string.Format(LocalizationManager.Current.MissingArtworkDownloaded, downloaded);
+        }
+        catch (Exception ex)
+        {
+            DatabaseMaintenanceStatusTextBlock.Text =
+                string.Format(LocalizationManager.Current.MissingArtworkDownloadFailed, ex.Message);
+        }
+        finally
+        {
+            DownloadMissingArtworkButton.IsEnabled = true;
+        }
+    }
+
     // ------------------------------------------------------------------
     // Dialog
     // ------------------------------------------------------------------

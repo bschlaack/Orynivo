@@ -1,4 +1,6 @@
 using System.IO;
+using System.Net;
+using System.Net.Http;
 using TagLib;
 
 namespace Player.Library;
@@ -25,6 +27,49 @@ public static class LibraryScanner
         CancellationToken cancellationToken = default)
         => Task.Run(() => RepairMissingAlbumArtwork(progress, cancellationToken), cancellationToken);
 
+    public static async Task<int> DownloadMissingAlbumArtworkAsync(
+        IProgress<ScanProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        using var db = AudioDatabase.OpenDefault();
+        var albums = db.GetAlbumsMissingArtworkReleaseIds();
+        var downloaded = 0;
+
+        using var client = new HttpClient();
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("Player/1.0 (album-artwork-download)");
+
+        for (var i = 0; i < albums.Count; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var (albumId, releaseId) = albums[i];
+            progress?.Report(new ScanProgress(i + 1, albums.Count, releaseId));
+
+            try
+            {
+                using var response = await client.GetAsync(
+                    $"https://coverartarchive.org/release/{Uri.EscapeDataString(releaseId)}/front",
+                    cancellationToken);
+
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                    continue;
+
+                response.EnsureSuccessStatusCode();
+                var data = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+                if (data.Length == 0)
+                    continue;
+
+                db.AttachArtworkToAlbum(albumId, data, response.Content.Headers.ContentType?.MediaType);
+                downloaded++;
+            }
+            catch (HttpRequestException)
+            {
+                // Einzelne fehlende oder temporär nicht erreichbare Cover überspringen.
+            }
+        }
+
+        return downloaded;
+    }
+
     private static ScanResult Scan(
         string rootPath,
         IProgress<ScanProgress>? progress,
@@ -39,6 +84,7 @@ public static class LibraryScanner
         int added = 0;
         int updated = 0;
         int failed = 0;
+        var changedTracks = new List<TrackRecord>();
 
         using var db = AudioDatabase.OpenDefault();
         var timestamps = db.GetPathTimestamps();
@@ -59,7 +105,9 @@ public static class LibraryScanner
                     continue;
 
                 bool isNew = !timestamps.ContainsKey(filePath);
-                db.Upsert(BuildRecord(filePath, fi, modifiedAt, now));
+                var record = BuildRecord(filePath, fi, modifiedAt, now);
+                db.Upsert(record);
+                changedTracks.Add(db.GetByPath(filePath) ?? record);
 
                 if (isNew) added++; else updated++;
             }
@@ -68,6 +116,10 @@ public static class LibraryScanner
                 failed++;
             }
         }
+
+        if (changedTracks.Count > 0)
+            TrackSearchIndex.UpdateMany(changedTracks);
+        TrackSearchIndex.RemoveMissingUnderRoot(rootPath, files);
 
         return new ScanResult(total, added, updated, failed);
     }
