@@ -190,6 +190,7 @@ Windows audio player with:
 - **Now Playing**: shows a 96 px thumbnail and track favorite button; the button is disabled when the current file has no database track
 - `VirtualizingWrapPanel.cs` materializes only visible artwork cards
 - **Album tracks**: `GetTrackListByAlbum(albumId)` sorts by disc, track number, and file name; playback queues all visible album tracks
+- When album tracks are opened from an artist drill-down, the list initially contains only tracks by that artist; a localized **Show all album tracks** switch removes the artist filter and rebuilds the visible playback queue
 - The album-track view has a centered header with a large 240 px cover, album title, album artist, and optional year; artwork can be searched, reassigned, or deleted
 - **Favorites**: artist, album, and track lists and album cards can toggle their direct favorite flags
 - **Back navigation**: drill-downs remember the previous selection and use a themed pill-shaped chevron button

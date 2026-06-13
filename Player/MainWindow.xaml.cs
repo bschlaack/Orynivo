@@ -49,6 +49,8 @@ public partial class MainWindow : Window
     private string? _activeAlbumFilterTitle;
     private long? _activeArtistFilterId;
     private string? _activeArtistFilterName;
+    private bool _showAllAlbumTracks;
+    private bool _updatingAlbumTrackScope;
     private readonly Stack<NavigationState> _navigationStack = [];
     private readonly DispatcherTimer _searchTimer;
     private bool _trackFavoritesOnly;
@@ -1543,6 +1545,13 @@ public partial class MainWindow : Window
             _navigationStack.Push(new NavigationState("Albums", albumId, _activeArtistFilterId, _activeArtistFilterName));
         _activeAlbumFilterId = albumId;
         _activeAlbumFilterTitle = albumTitle;
+        _showAllAlbumTracks = false;
+        _updatingAlbumTrackScope = true;
+        ShowAllAlbumTracksCheckBox.IsChecked = false;
+        ShowAllAlbumTracksCheckBox.Visibility = _activeArtistFilterId.HasValue
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        _updatingAlbumTrackScope = false;
         ContentTitleTextBlock.Text = $"Tracks · {albumTitle}";
         AlbumViewModeBorder.Visibility = Visibility.Collapsed;
         ContentDataGrid.Visibility = Visibility.Visible;
@@ -1552,12 +1561,22 @@ public partial class MainWindow : Window
         SearchResultsScrollViewer.Visibility = Visibility.Collapsed;
         DashboardScrollViewer.Visibility = Visibility.Collapsed;
 
+        await ReloadVisibleAlbumTracksAsync();
+        BackButton.Visibility = Visibility.Visible;
+    }
+
+    private async Task ReloadVisibleAlbumTracksAsync()
+    {
+        if (_activeAlbumFilterId is not long albumId)
+            return;
+
+        var artistId = _showAllAlbumTracks ? null : _activeArtistFilterId;
         var result = await Task.Run(() =>
         {
             using var db = AudioDatabase.OpenDefault();
             return (
                 Album: db.GetAlbumById(albumId),
-                Tracks: db.GetTrackListByAlbum(albumId)
+                Tracks: db.GetTrackListByAlbum(albumId, artistId)
                     .Select(ToTrackContentRow)
                     .ToList());
         });
@@ -1566,7 +1585,15 @@ public partial class MainWindow : Window
         ContentDataGrid.ItemsSource = rows;
         ContentCountTextBlock.Text = rows.Count == 1 ? "1 Titel" : $"{rows.Count:N0} Titel";
         ApplyAlbumDetailHeader(result.Album);
-        BackButton.Visibility = Visibility.Visible;
+    }
+
+    private async void ShowAllAlbumTracksCheckBox_OnChanged(object sender, RoutedEventArgs e)
+    {
+        if (_updatingAlbumTrackScope || _activeAlbumFilterId is null)
+            return;
+
+        _showAllAlbumTracks = ShowAllAlbumTracksCheckBox.IsChecked == true;
+        await ReloadVisibleAlbumTracksAsync();
     }
 
     private void ApplyAlbumDetailHeader(AlbumInfo? album)
@@ -1601,6 +1628,7 @@ public partial class MainWindow : Window
     {
         AlbumDetailHeader.Visibility = Visibility.Collapsed;
         AlbumDetailHeader.DataContext = null;
+        ShowAllAlbumTracksCheckBox.Visibility = Visibility.Collapsed;
     }
 
     private async Task ReloadAlbumDetailHeaderAsync(long albumId)

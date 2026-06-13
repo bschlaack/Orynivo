@@ -802,6 +802,14 @@
                                     HorizontalAlignment="Left"
                                     Style="{StaticResource HeaderFilterButtonStyle}"
                                     Click="SearchCoverButton_OnClick"/>
+                            <CheckBox x:Name="ShowAllAlbumTracksCheckBox"
+                                      Margin="0,18,0,0"
+                                      HorizontalAlignment="Left"
+                                      Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                      Content="{DynamicResource L_ShowAllAlbumTracks}"
+                                      Visibility="Collapsed"
+                                      Checked="ShowAllAlbumTracksCheckBox_OnChanged"
+                                      Unchecked="ShowAllAlbumTracksCheckBox_OnChanged"/>
                         </StackPanel>
                     </Grid>
                 </Border>

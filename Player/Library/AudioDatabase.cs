@@ -674,7 +674,7 @@ public sealed class AudioDatabase : IDisposable
         return result;
     }
 
-    public List<TrackListInfo> GetTrackListByAlbum(long albumId)
+    public List<TrackListInfo> GetTrackListByAlbum(long albumId, long? artistId = null)
     {
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = """
@@ -682,12 +682,14 @@ public sealed class AudioDatabase : IDisposable
                 path, file_name, title, artist, album, genre, format, bitrate, duration, sort_title, id, is_favorite
             FROM tracks
             WHERE album_id = $album_id
+              AND ($artist_id IS NULL OR artist_id = $artist_id)
             ORDER BY
                 COALESCE(disc_number, 0),
                 COALESCE(track_number, 0),
                 file_name COLLATE NOCASE;
             """;
         Add(cmd, "$album_id", albumId);
+        Add(cmd, "$artist_id", artistId);
         using var reader = cmd.ExecuteReader();
         var result = new List<TrackListInfo>();
         while (reader.Read())

@@ -127,4 +127,5 @@ public sealed record LocalizedStrings(
     string ArtistInfoDownloading,
     string ArtistInfoNotFound,
     string ArtistInfoDownloadFailed,
-    string ArtistInfoSource);
+    string ArtistInfoSource,
+    string ShowAllAlbumTracks);

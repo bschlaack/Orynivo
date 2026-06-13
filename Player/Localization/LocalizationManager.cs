@@ -75,6 +75,7 @@ public static class LocalizationManager
         resources["L_RefreshArtistInfo"] = Current.RefreshArtistInfo;
         resources["L_CloseArtistInfo"] = Current.CloseArtistInfo;
         resources["L_ArtistInfoSource"] = Current.ArtistInfoSource;
+        resources["L_ShowAllAlbumTracks"] = Current.ShowAllAlbumTracks;
     }
 
     private static readonly LocalizedStrings German = new(
@@ -128,7 +129,7 @@ public static class LocalizationManager
         "Künstlerinfo", "Künstlerinfo anzeigen", "Künstlerinfo neu laden", "Künstlerinfo schließen",
         "Künstlerinfo wird geladen …", "Künstlerinfo wird von Wikipedia geladen …",
         "Keine Künstlerinfo gefunden.", "Künstlerinfo konnte nicht heruntergeladen werden.",
-        "Quelle: Wikipedia");
+        "Quelle: Wikipedia", "Alle Tracks des Albums anzeigen");
 
     private static readonly LocalizedStrings English = new(
         "LOCAL LIBRARY", "Artists", "Albums", "Tracks", "Folder structure", "Search", "PLAYLISTS", "About", "Settings",
@@ -181,7 +182,7 @@ public static class LocalizationManager
         "Artist information", "Show artist information", "Refresh artist information", "Close artist information",
         "Loading artist information …", "Downloading artist information from Wikipedia …",
         "No artist information found.", "Artist information could not be downloaded.",
-        "Source: Wikipedia");
+        "Source: Wikipedia", "Show all album tracks");
 
     private static readonly LocalizedStrings French = new(
         "BIBLIOTHÈQUE LOCALE", "Artistes", "Albums", "Titres", "Arborescence", "Recherche", "PLAYLISTS", "À propos", "Paramètres",
@@ -237,7 +238,7 @@ public static class LocalizationManager
         "Téléchargement des informations sur l’artiste depuis Wikipédia …",
         "Aucune information trouvée sur l’artiste.",
         "Impossible de télécharger les informations sur l’artiste.",
-        "Source : Wikipédia");
+        "Source : Wikipédia", "Afficher tous les titres de l’album");
 
     public static LocalizedStrings Current { get; private set; } = German;
 }

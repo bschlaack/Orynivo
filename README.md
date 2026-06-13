@@ -121,6 +121,8 @@ visible artists are loaded lazily in the selected UI language and cached in the
 database and `artist-images\`. The stylized information button beside the
 lyrics button opens the current artist profile in the main content area, with a
 large image, biography, refresh action, and a link to the Wikipedia source.
+Opening an album from an artist drill-down initially shows only that artist's
+tracks. The album header provides a switch to show every track on the album.
 
 The Settings library page can export this managed library data as a ZIP archive
 and import it again. Audio files are intentionally not included; their existing

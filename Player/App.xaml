@@ -157,6 +157,7 @@
         <sys:String x:Key="L_RefreshArtistInfo" xmlns:sys="clr-namespace:System;assembly=mscorlib">Künstlerinfo neu laden</sys:String>
         <sys:String x:Key="L_CloseArtistInfo" xmlns:sys="clr-namespace:System;assembly=mscorlib">Künstlerinfo schließen</sys:String>
         <sys:String x:Key="L_ArtistInfoSource" xmlns:sys="clr-namespace:System;assembly=mscorlib">Quelle: Wikipedia</sys:String>
+        <sys:String x:Key="L_ShowAllAlbumTracks" xmlns:sys="clr-namespace:System;assembly=mscorlib">Alle Tracks des Albums anzeigen</sys:String>
         <sys:String x:Key="L_OptimizeDatabase" xmlns:sys="clr-namespace:System;assembly=mscorlib">Datenbank optimieren</sys:String>
         <sys:String x:Key="L_RepairAlbumArtwork" xmlns:sys="clr-namespace:System;assembly=mscorlib">Album-Cover reparieren</sys:String>
         <sys:String x:Key="L_Save" xmlns:sys="clr-namespace:System;assembly=mscorlib">Speichern</sys:String>
