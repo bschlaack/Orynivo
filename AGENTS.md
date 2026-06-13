@@ -37,7 +37,8 @@ Windows-Audioplayer mit:
 - `AppSettings.Theme` speichert das Farbschema (`Light`/`Dark`)
 - `AppSettings.Language` speichert die UI-Sprache (`German`/`English`/`French`)
 - `Player/Library/TrackRecord.cs`: C#-Modell für einen DB-Track-Eintrag (ID3 + technische Metadaten)
-- `Player/Library/PlaylistRecord.cs`: C#-Modell für eine Playlist (inkl. denormalisiertem `TrackCount`)
+- `Player/Library/PlaylistRecord.cs`: C#-Modell für eine Playlist (inkl. denormalisiertem `TrackCount`, `IsSmartPlaylist`, `FilterCriteria`)
+- `Player/Library/SmartPlaylistCriteria.cs`: Record für serialisierte Filter-Kriterien einer intelligenten Playlist (`FavoritesOnly`, `Genres`, `Formats`, `Bitrates`)
 - `Player/Library/PlaylistTrackRecord.cs`: C#-Modell für einen Playlist-Eintrag (Position, optionale TrackId-Referenz, immer Pfad)
 - `Player/Library/AudioDatabase.cs`: SQLite-Datenbankschicht (via `Microsoft.Data.Sqlite`); DB-Datei unter `%LOCALAPPDATA%\Player\library.db`
 - `Player/Library/LibraryScanner.cs`: Verzeichnis-Scanner; liest Metadaten via TagLibSharp und schreibt sie per `AudioDatabase.Upsert()` in die DB; unterstützt Fortschritts-Reporting (`IProgress<ScanProgress>`) und Abbruch per `CancellationToken`
@@ -94,14 +95,15 @@ Windows-Audioplayer mit:
 - **Track aus Playlist entfernen**: In der Playlist-Ansicht (nur wenn `_activePlaylistId` gesetzt) zeigt Rechtsklick auf einen Track das „Von Playlist entfernen"-Menü; nutzt `PlaylistEntryId` (gespeichert in `ContentRow.PlaylistEntryId` aus `playlist_tracks.id`) und ruft `RemoveTrackFromPlaylist` auf; danach wird die Playlist-Ansicht neu geladen
 - `_activePlaylistId` (Feld in MainWindow): wird in `ShowTopLevelViewAsync` gesetzt wenn eine Playlist-Ansicht geladen wird, sonst `null`; steuert den Kontextmenü-Zweig in `ContentDataGrid_OnPreviewMouseRightButtonDown`
 - `ContentRow.PlaylistEntryId`: speichert `playlist_tracks.id` für Zeilen in der Playlist-Ansicht; nur dort gesetzt
-- Neue Lokalisierungsschlüssel: `AddToPlaylist`, `NewPlaylist`, `NewPlaylistDialogTitle`, `NewPlaylistNameLabel`, `CreatePlaylist`, `TrackAddedToPlaylist`, `TracksAddedToPlaylist` – vollständig in DE/EN/FR vorhanden
+- Neue Lokalisierungsschlüssel: `AddToPlaylist`, `NewPlaylist`, `NewPlaylistDialogTitle`, `NewPlaylistNameLabel`, `CreatePlaylist`, `TrackAddedToPlaylist`, `TracksAddedToPlaylist`, `DeletePlaylist`, `RemoveFromPlaylist`, `PlaylistDeleted`, `TrackRemovedFromPlaylist`, `SaveSmartPlaylist`, `SmartPlaylistSaved` – vollständig in DE/EN/FR vorhanden
 
 ## Playlisten-Datenbankstruktur
 
-- Tabelle `playlists`: id, name, description, created_at, modified_at
+- Tabelle `playlists`: id, name, description, created_at, modified_at, `is_smart` (INTEGER 0/1), `filter_criteria` (TEXT JSON, nur bei Smart-Playlists)
 - Tabelle `playlist_tracks`: id, playlist_id (FK→playlists, CASCADE), track_id (FK→tracks, SET NULL), path, position (1-basiert, lückenlos), added_at
 - `track_id` ist nullable: Playlist-Einträge bleiben erhalten, wenn ein Track aus der Bibliothek entfernt wird; `path` ist immer gesetzt
-- Verfügbare Methoden: `CreatePlaylist`, `UpdatePlaylist`, `DeletePlaylist`, `GetAllPlaylists` (inkl. TrackCount via JOIN), `GetPlaylistById`, `GetPlaylistTracks`, `AddTrackToPlaylist`, `RemoveTrackFromPlaylist`, `MovePlaylistTrack` (transaktional, nummeriert Positionen neu)
+- Neue Spalten werden via `EnsureColumn` in Bestandsdatenbanken nachgerüstet (Schema-Migration bei DB-Open)
+- Verfügbare Methoden: `CreatePlaylist`, `CreateSmartPlaylist`, `UpdatePlaylist`, `DeletePlaylist`, `GetAllPlaylists` (inkl. TrackCount via JOIN), `GetPlaylistById`, `GetPlaylistTracks`, `AddTrackToPlaylist`, `RemoveTrackFromPlaylist`, `MovePlaylistTrack` (transaktional, nummeriert Positionen neu)
 
 ## Performance-Maßnahmen
 
@@ -109,6 +111,7 @@ Windows-Audioplayer mit:
 - `AudioDatabase.GetArtistsLite()`: lädt für die Künstleransicht ausschließlich distinct-Künstlernamen direkt per SQL – keine vollständigen Track-Datensätze
 - `AudioDatabase.GetAlbumsLite(includeArtwork)`: lädt standardmäßig nur Album, Anzeige-Künstler und Jahr; Artwork-BLOBs werden nur für die Kachelansicht mitgeladen
 - `AudioDatabase.GetTrackList()`: lädt für die Trackliste nur die tatsächlich sichtbaren Spalten – kein Cover-Art-BLOB, keine Lyrics, kein Voll-`TrackRecord`
+- `AudioDatabase.GetTrackListByIds(ids)`: teilt große ID-Mengen in begrenzte SQL-Abfrageblöcke, damit große Bibliotheken und breite Filter-/Suchtreffer nicht die SQLite-Grenze für gebundene Variablen überschreiten
 - `AudioDatabase.GetTracksByDirectory(dirPath)`: SQL-LIKE-Abfrage auf Verzeichnis-Prefix + C#-Filter für direkte Kinder (kein `GetAll()` + LINQ)
 - `AudioDatabase.GetTrackPathsUnderDirectory(rootPath)`: wie GetTracksByDirectory, aber ohne C#-Filter – liefert alle Tracks rekursiv unterhalb des Wurzelpfads (für Ordnerstruktur-Kontextmenü)
 - Ordnerstruktur-Ansicht: lazy loading – `FolderTree`-Klasse baut eine in-memory Parent→Children-Map (O(1)-Lookup); WPF-`TreeViewItem`-Objekte werden erst beim Aufklappen eines Knotens erzeugt (`Expanded`-Event + Platzhalter-Technik)
@@ -127,6 +130,7 @@ Windows-Audioplayer mit:
 - `KernelStreaming` ist vorbereitet, aber noch nicht implementiert
 - WASAPI wird derzeit für PCM-Wiedergabe genutzt; natives DSD bleibt ASIO vorbehalten
 - WASAPI läuft exklusiv und wählt für PCM das erste passende Stereoformat aus 32-Bit Float, 24-Bit PCM und 16-Bit PCM
+- WASAPI-Pause hält den exklusiven AudioClient aktiv und liefert über einen pausierbaren Provider Stille, damit Geräte den letzten Endpoint-Puffer nicht als kurzen Loop wiederholen; gepufferte Audiodaten bleiben für Resume erhalten
 - Transport-UI nutzt zentral drei selbst gezeichnete Vektor-Icons für Skip Back, Play/Pause und Skip Forward; der mittlere Button wechselt je nach Wiedergabestatus zwischen Play und Pause, an Queue-Anfang/-Ende werden die jeweiligen Navigationsbuttons deaktiviert
 - Seeking ist aktuell für ASIO-PCM, WASAPI-PCM sowie native DSF/DFF-Pfade implementiert
 - Playlist-Grundfunktion ist vorhanden: Einzeldatei oder Ordner laden, Doppelklick startet einen Eintrag, nach Titelende folgt automatisch der nächste
@@ -162,6 +166,19 @@ Windows-Audioplayer mit:
 - Das Hauptfenster überschreibt zusätzlich die DataGrid-Flächen inkl. ScrollViewer-Hintergrund lokal, damit auch die leeren Restbereiche neben Tabellen dunkel bleiben
 - DataGrid-Row-Header sind global deaktiviert (`HeadersVisibility="Column"`), damit links keine zusätzliche helle Auswahlspalte erscheint
 
+## Dashboard
+
+- Oberster Navigationseintrag in der Sidebar (⊞ Dashboard, Tag `"Dashboard"`)
+- Zeigt eine scrollbare Übersichtsseite mit drei Abschnitten:
+  1. **Zuletzt hinzugefügte Alben**: horizontaler Cover-Scrollstreifen (bis 12 Alben); Klick auf eine Karte navigiert in die Album-Trackansicht (Dashboard wird auf den Navigationsstapel gelegt, Zurück-Button kehrt zurück)
+  2. **Kalender (Monatsansicht)**: Montag-erster 7-Spalten-Grid; Kopfzeile Mo–So; pro Zelle: Tagesnummer, Spielzeit `HH:mm`, Top-3-Genres; Heute-Tag farbig hervorgehoben; ◀/▶-Buttons navigieren monatsweise; Sektions-Titel zeigt Monatsname und Jahr
+  3. **Top 10 Genres**: absteigende Liste mit proportionalen Fortschrittsbalken und Spieldauer `HH:mm`; Farben aus `_genreColors`-Palette
+- `AudioDatabase.GetRecentAlbums(limit)`, `GetCalendarData(year, month)`, `GetTopGenres(limit)` liefern die Daten
+- `RecentAlbumInfo` und `CalendarDayData` sind neue Records in `AudioDatabase.cs`
+- Felder: `_dashboardYear`, `_dashboardMonth` (laufende Kalenderposition), `_calendarInner` (Referenz für Monats-Refresh), `_genreColors` (statische Farbpalette)
+- Kalender-Navigation ruft `BuildDashboardAsync()` neu auf (rebuild statt Partial-Update), damit der Sektions-Titel mitaktualisiert wird
+- `HorizontalAlignment.Center/Right` und `Brushes.Transparent` in Dashboard-Methoden müssen vollständig qualifiziert werden (`System.Windows.HorizontalAlignment`, `System.Windows.Media.Brushes`), da in `MainWindow`-Methoden `this.HorizontalAlignment` Vorrang hat
+
 ## Inhaltsansichten (Hauptfenster)
 
 - **Künstler**: distinct-Künstler-Liste (eine Zeile pro Künstler, alphabetisch); Doppelklick öffnet die Alben, auf denen dieser Künstler vorkommt
@@ -169,7 +186,7 @@ Windows-Audioplayer mit:
 - `ContentRow` implementiert `INotifyPropertyChanged`, damit nachträglich geladene Thumbnails/Artworks sofort sichtbar werden und nicht erst nach Scroll-Recycling der UI.
 - **Now Playing**: zeigt links neben den Titelinformationen ein 96px-Thumbnail des gerade laufenden Tracks; rechts daneben ein Favoriten-Herz-Button (`♡`/`♥`), der den aktuell abgespielten Track sofort als Favorit markiert oder entmarkiert und den Status in DB und ggf. sichtbarer Trackliste reflektiert; der Button ist deaktiviert, wenn kein Track in der DB gefunden wird
 - `Player/Controls/VirtualizingWrapPanel.cs`: eigenes virtualisierendes WrapPanel für die Album-Artwork-Kacheln; hält das Coverraster visuell bei, materialisiert aber nur sichtbare Elemente
-- **Album-Trackansicht**: nutzt `AudioDatabase.GetTrackListByAlbum(albumId)`, sortiert nach Disc → Tracknummer → Dateiname; Doppelklick startet einen Track und verwendet alle sichtbaren Albumtitel als Queue, sodass nach Titelende automatisch der nächste Albumtitel folgt.
+- **Album-Trackansicht**: nutzt `AudioDatabase.GetTrackListByAlbum(albumId)`, sortiert nach Disc → Tracknummer → Dateiname; Doppelklick startet einen Track und verwendet alle sichtbaren Albumtitel als Queue, sodass nach Titelende automatisch der nächste Albumtitel folgt. Über der Trackliste steht mittig ein Albumkopf mit großem 240px-Cover, Albumtitel, Album-Interpret und optionalem Jahr; Cover können dort über dieselbe manuelle MusicBrainz-Suche wie in der Albumansicht gesucht, neu zugeordnet oder per Kontextmenü gelöscht werden.
 - **Favoriten**: Künstler-, Album- und Tracklisten zeigen eine Herzspalte (`♡`/`♥`) zum direkten Umschalten des jeweiligen `is_favorite`-Flags; Album-Kacheln zeigen ebenfalls ein Herz.
 - **Zurück-Navigation**: interne Drill-downs merken sich die vorherige Auswahl. Von Albumtracks geht es zurück zum zuvor gewählten Album; von Künstleralben zurück zum zuvor gewählten Künstler. Die Schaltfläche im Header nutzt ein appliktionskonformes, pillenförmiges Icon-Button-Design mit Chevron.
 - Ein expliziter Klick auf einen Eintrag der linken Hauptnavigation setzt alle internen Drill-down-Filter zurück; Sidebar-Navigation zeigt immer die ungefilterte Top-Level-Ansicht. Auch erneutes Anklicken des bereits markierten Sidebar-Eintrags stellt die ungefilterte Hauptansicht wieder her.
@@ -178,6 +195,8 @@ Windows-Audioplayer mit:
 - Drill-downs aus der Suchseite merken sich die ursprüngliche Suchanfrage; die Zurück-Schaltfläche führt wieder auf dieselbe Ergebnisansicht mit identischem Suchstand zurück
 - **Ordnerstruktur**: `TreeView` (statt DataGrid); Wurzelelemente sind die in den Einstellungen konfigurierten Bibliotheksverzeichnisse (voller Pfad als Label, initial aufgeklappt); Unterordner werden mit Ordnernamen angezeigt und sind initial zugeklappt; Tracks als Blattknoten (Titel oder Dateiname); Doppelklick auf einen Track spielt alle Tracks desselben Ordners als Queue ab (sortiert nach Disc → Track-Nr. → Dateiname)
 - **Playlists**: Playlist-Tracks mit Positions-Nr., Titel, Künstler, Album, Dauer; Playlists erscheinen automatisch in der linken Sidebar unter PLAYLISTS; Klick öffnet die Track-Liste, Doppelklick startet Wiedergabe
+- **Intelligente Playlists (Smart Playlists)**: Speichern keine Track-Liste, sondern Filter-Kriterien als JSON (`SmartPlaylistCriteria`); beim Öffnen werden die Tracks live anhand der gespeicherten Kriterien aus der DB abgefragt. Erkennbar am ⚡-Icon (gold) vor dem Namen in der Sidebar. Tracks in Smart-Playlists haben kein `PlaylistEntryId` und können nicht per Rechtsklick entfernt werden.
+- **Smart-Playlist speichern**: Im Tracks-Header erscheint neben dem Filter-Button ein `⚡ Als Smart-Playlist speichern`-Button (nur in der Tracks-Ansicht sichtbar); er ist nur aktiv wenn mindestens ein Filter gesetzt ist (`HasActiveFilters`); Klick öffnet `NewPlaylistDialog`, serialisiert die aktuellen Filter und ruft `CreateSmartPlaylist` auf
 - Tracks und Alben können per Rechtsklick-Kontextmenü zu bestehenden Playlisten hinzugefügt oder eine neue Playlist dafür erstellt werden (gilt für ContentDataGrid, AlbumArtworkListBox, Suchergebnis-DataGrids und die Ordnerstruktur-TreeView)
 
 ## Pflegehinweis

@@ -91,4 +91,7 @@ public sealed record LocalizedStrings(
     string DeletePlaylist,
     string RemoveFromPlaylist,
     string PlaylistDeleted,
-    string TrackRemovedFromPlaylist);
+    string TrackRemovedFromPlaylist,
+    string SaveSmartPlaylist,
+    string SmartPlaylistSaved,
+    string SaveSmartPlaylistDisabledTooltip);

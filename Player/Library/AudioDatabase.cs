@@ -52,6 +52,10 @@ public sealed record TrackLite(
     public string DisplayName => Title ?? FileName;
 }
 
+public sealed record RecentAlbumInfo(long Id, string Title, string Artist, string? ThumbPath);
+
+public sealed record CalendarDayData(int Day, double TotalSeconds, IReadOnlyList<string> TopGenres);
+
 /// <summary>
 /// Verwaltet die SQLite-Audiodatenbank. Eine Instanz pro Anwendungslaufzeit.
 /// Die DB-Datei liegt unter %LOCALAPPDATA%\Player\library.db (Windows) bzw.
@@ -293,6 +297,38 @@ public sealed class AudioDatabase : IDisposable
         return result;
     }
 
+    public AlbumInfo? GetAlbumById(long albumId)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT
+                al.id,
+                al.title,
+                ar.name,
+                CASE WHEN al.year = 0 THEN NULL ELSE al.year END,
+                aw.thumb_320_path,
+                aw.thumb_96_path,
+                al.is_favorite
+            FROM albums al
+            LEFT JOIN artists ar ON ar.id = al.artist_id
+            LEFT JOIN artworks aw ON aw.id = al.artwork_id
+            WHERE al.id = $album_id
+            LIMIT 1;
+            """;
+        Add(cmd, "$album_id", albumId);
+        using var reader = cmd.ExecuteReader();
+        return reader.Read()
+            ? new AlbumInfo(
+                reader.GetInt64(0),
+                reader.GetString(1),
+                reader.IsDBNull(2) ? null : reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetInt32(3),
+                reader.IsDBNull(4) ? null : reader.GetString(4),
+                reader.IsDBNull(5) ? null : reader.GetString(5),
+                reader.GetInt32(6) != 0)
+            : null;
+    }
+
     public void RebuildAlbumsFromAlbumArtists()
     {
         using var tx = _conn.BeginTransaction();
@@ -377,7 +413,7 @@ public sealed class AudioDatabase : IDisposable
         cmd.Transaction = tx;
         cmd.CommandText = """
             UPDATE albums
-            SET artwork_id = COALESCE(artwork_id, $artwork_id)
+            SET artwork_id = $artwork_id
             WHERE id = $album_id;
             """;
         Add(cmd, "$artwork_id", artworkId);
@@ -577,39 +613,44 @@ public sealed class AudioDatabase : IDisposable
 
     public List<TrackListInfo> GetTrackListByIds(IEnumerable<long> ids)
     {
-        var idList = ids.ToList();
+        const int batchSize = 500;
+        var idList = ids.Distinct().ToList();
         if (idList.Count == 0)
             return [];
 
-        using var cmd = _conn.CreateCommand();
-        var parameters = idList.Select((id, i) =>
+        var result = new List<TrackListInfo>(idList.Count);
+        foreach (var batch in idList.Chunk(batchSize))
         {
-            var name = $"$id{i}";
-            Add(cmd, name, id);
-            return name;
-        }).ToList();
-        cmd.CommandText = $"""
-            SELECT
-                path, file_name, title, artist, album, genre, format, bitrate, duration, sort_title, id, is_favorite
-            FROM tracks
-            WHERE id IN ({string.Join(", ", parameters)});
-            """;
-        using var reader = cmd.ExecuteReader();
-        var result = new List<TrackListInfo>();
-        while (reader.Read())
-            result.Add(new TrackListInfo(
-                reader.GetString(0),
-                reader.GetString(1),
-                reader.IsDBNull(2) ? null : reader.GetString(2),
-                reader.IsDBNull(3) ? null : reader.GetString(3),
-                reader.IsDBNull(4) ? null : reader.GetString(4),
-                reader.IsDBNull(5) ? null : reader.GetString(5),
-                reader.IsDBNull(6) ? null : reader.GetString(6),
-                reader.IsDBNull(7) ? null : reader.GetInt32(7),
-                reader.IsDBNull(8) ? null : reader.GetDouble(8),
-                reader.IsDBNull(9) ? null : reader.GetString(9),
-                reader.GetInt64(10),
-                reader.GetInt32(11) != 0));
+            using var cmd = _conn.CreateCommand();
+            var parameters = batch.Select((id, i) =>
+            {
+                var name = $"$id{i}";
+                Add(cmd, name, id);
+                return name;
+            }).ToList();
+            cmd.CommandText = $"""
+                SELECT
+                    path, file_name, title, artist, album, genre, format, bitrate, duration, sort_title, id, is_favorite
+                FROM tracks
+                WHERE id IN ({string.Join(", ", parameters)});
+                """;
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+                result.Add(new TrackListInfo(
+                    reader.GetString(0),
+                    reader.GetString(1),
+                    reader.IsDBNull(2) ? null : reader.GetString(2),
+                    reader.IsDBNull(3) ? null : reader.GetString(3),
+                    reader.IsDBNull(4) ? null : reader.GetString(4),
+                    reader.IsDBNull(5) ? null : reader.GetString(5),
+                    reader.IsDBNull(6) ? null : reader.GetString(6),
+                    reader.IsDBNull(7) ? null : reader.GetInt32(7),
+                    reader.IsDBNull(8) ? null : reader.GetDouble(8),
+                    reader.IsDBNull(9) ? null : reader.GetString(9),
+                    reader.GetInt64(10),
+                    reader.GetInt32(11) != 0));
+        }
+
         var order = idList.Select((id, index) => (id, index)).ToDictionary(x => x.id, x => x.index);
         return result.OrderBy(t => order[t.Id]).ToList();
     }
@@ -1048,11 +1089,13 @@ public sealed class AudioDatabase : IDisposable
 
         Execute("""
             CREATE TABLE IF NOT EXISTS playlists (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                name        TEXT    NOT NULL,
-                description TEXT,
-                created_at  INTEGER NOT NULL,
-                modified_at INTEGER NOT NULL
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                name             TEXT    NOT NULL,
+                description      TEXT,
+                created_at       INTEGER NOT NULL,
+                modified_at      INTEGER NOT NULL,
+                is_smart         INTEGER NOT NULL DEFAULT 0,
+                filter_criteria  TEXT
             );
 
             CREATE TABLE IF NOT EXISTS playlist_tracks (
@@ -1067,11 +1110,28 @@ public sealed class AudioDatabase : IDisposable
             CREATE INDEX IF NOT EXISTS idx_playlist_tracks_playlist ON playlist_tracks (playlist_id, position);
             CREATE INDEX IF NOT EXISTS idx_playlist_tracks_path     ON playlist_tracks (path);
             """);
+        EnsureColumn("playlists", "is_smart",        "INTEGER NOT NULL DEFAULT 0");
+        EnsureColumn("playlists", "filter_criteria",  "TEXT");
     }
 
     // ------------------------------------------------------------------
     // Playlisten – CRUD
     // ------------------------------------------------------------------
+
+    public long CreateSmartPlaylist(string name, string filterCriteria)
+    {
+        long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO playlists (name, is_smart, filter_criteria, created_at, modified_at)
+            VALUES ($name, 1, $filter, $now, $now)
+            RETURNING id;
+            """;
+        cmd.Parameters.AddWithValue("$name", name);
+        cmd.Parameters.AddWithValue("$filter", filterCriteria);
+        cmd.Parameters.AddWithValue("$now", now);
+        return (long)cmd.ExecuteScalar()!;
+    }
 
     public long CreatePlaylist(string name, string? description = null)
     {
@@ -1644,12 +1704,14 @@ public sealed class AudioDatabase : IDisposable
 
     private static PlaylistRecord MapPlaylist(SqliteDataReader r) => new()
     {
-        Id          = r.GetInt64(r.GetOrdinal("id")),
-        Name        = r.GetString(r.GetOrdinal("name")),
-        Description = NullableString(r, "description"),
-        TrackCount  = r.GetInt32(r.GetOrdinal("track_count")),
-        CreatedAt   = r.GetInt64(r.GetOrdinal("created_at")),
-        ModifiedAt  = r.GetInt64(r.GetOrdinal("modified_at")),
+        Id              = r.GetInt64(r.GetOrdinal("id")),
+        Name            = r.GetString(r.GetOrdinal("name")),
+        Description     = NullableString(r, "description"),
+        TrackCount      = r.GetInt32(r.GetOrdinal("track_count")),
+        CreatedAt       = r.GetInt64(r.GetOrdinal("created_at")),
+        ModifiedAt      = r.GetInt64(r.GetOrdinal("modified_at")),
+        IsSmartPlaylist = r.GetInt32(r.GetOrdinal("is_smart")) != 0,
+        FilterCriteria  = NullableString(r, "filter_criteria"),
     };
 
     private static PlaylistTrackRecord MapPlaylistTrack(SqliteDataReader r) => new()
@@ -1661,6 +1723,123 @@ public sealed class AudioDatabase : IDisposable
         Position   = r.GetInt32(r.GetOrdinal("position")),
         AddedAt    = r.GetInt64(r.GetOrdinal("added_at")),
     };
+
+    // ------------------------------------------------------------------
+    // Dashboard-Abfragen
+    // ------------------------------------------------------------------
+
+    public List<RecentAlbumInfo> GetRecentAlbums(int limit = 12)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT a.id,
+                   COALESCE(a.title, '')  AS title,
+                   COALESCE(ar.name, '')  AS artist,
+                   art.thumb_96_path,
+                   MAX(COALESCE(t.added_at, 0)) AS last_added
+            FROM albums a
+            LEFT JOIN artists  ar  ON ar.id  = a.artist_id
+            LEFT JOIN artworks art ON art.id  = a.artwork_id
+            LEFT JOIN tracks   t   ON t.album_id = a.id
+            GROUP BY a.id
+            ORDER BY last_added DESC
+            LIMIT $limit;
+            """;
+        cmd.Parameters.AddWithValue("$limit", limit);
+        using var r = cmd.ExecuteReader();
+        var result = new List<RecentAlbumInfo>();
+        while (r.Read())
+            result.Add(new RecentAlbumInfo(
+                r.GetInt64(0), r.GetString(1), r.GetString(2),
+                r.IsDBNull(3) ? null : r.GetString(3)));
+        return result;
+    }
+
+    public List<CalendarDayData> GetCalendarData(int year, int month)
+    {
+        var ym = $"{year:D4}-{month:D2}";
+
+        var dayTotals = new Dictionary<int, double>();
+        using (var cmd = _conn.CreateCommand())
+        {
+            cmd.CommandText = """
+                SELECT CAST(strftime('%d', started_at, 'unixepoch', 'localtime') AS INTEGER) AS day,
+                       SUM(COALESCE(position_seconds, 0)) AS secs
+                FROM play_history
+                WHERE strftime('%Y-%m', started_at, 'unixepoch', 'localtime') = $ym
+                  AND position_seconds > 0
+                GROUP BY day;
+                """;
+            cmd.Parameters.AddWithValue("$ym", ym);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+                dayTotals[r.GetInt32(0)] = r.GetDouble(1);
+        }
+
+        var dayGenres = new Dictionary<int, Dictionary<string, double>>();
+        using (var cmd = _conn.CreateCommand())
+        {
+            cmd.CommandText = """
+                SELECT CAST(strftime('%d', ph.started_at, 'unixepoch', 'localtime') AS INTEGER) AS day,
+                       SUM(COALESCE(ph.position_seconds, 0)) AS secs,
+                       t.genre
+                FROM play_history ph
+                JOIN tracks t ON t.id = ph.track_id
+                WHERE strftime('%Y-%m', ph.started_at, 'unixepoch', 'localtime') = $ym
+                  AND ph.position_seconds > 0
+                  AND t.genre IS NOT NULL AND t.genre != ''
+                GROUP BY day, t.genre;
+                """;
+            cmd.Parameters.AddWithValue("$ym", ym);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                int day = r.GetInt32(0);
+                double secs = r.GetDouble(1);
+                if (!dayGenres.TryGetValue(day, out var gd))
+                    dayGenres[day] = gd = new(StringComparer.OrdinalIgnoreCase);
+                foreach (var g in r.GetString(2).Split(';',
+                    StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    gd[g] = gd.GetValueOrDefault(g) + secs;
+            }
+        }
+
+        return dayTotals
+            .Select(kvp =>
+            {
+                IReadOnlyList<string> top = dayGenres.TryGetValue(kvp.Key, out var gd)
+                    ? gd.OrderByDescending(x => x.Value).Take(3).Select(x => x.Key).ToList()
+                    : Array.Empty<string>();
+                return new CalendarDayData(kvp.Key, kvp.Value, top);
+            })
+            .OrderBy(x => x.Day)
+            .ToList();
+    }
+
+    public List<(string Genre, double Seconds)> GetTopGenres(int limit = 10)
+    {
+        var agg = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT t.genre, SUM(COALESCE(ph.position_seconds, 0)) AS secs
+            FROM play_history ph
+            JOIN tracks t ON t.id = ph.track_id
+            WHERE ph.position_seconds > 0
+              AND t.genre IS NOT NULL AND t.genre != ''
+            GROUP BY t.genre
+            ORDER BY secs DESC;
+            """;
+        using var r = cmd.ExecuteReader();
+        while (r.Read())
+        {
+            double secs = r.GetDouble(1);
+            foreach (var g in r.GetString(0).Split(';',
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                agg[g] = agg.GetValueOrDefault(g) + secs;
+        }
+        return agg.OrderByDescending(x => x.Value).Take(limit)
+                  .Select(x => (x.Key, x.Value)).ToList();
+    }
 
     public void Dispose() => _conn.Dispose();
 }

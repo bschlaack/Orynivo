@@ -12,6 +12,7 @@ public sealed class WasapiAudioPlayer : IAudioPlayer
     private readonly string _filePath;
     private readonly WasapiOut _output;
     private readonly BufferedWaveProvider _bufferedProvider;
+    private readonly PausableWaveProvider _playbackProvider;
     private readonly MMDevice _device;
     private readonly AudioFileInfo _info;
     private readonly WasapiSelectedFormat _selectedFormat;
@@ -27,6 +28,7 @@ public sealed class WasapiAudioPlayer : IAudioPlayer
         Process process,
         WasapiOut output,
         BufferedWaveProvider bufferedProvider,
+        PausableWaveProvider playbackProvider,
         MMDevice device,
         AudioFileInfo info,
         WasapiSelectedFormat selectedFormat)
@@ -35,6 +37,7 @@ public sealed class WasapiAudioPlayer : IAudioPlayer
         _process = process;
         _output = output;
         _bufferedProvider = bufferedProvider;
+        _playbackProvider = playbackProvider;
         _device = device;
         _info = info;
         _selectedFormat = selectedFormat;
@@ -43,7 +46,7 @@ public sealed class WasapiAudioPlayer : IAudioPlayer
 
     public TimeSpan Duration => _info.Duration;
     public TimeSpan Position => TimeSpan.FromSeconds((double)Interlocked.Read(ref _framesWritten) / _info.OutputSampleRate);
-    public bool IsPaused => _output.PlaybackState == PlaybackState.Paused;
+    public bool IsPaused => _playbackProvider.IsPaused;
     public bool CanSeek => Duration > TimeSpan.Zero;
     public float Volume { get; set; } = 1.0f;
 
@@ -65,17 +68,19 @@ public sealed class WasapiAudioPlayer : IAudioPlayer
             BufferDuration = TimeSpan.FromSeconds(2),
             DiscardOnBufferOverflow = false
         };
+        var playbackProvider = new PausableWaveProvider(provider);
 
         var output = new WasapiOut(device, AudioClientShareMode.Exclusive, useEventSync: true, latency: 100);
-        output.Init(provider);
+        output.Init(playbackProvider);
         output.Play();
 
         var process = StartFfmpeg(filePath, info.OutputSampleRate, selectedFormat, TimeSpan.Zero);
-        return (new WasapiAudioPlayer(filePath, process, output, provider, device, info, selectedFormat), info);
+        return (new WasapiAudioPlayer(
+            filePath, process, output, provider, playbackProvider, device, info, selectedFormat), info);
     }
 
-    public void Pause() => _output.Pause();
-    public void Resume() => _output.Play();
+    public void Pause() => _playbackProvider.IsPaused = true;
+    public void Resume() => _playbackProvider.IsPaused = false;
 
     public async Task SeekAsync(TimeSpan position)
     {
@@ -301,4 +306,28 @@ public sealed class WasapiAudioPlayer : IAudioPlayer
         string FfmpegSampleFormat,
         string FfmpegCodec,
         int BytesPerFrame);
+
+    private sealed class PausableWaveProvider(IWaveProvider source) : IWaveProvider
+    {
+        private volatile bool _isPaused;
+
+        public WaveFormat WaveFormat => source.WaveFormat;
+
+        public bool IsPaused
+        {
+            get => _isPaused;
+            set => _isPaused = value;
+        }
+
+        public int Read(byte[] buffer, int offset, int count)
+        {
+            if (!_isPaused)
+            {
+                return source.Read(buffer, offset, count);
+            }
+
+            Array.Clear(buffer, offset, count);
+            return count;
+        }
+    }
 }

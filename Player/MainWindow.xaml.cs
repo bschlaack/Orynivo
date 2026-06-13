@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -54,6 +55,24 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<PlaylistItem> _queue = [];
     private int _queueIndex = -1;
     private string _currentFilePath = string.Empty;
+
+    private int _dashboardYear;
+    private int _dashboardMonth;
+    private StackPanel? _calendarInner;
+
+    private static readonly System.Windows.Media.Color[] _genreColors =
+    [
+        System.Windows.Media.Color.FromRgb(0x6C, 0x63, 0xFF),
+        System.Windows.Media.Color.FromRgb(0xFF, 0x6B, 0x9D),
+        System.Windows.Media.Color.FromRgb(0xFF, 0x9F, 0x43),
+        System.Windows.Media.Color.FromRgb(0x1D, 0xD1, 0xA1),
+        System.Windows.Media.Color.FromRgb(0x54, 0xA0, 0xFF),
+        System.Windows.Media.Color.FromRgb(0xFE, 0xCE, 0x00),
+        System.Windows.Media.Color.FromRgb(0xC4, 0x4E, 0xFC),
+        System.Windows.Media.Color.FromRgb(0xFF, 0x6B, 0x6B),
+        System.Windows.Media.Color.FromRgb(0x2E, 0xCC, 0x71),
+        System.Windows.Media.Color.FromRgb(0x3C, 0xC7, 0xF0),
+    ];
 
     private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -196,7 +215,7 @@ public partial class MainWindow : Window
     private void PersistViewState()
     {
         if (NavListBox.SelectedItem is ListBoxItem { Tag: string tag } &&
-            tag is "Artists" or "Albums" or "Tracks" or "Folders")
+            tag is "Dashboard" or "Artists" or "Albums" or "Tracks" or "Folders")
         {
             _settings.LastMainView = tag;
         }
@@ -268,8 +287,8 @@ public partial class MainWindow : Window
 
     private void LoadNavPlaylists()
     {
-        // Dynamisch hinzugefügte Playlist-Einträge (Index 6+) entfernen
-        while (NavListBox.Items.Count > 6)
+        // Dynamisch hinzugefügte Playlist-Einträge (Index 7+) entfernen; Index 0 = Dashboard
+        while (NavListBox.Items.Count > 7)
             NavListBox.Items.RemoveAt(NavListBox.Items.Count - 1);
 
         try
@@ -277,9 +296,27 @@ public partial class MainWindow : Window
             using var db = AudioDatabase.OpenDefault();
             foreach (var pl in db.GetAllPlaylists())
             {
+                object content;
+                if (pl.IsSmartPlaylist)
+                {
+                    var sp = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
+                    sp.Children.Add(new TextBlock
+                    {
+                        Text       = "⚡ ",
+                        Foreground = new System.Windows.Media.SolidColorBrush(
+                                         System.Windows.Media.Color.FromRgb(0xFF, 0xCC, 0x00))
+                    });
+                    sp.Children.Add(new TextBlock { Text = pl.Name });
+                    content = sp;
+                }
+                else
+                {
+                    content = pl.Name;
+                }
+
                 NavListBox.Items.Add(new ListBoxItem
                 {
-                    Content = pl.Name,
+                    Content = content,
                     Tag     = $"Playlist:{pl.Id}",
                     Style   = (Style)FindResource("NavItemStyle")
                 });
@@ -341,11 +378,23 @@ public partial class MainWindow : Window
         ContentDataGrid.ItemsSource = null;
         AlbumArtworkListBox.ItemsSource = null;
         SearchResultsScrollViewer.Visibility = Visibility.Collapsed;
+        DashboardScrollViewer.Visibility = Visibility.Collapsed;
+        HideAlbumDetailHeader();
         ContentCountTextBlock.Text  = "";
         AlbumViewModeBorder.Visibility = tag == "Albums" ? Visibility.Visible : Visibility.Collapsed;
         TrackFilterButton.Visibility = tag == "Tracks" ? Visibility.Visible : Visibility.Collapsed;
+        SaveSmartPlaylistButton.Visibility = tag == "Tracks" ? Visibility.Visible : Visibility.Collapsed;
+        if (tag == "Tracks") UpdateSaveSmartPlaylistButtonState();
         TrackFilterPopup.IsOpen = false;
-        if (tag == "Folders")
+        if (tag == "Dashboard")
+        {
+            ContentDataGrid.Visibility = Visibility.Collapsed;
+            FolderTreeView.Visibility  = Visibility.Collapsed;
+            AlbumArtworkListBox.Visibility = Visibility.Collapsed;
+            DashboardScrollViewer.Visibility = Visibility.Visible;
+            await ShowDashboardAsync();
+        }
+        else if (tag == "Folders")
         {
             ContentDataGrid.Visibility = Visibility.Collapsed;
             FolderTreeView.Visibility  = Visibility.Visible;
@@ -415,6 +464,33 @@ public partial class MainWindow : Window
 
             if (view.StartsWith("Playlist:") && long.TryParse(view.AsSpan("Playlist:".Length), out long pid))
             {
+                var playlist = db.GetPlaylistById(pid);
+                if (playlist is null) return [];
+
+                if (playlist.IsSmartPlaylist && playlist.FilterCriteria is not null)
+                {
+                    SmartPlaylistCriteria criteria;
+                    try { criteria = JsonSerializer.Deserialize<SmartPlaylistCriteria>(playlist.FilterCriteria)!; }
+                    catch { return []; }
+
+                    var facets = db.GetTrackFacets();
+                    var ids = facets.Where(f => MatchesCriteria(f, criteria)).Select(f => f.Id).ToList();
+                    return db.GetTrackListFiltered(ids)
+                        .Select((t, i) => new ContentRow
+                        {
+                            Nr       = (i + 1).ToString(),
+                            Id       = t.Id,
+                            Title    = t.Title ?? t.FileName,
+                            Artist   = t.Artist,
+                            Album    = t.Album,
+                            Duration = FormatSeconds(t.Duration),
+                            Genre    = t.Genre,
+                            Format   = t.Format?.ToUpperInvariant(),
+                            FilePath = t.Path,
+                            IsFavorite = t.IsFavorite
+                        }).ToList();
+                }
+
                 var ptracks = db.GetPlaylistTracks(pid).ToList();
                 return ptracks.Select((pt, i) =>
                 {
@@ -475,6 +551,13 @@ public partial class MainWindow : Window
     private List<ContentRow> GetFilteredTrackRows()
     {
         using var db = AudioDatabase.OpenDefault();
+        if (!HasActiveFilters)
+        {
+            return db.GetTrackList()
+                .Select(ToTrackContentRow)
+                .ToList();
+        }
+
         var facets = db.GetTrackFacets();
         var ids = facets
             .Where(f => MatchesTrackFilters(f))
@@ -614,6 +697,7 @@ public partial class MainWindow : Window
         var rows = await Task.Run(GetFilteredTrackRows);
         ContentDataGrid.ItemsSource = rows;
         ContentCountTextBlock.Text = rows.Count == 1 ? "1 Eintrag" : $"{rows.Count:N0} Einträge";
+        UpdateSaveSmartPlaylistButtonState();
         await RefreshTrackFilterPopupAsync();
     }
 
@@ -639,6 +723,63 @@ public partial class MainWindow : Window
             (!facet.Bitrate.HasValue || !_selectedTrackBitrates.Contains(facet.Bitrate.Value)))
             return false;
         return true;
+    }
+
+    private static bool MatchesCriteria(TrackFacetInfo facet, SmartPlaylistCriteria criteria)
+    {
+        if (criteria.FavoritesOnly && !facet.IsFavorite)
+            return false;
+        if (criteria.Genres.Count > 0)
+        {
+            var trackGenres = string.IsNullOrWhiteSpace(facet.Genre)
+                ? Array.Empty<string>()
+                : facet.Genre.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (!trackGenres.Any(g => criteria.Genres.Contains(g, StringComparer.OrdinalIgnoreCase)))
+                return false;
+        }
+        if (criteria.Formats.Count > 0 &&
+            (string.IsNullOrWhiteSpace(facet.Format) ||
+             !criteria.Formats.Contains(facet.Format, StringComparer.OrdinalIgnoreCase)))
+            return false;
+        if (criteria.Bitrates.Count > 0 &&
+            (!facet.Bitrate.HasValue || !criteria.Bitrates.Contains(facet.Bitrate.Value)))
+            return false;
+        return true;
+    }
+
+    private bool HasActiveFilters =>
+        _trackFavoritesOnly || _selectedTrackGenres.Count > 0 ||
+        _selectedTrackFormats.Count > 0 || _selectedTrackBitrates.Count > 0;
+
+    private void UpdateSaveSmartPlaylistButtonState()
+    {
+        SaveSmartPlaylistButton.IsEnabled = HasActiveFilters;
+    }
+
+    private void SaveSmartPlaylistButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new NewPlaylistDialog { Owner = this };
+        if (dialog.ShowDialog() != true || string.IsNullOrWhiteSpace(dialog.PlaylistName))
+            return;
+
+        var criteria = new SmartPlaylistCriteria(
+            FavoritesOnly: _trackFavoritesOnly,
+            Genres:   [.. _selectedTrackGenres.OrderBy(g => g)],
+            Formats:  [.. _selectedTrackFormats.OrderBy(f => f)],
+            Bitrates: [.. _selectedTrackBitrates.OrderBy(b => b)]);
+
+        var json = JsonSerializer.Serialize(criteria);
+        var name = dialog.PlaylistName.Trim();
+
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            db.CreateSmartPlaylist(name, json);
+        }
+        catch { return; }
+
+        LoadNavPlaylists();
+        StatusTextBlock.Text = string.Format(LocalizationManager.Current.SmartPlaylistSaved, name);
     }
 
     private IEnumerable<KeyValuePair<string, int>> BuildGenreFacetCounts(IEnumerable<TrackFacetInfo> facets)
@@ -715,6 +856,8 @@ public partial class MainWindow : Window
         FolderTreeView.Visibility = Visibility.Collapsed;
         AlbumArtworkListBox.Visibility = Visibility.Collapsed;
         SearchResultsScrollViewer.Visibility = Visibility.Visible;
+        DashboardScrollViewer.Visibility = Visibility.Collapsed;
+        HideAlbumDetailHeader();
 
         var result = await Task.Run(() =>
         {
@@ -1267,12 +1410,67 @@ public partial class MainWindow : Window
         AlbumArtworkListBox.Visibility = Visibility.Collapsed;
         FolderTreeView.Visibility = Visibility.Collapsed;
         SearchResultsScrollViewer.Visibility = Visibility.Collapsed;
+        DashboardScrollViewer.Visibility = Visibility.Collapsed;
 
-        var rows = await Task.Run(() => QueryRows("Tracks"));
+        var result = await Task.Run(() =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            return (
+                Album: db.GetAlbumById(albumId),
+                Tracks: db.GetTrackListByAlbum(albumId)
+                    .Select(ToTrackContentRow)
+                    .ToList());
+        });
+        var rows = result.Tracks;
         ApplyColumns("Tracks");
         ContentDataGrid.ItemsSource = rows;
         ContentCountTextBlock.Text = rows.Count == 1 ? "1 Titel" : $"{rows.Count:N0} Titel";
+        ApplyAlbumDetailHeader(result.Album);
         BackButton.Visibility = Visibility.Visible;
+    }
+
+    private void ApplyAlbumDetailHeader(AlbumInfo? album)
+    {
+        if (album is null)
+        {
+            HideAlbumDetailHeader();
+            return;
+        }
+
+        var row = new ContentRow
+        {
+            Id = album.Id,
+            Title = string.IsNullOrWhiteSpace(album.Album)
+                ? LocalizationManager.Current.Unknown
+                : album.Album,
+            Artist = string.IsNullOrWhiteSpace(album.DisplayArtist)
+                ? null
+                : album.DisplayArtist,
+            Year = album.Year?.ToString(),
+            ArtworkPath = album.ArtworkPath,
+            ThumbnailPath = album.ThumbnailPath,
+            IsFavorite = album.IsFavorite,
+            FilePath = ""
+        };
+        EnsureArtworkHydrated(row);
+        AlbumDetailHeader.DataContext = row;
+        AlbumDetailHeader.Visibility = Visibility.Visible;
+    }
+
+    private void HideAlbumDetailHeader()
+    {
+        AlbumDetailHeader.Visibility = Visibility.Collapsed;
+        AlbumDetailHeader.DataContext = null;
+    }
+
+    private async Task ReloadAlbumDetailHeaderAsync(long albumId)
+    {
+        var album = await Task.Run(() =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            return db.GetAlbumById(albumId);
+        });
+        ApplyAlbumDetailHeader(album);
     }
 
     private async Task ShowArtistAlbumsAsync(long artistId, string artistName)
@@ -1289,6 +1487,7 @@ public partial class MainWindow : Window
         AlbumArtworkListBox.Visibility = _showAlbumArtworkView ? Visibility.Visible : Visibility.Collapsed;
         FolderTreeView.Visibility = Visibility.Collapsed;
         SearchResultsScrollViewer.Visibility = Visibility.Collapsed;
+        HideAlbumDetailHeader();
 
         var rows = await Task.Run(() => QueryRows("Albums"));
         ApplyColumns("Albums");
@@ -1314,7 +1513,10 @@ public partial class MainWindow : Window
         using (var db = AudioDatabase.OpenDefault())
             db.ClearArtworkFromAlbum(albumId);
 
-        await ReloadAlbumRowsAsync();
+        if (_activeAlbumFilterId == albumId)
+            await ReloadAlbumDetailHeaderAsync(albumId);
+        else
+            await ReloadAlbumRowsAsync();
     }
 
     private async void ReassignCoverMenuItem_OnClick(object sender, RoutedEventArgs e)
@@ -1337,7 +1539,10 @@ public partial class MainWindow : Window
         using (var db = AudioDatabase.OpenDefault())
             db.AttachArtworkToAlbum(albumId, selected.ImageData, selected.MimeType);
 
-        await ReloadAlbumRowsAsync();
+        if (_activeAlbumFilterId == albumId)
+            await ReloadAlbumDetailHeaderAsync(albumId);
+        else
+            await ReloadAlbumRowsAsync();
     }
 
     private async Task ReloadAlbumRowsAsync()
@@ -1359,9 +1564,19 @@ public partial class MainWindow : Window
         _activeArtistFilterName = state.ArtistFilterName;
         _activeAlbumFilterId = null;
         _activeAlbumFilterTitle = null;
+        HideAlbumDetailHeader();
 
         switch (state.View)
         {
+            case "Dashboard":
+                ContentTitleTextBlock.Text = "Dashboard";
+                ContentDataGrid.Visibility = Visibility.Collapsed;
+                FolderTreeView.Visibility  = Visibility.Collapsed;
+                AlbumArtworkListBox.Visibility = Visibility.Collapsed;
+                DashboardScrollViewer.Visibility = Visibility.Visible;
+                await ShowDashboardAsync();
+                return;
+
             case "Search":
                 SearchTextBox.Text = state.SearchQuery ?? string.Empty;
                 await ShowSearchResultsAsync(state.SearchQuery ?? string.Empty);
@@ -1675,7 +1890,9 @@ public partial class MainWindow : Window
         }
 
         item.IsSelected = true;
-        var name = item.Content?.ToString() ?? string.Empty;
+        string name;
+        try { using var db = AudioDatabase.OpenDefault(); name = db.GetPlaylistById(playlistId)?.Name ?? string.Empty; }
+        catch { name = string.Empty; }
         NavListBox.ContextMenu = BuildDeletePlaylistContextMenu(playlistId, name);
     }
 
@@ -2121,5 +2338,457 @@ public partial class MainWindow : Window
     private void AboutButton_OnClick(object sender, RoutedEventArgs e)
     {
         new AboutWindow { Owner = this }.ShowDialog();
+    }
+
+    // ------------------------------------------------------------------
+    // Dashboard
+    // ------------------------------------------------------------------
+
+    private async Task ShowDashboardAsync()
+    {
+        ContentTitleTextBlock.Text = "Dashboard";
+        var now = DateTime.Now;
+        if (_dashboardYear == 0)
+        {
+            _dashboardYear  = now.Year;
+            _dashboardMonth = now.Month;
+        }
+        await BuildDashboardAsync();
+    }
+
+    private async Task BuildDashboardAsync()
+    {
+        DashboardPanel.Children.Clear();
+        _calendarInner = null;
+
+        var recentAlbums = await Task.Run(() =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            return db.GetRecentAlbums(12);
+        });
+
+        var calendarData = await Task.Run(() =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            return db.GetCalendarData(_dashboardYear, _dashboardMonth);
+        });
+
+        var topGenres = await Task.Run(() =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            return db.GetTopGenres(10);
+        });
+
+        DashboardAddSectionHeader("Zuletzt hinzugefügte Alben");
+        DashboardBuildRecentAlbums(recentAlbums);
+
+        DashboardAddSectionHeader($"Kalender – {new DateTime(_dashboardYear, _dashboardMonth, 1):MMMM yyyy}",
+            calendarNav: true);
+        DashboardBuildCalendar(calendarData);
+
+        DashboardAddSectionHeader("Top 10 Genres nach Spielzeit");
+        DashboardBuildTopGenres(topGenres);
+    }
+
+    private void DashboardAddSectionHeader(string title, bool calendarNav = false)
+    {
+        var grid = new Grid { Margin = new Thickness(0, 24, 0, 8) };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        if (calendarNav)
+        {
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        }
+
+        var tb = new TextBlock
+        {
+            Text       = title,
+            FontSize   = 15,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = (WpfBrush)FindResource("AppPrimaryTextBrush"),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(tb, 0);
+        grid.Children.Add(tb);
+
+        if (calendarNav)
+        {
+            var prev = CreateCalNavButton("◀");
+            var next = CreateCalNavButton("▶");
+            prev.Click += CalendarPrev_OnClick;
+            next.Click += CalendarNext_OnClick;
+            Grid.SetColumn(prev, 2);
+            Grid.SetColumn(next, 3);
+            grid.Children.Add(prev);
+            grid.Children.Add(next);
+        }
+
+        DashboardPanel.Children.Add(grid);
+
+        var sep = new Border
+        {
+            Height     = 1,
+            Background = (WpfBrush)FindResource("AppGridLineBrush"),
+            Margin     = new Thickness(0, 0, 0, 12)
+        };
+        DashboardPanel.Children.Add(sep);
+    }
+
+    private Button CreateCalNavButton(string symbol)
+    {
+        return new Button
+        {
+            Content    = symbol,
+            FontSize   = 13,
+            Padding    = new Thickness(8, 3, 8, 3),
+            Margin     = new Thickness(4, 0, 0, 0),
+            Background = (WpfBrush)FindResource("AppContentBrush"),
+            Foreground = (WpfBrush)FindResource("AppPrimaryTextBrush"),
+            BorderBrush = (WpfBrush)FindResource("AppGridLineBrush"),
+            BorderThickness = new Thickness(1),
+            Cursor     = WpfCursors.Hand,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+    }
+
+    private void DashboardBuildRecentAlbums(List<RecentAlbumInfo> albums)
+    {
+        var scroll = new ScrollViewer
+        {
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            VerticalScrollBarVisibility   = ScrollBarVisibility.Disabled,
+            Margin = new Thickness(0, 0, 0, 4)
+        };
+
+        var panel = new StackPanel
+        {
+            Orientation = System.Windows.Controls.Orientation.Horizontal
+        };
+
+        foreach (var album in albums)
+            panel.Children.Add(BuildAlbumCard(album));
+
+        scroll.Content = panel;
+        DashboardPanel.Children.Add(scroll);
+    }
+
+    private FrameworkElement BuildAlbumCard(RecentAlbumInfo album)
+    {
+        var card = new Border
+        {
+            Width           = 140,
+            Margin          = new Thickness(0, 0, 12, 0),
+            Background      = (WpfBrush)FindResource("AppSurfaceBrush"),
+            BorderBrush     = (WpfBrush)FindResource("AppGridLineBrush"),
+            BorderThickness = new Thickness(1),
+            CornerRadius    = new CornerRadius(6),
+            Cursor          = WpfCursors.Hand,
+            ClipToBounds    = true
+        };
+
+        var stack = new StackPanel();
+
+        var img = new WpfImage
+        {
+            Width   = 140,
+            Height  = 140,
+            Stretch = System.Windows.Media.Stretch.UniformToFill
+        };
+
+        if (!string.IsNullOrEmpty(album.ThumbPath) && File.Exists(album.ThumbPath))
+        {
+            try
+            {
+                var bmp = new BitmapImage();
+                bmp.BeginInit();
+                bmp.UriSource      = new Uri(album.ThumbPath);
+                bmp.CacheOption    = BitmapCacheOption.OnLoad;
+                bmp.DecodePixelWidth = 140;
+                bmp.EndInit();
+                img.Source = bmp;
+            }
+            catch { img.Source = null; }
+        }
+
+        var placeholder = new Border
+        {
+            Width  = 140,
+            Height = 140,
+            Background = (WpfBrush)FindResource("AppArtworkPlaceholderBrush")
+        };
+
+        if (img.Source is null)
+            stack.Children.Add(placeholder);
+        else
+            stack.Children.Add(img);
+
+        stack.Children.Add(new TextBlock
+        {
+            Text        = album.Title,
+            FontWeight  = FontWeights.SemiBold,
+            FontSize    = 11,
+            Foreground  = (WpfBrush)FindResource("AppPrimaryTextBrush"),
+            Margin      = new Thickness(8, 6, 8, 2),
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            TextWrapping = TextWrapping.NoWrap
+        });
+        stack.Children.Add(new TextBlock
+        {
+            Text       = album.Artist,
+            FontSize   = 10,
+            Foreground = (WpfBrush)FindResource("AppSecondaryTextBrush"),
+            Margin     = new Thickness(8, 0, 8, 8),
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            TextWrapping = TextWrapping.NoWrap
+        });
+
+        card.Child = stack;
+
+        card.MouseLeftButtonUp += (_, _) =>
+        {
+            _navigationStack.Push(new NavigationState("Dashboard", null, null, null));
+            BackButton.Visibility = Visibility.Visible;
+            _ = ShowAlbumTracksAsync(album.Id, album.Title);
+        };
+
+        return card;
+    }
+
+    private void DashboardBuildCalendar(List<CalendarDayData> data)
+    {
+        var dayMap = data.ToDictionary(d => d.Day);
+        int daysInMonth = DateTime.DaysInMonth(_dashboardYear, _dashboardMonth);
+        var firstDay = new DateTime(_dashboardYear, _dashboardMonth, 1);
+        int startDow = ((int)firstDay.DayOfWeek + 6) % 7; // Monday=0
+
+        var outer = new Border
+        {
+            Background      = (WpfBrush)FindResource("AppSurfaceBrush"),
+            BorderBrush     = (WpfBrush)FindResource("AppGridLineBrush"),
+            BorderThickness = new Thickness(1),
+            CornerRadius    = new CornerRadius(8),
+            Padding         = new Thickness(12),
+            Margin          = new Thickness(0, 0, 0, 4)
+        };
+
+        var inner = new StackPanel();
+        _calendarInner = inner;
+
+        var headerRow = new Grid { Margin = new Thickness(0, 0, 0, 4) };
+        for (int i = 0; i < 7; i++)
+            headerRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        string[] dayNames = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+        for (int i = 0; i < 7; i++)
+        {
+            var tb = new TextBlock
+            {
+                Text      = dayNames[i],
+                FontSize  = 10,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = (WpfBrush)FindResource("AppSecondaryTextBrush"),
+                HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+                Margin    = new Thickness(0, 0, 0, 4)
+            };
+            Grid.SetColumn(tb, i);
+            headerRow.Children.Add(tb);
+        }
+        inner.Children.Add(headerRow);
+
+        DashboardRefreshCalendarContent(inner, dayMap, daysInMonth, startDow);
+
+        outer.Child = inner;
+        DashboardPanel.Children.Add(outer);
+    }
+
+    private void DashboardRefreshCalendarContent(StackPanel inner, Dictionary<int, CalendarDayData> dayMap,
+        int daysInMonth, int startDow)
+    {
+        // Remove all rows except the header (index 0)
+        while (inner.Children.Count > 1)
+            inner.Children.RemoveAt(1);
+
+        int col = startDow;
+        Grid? rowGrid = null;
+
+        for (int day = 1; day <= daysInMonth; day++)
+        {
+            if (col == 0 || rowGrid is null)
+            {
+                rowGrid = new Grid { Margin = new Thickness(0, 2, 0, 2) };
+                for (int i = 0; i < 7; i++)
+                    rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                inner.Children.Add(rowGrid);
+            }
+
+            dayMap.TryGetValue(day, out var dayData);
+            var cell = BuildCalDayCell(day, dayData);
+            Grid.SetColumn(cell, col);
+            rowGrid.Children.Add(cell);
+
+            col = (col + 1) % 7;
+        }
+    }
+
+    private FrameworkElement BuildCalDayCell(int day, CalendarDayData? data)
+    {
+        bool isToday = _dashboardYear == DateTime.Now.Year
+                    && _dashboardMonth == DateTime.Now.Month
+                    && day == DateTime.Now.Day;
+
+        var border = new Border
+        {
+            Margin          = new Thickness(2),
+            MinHeight       = 64,
+            Background      = isToday
+                ? new SolidColorBrush(System.Windows.Media.Color.FromArgb(30, 0x54, 0xA0, 0xFF))
+                : System.Windows.Media.Brushes.Transparent,
+            BorderBrush     = (WpfBrush)FindResource("AppGridLineBrush"),
+            BorderThickness = new Thickness(1),
+            CornerRadius    = new CornerRadius(4),
+            Padding         = new Thickness(4)
+        };
+
+        var stack = new StackPanel();
+
+        stack.Children.Add(new TextBlock
+        {
+            Text       = day.ToString(),
+            FontSize   = 11,
+            FontWeight = isToday ? FontWeights.Bold : FontWeights.Normal,
+            Foreground = (WpfBrush)FindResource("AppPrimaryTextBrush"),
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Right
+        });
+
+        if (data is not null && data.TotalSeconds > 0)
+        {
+            var ts = TimeSpan.FromSeconds(data.TotalSeconds);
+            stack.Children.Add(new TextBlock
+            {
+                Text       = $"{(int)ts.TotalHours:D2}:{ts.Minutes:D2}",
+                FontSize   = 10,
+                Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x54, 0xA0, 0xFF)),
+                HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+                Margin = new Thickness(0, 2, 0, 2)
+            });
+
+            foreach (var genre in data.TopGenres.Take(3))
+                stack.Children.Add(new TextBlock
+                {
+                    Text         = genre,
+                    FontSize     = 9,
+                    Foreground   = (WpfBrush)FindResource("AppSecondaryTextBrush"),
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+                });
+        }
+
+        border.Child = stack;
+        return border;
+    }
+
+    private void DashboardBuildTopGenres(List<(string Genre, double Seconds)> genres)
+    {
+        if (genres.Count == 0)
+        {
+            DashboardPanel.Children.Add(new TextBlock
+            {
+                Text       = "Keine Daten vorhanden.",
+                Foreground = (WpfBrush)FindResource("AppSecondaryTextBrush"),
+                Margin     = new Thickness(0, 4, 0, 0)
+            });
+            return;
+        }
+
+        double maxSecs = genres[0].Seconds;
+
+        var panel = new StackPanel { Margin = new Thickness(0, 0, 0, 4) };
+
+        for (int i = 0; i < genres.Count; i++)
+        {
+            var (genre, secs) = genres[i];
+            var color = _genreColors[i % _genreColors.Length];
+            var brush = new SolidColorBrush(color);
+
+            var row = new Grid { Margin = new Thickness(0, 0, 0, 6) };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(160) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var labelTb = new TextBlock
+            {
+                Text         = $"{i + 1}. {genre}",
+                FontSize     = 12,
+                Foreground   = (WpfBrush)FindResource("AppPrimaryTextBrush"),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin       = new Thickness(0, 0, 12, 0)
+            };
+            Grid.SetColumn(labelTb, 0);
+            row.Children.Add(labelTb);
+
+            double fraction = maxSecs > 0 ? secs / maxSecs : 0;
+            var barHost = new Grid { VerticalAlignment = VerticalAlignment.Center };
+            var barBg = new Border
+            {
+                Height          = 10,
+                Background      = (WpfBrush)FindResource("AppGridLineBrush"),
+                CornerRadius    = new CornerRadius(5)
+            };
+            var barGrid = new Grid();
+            barGrid.ColumnDefinitions.Add(new ColumnDefinition
+                { Width = new GridLength(fraction, GridUnitType.Star) });
+            barGrid.ColumnDefinitions.Add(new ColumnDefinition
+                { Width = new GridLength(1 - fraction, GridUnitType.Star) });
+            var barFill = new Border
+            {
+                Height       = 10,
+                Background   = brush,
+                CornerRadius = new CornerRadius(5)
+            };
+            Grid.SetColumn(barFill, 0);
+            barGrid.Children.Add(barFill);
+            barHost.Children.Add(barBg);
+            barHost.Children.Add(barGrid);
+            Grid.SetColumn(barHost, 1);
+            row.Children.Add(barHost);
+
+            var ts = TimeSpan.FromSeconds(secs);
+            var durationTb = new TextBlock
+            {
+                Text      = $"{(int)ts.TotalHours:D2}:{ts.Minutes:D2}",
+                FontSize  = 11,
+                Foreground = (WpfBrush)FindResource("AppSecondaryTextBrush"),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin    = new Thickness(12, 0, 0, 0)
+            };
+            Grid.SetColumn(durationTb, 2);
+            row.Children.Add(durationTb);
+
+            panel.Children.Add(row);
+        }
+
+        DashboardPanel.Children.Add(panel);
+    }
+
+    private async void CalendarPrev_OnClick(object sender, RoutedEventArgs e)
+    {
+        _dashboardMonth--;
+        if (_dashboardMonth < 1) { _dashboardMonth = 12; _dashboardYear--; }
+        await RefreshCalendarSectionAsync();
+    }
+
+    private async void CalendarNext_OnClick(object sender, RoutedEventArgs e)
+    {
+        _dashboardMonth++;
+        if (_dashboardMonth > 12) { _dashboardMonth = 1; _dashboardYear++; }
+        await RefreshCalendarSectionAsync();
+    }
+
+    private async Task RefreshCalendarSectionAsync()
+    {
+        // Rebuild the whole dashboard — section header title contains the month/year
+        await BuildDashboardAsync();
     }
 }

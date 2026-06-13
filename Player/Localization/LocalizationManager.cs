@@ -63,6 +63,7 @@ public static class LocalizationManager
         resources["L_NewPlaylistDialogTitle"] = Current.NewPlaylistDialogTitle;
         resources["L_NewPlaylistNameLabel"] = Current.NewPlaylistNameLabel;
         resources["L_CreatePlaylist"] = Current.CreatePlaylist;
+        resources["L_SaveSmartPlaylistDisabledTooltip"] = Current.SaveSmartPlaylistDisabledTooltip;
     }
 
     private static readonly LocalizedStrings German = new(
@@ -72,7 +73,7 @@ public static class LocalizationManager
         "BIBLIOTHEK", "Verzeichnisse", "+ Verzeichnis hinzufügen", "Datenbankwartung",
         "Datenbank optimieren", "Album-Cover reparieren", "Fehlende Cover-Artworks herunterladen",
         "Automatischer Download findet nur Cover, wenn eine MusicBrainz-ID gesetzt ist. Für freiere Suchen nutze die Schaltfläche direkt in der Albumansicht.",
-        "Cover nicht gefunden", "Herunterladen", "Cover suchen", "Suche nach passenden Covern …",
+        "Cover nicht gefunden", "Cover suchen", "Cover suchen", "Suche nach passenden Covern …",
         "Keine Cover gefunden.", "Suchbegriff", "Erneut suchen", "Ausgewähltes Cover übernehmen",
         "Cover löschen", "Cover neu zuordnen", "Autor", "Lizenzen", "Speichern", "Abbrechen", "Tabelle", "Artwork",
         "(Unbekannt)", "Album-Künstler", "Jahr", "Titel", "Künstler", "Album", "Genre", "Dauer", "Format",
@@ -93,7 +94,9 @@ public static class LocalizationManager
         "Erstellen",
         "Track zur Playlist »{0}« hinzugefügt.", "{0} Tracks zur Playlist »{1}« hinzugefügt.",
         "Playlist löschen", "Von Playlist entfernen",
-        "Playlist »{0}« gelöscht.", "Track von Playlist entfernt.");
+        "Playlist »{0}« gelöscht.", "Track von Playlist entfernt.",
+        "Filter als Smart-Playlist speichern", "Smart-Playlist »{0}« gespeichert.",
+        "Bitte zuerst einen Filter auswählen.");
 
     private static readonly LocalizedStrings English = new(
         "LOCAL LIBRARY", "Artists", "Albums", "Tracks", "Folder structure", "Search", "PLAYLISTS", "About", "Settings",
@@ -102,7 +105,7 @@ public static class LocalizationManager
         "LIBRARY", "Directories", "+ Add directory", "Database maintenance",
         "Optimize database", "Repair album artwork", "Download missing artwork",
         "Automatic download only finds covers when a MusicBrainz ID is present. For freer searches, use the button directly in the album view.",
-        "Cover not found", "Download", "Search cover", "Searching for matching covers …",
+        "Cover not found", "Search cover", "Search cover", "Searching for matching covers …",
         "No covers found.", "Search term", "Search again", "Use selected cover",
         "Delete cover", "Reassign cover", "Author", "Licenses", "Save", "Cancel", "Table", "Artwork",
         "(Unknown)", "Album artist", "Year", "Title", "Artist", "Album", "Genre", "Duration", "Format",
@@ -123,7 +126,9 @@ public static class LocalizationManager
         "Create",
         "Track added to playlist '{0}'.", "{0} tracks added to playlist '{1}'.",
         "Delete playlist", "Remove from playlist",
-        "Playlist '{0}' deleted.", "Track removed from playlist.");
+        "Playlist '{0}' deleted.", "Track removed from playlist.",
+        "Save filters as smart playlist", "Smart playlist '{0}' saved.",
+        "Please select a filter first.");
 
     private static readonly LocalizedStrings French = new(
         "BIBLIOTHÈQUE LOCALE", "Artistes", "Albums", "Titres", "Arborescence", "Recherche", "PLAYLISTS", "À propos", "Paramètres",
@@ -132,7 +137,7 @@ public static class LocalizationManager
         "BIBLIOTHÈQUE", "Dossiers", "+ Ajouter un dossier", "Maintenance de la base",
         "Optimiser la base", "Réparer les pochettes", "Télécharger les pochettes manquantes",
         "Le téléchargement automatique ne trouve des pochettes que si un identifiant MusicBrainz est présent. Pour une recherche plus libre, utilisez le bouton directement dans la vue des albums.",
-        "Pochette introuvable", "Télécharger", "Rechercher une pochette", "Recherche de pochettes correspondantes …",
+        "Pochette introuvable", "Rechercher une pochette", "Rechercher une pochette", "Recherche de pochettes correspondantes …",
         "Aucune pochette trouvée.", "Terme de recherche", "Relancer la recherche", "Utiliser la pochette sélectionnée",
         "Supprimer la pochette", "Réattribuer la pochette", "Auteur", "Licences", "Enregistrer", "Annuler", "Tableau", "Pochettes",
         "(Inconnu)", "Artiste de l’album", "Année", "Titre", "Artiste", "Album", "Genre", "Durée", "Format",
@@ -153,5 +158,7 @@ public static class LocalizationManager
         "Créer",
         "Titre ajouté à la playlist « {0} ».", "{0} titres ajoutés à la playlist « {1} ».",
         "Supprimer la playlist", "Retirer de la playlist",
-        "Playlist « {0} » supprimée.", "Titre retiré de la playlist.");
+        "Playlist « {0} » supprimée.", "Titre retiré de la playlist.",
+        "Enregistrer les filtres comme playlist intelligente", "Playlist intelligente « {0} » enregistrée.",
+        "Veuillez d'abord sélectionner un filtre.");
 }

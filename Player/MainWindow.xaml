@@ -184,10 +184,18 @@
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AppButtonPressedBrush}"/>
                             </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.38"/>
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Cursor" Value="Arrow"/>
+                </Trigger>
+            </Style.Triggers>
         </Style>
 
         <Style x:Key="TrackFilterExpanderStyle" TargetType="Expander">
@@ -494,6 +502,13 @@
                      PreviewMouseLeftButtonUp="NavListBox_OnPreviewMouseLeftButtonUp"
                      PreviewMouseRightButtonDown="NavListBox_OnPreviewMouseRightButtonDown">
 
+                <ListBoxItem Tag="Dashboard" Style="{StaticResource NavItemStyle}">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="⊞" Width="18" FontSize="13" VerticalAlignment="Center"/>
+                        <TextBlock Text="Dashboard" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </ListBoxItem>
+
                 <ListBoxItem IsHitTestVisible="False" Focusable="False"
                              Foreground="#44445A" FontSize="10" FontWeight="Bold"
                              Padding="24,12,0,4">
@@ -574,6 +589,7 @@
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <Button x:Name="BackButton"
                             Width="34"
@@ -606,13 +622,29 @@
                             Style="{StaticResource HeaderFilterButtonStyle}"
                             Content="{DynamicResource L_Filter}"
                             Click="TrackFilterButton_OnClick"/>
+                    <Button x:Name="SaveSmartPlaylistButton"
+                            Grid.Column="3"
+                            Margin="8,0,0,0"
+                            Padding="12,5"
+                            VerticalAlignment="Center"
+                            Visibility="Collapsed"
+                            IsEnabled="False"
+                            Style="{StaticResource HeaderFilterButtonStyle}"
+                            ToolTip="{DynamicResource L_SaveSmartPlaylistDisabledTooltip}"
+                            ToolTipService.ShowOnDisabled="True"
+                            Click="SaveSmartPlaylistButton_OnClick">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="⚡" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Als Smart-Playlist speichern" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
                     <TextBlock x:Name="ContentCountTextBlock"
-                               Grid.Column="3"
+                               Grid.Column="4"
                                Margin="14,0,0,0"
                                FontSize="12" Foreground="{DynamicResource AppMutedTextBrush}"
                                VerticalAlignment="Center"/>
                     <TextBox x:Name="SearchTextBox"
-                             Grid.Column="4"
+                             Grid.Column="5"
                              Width="240"
                              Height="30"
                              Margin="20,0,0,0"
@@ -623,7 +655,7 @@
                              ToolTip="{DynamicResource L_Search}"
                              TextChanged="SearchTextBox_OnTextChanged"/>
                     <Border x:Name="AlbumViewModeBorder"
-                            Grid.Column="5"
+                            Grid.Column="6"
                             Margin="20,0,0,0"
                             Padding="3"
                             Background="#252640"
@@ -669,22 +701,128 @@
                 </Border>
             </Popup>
 
-            <!-- Content DataGrid -->
-            <DataGrid x:Name="ContentDataGrid"
-                      Grid.Row="1"
-                      Background="{DynamicResource AppContentBrush}"
-                      BorderThickness="0"
-                      RowHeight="38"
-                      GridLinesVisibility="Horizontal"
-                      HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
-                      AutoGenerateColumns="False"
-                      IsReadOnly="True"
-                      SelectionMode="Single"
-                      FontSize="13"
-                      CanUserResizeRows="False"
-                      LoadingRow="ContentDataGrid_OnLoadingRow"
-                      MouseDoubleClick="ContentDataGrid_OnMouseDoubleClick"
-                      PreviewMouseRightButtonDown="ContentDataGrid_OnPreviewMouseRightButtonDown"/>
+            <!-- Dashboard -->
+            <ScrollViewer x:Name="DashboardScrollViewer"
+                          Grid.Row="1"
+                          Visibility="Collapsed"
+                          Background="{DynamicResource AppContentBrush}"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel x:Name="DashboardPanel" Margin="28,24,28,28"/>
+            </ScrollViewer>
+
+            <Grid Grid.Row="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Border x:Name="AlbumDetailHeader"
+                        Grid.Row="0"
+                        Visibility="Collapsed"
+                        Margin="24,22,24,18"
+                        Padding="22"
+                        HorizontalAlignment="Center"
+                        MaxWidth="920"
+                        Background="{DynamicResource AppSurfaceBrush}"
+                        BorderBrush="{DynamicResource AppGridLineBrush}"
+                        BorderThickness="1"
+                        CornerRadius="12">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="240"/>
+                            <ColumnDefinition Width="44"/>
+                            <ColumnDefinition Width="360"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0"
+                                Width="240"
+                                Height="240"
+                                Background="{DynamicResource AppArtworkPlaceholderBrush}"
+                                CornerRadius="8"
+                                ClipToBounds="True">
+                            <Border.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="{DynamicResource L_DeleteCover}"
+                                              Tag="{Binding}"
+                                              Click="DeleteCoverMenuItem_OnClick"/>
+                                    <MenuItem Header="{DynamicResource L_ReassignCover}"
+                                              Tag="{Binding}"
+                                              Click="ReassignCoverMenuItem_OnClick"/>
+                                </ContextMenu>
+                            </Border.ContextMenu>
+                            <Grid>
+                                <Image Source="{Binding Artwork}" Stretch="UniformToFill"/>
+                                <StackPanel HorizontalAlignment="Center"
+                                            VerticalAlignment="Center">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Artwork}" Value="{x:Null}">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <TextBlock Text="{DynamicResource L_CoverNotFound}"
+                                               Foreground="{DynamicResource AppMutedTextBrush}"
+                                               HorizontalAlignment="Center"
+                                               Margin="0,0,0,10"/>
+                                    <Button Content="{DynamicResource L_SearchCover}"
+                                            Tag="{Binding}"
+                                            Padding="14,7"
+                                            Background="#6C63FF"
+                                            Foreground="White"
+                                            BorderThickness="0"
+                                            Cursor="Hand"
+                                            Click="SearchCoverButton_OnClick"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Title}"
+                                       FontSize="28"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                       TextWrapping="Wrap"/>
+                            <TextBlock Text="{Binding Artist}"
+                                       Margin="0,10,0,0"
+                                       FontSize="17"
+                                       Foreground="{DynamicResource AppSecondaryTextBrush}"
+                                       TextWrapping="Wrap"/>
+                            <TextBlock Text="{Binding Year}"
+                                       Margin="0,8,0,0"
+                                       FontSize="14"
+                                       Foreground="{DynamicResource AppMutedTextBrush}"/>
+                            <Button Content="{DynamicResource L_SearchCover}"
+                                    Tag="{Binding}"
+                                    Margin="0,22,0,0"
+                                    Padding="14,7"
+                                    HorizontalAlignment="Left"
+                                    Style="{StaticResource HeaderFilterButtonStyle}"
+                                    Click="SearchCoverButton_OnClick"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Content DataGrid -->
+                <DataGrid x:Name="ContentDataGrid"
+                          Grid.Row="1"
+                          Background="{DynamicResource AppContentBrush}"
+                          BorderThickness="0"
+                          RowHeight="38"
+                          GridLinesVisibility="Horizontal"
+                          HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          SelectionMode="Single"
+                          FontSize="13"
+                          CanUserResizeRows="False"
+                          LoadingRow="ContentDataGrid_OnLoadingRow"
+                          MouseDoubleClick="ContentDataGrid_OnMouseDoubleClick"
+                          PreviewMouseRightButtonDown="ContentDataGrid_OnPreviewMouseRightButtonDown"/>
+            </Grid>
 
             <ScrollViewer x:Name="SearchResultsScrollViewer"
                           Grid.Row="1"
