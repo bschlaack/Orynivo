@@ -33,6 +33,12 @@ public partial class SettingsWindow : Window
         ThemeComboBox.SelectedItem = settings.Theme;
         LanguageComboBox.ItemsSource = Enum.GetValues<UiLanguage>();
         LanguageComboBox.SelectedItem = settings.Language;
+        ArtistInfoSourceComboBox.ItemsSource = Enum.GetValues<ArtistInfoSource>();
+        ArtistInfoSourceComboBox.SelectedItem = settings.ArtistInfoSource;
+        LastFmApiKeyTextBox.Text = settings.LastFmApiKey ?? string.Empty;
+        LastFmPanel.Visibility = settings.ArtistInfoSource == ArtistInfoSource.LastFm
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         _libraryPaths.AddRange(settings.LibraryPaths);
         RebuildDirectoryList();
         LoadDrivers();
@@ -53,6 +59,9 @@ public partial class SettingsWindow : Window
         ThemeComboBox.SelectedItem is AppTheme theme ? theme : AppTheme.Dark;
     public UiLanguage SelectedLanguage =>
         LanguageComboBox.SelectedItem is UiLanguage language ? language : UiLanguage.German;
+    public ArtistInfoSource SelectedArtistInfoSource =>
+        ArtistInfoSourceComboBox.SelectedItem is ArtistInfoSource src ? src : ArtistInfoSource.Wikipedia;
+    public string SelectedLastFmApiKey => LastFmApiKeyTextBox.Text.Trim();
 
     protected override void OnClosed(EventArgs e)
     {
@@ -100,6 +109,14 @@ public partial class SettingsWindow : Window
         AudioDevicePanel.Visibility = tag == "AudioDevice" ? Visibility.Visible : Visibility.Collapsed;
         LibraryPanel.Visibility     = tag == "Library"      ? Visibility.Visible : Visibility.Collapsed;
         AppearancePanel.Visibility  = tag == "Appearance"   ? Visibility.Visible : Visibility.Collapsed;
+        ArtistInfoPanel.Visibility  = tag == "ArtistInfo"   ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void ArtistInfoSourceComboBox_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        LastFmPanel.Visibility = SelectedArtistInfoSource == ArtistInfoSource.LastFm
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     // ------------------------------------------------------------------

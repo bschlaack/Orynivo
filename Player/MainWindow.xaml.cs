@@ -1,5 +1,7 @@
 using System.IO;
 using System.Diagnostics;
+using System.Globalization;
+using System.Text;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -14,6 +16,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Player.Audio;
+using Player.Controls;
 using Player.Library;
 using Player.Localization;
 using Button = System.Windows.Controls.Button;
@@ -41,6 +44,7 @@ public partial class MainWindow : Window
     private long? _currentPlayHistoryId;
     private long? _currentTrackId;
     private long? _currentArtistId;
+    private long? _artistInfoDisplayedId;
     private string? _currentArtistName;
     private string? _artistInfoSourceUrl;
     private bool  _currentTrackIsFavorite;
@@ -59,6 +63,9 @@ public partial class MainWindow : Window
     private readonly HashSet<int> _selectedTrackBitrates = [];
     private readonly HashSet<string> _expandedTrackFilterSections = new(StringComparer.Ordinal);
     private readonly HashSet<long> _artistProfilesLoading = [];
+    private bool _isDraggingAlphabetIndex;
+    private bool _alphabetScrollUpdatePending;
+    private bool _isAlphabetProgrammaticScroll;
 
     private readonly ObservableCollection<PlaylistItem> _queue = [];
     private readonly ObservableCollection<LyricLineViewModel> _lyricLines = [];
@@ -66,6 +73,7 @@ public partial class MainWindow : Window
     private string _currentFilePath = string.Empty;
     private CancellationTokenSource? _lyricsCts;
     private CancellationTokenSource? _artistProfileCts;
+    private CancellationTokenSource _backgroundArtistLoadCts = new();
     private int _activeLyricIndex = -1;
     private bool _updatingViewMode;
 
@@ -92,6 +100,9 @@ public partial class MainWindow : Window
         ".dsf", ".dff", ".flac", ".mp3", ".wav", ".aiff", ".aif",
         ".m4a", ".aac", ".ogg", ".opus", ".wma"
     };
+    private static readonly string[] AlphabetIndexLabels =
+        ["#", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
+         "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"];
 
     private sealed record FolderTag(bool IsFile, string FilePath, string FolderPath);
     private sealed record PlaylistMenuTag(long PlaylistId, IReadOnlyList<string> Paths);
@@ -186,6 +197,15 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         LyricsListBox.ItemsSource = _lyricLines;
+        ContentDataGrid.AddHandler(
+            ScrollViewer.ScrollChangedEvent,
+            new ScrollChangedEventHandler(AlphabetTarget_OnScrollChanged));
+        AlbumArtworkListBox.AddHandler(
+            ScrollViewer.ScrollChangedEvent,
+            new ScrollChangedEventHandler(AlphabetTarget_OnScrollChanged));
+        ArtistArtworkListBox.AddHandler(
+            ScrollViewer.ScrollChangedEvent,
+            new ScrollChangedEventHandler(AlphabetTarget_OnScrollChanged));
         SourceInitialized += (_, _) => ApplyWindowTitleBarColors();
         _transportTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         _transportTimer.Tick += (_, _) => RefreshTransport();
@@ -277,6 +297,13 @@ public partial class MainWindow : Window
     {
         _settings = _settingsStore.Load();
         RefreshSelectedDriverText();
+        ApplyArtistInfoSettings();
+    }
+
+    private void ApplyArtistInfoSettings()
+    {
+        ArtistProfileService.Source = _settings.ArtistInfoSource;
+        ArtistProfileService.LastFmApiKey = _settings.LastFmApiKey;
     }
 
     private void RestoreLastTrackState()
@@ -441,6 +468,7 @@ public partial class MainWindow : Window
 
         ContentDataGrid.ItemsSource = null;
         AlbumArtworkListBox.ItemsSource = null;
+        UpdateAlphabetIndex(null, false);
         SearchResultsScrollViewer.Visibility = Visibility.Collapsed;
         DashboardScrollViewer.Visibility = Visibility.Collapsed;
         HideAlbumDetailHeader();
@@ -500,8 +528,233 @@ public partial class MainWindow : Window
             ContentDataGrid.ItemsSource = rows;
             AlbumArtworkListBox.ItemsSource = tag == "Albums" ? rows : null;
             ArtistArtworkListBox.ItemsSource = tag == "Artists" ? rows : null;
+            UpdateAlphabetIndex(rows, tag is "Artists" or "Albums" or "Tracks");
             ContentCountTextBlock.Text  = rows.Count == 1 ? "1 Eintrag" : $"{rows.Count:N0} Einträge";
         }
+    }
+
+    private void UpdateAlphabetIndex(IEnumerable<ContentRow>? source, bool visible)
+    {
+        var rows = source?.ToList() ?? [];
+        var firstRows = rows
+            .GroupBy(row => GetAlphabetIndexKey(row.Title))
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+
+        AlphabetIndexPanel.Children.Clear();
+        foreach (var label in AlphabetIndexLabels)
+        {
+            var button = new Button
+            {
+                Content = label,
+                Tag = firstRows.GetValueOrDefault(label),
+                IsEnabled = firstRows.ContainsKey(label),
+                Style = (Style)FindResource("AlphabetIndexButtonStyle")
+            };
+            button.Click += AlphabetIndexButton_OnClick;
+            AlphabetIndexPanel.Children.Add(button);
+        }
+
+        AlphabetIndexBorder.Visibility = visible && rows.Count > 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        ContentDataGrid.Margin = new Thickness(0);
+        AlbumArtworkListBox.Margin = new Thickness(0);
+        ArtistArtworkListBox.Margin = new Thickness(0);
+        Dispatcher.BeginInvoke(UpdateActiveAlphabetButton, DispatcherPriority.Loaded);
+    }
+
+    private static string GetAlphabetIndexKey(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return "#";
+
+        var first = value.TrimStart()[0];
+        first = first switch
+        {
+            'ß' or 'ẞ' => 'S',
+            'Æ' or 'æ' => 'A',
+            'Ø' or 'ø' => 'O',
+            _ => first
+        };
+
+        var normalized = first.ToString().Normalize(NormalizationForm.FormD);
+        var baseCharacter = normalized.FirstOrDefault(
+            character => CharUnicodeInfo.GetUnicodeCategory(character) != UnicodeCategory.NonSpacingMark);
+        var upper = char.ToUpperInvariant(baseCharacter);
+        return upper is >= 'A' and <= 'Z' ? upper.ToString() : "#";
+    }
+
+    private void AlphabetIndexButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: ContentRow row })
+            return;
+
+        ScrollToAlphabetRow(row);
+    }
+
+    private void ScrollToAlphabetRow(ContentRow row)
+    {
+        var targetKey = GetAlphabetIndexKey(row.Title);
+        _isAlphabetProgrammaticScroll = true;
+        SetActiveAlphabetButton(targetKey);
+
+        if (ContentDataGrid.Visibility == Visibility.Visible)
+        {
+            var index = ContentDataGrid.Items.IndexOf(row);
+            var scrollViewer = FindVisualChild<ScrollViewer>(ContentDataGrid);
+            if (index >= 0 && scrollViewer is not null)
+                scrollViewer.ScrollToVerticalOffset(index);
+            else
+                ContentDataGrid.ScrollIntoView(row);
+        }
+        else
+        {
+            var listBox = AlbumArtworkListBox.Visibility == Visibility.Visible
+                ? AlbumArtworkListBox
+                : ArtistArtworkListBox;
+            var index = listBox.Items.IndexOf(row);
+            var panel = FindVisualChild<VirtualizingWrapPanel>(listBox);
+            if (index >= 0 && panel is not null)
+            {
+                var itemsPerRow = Math.Max(1, (int)Math.Floor(panel.ViewportWidth / panel.ItemWidth));
+                panel.SetVerticalOffset((index / itemsPerRow) * panel.ItemHeight);
+            }
+            else
+            {
+                listBox.ScrollIntoView(row);
+            }
+        }
+
+        Dispatcher.BeginInvoke(() =>
+        {
+            SetActiveAlphabetButton(targetKey);
+            _isAlphabetProgrammaticScroll = false;
+        }, DispatcherPriority.ContextIdle);
+    }
+
+    private void AlphabetTarget_OnScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        if (AlphabetIndexBorder.Visibility != Visibility.Visible ||
+            e.VerticalChange == 0 ||
+            _isAlphabetProgrammaticScroll ||
+            _alphabetScrollUpdatePending)
+            return;
+
+        _alphabetScrollUpdatePending = true;
+        Dispatcher.BeginInvoke(() =>
+        {
+            _alphabetScrollUpdatePending = false;
+            UpdateActiveAlphabetButton();
+        }, DispatcherPriority.Background);
+    }
+
+    private void UpdateActiveAlphabetButton()
+    {
+        if (AlphabetIndexBorder.Visibility != Visibility.Visible)
+            return;
+
+        var row = GetTopVisibleAlphabetRow();
+        var activeKey = row is null ? null : GetAlphabetIndexKey(row.Title);
+        SetActiveAlphabetButton(activeKey);
+    }
+
+    private void SetActiveAlphabetButton(string? activeKey)
+    {
+        foreach (var button in AlphabetIndexPanel.Children.OfType<Button>())
+            button.IsDefault = string.Equals(button.Content as string, activeKey, StringComparison.Ordinal);
+    }
+
+    private ContentRow? GetTopVisibleAlphabetRow()
+    {
+        ItemsControl? itemsControl = ContentDataGrid.Visibility == Visibility.Visible
+            ? ContentDataGrid
+            : AlbumArtworkListBox.Visibility == Visibility.Visible
+                ? AlbumArtworkListBox
+                : ArtistArtworkListBox.Visibility == Visibility.Visible
+                    ? ArtistArtworkListBox
+                    : null;
+        if (itemsControl is null)
+            return null;
+
+        FrameworkElement? bestContainer = null;
+        var bestTop = double.PositiveInfinity;
+        var visibleTop = 0d;
+        if (itemsControl is DataGrid &&
+            FindVisualChild<System.Windows.Controls.Primitives.DataGridColumnHeadersPresenter>(itemsControl) is { } headers)
+        {
+            visibleTop = headers.TransformToAncestor(itemsControl)
+                .TransformBounds(new Rect(0, 0, headers.ActualWidth, headers.ActualHeight))
+                .Bottom;
+        }
+        var candidates = itemsControl is DataGrid
+            ? FindVisualChildren<DataGridRow>(itemsControl).Cast<FrameworkElement>()
+            : FindVisualChildren<ListBoxItem>(itemsControl).Cast<FrameworkElement>();
+        foreach (var container in candidates)
+        {
+            if (container.DataContext is not ContentRow)
+                continue;
+
+            var bounds = container.TransformToAncestor(itemsControl)
+                .TransformBounds(new Rect(0, 0, container.ActualWidth, container.ActualHeight));
+            if (bounds.Bottom <= visibleTop || bounds.Top >= itemsControl.ActualHeight)
+                continue;
+            if (bounds.Top + 0.5 >= visibleTop && bounds.Top < bestTop)
+            {
+                bestTop = bounds.Top;
+                bestContainer = container;
+            }
+        }
+
+        return bestContainer?.DataContext as ContentRow;
+    }
+
+    private void AlphabetIndexBorder_OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _isDraggingAlphabetIndex = true;
+        AlphabetIndexBorder.CaptureMouse();
+        ScrollToAlphabetPosition(e.GetPosition(AlphabetIndexPanel));
+        e.Handled = true;
+    }
+
+    private void AlphabetIndexBorder_OnPreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (!_isDraggingAlphabetIndex || e.LeftButton != MouseButtonState.Pressed)
+            return;
+        ScrollToAlphabetPosition(e.GetPosition(AlphabetIndexPanel));
+        e.Handled = true;
+    }
+
+    private void AlphabetIndexBorder_OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_isDraggingAlphabetIndex)
+            return;
+        ScrollToAlphabetPosition(e.GetPosition(AlphabetIndexPanel));
+        _isDraggingAlphabetIndex = false;
+        AlphabetIndexBorder.ReleaseMouseCapture();
+        e.Handled = true;
+    }
+
+    private void ScrollToAlphabetPosition(System.Windows.Point point)
+    {
+        if (AlphabetIndexPanel.Children.Count == 0 || AlphabetIndexPanel.ActualHeight <= 0)
+            return;
+
+        var hit = AlphabetIndexPanel.InputHitTest(point) as DependencyObject;
+        var button = FindAncestor<Button>(hit);
+        if (button is null)
+        {
+            button = AlphabetIndexPanel.Children
+                .OfType<Button>()
+                .OrderBy(candidate =>
+                {
+                    var top = candidate.TranslatePoint(new System.Windows.Point(0, 0), AlphabetIndexPanel).Y;
+                    return Math.Abs(point.Y - (top + candidate.ActualHeight / 2));
+                })
+                .FirstOrDefault();
+        }
+
+        if (button is { IsEnabled: true, Tag: ContentRow row })
+            ScrollToAlphabetRow(row);
     }
 
     private static T? FindAncestor<T>(DependencyObject? current) where T : DependencyObject
@@ -513,6 +766,21 @@ public partial class MainWindow : Window
             current = VisualTreeHelper.GetParent(current);
         }
         return null;
+    }
+
+    private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+        => FindVisualChildren<T>(parent).FirstOrDefault();
+
+    private static IEnumerable<T> FindVisualChildren<T>(DependencyObject parent) where T : DependencyObject
+    {
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(parent); index++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, index);
+            if (child is T match)
+                yield return match;
+            foreach (var descendant in FindVisualChildren<T>(child))
+                yield return descendant;
+        }
     }
 
     private string GetPlaylistName(string tag)
@@ -779,6 +1047,7 @@ public partial class MainWindow : Window
         update(isChecked);
         var rows = await Task.Run(GetFilteredTrackRows);
         ContentDataGrid.ItemsSource = rows;
+        UpdateAlphabetIndex(rows, true);
         ContentCountTextBlock.Text = rows.Count == 1 ? "1 Eintrag" : $"{rows.Count:N0} Einträge";
         UpdateSaveSmartPlaylistButtonState();
         await RefreshTrackFilterPopupAsync();
@@ -934,6 +1203,7 @@ public partial class MainWindow : Window
         }
 
         ResetDrilldownState();
+        UpdateAlphabetIndex(null, false);
         ContentTitleTextBlock.Text = LocalizationManager.Current.Search;
         AlbumViewModeBorder.Visibility = Visibility.Collapsed;
         TrackFilterButton.Visibility = Visibility.Collapsed;
@@ -1056,7 +1326,7 @@ public partial class MainWindow : Window
             });
     }
 
-    private static ImageSource? CreateArtworkImage(string? path, int decodeWidth)
+    private static ImageSource? CreateArtworkImage(string? path, int decodeWidth, bool ignoreCache = false)
     {
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
             return null;
@@ -1065,6 +1335,8 @@ public partial class MainWindow : Window
             var image = new BitmapImage();
             image.BeginInit();
             image.CacheOption = BitmapCacheOption.OnLoad;
+            if (ignoreCache)
+                image.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
             image.UriSource = new Uri(path, UriKind.Absolute);
             image.DecodePixelWidth = decodeWidth;
             image.EndInit();
@@ -1076,15 +1348,22 @@ public partial class MainWindow : Window
 
     private static void EnsureArtworkHydrated(ContentRow row)
     {
-        if (row.Artwork is null)
+        if (string.IsNullOrWhiteSpace(row.ArtworkPath))
+            row.Artwork = null;
+        else if (row.Artwork is null)
             row.Artwork = CreateArtworkImage(row.ArtworkPath, 320);
-        if (row.Thumbnail is null)
+
+        if (string.IsNullOrWhiteSpace(row.ThumbnailPath))
+            row.Thumbnail = null;
+        else if (row.Thumbnail is null)
             row.Thumbnail = CreateArtworkImage(row.ThumbnailPath, 96);
     }
 
     private static void EnsureThumbnailHydrated(ContentRow row)
     {
-        if (row.Thumbnail is null)
+        if (string.IsNullOrWhiteSpace(row.ThumbnailPath))
+            row.Thumbnail = null;
+        else if (row.Thumbnail is null)
             row.Thumbnail = CreateArtworkImage(row.ThumbnailPath, 96);
     }
 
@@ -1131,6 +1410,7 @@ public partial class MainWindow : Window
             AlbumArtworkListBox.ItemsSource = rows;
         else
             ArtistArtworkListBox.ItemsSource = rows;
+        UpdateAlphabetIndex(rows, true);
         ContentCountTextBlock.Text = rows.Count == 1 ? "1 Eintrag" : $"{rows.Count:N0} Einträge";
     }
 
@@ -1160,8 +1440,7 @@ public partial class MainWindow : Window
     {
         if (e.Row.Item is not ContentRow row)
             return;
-        if (!string.IsNullOrWhiteSpace(row.ThumbnailPath))
-            EnsureThumbnailHydrated(row);
+        EnsureThumbnailHydrated(row);
         if (row.EntityType == "Artist")
             _ = EnsureArtistProfileAsync(row);
     }
@@ -1174,6 +1453,7 @@ public partial class MainWindow : Window
             case "Artists":
                 AddFavorite();
                 AddThumbnail();
+                AddArtistInfo();
                 Add(LocalizationManager.Current.Artist, nameof(ContentRow.Title), 0, star: true);
                 break;
             case "Albums":
@@ -1253,6 +1533,37 @@ public partial class MainWindow : Window
                 Header = "",
                 Width = new DataGridLength(64),
                 CellTemplate = new DataTemplate { VisualTree = imageFactory },
+                CellStyle = new Style(typeof(DataGridCell))
+                {
+                    Setters =
+                    {
+                        new Setter(DataGridCell.PaddingProperty, new Thickness(0)),
+                        new Setter(DataGridCell.HorizontalContentAlignmentProperty, System.Windows.HorizontalAlignment.Center),
+                        new Setter(DataGridCell.VerticalContentAlignmentProperty, System.Windows.VerticalAlignment.Center)
+                    }
+                }
+            });
+        }
+
+        void AddArtistInfo()
+        {
+            var buttonFactory = new FrameworkElementFactory(typeof(Button));
+            buttonFactory.SetValue(ContentControl.ContentProperty, "ℹ");
+            buttonFactory.SetBinding(FrameworkElement.TagProperty, new Binding("."));
+            buttonFactory.AddHandler(Button.ClickEvent, new RoutedEventHandler(ArtistInfoListButton_OnClick));
+            buttonFactory.SetValue(Button.BackgroundProperty, System.Windows.Media.Brushes.Transparent);
+            buttonFactory.SetValue(Button.BorderThicknessProperty, new Thickness(0));
+            buttonFactory.SetValue(Button.ForegroundProperty, new System.Windows.Media.SolidColorBrush(
+                System.Windows.Media.Color.FromRgb(0x6C, 0x63, 0xFF)));
+            buttonFactory.SetValue(Button.CursorProperty, WpfCursors.Hand);
+            buttonFactory.SetValue(Button.FontSizeProperty, 16d);
+            buttonFactory.SetValue(Button.PaddingProperty, new Thickness(0));
+            buttonFactory.SetValue(FrameworkElement.HorizontalAlignmentProperty, System.Windows.HorizontalAlignment.Center);
+            ContentDataGrid.Columns.Add(new DataGridTemplateColumn
+            {
+                Header = "",
+                Width = new DataGridLength(44),
+                CellTemplate = new DataTemplate { VisualTree = buttonFactory },
                 CellStyle = new Style(typeof(DataGridCell))
                 {
                     Setters =
@@ -1560,6 +1871,7 @@ public partial class MainWindow : Window
         FolderTreeView.Visibility = Visibility.Collapsed;
         SearchResultsScrollViewer.Visibility = Visibility.Collapsed;
         DashboardScrollViewer.Visibility = Visibility.Collapsed;
+        UpdateAlphabetIndex(null, false);
 
         await ReloadVisibleAlbumTracksAsync();
         BackButton.Visibility = Visibility.Visible;
@@ -1584,6 +1896,7 @@ public partial class MainWindow : Window
         ApplyColumns("Tracks");
         ContentDataGrid.ItemsSource = rows;
         ContentCountTextBlock.Text = rows.Count == 1 ? "1 Titel" : $"{rows.Count:N0} Titel";
+        UpdateAlphabetIndex(null, false);
         ApplyAlbumDetailHeader(result.Album);
     }
 
@@ -1663,6 +1976,7 @@ public partial class MainWindow : Window
         ApplyColumns("Albums");
         ContentDataGrid.ItemsSource = rows;
         AlbumArtworkListBox.ItemsSource = rows;
+        UpdateAlphabetIndex(rows, true);
         ContentCountTextBlock.Text = rows.Count == 1 ? "1 Eintrag" : $"{rows.Count:N0} Einträge";
         BackButton.Visibility = Visibility.Visible;
     }
@@ -1721,6 +2035,7 @@ public partial class MainWindow : Window
         ApplyColumns("Albums");
         ContentDataGrid.ItemsSource = rows;
         AlbumArtworkListBox.ItemsSource = rows;
+        UpdateAlphabetIndex(rows, true);
         ContentCountTextBlock.Text = rows.Count == 1 ? "1 Eintrag" : $"{rows.Count:N0} Einträge";
     }
 
@@ -1747,6 +2062,7 @@ public partial class MainWindow : Window
         {
             case "Dashboard":
                 ContentTitleTextBlock.Text = "Dashboard";
+                UpdateAlphabetIndex(null, false);
                 ContentDataGrid.Visibility = Visibility.Collapsed;
                 FolderTreeView.Visibility  = Visibility.Collapsed;
                 AlbumArtworkListBox.Visibility = Visibility.Collapsed;
@@ -1771,6 +2087,7 @@ public partial class MainWindow : Window
                 ApplyColumns("Artists");
                 ContentDataGrid.ItemsSource = artists;
                 ArtistArtworkListBox.ItemsSource = artists;
+                UpdateAlphabetIndex(artists, true);
                 ContentCountTextBlock.Text = artists.Count == 1 ? "1 Eintrag" : $"{artists.Count:N0} Einträge";
                 RestoreSelection(artists, state.SelectedId);
                 break;
@@ -1788,6 +2105,7 @@ public partial class MainWindow : Window
                 ContentDataGrid.ItemsSource = albums;
                 AlbumArtworkListBox.ItemsSource = albums;
                 ArtistArtworkListBox.Visibility = Visibility.Collapsed;
+                UpdateAlphabetIndex(albums, true);
                 ContentCountTextBlock.Text = albums.Count == 1 ? "1 Eintrag" : $"{albums.Count:N0} Einträge";
                 RestoreSelection(albums, state.SelectedId);
                 break;
@@ -2540,6 +2858,18 @@ public partial class MainWindow : Window
     private void CloseArtistInfoButton_OnClick(object sender, RoutedEventArgs e)
         => CloseNowPlayingDetailViews();
 
+    private async void ArtistInfoListButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: ContentRow row } && row.Id is long artistId)
+        {
+            e.Handled = true;
+            LyricsView.Visibility = Visibility.Collapsed;
+            ArtistInfoView.Visibility = Visibility.Visible;
+            UpdateBackButtonForDetailView();
+            await ShowArtistInfoAsync(artistId, forceRefresh: false);
+        }
+    }
+
     private void UpdateBackButtonForDetailView()
     {
         BackButton.Visibility =
@@ -2561,7 +2891,7 @@ public partial class MainWindow : Window
 
     private async void RefreshArtistInfoButton_OnClick(object sender, RoutedEventArgs e)
     {
-        if (_currentArtistId is long artistId)
+        if (_artistInfoDisplayedId is long artistId)
             await ShowArtistInfoAsync(artistId, forceRefresh: true);
     }
 
@@ -2574,14 +2904,19 @@ public partial class MainWindow : Window
 
     private async Task ShowArtistInfoAsync(long artistId, bool forceRefresh)
     {
+        _artistInfoDisplayedId = artistId;
         CancelArtistProfileLoad();
         var cts = new CancellationTokenSource();
         _artistProfileCts = cts;
         RefreshArtistInfoButton.IsEnabled = false;
+        ArtistInfoImage.Source = null;
+        ArtistInfoImagePlaceholder.Visibility = Visibility.Visible;
         ArtistInfoStatusTextBlock.Text = LocalizationManager.Current.ArtistInfoLoading;
         ArtistInfoStatusTextBlock.Visibility = Visibility.Visible;
         ArtistInfoBiographyTextBlock.Text = string.Empty;
         ArtistInfoSourceButton.Visibility = Visibility.Collapsed;
+        ArtistInfoImageStatusText.Text = string.Empty;
+        ArtistInfoImageStatusText.Visibility = Visibility.Collapsed;
 
         try
         {
@@ -2628,16 +2963,40 @@ public partial class MainWindow : Window
             {
                 ArtistInfoImage.Source = null;
                 ArtistInfoImagePlaceholder.Visibility = Visibility.Visible;
+                ArtistInfoImageStatusText.Visibility = Visibility.Collapsed;
                 ArtistInfoStatusTextBlock.Text = LocalizationManager.Current.ArtistInfoNotFound;
                 return;
             }
 
             ArtistInfoBiographyTextBlock.Text = artist.Biography;
-            ArtistInfoImage.Source = CreateArtworkImage(artist.ImagePath, 1000);
-            ArtistInfoImagePlaceholder.Visibility = ArtistInfoImage.Source is null
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+            ArtistInfoImage.Source = CreateArtworkImage(artist.ImagePath, 1000, ignoreCache: true);
+            if (ArtistInfoImage.Source is null)
+            {
+                ArtistInfoImagePlaceholder.Visibility = Visibility.Visible;
+                string imageMsg;
+                if (string.IsNullOrWhiteSpace(artist.ImagePath))
+                {
+                    imageMsg = LocalizationManager.Current.ArtistInfoNoImage;
+                    var diag = ArtistProfileService.LastImageDiagnostic;
+                    if (!string.IsNullOrWhiteSpace(diag))
+                        imageMsg += $"\n{diag}";
+                }
+                else if (!File.Exists(artist.ImagePath))
+                    imageMsg = $"{LocalizationManager.Current.ArtistInfoImageMissing}:\n{artist.ImagePath}";
+                else
+                    imageMsg = $"{LocalizationManager.Current.ArtistInfoImageLoadError}:\n{artist.ImagePath}";
+                ArtistInfoImageStatusText.Text = imageMsg;
+                ArtistInfoImageStatusText.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                ArtistInfoImagePlaceholder.Visibility = Visibility.Collapsed;
+                ArtistInfoImageStatusText.Visibility = Visibility.Collapsed;
+            }
             _artistInfoSourceUrl = artist.SourceUrl;
+            ArtistInfoSourceButton.Content = _artistInfoSourceUrl?.Contains("last.fm") == true
+                ? LocalizationManager.Current.ArtistInfoSourceLastFm
+                : LocalizationManager.Current.ArtistInfoSource;
             ArtistInfoSourceButton.Visibility = string.IsNullOrWhiteSpace(_artistInfoSourceUrl)
                 ? Visibility.Collapsed
                 : Visibility.Visible;
@@ -2679,12 +3038,14 @@ public partial class MainWindow : Window
         if (!_artistProfilesLoading.Add(artistId))
             return;
 
+        var backgroundToken = _backgroundArtistLoadCts.Token;
         try
         {
             var profile = await ArtistProfileService.DownloadAsync(
                 artistId,
                 row.Title ?? string.Empty,
-                language);
+                language,
+                backgroundToken);
             using var db = AudioDatabase.OpenDefault();
             db.UpdateArtistProfile(
                 artistId,
@@ -2700,8 +3061,8 @@ public partial class MainWindow : Window
             {
                 row.ArtworkPath = profile.ImagePath;
                 row.ThumbnailPath = profile.ImagePath;
-                row.Artwork = CreateArtworkImage(profile.ImagePath, 600);
-                row.Thumbnail = CreateArtworkImage(profile.ImagePath, 96);
+                row.Artwork = CreateArtworkImage(profile.ImagePath, 600, ignoreCache: true);
+                row.Thumbnail = CreateArtworkImage(profile.ImagePath, 96, ignoreCache: true);
             }
         }
         catch
@@ -2728,8 +3089,8 @@ public partial class MainWindow : Window
         row.ProfileFetchedAt = artist.ProfileFetchedAt;
         row.ArtworkPath = artist.ImagePath;
         row.ThumbnailPath = artist.ImagePath;
-        row.Artwork = CreateArtworkImage(artist.ImagePath, 600);
-        row.Thumbnail = CreateArtworkImage(artist.ImagePath, 96);
+        row.Artwork = CreateArtworkImage(artist.ImagePath, 600, ignoreCache: true);
+        row.Thumbnail = CreateArtworkImage(artist.ImagePath, 96, ignoreCache: true);
         return Task.CompletedTask;
     }
 
@@ -2743,6 +3104,8 @@ public partial class MainWindow : Window
     private void CancelArtistProfileLoad()
     {
         _artistProfileCts?.Cancel();
+        _backgroundArtistLoadCts.Cancel();
+        _backgroundArtistLoadCts = new CancellationTokenSource();
     }
 
     private async Task LoadLyricsForTrackAsync(string filePath, bool forceRefresh)
@@ -2936,9 +3299,12 @@ public partial class MainWindow : Window
             _settings.LibraryPaths           = window.SelectedLibraryPaths.ToList();
             _settings.Theme                  = window.SelectedTheme;
             _settings.Language               = window.SelectedLanguage;
+            _settings.ArtistInfoSource       = window.SelectedArtistInfoSource;
+            _settings.LastFmApiKey           = window.SelectedLastFmApiKey;
             _settingsStore.Save(_settings);
             ThemeManager.Apply(_settings.Theme);
             LocalizationManager.Apply(_settings.Language);
+            ApplyArtistInfoSettings();
             RefreshSelectedDriverText();
             LoadNavPlaylists();
 

@@ -127,5 +127,12 @@ public sealed record LocalizedStrings(
     string ArtistInfoDownloading,
     string ArtistInfoNotFound,
     string ArtistInfoDownloadFailed,
+    string ArtistInfoNoImage,
+    string ArtistInfoImageMissing,
+    string ArtistInfoImageLoadError,
     string ArtistInfoSource,
+    string ArtistInfoSourceLastFm,
+    string ArtistInfoSourceSetting,
+    string LastFmApiKey,
+    string LastFmApiKeyHint,
     string ShowAllAlbumTracks);

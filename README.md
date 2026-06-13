@@ -15,6 +15,7 @@ and ASIO and WASAPI playback.
 - SQLite music library with multiple monitored directories
 - Metadata and embedded artwork extraction through TagLibSharp
 - Artist, album, track, and folder views
+- Live A-Z/# quick navigation beside alphabetically sorted artist, album, and track lists
 - Album view with table and virtualized artwork modes
 - Dashboard with recently added albums, playback calendar, and top genres
 - Lucene.NET full-text search with partial-word and German umlaut variants

@@ -16,10 +16,18 @@ public sealed class AppSettings
     public string? LastTrackPath { get; set; }
     public AppTheme Theme { get; set; } = AppTheme.Dark;
     public Localization.Language Language { get; set; } = Localization.Language.German;
+    public ArtistInfoSource ArtistInfoSource { get; set; } = ArtistInfoSource.Wikipedia;
+    public string LastFmApiKey { get; set; } = string.Empty;
 }
 
 public enum AppTheme
 {
     Light,
     Dark
+}
+
+public enum ArtistInfoSource
+{
+    Wikipedia,
+    LastFm
 }

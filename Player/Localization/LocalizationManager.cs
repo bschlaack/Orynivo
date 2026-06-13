@@ -75,6 +75,10 @@ public static class LocalizationManager
         resources["L_RefreshArtistInfo"] = Current.RefreshArtistInfo;
         resources["L_CloseArtistInfo"] = Current.CloseArtistInfo;
         resources["L_ArtistInfoSource"] = Current.ArtistInfoSource;
+        resources["L_ArtistInfoSourceLastFm"] = Current.ArtistInfoSourceLastFm;
+        resources["L_ArtistInfoSourceSetting"] = Current.ArtistInfoSourceSetting;
+        resources["L_LastFmApiKey"] = Current.LastFmApiKey;
+        resources["L_LastFmApiKeyHint"] = Current.LastFmApiKeyHint;
         resources["L_ShowAllAlbumTracks"] = Current.ShowAllAlbumTracks;
     }
 
@@ -127,9 +131,13 @@ public static class LocalizationManager
         "Für diesen Track sind keine Metadaten verfügbar.", "Kein Songtext gefunden.",
         "Songtext konnte nicht heruntergeladen werden.",
         "Künstlerinfo", "Künstlerinfo anzeigen", "Künstlerinfo neu laden", "Künstlerinfo schließen",
-        "Künstlerinfo wird geladen …", "Künstlerinfo wird von Wikipedia geladen …",
+        "Künstlerinfo wird geladen …", "Künstlerinfo wird heruntergeladen …",
         "Keine Künstlerinfo gefunden.", "Künstlerinfo konnte nicht heruntergeladen werden.",
-        "Quelle: Wikipedia", "Alle Tracks des Albums anzeigen");
+        "Kein Bild heruntergeladen", "Bilddatei fehlt", "Bild konnte nicht geladen werden",
+        "Quelle: Wikipedia", "Quelle: Last.fm",
+        "Quelle für Künstlerinfos", "Last.fm API-Schlüssel",
+        "Kostenlosen API-Schlüssel erstellen unter: last.fm/api/account/create",
+        "Alle Tracks des Albums anzeigen");
 
     private static readonly LocalizedStrings English = new(
         "LOCAL LIBRARY", "Artists", "Albums", "Tracks", "Folder structure", "Search", "PLAYLISTS", "About", "Settings",
@@ -180,9 +188,13 @@ public static class LocalizationManager
         "No metadata is available for this track.", "No lyrics found.",
         "Lyrics could not be downloaded.",
         "Artist information", "Show artist information", "Refresh artist information", "Close artist information",
-        "Loading artist information …", "Downloading artist information from Wikipedia …",
+        "Loading artist information …", "Downloading artist information …",
         "No artist information found.", "Artist information could not be downloaded.",
-        "Source: Wikipedia", "Show all album tracks");
+        "No image downloaded", "Image file missing", "Failed to load image",
+        "Source: Wikipedia", "Source: Last.fm",
+        "Artist info source", "Last.fm API key",
+        "Create a free API key at: last.fm/api/account/create",
+        "Show all album tracks");
 
     private static readonly LocalizedStrings French = new(
         "BIBLIOTHÈQUE LOCALE", "Artistes", "Albums", "Titres", "Arborescence", "Recherche", "PLAYLISTS", "À propos", "Paramètres",
@@ -235,10 +247,14 @@ public static class LocalizationManager
         "Informations sur l’artiste", "Afficher les informations sur l’artiste",
         "Actualiser les informations sur l’artiste", "Fermer les informations sur l’artiste",
         "Chargement des informations sur l’artiste …",
-        "Téléchargement des informations sur l’artiste depuis Wikipédia …",
+        "Téléchargement des informations sur l’artiste …",
         "Aucune information trouvée sur l’artiste.",
         "Impossible de télécharger les informations sur l’artiste.",
-        "Source : Wikipédia", "Afficher tous les titres de l’album");
+        "Aucune image téléchargée", "Fichier image introuvable", "Échec du chargement de l’image",
+        "Source : Wikipédia", "Source : Last.fm",
+        "Source des informations artiste", "Clé API Last.fm",
+        "Créez une clé API gratuite sur : last.fm/api/account/create",
+        "Afficher tous les titres de l’album");
 
     public static LocalizedStrings Current { get; private set; } = German;
 }

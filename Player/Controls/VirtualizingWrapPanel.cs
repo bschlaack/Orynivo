@@ -165,7 +165,25 @@ public sealed class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
     public void PageLeft() { }
     public void PageRight() { }
 
-    public Rect MakeVisible(Visual visual, Rect rectangle) => rectangle;
+    public Rect MakeVisible(Visual visual, Rect rectangle)
+    {
+        if (visual is not UIElement element)
+            return rectangle;
+
+        var itemIndex = (int)element.GetValue(ItemIndexProperty);
+        if (itemIndex < 0)
+            return rectangle;
+
+        var itemsPerRow = Math.Max(1, (int)Math.Floor(ViewportWidth / ItemWidth));
+        var itemTop = (itemIndex / itemsPerRow) * ItemHeight;
+        var itemBottom = itemTop + ItemHeight;
+        if (itemTop < VerticalOffset)
+            SetVerticalOffset(itemTop);
+        else if (itemBottom > VerticalOffset + ViewportHeight)
+            SetVerticalOffset(itemBottom - ViewportHeight);
+
+        return new Rect(0, itemTop - VerticalOffset, ItemWidth, ItemHeight);
+    }
 
     public void SetHorizontalOffset(double offset) { }
 
@@ -176,5 +194,6 @@ public sealed class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
             return;
         _offset.Y = offset;
         InvalidateMeasure();
+        _scrollOwner?.InvalidateScrollInfo();
     }
 }

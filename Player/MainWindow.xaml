@@ -386,18 +386,38 @@
 
         <!-- Theme ScrollBar -->
         <Style TargetType="ScrollBar">
-            <Setter Property="Width" Value="12"/>
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="MinWidth" Value="16"/>
             <Setter Property="Background" Value="{DynamicResource AppScrollbarTrackBrush}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ScrollBar">
                         <Grid Background="{TemplateBinding Background}">
-                            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="18"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="18"/>
+                            </Grid.RowDefinitions>
+                            <RepeatButton Grid.Row="0"
+                                          Command="{x:Static ScrollBar.LineUpCommand}"
+                                          Background="Transparent"
+                                          BorderThickness="0"
+                                          Focusable="False">
+                                <Path Width="7"
+                                      Height="4"
+                                      Data="M 0 4 L 3.5 0 L 7 4"
+                                      Stroke="{DynamicResource AppScrollbarThumbBrush}"
+                                      StrokeThickness="1.5"
+                                      StrokeLineJoin="Round"/>
+                            </RepeatButton>
+                            <Track x:Name="PART_Track"
+                                   Grid.Row="1"
+                                   IsDirectionReversed="True">
                                 <Track.DecreaseRepeatButton>
                                     <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}" Opacity="0"/>
                                 </Track.DecreaseRepeatButton>
                                 <Track.Thumb>
-                                    <Thumb>
+                                    <Thumb MinHeight="42">
                                         <Thumb.Template>
                                             <ControlTemplate TargetType="Thumb">
                                                 <Border x:Name="Bd"
@@ -417,7 +437,57 @@
                                     <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}" Opacity="0"/>
                                 </Track.IncreaseRepeatButton>
                             </Track>
+                            <RepeatButton Grid.Row="2"
+                                          Command="{x:Static ScrollBar.LineDownCommand}"
+                                          Background="Transparent"
+                                          BorderThickness="0"
+                                          Focusable="False">
+                                <Path Width="7"
+                                      Height="4"
+                                      Data="M 0 0 L 3.5 4 L 7 0"
+                                      Stroke="{DynamicResource AppScrollbarThumbBrush}"
+                                      StrokeThickness="1.5"
+                                      StrokeLineJoin="Round"/>
+                            </RepeatButton>
                         </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="AlphabetIndexButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppSecondaryTextBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="2,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Margin="3,1"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="4">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AppNavHoverBrush}"/>
+                                <Setter Property="Foreground" Value="#6C63FF"/>
+                            </Trigger>
+                            <Trigger Property="IsDefault" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#6C63FF"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{DynamicResource AppMutedTextBrush}"/>
+                                <Setter Property="Opacity" Value="0.3"/>
+                                <Setter Property="Cursor" Value="Arrow"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -946,7 +1016,7 @@
                      Background="{DynamicResource AppContentBrush}"
                      BorderThickness="0"
                      ScrollViewer.CanContentScroll="True"
-                     ScrollViewer.IsDeferredScrollingEnabled="True"
+                     ScrollViewer.IsDeferredScrollingEnabled="False"
                      VirtualizingPanel.IsVirtualizing="True"
                      VirtualizingPanel.VirtualizationMode="Recycling"
                      MouseDoubleClick="AlbumArtworkListBox_OnMouseDoubleClick">
@@ -1050,6 +1120,7 @@
                      Background="{DynamicResource AppContentBrush}"
                      BorderThickness="0"
                      ScrollViewer.CanContentScroll="True"
+                     ScrollViewer.IsDeferredScrollingEnabled="False"
                      VirtualizingPanel.IsVirtualizing="True"
                      VirtualizingPanel.VirtualizationMode="Recycling"
                      MouseDoubleClick="ArtistArtworkListBox_OnMouseDoubleClick">
@@ -1075,55 +1146,89 @@
                                 Padding="10"
                                 Background="{DynamicResource AppSurfaceBrush}"
                                 CornerRadius="8">
-                            <StackPanel>
-                                <Border Width="180"
-                                        Height="180"
-                                        Background="{DynamicResource AppArtworkPlaceholderBrush}"
-                                        CornerRadius="90"
-                                        ClipToBounds="True">
-                                    <Grid>
-                                        <Image Source="{Binding Artwork}"
-                                               Stretch="UniformToFill"/>
-                                        <TextBlock Text="♪"
-                                                   FontSize="42"
-                                                   HorizontalAlignment="Center"
-                                                   VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource AppMutedTextBrush}">
-                                            <TextBlock.Style>
-                                                <Style TargetType="TextBlock">
-                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding Artwork}" Value="{x:Null}">
-                                                            <Setter Property="Visibility" Value="Visible"/>
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </TextBlock.Style>
-                                        </TextBlock>
-                                    </Grid>
-                                </Border>
-                                <TextBlock Text="{Binding Title}"
-                                           Margin="0,10,0,0"
-                                           FontSize="15"
-                                           FontWeight="SemiBold"
-                                           TextAlignment="Center"
-                                           Foreground="{DynamicResource AppPrimaryTextBrush}"
-                                           TextTrimming="CharacterEllipsis"/>
-                                <Button Content="{Binding FavoriteGlyph}"
+                            <Grid>
+                                <StackPanel>
+                                    <Border Width="180"
+                                            Height="180"
+                                            Background="{DynamicResource AppArtworkPlaceholderBrush}"
+                                            CornerRadius="90"
+                                            ClipToBounds="True">
+                                        <Grid>
+                                            <Image Source="{Binding Artwork}"
+                                                   Stretch="UniformToFill"/>
+                                            <TextBlock Text="♪"
+                                                       FontSize="42"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource AppMutedTextBrush}">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Artwork}" Value="{x:Null}">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                        </Grid>
+                                    </Border>
+                                    <TextBlock Text="{Binding Title}"
+                                               Margin="0,10,0,0"
+                                               FontSize="15"
+                                               FontWeight="SemiBold"
+                                               TextAlignment="Center"
+                                               Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                               TextTrimming="CharacterEllipsis"/>
+                                    <Button Content="{Binding FavoriteGlyph}"
+                                            Tag="{Binding}"
+                                            Margin="0,6,0,0"
+                                            HorizontalAlignment="Center"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            Foreground="#6C63FF"
+                                            FontSize="17"
+                                            Cursor="Hand"
+                                            Click="FavoriteButton_OnClick"/>
+                                </StackPanel>
+                                <!-- Info-Button als Overlay oben links über dem Bild -->
+                                <Button Content="ℹ"
                                         Tag="{Binding}"
-                                        Margin="0,6,0,0"
-                                        HorizontalAlignment="Center"
+                                        HorizontalAlignment="Left"
+                                        VerticalAlignment="Top"
+                                        Margin="2,2,0,0"
+                                        Padding="4,2"
                                         Background="Transparent"
                                         BorderThickness="0"
                                         Foreground="#6C63FF"
-                                        FontSize="17"
+                                        FontSize="15"
                                         Cursor="Hand"
-                                        Click="FavoriteButton_OnClick"/>
-                            </StackPanel>
+                                        Click="ArtistInfoListButton_OnClick"/>
+                            </Grid>
                         </Border>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
+
+            <Border x:Name="AlphabetIndexBorder"
+                    Grid.Row="1"
+                    Width="34"
+                    Margin="0,0,16,0"
+                    HorizontalAlignment="Right"
+                    Visibility="Collapsed"
+                    Background="{DynamicResource AppSurfaceBrush}"
+                    BorderBrush="{DynamicResource AppGridLineBrush}"
+                    BorderThickness="1,0,0,0"
+                    PreviewMouseLeftButtonDown="AlphabetIndexBorder_OnPreviewMouseLeftButtonDown"
+                    PreviewMouseLeftButtonUp="AlphabetIndexBorder_OnPreviewMouseLeftButtonUp"
+                    PreviewMouseMove="AlphabetIndexBorder_OnPreviewMouseMove"
+                    Panel.ZIndex="10">
+                <UniformGrid x:Name="AlphabetIndexPanel"
+                             Rows="27"
+                             Columns="1"
+                             Margin="0,4"/>
+            </Border>
 
             <!-- Songtextansicht -->
             <Grid x:Name="LyricsView"
@@ -1274,12 +1379,23 @@
                             <Grid>
                                 <Image x:Name="ArtistInfoImage"
                                        Stretch="Uniform"/>
-                                <TextBlock x:Name="ArtistInfoImagePlaceholder"
-                                           Text="♪"
-                                           FontSize="72"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           Foreground="{DynamicResource AppMutedTextBrush}"/>
+                                <StackPanel x:Name="ArtistInfoImagePlaceholder"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center">
+                                    <TextBlock Text="♪"
+                                               FontSize="72"
+                                               HorizontalAlignment="Center"
+                                               Foreground="{DynamicResource AppMutedTextBrush}"/>
+                                    <TextBlock x:Name="ArtistInfoImageStatusText"
+                                               FontSize="12"
+                                               TextWrapping="Wrap"
+                                               TextAlignment="Center"
+                                               MaxWidth="300"
+                                               Margin="0,8,0,0"
+                                               HorizontalAlignment="Center"
+                                               Foreground="{DynamicResource AppMutedTextBrush}"
+                                               Visibility="Collapsed"/>
+                                </StackPanel>
                             </Grid>
                         </Border>
                         <TextBlock x:Name="ArtistInfoBiographyTextBlock"

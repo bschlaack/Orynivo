@@ -44,7 +44,7 @@ Windows audio player with:
 - `Player/Library/LibraryScanner.cs`: directory scanner using TagLibSharp; writes through `AudioDatabase.Upsert()`, reports progress, and supports cancellation
 - `Player/Library/LibraryBackupService.cs`: versioned ZIP export/import for the SQLite library, artwork cache, and configured library directories; audio files are not included
 - `Player/Library/LyricsService.cs`: LRCLIB client and LRC parser for downloaded plain or synchronized lyrics
-- `Player/Library/ArtistProfileService.cs`: localized Wikipedia/Wikimedia lookup for artist biographies and images; images are cached under `%LOCALAPPDATA%\Player\artist-images\`
+- `Player/Library/ArtistProfileService.cs`: configurable artist biography and image lookup (Wikipedia or Last.fm); static `Source` and `LastFmApiKey` properties set from `AppSettings`; images cached under `%LOCALAPPDATA%\Player\artist-images\`
 
 ## Audio Database
 
@@ -82,7 +82,7 @@ Windows audio player with:
 - `AudioDatabase.Optimize()` runs `wal_checkpoint(TRUNCATE)`, `VACUUM`, and `ANALYZE`
 - Settings library backup creates a consistent SQLite snapshot, includes album artwork, artist images, and library paths, reports percentage and current-file progress for both export and import, writes to `.tmp` before publishing the completed `.zip`, validates imports in staging, rebases cached image paths, rolls back partial replacements, and reports Lucene index rebuild progress
 - Downloaded lyrics are cached in `tracks.downloaded_lyrics` / `tracks.synced_lyrics`; the transport note button replaces the current main content with a large lyrics view over a dimmed cover background, highlights timestamped LRC lines through the transport timer, and falls back to embedded unsynchronized lyrics
-- Artist views support table and image-card modes; visible artists lazily download localized Wikipedia biographies and images. The transport info button replaces the current main content with the current artist image, biography, and Wikipedia source link.
+- Artist views support table and image-card modes; visible artists lazily download localized biographies and images from the configured source (Wikipedia or Last.fm). The transport info button replaces the current main content with the current artist image, biography, and source link. The source label ("Quelle: Wikipedia" / "Quelle: Last.fm") is set dynamically from the stored `SourceUrl`.
 
 ## Playlist Context Menus
 
@@ -196,6 +196,7 @@ Windows audio player with:
 - **Back navigation**: drill-downs remember the previous selection and use a themed pill-shaped chevron button
 - Explicit sidebar navigation clears drill-down filters, including when the already selected item is clicked again
 - **Tracks**: title-sorted list with combinable Favorites, Genre, Audio Type, and Bitrate facets; counts reflect the other active filters and unavailable unselected values are hidden
+- Alphabetically sorted artist, album, and track views show an A-Z/# index immediately left of the right-aligned scrollbar; unavailable letters are disabled, dragging across letters scrolls live, and the highlighted letter follows the top visible entry
 - **Search**: delayed Lucene search returns separate themed Track, Album, and Artist sections, supports partial words and German normalization variants, sorts by score then display name, and preserves the original query across drill-down Back navigation
 - **Folder structure**: configured library roots start expanded; child folders load lazily; double-clicking a track queues its direct folder sorted by disc, track number, and file name
 - **Playlists**: display position, title, artist, album, and duration; sidebar entries open their live track list

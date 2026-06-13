@@ -222,6 +222,21 @@
                          Style="{StaticResource SettingsNavItemStyle}">
                 <TextBlock Text="{DynamicResource L_Appearance}"/>
             </ListBoxItem>
+
+            <!-- Oberpunkt: Künstlerinfos -->
+            <ListBoxItem IsHitTestVisible="False"
+                         Focusable="False"
+                         Padding="12,14,0,4"
+                         FontSize="10"
+                         FontWeight="Bold"
+                         Foreground="{DynamicResource AppMutedTextBrush}">
+                <TextBlock Text="{DynamicResource L_ArtistInfo}"/>
+            </ListBoxItem>
+            <ListBoxItem Tag="ArtistInfo"
+                         FontSize="13"
+                         Style="{StaticResource SettingsNavItemStyle}">
+                <TextBlock Text="{DynamicResource L_ArtistInfo}"/>
+            </ListBoxItem>
         </ListBox>
 
         <!-- Vertikale Trennlinie -->
@@ -386,6 +401,44 @@
                                FontSize="11"
                                Foreground="#555555"
                                TextWrapping="Wrap"/>
+                </StackPanel>
+
+                <!-- Panel: Künstlerinfos -->
+                <StackPanel x:Name="ArtistInfoPanel"
+                            Visibility="Collapsed">
+                    <TextBlock Text="{DynamicResource L_ArtistInfo}"
+                               FontSize="15"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,20"/>
+
+                    <TextBlock Text="{DynamicResource L_ArtistInfoSourceSetting}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+                    <ComboBox x:Name="ArtistInfoSourceComboBox"
+                              Height="30"
+                              HorizontalAlignment="Stretch"
+                              Style="{StaticResource SettingsComboBoxStyle}"
+                              Margin="0,0,0,18"
+                              SelectionChanged="ArtistInfoSourceComboBox_OnSelectionChanged"/>
+
+                    <StackPanel x:Name="LastFmPanel"
+                                Visibility="Collapsed">
+                        <TextBlock Text="{DynamicResource L_LastFmApiKey}"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,6"/>
+                        <TextBox x:Name="LastFmApiKeyTextBox"
+                                 Height="30"
+                                 HorizontalAlignment="Stretch"
+                                 Padding="8,0"
+                                 VerticalContentAlignment="Center"
+                                 Margin="0,0,0,8"/>
+                        <TextBlock Text="{DynamicResource L_LastFmApiKeyHint}"
+                                   FontSize="11"
+                                   Foreground="{DynamicResource AppMutedTextBrush}"
+                                   TextWrapping="Wrap"/>
+                    </StackPanel>
                 </StackPanel>
 
                 <!-- Panel: Darstellung -->
