@@ -58,6 +58,11 @@ public static class LocalizationManager
         resources["L_Licenses"] = Current.Licenses;
         resources["L_Save"] = Current.Save;
         resources["L_Cancel"] = Current.Cancel;
+        resources["L_AddToPlaylist"] = Current.AddToPlaylist;
+        resources["L_NewPlaylist"] = Current.NewPlaylist;
+        resources["L_NewPlaylistDialogTitle"] = Current.NewPlaylistDialogTitle;
+        resources["L_NewPlaylistNameLabel"] = Current.NewPlaylistNameLabel;
+        resources["L_CreatePlaylist"] = Current.CreatePlaylist;
     }
 
     private static readonly LocalizedStrings German = new(
@@ -71,6 +76,9 @@ public static class LocalizationManager
         "Keine Cover gefunden.", "Suchbegriff", "Erneut suchen", "Ausgewähltes Cover übernehmen",
         "Cover löschen", "Cover neu zuordnen", "Autor", "Lizenzen", "Speichern", "Abbrechen", "Tabelle", "Artwork",
         "(Unbekannt)", "Album-Künstler", "Jahr", "Titel", "Künstler", "Album", "Genre", "Dauer", "Format",
+        "Suchbegriff {0} wurde nicht in Tracks gefunden.",
+        "Suchbegriff {0} wurde nicht in Alben gefunden.",
+        "Suchbegriff {0} wurde nicht in Künstlern gefunden.",
         "{0:N0} Einträge", "{0:N0} Titel",
         "Bitte zuerst einen Track doppelklicken.", "Wiedergabe gestoppt.", "Wiedergabe beendet.",
         "Bitte zuerst ein ASIO-Gerät in den Einstellungen auswählen.", "Bitte zuerst ein WASAPI-Gerät in den Einstellungen auswählen.",
@@ -80,7 +88,12 @@ public static class LocalizationManager
         "Optimierung abgeschlossen.", "Optimierung fehlgeschlagen: {0}", "Album-Cover werden repariert …",
         "{0:N0} Album-Cover repariert.", "Cover-Reparatur fehlgeschlagen: {0}",
         "Fehlende Cover-Artworks werden heruntergeladen …", "{0:N0} fehlende Cover-Artworks heruntergeladen.",
-        "Cover-Download fehlgeschlagen: {0}");
+        "Cover-Download fehlgeschlagen: {0}",
+        "Zur Playlist hinzufügen", "Neue Playlist …", "Neue Playlist", "Name der Playlist",
+        "Erstellen",
+        "Track zur Playlist »{0}« hinzugefügt.", "{0} Tracks zur Playlist »{1}« hinzugefügt.",
+        "Playlist löschen", "Von Playlist entfernen",
+        "Playlist »{0}« gelöscht.", "Track von Playlist entfernt.");
 
     private static readonly LocalizedStrings English = new(
         "LOCAL LIBRARY", "Artists", "Albums", "Tracks", "Folder structure", "Search", "PLAYLISTS", "About", "Settings",
@@ -93,6 +106,9 @@ public static class LocalizationManager
         "No covers found.", "Search term", "Search again", "Use selected cover",
         "Delete cover", "Reassign cover", "Author", "Licenses", "Save", "Cancel", "Table", "Artwork",
         "(Unknown)", "Album artist", "Year", "Title", "Artist", "Album", "Genre", "Duration", "Format",
+        "Search term {0} was not found in tracks.",
+        "Search term {0} was not found in albums.",
+        "Search term {0} was not found in artists.",
         "{0:N0} entries", "{0:N0} tracks",
         "Please double-click a track first.", "Playback stopped.", "Playback finished.",
         "Please select an ASIO device in settings first.", "Please select a WASAPI device in settings first.",
@@ -102,7 +118,12 @@ public static class LocalizationManager
         "Optimization completed.", "Optimization failed: {0}", "Repairing album artwork …",
         "{0:N0} album covers repaired.", "Artwork repair failed: {0}",
         "Downloading missing artwork …", "{0:N0} missing artworks downloaded.",
-        "Artwork download failed: {0}");
+        "Artwork download failed: {0}",
+        "Add to playlist", "New playlist …", "New playlist", "Playlist name",
+        "Create",
+        "Track added to playlist '{0}'.", "{0} tracks added to playlist '{1}'.",
+        "Delete playlist", "Remove from playlist",
+        "Playlist '{0}' deleted.", "Track removed from playlist.");
 
     private static readonly LocalizedStrings French = new(
         "BIBLIOTHÈQUE LOCALE", "Artistes", "Albums", "Titres", "Arborescence", "Recherche", "PLAYLISTS", "À propos", "Paramètres",
@@ -115,6 +136,9 @@ public static class LocalizationManager
         "Aucune pochette trouvée.", "Terme de recherche", "Relancer la recherche", "Utiliser la pochette sélectionnée",
         "Supprimer la pochette", "Réattribuer la pochette", "Auteur", "Licences", "Enregistrer", "Annuler", "Tableau", "Pochettes",
         "(Inconnu)", "Artiste de l’album", "Année", "Titre", "Artiste", "Album", "Genre", "Durée", "Format",
+        "Le terme de recherche {0} est introuvable dans les titres.",
+        "Le terme de recherche {0} est introuvable dans les albums.",
+        "Le terme de recherche {0} est introuvable dans les artistes.",
         "{0:N0} entrées", "{0:N0} titres",
         "Veuillez d’abord double-cliquer sur un titre.", "Lecture arrêtée.", "Lecture terminée.",
         "Veuillez d’abord sélectionner un périphérique ASIO dans les paramètres.", "Veuillez d’abord sélectionner un périphérique WASAPI dans les paramètres.",
@@ -124,5 +148,10 @@ public static class LocalizationManager
         "Optimisation terminée.", "Échec de l’optimisation : {0}", "Réparation des pochettes …",
         "{0:N0} pochettes réparées.", "Échec de la réparation des pochettes : {0}",
         "Téléchargement des pochettes manquantes …", "{0:N0} pochettes manquantes téléchargées.",
-        "Échec du téléchargement des pochettes : {0}");
+        "Échec du téléchargement des pochettes : {0}",
+        "Ajouter à la playlist", "Nouvelle playlist …", "Nouvelle playlist", "Nom de la playlist",
+        "Créer",
+        "Titre ajouté à la playlist « {0} ».", "{0} titres ajoutés à la playlist « {1} ».",
+        "Supprimer la playlist", "Retirer de la playlist",
+        "Playlist « {0} » supprimée.", "Titre retiré de la playlist.");
 }

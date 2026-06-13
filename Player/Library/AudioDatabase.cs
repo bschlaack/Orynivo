@@ -686,6 +686,62 @@ public sealed class AudioDatabase : IDisposable
         return result;
     }
 
+    public Dictionary<long, long> GetAlbumIdsByTrackIds(IEnumerable<long> ids)
+    {
+        var idList = ids.ToList();
+        if (idList.Count == 0)
+            return [];
+
+        using var cmd = _conn.CreateCommand();
+        var parameters = idList.Select((id, i) => { var name = $"$id{i}"; Add(cmd, name, id); return name; }).ToList();
+        cmd.CommandText = $"""
+            SELECT t.id, (
+                SELECT MIN(al2.id)
+                FROM albums al2
+                WHERE al2.title = al.title
+            )
+            FROM tracks t
+            JOIN albums al ON al.id = t.album_id
+            WHERE t.id IN ({string.Join(", ", parameters)});
+            """;
+        using var reader = cmd.ExecuteReader();
+        var result = new Dictionary<long, long>();
+        while (reader.Read())
+            result[reader.GetInt64(0)] = reader.GetInt64(1);
+        return result;
+    }
+
+    public Dictionary<long, long> GetArtistIdsByTrackIds(IEnumerable<long> ids)
+    {
+        var idList = ids.ToList();
+        if (idList.Count == 0)
+            return [];
+
+        using var cmd = _conn.CreateCommand();
+        var parameters = idList.Select((id, i) => { var name = $"$id{i}"; Add(cmd, name, id); return name; }).ToList();
+        cmd.CommandText = $"""
+            SELECT t.id, ar.id
+            FROM tracks t
+            JOIN artists ar ON ar.id = t.artist_id
+            WHERE t.id IN ({string.Join(", ", parameters)});
+            """;
+        using var reader = cmd.ExecuteReader();
+        var result = new Dictionary<long, long>();
+        while (reader.Read())
+            result[reader.GetInt64(0)] = reader.GetInt64(1);
+        return result;
+    }
+
+    public (long Id, bool IsFavorite)? GetTrackIdAndFavorite(string path)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = "SELECT id, is_favorite FROM tracks WHERE path = $path LIMIT 1;";
+        Add(cmd, "$path", path);
+        using var reader = cmd.ExecuteReader();
+        if (!reader.Read()) return null;
+        return (reader.GetInt64(0), reader.GetInt32(1) != 0);
+    }
+
     public void SetTrackFavorite(long id, bool value) => SetFavorite("tracks", id, value);
     public void SetArtistFavorite(long id, bool value) => SetFavorite("artists", id, value);
     public void SetAlbumFavorite(long id, bool value) => SetFavorite("albums", id, value);
@@ -756,6 +812,22 @@ public sealed class AudioDatabase : IDisposable
                 reader.IsDBNull(3) ? null : (int?)reader.GetInt64(3),
                 reader.IsDBNull(4) ? null : (int?)reader.GetInt64(4)));
         }
+        return result;
+    }
+
+    /// <summary>Alle Track-Pfade rekursiv unterhalb von <paramref name="rootPath"/>, inkl. Unterordner.</summary>
+    public List<string> GetTrackPathsUnderDirectory(string rootPath)
+    {
+        var prefix = rootPath.TrimEnd(
+            System.IO.Path.DirectorySeparatorChar,
+            System.IO.Path.AltDirectorySeparatorChar) + System.IO.Path.DirectorySeparatorChar;
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = "SELECT path FROM tracks WHERE path LIKE $prefix || '%' ORDER BY path;";
+        cmd.Parameters.AddWithValue("$prefix", prefix);
+        using var reader = cmd.ExecuteReader();
+        var result = new List<string>();
+        while (reader.Read())
+            result.Add(reader.GetString(0));
         return result;
     }
 

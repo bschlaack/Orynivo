@@ -52,6 +52,7 @@ Windows-Audioplayer mit:
 - `artworks`: deduplizierte Cover-Metadaten, eindeutig über SHA-256-Hash; Originale und vorberechnete Thumbnails liegen dateibasiert unter `%LOCALAPPDATA%\Player\artworks\` (`original`, `thumb_96`, `thumb_320`)
 - `favorites`: ältere generische Vorbereitung für spätere Erweiterungen; die sichtbare Favoritenfunktion nutzt aktuell die direkten `is_favorite`-Spalten an Tracks, Künstlern und Alben
 - `play_history`: speichert Wiedergabestarts und -enden (`track_id`, Pfad, Start-/Endzeit, Dauer, Endposition, abgeschlossen ja/nein) als Basis für spätere Vorlieben, Vorschläge und „zuletzt gehört“
+- `AudioDatabase.GetTrackIdAndFavorite(path)`: schlanke Abfrage (nur `id` + `is_favorite`) für den Favoriten-Status des gerade abgespielten Tracks
 - `AudioDatabase.OpenDefault()` legt die DB unter `%LOCALAPPDATA%\Player\library.db` an
 - `Upsert()` ist idempotent (INSERT … ON CONFLICT DO UPDATE) — geeignet für Re-Scans
 - `GetPathTimestamps()` liefert Pfad+ModifiedAt für effiziente Änderungserkennung beim Scan
@@ -77,6 +78,24 @@ Windows-Audioplayer mit:
 - Ein `app_meta`-Eintrag (`normalized_library_v1`) verhindert, dass die teure Bestandsmigration bei jedem DB-Open erneut geprüft wird
 - `AudioDatabase.Optimize()` führt `wal_checkpoint(TRUNCATE)`, `VACUUM` und `ANALYZE` aus; im Settings-Fenster gibt es unter Bibliothek einen Button „Datenbank optimieren“
 
+## Playlisten-Kontextmenü
+
+- Rechtsklick auf einen Track (alle DataGrids und Suchergebnisse) oder ein Album (Tabellen- und Artwork-Ansicht) öffnet ein Kontextmenü mit bestehenden Playlisten sowie dem Eintrag „Neue Playlist …"
+- Auswahl einer bestehenden Playlist fügt den Track / alle Album-Tracks sofort hinzu; die Statusleiste bestätigt den Vorgang
+- „Neue Playlist …" öffnet `NewPlaylistDialog` (modales Fenster): Namens-Eingabe (Pflichtfeld, Enter bestätigt), danach wird die Playlist angelegt, die Track(s) hinzugefügt und die linke Sidebar aktualisiert
+- `Player/NewPlaylistDialog.xaml/.cs`: schlankes Eingabedialog-Fenster mit Theming (DynamicResource-Brushes, dunkle native Titelleiste per DWM)
+- Die Kontextmenüs werden in `AppendPlaylistItems()` (MainWindow.xaml.cs) dynamisch beim Öffnen aufgebaut; bei den Album-Artwork-Karten wird das bestehende Cover-Kontextmenü über das `ContextMenu.Opened`-Event um Playlist-Einträge erweitert
+- `GetPathsForRow()`: ermittelt Track-Pfade für eine `ContentRow`; bei Track-Zeilen ein Pfad, bei Album-Zeilen alle Tracks des Albums via `GetTrackListByAlbum`
+- `PlaylistMenuTag(long PlaylistId, IReadOnlyList<string> Paths)`: Tag-Record für Playlist-Menüeinträge; enthält Pfade direkt (nicht mehr `ContentRow`) – vereinheitlicht Track-, Album- und Ordnerstruktur-Kontextmenüs
+- Rechtsklick auf Ordnerstruktur-Knoten (TreeView) öffnet ebenfalls das Playlist-Kontextmenü; bei Datei-Knoten wird nur dieser Track hinzugefügt, bei Ordner-Knoten werden rekursiv alle Tracks darunter via `GetTrackPathsUnderDirectory` gesammelt; leere Ordner (keine DB-Tracks) zeigen kein Menü
+- Alle ContextMenus, MenuItems und Separatoren in MainWindow erhalten durch Styles in `Application.Resources` (App.xaml) das aktive Farbschema (`AppSurfaceBrush`, `AppPrimaryTextBrush`, `AppSurfaceHoverBrush`, `AppGridLineBrush`); das ContextMenu-Template ersetzt `ContextMenuChrome` durch ein einfaches `Border`-Template ohne das hartkodierte weiße Icon-Band
+- Styles werden bei dynamisch erzeugten Menüs immer explizit via `Application.Current.Resources[typeof(...)]` gesetzt (nicht nur implizit), da ContextMenus beim Befüllen noch keinen logischen Elternknoten haben
+- **Playlist löschen**: Rechtsklick auf einen Playlist-Eintrag in der linken Sidebar öffnet ein Kontextmenü mit „Playlist löschen" (rot); löscht die Playlist aus der DB (`DeletePlaylist`), aktualisiert die Sidebar und navigiert bei aktiver Ansicht zur Tracks-Ansicht
+- **Track aus Playlist entfernen**: In der Playlist-Ansicht (nur wenn `_activePlaylistId` gesetzt) zeigt Rechtsklick auf einen Track das „Von Playlist entfernen"-Menü; nutzt `PlaylistEntryId` (gespeichert in `ContentRow.PlaylistEntryId` aus `playlist_tracks.id`) und ruft `RemoveTrackFromPlaylist` auf; danach wird die Playlist-Ansicht neu geladen
+- `_activePlaylistId` (Feld in MainWindow): wird in `ShowTopLevelViewAsync` gesetzt wenn eine Playlist-Ansicht geladen wird, sonst `null`; steuert den Kontextmenü-Zweig in `ContentDataGrid_OnPreviewMouseRightButtonDown`
+- `ContentRow.PlaylistEntryId`: speichert `playlist_tracks.id` für Zeilen in der Playlist-Ansicht; nur dort gesetzt
+- Neue Lokalisierungsschlüssel: `AddToPlaylist`, `NewPlaylist`, `NewPlaylistDialogTitle`, `NewPlaylistNameLabel`, `CreatePlaylist`, `TrackAddedToPlaylist`, `TracksAddedToPlaylist` – vollständig in DE/EN/FR vorhanden
+
 ## Playlisten-Datenbankstruktur
 
 - Tabelle `playlists`: id, name, description, created_at, modified_at
@@ -91,11 +110,12 @@ Windows-Audioplayer mit:
 - `AudioDatabase.GetAlbumsLite(includeArtwork)`: lädt standardmäßig nur Album, Anzeige-Künstler und Jahr; Artwork-BLOBs werden nur für die Kachelansicht mitgeladen
 - `AudioDatabase.GetTrackList()`: lädt für die Trackliste nur die tatsächlich sichtbaren Spalten – kein Cover-Art-BLOB, keine Lyrics, kein Voll-`TrackRecord`
 - `AudioDatabase.GetTracksByDirectory(dirPath)`: SQL-LIKE-Abfrage auf Verzeichnis-Prefix + C#-Filter für direkte Kinder (kein `GetAll()` + LINQ)
+- `AudioDatabase.GetTrackPathsUnderDirectory(rootPath)`: wie GetTracksByDirectory, aber ohne C#-Filter – liefert alle Tracks rekursiv unterhalb des Wurzelpfads (für Ordnerstruktur-Kontextmenü)
 - Ordnerstruktur-Ansicht: lazy loading – `FolderTree`-Klasse baut eine in-memory Parent→Children-Map (O(1)-Lookup); WPF-`TreeViewItem`-Objekte werden erst beim Aufklappen eines Knotens erzeugt (`Expanded`-Event + Platzhalter-Technik)
 - WPF-TreeView: `VirtualizingStackPanel.IsVirtualizing="True"` + `VirtualizationMode=Recycling` – nur sichtbare Zeilen werden gerendert
 - `TrackLite`, `TrackListInfo`, `ArtistInfo` und `AlbumInfo` in `Player/Library/AudioDatabase.cs` halten Listenansichten bewusst schlank; vollständiger `TrackRecord` bleibt für Wiedergabe, Playlist- und Metadaten-Abfragen
 - Artwork wird nicht mehr pro Track gespeichert, sondern dedupliziert über `artworks`; dadurch bleiben Albumlisten trotz Cover-Unterstützung beherrschbar
-- `Player/Library/TrackSearchIndex.cs`: Lucene.NET-Dateiindex unter `%LOCALAPPDATA%\Player\search-index`; indiziert Track-Metadaten und technische Felder für performante Volltextsuche, wird beim ersten Start oder bei leer erkanntem Index aus der DB aufgebaut, nach Scans inkrementell aktualisiert und entfernt bei Re-Scans verschwundene Dateien unter dem jeweiligen Bibliotheks-Root
+- `Player/Library/TrackSearchIndex.cs`: Lucene.NET-Dateiindex unter `%LOCALAPPDATA%\Player\search-index`; indiziert Track-Metadaten und technische Felder für performante Volltextsuche sowie getrennte Suchfelder für Tracktitel, Album, Track-Künstler und Album-Künstler, nutzt für die Suchfelder einen deutschen Analyzer plus Wildcard-Termqueries für Teilworttreffer und Umlaut-/ß-Varianten (`ü`/`ue`, `ä`/`ae`, `ö`/`oe`, `ß`/`ss`), wird beim ersten Start oder bei leer/veraltet erkanntem Index aus der DB aufgebaut, nach Scans inkrementell aktualisiert und entfernt bei Re-Scans verschwundene Dateien unter dem jeweiligen Bibliotheks-Root
 
 ## Bekannte technische Details
 
@@ -122,7 +142,7 @@ Windows-Audioplayer mit:
 - Über-Schaltfläche unten links oberhalb der Einstellungen öffnet ein thematisiertes About-Fenster mit Autor und Bibliothekslizenzen
 - Das About-Fenster weist zusätzlich auf ASIO als Marke/Software von Steinberg Media Technologies GmbH hin
   - Rechter Inhaltsbereich: dunkler Header mit Titel + Anzahl als Fortsetzung der nativen Titelleiste/Sidebar; darunter je nach Ansicht ein `DataGrid` oder (für Ordnerstruktur) ein `TreeView`; Doppelklick startet Wiedergabe
-  - Transport-Leiste unten (dunkel, volle Breite): Now-Playing-Info links, Steuerung (⏹ ▶ ⏸) + Positionsslider mittig, Lautstärke rechts
+  - Transport-Leiste unten (dunkel, volle Breite): Now-Playing-Info links (Artwork, Titel, Künstler, Dateiinfo + Favoriten-Button), Steuerung (⏹ ▶ ⏸) + Positionsslider mittig, Lautstärke rechts
 - **Settings-Fenster**: zweispaltiges Layout – Navigationsleiste links, Inhalt rechts (Ausgabegerät / Bibliotheksverzeichnisse / Darstellung mit Farbschema und Sprache)
 - Die Navigation im Settings-Fenster verwendet dieselben thematisierten Sidebar-Ressourcen wie das Hauptfenster (Oberpunkte, Hover, Auswahl, Textfarben)
 - Alle Buttons im Settings-Fenster verwenden einen gemeinsamen Theme-Button-Stil; dynamisch erzeugte Scan-/Entfernen-Schaltflächen müssen diesen Stil ebenfalls übernehmen
@@ -147,17 +167,18 @@ Windows-Audioplayer mit:
 - **Künstler**: distinct-Künstler-Liste (eine Zeile pro Künstler, alphabetisch); Doppelklick öffnet die Alben, auf denen dieser Künstler vorkommt
 - **Alben**: normalisierte Album-Liste (eine Zeile pro eindeutigem Albumtitel; alphabetisch nach Albumtitel aufsteigend; Spalten: Herz, kleines 96px-Thumbnail, Album, Album-Künstler, Jahr) plus umschaltbare Artwork-Kachelansicht. In der Albumansicht wird der Album-Künstler gezeigt, bei mehreren Album-Interpreten nur der erste; Track-Interpreten werden dafür nicht zusammengeführt. Kacheln verwenden 320px-Thumbnails; sowohl Tabellen-Thumbnails als auch Kachelbilder werden erst beim Laden sichtbarer Elemente in `ImageSource` umgewandelt. Doppelklick auf ein Album öffnet eine nach diesem Album gefilterte Trackansicht.
 - `ContentRow` implementiert `INotifyPropertyChanged`, damit nachträglich geladene Thumbnails/Artworks sofort sichtbar werden und nicht erst nach Scroll-Recycling der UI.
-- **Now Playing**: zeigt links neben den Titelinformationen ein 96px-Thumbnail des gerade laufenden Tracks
+- **Now Playing**: zeigt links neben den Titelinformationen ein 96px-Thumbnail des gerade laufenden Tracks; rechts daneben ein Favoriten-Herz-Button (`♡`/`♥`), der den aktuell abgespielten Track sofort als Favorit markiert oder entmarkiert und den Status in DB und ggf. sichtbarer Trackliste reflektiert; der Button ist deaktiviert, wenn kein Track in der DB gefunden wird
 - `Player/Controls/VirtualizingWrapPanel.cs`: eigenes virtualisierendes WrapPanel für die Album-Artwork-Kacheln; hält das Coverraster visuell bei, materialisiert aber nur sichtbare Elemente
 - **Album-Trackansicht**: nutzt `AudioDatabase.GetTrackListByAlbum(albumId)`, sortiert nach Disc → Tracknummer → Dateiname; Doppelklick startet einen Track und verwendet alle sichtbaren Albumtitel als Queue, sodass nach Titelende automatisch der nächste Albumtitel folgt.
 - **Favoriten**: Künstler-, Album- und Tracklisten zeigen eine Herzspalte (`♡`/`♥`) zum direkten Umschalten des jeweiligen `is_favorite`-Flags; Album-Kacheln zeigen ebenfalls ein Herz.
 - **Zurück-Navigation**: interne Drill-downs merken sich die vorherige Auswahl. Von Albumtracks geht es zurück zum zuvor gewählten Album; von Künstleralben zurück zum zuvor gewählten Künstler. Die Schaltfläche im Header nutzt ein appliktionskonformes, pillenförmiges Icon-Button-Design mit Chevron.
 - Ein expliziter Klick auf einen Eintrag der linken Hauptnavigation setzt alle internen Drill-down-Filter zurück; Sidebar-Navigation zeigt immer die ungefilterte Top-Level-Ansicht. Auch erneutes Anklicken des bereits markierten Sidebar-Eintrags stellt die ungefilterte Hauptansicht wieder her.
 - **Tracks**: alle Tracks sortiert nach Titel; Doppelklick spielt Track und baut Queue aus allen sichtbaren Einträgen. Im Header steht ein Filter-Dropdown: Favoriten liegt direkt auf oberster Ebene, Genre, Audiotyp und Bitrate sind standardmäßig eingeklappt und einzeln aufklappbar; die Werte sind per Checkbox kombinierbar, jede Facette zeigt die unter den übrigen aktiven Filtern verfügbare Trefferzahl und blendet nicht mehr passende, nicht ausgewählte Werte aus.
-- **Suche**: Eingabefeld im Header; Suchanfragen werden kurz verzögert gegen den Lucene.NET-Index ausgeführt und liefern eine dreigeteilte Ergebnisseite für Tracks, Alben und Künstler. Die drei Bereiche erscheinen als thematisierte Karten mit Mindesthöhe statt als gequetschte Standardtabellen. Doppelklick auf Tracks spielt die sichtbare Trefferliste, Doppelklick auf Alben/Künstler nutzt dieselben Drill-downs wie die Hauptnavigation.
+- **Suche**: Eingabefeld im Header; Suchanfragen werden kurz verzögert gegen den Lucene.NET-Index ausgeführt und liefern eine dreigeteilte Ergebnisseite für Tracks, Alben und Künstler. Die Suche unterstützt Teilwörter (`Daf` oder `aft` findet `Daft`) und deutsche Ähnlichkeits-/Normalisierungsvarianten für Umlaute und ß. Die Track-Sektion sucht in Tracktitel, Albumname und Track-Künstler, die Album-Sektion in Albumname und Album-Künstler, die Künstler-Sektion nur im Künstlernamen; leere Sektionen zeigen einen lokalisierten Hinweis mit dem Suchbegriff. Suchergebnisse werden nach Lucene-Rang und bei gleichem Rang alphabetisch nach dem jeweiligen Anzeigenamen sortiert. Die drei Bereiche erscheinen als thematisierte Karten mit Mindesthöhe statt als gequetschte Standardtabellen. Doppelklick auf Tracks spielt die sichtbare Trefferliste, Doppelklick auf ^1  Alben/Künstler nutzt dieselben Drill-downs wie die Hauptnavigation.
 - Drill-downs aus der Suchseite merken sich die ursprüngliche Suchanfrage; die Zurück-Schaltfläche führt wieder auf dieselbe Ergebnisansicht mit identischem Suchstand zurück
 - **Ordnerstruktur**: `TreeView` (statt DataGrid); Wurzelelemente sind die in den Einstellungen konfigurierten Bibliotheksverzeichnisse (voller Pfad als Label, initial aufgeklappt); Unterordner werden mit Ordnernamen angezeigt und sind initial zugeklappt; Tracks als Blattknoten (Titel oder Dateiname); Doppelklick auf einen Track spielt alle Tracks desselben Ordners als Queue ab (sortiert nach Disc → Track-Nr. → Dateiname)
-- **Playlists**: Playlist-Tracks mit Positions-Nr., Titel, Künstler, Album, Dauer
+- **Playlists**: Playlist-Tracks mit Positions-Nr., Titel, Künstler, Album, Dauer; Playlists erscheinen automatisch in der linken Sidebar unter PLAYLISTS; Klick öffnet die Track-Liste, Doppelklick startet Wiedergabe
+- Tracks und Alben können per Rechtsklick-Kontextmenü zu bestehenden Playlisten hinzugefügt oder eine neue Playlist dafür erstellt werden (gilt für ContentDataGrid, AlbumArtworkListBox, Suchergebnis-DataGrids und die Ordnerstruktur-TreeView)
 
 ## Pflegehinweis
 

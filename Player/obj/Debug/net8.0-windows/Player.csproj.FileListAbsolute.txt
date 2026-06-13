@@ -107,3 +107,5 @@ X:\projects\c#\player\Player\bin\Debug\net8.0-windows\Microsoft.Extensions.Confi
 X:\projects\c#\player\Player\bin\Debug\net8.0-windows\Microsoft.Extensions.Primitives.dll
 X:\projects\c#\player\Player\obj\Debug\net8.0-windows\AboutWindow.baml
 X:\projects\c#\player\Player\obj\Debug\net8.0-windows\AboutWindow.g.cs
+X:\projects\c#\player\Player\obj\Debug\net8.0-windows\NewPlaylistDialog.baml
+X:\projects\c#\player\Player\obj\Debug\net8.0-windows\NewPlaylistDialog.g.cs

@@ -22,7 +22,7 @@ public partial class App : System.Windows.Application
             await Task.Run(() =>
             {
                 using var db = AudioDatabase.OpenDefault();
-                if (TrackSearchIndex.IsEmpty())
+                if (!TrackSearchIndex.IsCurrent())
                     TrackSearchIndex.Rebuild(db.GetAll());
             });
 

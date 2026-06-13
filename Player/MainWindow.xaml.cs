@@ -36,6 +36,9 @@ public partial class MainWindow : Window
     private bool _isSeekingWithSlider;
     private bool _showAlbumArtworkView;
     private long? _currentPlayHistoryId;
+    private long? _currentTrackId;
+    private bool  _currentTrackIsFavorite;
+    private long? _activePlaylistId;
     private long? _activeAlbumFilterId;
     private string? _activeAlbumFilterTitle;
     private long? _activeArtistFilterId;
@@ -59,6 +62,8 @@ public partial class MainWindow : Window
     };
 
     private sealed record FolderTag(bool IsFile, string FilePath, string FolderPath);
+    private sealed record PlaylistMenuTag(long PlaylistId, IReadOnlyList<string> Paths);
+    private sealed record RemovePlaylistEntryTag(long PlaylistEntryId);
     private sealed record NavigationState(
         string View,
         long? SelectedId,
@@ -96,6 +101,7 @@ public partial class MainWindow : Window
         public string  Duration    { get; init; } = "";
         public string? Format      { get; init; }
         public string  FilePath    { get; init; } = "";
+        public long?   PlaylistEntryId { get; init; }
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -224,6 +230,10 @@ public partial class MainWindow : Window
             NowPlayingArtistBlock.Text = track.Artist ?? string.Empty;
             NowPlayingArtworkImage.Source =
                 CreateArtworkImage(db.GetArtworkPathsByTrackPath(path)?.Thumb96Path, 96);
+            var trackInfo = db.GetTrackIdAndFavorite(path);
+            _currentTrackId = trackInfo?.Id;
+            _currentTrackIsFavorite = trackInfo?.IsFavorite ?? false;
+            UpdateNowPlayingFavoriteButton();
             PlayButton.IsEnabled = true;
             SetPlayPauseIcon(isPlaying: false);
         }
@@ -233,6 +243,9 @@ public partial class MainWindow : Window
             NowPlayingTitleBlock.Text = string.Empty;
             NowPlayingArtistBlock.Text = string.Empty;
             NowPlayingArtworkImage.Source = null;
+            _currentTrackId = null;
+            _currentTrackIsFavorite = false;
+            UpdateNowPlayingFavoriteButton();
         }
     }
 
@@ -312,6 +325,10 @@ public partial class MainWindow : Window
 
     private async Task ShowTopLevelViewAsync(string tag)
     {
+        _activePlaylistId = tag.StartsWith("Playlist:") &&
+                            long.TryParse(tag.AsSpan("Playlist:".Length), out long parsedPid)
+            ? parsedPid : null;
+
         ContentTitleTextBlock.Text = tag switch
         {
             "Artists" => LocalizationManager.Current.Artists,
@@ -404,7 +421,8 @@ public partial class MainWindow : Window
                     var t = db.GetByPath(pt.Path);
                     return new ContentRow
                     {
-                        Nr       = (i + 1).ToString(),
+                        Nr              = (i + 1).ToString(),
+                        PlaylistEntryId = pt.Id,
                         Title    = t?.Title ?? Path.GetFileName(pt.Path),
                         Artist   = t?.Artist,
                         Album    = t?.Album,
@@ -416,7 +434,7 @@ public partial class MainWindow : Window
 
             return view switch
             {
-                "Search" => db.GetTrackListByIds(TrackSearchIndex.Search(searchQuery ?? string.Empty))
+                "Search" => db.GetTrackListByIds(TrackSearchIndex.SearchByCategory(searchQuery ?? string.Empty).Tracks.Ids)
                     .Select(ToTrackContentRow)
                     .ToList(),
 
@@ -700,21 +718,61 @@ public partial class MainWindow : Window
 
         var result = await Task.Run(() =>
         {
-            var ids = TrackSearchIndex.Search(query);
+            var ids = TrackSearchIndex.SearchByCategory(query);
             using var db = AudioDatabase.OpenDefault();
+            var albumScores = BuildEntityScores(db.GetAlbumIdsByTrackIds(ids.Albums.Ids), ids.Albums.Scores);
+            var artistScores = BuildEntityScores(db.GetArtistIdsByTrackIds(ids.Artists.Ids), ids.Artists.Scores);
             return (
-                Tracks: db.GetTrackListByIds(ids).Select(ToTrackContentRow).ToList(),
-                Albums: db.GetAlbumsByTrackIds(ids).Select(ToAlbumContentRow).ToList(),
-                Artists: db.GetArtistsByTrackIds(ids).Select(ToArtistContentRow).ToList());
+                Tracks: SortBySearchScore(
+                    db.GetTrackListByIds(ids.Tracks.Ids).Select(ToTrackContentRow),
+                    ids.Tracks.Scores),
+                Albums: SortBySearchScore(
+                    db.GetAlbumsByTrackIds(ids.Albums.Ids).Select(ToAlbumContentRow),
+                    albumScores),
+                Artists: SortBySearchScore(
+                    db.GetArtistsByTrackIds(ids.Artists.Ids).Select(ToArtistContentRow),
+                    artistScores));
         });
 
         ApplySearchColumns();
         SearchTracksDataGrid.ItemsSource = result.Tracks;
         SearchAlbumsDataGrid.ItemsSource = result.Albums;
         SearchArtistsDataGrid.ItemsSource = result.Artists;
+        UpdateSearchEmptyState(SearchTracksEmptyTextBlock, result.Tracks.Count, LocalizationManager.Current.SearchTermNotFoundInTracks, query);
+        UpdateSearchEmptyState(SearchAlbumsEmptyTextBlock, result.Albums.Count, LocalizationManager.Current.SearchTermNotFoundInAlbums, query);
+        UpdateSearchEmptyState(SearchArtistsEmptyTextBlock, result.Artists.Count, LocalizationManager.Current.SearchTermNotFoundInArtists, query);
         ContentCountTextBlock.Text =
             $"{result.Tracks.Count:N0} Titel · {result.Albums.Count:N0} Alben · {result.Artists.Count:N0} Künstler";
     }
+
+    private static void UpdateSearchEmptyState(TextBlock textBlock, int count, string format, string query)
+    {
+        textBlock.Text = string.Format(format, query);
+        textBlock.Visibility = count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private static Dictionary<long, float> BuildEntityScores(
+        IReadOnlyDictionary<long, long> trackToEntityIds,
+        IReadOnlyDictionary<long, float> trackScores)
+    {
+        var result = new Dictionary<long, float>();
+        foreach (var (trackId, entityId) in trackToEntityIds)
+        {
+            if (!trackScores.TryGetValue(trackId, out var score))
+                continue;
+            if (!result.TryGetValue(entityId, out var existing) || score > existing)
+                result[entityId] = score;
+        }
+        return result;
+    }
+
+    private static List<ContentRow> SortBySearchScore(
+        IEnumerable<ContentRow> rows,
+        IReadOnlyDictionary<long, float> scores)
+        => rows
+            .OrderByDescending(row => row.Id is long id && scores.TryGetValue(id, out var score) ? score : 0)
+            .ThenBy(row => row.Title ?? string.Empty, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
 
     private static ContentRow ToAlbumContentRow(AlbumInfo a) => new()
     {
@@ -1078,6 +1136,41 @@ public partial class MainWindow : Window
         catch (Exception ex) { StopPlayback(); StatusTextBlock.Text = ex.Message; }
     }
 
+    private void FolderTreeView_OnPreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        var treeItem = FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject);
+        if (treeItem?.Tag is not FolderTag tag)
+        {
+            FolderTreeView.ContextMenu = null;
+            return;
+        }
+
+        treeItem.IsSelected = true;
+
+        List<string> paths;
+        if (tag.IsFile)
+        {
+            paths = [tag.FilePath];
+        }
+        else
+        {
+            try
+            {
+                using var db = AudioDatabase.OpenDefault();
+                paths = db.GetTrackPathsUnderDirectory(tag.FilePath);
+            }
+            catch { paths = []; }
+        }
+
+        if (paths.Count == 0)
+        {
+            FolderTreeView.ContextMenu = null;
+            return;
+        }
+
+        FolderTreeView.ContextMenu = BuildPlaylistContextMenu(paths);
+    }
+
     // ------------------------------------------------------------------
     // Content-Doppelklick → Wiedergabe
     // ------------------------------------------------------------------
@@ -1318,6 +1411,38 @@ public partial class MainWindow : Window
         AlbumArtworkListBox.ScrollIntoView(row);
     }
 
+    private void UpdateNowPlayingFavoriteButton()
+    {
+        NowPlayingFavoriteButton.IsEnabled = _currentTrackId.HasValue;
+        NowPlayingFavoriteGlyph.Text = _currentTrackIsFavorite ? "♥" : "♡";
+    }
+
+    private void NowPlayingFavoriteButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (_currentTrackId is not long id)
+            return;
+
+        _currentTrackIsFavorite = !_currentTrackIsFavorite;
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            db.SetTrackFavorite(id, _currentTrackIsFavorite);
+        }
+        catch { }
+
+        UpdateNowPlayingFavoriteButton();
+
+        if (ContentDataGrid.ItemsSource is IEnumerable<ContentRow> rows)
+        {
+            var row = rows.FirstOrDefault(r => r.Id == id);
+            if (row is not null)
+            {
+                row.IsFavorite = _currentTrackIsFavorite;
+                ContentDataGrid.Items.Refresh();
+            }
+        }
+    }
+
     private void FavoriteButton_OnClick(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: ContentRow row } || row.Id is not long id)
@@ -1335,6 +1460,350 @@ public partial class MainWindow : Window
         ContentDataGrid.Items.Refresh();
         AlbumArtworkListBox.Items.Refresh();
         e.Handled = true;
+    }
+
+    // ------------------------------------------------------------------
+    // Playlist-Kontextmenü
+    // ------------------------------------------------------------------
+
+    private void ContentDataGrid_OnPreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        var dataRow = FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject);
+        if (dataRow?.DataContext is not ContentRow contentRow)
+        {
+            ContentDataGrid.ContextMenu = null;
+            return;
+        }
+
+        ContentDataGrid.SelectedItem = contentRow;
+
+        bool isTrack = !string.IsNullOrEmpty(contentRow.FilePath);
+        bool isAlbum = contentRow.Id.HasValue && string.IsNullOrEmpty(contentRow.FilePath)
+                       && AlbumViewModeBorder.Visibility == Visibility.Visible;
+
+        if (!isTrack && !isAlbum)
+        {
+            ContentDataGrid.ContextMenu = null;
+            return;
+        }
+
+        if (_activePlaylistId.HasValue && isTrack && contentRow.PlaylistEntryId.HasValue)
+        {
+            ContentDataGrid.ContextMenu = BuildRemoveFromPlaylistContextMenu(contentRow.PlaylistEntryId.Value);
+            return;
+        }
+
+        ContentDataGrid.ContextMenu = BuildPlaylistContextMenu(GetPathsForRow(contentRow));
+    }
+
+    private void SearchTracksDataGrid_OnPreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        var dataRow = FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject);
+        if (dataRow?.DataContext is not ContentRow contentRow || string.IsNullOrEmpty(contentRow.FilePath))
+        {
+            SearchTracksDataGrid.ContextMenu = null;
+            return;
+        }
+        SearchTracksDataGrid.SelectedItem = contentRow;
+        SearchTracksDataGrid.ContextMenu = BuildPlaylistContextMenu(GetPathsForRow(contentRow));
+    }
+
+    private void SearchAlbumsDataGrid_OnPreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        var dataRow = FindAncestor<DataGridRow>(e.OriginalSource as DependencyObject);
+        if (dataRow?.DataContext is not ContentRow contentRow || contentRow.Id is null)
+        {
+            SearchAlbumsDataGrid.ContextMenu = null;
+            return;
+        }
+        SearchAlbumsDataGrid.SelectedItem = contentRow;
+        SearchAlbumsDataGrid.ContextMenu = BuildPlaylistContextMenu(GetPathsForRow(contentRow));
+    }
+
+    private void AlbumArtworkContextMenu_OnOpened(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ContextMenu menu) return;
+
+        var row = (menu.PlacementTarget as FrameworkElement)?.DataContext as ContentRow;
+        if (row?.Id is null) return;
+
+        // Vorherige dynamisch hinzugefügte Playlist-Einträge entfernen (erste 2: DeleteCover, ReassignCover)
+        while (menu.Items.Count > 2)
+            menu.Items.RemoveAt(menu.Items.Count - 1);
+
+        AppendPlaylistItems(menu, GetPathsForRow(row));
+    }
+
+    private ContextMenu BuildPlaylistContextMenu(IReadOnlyList<string> paths)
+    {
+        var menu = new ContextMenu();
+        if (System.Windows.Application.Current.Resources[typeof(ContextMenu)] is Style ctxStyle)
+            menu.Style = ctxStyle;
+        AppendPlaylistItems(menu, paths);
+        return menu;
+    }
+
+    private void AppendPlaylistItems(ItemsControl menu, IReadOnlyList<string> paths)
+    {
+        var miStyle  = System.Windows.Application.Current.Resources[typeof(MenuItem)]  as Style;
+        var sepStyle = System.Windows.Application.Current.Resources[typeof(Separator)] as Style;
+
+        var header = new MenuItem
+        {
+            Header           = LocalizationManager.Current.AddToPlaylist,
+            IsHitTestVisible = false,
+            Focusable        = false,
+            FontSize         = 11,
+            FontWeight       = FontWeights.SemiBold,
+            Foreground       = new System.Windows.Media.SolidColorBrush(
+                                   System.Windows.Media.Color.FromRgb(0x6C, 0x63, 0xFF))
+        };
+        if (miStyle != null) header.Style = miStyle;
+        menu.Items.Add(header);
+
+        var sep0 = new Separator();
+        if (sepStyle != null) sep0.Style = sepStyle;
+        menu.Items.Add(sep0);
+
+        List<PlaylistRecord> playlists;
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            playlists = db.GetAllPlaylists().ToList();
+        }
+        catch { playlists = []; }
+
+        foreach (var pl in playlists)
+        {
+            var item = new MenuItem { Header = pl.Name, Tag = new PlaylistMenuTag(pl.Id, paths) };
+            if (miStyle != null) item.Style = miStyle;
+            item.Click += PlaylistMenuItem_OnClick;
+            menu.Items.Add(item);
+        }
+
+        if (playlists.Count > 0)
+        {
+            var sep1 = new Separator();
+            if (sepStyle != null) sep1.Style = sepStyle;
+            menu.Items.Add(sep1);
+        }
+
+        var newItem = new MenuItem { Header = LocalizationManager.Current.NewPlaylist, Tag = paths };
+        if (miStyle != null) newItem.Style = miStyle;
+        newItem.Click += NewPlaylistMenuItem_OnClick;
+        menu.Items.Add(newItem);
+    }
+
+    private void PlaylistMenuItem_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: PlaylistMenuTag tag })
+            return;
+
+        var paths = tag.Paths;
+        if (paths.Count == 0) return;
+
+        string playlistName;
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            playlistName = db.GetPlaylistById(tag.PlaylistId)?.Name ?? string.Empty;
+            foreach (var path in paths)
+                db.AddTrackToPlaylist(tag.PlaylistId, path, db.GetTrackIdByPath(path));
+        }
+        catch { return; }
+
+        StatusTextBlock.Text = paths.Count == 1
+            ? string.Format(LocalizationManager.Current.TrackAddedToPlaylist, playlistName)
+            : string.Format(LocalizationManager.Current.TracksAddedToPlaylist, paths.Count, playlistName);
+    }
+
+    private void NewPlaylistMenuItem_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: IReadOnlyList<string> paths })
+            return;
+
+        var dialog = new NewPlaylistDialog { Owner = this };
+        if (dialog.ShowDialog() != true || string.IsNullOrWhiteSpace(dialog.PlaylistName))
+            return;
+
+        if (paths.Count == 0) return;
+
+        var playlistName = dialog.PlaylistName.Trim();
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            var playlistId = db.CreatePlaylist(playlistName);
+            foreach (var path in paths)
+                db.AddTrackToPlaylist(playlistId, path, db.GetTrackIdByPath(path));
+        }
+        catch { return; }
+
+        LoadNavPlaylists();
+        StatusTextBlock.Text = paths.Count == 1
+            ? string.Format(LocalizationManager.Current.TrackAddedToPlaylist, playlistName)
+            : string.Format(LocalizationManager.Current.TracksAddedToPlaylist, paths.Count, playlistName);
+    }
+
+    private List<string> GetPathsForRow(ContentRow row)
+    {
+        if (!string.IsNullOrEmpty(row.FilePath))
+            return [row.FilePath];
+
+        if (row.Id is not long albumId)
+            return [];
+
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            return db.GetTrackListByAlbum(albumId).Select(t => t.Path).ToList();
+        }
+        catch { return []; }
+    }
+
+    // ------------------------------------------------------------------
+    // Playlist – Löschen aus Sidebar / Entfernen aus Playlist-Ansicht
+    // ------------------------------------------------------------------
+
+    private void NavListBox_OnPreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        var item = FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject);
+        if (item?.Tag is not string tag || !tag.StartsWith("Playlist:") ||
+            !long.TryParse(tag.AsSpan("Playlist:".Length), out long playlistId))
+        {
+            NavListBox.ContextMenu = null;
+            return;
+        }
+
+        item.IsSelected = true;
+        var name = item.Content?.ToString() ?? string.Empty;
+        NavListBox.ContextMenu = BuildDeletePlaylistContextMenu(playlistId, name);
+    }
+
+    private ContextMenu BuildDeletePlaylistContextMenu(long playlistId, string playlistName)
+    {
+        var menu = new ContextMenu();
+        if (System.Windows.Application.Current.Resources[typeof(ContextMenu)] is Style cs)
+            menu.Style = cs;
+
+        var miStyle  = System.Windows.Application.Current.Resources[typeof(MenuItem)]  as Style;
+        var sepStyle = System.Windows.Application.Current.Resources[typeof(Separator)] as Style;
+
+        var header = new MenuItem
+        {
+            Header           = playlistName,
+            IsHitTestVisible = false,
+            Focusable        = false,
+            FontSize         = 11,
+            FontWeight       = FontWeights.SemiBold,
+            Foreground       = new System.Windows.Media.SolidColorBrush(
+                                   System.Windows.Media.Color.FromRgb(0x6C, 0x63, 0xFF))
+        };
+        if (miStyle != null) header.Style = miStyle;
+        menu.Items.Add(header);
+
+        var sep = new Separator();
+        if (sepStyle != null) sep.Style = sepStyle;
+        menu.Items.Add(sep);
+
+        var deleteItem = new MenuItem
+        {
+            Header     = LocalizationManager.Current.DeletePlaylist,
+            Tag        = playlistId,
+            Foreground = new System.Windows.Media.SolidColorBrush(
+                             System.Windows.Media.Color.FromRgb(0xFF, 0x6B, 0x6B))
+        };
+        if (miStyle != null) deleteItem.Style = miStyle;
+        deleteItem.Click += DeletePlaylistMenuItem_OnClick;
+        menu.Items.Add(deleteItem);
+
+        return menu;
+    }
+
+    private void DeletePlaylistMenuItem_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: long playlistId })
+            return;
+
+        string name;
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            name = db.GetPlaylistById(playlistId)?.Name ?? string.Empty;
+            db.DeletePlaylist(playlistId);
+        }
+        catch { return; }
+
+        if (_activePlaylistId == playlistId)
+        {
+            _activePlaylistId = null;
+            for (int i = 0; i < NavListBox.Items.Count; i++)
+            {
+                if (NavListBox.Items[i] is ListBoxItem { Tag: "Tracks" } tracksItem)
+                {
+                    NavListBox.SelectedItem = tracksItem;
+                    break;
+                }
+            }
+        }
+
+        LoadNavPlaylists();
+        StatusTextBlock.Text = string.Format(LocalizationManager.Current.PlaylistDeleted, name);
+    }
+
+    private ContextMenu BuildRemoveFromPlaylistContextMenu(long playlistEntryId)
+    {
+        var menu = new ContextMenu();
+        if (System.Windows.Application.Current.Resources[typeof(ContextMenu)] is Style cs)
+            menu.Style = cs;
+
+        var miStyle  = System.Windows.Application.Current.Resources[typeof(MenuItem)]  as Style;
+        var sepStyle = System.Windows.Application.Current.Resources[typeof(Separator)] as Style;
+
+        var header = new MenuItem
+        {
+            Header           = LocalizationManager.Current.RemoveFromPlaylist,
+            IsHitTestVisible = false,
+            Focusable        = false,
+            FontSize         = 11,
+            FontWeight       = FontWeights.SemiBold,
+            Foreground       = new System.Windows.Media.SolidColorBrush(
+                                   System.Windows.Media.Color.FromRgb(0x6C, 0x63, 0xFF))
+        };
+        if (miStyle != null) header.Style = miStyle;
+        menu.Items.Add(header);
+
+        var sep = new Separator();
+        if (sepStyle != null) sep.Style = sepStyle;
+        menu.Items.Add(sep);
+
+        var removeItem = new MenuItem
+        {
+            Header = LocalizationManager.Current.RemoveFromPlaylist,
+            Tag    = new RemovePlaylistEntryTag(playlistEntryId)
+        };
+        if (miStyle != null) removeItem.Style = miStyle;
+        removeItem.Click += RemoveFromPlaylistMenuItem_OnClick;
+        menu.Items.Add(removeItem);
+
+        return menu;
+    }
+
+    private async void RemoveFromPlaylistMenuItem_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: RemovePlaylistEntryTag tag })
+            return;
+
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            db.RemoveTrackFromPlaylist(tag.PlaylistEntryId);
+        }
+        catch { return; }
+
+        StatusTextBlock.Text = LocalizationManager.Current.TrackRemovedFromPlaylist;
+
+        if (NavListBox.SelectedItem is ListBoxItem { Tag: string navTag })
+            await ShowTopLevelViewAsync(navTag);
     }
 
     // ------------------------------------------------------------------
@@ -1431,11 +1900,17 @@ public partial class MainWindow : Window
             using var db = AudioDatabase.OpenDefault();
             NowPlayingArtworkImage.Source =
                 CreateArtworkImage(db.GetArtworkPathsByTrackPath(filePath)?.Thumb96Path, 96);
+            var trackInfo = db.GetTrackIdAndFavorite(filePath);
+            _currentTrackId = trackInfo?.Id;
+            _currentTrackIsFavorite = trackInfo?.IsFavorite ?? false;
         }
         catch
         {
             NowPlayingArtworkImage.Source = null;
+            _currentTrackId = null;
+            _currentTrackIsFavorite = false;
         }
+        UpdateNowPlayingFavoriteButton();
 
         StatusTextBlock.Text = _settings.OutputBackend == OutputBackend.Asio
             ? $"Wiedergabe über {_settings.SelectedDriverName}"
@@ -1512,6 +1987,9 @@ public partial class MainWindow : Window
         NowPlayingArtistBlock.Text = "";
         FileInfoTextBlock.Text     = "";
         NowPlayingArtworkImage.Source = null;
+        _currentTrackId = null;
+        _currentTrackIsFavorite = false;
+        UpdateNowPlayingFavoriteButton();
     }
 
     private void RecordPlaybackEnd(bool completed)

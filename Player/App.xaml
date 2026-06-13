@@ -67,6 +67,65 @@
             <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource AppGridLineBrush}"/>
         </Style>
+        <Style TargetType="ContextMenu">
+            <Setter Property="Background"        Value="{DynamicResource AppSurfaceBrush}"/>
+            <Setter Property="BorderBrush"       Value="{DynamicResource AppInputBorderBrush}"/>
+            <Setter Property="BorderThickness"   Value="1"/>
+            <Setter Property="Padding"           Value="0,4"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <!-- Ersetzt ContextMenuChrome, das ein hartkodiertes weißes Icon-Band enthält -->
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <ScrollViewer CanContentScroll="True"
+                                          VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          Style="{x:Null}">
+                                <ItemsPresenter/>
+                            </ScrollViewer>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="MenuItem">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+            <Setter Property="Padding"    Value="14,7"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter ContentSource="Header" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AppSurfaceHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{DynamicResource AppMutedTextBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="Separator">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Separator">
+                        <Border Height="1" Margin="8,4" Background="{DynamicResource AppGridLineBrush}"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <sys:String x:Key="L_LocalLibrary" xmlns:sys="clr-namespace:System;assembly=mscorlib">LOKALE BIBLIOTHEK</sys:String>
         <sys:String x:Key="L_Artists" xmlns:sys="clr-namespace:System;assembly=mscorlib">Künstler</sys:String>
         <sys:String x:Key="L_Albums" xmlns:sys="clr-namespace:System;assembly=mscorlib">Alben</sys:String>

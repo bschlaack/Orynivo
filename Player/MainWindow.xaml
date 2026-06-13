@@ -448,6 +448,7 @@
             </Setter>
         </Style>
 
+
     </Window.Resources>
 
     <Grid>
@@ -490,7 +491,8 @@
                      Padding="0,8,0,8"
                      FontSize="13"
                      SelectionChanged="NavListBox_OnSelectionChanged"
-                     PreviewMouseLeftButtonUp="NavListBox_OnPreviewMouseLeftButtonUp">
+                     PreviewMouseLeftButtonUp="NavListBox_OnPreviewMouseLeftButtonUp"
+                     PreviewMouseRightButtonDown="NavListBox_OnPreviewMouseRightButtonDown">
 
                 <ListBoxItem IsHitTestVisible="False" Focusable="False"
                              Foreground="#44445A" FontSize="10" FontWeight="Bold"
@@ -681,7 +683,8 @@
                       FontSize="13"
                       CanUserResizeRows="False"
                       LoadingRow="ContentDataGrid_OnLoadingRow"
-                      MouseDoubleClick="ContentDataGrid_OnMouseDoubleClick"/>
+                      MouseDoubleClick="ContentDataGrid_OnMouseDoubleClick"
+                      PreviewMouseRightButtonDown="ContentDataGrid_OnPreviewMouseRightButtonDown"/>
 
             <ScrollViewer x:Name="SearchResultsScrollViewer"
                           Grid.Row="1"
@@ -709,7 +712,13 @@
                                       HeadersVisibility="Column"
                                       GridLinesVisibility="Horizontal"
                                       HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
-                                      MouseDoubleClick="SearchTracksDataGrid_OnMouseDoubleClick"/>
+                                      MouseDoubleClick="SearchTracksDataGrid_OnMouseDoubleClick"
+                                      PreviewMouseRightButtonDown="SearchTracksDataGrid_OnPreviewMouseRightButtonDown"/>
+                            <TextBlock x:Name="SearchTracksEmptyTextBlock"
+                                       Visibility="Collapsed"
+                                       Foreground="{DynamicResource AppSecondaryTextBrush}"
+                                       Margin="2,10,0,0"
+                                       TextWrapping="Wrap"/>
                         </StackPanel>
                     </Border>
                     <Border Background="{DynamicResource AppSurfaceBrush}"
@@ -732,7 +741,13 @@
                                       HeadersVisibility="Column"
                                       GridLinesVisibility="Horizontal"
                                       HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
-                                      MouseDoubleClick="SearchAlbumsDataGrid_OnMouseDoubleClick"/>
+                                      MouseDoubleClick="SearchAlbumsDataGrid_OnMouseDoubleClick"
+                                      PreviewMouseRightButtonDown="SearchAlbumsDataGrid_OnPreviewMouseRightButtonDown"/>
+                            <TextBlock x:Name="SearchAlbumsEmptyTextBlock"
+                                       Visibility="Collapsed"
+                                       Foreground="{DynamicResource AppSecondaryTextBrush}"
+                                       Margin="2,10,0,0"
+                                       TextWrapping="Wrap"/>
                         </StackPanel>
                     </Border>
                     <Border Background="{DynamicResource AppSurfaceBrush}"
@@ -755,6 +770,11 @@
                                       GridLinesVisibility="Horizontal"
                                       HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
                                       MouseDoubleClick="SearchArtistsDataGrid_OnMouseDoubleClick"/>
+                            <TextBlock x:Name="SearchArtistsEmptyTextBlock"
+                                       Visibility="Collapsed"
+                                       Foreground="{DynamicResource AppSecondaryTextBrush}"
+                                       Margin="2,10,0,0"
+                                       TextWrapping="Wrap"/>
                         </StackPanel>
                     </Border>
                 </StackPanel>
@@ -770,7 +790,8 @@
                       VirtualizingStackPanel.IsVirtualizing="True"
                       VirtualizingStackPanel.VirtualizationMode="Recycling"
                       ScrollViewer.CanContentScroll="True"
-                      MouseDoubleClick="FolderTreeView_OnMouseDoubleClick"/>
+                      MouseDoubleClick="FolderTreeView_OnMouseDoubleClick"
+                      PreviewMouseRightButtonDown="FolderTreeView_OnPreviewMouseRightButtonDown"/>
 
             <!-- Album-Artworkansicht -->
             <ListBox x:Name="AlbumArtworkListBox"
@@ -811,7 +832,7 @@
                                         Background="#E4E4F0"
                                         CornerRadius="6">
                                     <Border.ContextMenu>
-                                        <ContextMenu>
+                                        <ContextMenu Opened="AlbumArtworkContextMenu_OnOpened">
                                             <MenuItem Header="{DynamicResource L_DeleteCover}"
                                                       Tag="{Binding}"
                                                       Click="DeleteCoverMenuItem_OnClick"/>
@@ -894,6 +915,7 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="52"/>
                         <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <Border Width="42" Height="42" Background="{DynamicResource AppArtworkPlaceholderBrush}" CornerRadius="5">
                         <Image x:Name="NowPlayingArtworkImage" Stretch="UniformToFill"/>
@@ -909,6 +931,17 @@
                                    Foreground="#44445A" FontSize="10" Margin="0,2,0,0"
                                    TextTrimming="CharacterEllipsis"/>
                     </StackPanel>
+                    <Button x:Name="NowPlayingFavoriteButton"
+                            Grid.Column="2"
+                            Style="{StaticResource TransportBtnStyle}"
+                            Margin="8,0,0,0"
+                            IsEnabled="False"
+                            ToolTip="Als Favorit markieren"
+                            Click="NowPlayingFavoriteButton_OnClick">
+                        <TextBlock x:Name="NowPlayingFavoriteGlyph"
+                                   Text="♡"
+                                   FontSize="16"/>
+                    </Button>
                 </Grid>
 
                 <!-- Controls -->
