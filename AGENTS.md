@@ -1,216 +1,217 @@
 # AGENTS.md
 
-## Projektüberblick
+## Project Overview
 
-Windows-Audioplayer mit:
+Windows audio player with:
 
-- WPF-Frontend in `Player/`
-- nativer ASIO-Bridge in `Native/AsioBridge/`
-- PCM-Wiedergabe über `ffmpeg`
-- nativer DSF/DFF-DSD-Wiedergabe über ASIO
+- WPF frontend in `Player/`
+- Native ASIO bridge in `Native/AsioBridge/`
+- PCM playback through `ffmpeg`
+- Native DSF/DFF DSD playback through ASIO
 
-## Build und Start
+## Build and Run
 
 ```powershell
 .\build.ps1
 .\Player\bin\Debug\net8.0-windows\Player.exe
 ```
 
-`build.ps1` baut zuerst `AsioBridge.dll`, danach die .NET-App.
+`build.ps1` builds `AsioBridge.dll` first and then the .NET application.
 
-## Wichtige Architektur
+## Important Architecture
 
-- `Player/Audio/SteinbergAsioStream.cs`: C#-Wrapper für die native Bridge
-- `Player/Audio/FfmpegAudioPlayer.cs`: PCM-Pfad
-- `Player/Audio/DsfAudioPlayer.cs`: nativer DSF→DSD-Pfad
-- `Player/Audio/DffAudioPlayer.cs`: nativer DFF/DSDIFF→DSD-Pfad
-- `Player/Audio/WasapiAudioPlayer.cs`: WASAPI-PCM-Pfad
-- `Player/Audio/WasapiDeviceProvider.cs`: WASAPI-Geräte und Capability-Abfragen
-- `Native/AsioBridge/bridge.cpp`: ASIO-Initialisierung, PCM-/DSD-Ringpuffer, Callback
-- `Player/SettingsWindow.*`: Zweispaltiges Einstellungsfenster – links Navigationsleiste mit Oberpunkten (WIEDERGABE, BIBLIOTHEK), rechts der Inhaltsbereich für den gewählten Punkt
-- `Player/ThemeManager.cs`: setzt globale WPF-Ressourcen für helles/dunkles Farbschema
-- `Player/Localization/*`: Sprachmodell und lokalisierte Texte für Deutsch, Englisch und Französisch
-- `Player/StartupWindow.*`: schlanker Splashscreen während der initialen Datenbankvorbereitung/Migration
-- `Player/SettingsStore.cs`: persistiert `%LOCALAPPDATA%\Player\settings.json`
-- `AppSettings.LastMainView` und `AppSettings.AlbumArtworkView` speichern die zuletzt gewählte Hauptansicht sowie den Album-Modus (Tabelle/Artwork) und werden beim nächsten Start wiederhergestellt
-- `AppSettings.Volume` und `AppSettings.LastTrackPath` speichern Lautstärke und zuletzt ausgewählten/abgespielten Track; beim Start werden sie defensiv wiederhergestellt, nur wenn Datei und DB-Eintrag noch existieren
-- `AppSettings.Theme` speichert das Farbschema (`Light`/`Dark`)
-- `AppSettings.Language` speichert die UI-Sprache (`German`/`English`/`French`)
-- `Player/Library/TrackRecord.cs`: C#-Modell für einen DB-Track-Eintrag (ID3 + technische Metadaten)
-- `Player/Library/PlaylistRecord.cs`: C#-Modell für eine Playlist (inkl. denormalisiertem `TrackCount`, `IsSmartPlaylist`, `FilterCriteria`)
-- `Player/Library/SmartPlaylistCriteria.cs`: Record für serialisierte Filter-Kriterien einer intelligenten Playlist (`FavoritesOnly`, `Genres`, `Formats`, `Bitrates`)
-- `Player/Library/PlaylistTrackRecord.cs`: C#-Modell für einen Playlist-Eintrag (Position, optionale TrackId-Referenz, immer Pfad)
-- `Player/Library/AudioDatabase.cs`: SQLite-Datenbankschicht (via `Microsoft.Data.Sqlite`); DB-Datei unter `%LOCALAPPDATA%\Player\library.db`
-- `Player/Library/LibraryScanner.cs`: Verzeichnis-Scanner; liest Metadaten via TagLibSharp und schreibt sie per `AudioDatabase.Upsert()` in die DB; unterstützt Fortschritts-Reporting (`IProgress<ScanProgress>`) und Abbruch per `CancellationToken`
+- `Player/Audio/SteinbergAsioStream.cs`: C# wrapper for the native bridge
+- `Player/Audio/FfmpegAudioPlayer.cs`: PCM path
+- `Player/Audio/DsfAudioPlayer.cs`: native DSF-to-DSD path
+- `Player/Audio/DffAudioPlayer.cs`: native DFF/DSDIFF-to-DSD path
+- `Player/Audio/WasapiAudioPlayer.cs`: WASAPI PCM path
+- `Player/Audio/WasapiDeviceProvider.cs`: WASAPI devices and capability queries
+- `Native/AsioBridge/bridge.cpp`: ASIO initialization, PCM/DSD ring buffers, and callback
+- `Player/SettingsWindow.*`: two-column settings window with navigation on the left and the selected section on the right
+- `Player/ThemeManager.cs`: sets global WPF resources for light and dark themes
+- `Player/Localization/*`: language model and localized German, English, and French strings
+- `Player/StartupWindow.*`: lightweight splash screen shown during initial database preparation and migration
+- `Player/SettingsStore.cs`: persists `%LOCALAPPDATA%\Player\settings.json`
+- `AppSettings.LastMainView` and `AppSettings.AlbumArtworkView` preserve the selected main view and album mode
+- `AppSettings.Volume` and `AppSettings.LastTrackPath` preserve volume and the last selected or played track; restoration requires both the file and database entry to exist
+- `AppSettings.Theme` stores the `Light` or `Dark` theme
+- `AppSettings.Language` stores `German`, `English`, or `French`
+- `Player/Library/TrackRecord.cs`: database track model containing tags and technical metadata
+- `Player/Library/PlaylistRecord.cs`: playlist model including denormalized `TrackCount`, `IsSmartPlaylist`, and `FilterCriteria`
+- `Player/Library/SmartPlaylistCriteria.cs`: serialized smart-playlist criteria (`FavoritesOnly`, `Genres`, `Formats`, `Bitrates`)
+- `Player/Library/PlaylistTrackRecord.cs`: playlist entry model with position, optional TrackId reference, and required path
+- `Player/Library/AudioDatabase.cs`: SQLite database layer through `Microsoft.Data.Sqlite`; database at `%LOCALAPPDATA%\Player\library.db`
+- `Player/Library/LibraryScanner.cs`: directory scanner using TagLibSharp; writes through `AudioDatabase.Upsert()`, reports progress, and supports cancellation
 
-## Audiodatenbank
+## Audio Database
 
-- Datenbank: SQLite via `Microsoft.Data.Sqlite` (cross-platform, keine Serverinstanz)
-- Schema: `tracks` enthält Dateipfad, ID3-Tags, technische Metadaten sowie Referenzen auf normalisierte `artists` und `albums`
-- `artists`: stabile Künstler-IDs (`id`, `name`) – vorbereitet für spätere Künstler-Favoriten
-- `artists`, `albums` und `tracks` besitzen jeweils `is_favorite` als direktes Bool-Flag für UI-nahe Favoriten
-- `albums`: stabile Album-IDs (`id`, `title`, `artist_id`, `year`, `artwork_id`, `is_favorite`)
-- `artworks`: deduplizierte Cover-Metadaten, eindeutig über SHA-256-Hash; Originale und vorberechnete Thumbnails liegen dateibasiert unter `%LOCALAPPDATA%\Player\artworks\` (`original`, `thumb_96`, `thumb_320`)
-- `favorites`: ältere generische Vorbereitung für spätere Erweiterungen; die sichtbare Favoritenfunktion nutzt aktuell die direkten `is_favorite`-Spalten an Tracks, Künstlern und Alben
-- `play_history`: speichert Wiedergabestarts und -enden (`track_id`, Pfad, Start-/Endzeit, Dauer, Endposition, abgeschlossen ja/nein) als Basis für spätere Vorlieben, Vorschläge und „zuletzt gehört“
-- `AudioDatabase.GetTrackIdAndFavorite(path)`: schlanke Abfrage (nur `id` + `is_favorite`) für den Favoriten-Status des gerade abgespielten Tracks
-- `AudioDatabase.OpenDefault()` legt die DB unter `%LOCALAPPDATA%\Player\library.db` an
-- `Upsert()` ist idempotent (INSERT … ON CONFLICT DO UPDATE) — geeignet für Re-Scans
-- `GetPathTimestamps()` liefert Pfad+ModifiedAt für effiziente Änderungserkennung beim Scan
-- WAL-Journal-Mode aktiv für bessere Concurrency
-- Mehrere Bibliotheksverzeichnisse möglich (`AppSettings.LibraryPaths: List<string>`), persistent in `settings.json`
-- Jedes Verzeichnis hat im Settings-Fenster einen eigenen „Scannen"-Button (wird zu „Abbrechen" während der Scan läuft); Fortschrittstext direkt unter dem jeweiligen Eintrag
-- Verzeichnisse können über „+ Verzeichnis hinzufügen" ergänzt und per × entfernt werden; laufende Scans werden beim Entfernen oder Schließen des Fensters abgebrochen
-- Scan überspringt unveränderte Dateien (ModifiedAt-Vergleich); `added_at` wird beim Update nicht überschrieben
-- Metadaten-Extraktion via TagLibSharp (ID3v1/v2, Vorbis Comments, APE Tags, Cover Art)
-- Beim Öffnen der DB wird eine Bestandsmigration durchgeführt: Künstler, Alben und Artworks werden normalisiert; alte pro-Track-Cover-BLOBs werden nach `artworks` verschoben und in `tracks` geleert
-- Eine zweite Einmalmigration (`album_artist_rebuild_v1`) baut Albumzuordnungen strikt aus `album_artist` neu auf, damit Compilations in der Albumansicht nicht über alle Track-Interpreten aufgefächert werden
-- Eine weitere Einmalmigration (`album_title_uniqueness_v1`) verdichtet Alben auf eindeutige Titel; bei mehreren Album-Interpreten wird für Anzeige und Albumzuordnung der erste Interpret verwendet
-- `RebuildAlbumsFromAlbumArtists()` muss vorhandene `artwork_id`-Zuordnungen bewahren; falls historische Album-Cover-Zuordnungen fehlen, gibt es im Settings-Fenster unter Bibliothek den Wartungspunkt „Album-Cover reparieren“, der pro Album eine Beispieldatei erneut via TagLib ausliest und das Cover wieder anhängt
-- Unter Bibliothek gibt es zusätzlich den Wartungspunkt „Fehlende Cover-Artworks herunterladen“; er lädt fehlende Albumcover für Alben mit vorhandenem `musicbrainz_release_id` aus dem öffentlichen Cover Art Archive nach
-- Fehlende Cover in der Album-Artworkansicht zeigen einen Platzhalter mit manueller Download-Schaltfläche; diese öffnet eine freie MusicBrainz-Suche nach Albumtitel, zeigt gefundene Cover zur Auswahl und übernimmt das gewählte Cover ins lokale Artwork-System
-- Der manuelle Cover-Suchdialog übernimmt die thematisierte native Titelleiste und ist kompakt auf die Ergebnisliste zugeschnitten
-- Der manuelle Cover-Suchdialog zeigt während der Suche eine Aktivitätsanimation und meldet explizit, wenn keine Cover gefunden wurden
-- Der Suchbegriff im manuellen Cover-Suchdialog ist editierbar; die Suche kann beliebig erneut ausgeführt werden
-- Albumcover besitzen in der Artworkansicht ein Kontextmenü zum Löschen oder zur Neu-Zuordnung über die manuelle MusicBrainz-Suche
-- Das Hauptfenster startet maximiert
-- Einmalmigration `artwork_files_v1` exportiert bestehende BLOB-Artworks in den dateibasierten Cache. Aus Kompatibilitätsgründen bleibt `artworks.data` in Bestandsdatenbanken vorerst erhalten, da ältere Schemas die Spalte als `NOT NULL` angelegt haben; ein späterer expliziter Schema-Rebuild kann sie entfernen.
-- Thumbnail-Erzeugung ist absichtlich fehlertolerant: exotische oder defekte eingebettete Cover dürfen keinen Startabbruch verursachen; in diesem Fall bleibt nur das Original erhalten und die UI zeigt für dieses Bild ggf. keinen Thumbnail-Cache.
-- Ein `app_meta`-Eintrag (`normalized_library_v1`) verhindert, dass die teure Bestandsmigration bei jedem DB-Open erneut geprüft wird
-- `AudioDatabase.Optimize()` führt `wal_checkpoint(TRUNCATE)`, `VACUUM` und `ANALYZE` aus; im Settings-Fenster gibt es unter Bibliothek einen Button „Datenbank optimieren“
+- SQLite through `Microsoft.Data.Sqlite`; no server process is required
+- `tracks` stores file paths, tags, technical metadata, and references to normalized `artists` and `albums`
+- `artists` contains stable artist IDs (`id`, `name`)
+- `artists`, `albums`, and `tracks` each have a direct `is_favorite` flag
+- `albums` contains stable album IDs (`id`, `title`, `artist_id`, `year`, `artwork_id`, `is_favorite`)
+- `artworks` deduplicates artwork by SHA-256 hash; originals and thumbnails live under `%LOCALAPPDATA%\Player\artworks\` as `original`, `thumb_96`, and `thumb_320`
+- `favorites` is an older generic extension point; visible favorites use the direct flags
+- `play_history` records playback starts and endings, duration, final position, and completion state
+- `AudioDatabase.GetTrackIdAndFavorite(path)` performs a lightweight `id` and `is_favorite` lookup
+- `AudioDatabase.OpenDefault()` creates or opens `%LOCALAPPDATA%\Player\library.db`
+- `Upsert()` is idempotent through `INSERT ... ON CONFLICT DO UPDATE`
+- `GetPathTimestamps()` returns paths and modification timestamps for efficient rescans
+- WAL journal mode is enabled
+- Multiple library directories are stored in `AppSettings.LibraryPaths`
+- Each directory in Settings has its own Scan button, which becomes Cancel while scanning, with progress shown below the entry
+- Directories can be added or removed; active scans are canceled when a directory is removed or the window closes
+- Scans skip unchanged files and do not overwrite `added_at`
+- Metadata extraction supports ID3v1/v2, Vorbis Comments, APE tags, and embedded artwork
+- Opening the database runs a legacy-data migration that normalizes artists, albums, and artwork and removes old per-track artwork BLOBs
+- `album_artist_rebuild_v1` rebuilds album assignments strictly from `album_artist` so compilations are not split by track artist
+- `album_title_uniqueness_v1` consolidates albums by unique title and uses the first album artist when multiple artists exist
+- `RebuildAlbumsFromAlbumArtists()` must preserve existing `artwork_id` assignments
+- Settings includes **Repair album artwork**, which re-reads a sample file per album through TagLib when historical assignments are missing
+- Settings includes **Download missing artwork**, using Cover Art Archive for albums with a `musicbrainz_release_id`
+- Missing covers show a placeholder and manual MusicBrainz search by editable album title
+- The manual cover-search dialog uses the themed native title bar, shows search activity and explicit empty results, and can be run repeatedly
+- Album artwork has a context menu for deletion or reassignment through manual MusicBrainz search
+- The main window starts maximized
+- `artwork_files_v1` exports legacy artwork BLOBs into the file cache; `artworks.data` remains for compatibility with old `NOT NULL` schemas
+- Thumbnail generation is intentionally fault tolerant; invalid embedded artwork must not prevent startup
+- `normalized_library_v1` prevents expensive legacy migration checks on every database open
+- `AudioDatabase.Optimize()` runs `wal_checkpoint(TRUNCATE)`, `VACUUM`, and `ANALYZE`
 
-## Playlisten-Kontextmenü
+## Playlist Context Menus
 
-- Rechtsklick auf einen Track (alle DataGrids und Suchergebnisse) oder ein Album (Tabellen- und Artwork-Ansicht) öffnet ein Kontextmenü mit bestehenden Playlisten sowie dem Eintrag „Neue Playlist …"
-- Auswahl einer bestehenden Playlist fügt den Track / alle Album-Tracks sofort hinzu; die Statusleiste bestätigt den Vorgang
-- „Neue Playlist …" öffnet `NewPlaylistDialog` (modales Fenster): Namens-Eingabe (Pflichtfeld, Enter bestätigt), danach wird die Playlist angelegt, die Track(s) hinzugefügt und die linke Sidebar aktualisiert
-- `Player/NewPlaylistDialog.xaml/.cs`: schlankes Eingabedialog-Fenster mit Theming (DynamicResource-Brushes, dunkle native Titelleiste per DWM)
-- Die Kontextmenüs werden in `AppendPlaylistItems()` (MainWindow.xaml.cs) dynamisch beim Öffnen aufgebaut; bei den Album-Artwork-Karten wird das bestehende Cover-Kontextmenü über das `ContextMenu.Opened`-Event um Playlist-Einträge erweitert
-- `GetPathsForRow()`: ermittelt Track-Pfade für eine `ContentRow`; bei Track-Zeilen ein Pfad, bei Album-Zeilen alle Tracks des Albums via `GetTrackListByAlbum`
-- `PlaylistMenuTag(long PlaylistId, IReadOnlyList<string> Paths)`: Tag-Record für Playlist-Menüeinträge; enthält Pfade direkt (nicht mehr `ContentRow`) – vereinheitlicht Track-, Album- und Ordnerstruktur-Kontextmenüs
-- Rechtsklick auf Ordnerstruktur-Knoten (TreeView) öffnet ebenfalls das Playlist-Kontextmenü; bei Datei-Knoten wird nur dieser Track hinzugefügt, bei Ordner-Knoten werden rekursiv alle Tracks darunter via `GetTrackPathsUnderDirectory` gesammelt; leere Ordner (keine DB-Tracks) zeigen kein Menü
-- Alle ContextMenus, MenuItems und Separatoren in MainWindow erhalten durch Styles in `Application.Resources` (App.xaml) das aktive Farbschema (`AppSurfaceBrush`, `AppPrimaryTextBrush`, `AppSurfaceHoverBrush`, `AppGridLineBrush`); das ContextMenu-Template ersetzt `ContextMenuChrome` durch ein einfaches `Border`-Template ohne das hartkodierte weiße Icon-Band
-- Styles werden bei dynamisch erzeugten Menüs immer explizit via `Application.Current.Resources[typeof(...)]` gesetzt (nicht nur implizit), da ContextMenus beim Befüllen noch keinen logischen Elternknoten haben
-- **Playlist löschen**: Rechtsklick auf einen Playlist-Eintrag in der linken Sidebar öffnet ein Kontextmenü mit „Playlist löschen" (rot); löscht die Playlist aus der DB (`DeletePlaylist`), aktualisiert die Sidebar und navigiert bei aktiver Ansicht zur Tracks-Ansicht
-- **Track aus Playlist entfernen**: In der Playlist-Ansicht (nur wenn `_activePlaylistId` gesetzt) zeigt Rechtsklick auf einen Track das „Von Playlist entfernen"-Menü; nutzt `PlaylistEntryId` (gespeichert in `ContentRow.PlaylistEntryId` aus `playlist_tracks.id`) und ruft `RemoveTrackFromPlaylist` auf; danach wird die Playlist-Ansicht neu geladen
-- `_activePlaylistId` (Feld in MainWindow): wird in `ShowTopLevelViewAsync` gesetzt wenn eine Playlist-Ansicht geladen wird, sonst `null`; steuert den Kontextmenü-Zweig in `ContentDataGrid_OnPreviewMouseRightButtonDown`
-- `ContentRow.PlaylistEntryId`: speichert `playlist_tracks.id` für Zeilen in der Playlist-Ansicht; nur dort gesetzt
-- Neue Lokalisierungsschlüssel: `AddToPlaylist`, `NewPlaylist`, `NewPlaylistDialogTitle`, `NewPlaylistNameLabel`, `CreatePlaylist`, `TrackAddedToPlaylist`, `TracksAddedToPlaylist`, `DeletePlaylist`, `RemoveFromPlaylist`, `PlaylistDeleted`, `TrackRemovedFromPlaylist`, `SaveSmartPlaylist`, `SmartPlaylistSaved` – vollständig in DE/EN/FR vorhanden
+- Right-clicking a track, search result, album, or folder node offers existing playlists and **New playlist...**
+- Selecting a playlist immediately adds the track or all album tracks and updates the status bar
+- **New playlist...** opens `NewPlaylistDialog`; a name is required and Enter confirms
+- `Player/NewPlaylistDialog.xaml/.cs` is themed with dynamic brushes and a DWM-colored native title bar
+- `AppendPlaylistItems()` builds context-menu items dynamically
+- Album artwork cards extend their existing cover menu through `ContextMenu.Opened`
+- `GetPathsForRow()` returns one track path or all album tracks through `GetTrackListByAlbum`
+- `PlaylistMenuTag(long PlaylistId, IReadOnlyList<string> Paths)` stores paths directly
+- Folder nodes recursively collect tracks through `GetTrackPathsUnderDirectory`; empty folders have no menu
+- Main-window context menus use application theme resources and a custom border template without the default white icon strip
+- Dynamically created menu objects must receive their styles explicitly from `Application.Current.Resources[typeof(...)]`
+- **Delete playlist** appears in the sidebar playlist context menu, removes the database record, refreshes the sidebar, and returns to Tracks if needed
+- **Remove from playlist** appears only for regular playlist entries with a `PlaylistEntryId`
+- `_activePlaylistId` is set by `ShowTopLevelViewAsync` only for playlist views
+- `ContentRow.PlaylistEntryId` contains `playlist_tracks.id` only in regular playlist views
+- Playlist localization keys must exist in German, English, and French
 
-## Playlisten-Datenbankstruktur
+## Playlist Database Structure
 
-- Tabelle `playlists`: id, name, description, created_at, modified_at, `is_smart` (INTEGER 0/1), `filter_criteria` (TEXT JSON, nur bei Smart-Playlists)
-- Tabelle `playlist_tracks`: id, playlist_id (FK→playlists, CASCADE), track_id (FK→tracks, SET NULL), path, position (1-basiert, lückenlos), added_at
-- `track_id` ist nullable: Playlist-Einträge bleiben erhalten, wenn ein Track aus der Bibliothek entfernt wird; `path` ist immer gesetzt
-- Neue Spalten werden via `EnsureColumn` in Bestandsdatenbanken nachgerüstet (Schema-Migration bei DB-Open)
-- Verfügbare Methoden: `CreatePlaylist`, `CreateSmartPlaylist`, `UpdatePlaylist`, `DeletePlaylist`, `GetAllPlaylists` (inkl. TrackCount via JOIN), `GetPlaylistById`, `GetPlaylistTracks`, `AddTrackToPlaylist`, `RemoveTrackFromPlaylist`, `MovePlaylistTrack` (transaktional, nummeriert Positionen neu)
+- `playlists`: id, name, description, created_at, modified_at, `is_smart`, `filter_criteria`
+- `playlist_tracks`: id, playlist_id, nullable track_id, path, one-based contiguous position, added_at
+- Nullable `track_id` keeps playlist entries after a library track is removed; `path` is always present
+- `EnsureColumn` upgrades existing databases when new columns are introduced
+- Available methods include `CreatePlaylist`, `CreateSmartPlaylist`, `UpdatePlaylist`, `DeletePlaylist`, `GetAllPlaylists`, `GetPlaylistById`, `GetPlaylistTracks`, `AddTrackToPlaylist`, `RemoveTrackFromPlaylist`, and transactional `MovePlaylistTrack`
 
-## Performance-Maßnahmen
+## Performance Measures
 
-- `AudioDatabase.GetTracksLite()`: schlanke Abfrage (nur path, file_name, title, disc_number, track_number) – kein Cover-Art-BLOB, keine Lyrics; wird für die Ordnerstruktur-Ansicht verwendet
-- `AudioDatabase.GetArtistsLite()`: lädt für die Künstleransicht ausschließlich distinct-Künstlernamen direkt per SQL – keine vollständigen Track-Datensätze
-- `AudioDatabase.GetAlbumsLite(includeArtwork)`: lädt standardmäßig nur Album, Anzeige-Künstler und Jahr; Artwork-BLOBs werden nur für die Kachelansicht mitgeladen
-- `AudioDatabase.GetTrackList()`: lädt für die Trackliste nur die tatsächlich sichtbaren Spalten – kein Cover-Art-BLOB, keine Lyrics, kein Voll-`TrackRecord`
-- `AudioDatabase.GetTrackListByIds(ids)`: teilt große ID-Mengen in begrenzte SQL-Abfrageblöcke, damit große Bibliotheken und breite Filter-/Suchtreffer nicht die SQLite-Grenze für gebundene Variablen überschreiten
-- `AudioDatabase.GetTracksByDirectory(dirPath)`: SQL-LIKE-Abfrage auf Verzeichnis-Prefix + C#-Filter für direkte Kinder (kein `GetAll()` + LINQ)
-- `AudioDatabase.GetTrackPathsUnderDirectory(rootPath)`: wie GetTracksByDirectory, aber ohne C#-Filter – liefert alle Tracks rekursiv unterhalb des Wurzelpfads (für Ordnerstruktur-Kontextmenü)
-- Ordnerstruktur-Ansicht: lazy loading – `FolderTree`-Klasse baut eine in-memory Parent→Children-Map (O(1)-Lookup); WPF-`TreeViewItem`-Objekte werden erst beim Aufklappen eines Knotens erzeugt (`Expanded`-Event + Platzhalter-Technik)
-- WPF-TreeView: `VirtualizingStackPanel.IsVirtualizing="True"` + `VirtualizationMode=Recycling` – nur sichtbare Zeilen werden gerendert
-- `TrackLite`, `TrackListInfo`, `ArtistInfo` und `AlbumInfo` in `Player/Library/AudioDatabase.cs` halten Listenansichten bewusst schlank; vollständiger `TrackRecord` bleibt für Wiedergabe, Playlist- und Metadaten-Abfragen
-- Artwork wird nicht mehr pro Track gespeichert, sondern dedupliziert über `artworks`; dadurch bleiben Albumlisten trotz Cover-Unterstützung beherrschbar
-- `Player/Library/TrackSearchIndex.cs`: Lucene.NET-Dateiindex unter `%LOCALAPPDATA%\Player\search-index`; indiziert Track-Metadaten und technische Felder für performante Volltextsuche sowie getrennte Suchfelder für Tracktitel, Album, Track-Künstler und Album-Künstler, nutzt für die Suchfelder einen deutschen Analyzer plus Wildcard-Termqueries für Teilworttreffer und Umlaut-/ß-Varianten (`ü`/`ue`, `ä`/`ae`, `ö`/`oe`, `ß`/`ss`), wird beim ersten Start oder bei leer/veraltet erkanntem Index aus der DB aufgebaut, nach Scans inkrementell aktualisiert und entfernt bei Re-Scans verschwundene Dateien unter dem jeweiligen Bibliotheks-Root
+- `GetTracksLite()` loads only path, file name, title, disc number, and track number for the folder tree
+- `GetArtistsLite()` loads distinct artist names directly through SQL
+- `GetAlbumsLite(includeArtwork)` loads only album, display artist, and year unless artwork is requested
+- `GetTrackList()` loads only visible track-list columns
+- `GetTrackListByIds(ids)` batches large ID sets to stay below SQLite variable limits
+- `GetTracksByDirectory(dirPath)` uses an SQL prefix query plus a direct-child filter
+- `GetTrackPathsUnderDirectory(rootPath)` returns all recursive track paths below a root
+- Folder-tree lazy loading uses an in-memory parent-to-children map and creates WPF items only when expanded
+- TreeView virtualization uses recycling mode
+- `TrackLite`, `TrackListInfo`, `ArtistInfo`, and `AlbumInfo` remain intentionally small; `TrackRecord` is reserved for complete metadata operations
+- Artwork is deduplicated instead of stored per track
+- `TrackSearchIndex.cs` stores a Lucene.NET index under `%LOCALAPPDATA%\Player\search-index`, supports category-specific fields, partial words, and German umlaut/eszett variants, rebuilds stale indexes, updates incrementally after scans, and removes missing files below rescanned roots
 
-## Bekannte technische Details
+## Known Technical Details
 
-- Zielplattform: `net8.0-windows`, x64
-- Native DSD-Wiedergabe ist aktuell für `.dsf` und unkomprimierte Stereo-`.dff` implementiert
-- `.dff` mit DST-Kompression wird derzeit nicht nativ abgespielt
-- Ausgabearten sind im Settings-Modell vorbereitet: `ASIO`, `WASAPI`, `KernelStreaming`
-- `ASIO` und `WASAPI` sind echte Wiedergabe-Backend-Pfade
-- `KernelStreaming` ist vorbereitet, aber noch nicht implementiert
-- WASAPI wird derzeit für PCM-Wiedergabe genutzt; natives DSD bleibt ASIO vorbehalten
-- WASAPI läuft exklusiv und wählt für PCM das erste passende Stereoformat aus 32-Bit Float, 24-Bit PCM und 16-Bit PCM
-- WASAPI-Pause hält den exklusiven AudioClient aktiv und liefert über einen pausierbaren Provider Stille, damit Geräte den letzten Endpoint-Puffer nicht als kurzen Loop wiederholen; gepufferte Audiodaten bleiben für Resume erhalten
-- Transport-UI nutzt zentral drei selbst gezeichnete Vektor-Icons für Skip Back, Play/Pause und Skip Forward; der mittlere Button wechselt je nach Wiedergabestatus zwischen Play und Pause, an Queue-Anfang/-Ende werden die jeweiligen Navigationsbuttons deaktiviert
-- Seeking ist aktuell für ASIO-PCM, WASAPI-PCM sowie native DSF/DFF-Pfade implementiert
-- Playlist-Grundfunktion ist vorhanden: Einzeldatei oder Ordner laden, Doppelklick startet einen Eintrag, nach Titelende folgt automatisch der nächste
-- Playlist-Tabelle ist höhenbegrenzt und scrollbar, damit Transportelemente sichtbar bleiben
-- Lautstärkeregler wirkt auf PCM-Pfade; natives DSD bleibt bitgenau und wird nicht digital abgesenkt
-- Im ASIO-DSD-Modus zählt `preferredBufferSize` Samples, nicht Bytes; bei `ASIOSTDSDInt8*` werden daher `preferredBufferSize / 8` Bytes pro Kanal geschrieben
-- ASIO-Capability-Abfragen können fehlschlagen, wenn andere Programme das Gerät belegen
+- Target platform: `net8.0-windows`, x64
+- Native DSD supports `.dsf` and uncompressed stereo `.dff`
+- DST-compressed `.dff` is not played natively
+- Output types represented by settings: `ASIO`, `WASAPI`, `KernelStreaming`
+- ASIO and WASAPI are implemented; Kernel Streaming is not
+- WASAPI handles PCM only; native DSD remains ASIO-only
+- WASAPI runs exclusively and selects the first supported stereo format from 32-bit float, 24-bit PCM, and 16-bit PCM
+- WASAPI pause keeps the exclusive AudioClient running and supplies silence so drivers do not loop the final endpoint buffer; buffered audio remains available for resume
+- Transport uses custom vector icons for previous, play/pause, and next; unavailable queue directions are disabled
+- Seeking is implemented for ASIO PCM, WASAPI PCM, DSF, and DFF
+- Loading a file or folder builds a playback queue; completion advances automatically
+- The playlist table is height-limited and scrollable
+- Volume affects PCM paths; native DSD remains bit-perfect
+- In ASIO DSD mode, `preferredBufferSize` counts samples rather than bytes; `ASIOSTDSDInt8*` writes `preferredBufferSize / 8` bytes per channel
+- ASIO capability queries may fail while another application owns the device
 
-## UI-Leitlinie
+## UI Guidelines
 
-- **Hauptfenster** – dreispaltiges modernes Layout:
-  - Linke Sidebar (220 px, dunkel `#13142A`): Navigation mit Oberpunkten LOKALE BIBLIOTHEK (Künstler, Alben, Tracks, Ordnerstruktur) und PLAYLISTS (dynamisch aus DB); Geräte-Info oben; Einstellungen-Button unten
-- Über-Schaltfläche unten links oberhalb der Einstellungen öffnet ein thematisiertes About-Fenster mit Autor und Bibliothekslizenzen
-- Das About-Fenster weist zusätzlich auf ASIO als Marke/Software von Steinberg Media Technologies GmbH hin
-  - Rechter Inhaltsbereich: dunkler Header mit Titel + Anzahl als Fortsetzung der nativen Titelleiste/Sidebar; darunter je nach Ansicht ein `DataGrid` oder (für Ordnerstruktur) ein `TreeView`; Doppelklick startet Wiedergabe
-  - Transport-Leiste unten (dunkel, volle Breite): Now-Playing-Info links (Artwork, Titel, Künstler, Dateiinfo + Favoriten-Button), Steuerung (⏹ ▶ ⏸) + Positionsslider mittig, Lautstärke rechts
-- **Settings-Fenster**: zweispaltiges Layout – Navigationsleiste links, Inhalt rechts (Ausgabegerät / Bibliotheksverzeichnisse / Darstellung mit Farbschema und Sprache)
-- Die Navigation im Settings-Fenster verwendet dieselben thematisierten Sidebar-Ressourcen wie das Hauptfenster (Oberpunkte, Hover, Auswahl, Textfarben)
-- Alle Buttons im Settings-Fenster verwenden einen gemeinsamen Theme-Button-Stil; dynamisch erzeugte Scan-/Entfernen-Schaltflächen müssen diesen Stil ebenfalls übernehmen
-- ComboBoxen im Settings-Fenster verwenden thematisierte Eingabefarben; der Geräteinfo-Dialog folgt ebenfalls dem aktiven Theme inkl. nativer Titelleiste
-- DSD-Stufen in der Geräteinfo nutzen explizite Theme-Farben für unterstützt/nicht unterstützt; ComboBoxen benötigen eine vollständige Template-Färbung, nicht nur äußere Brush-Setter
-- **Start**: vor dem Hauptfenster erscheint ein Splashscreen, solange die initiale DB-Vorbereitung/Migration läuft
-- Geräteinfo zeigt Kanäle, Buffer, PCM-Sampleraten, DSD-Stufen und lesbar übersetzte Rohformate
-- Die native Windows-Titelleiste wird auf unterstützten Systemen per DWM farblich an die dunkle Sidebar angepasst; auf älteren Systemen bleibt der OS-Standard erhalten
-- Es gibt ein helles und ein dunkles Farbschema; Tabellen, Artworkansicht, Flächen und Textfarben werden über globale DynamicResources umgeschaltet
-- Sichtbare Haupttexte werden über `LocalizationManager`/Sprachressourcen verwaltet; aktuell vorhanden: Deutsch, Englisch, Französisch
-- Auch Settings-Dialog und zentrale Status-/Laufzeitmeldungen greifen auf die Sprachressourcen zu
-- Auch die Transportleiste unten folgt dem gewählten Farbschema; im hellen Theme wird sie hell gerendert
-- Sidebar-Hover und aktive Auswahl besitzen eigene Theme-Ressourcen, damit sie im hellen Farbschema nicht wie Fremdkörper aus dem dunklen Theme wirken
-- Die Einstellungen-Schaltfläche übernimmt dieselben Sidebar-Ressourcen; leere Now-Playing-Artworkflächen nutzen eine eigene thematisierte Placeholder-Farbe
-- Native Titelleisten von Haupt- und Settings-Fenster werden passend zum aktiven Theme eingefärbt; Trenner und Scrollbars nutzen ebenfalls Theme-Ressourcen
-- Tabellen, Listen und Baumansichten besitzen globale thematisierte Standardflächen, damit kein weißer WPF-Default-Hintergrund in dunklen Ansichten durchscheint
-- Das Hauptfenster überschreibt zusätzlich die DataGrid-Flächen inkl. ScrollViewer-Hintergrund lokal, damit auch die leeren Restbereiche neben Tabellen dunkel bleiben
-- DataGrid-Row-Header sind global deaktiviert (`HeadersVisibility="Column"`), damit links keine zusätzliche helle Auswahlspalte erscheint
+- The main window uses a modern sidebar, content area, and full-width transport bar
+- The 220 px sidebar contains Dashboard, local library navigation, playlists, device information, About, and Settings
+- About displays the author, library licenses, and the Steinberg ASIO trademark notice
+- The content header continues the native title-bar/sidebar appearance and shows title, count, search, filters, or album mode controls
+- The bottom transport bar shows artwork and track information, favorite state, playback controls, position, and volume
+- Settings uses a two-column layout with navigation on the left and content on the right
+- Settings navigation reuses the main sidebar theme resources
+- All Settings buttons use the shared themed button style, including dynamic scan and remove buttons
+- Settings ComboBoxes use fully themed templates; device information follows the active theme and title-bar color
+- DSD capability states use explicit supported and unsupported theme colors
+- A splash screen is shown while initial database preparation runs
+- Device information displays channels, buffer sizes, PCM rates, DSD levels, and readable raw formats
+- Supported Windows versions use DWM-colored native title bars; older versions keep the OS default
+- Light and dark themes switch global dynamic resources for tables, artwork, surfaces, text, transport, navigation, separators, and scrollbars
+- Visible primary text and runtime messages use `LocalizationManager`
+- Empty artwork areas use a dedicated placeholder resource
+- Tables, lists, and trees must not expose white WPF default backgrounds in dark mode
+- MainWindow also overrides DataGrid and ScrollViewer backgrounds locally
+- DataGrid row headers remain disabled through `HeadersVisibility="Column"`
 
 ## Dashboard
 
-- Oberster Navigationseintrag in der Sidebar (⊞ Dashboard, Tag `"Dashboard"`)
-- Zeigt eine scrollbare Übersichtsseite mit drei Abschnitten:
-  1. **Zuletzt hinzugefügte Alben**: horizontaler Cover-Scrollstreifen (bis 12 Alben); Klick auf eine Karte navigiert in die Album-Trackansicht (Dashboard wird auf den Navigationsstapel gelegt, Zurück-Button kehrt zurück)
-  2. **Kalender (Monatsansicht)**: Montag-erster 7-Spalten-Grid; Kopfzeile Mo–So; pro Zelle: Tagesnummer, Spielzeit `HH:mm`, Top-3-Genres; Heute-Tag farbig hervorgehoben; ◀/▶-Buttons navigieren monatsweise; Sektions-Titel zeigt Monatsname und Jahr
-  3. **Top 10 Genres**: absteigende Liste mit proportionalen Fortschrittsbalken und Spieldauer `HH:mm`; Farben aus `_genreColors`-Palette
-- `AudioDatabase.GetRecentAlbums(limit)`, `GetCalendarData(year, month)`, `GetTopGenres(limit)` liefern die Daten
-- `RecentAlbumInfo` und `CalendarDayData` sind neue Records in `AudioDatabase.cs`
-- Felder: `_dashboardYear`, `_dashboardMonth` (laufende Kalenderposition), `_calendarInner` (Referenz für Monats-Refresh), `_genreColors` (statische Farbpalette)
-- Kalender-Navigation ruft `BuildDashboardAsync()` neu auf (rebuild statt Partial-Update), damit der Sektions-Titel mitaktualisiert wird
-- `HorizontalAlignment.Center/Right` und `Brushes.Transparent` in Dashboard-Methoden müssen vollständig qualifiziert werden (`System.Windows.HorizontalAlignment`, `System.Windows.Media.Brushes`), da in `MainWindow`-Methoden `this.HorizontalAlignment` Vorrang hat
+- The top sidebar item has tag `"Dashboard"`
+- The page contains:
+  1. **Recently added albums**: horizontal artwork strip of up to 12 albums; selecting a card opens album tracks and supports Back navigation
+  2. **Calendar**: Monday-first month grid with day number, `HH:mm` playback time, top three genres, today highlight, and month navigation
+  3. **Top 10 genres**: descending proportional bars with `HH:mm` duration and `_genreColors`
+- Data comes from `GetRecentAlbums`, `GetCalendarData`, and `GetTopGenres`
+- `RecentAlbumInfo` and `CalendarDayData` are records in `AudioDatabase.cs`
+- `_dashboardYear`, `_dashboardMonth`, `_calendarInner`, and `_genreColors` hold dashboard state
+- Month navigation rebuilds the dashboard so the section title changes
+- Dashboard code must fully qualify `System.Windows.HorizontalAlignment` and `System.Windows.Media.Brushes` where member-name resolution would otherwise conflict
 
-## Inhaltsansichten (Hauptfenster)
+## Main Content Views
 
-- **Künstler**: distinct-Künstler-Liste (eine Zeile pro Künstler, alphabetisch); Doppelklick öffnet die Alben, auf denen dieser Künstler vorkommt
-- **Alben**: normalisierte Album-Liste (eine Zeile pro eindeutigem Albumtitel; alphabetisch nach Albumtitel aufsteigend; Spalten: Herz, kleines 96px-Thumbnail, Album, Album-Künstler, Jahr) plus umschaltbare Artwork-Kachelansicht. In der Albumansicht wird der Album-Künstler gezeigt, bei mehreren Album-Interpreten nur der erste; Track-Interpreten werden dafür nicht zusammengeführt. Kacheln verwenden 320px-Thumbnails; sowohl Tabellen-Thumbnails als auch Kachelbilder werden erst beim Laden sichtbarer Elemente in `ImageSource` umgewandelt. Doppelklick auf ein Album öffnet eine nach diesem Album gefilterte Trackansicht.
-- `ContentRow` implementiert `INotifyPropertyChanged`, damit nachträglich geladene Thumbnails/Artworks sofort sichtbar werden und nicht erst nach Scroll-Recycling der UI.
-- **Now Playing**: zeigt links neben den Titelinformationen ein 96px-Thumbnail des gerade laufenden Tracks; rechts daneben ein Favoriten-Herz-Button (`♡`/`♥`), der den aktuell abgespielten Track sofort als Favorit markiert oder entmarkiert und den Status in DB und ggf. sichtbarer Trackliste reflektiert; der Button ist deaktiviert, wenn kein Track in der DB gefunden wird
-- `Player/Controls/VirtualizingWrapPanel.cs`: eigenes virtualisierendes WrapPanel für die Album-Artwork-Kacheln; hält das Coverraster visuell bei, materialisiert aber nur sichtbare Elemente
-- **Album-Trackansicht**: nutzt `AudioDatabase.GetTrackListByAlbum(albumId)`, sortiert nach Disc → Tracknummer → Dateiname; Doppelklick startet einen Track und verwendet alle sichtbaren Albumtitel als Queue, sodass nach Titelende automatisch der nächste Albumtitel folgt. Über der Trackliste steht mittig ein Albumkopf mit großem 240px-Cover, Albumtitel, Album-Interpret und optionalem Jahr; Cover können dort über dieselbe manuelle MusicBrainz-Suche wie in der Albumansicht gesucht, neu zugeordnet oder per Kontextmenü gelöscht werden.
-- **Favoriten**: Künstler-, Album- und Tracklisten zeigen eine Herzspalte (`♡`/`♥`) zum direkten Umschalten des jeweiligen `is_favorite`-Flags; Album-Kacheln zeigen ebenfalls ein Herz.
-- **Zurück-Navigation**: interne Drill-downs merken sich die vorherige Auswahl. Von Albumtracks geht es zurück zum zuvor gewählten Album; von Künstleralben zurück zum zuvor gewählten Künstler. Die Schaltfläche im Header nutzt ein appliktionskonformes, pillenförmiges Icon-Button-Design mit Chevron.
-- Ein expliziter Klick auf einen Eintrag der linken Hauptnavigation setzt alle internen Drill-down-Filter zurück; Sidebar-Navigation zeigt immer die ungefilterte Top-Level-Ansicht. Auch erneutes Anklicken des bereits markierten Sidebar-Eintrags stellt die ungefilterte Hauptansicht wieder her.
-- **Tracks**: alle Tracks sortiert nach Titel; Doppelklick spielt Track und baut Queue aus allen sichtbaren Einträgen. Im Header steht ein Filter-Dropdown: Favoriten liegt direkt auf oberster Ebene, Genre, Audiotyp und Bitrate sind standardmäßig eingeklappt und einzeln aufklappbar; die Werte sind per Checkbox kombinierbar, jede Facette zeigt die unter den übrigen aktiven Filtern verfügbare Trefferzahl und blendet nicht mehr passende, nicht ausgewählte Werte aus.
-- **Suche**: Eingabefeld im Header; Suchanfragen werden kurz verzögert gegen den Lucene.NET-Index ausgeführt und liefern eine dreigeteilte Ergebnisseite für Tracks, Alben und Künstler. Die Suche unterstützt Teilwörter (`Daf` oder `aft` findet `Daft`) und deutsche Ähnlichkeits-/Normalisierungsvarianten für Umlaute und ß. Die Track-Sektion sucht in Tracktitel, Albumname und Track-Künstler, die Album-Sektion in Albumname und Album-Künstler, die Künstler-Sektion nur im Künstlernamen; leere Sektionen zeigen einen lokalisierten Hinweis mit dem Suchbegriff. Suchergebnisse werden nach Lucene-Rang und bei gleichem Rang alphabetisch nach dem jeweiligen Anzeigenamen sortiert. Die drei Bereiche erscheinen als thematisierte Karten mit Mindesthöhe statt als gequetschte Standardtabellen. Doppelklick auf Tracks spielt die sichtbare Trefferliste, Doppelklick auf ^1  Alben/Künstler nutzt dieselben Drill-downs wie die Hauptnavigation.
-- Drill-downs aus der Suchseite merken sich die ursprüngliche Suchanfrage; die Zurück-Schaltfläche führt wieder auf dieselbe Ergebnisansicht mit identischem Suchstand zurück
-- **Ordnerstruktur**: `TreeView` (statt DataGrid); Wurzelelemente sind die in den Einstellungen konfigurierten Bibliotheksverzeichnisse (voller Pfad als Label, initial aufgeklappt); Unterordner werden mit Ordnernamen angezeigt und sind initial zugeklappt; Tracks als Blattknoten (Titel oder Dateiname); Doppelklick auf einen Track spielt alle Tracks desselben Ordners als Queue ab (sortiert nach Disc → Track-Nr. → Dateiname)
-- **Playlists**: Playlist-Tracks mit Positions-Nr., Titel, Künstler, Album, Dauer; Playlists erscheinen automatisch in der linken Sidebar unter PLAYLISTS; Klick öffnet die Track-Liste, Doppelklick startet Wiedergabe
-- **Intelligente Playlists (Smart Playlists)**: Speichern keine Track-Liste, sondern Filter-Kriterien als JSON (`SmartPlaylistCriteria`); beim Öffnen werden die Tracks live anhand der gespeicherten Kriterien aus der DB abgefragt. Erkennbar am ⚡-Icon (gold) vor dem Namen in der Sidebar. Tracks in Smart-Playlists haben kein `PlaylistEntryId` und können nicht per Rechtsklick entfernt werden.
-- **Smart-Playlist speichern**: Im Tracks-Header erscheint neben dem Filter-Button ein `⚡ Als Smart-Playlist speichern`-Button (nur in der Tracks-Ansicht sichtbar); er ist nur aktiv wenn mindestens ein Filter gesetzt ist (`HasActiveFilters`); Klick öffnet `NewPlaylistDialog`, serialisiert die aktuellen Filter und ruft `CreateSmartPlaylist` auf
-- Tracks und Alben können per Rechtsklick-Kontextmenü zu bestehenden Playlisten hinzugefügt oder eine neue Playlist dafür erstellt werden (gilt für ContentDataGrid, AlbumArtworkListBox, Suchergebnis-DataGrids und die Ordnerstruktur-TreeView)
+- **Artists**: distinct alphabetical artist list; double-click opens albums containing that artist
+- **Albums**: normalized unique-title list with favorite, 96 px thumbnail, album, album artist, and year, plus a switchable artwork grid using 320 px thumbnails
+- Album views show the album artist rather than combining track artists; when multiple album artists exist, the first is used
+- Album images are converted to `ImageSource` only when visible elements load
+- `ContentRow` implements `INotifyPropertyChanged` so asynchronously loaded artwork appears immediately
+- **Now Playing**: shows a 96 px thumbnail and track favorite button; the button is disabled when the current file has no database track
+- `VirtualizingWrapPanel.cs` materializes only visible artwork cards
+- **Album tracks**: `GetTrackListByAlbum(albumId)` sorts by disc, track number, and file name; playback queues all visible album tracks
+- The album-track view has a centered header with a large 240 px cover, album title, album artist, and optional year; artwork can be searched, reassigned, or deleted
+- **Favorites**: artist, album, and track lists and album cards can toggle their direct favorite flags
+- **Back navigation**: drill-downs remember the previous selection and use a themed pill-shaped chevron button
+- Explicit sidebar navigation clears drill-down filters, including when the already selected item is clicked again
+- **Tracks**: title-sorted list with combinable Favorites, Genre, Audio Type, and Bitrate facets; counts reflect the other active filters and unavailable unselected values are hidden
+- **Search**: delayed Lucene search returns separate themed Track, Album, and Artist sections, supports partial words and German normalization variants, sorts by score then display name, and preserves the original query across drill-down Back navigation
+- **Folder structure**: configured library roots start expanded; child folders load lazily; double-clicking a track queues its direct folder sorted by disc, track number, and file name
+- **Playlists**: display position, title, artist, album, and duration; sidebar entries open their live track list
+- **Smart playlists**: store JSON criteria instead of track rows, show a gold lightning icon, resolve live when opened, and do not permit manual entry removal
+- **Save smart playlist**: available in Tracks only when filters are active; opens `NewPlaylistDialog`, serializes criteria, and calls `CreateSmartPlaylist`
+- Tracks, albums, search results, and folder-tree nodes support playlist context menus
 
-## Pflegehinweis
+## Maintenance Requirement
 
-Diese Datei bei Architektur-, Build- oder Verhaltensänderungen mitpflegen.
+Keep this file updated whenever architecture, build behavior, or user-visible
+behavior changes.
 
-## Lokalisierungsregel
+Update `README.md` whenever features, requirements, build steps, supported
+formats, or known limitations change so the public GitHub documentation matches
+the actual project.
 
-- Neue sichtbare UI-Texte und neue Status-/Fehlermeldungen dürfen nicht hart im XAML oder Code-Behind verdrahtet werden.
-- Alle Texte müssen über `Player/Localization/` ausgelagert werden.
-- Bei neuen oder geänderten Texten sind alle unterstützten Sprachen vollständig mitzuführen: aktuell Deutsch, Englisch und Französisch.
-- Änderungen gelten erst als vollständig, wenn die neuen Texte in allen Sprachressourcen abgelegt und sinnvoll übersetzt sind.
+## Localization Rule
 
-## Settings-Layout-Regel
+- Do not hard-code new visible UI text or status/error messages in XAML or code-behind
+- Store all such text under `Player/Localization/`
+- Every new or changed string must be provided in German, English, and French
+- A text change is complete only after all supported language resources contain meaningful translations
 
-- Eingabefelder im Einstellungen-Dialog folgen einheitlich dem Muster: Label in einer eigenen Zeile, darunter das zugehörige Feld über die verfügbare Breite.
-- Neue ComboBoxen oder vergleichbare Eingaben dürfen nicht daneben in Sonderlayouts gesetzt werden, sofern es keinen klaren funktionalen Grund dafür gibt.
+## Settings Layout Rule
+
+- Settings inputs use a label on its own row with the field below it using the available width
+- Do not place new ComboBoxes or similar inputs beside labels in special layouts unless there is a clear functional reason
