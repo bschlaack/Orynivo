@@ -11,6 +11,7 @@ public sealed class AppSettings
     public List<string> LibraryPaths { get; set; } = [];
     public string LastMainView { get; set; } = "Tracks";
     public bool AlbumArtworkView { get; set; }
+    public bool ArtistArtworkView { get; set; }
     public double Volume { get; set; } = 1.0;
     public string? LastTrackPath { get; set; }
     public AppTheme Theme { get; set; } = AppTheme.Dark;

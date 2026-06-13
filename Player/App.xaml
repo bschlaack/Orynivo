@@ -152,6 +152,11 @@
         <sys:String x:Key="L_ShowLyrics" xmlns:sys="clr-namespace:System;assembly=mscorlib">Songtext anzeigen</sys:String>
         <sys:String x:Key="L_RefreshLyrics" xmlns:sys="clr-namespace:System;assembly=mscorlib">Songtext neu laden</sys:String>
         <sys:String x:Key="L_CloseLyrics" xmlns:sys="clr-namespace:System;assembly=mscorlib">Songtext schließen</sys:String>
+        <sys:String x:Key="L_ArtistInfo" xmlns:sys="clr-namespace:System;assembly=mscorlib">Künstlerinfo</sys:String>
+        <sys:String x:Key="L_ShowArtistInfo" xmlns:sys="clr-namespace:System;assembly=mscorlib">Künstlerinfo anzeigen</sys:String>
+        <sys:String x:Key="L_RefreshArtistInfo" xmlns:sys="clr-namespace:System;assembly=mscorlib">Künstlerinfo neu laden</sys:String>
+        <sys:String x:Key="L_CloseArtistInfo" xmlns:sys="clr-namespace:System;assembly=mscorlib">Künstlerinfo schließen</sys:String>
+        <sys:String x:Key="L_ArtistInfoSource" xmlns:sys="clr-namespace:System;assembly=mscorlib">Quelle: Wikipedia</sys:String>
         <sys:String x:Key="L_OptimizeDatabase" xmlns:sys="clr-namespace:System;assembly=mscorlib">Datenbank optimieren</sys:String>
         <sys:String x:Key="L_RepairAlbumArtwork" xmlns:sys="clr-namespace:System;assembly=mscorlib">Album-Cover reparieren</sys:String>
         <sys:String x:Key="L_Save" xmlns:sys="clr-namespace:System;assembly=mscorlib">Speichern</sys:String>

@@ -1035,6 +1035,88 @@
                 </ListBox.ItemTemplate>
             </ListBox>
 
+            <!-- Künstler-Bildansicht -->
+            <ListBox x:Name="ArtistArtworkListBox"
+                     Grid.Row="1"
+                     Visibility="Collapsed"
+                     Background="{DynamicResource AppContentBrush}"
+                     BorderThickness="0"
+                     ScrollViewer.CanContentScroll="True"
+                     VirtualizingPanel.IsVirtualizing="True"
+                     VirtualizingPanel.VirtualizationMode="Recycling"
+                     MouseDoubleClick="ArtistArtworkListBox_OnMouseDoubleClick">
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <controls:VirtualizingWrapPanel Margin="16"
+                                                        ItemWidth="216"
+                                                        ItemHeight="260"/>
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="Padding" Value="0"/>
+                        <Setter Property="BorderThickness" Value="0"/>
+                        <EventSetter Event="Loaded" Handler="ArtistArtworkItem_OnLoaded"/>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Border Width="200"
+                                Margin="8"
+                                Padding="10"
+                                Background="{DynamicResource AppSurfaceBrush}"
+                                CornerRadius="8">
+                            <StackPanel>
+                                <Border Width="180"
+                                        Height="180"
+                                        Background="{DynamicResource AppArtworkPlaceholderBrush}"
+                                        CornerRadius="90"
+                                        ClipToBounds="True">
+                                    <Grid>
+                                        <Image Source="{Binding Artwork}"
+                                               Stretch="UniformToFill"/>
+                                        <TextBlock Text="♪"
+                                                   FontSize="42"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource AppMutedTextBrush}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Artwork}" Value="{x:Null}">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Grid>
+                                </Border>
+                                <TextBlock Text="{Binding Title}"
+                                           Margin="0,10,0,0"
+                                           FontSize="15"
+                                           FontWeight="SemiBold"
+                                           TextAlignment="Center"
+                                           Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                           TextTrimming="CharacterEllipsis"/>
+                                <Button Content="{Binding FavoriteGlyph}"
+                                        Tag="{Binding}"
+                                        Margin="0,6,0,0"
+                                        HorizontalAlignment="Center"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Foreground="#6C63FF"
+                                        FontSize="17"
+                                        Cursor="Hand"
+                                        Click="FavoriteButton_OnClick"/>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
             <!-- Songtextansicht -->
             <Grid x:Name="LyricsView"
                   Grid.Row="1"
@@ -1131,6 +1213,97 @@
                     </Grid>
                 </Grid>
             </Grid>
+
+            <!-- Künstlerinfoansicht -->
+            <Grid x:Name="ArtistInfoView"
+                  Grid.Row="1"
+                  Visibility="Collapsed"
+                  Background="{DynamicResource AppContentBrush}"
+                  Panel.ZIndex="21">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <Grid Margin="60,30,60,50">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid Grid.Row="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="ArtistInfoTitleTextBlock"
+                                       FontSize="28"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                       VerticalAlignment="Center"/>
+                            <Button x:Name="RefreshArtistInfoButton"
+                                    Grid.Column="1"
+                                    Style="{StaticResource TransportBtnStyle}"
+                                    Margin="0,0,8,0"
+                                    ToolTip="{DynamicResource L_RefreshArtistInfo}"
+                                    Click="RefreshArtistInfoButton_OnClick">
+                                <TextBlock Text="↻" FontSize="18"/>
+                            </Button>
+                            <Button Grid.Column="2"
+                                    Style="{StaticResource TransportBtnStyle}"
+                                    ToolTip="{DynamicResource L_CloseArtistInfo}"
+                                    Click="CloseArtistInfoButton_OnClick">
+                                <TextBlock Text="×" FontSize="20"/>
+                            </Button>
+                        </Grid>
+                        <Border Grid.Row="1"
+                                Width="360"
+                                Height="360"
+                                Margin="0,28,0,28"
+                                HorizontalAlignment="Center"
+                                Background="{DynamicResource AppArtworkPlaceholderBrush}"
+                                CornerRadius="12"
+                                ClipToBounds="True">
+                            <Grid>
+                                <Image x:Name="ArtistInfoImage"
+                                       Stretch="Uniform"/>
+                                <TextBlock x:Name="ArtistInfoImagePlaceholder"
+                                           Text="♪"
+                                           FontSize="72"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource AppMutedTextBrush}"/>
+                            </Grid>
+                        </Border>
+                        <TextBlock x:Name="ArtistInfoBiographyTextBlock"
+                                   Grid.Row="2"
+                                   MaxWidth="900"
+                                   FontSize="20"
+                                   LineHeight="31"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Left"
+                                   HorizontalAlignment="Center"
+                                   Foreground="{DynamicResource AppPrimaryTextBrush}"/>
+                        <Button x:Name="ArtistInfoSourceButton"
+                                Grid.Row="3"
+                                Margin="0,26,0,0"
+                                Padding="14,7"
+                                HorizontalAlignment="Center"
+                                Visibility="Collapsed"
+                                Style="{StaticResource HeaderFilterButtonStyle}"
+                                Content="{DynamicResource L_ArtistInfoSource}"
+                                Click="ArtistInfoSourceButton_OnClick"/>
+                    </Grid>
+                </ScrollViewer>
+                <TextBlock x:Name="ArtistInfoStatusTextBlock"
+                           Margin="60"
+                           FontSize="22"
+                           FontWeight="SemiBold"
+                           TextWrapping="Wrap"
+                           TextAlignment="Center"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource AppPrimaryTextBrush}"/>
+            </Grid>
         </Grid>
 
         <!-- ═══ TRANSPORT BAR ═══ -->
@@ -1152,6 +1325,7 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <Border Width="42" Height="42" Background="{DynamicResource AppArtworkPlaceholderBrush}" CornerRadius="5">
                         <Image x:Name="NowPlayingArtworkImage" Stretch="UniformToFill"/>
@@ -1167,8 +1341,21 @@
                                    Foreground="#44445A" FontSize="10" Margin="0,2,0,0"
                                    TextTrimming="CharacterEllipsis"/>
                     </StackPanel>
-                    <Button x:Name="LyricsButton"
+                    <Button x:Name="ArtistInfoButton"
                             Grid.Column="2"
+                            Style="{StaticResource TransportBtnStyle}"
+                            Margin="8,0,0,0"
+                            IsEnabled="False"
+                            ToolTip="{DynamicResource L_ShowArtistInfo}"
+                            Click="ArtistInfoButton_OnClick">
+                        <TextBlock Text="i"
+                                   FontFamily="Segoe UI"
+                                   FontStyle="Italic"
+                                   FontWeight="Bold"
+                                   FontSize="15"/>
+                    </Button>
+                    <Button x:Name="LyricsButton"
+                            Grid.Column="3"
                             Style="{StaticResource TransportBtnStyle}"
                             Margin="8,0,0,0"
                             IsEnabled="False"
@@ -1178,7 +1365,7 @@
                                    FontSize="16"/>
                     </Button>
                     <Button x:Name="NowPlayingFavoriteButton"
-                            Grid.Column="3"
+                            Grid.Column="4"
                             Style="{StaticResource TransportBtnStyle}"
                             Margin="8,0,0,0"
                             IsEnabled="False"

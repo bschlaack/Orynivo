@@ -89,6 +89,11 @@ public static class LibraryBackupService
                         : 15 + (int)(25d * copiedArtworkFiles / artworkFiles.Count);
                     Report(progress, percentage, Path.GetFileName(file));
                 });
+            CopyDirectory(
+                Path.Combine(playerDataRoot, "artist-images"),
+                Path.Combine(stagingRoot, "artist-images"),
+                cancellationToken,
+                file => Report(progress, 40, Path.GetFileName(file)));
 
             var destinationDirectory = Path.GetDirectoryName(destinationPath);
             if (!string.IsNullOrWhiteSpace(destinationDirectory))
@@ -127,13 +132,17 @@ public static class LibraryBackupService
         var rollbackRoot = CreateTemporaryDirectory();
         var targetDatabase = Path.Combine(playerDataRoot, "library.db");
         var targetArtworks = Path.Combine(playerDataRoot, "artworks");
+        var targetArtistImages = Path.Combine(playerDataRoot, "artist-images");
         var targetSearchIndex = Path.Combine(playerDataRoot, "search-index");
         var rollbackDatabase = Path.Combine(rollbackRoot, "library.db");
         var rollbackArtworks = Path.Combine(rollbackRoot, "artworks");
+        var rollbackArtistImages = Path.Combine(rollbackRoot, "artist-images");
         var existingDatabaseMoved = false;
         var existingArtworksMoved = false;
+        var existingArtistImagesMoved = false;
         var importedDatabaseInstalled = false;
         var importedArtworksInstalled = false;
+        var importedArtistImagesInstalled = false;
 
         try
         {
@@ -171,6 +180,11 @@ public static class LibraryBackupService
                 Directory.Move(targetArtworks, rollbackArtworks);
                 existingArtworksMoved = true;
             }
+            if (Directory.Exists(targetArtistImages))
+            {
+                Directory.Move(targetArtistImages, rollbackArtistImages);
+                existingArtistImagesMoved = true;
+            }
 
             File.Copy(importedDatabase, targetDatabase);
             importedDatabaseInstalled = true;
@@ -193,6 +207,16 @@ public static class LibraryBackupService
                         Report(progress, percentage, Path.GetFileName(file));
                     });
             }
+            var importedArtistImages = Path.Combine(stagingRoot, "artist-images");
+            if (Directory.Exists(importedArtistImages))
+            {
+                importedArtistImagesInstalled = true;
+                CopyDirectory(
+                    importedArtistImages,
+                    targetArtistImages,
+                    cancellationToken,
+                    file => Report(progress, 68, Path.GetFileName(file)));
+            }
             Report(progress, 70, "library.db");
             RebaseArtworkPaths(
                 targetDatabase,
@@ -204,6 +228,7 @@ public static class LibraryBackupService
                         : 70 + (int)(8d * current / total);
                     Report(progress, percentage, file);
                 });
+            RebaseArtistImagePaths(targetDatabase, targetArtistImages);
 
             if (rebuildSearchIndex)
             {
@@ -233,10 +258,14 @@ public static class LibraryBackupService
             CloseDatabaseSidecarFiles(targetDatabase);
             if (importedArtworksInstalled)
                 TryDeleteDirectory(targetArtworks);
+            if (importedArtistImagesInstalled)
+                TryDeleteDirectory(targetArtistImages);
             if (existingDatabaseMoved && File.Exists(rollbackDatabase))
                 File.Move(rollbackDatabase, targetDatabase);
             if (existingArtworksMoved && Directory.Exists(rollbackArtworks))
                 Directory.Move(rollbackArtworks, targetArtworks);
+            if (existingArtistImagesMoved && Directory.Exists(rollbackArtistImages))
+                Directory.Move(rollbackArtistImages, targetArtistImages);
             throw;
         }
         finally
@@ -311,6 +340,33 @@ public static class LibraryBackupService
             update.Parameters.AddWithValue("$id", row.Id);
             update.ExecuteNonQuery();
             progress?.Invoke(index + 1, rows.Count, row.Hash + originalExtension);
+        }
+        transaction.Commit();
+    }
+
+    private static void RebaseArtistImagePaths(string databasePath, string artistImageRoot)
+    {
+        using var connection = new SqliteConnection($"Data Source={databasePath}");
+        connection.Open();
+        using var select = connection.CreateCommand();
+        select.CommandText = "SELECT id, image_path FROM artists WHERE image_path IS NOT NULL;";
+        using var reader = select.ExecuteReader();
+        var rows = new List<(long Id, string Path)>();
+        while (reader.Read())
+            rows.Add((reader.GetInt64(0), reader.GetString(1)));
+        reader.Close();
+
+        using var transaction = connection.BeginTransaction();
+        foreach (var row in rows)
+        {
+            using var update = connection.CreateCommand();
+            update.Transaction = transaction;
+            update.CommandText = "UPDATE artists SET image_path = $path WHERE id = $id;";
+            update.Parameters.AddWithValue(
+                "$path",
+                Path.Combine(artistImageRoot, Path.GetFileName(row.Path)));
+            update.Parameters.AddWithValue("$id", row.Id);
+            update.ExecuteNonQuery();
         }
         transaction.Commit();
     }

@@ -118,4 +118,13 @@ public sealed record LocalizedStrings(
     string LyricsDownloading,
     string LyricsUnavailable,
     string LyricsNotFound,
-    string LyricsDownloadFailed);
+    string LyricsDownloadFailed,
+    string ArtistInfo,
+    string ShowArtistInfo,
+    string RefreshArtistInfo,
+    string CloseArtistInfo,
+    string ArtistInfoLoading,
+    string ArtistInfoDownloading,
+    string ArtistInfoNotFound,
+    string ArtistInfoDownloadFailed,
+    string ArtistInfoSource);

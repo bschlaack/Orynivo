@@ -1,4 +1,5 @@
 using System.IO;
+using System.Diagnostics;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -36,8 +37,12 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _transportTimer;
     private bool _isSeekingWithSlider;
     private bool _showAlbumArtworkView;
+    private bool _showArtistArtworkView;
     private long? _currentPlayHistoryId;
     private long? _currentTrackId;
+    private long? _currentArtistId;
+    private string? _currentArtistName;
+    private string? _artistInfoSourceUrl;
     private bool  _currentTrackIsFavorite;
     private long? _activePlaylistId;
     private long? _activeAlbumFilterId;
@@ -51,13 +56,16 @@ public partial class MainWindow : Window
     private readonly HashSet<string> _selectedTrackFormats = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<int> _selectedTrackBitrates = [];
     private readonly HashSet<string> _expandedTrackFilterSections = new(StringComparer.Ordinal);
+    private readonly HashSet<long> _artistProfilesLoading = [];
 
     private readonly ObservableCollection<PlaylistItem> _queue = [];
     private readonly ObservableCollection<LyricLineViewModel> _lyricLines = [];
     private int _queueIndex = -1;
     private string _currentFilePath = string.Empty;
     private CancellationTokenSource? _lyricsCts;
+    private CancellationTokenSource? _artistProfileCts;
     private int _activeLyricIndex = -1;
+    private bool _updatingViewMode;
 
     private int _dashboardYear;
     private int _dashboardMonth;
@@ -104,8 +112,13 @@ public partial class MainWindow : Window
         public string? Year        { get; init; }
         public string? Genre       { get; init; }
         public string? Folder      { get; init; }
-        public string? ArtworkPath { get; init; }
-        public string? ThumbnailPath { get; init; }
+        public string? ArtworkPath { get; set; }
+        public string? ThumbnailPath { get; set; }
+        public string? Biography { get; set; }
+        public string? SourceUrl { get; set; }
+        public string? ProfileLanguage { get; set; }
+        public long? ProfileFetchedAt { get; set; }
+        public string EntityType { get; init; } = "Track";
         private ImageSource? _artwork;
         private ImageSource? _thumbnail;
         public ImageSource? Artwork
@@ -189,6 +202,7 @@ public partial class MainWindow : Window
         LoadSettings();
         LoadNavPlaylists();
         _showAlbumArtworkView = _settings.AlbumArtworkView;
+        _showArtistArtworkView = _settings.ArtistArtworkView;
         VolumeSlider.Value = Math.Clamp(_settings.Volume, 0, 1);
         AlbumArtworkViewRadioButton.IsChecked = _showAlbumArtworkView;
         AlbumTableViewRadioButton.IsChecked = !_showAlbumArtworkView;
@@ -251,6 +265,7 @@ public partial class MainWindow : Window
             _settings.LastMainView = tag;
         }
         _settings.AlbumArtworkView = _showAlbumArtworkView;
+        _settings.ArtistArtworkView = _showArtistArtworkView;
         _settings.Volume = VolumeSlider.Value;
         _settings.LastTrackPath = File.Exists(_currentFilePath) ? _currentFilePath : null;
         _settingsStore.Save(_settings);
@@ -284,8 +299,12 @@ public partial class MainWindow : Window
                 artworkPaths?.Thumb320Path ?? artworkPaths?.OriginalPath,
                 900);
             var trackInfo = db.GetTrackIdAndFavorite(path);
+            var artist = db.GetArtistByTrackPath(path);
             _currentTrackId = trackInfo?.Id;
             _currentTrackIsFavorite = trackInfo?.IsFavorite ?? false;
+            _currentArtistId = artist?.Id;
+            _currentArtistName = artist?.Artist;
+            ArtistInfoButton.IsEnabled = artist is not null;
             UpdateNowPlayingFavoriteButton();
             LyricsButton.IsEnabled = true;
             _ = LoadLyricsForTrackAsync(path, forceRefresh: false);
@@ -300,9 +319,12 @@ public partial class MainWindow : Window
             NowPlayingArtworkImage.Source = null;
             LyricsBackgroundImage.Source = null;
             _currentTrackId = null;
+            _currentArtistId = null;
+            _currentArtistName = null;
             _currentTrackIsFavorite = false;
             UpdateNowPlayingFavoriteButton();
             LyricsButton.IsEnabled = false;
+            ArtistInfoButton.IsEnabled = false;
         }
     }
 
@@ -401,6 +423,7 @@ public partial class MainWindow : Window
     private async Task ShowTopLevelViewAsync(string tag)
     {
         LyricsView.Visibility = Visibility.Collapsed;
+        ArtistInfoView.Visibility = Visibility.Collapsed;
         _activePlaylistId = tag.StartsWith("Playlist:") &&
                             long.TryParse(tag.AsSpan("Playlist:".Length), out long parsedPid)
             ? parsedPid : null;
@@ -420,7 +443,9 @@ public partial class MainWindow : Window
         DashboardScrollViewer.Visibility = Visibility.Collapsed;
         HideAlbumDetailHeader();
         ContentCountTextBlock.Text  = "";
-        AlbumViewModeBorder.Visibility = tag == "Albums" ? Visibility.Visible : Visibility.Collapsed;
+        AlbumViewModeBorder.Visibility = tag is "Albums" or "Artists" ? Visibility.Visible : Visibility.Collapsed;
+        if (tag is "Albums" or "Artists")
+            SetViewModeButtons(tag == "Albums" ? _showAlbumArtworkView : _showArtistArtworkView);
         TrackFilterButton.Visibility = tag == "Tracks" ? Visibility.Visible : Visibility.Collapsed;
         SaveSmartPlaylistButton.Visibility = tag == "Tracks" ? Visibility.Visible : Visibility.Collapsed;
         if (tag == "Tracks") UpdateSaveSmartPlaylistButtonState();
@@ -430,6 +455,7 @@ public partial class MainWindow : Window
             ContentDataGrid.Visibility = Visibility.Collapsed;
             FolderTreeView.Visibility  = Visibility.Collapsed;
             AlbumArtworkListBox.Visibility = Visibility.Collapsed;
+            ArtistArtworkListBox.Visibility = Visibility.Collapsed;
             DashboardScrollViewer.Visibility = Visibility.Visible;
             await ShowDashboardAsync();
         }
@@ -438,6 +464,7 @@ public partial class MainWindow : Window
             ContentDataGrid.Visibility = Visibility.Collapsed;
             FolderTreeView.Visibility  = Visibility.Visible;
             AlbumArtworkListBox.Visibility = Visibility.Collapsed;
+            ArtistArtworkListBox.Visibility = Visibility.Collapsed;
 
             var tracks = await Task.Run(() =>
             {
@@ -450,11 +477,17 @@ public partial class MainWindow : Window
         }
         else
         {
-            ContentDataGrid.Visibility = tag == "Albums" && _showAlbumArtworkView
+            var showArtwork = tag == "Albums"
+                ? _showAlbumArtworkView
+                : tag == "Artists" && _showArtistArtworkView;
+            ContentDataGrid.Visibility = showArtwork
                 ? Visibility.Collapsed
                 : Visibility.Visible;
             FolderTreeView.Visibility  = Visibility.Collapsed;
             AlbumArtworkListBox.Visibility = tag == "Albums" && _showAlbumArtworkView
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            ArtistArtworkListBox.Visibility = tag == "Artists" && _showArtistArtworkView
                 ? Visibility.Visible
                 : Visibility.Collapsed;
 
@@ -464,6 +497,7 @@ public partial class MainWindow : Window
             ApplyColumns(tag);
             ContentDataGrid.ItemsSource = rows;
             AlbumArtworkListBox.ItemsSource = tag == "Albums" ? rows : null;
+            ArtistArtworkListBox.ItemsSource = tag == "Artists" ? rows : null;
             ContentCountTextBlock.Text  = rows.Count == 1 ? "1 Eintrag" : $"{rows.Count:N0} Einträge";
         }
     }
@@ -559,6 +593,13 @@ public partial class MainWindow : Window
                         Id       = a.Id,
                         Title    = string.IsNullOrEmpty(a.Artist) ? LocalizationManager.Current.Unknown : a.Artist,
                         IsFavorite = a.IsFavorite,
+                        ArtworkPath = a.ImagePath,
+                        ThumbnailPath = a.ImagePath,
+                        Biography = a.Biography,
+                        SourceUrl = a.SourceUrl,
+                        ProfileLanguage = a.ProfileLanguage,
+                        ProfileFetchedAt = a.ProfileFetchedAt,
+                        EntityType = "Artist",
                         FilePath = ""
                     }).ToList(),
 
@@ -574,6 +615,7 @@ public partial class MainWindow : Window
                         ArtworkPath = a.ArtworkPath,
                         ThumbnailPath = a.ThumbnailPath,
                         IsFavorite = a.IsFavorite,
+                        EntityType = "Album",
                         FilePath = ""
                     }).ToList(),
 
@@ -881,6 +923,7 @@ public partial class MainWindow : Window
     private async Task ShowSearchResultsAsync(string query)
     {
         LyricsView.Visibility = Visibility.Collapsed;
+        ArtistInfoView.Visibility = Visibility.Collapsed;
         if (string.IsNullOrWhiteSpace(query))
         {
             if (NavListBox.SelectedItem is ListBoxItem { Tag: string tag })
@@ -895,6 +938,7 @@ public partial class MainWindow : Window
         ContentDataGrid.Visibility = Visibility.Collapsed;
         FolderTreeView.Visibility = Visibility.Collapsed;
         AlbumArtworkListBox.Visibility = Visibility.Collapsed;
+        ArtistArtworkListBox.Visibility = Visibility.Collapsed;
         SearchResultsScrollViewer.Visibility = Visibility.Visible;
         DashboardScrollViewer.Visibility = Visibility.Collapsed;
         HideAlbumDetailHeader();
@@ -965,14 +1009,22 @@ public partial class MainWindow : Window
         Year = a.Year?.ToString(),
         ArtworkPath = a.ArtworkPath,
         ThumbnailPath = a.ThumbnailPath,
-        IsFavorite = a.IsFavorite
+        IsFavorite = a.IsFavorite,
+        EntityType = "Album"
     };
 
     private static ContentRow ToArtistContentRow(ArtistInfo a) => new()
     {
         Id = a.Id,
         Title = string.IsNullOrEmpty(a.Artist) ? LocalizationManager.Current.Unknown : a.Artist,
-        IsFavorite = a.IsFavorite
+        IsFavorite = a.IsFavorite,
+        ArtworkPath = a.ImagePath,
+        ThumbnailPath = a.ImagePath,
+        Biography = a.Biography,
+        SourceUrl = a.SourceUrl,
+        ProfileLanguage = a.ProfileLanguage,
+        ProfileFetchedAt = a.ProfileFetchedAt,
+        EntityType = "Artist"
     };
 
     private void ApplySearchColumns()
@@ -1043,21 +1095,49 @@ public partial class MainWindow : Window
 
     private async void AlbumViewModeRadioButton_OnChecked(object sender, RoutedEventArgs e)
     {
-        if (!IsLoaded)
+        if (!IsLoaded || _updatingViewMode)
             return;
 
-        _showAlbumArtworkView = AlbumArtworkViewRadioButton.IsChecked == true;
-        _settings.AlbumArtworkView = _showAlbumArtworkView;
-        if (NavListBox.SelectedItem is not ListBoxItem { Tag: "Albums" })
+        var artworkMode = AlbumArtworkViewRadioButton.IsChecked == true;
+        if (NavListBox.SelectedItem is not ListBoxItem { Tag: string tag } ||
+            tag is not ("Albums" or "Artists"))
             return;
 
-        ContentDataGrid.Visibility = _showAlbumArtworkView ? Visibility.Collapsed : Visibility.Visible;
-        AlbumArtworkListBox.Visibility = _showAlbumArtworkView ? Visibility.Visible : Visibility.Collapsed;
+        if (tag == "Albums")
+        {
+            _showAlbumArtworkView = artworkMode;
+            _settings.AlbumArtworkView = artworkMode;
+        }
+        else
+        {
+            _showArtistArtworkView = artworkMode;
+            _settings.ArtistArtworkView = artworkMode;
+        }
 
-        var rows = await Task.Run(() => QueryRows("Albums"));
+        ContentDataGrid.Visibility = artworkMode ? Visibility.Collapsed : Visibility.Visible;
+        AlbumArtworkListBox.Visibility = tag == "Albums" && artworkMode
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        ArtistArtworkListBox.Visibility = tag == "Artists" && artworkMode
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        var rows = await Task.Run(() => QueryRows(tag));
+        ApplyColumns(tag);
         ContentDataGrid.ItemsSource = rows;
-        AlbumArtworkListBox.ItemsSource = rows;
+        if (tag == "Albums")
+            AlbumArtworkListBox.ItemsSource = rows;
+        else
+            ArtistArtworkListBox.ItemsSource = rows;
         ContentCountTextBlock.Text = rows.Count == 1 ? "1 Eintrag" : $"{rows.Count:N0} Einträge";
+    }
+
+    private void SetViewModeButtons(bool artworkMode)
+    {
+        _updatingViewMode = true;
+        AlbumArtworkViewRadioButton.IsChecked = artworkMode;
+        AlbumTableViewRadioButton.IsChecked = !artworkMode;
+        _updatingViewMode = false;
     }
 
     private void AlbumArtworkItem_OnLoaded(object sender, RoutedEventArgs e)
@@ -1066,10 +1146,22 @@ public partial class MainWindow : Window
             EnsureArtworkHydrated(row);
     }
 
+    private async void ArtistArtworkItem_OnLoaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ListBoxItem { DataContext: ContentRow row })
+            return;
+        EnsureArtworkHydrated(row);
+        await EnsureArtistProfileAsync(row);
+    }
+
     private void ContentDataGrid_OnLoadingRow(object sender, DataGridRowEventArgs e)
     {
-        if (e.Row.Item is ContentRow row && AlbumViewModeBorder.Visibility == Visibility.Visible)
+        if (e.Row.Item is not ContentRow row)
+            return;
+        if (!string.IsNullOrWhiteSpace(row.ThumbnailPath))
             EnsureThumbnailHydrated(row);
+        if (row.EntityType == "Artist")
+            _ = EnsureArtistProfileAsync(row);
     }
 
     private void ApplyColumns(string view)
@@ -1079,6 +1171,7 @@ public partial class MainWindow : Window
         {
             case "Artists":
                 AddFavorite();
+                AddThumbnail();
                 Add(LocalizationManager.Current.Artist, nameof(ContentRow.Title), 0, star: true);
                 break;
             case "Albums":
@@ -1372,6 +1465,12 @@ public partial class MainWindow : Window
         await HandleContentRowDoubleClickAsync(row);
     }
 
+    private async void ArtistArtworkListBox_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (ArtistArtworkListBox.SelectedItem is ContentRow row)
+            await HandleContentRowDoubleClickAsync(row);
+    }
+
     private async void SearchTracksDataGrid_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (SearchTracksDataGrid.SelectedItem is not ContentRow row)
@@ -1402,7 +1501,7 @@ public partial class MainWindow : Window
     private async Task HandleContentRowDoubleClickAsync(ContentRow row)
     {
 
-        if (ContentTitleTextBlock.Text == "Künstler" && row.Id is long artistId)
+        if (row.EntityType == "Artist" && row.Id is long artistId)
         {
             await ShowArtistAlbumsAsync(artistId, row.Title ?? "(Unbekannt)");
             return;
@@ -1448,6 +1547,7 @@ public partial class MainWindow : Window
         AlbumViewModeBorder.Visibility = Visibility.Collapsed;
         ContentDataGrid.Visibility = Visibility.Visible;
         AlbumArtworkListBox.Visibility = Visibility.Collapsed;
+        ArtistArtworkListBox.Visibility = Visibility.Collapsed;
         FolderTreeView.Visibility = Visibility.Collapsed;
         SearchResultsScrollViewer.Visibility = Visibility.Collapsed;
         DashboardScrollViewer.Visibility = Visibility.Collapsed;
@@ -1523,8 +1623,10 @@ public partial class MainWindow : Window
         _activeAlbumFilterTitle = null;
         ContentTitleTextBlock.Text = $"Alben · {artistName}";
         AlbumViewModeBorder.Visibility = Visibility.Visible;
+        SetViewModeButtons(_showAlbumArtworkView);
         ContentDataGrid.Visibility = _showAlbumArtworkView ? Visibility.Collapsed : Visibility.Visible;
         AlbumArtworkListBox.Visibility = _showAlbumArtworkView ? Visibility.Visible : Visibility.Collapsed;
+        ArtistArtworkListBox.Visibility = Visibility.Collapsed;
         FolderTreeView.Visibility = Visibility.Collapsed;
         SearchResultsScrollViewer.Visibility = Visibility.Collapsed;
         HideAlbumDetailHeader();
@@ -1596,6 +1698,13 @@ public partial class MainWindow : Window
 
     private async void BackButton_OnClick(object sender, RoutedEventArgs e)
     {
+        if (LyricsView.Visibility == Visibility.Visible ||
+            ArtistInfoView.Visibility == Visibility.Visible)
+        {
+            CloseNowPlayingDetailViews();
+            return;
+        }
+
         if (_navigationStack.Count == 0)
             return;
 
@@ -1613,6 +1722,7 @@ public partial class MainWindow : Window
                 ContentDataGrid.Visibility = Visibility.Collapsed;
                 FolderTreeView.Visibility  = Visibility.Collapsed;
                 AlbumArtworkListBox.Visibility = Visibility.Collapsed;
+                ArtistArtworkListBox.Visibility = Visibility.Collapsed;
                 DashboardScrollViewer.Visibility = Visibility.Visible;
                 await ShowDashboardAsync();
                 return;
@@ -1624,12 +1734,15 @@ public partial class MainWindow : Window
 
             case "Artists":
                 ContentTitleTextBlock.Text = "Künstler";
-                AlbumViewModeBorder.Visibility = Visibility.Collapsed;
-                ContentDataGrid.Visibility = Visibility.Visible;
+                AlbumViewModeBorder.Visibility = Visibility.Visible;
+                SetViewModeButtons(_showArtistArtworkView);
+                ContentDataGrid.Visibility = _showArtistArtworkView ? Visibility.Collapsed : Visibility.Visible;
                 AlbumArtworkListBox.Visibility = Visibility.Collapsed;
+                ArtistArtworkListBox.Visibility = _showArtistArtworkView ? Visibility.Visible : Visibility.Collapsed;
                 var artists = await Task.Run(() => QueryRows("Artists"));
                 ApplyColumns("Artists");
                 ContentDataGrid.ItemsSource = artists;
+                ArtistArtworkListBox.ItemsSource = artists;
                 ContentCountTextBlock.Text = artists.Count == 1 ? "1 Eintrag" : $"{artists.Count:N0} Einträge";
                 RestoreSelection(artists, state.SelectedId);
                 break;
@@ -1639,12 +1752,14 @@ public partial class MainWindow : Window
                     ? $"Alben · {_activeArtistFilterName}"
                     : "Alben";
                 AlbumViewModeBorder.Visibility = Visibility.Visible;
+                SetViewModeButtons(_showAlbumArtworkView);
                 ContentDataGrid.Visibility = _showAlbumArtworkView ? Visibility.Collapsed : Visibility.Visible;
                 AlbumArtworkListBox.Visibility = _showAlbumArtworkView ? Visibility.Visible : Visibility.Collapsed;
                 var albums = await Task.Run(() => QueryRows("Albums"));
                 ApplyColumns("Albums");
                 ContentDataGrid.ItemsSource = albums;
                 AlbumArtworkListBox.ItemsSource = albums;
+                ArtistArtworkListBox.Visibility = Visibility.Collapsed;
                 ContentCountTextBlock.Text = albums.Count == 1 ? "1 Eintrag" : $"{albums.Count:N0} Einträge";
                 RestoreSelection(albums, state.SelectedId);
                 break;
@@ -1664,6 +1779,8 @@ public partial class MainWindow : Window
         ContentDataGrid.ScrollIntoView(row);
         AlbumArtworkListBox.SelectedItem = row;
         AlbumArtworkListBox.ScrollIntoView(row);
+        ArtistArtworkListBox.SelectedItem = row;
+        ArtistArtworkListBox.ScrollIntoView(row);
     }
 
     private void UpdateNowPlayingFavoriteButton()
@@ -1705,15 +1822,16 @@ public partial class MainWindow : Window
 
         row.IsFavorite = !row.IsFavorite;
         using var db = AudioDatabase.OpenDefault();
-        if (ContentTitleTextBlock.Text == "Künstler")
+        if (row.EntityType == "Artist")
             db.SetArtistFavorite(id, row.IsFavorite);
-        else if (AlbumViewModeBorder.Visibility == Visibility.Visible)
+        else if (row.EntityType == "Album")
             db.SetAlbumFavorite(id, row.IsFavorite);
         else
             db.SetTrackFavorite(id, row.IsFavorite);
 
         ContentDataGrid.Items.Refresh();
         AlbumArtworkListBox.Items.Refresh();
+        ArtistArtworkListBox.Items.Refresh();
         e.Handled = true;
     }
 
@@ -1733,8 +1851,7 @@ public partial class MainWindow : Window
         ContentDataGrid.SelectedItem = contentRow;
 
         bool isTrack = !string.IsNullOrEmpty(contentRow.FilePath);
-        bool isAlbum = contentRow.Id.HasValue && string.IsNullOrEmpty(contentRow.FilePath)
-                       && AlbumViewModeBorder.Visibility == Visibility.Visible;
+        bool isAlbum = contentRow.EntityType == "Album";
 
         if (!isTrack && !isAlbum)
         {
@@ -2156,6 +2273,8 @@ public partial class MainWindow : Window
         {
             using var db = AudioDatabase.OpenDefault();
             var artworkPaths = db.GetArtworkPathsByTrackPath(filePath);
+            var track = db.GetByPath(filePath);
+            var artist = db.GetArtistByTrackPath(filePath);
             NowPlayingArtworkImage.Source = CreateArtworkImage(artworkPaths?.Thumb96Path, 96);
             LyricsBackgroundImage.Source = CreateArtworkImage(
                 artworkPaths?.Thumb320Path ?? artworkPaths?.OriginalPath,
@@ -2163,15 +2282,26 @@ public partial class MainWindow : Window
             var trackInfo = db.GetTrackIdAndFavorite(filePath);
             _currentTrackId = trackInfo?.Id;
             _currentTrackIsFavorite = trackInfo?.IsFavorite ?? false;
-            LyricsButton.IsEnabled = db.GetByPath(filePath) is not null;
+            _currentArtistId = artist?.Id;
+            _currentArtistName = artist?.Artist;
+            LyricsButton.IsEnabled = track is not null;
+            ArtistInfoButton.IsEnabled = artist is not null;
+            if (track is not null)
+            {
+                NowPlayingTitleBlock.Text = track.Title ?? filename;
+                NowPlayingArtistBlock.Text = track.Artist ?? string.Empty;
+            }
         }
         catch
         {
             NowPlayingArtworkImage.Source = null;
             LyricsBackgroundImage.Source = null;
             _currentTrackId = null;
+            _currentArtistId = null;
+            _currentArtistName = null;
             _currentTrackIsFavorite = false;
             LyricsButton.IsEnabled = false;
+            ArtistInfoButton.IsEnabled = false;
         }
         UpdateNowPlayingFavoriteButton();
         _ = LoadLyricsForTrackAsync(filePath, forceRefresh: false);
@@ -2247,6 +2377,7 @@ public partial class MainWindow : Window
         PositionSlider.IsEnabled = false;
         _transportTimer.Stop();
         CancelLyricsLoad();
+        CancelArtistProfileLoad();
         ClearLyrics();
 
         NowPlayingTitleBlock.Text  = "";
@@ -2255,8 +2386,12 @@ public partial class MainWindow : Window
         NowPlayingArtworkImage.Source = null;
         LyricsBackgroundImage.Source = null;
         _currentTrackId = null;
+        _currentArtistId = null;
+        _currentArtistName = null;
         _currentTrackIsFavorite = false;
         LyricsButton.IsEnabled = false;
+        ArtistInfoButton.IsEnabled = false;
+        ArtistInfoView.Visibility = Visibility.Collapsed;
         UpdateNowPlayingFavoriteButton();
     }
 
@@ -2337,9 +2472,11 @@ public partial class MainWindow : Window
 
     private void LyricsButton_OnClick(object sender, RoutedEventArgs e)
     {
+        ArtistInfoView.Visibility = Visibility.Collapsed;
         LyricsView.Visibility = LyricsView.Visibility == Visibility.Visible
             ? Visibility.Collapsed
             : Visibility.Visible;
+        UpdateBackButtonForDetailView();
         if (LyricsView.Visibility == Visibility.Visible &&
             _lyricLines.Count == 0 &&
             !string.IsNullOrWhiteSpace(_currentFilePath))
@@ -2349,13 +2486,235 @@ public partial class MainWindow : Window
     }
 
     private void CloseLyricsButton_OnClick(object sender, RoutedEventArgs e)
-        => LyricsView.Visibility = Visibility.Collapsed;
+        => CloseNowPlayingDetailViews();
 
     private async void RefreshLyricsButton_OnClick(object sender, RoutedEventArgs e)
     {
         if (string.IsNullOrWhiteSpace(_currentFilePath))
             return;
         await LoadLyricsForTrackAsync(_currentFilePath, forceRefresh: true);
+    }
+
+    private async void ArtistInfoButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (_currentArtistId is not long artistId || string.IsNullOrWhiteSpace(_currentArtistName))
+            return;
+
+        LyricsView.Visibility = Visibility.Collapsed;
+        ArtistInfoView.Visibility = ArtistInfoView.Visibility == Visibility.Visible
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        UpdateBackButtonForDetailView();
+        if (ArtistInfoView.Visibility == Visibility.Visible)
+            await ShowArtistInfoAsync(artistId, forceRefresh: false);
+    }
+
+    private void CloseArtistInfoButton_OnClick(object sender, RoutedEventArgs e)
+        => CloseNowPlayingDetailViews();
+
+    private void UpdateBackButtonForDetailView()
+    {
+        BackButton.Visibility =
+            LyricsView.Visibility == Visibility.Visible ||
+            ArtistInfoView.Visibility == Visibility.Visible ||
+            _navigationStack.Count > 0
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+    }
+
+    private void CloseNowPlayingDetailViews()
+    {
+        LyricsView.Visibility = Visibility.Collapsed;
+        ArtistInfoView.Visibility = Visibility.Collapsed;
+        BackButton.Visibility = _navigationStack.Count > 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private async void RefreshArtistInfoButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (_currentArtistId is long artistId)
+            await ShowArtistInfoAsync(artistId, forceRefresh: true);
+    }
+
+    private void ArtistInfoSourceButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_artistInfoSourceUrl))
+            return;
+        Process.Start(new ProcessStartInfo(_artistInfoSourceUrl) { UseShellExecute = true });
+    }
+
+    private async Task ShowArtistInfoAsync(long artistId, bool forceRefresh)
+    {
+        CancelArtistProfileLoad();
+        var cts = new CancellationTokenSource();
+        _artistProfileCts = cts;
+        RefreshArtistInfoButton.IsEnabled = false;
+        ArtistInfoStatusTextBlock.Text = LocalizationManager.Current.ArtistInfoLoading;
+        ArtistInfoStatusTextBlock.Visibility = Visibility.Visible;
+        ArtistInfoBiographyTextBlock.Text = string.Empty;
+        ArtistInfoSourceButton.Visibility = Visibility.Collapsed;
+
+        try
+        {
+            ArtistInfo? artist;
+            using (var db = AudioDatabase.OpenDefault())
+                artist = db.GetArtistById(artistId);
+            if (artist is null)
+            {
+                ArtistInfoStatusTextBlock.Text = LocalizationManager.Current.ArtistInfoNotFound;
+                return;
+            }
+
+            ArtistInfoTitleTextBlock.Text = artist.Artist;
+            var language = GetProfileLanguageCode();
+            var fetchedAt = artist.ProfileFetchedAt is long timestamp
+                ? DateTimeOffset.FromUnixTimeSeconds(timestamp)
+                : (DateTimeOffset?)null;
+            var needsDownload = forceRefresh ||
+                string.IsNullOrWhiteSpace(artist.Biography) ||
+                !string.Equals(artist.ProfileLanguage, language, StringComparison.OrdinalIgnoreCase) ||
+                fetchedAt is null ||
+                fetchedAt < DateTimeOffset.UtcNow.AddDays(-90);
+
+            if (needsDownload)
+            {
+                ArtistInfoStatusTextBlock.Text = LocalizationManager.Current.ArtistInfoDownloading;
+                var profile = await ArtistProfileService.DownloadAsync(
+                    artist.Id,
+                    artist.Artist,
+                    language,
+                    cts.Token);
+                cts.Token.ThrowIfCancellationRequested();
+                using var db = AudioDatabase.OpenDefault();
+                db.UpdateArtistProfile(
+                    artist.Id,
+                    profile?.Biography,
+                    profile?.ImagePath,
+                    profile?.SourceUrl,
+                    language);
+                artist = db.GetArtistById(artist.Id);
+            }
+
+            if (artist is null || string.IsNullOrWhiteSpace(artist.Biography))
+            {
+                ArtistInfoImage.Source = null;
+                ArtistInfoImagePlaceholder.Visibility = Visibility.Visible;
+                ArtistInfoStatusTextBlock.Text = LocalizationManager.Current.ArtistInfoNotFound;
+                return;
+            }
+
+            ArtistInfoBiographyTextBlock.Text = artist.Biography;
+            ArtistInfoImage.Source = CreateArtworkImage(artist.ImagePath, 1000);
+            ArtistInfoImagePlaceholder.Visibility = ArtistInfoImage.Source is null
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            _artistInfoSourceUrl = artist.SourceUrl;
+            ArtistInfoSourceButton.Visibility = string.IsNullOrWhiteSpace(_artistInfoSourceUrl)
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+            ArtistInfoStatusTextBlock.Visibility = Visibility.Collapsed;
+            await RefreshVisibleArtistRowAsync(artist);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch
+        {
+            ArtistInfoStatusTextBlock.Text = LocalizationManager.Current.ArtistInfoDownloadFailed;
+        }
+        finally
+        {
+            if (_artistProfileCts == cts)
+            {
+                _artistProfileCts = null;
+                RefreshArtistInfoButton.IsEnabled = true;
+            }
+            cts.Dispose();
+        }
+    }
+
+    private async Task EnsureArtistProfileAsync(ContentRow row)
+    {
+        if (row.Id is not long artistId || row.EntityType != "Artist")
+            return;
+
+        var language = GetProfileLanguageCode();
+        var fetchedAt = row.ProfileFetchedAt is long timestamp
+            ? DateTimeOffset.FromUnixTimeSeconds(timestamp)
+            : (DateTimeOffset?)null;
+        if (fetchedAt >= DateTimeOffset.UtcNow.AddDays(-90) &&
+            string.Equals(row.ProfileLanguage, language, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+        if (!_artistProfilesLoading.Add(artistId))
+            return;
+
+        try
+        {
+            var profile = await ArtistProfileService.DownloadAsync(
+                artistId,
+                row.Title ?? string.Empty,
+                language);
+            using var db = AudioDatabase.OpenDefault();
+            db.UpdateArtistProfile(
+                artistId,
+                profile?.Biography,
+                profile?.ImagePath,
+                profile?.SourceUrl,
+                language);
+            row.Biography = profile?.Biography;
+            row.SourceUrl = profile?.SourceUrl;
+            row.ProfileLanguage = language;
+            row.ProfileFetchedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            if (!string.IsNullOrWhiteSpace(profile?.ImagePath))
+            {
+                row.ArtworkPath = profile.ImagePath;
+                row.ThumbnailPath = profile.ImagePath;
+                row.Artwork = CreateArtworkImage(profile.ImagePath, 600);
+                row.Thumbnail = CreateArtworkImage(profile.ImagePath, 96);
+            }
+        }
+        catch
+        {
+            // Künstlerkarten bleiben auch ohne Netzwerk nutzbar.
+        }
+        finally
+        {
+            _artistProfilesLoading.Remove(artistId);
+        }
+    }
+
+    private Task RefreshVisibleArtistRowAsync(ArtistInfo artist)
+    {
+        var rows = ContentDataGrid.ItemsSource as IEnumerable<ContentRow>
+            ?? ArtistArtworkListBox.ItemsSource as IEnumerable<ContentRow>;
+        var row = rows?.FirstOrDefault(item => item.Id == artist.Id && item.EntityType == "Artist");
+        if (row is null)
+            return Task.CompletedTask;
+
+        row.Biography = artist.Biography;
+        row.SourceUrl = artist.SourceUrl;
+        row.ProfileLanguage = artist.ProfileLanguage;
+        row.ProfileFetchedAt = artist.ProfileFetchedAt;
+        row.ArtworkPath = artist.ImagePath;
+        row.ThumbnailPath = artist.ImagePath;
+        row.Artwork = CreateArtworkImage(artist.ImagePath, 600);
+        row.Thumbnail = CreateArtworkImage(artist.ImagePath, 96);
+        return Task.CompletedTask;
+    }
+
+    private string GetProfileLanguageCode() => _settings.Language switch
+    {
+        Player.Localization.Language.German => "de",
+        Player.Localization.Language.French => "fr",
+        _ => "en"
+    };
+
+    private void CancelArtistProfileLoad()
+    {
+        _artistProfileCts?.Cancel();
     }
 
     private async Task LoadLyricsForTrackAsync(string filePath, bool forceRefresh)

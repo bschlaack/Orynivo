@@ -44,12 +44,13 @@ Windows audio player with:
 - `Player/Library/LibraryScanner.cs`: directory scanner using TagLibSharp; writes through `AudioDatabase.Upsert()`, reports progress, and supports cancellation
 - `Player/Library/LibraryBackupService.cs`: versioned ZIP export/import for the SQLite library, artwork cache, and configured library directories; audio files are not included
 - `Player/Library/LyricsService.cs`: LRCLIB client and LRC parser for downloaded plain or synchronized lyrics
+- `Player/Library/ArtistProfileService.cs`: localized Wikipedia/Wikimedia lookup for artist biographies and images; images are cached under `%LOCALAPPDATA%\Player\artist-images\`
 
 ## Audio Database
 
 - SQLite through `Microsoft.Data.Sqlite`; no server process is required
 - `tracks` stores file paths, tags, technical metadata, and references to normalized `artists` and `albums`
-- `artists` contains stable artist IDs (`id`, `name`)
+- `artists` contains stable artist IDs plus cached profile biography, image path, source URL, language, and fetch timestamp
 - `artists`, `albums`, and `tracks` each have a direct `is_favorite` flag
 - `albums` contains stable album IDs (`id`, `title`, `artist_id`, `year`, `artwork_id`, `is_favorite`)
 - `artworks` deduplicates artwork by SHA-256 hash; originals and thumbnails live under `%LOCALAPPDATA%\Player\artworks\` as `original`, `thumb_96`, and `thumb_320`
@@ -79,8 +80,9 @@ Windows audio player with:
 - Thumbnail generation is intentionally fault tolerant; invalid embedded artwork must not prevent startup
 - `normalized_library_v1` prevents expensive legacy migration checks on every database open
 - `AudioDatabase.Optimize()` runs `wal_checkpoint(TRUNCATE)`, `VACUUM`, and `ANALYZE`
-- Settings library backup creates a consistent SQLite snapshot, includes artwork and library paths, reports percentage and current-file progress for both export and import, writes to `.tmp` before publishing the completed `.zip`, validates imports in staging, rebases artwork paths, rolls back partial replacements, and reports Lucene index rebuild progress
+- Settings library backup creates a consistent SQLite snapshot, includes album artwork, artist images, and library paths, reports percentage and current-file progress for both export and import, writes to `.tmp` before publishing the completed `.zip`, validates imports in staging, rebases cached image paths, rolls back partial replacements, and reports Lucene index rebuild progress
 - Downloaded lyrics are cached in `tracks.downloaded_lyrics` / `tracks.synced_lyrics`; the transport note button replaces the current main content with a large lyrics view over a dimmed cover background, highlights timestamped LRC lines through the transport timer, and falls back to embedded unsynchronized lyrics
+- Artist views support table and image-card modes; visible artists lazily download localized Wikipedia biographies and images. The transport info button replaces the current main content with the current artist image, biography, and Wikipedia source link.
 
 ## Playlist Context Menus
 
@@ -112,7 +114,7 @@ Windows audio player with:
 ## Performance Measures
 
 - `GetTracksLite()` loads only path, file name, title, disc number, and track number for the folder tree
-- `GetArtistsLite()` loads distinct artist names directly through SQL
+- `GetArtistsLite()` loads artist IDs, names, favorite state, and cached profile data without loading tracks
 - `GetAlbumsLite(includeArtwork)` loads only album, display artist, and year unless artwork is requested
 - `GetTrackList()` loads only visible track-list columns
 - `GetTrackListByIds(ids)` batches large ID sets to stay below SQLite variable limits

@@ -70,6 +70,11 @@ public static class LocalizationManager
         resources["L_ShowLyrics"] = Current.ShowLyrics;
         resources["L_RefreshLyrics"] = Current.RefreshLyrics;
         resources["L_CloseLyrics"] = Current.CloseLyrics;
+        resources["L_ArtistInfo"] = Current.ArtistInfo;
+        resources["L_ShowArtistInfo"] = Current.ShowArtistInfo;
+        resources["L_RefreshArtistInfo"] = Current.RefreshArtistInfo;
+        resources["L_CloseArtistInfo"] = Current.CloseArtistInfo;
+        resources["L_ArtistInfoSource"] = Current.ArtistInfoSource;
     }
 
     private static readonly LocalizedStrings German = new(
@@ -119,7 +124,11 @@ public static class LocalizationManager
         "Songtext", "Songtext anzeigen", "Songtext neu laden", "Songtext schließen",
         "Songtext wird geladen …", "Songtext wird von LRCLIB heruntergeladen …",
         "Für diesen Track sind keine Metadaten verfügbar.", "Kein Songtext gefunden.",
-        "Songtext konnte nicht heruntergeladen werden.");
+        "Songtext konnte nicht heruntergeladen werden.",
+        "Künstlerinfo", "Künstlerinfo anzeigen", "Künstlerinfo neu laden", "Künstlerinfo schließen",
+        "Künstlerinfo wird geladen …", "Künstlerinfo wird von Wikipedia geladen …",
+        "Keine Künstlerinfo gefunden.", "Künstlerinfo konnte nicht heruntergeladen werden.",
+        "Quelle: Wikipedia");
 
     private static readonly LocalizedStrings English = new(
         "LOCAL LIBRARY", "Artists", "Albums", "Tracks", "Folder structure", "Search", "PLAYLISTS", "About", "Settings",
@@ -168,7 +177,11 @@ public static class LocalizationManager
         "Lyrics", "Show lyrics", "Refresh lyrics", "Close lyrics",
         "Loading lyrics …", "Downloading lyrics from LRCLIB …",
         "No metadata is available for this track.", "No lyrics found.",
-        "Lyrics could not be downloaded.");
+        "Lyrics could not be downloaded.",
+        "Artist information", "Show artist information", "Refresh artist information", "Close artist information",
+        "Loading artist information …", "Downloading artist information from Wikipedia …",
+        "No artist information found.", "Artist information could not be downloaded.",
+        "Source: Wikipedia");
 
     private static readonly LocalizedStrings French = new(
         "BIBLIOTHÈQUE LOCALE", "Artistes", "Albums", "Titres", "Arborescence", "Recherche", "PLAYLISTS", "À propos", "Paramètres",
@@ -217,7 +230,14 @@ public static class LocalizationManager
         "Paroles", "Afficher les paroles", "Actualiser les paroles", "Fermer les paroles",
         "Chargement des paroles …", "Téléchargement des paroles depuis LRCLIB …",
         "Aucune métadonnée n’est disponible pour ce titre.", "Aucune parole trouvée.",
-        "Impossible de télécharger les paroles.");
+        "Impossible de télécharger les paroles.",
+        "Informations sur l’artiste", "Afficher les informations sur l’artiste",
+        "Actualiser les informations sur l’artiste", "Fermer les informations sur l’artiste",
+        "Chargement des informations sur l’artiste …",
+        "Téléchargement des informations sur l’artiste depuis Wikipédia …",
+        "Aucune information trouvée sur l’artiste.",
+        "Impossible de télécharger les informations sur l’artiste.",
+        "Source : Wikipédia");
 
     public static LocalizedStrings Current { get; private set; } = German;
 }

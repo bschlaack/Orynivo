@@ -4,8 +4,15 @@ using Microsoft.Data.Sqlite;
 
 namespace Player.Library;
 
-/// <summary>Distinct-Künstler-Eintrag – absichtlich nur der Künstlername.</summary>
-public sealed record ArtistInfo(long Id, string Artist, bool IsFavorite);
+public sealed record ArtistInfo(
+    long Id,
+    string Artist,
+    bool IsFavorite,
+    string? Biography,
+    string? ImagePath,
+    string? SourceUrl,
+    string? ProfileLanguage,
+    long? ProfileFetchedAt);
 
 /// <summary>Distinct-Album-Eintrag für die Albumansichten.</summary>
 public sealed record AlbumInfo(
@@ -246,7 +253,8 @@ public sealed class AudioDatabase : IDisposable
     {
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = """
-            SELECT id, name, is_favorite
+            SELECT id, name, is_favorite, NULL AS biography, image_path,
+                   profile_source_url, profile_language, profile_fetched_at
             FROM artists
             ORDER BY CASE WHEN name = '' THEN 1 ELSE 0 END,
                      name COLLATE NOCASE;
@@ -254,8 +262,73 @@ public sealed class AudioDatabase : IDisposable
         using var reader = cmd.ExecuteReader();
         var result = new List<ArtistInfo>();
         while (reader.Read())
-            result.Add(new ArtistInfo(reader.GetInt64(0), reader.GetString(1), reader.GetInt32(2) != 0));
+            result.Add(new ArtistInfo(
+                reader.GetInt64(0),
+                reader.GetString(1),
+                reader.GetInt32(2) != 0,
+                reader.IsDBNull(3) ? null : reader.GetString(3),
+                reader.IsDBNull(4) ? null : reader.GetString(4),
+                reader.IsDBNull(5) ? null : reader.GetString(5),
+                reader.IsDBNull(6) ? null : reader.GetString(6),
+                reader.IsDBNull(7) ? null : reader.GetInt64(7)));
         return result;
+    }
+
+    public ArtistInfo? GetArtistById(long artistId)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, name, is_favorite, biography, image_path,
+                   profile_source_url, profile_language, profile_fetched_at
+            FROM artists
+            WHERE id = $id
+            LIMIT 1;
+            """;
+        Add(cmd, "$id", artistId);
+        using var reader = cmd.ExecuteReader();
+        return reader.Read() ? MapArtistInfo(reader) : null;
+    }
+
+    public ArtistInfo? GetArtistByTrackPath(string path)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT ar.id, ar.name, ar.is_favorite, ar.biography, ar.image_path,
+                   ar.profile_source_url, ar.profile_language, ar.profile_fetched_at
+            FROM tracks t
+            JOIN artists ar ON ar.id = t.artist_id
+            WHERE t.path = $path
+            LIMIT 1;
+            """;
+        Add(cmd, "$path", path);
+        using var reader = cmd.ExecuteReader();
+        return reader.Read() ? MapArtistInfo(reader) : null;
+    }
+
+    public void UpdateArtistProfile(
+        long artistId,
+        string? biography,
+        string? imagePath,
+        string? sourceUrl,
+        string language)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            UPDATE artists
+            SET biography = $biography,
+                image_path = COALESCE($image_path, image_path),
+                profile_source_url = $source_url,
+                profile_language = $language,
+                profile_fetched_at = $fetched_at
+            WHERE id = $id;
+            """;
+        Add(cmd, "$biography", (object?)biography ?? DBNull.Value);
+        Add(cmd, "$image_path", (object?)imagePath ?? DBNull.Value);
+        Add(cmd, "$source_url", (object?)sourceUrl ?? DBNull.Value);
+        Add(cmd, "$language", language);
+        Add(cmd, "$fetched_at", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        Add(cmd, "$id", artistId);
+        cmd.ExecuteNonQuery();
     }
 
     /// <summary>
@@ -737,7 +810,8 @@ public sealed class AudioDatabase : IDisposable
         using var cmd = _conn.CreateCommand();
         var parameters = idList.Select((id, i) => { var name = $"$id{i}"; Add(cmd, name, id); return name; }).ToList();
         cmd.CommandText = $"""
-            SELECT DISTINCT ar.id, ar.name, ar.is_favorite
+            SELECT DISTINCT ar.id, ar.name, ar.is_favorite, NULL AS biography, ar.image_path,
+                            ar.profile_source_url, ar.profile_language, ar.profile_fetched_at
             FROM tracks t
             JOIN artists ar ON ar.id = t.artist_id
             WHERE t.id IN ({string.Join(", ", parameters)})
@@ -746,7 +820,7 @@ public sealed class AudioDatabase : IDisposable
         using var reader = cmd.ExecuteReader();
         var result = new List<ArtistInfo>();
         while (reader.Read())
-            result.Add(new ArtistInfo(reader.GetInt64(0), reader.GetString(1), reader.GetInt32(2) != 0));
+            result.Add(MapArtistInfo(reader));
         return result;
     }
 
@@ -1038,7 +1112,12 @@ public sealed class AudioDatabase : IDisposable
             CREATE TABLE IF NOT EXISTS artists (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
                 name        TEXT NOT NULL UNIQUE COLLATE NOCASE,
-                is_favorite INTEGER NOT NULL DEFAULT 0
+                is_favorite INTEGER NOT NULL DEFAULT 0,
+                biography TEXT,
+                image_path TEXT,
+                profile_source_url TEXT,
+                profile_language TEXT,
+                profile_fetched_at INTEGER
             );
 
             CREATE TABLE IF NOT EXISTS artworks (
@@ -1092,6 +1171,11 @@ public sealed class AudioDatabase : IDisposable
             );
             """);
         EnsureColumn("artists", "is_favorite", "INTEGER NOT NULL DEFAULT 0");
+        EnsureColumn("artists", "biography", "TEXT");
+        EnsureColumn("artists", "image_path", "TEXT");
+        EnsureColumn("artists", "profile_source_url", "TEXT");
+        EnsureColumn("artists", "profile_language", "TEXT");
+        EnsureColumn("artists", "profile_fetched_at", "INTEGER");
         EnsureColumn("albums", "is_favorite", "INTEGER NOT NULL DEFAULT 0");
         EnsureColumn("artworks", "original_path", "TEXT");
         EnsureColumn("artworks", "thumb_96_path", "TEXT");
@@ -1709,6 +1793,16 @@ public sealed class AudioDatabase : IDisposable
                                         : (byte[])r.GetValue(r.GetOrdinal("cover_data")),
         };
     }
+
+    private static ArtistInfo MapArtistInfo(SqliteDataReader reader) => new(
+        reader.GetInt64(0),
+        reader.GetString(1),
+        reader.GetInt32(2) != 0,
+        reader.IsDBNull(3) ? null : reader.GetString(3),
+        reader.IsDBNull(4) ? null : reader.GetString(4),
+        reader.IsDBNull(5) ? null : reader.GetString(5),
+        reader.IsDBNull(6) ? null : reader.GetString(6),
+        reader.IsDBNull(7) ? null : reader.GetInt64(7));
 
     private static void Add(SqliteCommand cmd, string name, object? value)
         => cmd.Parameters.AddWithValue(name, value ?? DBNull.Value);

@@ -23,6 +23,7 @@ and ASIO and WASAPI playback.
 - Playback history used for statistics
 - Artwork downloads through the Cover Art Archive and manual MusicBrainz search
 - Embedded or downloaded lyrics with synchronized LRC highlighting during playback
+- Cached artist images and localized biographies from Wikipedia/Wikimedia
 - ZIP export and import for the managed library, playlists, history, artwork,
   and configured library directories
 - Light and dark themes
@@ -100,6 +101,7 @@ Player stores its local data under `%LOCALAPPDATA%\Player\`:
 - `settings.json`: application settings
 - `library.db`: SQLite music library and playback history
 - `artworks\`: original artwork and generated thumbnails
+- `artist-images\`: cached Wikipedia/Wikimedia artist images
 - `search-index\`: Lucene.NET search index
 
 These files are not part of the repository.
@@ -113,6 +115,12 @@ view using the current playback position. The refresh button performs a new
 lookup, and a missing result is shown directly in the lyrics view.
 For WASAPI, buffered but not yet audible frames are excluded from the playback
 position so synchronized lyrics follow the actual output timing.
+
+The Artists page supports the same table/artwork modes as Albums. Profiles for
+visible artists are loaded lazily in the selected UI language and cached in the
+database and `artist-images\`. The stylized information button beside the
+lyrics button opens the current artist profile in the main content area, with a
+large image, biography, refresh action, and a link to the Wikipedia source.
 
 The Settings library page can export this managed library data as a ZIP archive
 and import it again. Audio files are intentionally not included; their existing
