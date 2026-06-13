@@ -43,6 +43,7 @@ Windows audio player with:
 - `Player/Library/AudioDatabase.cs`: SQLite database layer through `Microsoft.Data.Sqlite`; database at `%LOCALAPPDATA%\Player\library.db`
 - `Player/Library/LibraryScanner.cs`: directory scanner using TagLibSharp; writes through `AudioDatabase.Upsert()`, reports progress, and supports cancellation
 - `Player/Library/LibraryBackupService.cs`: versioned ZIP export/import for the SQLite library, artwork cache, and configured library directories; audio files are not included
+- `Player/Library/LyricsService.cs`: LRCLIB client and LRC parser for downloaded plain or synchronized lyrics
 
 ## Audio Database
 
@@ -79,6 +80,7 @@ Windows audio player with:
 - `normalized_library_v1` prevents expensive legacy migration checks on every database open
 - `AudioDatabase.Optimize()` runs `wal_checkpoint(TRUNCATE)`, `VACUUM`, and `ANALYZE`
 - Settings library backup creates a consistent SQLite snapshot, includes artwork and library paths, reports percentage and current-file progress for both export and import, writes to `.tmp` before publishing the completed `.zip`, validates imports in staging, rebases artwork paths, rolls back partial replacements, and reports Lucene index rebuild progress
+- Downloaded lyrics are cached in `tracks.downloaded_lyrics` / `tracks.synced_lyrics`; the transport note button replaces the current main content with a large lyrics view over a dimmed cover background, highlights timestamped LRC lines through the transport timer, and falls back to embedded unsynchronized lyrics
 
 ## Playlist Context Menus
 
@@ -132,6 +134,7 @@ Windows audio player with:
 - WASAPI handles PCM only; native DSD remains ASIO-only
 - WASAPI runs exclusively and selects the first supported stereo format from 32-bit float, 24-bit PCM, and 16-bit PCM
 - WASAPI pause keeps the exclusive AudioClient running and supplies silence so drivers do not loop the final endpoint buffer; buffered audio remains available for resume
+- WASAPI playback position subtracts frames still queued in `BufferedWaveProvider`, so transport time, history, and synchronized lyrics follow audible output instead of producer progress
 - Transport uses custom vector icons for previous, play/pause, and next; unavailable queue directions are disabled
 - Seeking is implemented for ASIO PCM, WASAPI PCM, DSF, and DFF
 - Loading a file or folder builds a playback queue; completion advances automatically

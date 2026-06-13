@@ -109,4 +109,13 @@ public sealed record LocalizedStrings(
     string LibraryOperationScanActive,
     string LibraryArchiveFilter,
     string LibraryExportProgress,
-    string LibraryImportProgress);
+    string LibraryImportProgress,
+    string Lyrics,
+    string ShowLyrics,
+    string RefreshLyrics,
+    string CloseLyrics,
+    string LyricsLoading,
+    string LyricsDownloading,
+    string LyricsUnavailable,
+    string LyricsNotFound,
+    string LyricsDownloadFailed);

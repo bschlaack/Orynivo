@@ -45,7 +45,16 @@ public sealed class WasapiAudioPlayer : IAudioPlayer
     }
 
     public TimeSpan Duration => _info.Duration;
-    public TimeSpan Position => TimeSpan.FromSeconds((double)Interlocked.Read(ref _framesWritten) / _info.OutputSampleRate);
+    public TimeSpan Position
+    {
+        get
+        {
+            var framesWritten = Interlocked.Read(ref _framesWritten);
+            var bufferedFrames = _bufferedProvider.BufferedBytes / _selectedFormat.BytesPerFrame;
+            var playedFrames = Math.Max(0, framesWritten - bufferedFrames);
+            return TimeSpan.FromSeconds((double)playedFrames / _info.OutputSampleRate);
+        }
+    }
     public bool IsPaused => _playbackProvider.IsPaused;
     public bool CanSeek => Duration > TimeSpan.Zero;
     public float Volume { get; set; } = 1.0f;

@@ -1034,6 +1034,103 @@
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
+
+            <!-- Songtextansicht -->
+            <Grid x:Name="LyricsView"
+                  Grid.Row="1"
+                  Visibility="Collapsed"
+                  Background="{DynamicResource AppContentBrush}"
+                  Panel.ZIndex="20"
+                  ClipToBounds="True">
+                <Image x:Name="LyricsBackgroundImage"
+                       Stretch="Uniform"
+                       Opacity="0.22"/>
+                <Border Background="#B018192E"/>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Grid Margin="28,22,28,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{DynamicResource L_Lyrics}"
+                                   VerticalAlignment="Center"
+                                   FontSize="24"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource AppPrimaryTextBrush}"/>
+                        <Button x:Name="RefreshLyricsButton"
+                                Grid.Column="1"
+                                Style="{StaticResource TransportBtnStyle}"
+                                Margin="0,0,8,0"
+                                ToolTip="{DynamicResource L_RefreshLyrics}"
+                                Click="RefreshLyricsButton_OnClick">
+                            <TextBlock Text="↻" FontSize="18"/>
+                        </Button>
+                        <Button Grid.Column="2"
+                                Style="{StaticResource TransportBtnStyle}"
+                                ToolTip="{DynamicResource L_CloseLyrics}"
+                                Click="CloseLyricsButton_OnClick">
+                            <TextBlock Text="×" FontSize="20"/>
+                        </Button>
+                    </Grid>
+                    <Grid Grid.Row="1">
+                        <ListBox x:Name="LyricsListBox"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 Padding="80,26,80,60"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                    <Setter Property="Focusable" Value="False"/>
+                                    <Setter Property="IsHitTestVisible" Value="False"/>
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="Padding" Value="0"/>
+                                    <Setter Property="Margin" Value="0,5"/>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Text}"
+                                               Padding="16,10"
+                                               TextWrapping="Wrap"
+                                               TextAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="#B8B8D0"/>
+                                                <Setter Property="Opacity" Value="0.78"/>
+                                                <Setter Property="FontSize" Value="24"/>
+                                                <Setter Property="FontWeight" Value="Medium"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                        <Setter Property="Foreground" Value="White"/>
+                                                        <Setter Property="FontSize" Value="30"/>
+                                                        <Setter Property="FontWeight" Value="Bold"/>
+                                                        <Setter Property="Opacity" Value="1"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <TextBlock x:Name="LyricsStatusTextBlock"
+                                   Margin="60"
+                                   FontSize="24"
+                                   FontWeight="SemiBold"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Foreground="White"/>
+                    </Grid>
+                </Grid>
+            </Grid>
         </Grid>
 
         <!-- ═══ TRANSPORT BAR ═══ -->
@@ -1054,6 +1151,7 @@
                         <ColumnDefinition Width="52"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <Border Width="42" Height="42" Background="{DynamicResource AppArtworkPlaceholderBrush}" CornerRadius="5">
                         <Image x:Name="NowPlayingArtworkImage" Stretch="UniformToFill"/>
@@ -1069,8 +1167,18 @@
                                    Foreground="#44445A" FontSize="10" Margin="0,2,0,0"
                                    TextTrimming="CharacterEllipsis"/>
                     </StackPanel>
-                    <Button x:Name="NowPlayingFavoriteButton"
+                    <Button x:Name="LyricsButton"
                             Grid.Column="2"
+                            Style="{StaticResource TransportBtnStyle}"
+                            Margin="8,0,0,0"
+                            IsEnabled="False"
+                            ToolTip="{DynamicResource L_ShowLyrics}"
+                            Click="LyricsButton_OnClick">
+                        <TextBlock Text="♪"
+                                   FontSize="16"/>
+                    </Button>
+                    <Button x:Name="NowPlayingFavoriteButton"
+                            Grid.Column="3"
                             Style="{StaticResource TransportBtnStyle}"
                             Margin="8,0,0,0"
                             IsEnabled="False"
@@ -1166,5 +1274,6 @@
                 </StackPanel>
             </Grid>
         </Border>
+
     </Grid>
 </Window>

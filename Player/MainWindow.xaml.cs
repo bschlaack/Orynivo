@@ -53,8 +53,11 @@ public partial class MainWindow : Window
     private readonly HashSet<string> _expandedTrackFilterSections = new(StringComparer.Ordinal);
 
     private readonly ObservableCollection<PlaylistItem> _queue = [];
+    private readonly ObservableCollection<LyricLineViewModel> _lyricLines = [];
     private int _queueIndex = -1;
     private string _currentFilePath = string.Empty;
+    private CancellationTokenSource? _lyricsCts;
+    private int _activeLyricIndex = -1;
 
     private int _dashboardYear;
     private int _dashboardMonth;
@@ -133,6 +136,33 @@ public partial class MainWindow : Window
         }
     }
 
+    private sealed class LyricLineViewModel : INotifyPropertyChanged
+    {
+        private bool _isActive;
+
+        public LyricLineViewModel(string text, TimeSpan? time)
+        {
+            Text = text;
+            Time = time;
+        }
+
+        public string Text { get; }
+        public TimeSpan? Time { get; }
+        public bool IsActive
+        {
+            get => _isActive;
+            set
+            {
+                if (_isActive == value)
+                    return;
+                _isActive = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsActive)));
+            }
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+    }
+
     // ------------------------------------------------------------------
     // Initialisierung
     // ------------------------------------------------------------------
@@ -140,6 +170,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        LyricsListBox.ItemsSource = _lyricLines;
         SourceInitialized += (_, _) => ApplyWindowTitleBarColors();
         _transportTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         _transportTimer.Tick += (_, _) => RefreshTransport();
@@ -247,12 +278,17 @@ public partial class MainWindow : Window
             _currentFilePath = path;
             NowPlayingTitleBlock.Text = track.Title ?? Path.GetFileNameWithoutExtension(path);
             NowPlayingArtistBlock.Text = track.Artist ?? string.Empty;
-            NowPlayingArtworkImage.Source =
-                CreateArtworkImage(db.GetArtworkPathsByTrackPath(path)?.Thumb96Path, 96);
+            var artworkPaths = db.GetArtworkPathsByTrackPath(path);
+            NowPlayingArtworkImage.Source = CreateArtworkImage(artworkPaths?.Thumb96Path, 96);
+            LyricsBackgroundImage.Source = CreateArtworkImage(
+                artworkPaths?.Thumb320Path ?? artworkPaths?.OriginalPath,
+                900);
             var trackInfo = db.GetTrackIdAndFavorite(path);
             _currentTrackId = trackInfo?.Id;
             _currentTrackIsFavorite = trackInfo?.IsFavorite ?? false;
             UpdateNowPlayingFavoriteButton();
+            LyricsButton.IsEnabled = true;
+            _ = LoadLyricsForTrackAsync(path, forceRefresh: false);
             PlayButton.IsEnabled = true;
             SetPlayPauseIcon(isPlaying: false);
         }
@@ -262,9 +298,11 @@ public partial class MainWindow : Window
             NowPlayingTitleBlock.Text = string.Empty;
             NowPlayingArtistBlock.Text = string.Empty;
             NowPlayingArtworkImage.Source = null;
+            LyricsBackgroundImage.Source = null;
             _currentTrackId = null;
             _currentTrackIsFavorite = false;
             UpdateNowPlayingFavoriteButton();
+            LyricsButton.IsEnabled = false;
         }
     }
 
@@ -362,6 +400,7 @@ public partial class MainWindow : Window
 
     private async Task ShowTopLevelViewAsync(string tag)
     {
+        LyricsView.Visibility = Visibility.Collapsed;
         _activePlaylistId = tag.StartsWith("Playlist:") &&
                             long.TryParse(tag.AsSpan("Playlist:".Length), out long parsedPid)
             ? parsedPid : null;
@@ -841,6 +880,7 @@ public partial class MainWindow : Window
 
     private async Task ShowSearchResultsAsync(string query)
     {
+        LyricsView.Visibility = Visibility.Collapsed;
         if (string.IsNullOrWhiteSpace(query))
         {
             if (NavListBox.SelectedItem is ListBoxItem { Tag: string tag })
@@ -2115,19 +2155,26 @@ public partial class MainWindow : Window
         try
         {
             using var db = AudioDatabase.OpenDefault();
-            NowPlayingArtworkImage.Source =
-                CreateArtworkImage(db.GetArtworkPathsByTrackPath(filePath)?.Thumb96Path, 96);
+            var artworkPaths = db.GetArtworkPathsByTrackPath(filePath);
+            NowPlayingArtworkImage.Source = CreateArtworkImage(artworkPaths?.Thumb96Path, 96);
+            LyricsBackgroundImage.Source = CreateArtworkImage(
+                artworkPaths?.Thumb320Path ?? artworkPaths?.OriginalPath,
+                900);
             var trackInfo = db.GetTrackIdAndFavorite(filePath);
             _currentTrackId = trackInfo?.Id;
             _currentTrackIsFavorite = trackInfo?.IsFavorite ?? false;
+            LyricsButton.IsEnabled = db.GetByPath(filePath) is not null;
         }
         catch
         {
             NowPlayingArtworkImage.Source = null;
+            LyricsBackgroundImage.Source = null;
             _currentTrackId = null;
             _currentTrackIsFavorite = false;
+            LyricsButton.IsEnabled = false;
         }
         UpdateNowPlayingFavoriteButton();
+        _ = LoadLyricsForTrackAsync(filePath, forceRefresh: false);
 
         StatusTextBlock.Text = _settings.OutputBackend == OutputBackend.Asio
             ? $"Wiedergabe über {_settings.SelectedDriverName}"
@@ -2199,13 +2246,17 @@ public partial class MainWindow : Window
         RefreshQueueNavigationButtons();
         PositionSlider.IsEnabled = false;
         _transportTimer.Stop();
+        CancelLyricsLoad();
+        ClearLyrics();
 
         NowPlayingTitleBlock.Text  = "";
         NowPlayingArtistBlock.Text = "";
         FileInfoTextBlock.Text     = "";
         NowPlayingArtworkImage.Source = null;
+        LyricsBackgroundImage.Source = null;
         _currentTrackId = null;
         _currentTrackIsFavorite = false;
+        LyricsButton.IsEnabled = false;
         UpdateNowPlayingFavoriteButton();
     }
 
@@ -2281,6 +2332,188 @@ public partial class MainWindow : Window
         PositionSlider.Maximum    = Math.Max(1, _player.Duration.TotalSeconds);
         if (!_isSeekingWithSlider)
             PositionSlider.Value = Math.Min(PositionSlider.Maximum, _player.Position.TotalSeconds);
+        UpdateActiveLyric(_player.Position);
+    }
+
+    private void LyricsButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        LyricsView.Visibility = LyricsView.Visibility == Visibility.Visible
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        if (LyricsView.Visibility == Visibility.Visible &&
+            _lyricLines.Count == 0 &&
+            !string.IsNullOrWhiteSpace(_currentFilePath))
+        {
+            _ = LoadLyricsForTrackAsync(_currentFilePath, forceRefresh: false);
+        }
+    }
+
+    private void CloseLyricsButton_OnClick(object sender, RoutedEventArgs e)
+        => LyricsView.Visibility = Visibility.Collapsed;
+
+    private async void RefreshLyricsButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_currentFilePath))
+            return;
+        await LoadLyricsForTrackAsync(_currentFilePath, forceRefresh: true);
+    }
+
+    private async Task LoadLyricsForTrackAsync(string filePath, bool forceRefresh)
+    {
+        CancelLyricsLoad();
+        var cts = new CancellationTokenSource();
+        _lyricsCts = cts;
+        _activeLyricIndex = -1;
+        RefreshLyricsButton.IsEnabled = false;
+        ShowLyricsStatus(LocalizationManager.Current.LyricsLoading);
+
+        try
+        {
+            TrackRecord? track;
+            using (var db = AudioDatabase.OpenDefault())
+                track = db.GetByPath(filePath);
+
+            if (track is null)
+            {
+                ClearLyrics();
+                ShowLyricsStatus(LocalizationManager.Current.LyricsUnavailable);
+                return;
+            }
+
+            var hasLocalLyrics = ApplyLyrics(track);
+            var fetchedAt = track.LyricsFetchedAt is long timestamp
+                ? DateTimeOffset.FromUnixTimeSeconds(timestamp)
+                : (DateTimeOffset?)null;
+            var lookupExpired = fetchedAt is null ||
+                fetchedAt < DateTimeOffset.UtcNow.AddDays(-30);
+            var shouldDownload = forceRefresh ||
+                (string.IsNullOrWhiteSpace(track.SyncedLyrics) && lookupExpired);
+            if (!shouldDownload)
+            {
+                if (!hasLocalLyrics)
+                    ShowLyricsStatus(LocalizationManager.Current.LyricsNotFound);
+                return;
+            }
+
+            if (!hasLocalLyrics)
+                ShowLyricsStatus(LocalizationManager.Current.LyricsDownloading);
+
+            var result = await LyricsService.DownloadAsync(track, cts.Token);
+            cts.Token.ThrowIfCancellationRequested();
+            if (!string.Equals(filePath, _currentFilePath, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            using (var db = AudioDatabase.OpenDefault())
+            {
+                db.UpdateDownloadedLyrics(
+                    filePath,
+                    result?.PlainLyrics,
+                    result?.SyncedLyrics,
+                    "LRCLIB");
+            }
+
+            track.DownloadedLyrics = result?.PlainLyrics;
+            track.SyncedLyrics = result?.SyncedLyrics;
+            track.LyricsSource = "LRCLIB";
+            track.LyricsFetchedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            if (!ApplyLyrics(track))
+                ShowLyricsStatus(LocalizationManager.Current.LyricsNotFound);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch
+        {
+            if (_lyricLines.Count == 0)
+                ShowLyricsStatus(LocalizationManager.Current.LyricsDownloadFailed);
+        }
+        finally
+        {
+            if (_lyricsCts == cts)
+            {
+                RefreshLyricsButton.IsEnabled = true;
+                _lyricsCts = null;
+            }
+            cts.Dispose();
+        }
+    }
+
+    private bool ApplyLyrics(TrackRecord track)
+    {
+        ClearLyrics();
+        var timedLines = LyricsService.ParseLrc(track.SyncedLyrics);
+        if (timedLines.Count > 0)
+        {
+            foreach (var line in timedLines)
+                _lyricLines.Add(new LyricLineViewModel(line.Text, line.Time));
+        }
+        else
+        {
+            var plainLyrics = track.DownloadedLyrics ?? track.Lyrics;
+            if (!string.IsNullOrWhiteSpace(plainLyrics))
+            {
+                foreach (var line in plainLyrics.Replace("\r\n", "\n").Split('\n'))
+                    _lyricLines.Add(new LyricLineViewModel(line.Trim(), null));
+            }
+        }
+
+        var hasLyrics = _lyricLines.Count > 0;
+        LyricsStatusTextBlock.Visibility = hasLyrics ? Visibility.Collapsed : Visibility.Visible;
+        if (hasLyrics && _player is not null)
+            UpdateActiveLyric(_player.Position);
+        return hasLyrics;
+    }
+
+    private void UpdateActiveLyric(TimeSpan position)
+    {
+        if (_lyricLines.Count == 0 || _lyricLines[0].Time is null)
+            return;
+
+        var nextIndex = -1;
+        var low = 0;
+        var high = _lyricLines.Count - 1;
+        while (low <= high)
+        {
+            var middle = low + (high - low) / 2;
+            if (_lyricLines[middle].Time <= position)
+            {
+                nextIndex = middle;
+                low = middle + 1;
+            }
+            else
+            {
+                high = middle - 1;
+            }
+        }
+
+        if (nextIndex == _activeLyricIndex)
+            return;
+        if (_activeLyricIndex >= 0 && _activeLyricIndex < _lyricLines.Count)
+            _lyricLines[_activeLyricIndex].IsActive = false;
+        _activeLyricIndex = nextIndex;
+        if (_activeLyricIndex >= 0)
+        {
+            var activeLine = _lyricLines[_activeLyricIndex];
+            activeLine.IsActive = true;
+            LyricsListBox.ScrollIntoView(activeLine);
+        }
+    }
+
+    private void ShowLyricsStatus(string text)
+    {
+        LyricsStatusTextBlock.Text = text;
+        LyricsStatusTextBlock.Visibility = Visibility.Visible;
+    }
+
+    private void ClearLyrics()
+    {
+        _lyricLines.Clear();
+        _activeLyricIndex = -1;
+    }
+
+    private void CancelLyricsLoad()
+    {
+        _lyricsCts?.Cancel();
     }
 
     private void VolumeSlider_OnValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)

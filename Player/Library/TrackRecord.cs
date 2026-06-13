@@ -47,6 +47,10 @@ public sealed class TrackRecord
     public string? Conductor       { get; set; }   // TPE3
     public string? Lyricist        { get; set; }   // TEXT
     public string? Lyrics          { get; set; }   // USLT – unsynchronisierte Liedtexte
+    public string? DownloadedLyrics { get; set; }
+    public string? SyncedLyrics     { get; set; }   // LRC – zeitcodierte Liedtexte
+    public string? LyricsSource     { get; set; }
+    public long?   LyricsFetchedAt  { get; set; }   // Unix-Timestamp (Sekunden)
     public string? Comment         { get; set; }   // COMM
     public string? Copyright       { get; set; }   // TCOP
     public string? Publisher       { get; set; }   // TPUB

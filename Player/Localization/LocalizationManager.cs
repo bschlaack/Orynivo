@@ -4,8 +4,6 @@ namespace Player.Localization;
 
 public static class LocalizationManager
 {
-    public static LocalizedStrings Current { get; private set; } = German;
-
     public static void Apply(Language language)
     {
         Current = language switch
@@ -68,6 +66,10 @@ public static class LocalizationManager
         resources["L_LibraryBackupHint"] = Current.LibraryBackupHint;
         resources["L_ExportLibrary"] = Current.ExportLibrary;
         resources["L_ImportLibrary"] = Current.ImportLibrary;
+        resources["L_Lyrics"] = Current.Lyrics;
+        resources["L_ShowLyrics"] = Current.ShowLyrics;
+        resources["L_RefreshLyrics"] = Current.RefreshLyrics;
+        resources["L_CloseLyrics"] = Current.CloseLyrics;
     }
 
     private static readonly LocalizedStrings German = new(
@@ -113,7 +115,11 @@ public static class LocalizationManager
         "Bitte laufende Bibliotheksscans oder Wartungsarbeiten zuerst beenden.",
         "Player-Bibliothek (*.zip)|*.zip",
         "Bibliothek wird exportiert: {0}% – {1}",
-        "Bibliothek wird importiert: {0}% – {1}");
+        "Bibliothek wird importiert: {0}% – {1}",
+        "Songtext", "Songtext anzeigen", "Songtext neu laden", "Songtext schließen",
+        "Songtext wird geladen …", "Songtext wird von LRCLIB heruntergeladen …",
+        "Für diesen Track sind keine Metadaten verfügbar.", "Kein Songtext gefunden.",
+        "Songtext konnte nicht heruntergeladen werden.");
 
     private static readonly LocalizedStrings English = new(
         "LOCAL LIBRARY", "Artists", "Albums", "Tracks", "Folder structure", "Search", "PLAYLISTS", "About", "Settings",
@@ -158,7 +164,11 @@ public static class LocalizationManager
         "Please finish active library scans or maintenance operations first.",
         "Player library (*.zip)|*.zip",
         "Exporting library: {0}% – {1}",
-        "Importing library: {0}% – {1}");
+        "Importing library: {0}% – {1}",
+        "Lyrics", "Show lyrics", "Refresh lyrics", "Close lyrics",
+        "Loading lyrics …", "Downloading lyrics from LRCLIB …",
+        "No metadata is available for this track.", "No lyrics found.",
+        "Lyrics could not be downloaded.");
 
     private static readonly LocalizedStrings French = new(
         "BIBLIOTHÈQUE LOCALE", "Artistes", "Albums", "Titres", "Arborescence", "Recherche", "PLAYLISTS", "À propos", "Paramètres",
@@ -203,5 +213,11 @@ public static class LocalizationManager
         "Veuillez d’abord terminer les analyses ou opérations de maintenance en cours.",
         "Bibliothèque Player (*.zip)|*.zip",
         "Exportation de la bibliothèque : {0}% – {1}",
-        "Importation de la bibliothèque : {0}% – {1}");
+        "Importation de la bibliothèque : {0}% – {1}",
+        "Paroles", "Afficher les paroles", "Actualiser les paroles", "Fermer les paroles",
+        "Chargement des paroles …", "Téléchargement des paroles depuis LRCLIB …",
+        "Aucune métadonnée n’est disponible pour ce titre.", "Aucune parole trouvée.",
+        "Impossible de télécharger les paroles.");
+
+    public static LocalizedStrings Current { get; private set; } = German;
 }

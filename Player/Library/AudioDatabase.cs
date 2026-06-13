@@ -209,6 +209,29 @@ public sealed class AudioDatabase : IDisposable
         return reader.Read() ? MapRow(reader) : null;
     }
 
+    public void UpdateDownloadedLyrics(
+        string path,
+        string? plainLyrics,
+        string? syncedLyrics,
+        string source)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            UPDATE tracks
+            SET downloaded_lyrics = $plain,
+                synced_lyrics = $synced,
+                lyrics_source = $source,
+                lyrics_fetched_at = $fetched_at
+            WHERE path = $path;
+            """;
+        Add(cmd, "$plain", (object?)plainLyrics ?? DBNull.Value);
+        Add(cmd, "$synced", (object?)syncedLyrics ?? DBNull.Value);
+        Add(cmd, "$source", source);
+        Add(cmd, "$fetched_at", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        Add(cmd, "$path", path);
+        cmd.ExecuteNonQuery();
+    }
+
     public IEnumerable<TrackRecord> GetAll()
     {
         using var cmd = _conn.CreateCommand();
@@ -961,6 +984,10 @@ public sealed class AudioDatabase : IDisposable
                 conductor               TEXT,
                 lyricist                TEXT,
                 lyrics                  TEXT,
+                downloaded_lyrics       TEXT,
+                synced_lyrics           TEXT,
+                lyrics_source           TEXT,
+                lyrics_fetched_at       INTEGER,
                 comment                 TEXT,
                 copyright               TEXT,
                 publisher               TEXT,
@@ -1002,6 +1029,10 @@ public sealed class AudioDatabase : IDisposable
         EnsureColumn("tracks", "artist_id", "INTEGER REFERENCES artists(id)");
         EnsureColumn("tracks", "album_id", "INTEGER REFERENCES albums(id)");
         EnsureColumn("tracks", "is_favorite", "INTEGER NOT NULL DEFAULT 0");
+        EnsureColumn("tracks", "downloaded_lyrics", "TEXT");
+        EnsureColumn("tracks", "synced_lyrics", "TEXT");
+        EnsureColumn("tracks", "lyrics_source", "TEXT");
+        EnsureColumn("tracks", "lyrics_fetched_at", "INTEGER");
 
         Execute("""
             CREATE TABLE IF NOT EXISTS artists (
@@ -1651,6 +1682,10 @@ public sealed class AudioDatabase : IDisposable
             Conductor             = NullableString(r, "conductor"),
             Lyricist              = NullableString(r, "lyricist"),
             Lyrics                = NullableString(r, "lyrics"),
+            DownloadedLyrics      = NullableString(r, "downloaded_lyrics"),
+            SyncedLyrics          = NullableString(r, "synced_lyrics"),
+            LyricsSource          = NullableString(r, "lyrics_source"),
+            LyricsFetchedAt       = NullableLong(r, "lyrics_fetched_at"),
             Comment               = NullableString(r, "comment"),
             Copyright             = NullableString(r, "copyright"),
             Publisher             = NullableString(r, "publisher"),

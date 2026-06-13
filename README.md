@@ -22,6 +22,7 @@ and ASIO and WASAPI playback.
 - Regular and filter-based smart playlists
 - Playback history used for statistics
 - Artwork downloads through the Cover Art Archive and manual MusicBrainz search
+- Embedded or downloaded lyrics with synchronized LRC highlighting during playback
 - ZIP export and import for the managed library, playlists, history, artwork,
   and configured library directories
 - Light and dark themes
@@ -102,6 +103,16 @@ Player stores its local data under `%LOCALAPPDATA%\Player\`:
 - `search-index\`: Lucene.NET search index
 
 These files are not part of the repository.
+
+The note button in the transport bar replaces the current main content with a
+large lyrics view. The current cover is shown dimmed in the background. Player
+first uses cached synchronized lyrics, then downloaded or embedded plain lyrics
+as a fallback. Missing lyrics can be requested from the public LRCLIB API and
+are stored in `library.db`; synchronized LRC lines are highlighted and kept in
+view using the current playback position. The refresh button performs a new
+lookup, and a missing result is shown directly in the lyrics view.
+For WASAPI, buffered but not yet audible frames are excluded from the playback
+position so synchronized lyrics follow the actual output timing.
 
 The Settings library page can export this managed library data as a ZIP archive
 and import it again. Audio files are intentionally not included; their existing
