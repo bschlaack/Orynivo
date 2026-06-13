@@ -17,6 +17,11 @@ namespace Player;
 
 public partial class SettingsWindow : Window
 {
+    private sealed record SettingChoice<T>(T Value, string Label)
+    {
+        public override string ToString() => Label;
+    }
+
     private readonly AppSettings _settings;
     private readonly List<string> _libraryPaths = [];
     private readonly Dictionary<string, CancellationTokenSource> _activeScans = [];
@@ -29,10 +34,22 @@ public partial class SettingsWindow : Window
         _onLibraryPathsChanged = onLibraryPathsChanged;
         OutputBackendComboBox.ItemsSource = Enum.GetValues<OutputBackend>();
         OutputBackendComboBox.SelectedItem = settings.OutputBackend;
-        ThemeComboBox.ItemsSource = Enum.GetValues<AppTheme>();
-        ThemeComboBox.SelectedItem = settings.Theme;
-        LanguageComboBox.ItemsSource = Enum.GetValues<UiLanguage>();
-        LanguageComboBox.SelectedItem = settings.Language;
+        var themeChoices = new[]
+        {
+            new SettingChoice<AppTheme>(AppTheme.Light, LocalizationManager.Current.ThemeLight),
+            new SettingChoice<AppTheme>(AppTheme.Dark, LocalizationManager.Current.ThemeDark)
+        };
+        ThemeComboBox.ItemsSource = themeChoices;
+        ThemeComboBox.SelectedItem = themeChoices.First(choice => choice.Value == settings.Theme);
+        var languageChoices = new[]
+        {
+            new SettingChoice<UiLanguage>(UiLanguage.German, LocalizationManager.Current.LanguageGerman),
+            new SettingChoice<UiLanguage>(UiLanguage.English, LocalizationManager.Current.LanguageEnglish),
+            new SettingChoice<UiLanguage>(UiLanguage.French, LocalizationManager.Current.LanguageFrench),
+            new SettingChoice<UiLanguage>(UiLanguage.Spanish, LocalizationManager.Current.LanguageSpanish)
+        };
+        LanguageComboBox.ItemsSource = languageChoices;
+        LanguageComboBox.SelectedItem = languageChoices.First(choice => choice.Value == settings.Language);
         ArtistInfoSourceComboBox.ItemsSource = Enum.GetValues<ArtistInfoSource>();
         ArtistInfoSourceComboBox.SelectedItem = settings.ArtistInfoSource;
         LastFmApiKeyTextBox.Text = settings.LastFmApiKey ?? string.Empty;
@@ -56,9 +73,9 @@ public partial class SettingsWindow : Window
             : OutputBackend.Asio;
     public IReadOnlyList<string> SelectedLibraryPaths => _libraryPaths.AsReadOnly();
     public AppTheme SelectedTheme =>
-        ThemeComboBox.SelectedItem is AppTheme theme ? theme : AppTheme.Dark;
+        ThemeComboBox.SelectedItem is SettingChoice<AppTheme> theme ? theme.Value : AppTheme.Dark;
     public UiLanguage SelectedLanguage =>
-        LanguageComboBox.SelectedItem is UiLanguage language ? language : UiLanguage.German;
+        LanguageComboBox.SelectedItem is SettingChoice<UiLanguage> language ? language.Value : UiLanguage.German;
     public ArtistInfoSource SelectedArtistInfoSource =>
         ArtistInfoSourceComboBox.SelectedItem is ArtistInfoSource src ? src : ArtistInfoSource.Wikipedia;
     public string SelectedLastFmApiKey => LastFmApiKeyTextBox.Text.Trim();
@@ -135,7 +152,7 @@ public partial class SettingsWindow : Window
                 DriverComboBox.SelectedItem = devices.FirstOrDefault(device =>
                     string.Equals(device.Id, _settings.SelectedWasapiDeviceId, StringComparison.Ordinal))
                     ?? devices.FirstOrDefault();
-                DeviceLabelTextBlock.Text = "WASAPI-Ausgabegerät";
+                DeviceLabelTextBlock.Text = LocalizationManager.Current.WasapiOutputDevice;
                 StatusTextBlock.Text = devices.Count == 0
                     ? LocalizationManager.Current.NoWasapiDevices
                     : LocalizationManager.Current.SelectAndSave;
@@ -151,8 +168,8 @@ public partial class SettingsWindow : Window
                         name.Contains("TOPPING", StringComparison.OrdinalIgnoreCase))
                     ?? drivers.FirstOrDefault();
                 DeviceLabelTextBlock.Text = SelectedOutputBackend == OutputBackend.Asio
-                    ? "ASIO-Ausgabegerät"
-                    : "Ausgabegerät";
+                    ? LocalizationManager.Current.AsioOutputDevice
+                    : LocalizationManager.Current.OutputDevice;
                 StatusTextBlock.Text = drivers.Count == 0
                     ? LocalizationManager.Current.NoAsioDrivers
                     : LocalizationManager.Current.SelectAndSave;
@@ -160,7 +177,7 @@ public partial class SettingsWindow : Window
         }
         catch (DllNotFoundException)
         {
-            StatusTextBlock.Text = "AsioBridge.dll fehlt. Bitte zuerst build.ps1 ausführen.";
+            StatusTextBlock.Text = LocalizationManager.Current.AsioBridgeMissing;
         }
     }
 
@@ -180,7 +197,7 @@ public partial class SettingsWindow : Window
         if (backend == OutputBackend.KernelStreaming)
         {
             DriverComboBox.ItemsSource = null;
-            StatusTextBlock.Text = "KernelStreaming ist auswählbar, aber noch nicht als Wiedergabe-Backend implementiert.";
+            StatusTextBlock.Text = LocalizationManager.Current.KernelStreamingUnavailable;
         }
     }
 
@@ -213,7 +230,7 @@ public partial class SettingsWindow : Window
     {
         using var dialog = new System.Windows.Forms.FolderBrowserDialog
         {
-            Description = "Musikverzeichnis hinzufügen",
+            Description = LocalizationManager.Current.AddMusicDirectory,
             UseDescriptionForTitle = true
         };
 
@@ -245,7 +262,7 @@ public partial class SettingsWindow : Window
                 using var db = AudioDatabase.OpenDefault();
                 return db.CountByDirectory(path);
             });
-            countBlock.Text = count == 1 ? "1 Titel" : $"{count:N0} Titel";
+            countBlock.Text = LocalizationManager.FormatTrackCount(count);
         }
         catch
         {
@@ -281,13 +298,13 @@ public partial class SettingsWindow : Window
             Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)),
             FontSize = 11,
             Margin = new Thickness(0, 0, 10, 0),
-            ToolTip = "Anzahl Titel in der Datenbank"
+            ToolTip = LocalizationManager.Current.TrackCountTooltip
         };
         Grid.SetColumn(countBlock, 1);
 
         var scanBtn = new Button
         {
-            Content = "Scannen",
+            Content = LocalizationManager.Current.Scan,
             Width = 80,
             Height = 26,
             Margin = new Thickness(0, 0, 4, 0),
@@ -301,7 +318,7 @@ public partial class SettingsWindow : Window
             Width = 26,
             Height = 26,
             FontSize = 14,
-            ToolTip = "Verzeichnis entfernen",
+            ToolTip = LocalizationManager.Current.RemoveDirectory,
             Style = (Style)FindResource("SettingsButtonStyle")
         };
         Grid.SetColumn(removeBtn, 3);
@@ -342,7 +359,7 @@ public partial class SettingsWindow : Window
             var cts = new CancellationTokenSource();
             _activeScans[path] = cts;
             UpdateBackupButtonAvailability();
-            scanBtn.Content = "Abbrechen";
+            scanBtn.Content = LocalizationManager.Current.Cancel;
             statusBlock.Visibility = Visibility.Visible;
             statusBlock.Text = LocalizationManager.Current.ScanRunning;
 
@@ -352,9 +369,15 @@ public partial class SettingsWindow : Window
             try
             {
                 var result = await LibraryScanner.ScanAsync(path, progress, cts.Token);
-                statusBlock.Text =
-                    $"Fertig: {result.Total} Dateien · {result.Added} neu · {result.Updated} aktualisiert" +
-                    (result.Failed > 0 ? $" · {result.Failed} Fehler" : string.Empty);
+                var failed = result.Failed > 0
+                    ? $" · {string.Format(LocalizationManager.Current.ScanFailed, result.Failed)}"
+                    : string.Empty;
+                statusBlock.Text = string.Format(
+                    LocalizationManager.Current.ScanCompleted,
+                    result.Total,
+                    result.Added,
+                    result.Updated,
+                    failed);
             }
             catch (OperationCanceledException)
             {
@@ -362,13 +385,13 @@ public partial class SettingsWindow : Window
             }
             catch (Exception ex)
             {
-                statusBlock.Text = $"Fehler: {ex.Message}";
+                statusBlock.Text = string.Format(LocalizationManager.Current.ScanFailed, ex.Message);
             }
             finally
             {
                 _activeScans.Remove(path);
                 cts.Dispose();
-                scanBtn.Content = "Scannen";
+                scanBtn.Content = LocalizationManager.Current.Scan;
                 UpdateBackupButtonAvailability();
                 _ = RefreshCountAsync(path, countBlock);
             }
@@ -439,6 +462,38 @@ public partial class SettingsWindow : Window
         finally
         {
             RepairAlbumArtworkButton.IsEnabled = true;
+            UpdateBackupButtonAvailability();
+        }
+    }
+
+    private async void NormalizeArtistsButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        NormalizeArtistsButton.IsEnabled = false;
+        SetBackupButtonsEnabled(false);
+        DatabaseMaintenanceStatusTextBlock.Text = LocalizationManager.Current.ArtistsNormalizing;
+        try
+        {
+            var result = await Task.Run(() =>
+            {
+                using var db = AudioDatabase.OpenDefault();
+                var normalization = db.NormalizeArtists();
+                TrackSearchIndex.Rebuild(db.GetAll().ToList());
+                return normalization;
+            });
+            DatabaseMaintenanceStatusTextBlock.Text = string.Format(
+                LocalizationManager.Current.ArtistsNormalized,
+                result.MergedArtists,
+                result.UpdatedTracks);
+        }
+        catch (Exception ex)
+        {
+            DatabaseMaintenanceStatusTextBlock.Text = string.Format(
+                LocalizationManager.Current.ArtistNormalizationFailed,
+                ex.Message);
+        }
+        finally
+        {
+            NormalizeArtistsButton.IsEnabled = true;
             UpdateBackupButtonAvailability();
         }
     }
@@ -590,6 +645,7 @@ public partial class SettingsWindow : Window
         var maintenanceActive =
             !OptimizeDatabaseButton.IsEnabled ||
             !RepairAlbumArtworkButton.IsEnabled ||
+            !NormalizeArtistsButton.IsEnabled ||
             !DownloadMissingArtworkButton.IsEnabled;
         if (_activeScans.Count == 0 && !maintenanceActive)
             return true;
@@ -610,6 +666,7 @@ public partial class SettingsWindow : Window
             _activeScans.Count == 0 &&
             OptimizeDatabaseButton.IsEnabled &&
             RepairAlbumArtworkButton.IsEnabled &&
+            NormalizeArtistsButton.IsEnabled &&
             DownloadMissingArtworkButton.IsEnabled);
     }
 
@@ -618,6 +675,7 @@ public partial class SettingsWindow : Window
         AddDirectoryButton.IsEnabled = enabled;
         OptimizeDatabaseButton.IsEnabled = enabled;
         RepairAlbumArtworkButton.IsEnabled = enabled;
+        NormalizeArtistsButton.IsEnabled = enabled;
         DownloadMissingArtworkButton.IsEnabled = enabled;
         SetBackupButtonsEnabled(enabled);
         DirectoriesPanel.IsEnabled = enabled;

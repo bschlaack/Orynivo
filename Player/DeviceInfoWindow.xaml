@@ -1,7 +1,7 @@
 <Window x:Class="Player.DeviceInfoWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Geräteinfo"
+        Title="{DynamicResource L_DeviceInfo}"
         Height="420"
         Width="560"
         MinHeight="360"
@@ -21,24 +21,24 @@
 
             <TextBlock Margin="0,18,0,6"
                        FontWeight="SemiBold"
-                       Text="Unterstützte PCM-Sampleraten" />
+                       Text="{DynamicResource L_DevicePcmSampleRates}" />
             <TextBlock x:Name="PcmSampleRatesTextBlock"
                        TextWrapping="Wrap" />
 
             <TextBlock Margin="0,18,0,6"
                        FontWeight="SemiBold"
-                       Text="DSD-Stufen" />
+                       Text="{DynamicResource L_DeviceDsdRates}" />
             <WrapPanel x:Name="DsdRatesPanel" />
 
             <TextBlock Margin="0,18,0,6"
                        FontWeight="SemiBold"
-                       Text="PCM-Ausgabeformate" />
+                       Text="{DynamicResource L_DevicePcmFormats}" />
             <TextBlock x:Name="PcmFormatsTextBlock"
                        TextWrapping="Wrap" />
 
             <TextBlock Margin="0,18,0,6"
                        FontWeight="SemiBold"
-                       Text="DSD-Ausgabeformate" />
+                       Text="{DynamicResource L_DeviceDsdFormats}" />
             <TextBlock x:Name="DsdFormatsTextBlock"
                        TextWrapping="Wrap" />
         </StackPanel>

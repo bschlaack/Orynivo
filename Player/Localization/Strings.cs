@@ -135,4 +135,65 @@ public sealed record LocalizedStrings(
     string ArtistInfoSourceSetting,
     string LastFmApiKey,
     string LastFmApiKeyHint,
-    string ShowAllAlbumTracks);
+    string ShowAllAlbumTracks,
+    string CrashTitle,
+    string CrashMessage,
+    string CrashMessageWithoutLog)
+{
+    public string OutputType { get; init; } = "";
+    public string AsioOutputDevice { get; init; } = "";
+    public string WasapiOutputDevice { get; init; } = "";
+    public string DeviceInfo { get; init; } = "";
+    public string DatabaseOptimizeHint { get; init; } = "";
+    public string NormalizeArtists { get; init; } = "";
+    public string NormalizeArtistsHint { get; init; } = "";
+    public string ArtistsNormalizing { get; init; } = "";
+    public string ArtistsNormalized { get; init; } = "";
+    public string ArtistNormalizationFailed { get; init; } = "";
+    public string AsioBridgeMissing { get; init; } = "";
+    public string KernelStreamingUnavailable { get; init; } = "";
+    public string AddMusicDirectory { get; init; } = "";
+    public string TrackCountTooltip { get; init; } = "";
+    public string Scan { get; init; } = "";
+    public string RemoveDirectory { get; init; } = "";
+    public string ScanCompleted { get; init; } = "";
+    public string ScanFailed { get; init; } = "";
+    public string StartupPreparingLibrary { get; init; } = "";
+    public string Back { get; init; } = "";
+    public string MarkAsFavorite { get; init; } = "";
+    public string PlaybackThrough { get; init; } = "";
+    public string SearchResultSummary { get; init; } = "";
+    public string RecentAlbums { get; init; } = "";
+    public string Calendar { get; init; } = "";
+    public string TopGenres { get; init; } = "";
+    public string NoData { get; init; } = "";
+    public string DevicePcmSampleRates { get; init; } = "";
+    public string DeviceDsdRates { get; init; } = "";
+    public string DevicePcmFormats { get; init; } = "";
+    public string DeviceDsdFormats { get; init; } = "";
+    public string DeviceChannelSummary { get; init; } = "";
+    public string DeviceBufferSummary { get; init; } = "";
+    public string DriverProvidedNoInformation { get; init; } = "";
+    public string DsdSupportedWithoutFormats { get; init; } = "";
+    public string Unsupported { get; init; } = "";
+    public string DeviceProbeInconclusive { get; init; } = "";
+    public string WasapiEndpointSummary { get; init; } = "";
+    public string WasapiNoExclusiveFormats { get; init; } = "";
+    public string WasapiDsdNotRelevant { get; init; } = "";
+    public string NativeDsdUsesAsio { get; init; } = "";
+    public string Dashboard { get; init; } = "";
+    public string ThemeLight { get; init; } = "";
+    public string ThemeDark { get; init; } = "";
+    public string LanguageGerman { get; init; } = "";
+    public string LanguageEnglish { get; init; } = "";
+    public string LanguageFrench { get; init; } = "";
+    public string LanguageSpanish { get; init; } = "";
+    public string PcmIntegerFormat { get; init; } = "";
+    public string PcmContainerFormat { get; init; } = "";
+    public string PcmFloatFormat { get; init; } = "";
+    public string NativeDsdLsbFormat { get; init; } = "";
+    public string NativeDsdMsbFormat { get; init; } = "";
+    public string NativeDsdWordFormat { get; init; } = "";
+    public string CountEntrySingular { get; init; } = "";
+    public string CountTrackSingular { get; init; } = "";
+}

@@ -29,13 +29,14 @@ Windows audio player with:
 - `Native/AsioBridge/bridge.cpp`: ASIO initialization, PCM/DSD ring buffers, and callback
 - `Player/SettingsWindow.*`: two-column settings window with navigation on the left and the selected section on the right
 - `Player/ThemeManager.cs`: sets global WPF resources for light and dark themes
-- `Player/Localization/*`: language model and localized German, English, and French strings
+- `Player/Localization/*`: language model and localized German, English, French, and Spanish strings
 - `Player/StartupWindow.*`: lightweight splash screen shown during initial database preparation and migration
+- `Player/CrashLogger.cs`: writes unhandled UI, AppDomain, and task exception reports to `%LOCALAPPDATA%\Player\logs\`
 - `Player/SettingsStore.cs`: persists `%LOCALAPPDATA%\Player\settings.json`
 - `AppSettings.LastMainView` and `AppSettings.AlbumArtworkView` preserve the selected main view and album mode
 - `AppSettings.Volume` and `AppSettings.LastTrackPath` preserve volume and the last selected or played track; restoration requires both the file and database entry to exist
 - `AppSettings.Theme` stores the `Light` or `Dark` theme
-- `AppSettings.Language` stores `German`, `English`, or `French`
+- `AppSettings.Language` stores `German`, `English`, `French`, or `Spanish`
 - `Player/Library/TrackRecord.cs`: database track model containing tags and technical metadata
 - `Player/Library/PlaylistRecord.cs`: playlist model including denormalized `TrackCount`, `IsSmartPlaylist`, and `FilterCriteria`
 - `Player/Library/SmartPlaylistCriteria.cs`: serialized smart-playlist criteria (`FavoritesOnly`, `Genres`, `Formats`, `Bitrates`)
@@ -83,6 +84,8 @@ Windows audio player with:
 - Settings library backup creates a consistent SQLite snapshot, includes album artwork, artist images, and library paths, reports percentage and current-file progress for both export and import, writes to `.tmp` before publishing the completed `.zip`, validates imports in staging, rebases cached image paths, rolls back partial replacements, and reports Lucene index rebuild progress
 - Downloaded lyrics are cached in `tracks.downloaded_lyrics` / `tracks.synced_lyrics`; the transport note button replaces the current main content with a large lyrics view over a dimmed cover background, highlights timestamped LRC lines through the transport timer, and falls back to embedded unsynchronized lyrics
 - Artist views support table and image-card modes; visible artists lazily download localized biographies and images from the configured source (Wikipedia or Last.fm). The transport info button replaces the current main content with the current artist image, biography, and source link. The source label ("Quelle: Wikipedia" / "Quelle: Last.fm") is set dynamically from the stored `SourceUrl`.
+- Artist names are normalized when scanned: only the primary performer is retained, `feat.`/`ft.` suffixes are removed, and Unicode, whitespace, case, diacritic, and punctuation variants share one normalized artist identity
+- Settings includes **Normalize artist names**, which transactionally merges existing variants, preserves favorites and cached profile data, updates visible track and album-artist names without modifying audio files, and rebuilds the Lucene index
 
 ## Playlist Context Menus
 
@@ -101,7 +104,7 @@ Windows audio player with:
 - **Remove from playlist** appears only for regular playlist entries with a `PlaylistEntryId`
 - `_activePlaylistId` is set by `ShowTopLevelViewAsync` only for playlist views
 - `ContentRow.PlaylistEntryId` contains `playlist_tracks.id` only in regular playlist views
-- Playlist localization keys must exist in German, English, and French
+- Playlist localization keys must exist in German, English, French, and Spanish
 
 ## Playlist Database Structure
 
@@ -194,6 +197,7 @@ Windows audio player with:
 - The album-track view has a centered header with a large 240 px cover, album title, album artist, and optional year; artwork can be searched, reassigned, or deleted
 - **Favorites**: artist, album, and track lists and album cards can toggle their direct favorite flags
 - **Back navigation**: drill-downs remember the previous selection and use a themed pill-shaped chevron button
+- Visible artist and album names act as links across tables, search results, artwork cards, album headers, artist profiles, dashboard cards, and Now Playing; artist links open the artist's albums and album links open the album's tracks
 - Explicit sidebar navigation clears drill-down filters, including when the already selected item is clicked again
 - **Tracks**: title-sorted list with combinable Favorites, Genre, Audio Type, and Bitrate facets; counts reflect the other active filters and unavailable unselected values are hidden
 - Alphabetically sorted artist, album, and track views show an A-Z/# index immediately left of the right-aligned scrollbar; unavailable letters are disabled, dragging across letters scrolls live, and the highlighted letter follows the top visible entry
@@ -217,7 +221,7 @@ the actual project.
 
 - Do not hard-code new visible UI text or status/error messages in XAML or code-behind
 - Store all such text under `Player/Localization/`
-- Every new or changed string must be provided in German, English, and French
+- Every new or changed string must be provided in German, English, French, and Spanish
 - A text change is complete only after all supported language resources contain meaningful translations
 
 ## Settings Layout Rule

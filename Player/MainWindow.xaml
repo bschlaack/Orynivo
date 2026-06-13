@@ -493,6 +493,32 @@
             </Setter>
         </Style>
 
+        <Style x:Key="EntityLinkButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <TextBlock x:Name="Text"
+                                   Text="{TemplateBinding Content}"
+                                   Foreground="{TemplateBinding Foreground}"
+                                   HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Text" Property="Foreground" Value="#6C63FF"/>
+                                <Setter TargetName="Text" Property="TextDecorations" Value="Underline"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Segmentierter Ansichtsumschalter -->
         <Style x:Key="ViewModeRadioStyle" TargetType="RadioButton">
             <Setter Property="Foreground" Value="#666688"/>
@@ -556,7 +582,7 @@
                                Foreground="White" FontSize="17" FontWeight="Bold"/>
                     <TextBlock x:Name="SelectedDriverTextBlock"
                                Foreground="#44445A" FontSize="10" Margin="0,4,0,0"
-                               Text="Kein Gerät ausgewählt."
+                               Text="{DynamicResource L_NoDeviceSelected}"
                                TextTrimming="CharacterEllipsis"/>
                 </StackPanel>
             </Border>
@@ -575,7 +601,7 @@
                 <ListBoxItem Tag="Dashboard" Style="{StaticResource NavItemStyle}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="⊞" Width="18" FontSize="13" VerticalAlignment="Center"/>
-                        <TextBlock Text="Dashboard" VerticalAlignment="Center"/>
+                        <TextBlock Text="{DynamicResource L_Dashboard}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </ListBoxItem>
 
@@ -668,7 +694,7 @@
                             Visibility="Collapsed"
                             Style="{StaticResource HeaderIconButtonStyle}"
                             Click="BackButton_OnClick"
-                            ToolTip="Zurück">
+                            ToolTip="{DynamicResource L_Back}">
                         <Path Data="M 12 6 L 6 12 L 12 18"
                               Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                               StrokeThickness="2.2"
@@ -705,7 +731,7 @@
                             Click="SaveSmartPlaylistButton_OnClick">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="⚡" Margin="0,0,5,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="Als Smart-Playlist speichern" VerticalAlignment="Center"/>
+                            <TextBlock Text="{DynamicResource L_SaveSmartPlaylist}" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
                     <TextBlock x:Name="ContentCountTextBlock"
@@ -851,16 +877,19 @@
                         </Border>
 
                         <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding Title}"
-                                       FontSize="28"
-                                       FontWeight="SemiBold"
-                                       Foreground="{DynamicResource AppPrimaryTextBrush}"
-                                       TextWrapping="Wrap"/>
-                            <TextBlock Text="{Binding Artist}"
-                                       Margin="0,10,0,0"
-                                       FontSize="17"
-                                       Foreground="{DynamicResource AppSecondaryTextBrush}"
-                                       TextWrapping="Wrap"/>
+                            <Button Content="{Binding Title}"
+                                    Tag="{Binding}"
+                                    FontSize="28"
+                                    FontWeight="SemiBold"
+                                    Style="{StaticResource EntityLinkButtonStyle}"
+                                    Click="AlbumLinkButton_OnClick"/>
+                            <Button Content="{Binding Artist}"
+                                    Tag="{Binding}"
+                                    Margin="0,10,0,0"
+                                    FontSize="17"
+                                    Foreground="{DynamicResource AppSecondaryTextBrush}"
+                                    Style="{StaticResource EntityLinkButtonStyle}"
+                                    Click="ArtistLinkButton_OnClick"/>
                             <TextBlock Text="{Binding Year}"
                                        Margin="0,8,0,0"
                                        FontSize="14"
@@ -1080,15 +1109,18 @@
                                         </StackPanel>
                                     </Grid>
                                 </Border>
-                                <TextBlock Text="{Binding Title}"
-                                           Margin="0,10,0,0"
-                                           FontWeight="SemiBold"
-                                           Foreground="{DynamicResource AppPrimaryTextBrush}"
-                                           TextTrimming="CharacterEllipsis"/>
-                                <TextBlock Text="{Binding Artist}"
-                                           Margin="0,3,0,0"
-                                               Foreground="{DynamicResource AppSecondaryTextBrush}"
-                                           TextTrimming="CharacterEllipsis"/>
+                                <Button Content="{Binding Title}"
+                                        Tag="{Binding}"
+                                        Margin="0,10,0,0"
+                                        FontWeight="SemiBold"
+                                        Style="{StaticResource EntityLinkButtonStyle}"
+                                        Click="AlbumLinkButton_OnClick"/>
+                                <Button Content="{Binding Artist}"
+                                        Tag="{Binding}"
+                                        Margin="0,3,0,0"
+                                        Foreground="{DynamicResource AppSecondaryTextBrush}"
+                                        Style="{StaticResource EntityLinkButtonStyle}"
+                                        Click="ArtistLinkButton_OnClick"/>
                                 <TextBlock Text="{Binding Year}"
                                            Margin="0,3,0,0"
                                                Foreground="{DynamicResource AppMutedTextBrush}"/>
@@ -1174,13 +1206,14 @@
                                             </TextBlock>
                                         </Grid>
                                     </Border>
-                                    <TextBlock Text="{Binding Title}"
-                                               Margin="0,10,0,0"
-                                               FontSize="15"
-                                               FontWeight="SemiBold"
-                                               TextAlignment="Center"
-                                               Foreground="{DynamicResource AppPrimaryTextBrush}"
-                                               TextTrimming="CharacterEllipsis"/>
+                                    <Button Content="{Binding Title}"
+                                            Tag="{Binding}"
+                                            Margin="0,10,0,0"
+                                            FontSize="15"
+                                            FontWeight="SemiBold"
+                                            HorizontalContentAlignment="Center"
+                                            Style="{StaticResource EntityLinkButtonStyle}"
+                                            Click="ArtistLinkButton_OnClick"/>
                                     <Button Content="{Binding FavoriteGlyph}"
                                             Tag="{Binding}"
                                             Margin="0,6,0,0"
@@ -1348,11 +1381,12 @@
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock x:Name="ArtistInfoTitleTextBlock"
-                                       FontSize="28"
-                                       FontWeight="SemiBold"
-                                       Foreground="{DynamicResource AppPrimaryTextBrush}"
-                                       VerticalAlignment="Center"/>
+                            <Button x:Name="ArtistInfoTitleButton"
+                                    FontSize="28"
+                                    FontWeight="SemiBold"
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource EntityLinkButtonStyle}"
+                                    Click="ArtistInfoTitleButton_OnClick"/>
                             <Button x:Name="RefreshArtistInfoButton"
                                     Grid.Column="1"
                                     Style="{StaticResource TransportBtnStyle}"
@@ -1458,9 +1492,15 @@
                     <TextBlock x:Name="NowPlayingTitleBlock"
                                    Foreground="{DynamicResource AppTransportPrimaryTextBrush}" FontSize="13" FontWeight="SemiBold"
                                    TextTrimming="CharacterEllipsis"/>
-                        <TextBlock x:Name="NowPlayingArtistBlock"
-                                   Foreground="#6666AA" FontSize="11" Margin="0,2,0,0"
-                                   TextTrimming="CharacterEllipsis"/>
+                        <Button x:Name="NowPlayingArtistButton"
+                                Content="{Binding Text, ElementName=NowPlayingArtistBlock}"
+                                Foreground="#6666AA"
+                                FontSize="11"
+                                Margin="0,2,0,0"
+                                IsEnabled="False"
+                                Style="{StaticResource EntityLinkButtonStyle}"
+                                Click="NowPlayingArtistButton_OnClick"/>
+                        <TextBlock x:Name="NowPlayingArtistBlock" Visibility="Collapsed"/>
                         <TextBlock x:Name="FileInfoTextBlock"
                                    Foreground="#44445A" FontSize="10" Margin="0,2,0,0"
                                    TextTrimming="CharacterEllipsis"/>
@@ -1493,7 +1533,7 @@
                             Style="{StaticResource TransportBtnStyle}"
                             Margin="8,0,0,0"
                             IsEnabled="False"
-                            ToolTip="Als Favorit markieren"
+                            ToolTip="{DynamicResource L_MarkAsFavorite}"
                             Click="NowPlayingFavoriteButton_OnClick">
                         <TextBlock x:Name="NowPlayingFavoriteGlyph"
                                    Text="♡"

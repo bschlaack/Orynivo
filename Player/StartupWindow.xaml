@@ -18,7 +18,7 @@
                        Margin="0,18,0,12"
                        Foreground="#CCCCEE"
                        FontSize="13"
-                       Text="Bibliothek wird vorbereitet …"/>
+                       Text="{DynamicResource L_StartupPreparingLibrary}"/>
             <ProgressBar IsIndeterminate="True"
                          Height="6"
                          Background="#252640"

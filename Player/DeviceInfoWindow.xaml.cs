@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using Player.Audio;
+using Player.Localization;
 using System.Runtime.InteropServices;
 using WpfApplication = System.Windows.Application;
 
@@ -14,11 +15,11 @@ public partial class DeviceInfoWindow : Window
 
         DriverNameTextBlock.Text = info.DriverName;
         SummaryTextBlock.Text =
-            $"{info.OutputChannels} Ausgangskanal/Kanäle · {info.InputChannels} Eingangskanal/Kanäle\n" +
-            $"Buffer: min {info.MinBufferSize}, bevorzugt {info.PreferredBufferSize}, max {info.MaxBufferSize}, Granularität {info.BufferGranularity}";
+            string.Format(LocalizationManager.Current.DeviceChannelSummary, info.OutputChannels, info.InputChannels) + "\n" +
+            string.Format(LocalizationManager.Current.DeviceBufferSummary, info.MinBufferSize, info.PreferredBufferSize, info.MaxBufferSize, info.BufferGranularity);
 
         PcmSampleRatesTextBlock.Text = info.SupportedPcmSampleRates.Count == 0
-            ? "Keine Angaben vom Treiber."
+            ? LocalizationManager.Current.DriverProvidedNoInformation
             : string.Join(" · ", info.SupportedPcmSampleRates.Select(FormatPcmRate));
 
         foreach (var dsdRate in new[] { 64, 128, 256, 512, 1024 })
@@ -35,16 +36,16 @@ public partial class DeviceInfoWindow : Window
         }
 
         PcmFormatsTextBlock.Text = info.PcmOutputFormats.Count == 0
-            ? "Keine Angaben vom Treiber."
+            ? LocalizationManager.Current.DriverProvidedNoInformation
             : string.Join(Environment.NewLine, info.PcmOutputFormats.Distinct().Select(DescribeFormat));
 
         DsdFormatsTextBlock.Text = info.SupportsDsd
             ? info.DsdOutputFormats.Count == 0
-                ? "DSD-Modus unterstützt; keine konkreten Kanalformate gemeldet."
+                ? LocalizationManager.Current.DsdSupportedWithoutFormats
                 : string.Join(Environment.NewLine, info.DsdOutputFormats.Distinct().Select(DescribeFormat))
             : info.DsdProbeWasConclusive
-                ? "Nicht unterstützt."
-                : "Konnte nicht eindeutig geprüft werden — Gerät wird möglicherweise von einer anderen Anwendung verwendet.";
+                ? LocalizationManager.Current.Unsupported
+                : LocalizationManager.Current.DeviceProbeInconclusive;
     }
 
     private void DeviceInfoWindow_OnSourceInitialized(object sender, EventArgs e)
@@ -77,42 +78,44 @@ public partial class DeviceInfoWindow : Window
         InitializeComponent();
 
         DriverNameTextBlock.Text = info.Name;
-        SummaryTextBlock.Text =
-            $"WASAPI-Endpunkt · {info.MixFormatChannels} Kanal/Kanäle\n" +
-            $"Mix-Format: {FormatPcmRate(info.MixFormatSampleRate)} · {info.MixFormatBitsPerSample} Bit";
+        SummaryTextBlock.Text = string.Format(
+            LocalizationManager.Current.WasapiEndpointSummary,
+            info.MixFormatChannels,
+            FormatPcmRate(info.MixFormatSampleRate),
+            info.MixFormatBitsPerSample);
 
         PcmSampleRatesTextBlock.Text = info.ExclusivePcmSampleRates.Count == 0
-            ? "Keine exklusiven PCM-Formate erkannt."
+            ? LocalizationManager.Current.WasapiNoExclusiveFormats
             : string.Join(" · ", info.ExclusivePcmSampleRates.Select(FormatPcmRate));
 
         DsdRatesPanel.Children.Add(new TextBlock
         {
-            Text = "Nicht relevant für WASAPI in diesem Player.",
+            Text = LocalizationManager.Current.WasapiDsdNotRelevant,
             Foreground = (System.Windows.Media.Brush)FindResource("AppDsdUnsupportedBrush")
         });
 
         PcmFormatsTextBlock.Text = info.ExclusivePcmFormats.Count == 0
-            ? "Keine exklusiven PCM-Formate erkannt."
+            ? LocalizationManager.Current.WasapiNoExclusiveFormats
             : string.Join(Environment.NewLine, info.ExclusivePcmFormats);
 
-        DsdFormatsTextBlock.Text = "Native DSD-Wiedergabe läuft in diesem Player über ASIO.";
+        DsdFormatsTextBlock.Text = LocalizationManager.Current.NativeDsdUsesAsio;
     }
 
     private static string DescribeFormat(string format) =>
         format switch
         {
-            "Int16LSB" => "16-Bit PCM, Little Endian (Int16LSB)",
-            "Int24LSB" => "24-Bit PCM, Little Endian (Int24LSB)",
-            "Int32LSB" => "32-Bit PCM, Little Endian (Int32LSB)",
-            "Int32LSB16" => "16-Bit PCM in 32-Bit-Container, Little Endian (Int32LSB16)",
-            "Int32LSB18" => "18-Bit PCM in 32-Bit-Container, Little Endian (Int32LSB18)",
-            "Int32LSB20" => "20-Bit PCM in 32-Bit-Container, Little Endian (Int32LSB20)",
-            "Int32LSB24" => "24-Bit PCM in 32-Bit-Container, Little Endian (Int32LSB24)",
-            "Float32LSB" => "32-Bit Float PCM, Little Endian (Float32LSB)",
-            "Float64LSB" => "64-Bit Float PCM, Little Endian (Float64LSB)",
-            "DSDInt8LSB1" => "Natives DSD, 1-Bit-Daten, erste Probe im niederwertigsten Bit (DSDInt8LSB1)",
-            "DSDInt8MSB1" => "Natives DSD, 1-Bit-Daten, erste Probe im höchstwertigen Bit (DSDInt8MSB1)",
-            "DSDInt8NER8" => "Natives DSD, 8-Bit-Wörter ohne Endian-Relevanz (DSDInt8NER8)",
+            "Int16LSB" => string.Format(LocalizationManager.Current.PcmIntegerFormat, 16, format),
+            "Int24LSB" => string.Format(LocalizationManager.Current.PcmIntegerFormat, 24, format),
+            "Int32LSB" => string.Format(LocalizationManager.Current.PcmIntegerFormat, 32, format),
+            "Int32LSB16" => string.Format(LocalizationManager.Current.PcmContainerFormat, 16, 32, format),
+            "Int32LSB18" => string.Format(LocalizationManager.Current.PcmContainerFormat, 18, 32, format),
+            "Int32LSB20" => string.Format(LocalizationManager.Current.PcmContainerFormat, 20, 32, format),
+            "Int32LSB24" => string.Format(LocalizationManager.Current.PcmContainerFormat, 24, 32, format),
+            "Float32LSB" => string.Format(LocalizationManager.Current.PcmFloatFormat, 32, format),
+            "Float64LSB" => string.Format(LocalizationManager.Current.PcmFloatFormat, 64, format),
+            "DSDInt8LSB1" => string.Format(LocalizationManager.Current.NativeDsdLsbFormat, format),
+            "DSDInt8MSB1" => string.Format(LocalizationManager.Current.NativeDsdMsbFormat, format),
+            "DSDInt8NER8" => string.Format(LocalizationManager.Current.NativeDsdWordFormat, format),
             _ => format
         };
 

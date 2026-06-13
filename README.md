@@ -15,6 +15,8 @@ and ASIO and WASAPI playback.
 - SQLite music library with multiple monitored directories
 - Metadata and embedded artwork extraction through TagLibSharp
 - Artist, album, track, and folder views
+- Linked artist and album names for direct navigation to artist albums and album tracks
+- Conservative artist-name normalization for `feat.` credits and unambiguous case, accent, spacing, and punctuation variants, with a repair action for existing libraries
 - Live A-Z/# quick navigation beside alphabetically sorted artist, album, and track lists
 - Album view with table and virtualized artwork modes
 - Dashboard with recently added albums, playback calendar, and top genres
@@ -28,7 +30,7 @@ and ASIO and WASAPI playback.
 - ZIP export and import for the managed library, playlists, history, artwork,
   and configured library directories
 - Light and dark themes
-- German, English, and French user interfaces
+- German, English, French, and Spanish user interfaces
 
 ## Supported Formats
 
@@ -89,7 +91,7 @@ Player/
 │   ├── Audio/               ASIO, WASAPI, PCM, and DSD playback
 │   ├── Controls/            Custom WPF controls
 │   ├── Library/             SQLite database, scanner, search, and artwork cache
-│   ├── Localization/        German, English, and French resources
+│   ├── Localization/        German, English, French, and Spanish resources
 │   └── MainWindow.*         Main user interface and navigation
 ├── build.ps1                Builds the bridge and .NET application
 └── Player.sln               Visual Studio solution
@@ -101,6 +103,7 @@ Player stores its local data under `%LOCALAPPDATA%\Player\`:
 
 - `settings.json`: application settings
 - `library.db`: SQLite music library and playback history
+- `logs\`: timestamped crash reports for unhandled application errors
 - `artworks\`: original artwork and generated thumbnails
 - `artist-images\`: cached Wikipedia/Wikimedia artist images
 - `search-index\`: Lucene.NET search index
