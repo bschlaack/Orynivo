@@ -304,6 +304,46 @@
 
                     <Separator Margin="0,18,0,14"/>
 
+                    <TextBlock Text="{DynamicResource L_LibraryBackup}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+                    <TextBlock Text="{DynamicResource L_LibraryBackupHint}"
+                               FontSize="11"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,8"/>
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="ExportLibraryButton"
+                                Width="180"
+                                Height="28"
+                                Style="{StaticResource SettingsButtonStyle}"
+                                Content="{DynamicResource L_ExportLibrary}"
+                                Click="ExportLibraryButton_OnClick"/>
+                        <Button x:Name="ImportLibraryButton"
+                                Width="180"
+                                Height="28"
+                                Margin="8,0,0,0"
+                                Style="{StaticResource SettingsButtonStyle}"
+                                Content="{DynamicResource L_ImportLibrary}"
+                                Click="ImportLibraryButton_OnClick"/>
+                    </StackPanel>
+                    <TextBlock x:Name="LibraryBackupStatusTextBlock"
+                               Margin="0,8,0,0"
+                               FontSize="11"
+                               Foreground="{DynamicResource AppSecondaryTextBrush}"
+                               TextWrapping="Wrap"/>
+                    <ProgressBar x:Name="LibraryExportProgressBar"
+                                 Height="8"
+                                 Margin="0,8,0,0"
+                                 Minimum="0"
+                                 Maximum="100"
+                                 Visibility="Collapsed"
+                                 Foreground="#6C63FF"
+                                 Background="{DynamicResource AppGridLineBrush}"/>
+
+                    <Separator Margin="0,18,0,14"/>
+
                     <TextBlock Text="{DynamicResource L_DatabaseMaintenance}"
                                FontSize="12"
                                FontWeight="SemiBold"

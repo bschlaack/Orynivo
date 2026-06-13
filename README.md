@@ -22,6 +22,8 @@ and ASIO and WASAPI playback.
 - Regular and filter-based smart playlists
 - Playback history used for statistics
 - Artwork downloads through the Cover Art Archive and manual MusicBrainz search
+- ZIP export and import for the managed library, playlists, history, artwork,
+  and configured library directories
 - Light and dark themes
 - German, English, and French user interfaces
 
@@ -100,6 +102,15 @@ Player stores its local data under `%LOCALAPPDATA%\Player\`:
 - `search-index\`: Lucene.NET search index
 
 These files are not part of the repository.
+
+The Settings library page can export this managed library data as a ZIP archive
+and import it again. Audio files are intentionally not included; their existing
+paths and the configured library directories are preserved in the backup. A
+successful import rebuilds the search index and restarts the application state.
+Exports show file-level progress and write to a temporary `.tmp` archive first;
+the file is renamed to `.zip` only after the export completes successfully.
+Imports use the same progress bar while extracting, validating, restoring
+artwork, rebasing paths, and rebuilding the search index.
 
 ## Current Limitations
 

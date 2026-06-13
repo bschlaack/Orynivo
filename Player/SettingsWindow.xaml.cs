@@ -9,6 +9,9 @@ using Player.Library;
 using Player.Localization;
 using UiLanguage = Player.Localization.Language;
 using System.Runtime.InteropServices;
+using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
+using SaveFileDialog = Microsoft.Win32.SaveFileDialog;
+using WpfMessageBox = System.Windows.MessageBox;
 
 namespace Player;
 
@@ -321,6 +324,7 @@ public partial class SettingsWindow : Window
 
             var cts = new CancellationTokenSource();
             _activeScans[path] = cts;
+            UpdateBackupButtonAvailability();
             scanBtn.Content = "Abbrechen";
             statusBlock.Visibility = Visibility.Visible;
             statusBlock.Text = LocalizationManager.Current.ScanRunning;
@@ -348,6 +352,7 @@ public partial class SettingsWindow : Window
                 _activeScans.Remove(path);
                 cts.Dispose();
                 scanBtn.Content = "Scannen";
+                UpdateBackupButtonAvailability();
                 _ = RefreshCountAsync(path, countBlock);
             }
         };
@@ -359,6 +364,7 @@ public partial class SettingsWindow : Window
             {
                 cts.Cancel();
                 _activeScans.Remove(path);
+                UpdateBackupButtonAvailability();
             }
             _libraryPaths.Remove(path);
             RebuildDirectoryList();
@@ -373,6 +379,7 @@ public partial class SettingsWindow : Window
     private async void OptimizeDatabaseButton_OnClick(object sender, RoutedEventArgs e)
     {
         OptimizeDatabaseButton.IsEnabled = false;
+        SetBackupButtonsEnabled(false);
         DatabaseMaintenanceStatusTextBlock.Text = LocalizationManager.Current.DatabaseOptimizing;
         try
         {
@@ -390,12 +397,14 @@ public partial class SettingsWindow : Window
         finally
         {
             OptimizeDatabaseButton.IsEnabled = true;
+            UpdateBackupButtonAvailability();
         }
     }
 
     private async void RepairAlbumArtworkButton_OnClick(object sender, RoutedEventArgs e)
     {
         RepairAlbumArtworkButton.IsEnabled = false;
+        SetBackupButtonsEnabled(false);
         DatabaseMaintenanceStatusTextBlock.Text = LocalizationManager.Current.AlbumArtworkRepairing;
         var progress = new Progress<ScanProgress>(p =>
             DatabaseMaintenanceStatusTextBlock.Text =
@@ -413,12 +422,14 @@ public partial class SettingsWindow : Window
         finally
         {
             RepairAlbumArtworkButton.IsEnabled = true;
+            UpdateBackupButtonAvailability();
         }
     }
 
     private async void DownloadMissingArtworkButton_OnClick(object sender, RoutedEventArgs e)
     {
         DownloadMissingArtworkButton.IsEnabled = false;
+        SetBackupButtonsEnabled(false);
         DatabaseMaintenanceStatusTextBlock.Text = LocalizationManager.Current.MissingArtworkDownloading;
         var progress = new Progress<ScanProgress>(p =>
             DatabaseMaintenanceStatusTextBlock.Text =
@@ -437,7 +448,162 @@ public partial class SettingsWindow : Window
         finally
         {
             DownloadMissingArtworkButton.IsEnabled = true;
+            UpdateBackupButtonAvailability();
         }
+    }
+
+    private async void ExportLibraryButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (!CanStartLibraryBackupOperation())
+            return;
+
+        var dialog = new SaveFileDialog
+        {
+            Title = LocalizationManager.Current.ExportLibrary,
+            Filter = LocalizationManager.Current.LibraryArchiveFilter,
+            DefaultExt = ".zip",
+            AddExtension = true,
+            FileName = $"Player-library-{DateTime.Now:yyyyMMdd-HHmm}.zip"
+        };
+        if (dialog.ShowDialog(this) != true)
+            return;
+
+        SetLibraryOperationControlsEnabled(false);
+        LibraryBackupStatusTextBlock.Text = LocalizationManager.Current.LibraryExporting;
+        LibraryExportProgressBar.Value = 0;
+        LibraryExportProgressBar.Visibility = Visibility.Visible;
+        var progress = new Progress<LibraryExportProgress>(value =>
+        {
+            LibraryExportProgressBar.Value = value.Percentage;
+            LibraryBackupStatusTextBlock.Text = string.Format(
+                LocalizationManager.Current.LibraryExportProgress,
+                value.Percentage,
+                value.CurrentFile ?? string.Empty);
+        });
+        try
+        {
+            await LibraryBackupService.ExportAsync(dialog.FileName, _libraryPaths, progress);
+            LibraryExportProgressBar.Value = 100;
+            LibraryBackupStatusTextBlock.Text =
+                string.Format(LocalizationManager.Current.LibraryExported, dialog.FileName);
+        }
+        catch (Exception ex)
+        {
+            LibraryExportProgressBar.Visibility = Visibility.Collapsed;
+            LibraryBackupStatusTextBlock.Text =
+                string.Format(LocalizationManager.Current.LibraryExportFailed, ex.Message);
+        }
+        finally
+        {
+            SetLibraryOperationControlsEnabled(true);
+        }
+    }
+
+    private async void ImportLibraryButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (!CanStartLibraryBackupOperation())
+            return;
+
+        var dialog = new OpenFileDialog
+        {
+            Title = LocalizationManager.Current.ImportLibrary,
+            Filter = LocalizationManager.Current.LibraryArchiveFilter,
+            DefaultExt = ".zip",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+        if (dialog.ShowDialog(this) != true)
+            return;
+
+        var confirmation = WpfMessageBox.Show(
+            this,
+            LocalizationManager.Current.LibraryImportConfirm,
+            LocalizationManager.Current.ImportLibrary,
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning,
+            MessageBoxResult.No);
+        if (confirmation != MessageBoxResult.Yes)
+            return;
+
+        SetLibraryOperationControlsEnabled(false);
+        LibraryBackupStatusTextBlock.Text = LocalizationManager.Current.LibraryImporting;
+        LibraryExportProgressBar.Value = 0;
+        LibraryExportProgressBar.Visibility = Visibility.Visible;
+        var progress = new Progress<LibraryImportProgress>(value =>
+        {
+            LibraryExportProgressBar.Value = value.Percentage;
+            LibraryBackupStatusTextBlock.Text = string.Format(
+                LocalizationManager.Current.LibraryImportProgress,
+                value.Percentage,
+                value.CurrentFile ?? string.Empty);
+        });
+        try
+        {
+            if (Owner is MainWindow mainWindow)
+                mainWindow.PrepareForLibraryImport();
+
+            var importedPaths = await LibraryBackupService.ImportAsync(dialog.FileName, progress);
+            LibraryExportProgressBar.Value = 100;
+            _libraryPaths.Clear();
+            _libraryPaths.AddRange(importedPaths);
+            _settings.LibraryPaths = _libraryPaths.ToList();
+            _onLibraryPathsChanged?.Invoke(_libraryPaths.ToList());
+            RebuildDirectoryList();
+            LibraryBackupStatusTextBlock.Text = LocalizationManager.Current.LibraryImported;
+
+            WpfMessageBox.Show(
+                this,
+                LocalizationManager.Current.LibraryImported,
+                LocalizationManager.Current.ImportLibrary,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            System.Windows.Application.Current.Shutdown();
+        }
+        catch (Exception ex)
+        {
+            LibraryExportProgressBar.Visibility = Visibility.Collapsed;
+            LibraryBackupStatusTextBlock.Text =
+                string.Format(LocalizationManager.Current.LibraryImportFailed, ex.Message);
+            SetLibraryOperationControlsEnabled(true);
+        }
+    }
+
+    private bool CanStartLibraryBackupOperation()
+    {
+        var maintenanceActive =
+            !OptimizeDatabaseButton.IsEnabled ||
+            !RepairAlbumArtworkButton.IsEnabled ||
+            !DownloadMissingArtworkButton.IsEnabled;
+        if (_activeScans.Count == 0 && !maintenanceActive)
+            return true;
+
+        LibraryBackupStatusTextBlock.Text = LocalizationManager.Current.LibraryOperationScanActive;
+        return false;
+    }
+
+    private void SetBackupButtonsEnabled(bool enabled)
+    {
+        ExportLibraryButton.IsEnabled = enabled;
+        ImportLibraryButton.IsEnabled = enabled;
+    }
+
+    private void UpdateBackupButtonAvailability()
+    {
+        SetBackupButtonsEnabled(
+            _activeScans.Count == 0 &&
+            OptimizeDatabaseButton.IsEnabled &&
+            RepairAlbumArtworkButton.IsEnabled &&
+            DownloadMissingArtworkButton.IsEnabled);
+    }
+
+    private void SetLibraryOperationControlsEnabled(bool enabled)
+    {
+        AddDirectoryButton.IsEnabled = enabled;
+        OptimizeDatabaseButton.IsEnabled = enabled;
+        RepairAlbumArtworkButton.IsEnabled = enabled;
+        DownloadMissingArtworkButton.IsEnabled = enabled;
+        SetBackupButtonsEnabled(enabled);
+        DirectoriesPanel.IsEnabled = enabled;
     }
 
     // ------------------------------------------------------------------

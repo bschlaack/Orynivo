@@ -64,6 +64,10 @@ public static class LocalizationManager
         resources["L_NewPlaylistNameLabel"] = Current.NewPlaylistNameLabel;
         resources["L_CreatePlaylist"] = Current.CreatePlaylist;
         resources["L_SaveSmartPlaylistDisabledTooltip"] = Current.SaveSmartPlaylistDisabledTooltip;
+        resources["L_LibraryBackup"] = Current.LibraryBackup;
+        resources["L_LibraryBackupHint"] = Current.LibraryBackupHint;
+        resources["L_ExportLibrary"] = Current.ExportLibrary;
+        resources["L_ImportLibrary"] = Current.ImportLibrary;
     }
 
     private static readonly LocalizedStrings German = new(
@@ -96,7 +100,20 @@ public static class LocalizationManager
         "Playlist löschen", "Von Playlist entfernen",
         "Playlist »{0}« gelöscht.", "Track von Playlist entfernt.",
         "Filter als Smart-Playlist speichern", "Smart-Playlist »{0}« gespeichert.",
-        "Bitte zuerst einen Filter auswählen.");
+        "Bitte zuerst einen Filter auswählen.",
+        "Bibliothek sichern",
+        "Exportiert Datenbank, Playlists, Verlauf, Cover und Verzeichnisliste als ZIP. Audiodateien sind nicht enthalten.",
+        "Bibliothek exportieren", "Bibliothek importieren",
+        "Bibliothek wird exportiert …", "Bibliothek wurde nach »{0}« exportiert.",
+        "Bibliothek konnte nicht exportiert werden: {0}",
+        "Der Import ersetzt die aktuelle Bibliothek, Playlists, den Verlauf und alle Cover. Fortfahren?",
+        "Bibliothek wird importiert und der Suchindex neu aufgebaut …",
+        "Bibliothek wurde importiert. Der Player wird jetzt beendet und kann anschließend neu gestartet werden.",
+        "Bibliothek konnte nicht importiert werden: {0}",
+        "Bitte laufende Bibliotheksscans oder Wartungsarbeiten zuerst beenden.",
+        "Player-Bibliothek (*.zip)|*.zip",
+        "Bibliothek wird exportiert: {0}% – {1}",
+        "Bibliothek wird importiert: {0}% – {1}");
 
     private static readonly LocalizedStrings English = new(
         "LOCAL LIBRARY", "Artists", "Albums", "Tracks", "Folder structure", "Search", "PLAYLISTS", "About", "Settings",
@@ -128,7 +145,20 @@ public static class LocalizationManager
         "Delete playlist", "Remove from playlist",
         "Playlist '{0}' deleted.", "Track removed from playlist.",
         "Save filters as smart playlist", "Smart playlist '{0}' saved.",
-        "Please select a filter first.");
+        "Please select a filter first.",
+        "Library backup",
+        "Exports the database, playlists, history, artwork, and directory list as ZIP. Audio files are not included.",
+        "Export library", "Import library",
+        "Exporting library …", "Library exported to '{0}'.",
+        "Library export failed: {0}",
+        "Import replaces the current library, playlists, history, and all artwork. Continue?",
+        "Importing library and rebuilding the search index …",
+        "Library imported. Player will now close and can then be restarted.",
+        "Library import failed: {0}",
+        "Please finish active library scans or maintenance operations first.",
+        "Player library (*.zip)|*.zip",
+        "Exporting library: {0}% – {1}",
+        "Importing library: {0}% – {1}");
 
     private static readonly LocalizedStrings French = new(
         "BIBLIOTHÈQUE LOCALE", "Artistes", "Albums", "Titres", "Arborescence", "Recherche", "PLAYLISTS", "À propos", "Paramètres",
@@ -160,5 +190,18 @@ public static class LocalizationManager
         "Supprimer la playlist", "Retirer de la playlist",
         "Playlist « {0} » supprimée.", "Titre retiré de la playlist.",
         "Enregistrer les filtres comme playlist intelligente", "Playlist intelligente « {0} » enregistrée.",
-        "Veuillez d'abord sélectionner un filtre.");
+        "Veuillez d'abord sélectionner un filtre.",
+        "Sauvegarde de la bibliothèque",
+        "Exporte la base, les playlists, l’historique, les pochettes et la liste des dossiers au format ZIP. Les fichiers audio ne sont pas inclus.",
+        "Exporter la bibliothèque", "Importer la bibliothèque",
+        "Exportation de la bibliothèque …", "Bibliothèque exportée vers « {0} ».",
+        "Échec de l’exportation de la bibliothèque : {0}",
+        "L’importation remplace la bibliothèque, les playlists, l’historique et toutes les pochettes actuelles. Continuer ?",
+        "Importation de la bibliothèque et reconstruction de l’index de recherche …",
+        "Bibliothèque importée. Le lecteur va maintenant se fermer et pourra ensuite être redémarré.",
+        "Échec de l’importation de la bibliothèque : {0}",
+        "Veuillez d’abord terminer les analyses ou opérations de maintenance en cours.",
+        "Bibliothèque Player (*.zip)|*.zip",
+        "Exportation de la bibliothèque : {0}% – {1}",
+        "Importation de la bibliothèque : {0}% – {1}");
 }

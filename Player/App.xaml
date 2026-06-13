@@ -144,6 +144,10 @@
         <sys:String x:Key="L_Directories" xmlns:sys="clr-namespace:System;assembly=mscorlib">Verzeichnisse</sys:String>
         <sys:String x:Key="L_AddDirectory" xmlns:sys="clr-namespace:System;assembly=mscorlib">+ Verzeichnis hinzufügen</sys:String>
         <sys:String x:Key="L_DatabaseMaintenance" xmlns:sys="clr-namespace:System;assembly=mscorlib">Datenbankwartung</sys:String>
+        <sys:String x:Key="L_LibraryBackup" xmlns:sys="clr-namespace:System;assembly=mscorlib">Bibliothek sichern</sys:String>
+        <sys:String x:Key="L_LibraryBackupHint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Datenbank, Playlists, Verlauf und Cover als ZIP exportieren. Audiodateien sind nicht enthalten.</sys:String>
+        <sys:String x:Key="L_ExportLibrary" xmlns:sys="clr-namespace:System;assembly=mscorlib">Bibliothek exportieren</sys:String>
+        <sys:String x:Key="L_ImportLibrary" xmlns:sys="clr-namespace:System;assembly=mscorlib">Bibliothek importieren</sys:String>
         <sys:String x:Key="L_OptimizeDatabase" xmlns:sys="clr-namespace:System;assembly=mscorlib">Datenbank optimieren</sys:String>
         <sys:String x:Key="L_RepairAlbumArtwork" xmlns:sys="clr-namespace:System;assembly=mscorlib">Album-Cover reparieren</sys:String>
         <sys:String x:Key="L_Save" xmlns:sys="clr-namespace:System;assembly=mscorlib">Speichern</sys:String>

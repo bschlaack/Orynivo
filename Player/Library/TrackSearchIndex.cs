@@ -58,8 +58,11 @@ public static class TrackSearchIndex
             && SearchFields.All(field => doc.GetFields(field).Length > 0);
     }
 
-    public static void Rebuild(IEnumerable<TrackRecord> tracks)
+    public static void Rebuild(
+        IEnumerable<TrackRecord> tracks,
+        Action<int, int, string?>? progress = null)
     {
+        var trackList = tracks as IReadOnlyList<TrackRecord> ?? tracks.ToList();
         if (IODirectory.Exists(Root))
             IODirectory.Delete(Root, recursive: true);
 
@@ -68,8 +71,16 @@ public static class TrackSearchIndex
         using var analyzer = CreateAnalyzer();
         var config = new IndexWriterConfig(Version, analyzer);
         using var writer = new IndexWriter(directory, config);
-        foreach (var track in tracks)
+        for (var index = 0; index < trackList.Count; index++)
+        {
+            var track = trackList[index];
             writer.AddDocument(ToDocument(track));
+            if (progress is not null &&
+                (index == trackList.Count - 1 || index % 100 == 0))
+            {
+                progress(index + 1, trackList.Count, track.FileName);
+            }
+        }
         writer.Commit();
     }
 

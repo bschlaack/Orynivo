@@ -2335,6 +2335,12 @@ public partial class MainWindow : Window
         }
     }
 
+    internal void PrepareForLibraryImport()
+    {
+        _searchTimer.Stop();
+        StopPlayback();
+    }
+
     private void AboutButton_OnClick(object sender, RoutedEventArgs e)
     {
         new AboutWindow { Owner = this }.ShowDialog();

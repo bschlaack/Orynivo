@@ -42,6 +42,7 @@ Windows audio player with:
 - `Player/Library/PlaylistTrackRecord.cs`: playlist entry model with position, optional TrackId reference, and required path
 - `Player/Library/AudioDatabase.cs`: SQLite database layer through `Microsoft.Data.Sqlite`; database at `%LOCALAPPDATA%\Player\library.db`
 - `Player/Library/LibraryScanner.cs`: directory scanner using TagLibSharp; writes through `AudioDatabase.Upsert()`, reports progress, and supports cancellation
+- `Player/Library/LibraryBackupService.cs`: versioned ZIP export/import for the SQLite library, artwork cache, and configured library directories; audio files are not included
 
 ## Audio Database
 
@@ -77,6 +78,7 @@ Windows audio player with:
 - Thumbnail generation is intentionally fault tolerant; invalid embedded artwork must not prevent startup
 - `normalized_library_v1` prevents expensive legacy migration checks on every database open
 - `AudioDatabase.Optimize()` runs `wal_checkpoint(TRUNCATE)`, `VACUUM`, and `ANALYZE`
+- Settings library backup creates a consistent SQLite snapshot, includes artwork and library paths, reports percentage and current-file progress for both export and import, writes to `.tmp` before publishing the completed `.zip`, validates imports in staging, rebases artwork paths, rolls back partial replacements, and reports Lucene index rebuild progress
 
 ## Playlist Context Menus
 
