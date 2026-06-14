@@ -209,6 +209,21 @@
                 <TextBlock Text="{DynamicResource L_Directories}"/>
             </ListBoxItem>
 
+            <!-- Oberpunkt: Streaming -->
+            <ListBoxItem IsHitTestVisible="False"
+                         Focusable="False"
+                         Padding="12,14,0,4"
+                         FontSize="10"
+                         FontWeight="Bold"
+                         Foreground="{DynamicResource AppMutedTextBrush}">
+                <TextBlock Text="{DynamicResource L_Streaming}"/>
+            </ListBoxItem>
+            <ListBoxItem Tag="Streaming"
+                         FontSize="13"
+                         Style="{StaticResource SettingsNavItemStyle}">
+                <TextBlock Text="{DynamicResource L_StreamingServices}"/>
+            </ListBoxItem>
+
             <!-- Oberpunkt: Darstellung -->
             <ListBoxItem IsHitTestVisible="False"
                          Focusable="False"
@@ -414,6 +429,40 @@
                                Margin="0,8,0,0"
                                FontSize="11"
                                Foreground="#555555"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+
+                <!-- Panel: Streamingdienste -->
+                <StackPanel x:Name="StreamingPanel"
+                            Visibility="Collapsed">
+                    <TextBlock Text="{DynamicResource L_StreamingServices}"
+                               FontSize="15"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,20"/>
+
+                    <TextBlock Text="{DynamicResource L_Qobuz}"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,8"/>
+                    <TextBlock Text="{DynamicResource L_QobuzIntegrationHint}"
+                               FontSize="11"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,16"/>
+
+                    <TextBlock Text="{DynamicResource L_QobuzApplicationId}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+                    <TextBox x:Name="QobuzApplicationIdTextBox"
+                             Height="30"
+                             HorizontalAlignment="Stretch"
+                             Padding="8,0"
+                             VerticalContentAlignment="Center"
+                             Margin="0,0,0,8"/>
+                    <TextBlock Text="{DynamicResource L_QobuzCredentialsHint}"
+                               FontSize="11"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"/>
                 </StackPanel>
 

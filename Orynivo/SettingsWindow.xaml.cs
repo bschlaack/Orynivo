@@ -53,6 +53,7 @@ public partial class SettingsWindow : Window
         ArtistInfoSourceComboBox.ItemsSource = Enum.GetValues<ArtistInfoSource>();
         ArtistInfoSourceComboBox.SelectedItem = settings.ArtistInfoSource;
         LastFmApiKeyTextBox.Text = settings.LastFmApiKey ?? string.Empty;
+        QobuzApplicationIdTextBox.Text = settings.QobuzApplicationId ?? string.Empty;
         LastFmPanel.Visibility = settings.ArtistInfoSource == ArtistInfoSource.LastFm
             ? Visibility.Visible
             : Visibility.Collapsed;
@@ -79,6 +80,7 @@ public partial class SettingsWindow : Window
     public ArtistInfoSource SelectedArtistInfoSource =>
         ArtistInfoSourceComboBox.SelectedItem is ArtistInfoSource src ? src : ArtistInfoSource.Wikipedia;
     public string SelectedLastFmApiKey => LastFmApiKeyTextBox.Text.Trim();
+    public string SelectedQobuzApplicationId => QobuzApplicationIdTextBox.Text.Trim();
 
     protected override void OnClosed(EventArgs e)
     {
@@ -125,6 +127,7 @@ public partial class SettingsWindow : Window
 
         AudioDevicePanel.Visibility = tag == "AudioDevice" ? Visibility.Visible : Visibility.Collapsed;
         LibraryPanel.Visibility     = tag == "Library"      ? Visibility.Visible : Visibility.Collapsed;
+        StreamingPanel.Visibility   = tag == "Streaming"    ? Visibility.Visible : Visibility.Collapsed;
         AppearancePanel.Visibility  = tag == "Appearance"   ? Visibility.Visible : Visibility.Collapsed;
         ArtistInfoPanel.Visibility  = tag == "ArtistInfo"   ? Visibility.Visible : Visibility.Collapsed;
     }

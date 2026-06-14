@@ -34,6 +34,8 @@ plus a multi-resolution Windows application icon based on the standalone logo.
   and configured library directories
 - Light and dark themes
 - German, English, French, and Spanish user interfaces
+- Provider-neutral streaming interfaces with a prepared Qobuz configuration
+  page for future approved partner API access
 
 ## Supported Formats
 
@@ -95,6 +97,7 @@ Orynivo/
 │   ├── Controls/            Custom WPF controls
 │   ├── Library/             SQLite database, scanner, search, and artwork cache
 │   ├── Localization/        German, English, French, and Spanish resources
+│   ├── Streaming/           Provider-neutral catalog, playback, and credential contracts
 │   └── MainWindow.*         Main user interface and navigation
 ├── build.ps1                Builds the bridge and .NET application
 └── Orynivo.sln              Visual Studio solution
@@ -105,6 +108,7 @@ Orynivo/
 Orynivo stores its local data under `%LOCALAPPDATA%\Orynivo\`:
 
 - `settings.json`: application settings
+- `streaming-credentials.dat`: Windows user-bound encrypted streaming secrets
 - `library.db`: SQLite music library and playback history
 - `logs\`: timestamped crash reports for unhandled application errors
 - `artworks\`: original artwork and generated thumbnails
@@ -147,6 +151,10 @@ artwork, rebasing paths, and rebuilding the search index.
 - DST-compressed DFF files are not played natively.
 - Kernel Streaming is represented in the settings model but is not yet
   implemented.
+- Qobuz catalog access and playback are not yet active. The application contains
+  only the provider-neutral integration layer and settings scaffold; an approved
+  Qobuz partner API contract and official endpoint documentation are still
+  required.
 - ASIO devices may be unavailable for inspection or playback while another
   application holds them exclusively.
 - The build currently relies on fixed local paths for Visual Studio and the

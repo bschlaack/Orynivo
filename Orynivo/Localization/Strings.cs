@@ -196,4 +196,10 @@ public sealed record LocalizedStrings(
     public string NativeDsdWordFormat { get; init; } = "";
     public string CountEntrySingular { get; init; } = "";
     public string CountTrackSingular { get; init; } = "";
+    public string Streaming { get; init; } = "";
+    public string StreamingServices { get; init; } = "";
+    public string Qobuz { get; init; } = "";
+    public string QobuzApplicationId { get; init; } = "";
+    public string QobuzIntegrationHint { get; init; } = "";
+    public string QobuzCredentialsHint { get; init; } = "";
 }

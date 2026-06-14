@@ -3449,6 +3449,7 @@ public partial class MainWindow : Window
             _settings.Language               = window.SelectedLanguage;
             _settings.ArtistInfoSource       = window.SelectedArtistInfoSource;
             _settings.LastFmApiKey           = window.SelectedLastFmApiKey;
+            _settings.QobuzApplicationId      = window.SelectedQobuzApplicationId;
             _settingsStore.Save(_settings);
             ThemeManager.Apply(_settings.Theme);
             LocalizationManager.Apply(_settings.Language);

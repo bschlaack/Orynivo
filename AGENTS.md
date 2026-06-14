@@ -36,6 +36,10 @@ Windows audio player with:
 - The process uses the explicit Windows AppUserModelID `Orynivo.AudioPlayer`; the startup window is excluded from the taskbar so the main window owns the taskbar identity
 - `Orynivo/CrashLogger.cs`: writes unhandled UI, AppDomain, and task exception reports to `%LOCALAPPDATA%\Orynivo\logs\`
 - `Orynivo/SettingsStore.cs`: persists `%LOCALAPPDATA%\Orynivo\settings.json`
+- `Orynivo/Streaming/IStreamingCatalog.cs` and `IStreamingPlaybackProvider.cs`: provider-neutral contracts for future streaming catalog and playback integrations
+- `Orynivo/Streaming/QobuzStreamingProvider.cs`: inactive Qobuz scaffold; do not add unofficial endpoints, enable it only with approved partner API documentation
+- `Orynivo/Streaming/WindowsStreamingCredentialStore.cs`: stores future provider secrets and tokens in `%LOCALAPPDATA%\Orynivo\streaming-credentials.dat` using Windows DPAPI for the current user
+- `AppSettings.QobuzApplicationId` stores only the non-secret Qobuz application identifier; client secrets and tokens must not be added to `settings.json`
 - `AppSettings.LastMainView` and `AppSettings.AlbumArtworkView` preserve the selected main view and album mode
 - `AppSettings.Volume` and `AppSettings.LastTrackPath` preserve volume and the last selected or played track; restoration requires both the file and database entry to exist
 - `AppSettings.Theme` stores the `Light` or `Dark` theme

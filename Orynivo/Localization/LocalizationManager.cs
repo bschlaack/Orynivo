@@ -114,6 +114,12 @@ public static class LocalizationManager
         resources["L_DeviceDsdFormats"] = Current.DeviceDsdFormats;
         resources["L_Dashboard"] = Current.Dashboard;
         resources["L_StartupPreparingLibrary"] = Current.StartupPreparingLibrary;
+        resources["L_Streaming"] = Current.Streaming;
+        resources["L_StreamingServices"] = Current.StreamingServices;
+        resources["L_Qobuz"] = Current.Qobuz;
+        resources["L_QobuzApplicationId"] = Current.QobuzApplicationId;
+        resources["L_QobuzIntegrationHint"] = Current.QobuzIntegrationHint;
+        resources["L_QobuzCredentialsHint"] = Current.QobuzCredentialsHint;
     }
 
     private static readonly LocalizedStrings German = new(
@@ -226,6 +232,12 @@ public static class LocalizationManager
         , ArtistsNormalizing = "Künstlernamen werden normalisiert und der Suchindex wird neu aufgebaut …"
         , ArtistsNormalized = "{0:N0} Künstlervarianten zusammengeführt, {1:N0} Tracks aktualisiert."
         , ArtistNormalizationFailed = "Künstlernormalisierung fehlgeschlagen: {0}"
+        , Streaming = "STREAMING"
+        , StreamingServices = "Streamingdienste"
+        , Qobuz = "Qobuz"
+        , QobuzApplicationId = "Qobuz-Anwendungs-ID"
+        , QobuzIntegrationHint = "Die Qobuz-Integration ist vorbereitet. Katalog und Wiedergabe werden aktiviert, sobald ein genehmigter Partnerzugang und die offizielle API-Dokumentation vorliegen."
+        , QobuzCredentialsHint = "Geheime Schlüssel und Anmeldetokens werden nicht in settings.json gespeichert, sondern benutzergebunden durch Windows geschützt."
     };
 
     private static readonly LocalizedStrings English = new(
@@ -324,6 +336,12 @@ public static class LocalizationManager
         , ArtistsNormalizing = "Normalizing artist names and rebuilding the search index …"
         , ArtistsNormalized = "Merged {0:N0} artist variants and updated {1:N0} tracks."
         , ArtistNormalizationFailed = "Artist normalization failed: {0}"
+        , Streaming = "STREAMING"
+        , StreamingServices = "Streaming services"
+        , Qobuz = "Qobuz"
+        , QobuzApplicationId = "Qobuz application ID"
+        , QobuzIntegrationHint = "The Qobuz integration is prepared. Catalog and playback will be enabled when approved partner access and the official API documentation are available."
+        , QobuzCredentialsHint = "Secrets and sign-in tokens are not stored in settings.json. Windows protects them for the current user."
     };
 
     private static readonly LocalizedStrings French = new(
@@ -425,6 +443,12 @@ public static class LocalizationManager
         , ArtistsNormalizing = "Normalisation des artistes et reconstruction de l’index de recherche …"
         , ArtistsNormalized = "{0:N0} variantes d’artistes fusionnées, {1:N0} titres mis à jour."
         , ArtistNormalizationFailed = "Échec de la normalisation des artistes : {0}"
+        , Streaming = "STREAMING"
+        , StreamingServices = "Services de streaming"
+        , Qobuz = "Qobuz"
+        , QobuzApplicationId = "Identifiant d’application Qobuz"
+        , QobuzIntegrationHint = "L’intégration Qobuz est préparée. Le catalogue et la lecture seront activés dès qu’un accès partenaire approuvé et la documentation officielle de l’API seront disponibles."
+        , QobuzCredentialsHint = "Les secrets et jetons de connexion ne sont pas stockés dans settings.json. Windows les protège pour l’utilisateur actuel."
     };
 
     private static readonly LocalizedStrings Spanish = new(
@@ -523,6 +547,12 @@ public static class LocalizationManager
         , ArtistsNormalizing = "Normalizando artistas y reconstruyendo el índice de búsqueda …"
         , ArtistsNormalized = "Se combinaron {0:N0} variantes de artistas y se actualizaron {1:N0} pistas."
         , ArtistNormalizationFailed = "Error al normalizar artistas: {0}"
+        , Streaming = "STREAMING"
+        , StreamingServices = "Servicios de streaming"
+        , Qobuz = "Qobuz"
+        , QobuzApplicationId = "ID de aplicación de Qobuz"
+        , QobuzIntegrationHint = "La integración con Qobuz está preparada. El catálogo y la reproducción se activarán cuando estén disponibles un acceso de socio aprobado y la documentación oficial de la API."
+        , QobuzCredentialsHint = "Los secretos y tokens de inicio de sesión no se guardan en settings.json. Windows los protege para el usuario actual."
     };
 
     public static LocalizedStrings Current { get; private set; } = German;

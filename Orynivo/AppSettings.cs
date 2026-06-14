@@ -18,6 +18,7 @@ public sealed class AppSettings
     public Localization.Language Language { get; set; } = Localization.Language.German;
     public ArtistInfoSource ArtistInfoSource { get; set; } = ArtistInfoSource.Wikipedia;
     public string LastFmApiKey { get; set; } = string.Empty;
+    public string QobuzApplicationId { get; set; } = string.Empty;
 }
 
 public enum AppTheme

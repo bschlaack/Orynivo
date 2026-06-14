@@ -143,6 +143,12 @@
         <sys:String x:Key="L_Library" xmlns:sys="clr-namespace:System;assembly=mscorlib">BIBLIOTHEK</sys:String>
         <sys:String x:Key="L_Directories" xmlns:sys="clr-namespace:System;assembly=mscorlib">Verzeichnisse</sys:String>
         <sys:String x:Key="L_AddDirectory" xmlns:sys="clr-namespace:System;assembly=mscorlib">+ Verzeichnis hinzufügen</sys:String>
+        <sys:String x:Key="L_Streaming" xmlns:sys="clr-namespace:System;assembly=mscorlib">STREAMING</sys:String>
+        <sys:String x:Key="L_StreamingServices" xmlns:sys="clr-namespace:System;assembly=mscorlib">Streamingdienste</sys:String>
+        <sys:String x:Key="L_Qobuz" xmlns:sys="clr-namespace:System;assembly=mscorlib">Qobuz</sys:String>
+        <sys:String x:Key="L_QobuzApplicationId" xmlns:sys="clr-namespace:System;assembly=mscorlib">Qobuz-Anwendungs-ID</sys:String>
+        <sys:String x:Key="L_QobuzIntegrationHint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Die Qobuz-Integration ist vorbereitet. Katalog und Wiedergabe werden nach Freigabe des Partnerzugangs aktiviert.</sys:String>
+        <sys:String x:Key="L_QobuzCredentialsHint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Geheime Schlüssel und Anmeldetokens werden benutzergebunden durch Windows geschützt.</sys:String>
         <sys:String x:Key="L_DatabaseMaintenance" xmlns:sys="clr-namespace:System;assembly=mscorlib">Datenbankwartung</sys:String>
         <sys:String x:Key="L_LibraryBackup" xmlns:sys="clr-namespace:System;assembly=mscorlib">Bibliothek sichern</sys:String>
         <sys:String x:Key="L_LibraryBackupHint" xmlns:sys="clr-namespace:System;assembly=mscorlib">Datenbank, Playlists, Verlauf und Cover als ZIP exportieren. Audiodateien sind nicht enthalten.</sys:String>
