@@ -1,5 +1,6 @@
 bin/
 obj/
+Native/AsioBridge/**/x64/
 _verify_build/
 third_party/asiosdk/
 external/asiosdk/
