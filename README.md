@@ -98,6 +98,10 @@ Paths can be supplied without modifying project files:
 For a persistent local setup, set `ASIO_SDK_DIR`. MSBuild discovery can
 similarly be overridden with `-MSBuildPath` or `MSBUILD_EXE_PATH`.
 
+GitHub Actions verifies Debug and Release builds of the managed WPF project.
+The native ASIO bridge is excluded from hosted CI because the separately
+licensed ASIO SDK is not stored in the repository.
+
 ## Run
 
 ```powershell

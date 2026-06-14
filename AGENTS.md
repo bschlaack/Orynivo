@@ -22,6 +22,10 @@ be supplied with `-AsioSdkDir`, `ASIO_SDK_DIR`, or a local
 `third_party/asiosdk` / `external/asiosdk` directory. `-MSBuildPath` and
 `MSBUILD_EXE_PATH` override MSBuild discovery.
 
+`.github/workflows/dotnet-desktop.yml` builds the managed WPF project in Debug
+and Release. It intentionally does not build the native bridge because the
+separately licensed ASIO SDK is not available on GitHub-hosted runners.
+
 ## Important Architecture
 
 - `Orynivo/Audio/SteinbergAsioStream.cs`: C# wrapper for the native bridge
