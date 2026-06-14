@@ -1,7 +1,10 @@
-# Player
+# Orynivo
 
 A native Windows audio player with a WPF user interface, local music library,
 and ASIO and WASAPI playback.
+
+The application uses the Orynivo wordmark in the startup screen and sidebar,
+plus a multi-resolution Windows application icon based on the standalone logo.
 
 > This project is under active development. The database schema, user
 > interface, and available features may still change.
@@ -60,8 +63,8 @@ adjust the include and source paths in that project file.
 Clone the repository:
 
 ```powershell
-git clone https://github.com/bschlaack/Player.git
-cd Player
+git clone https://github.com/bschlaack/Orynivo.git
+cd Orynivo
 ```
 
 Create a debug build:
@@ -76,7 +79,7 @@ application.
 ## Run
 
 ```powershell
-.\Player\bin\Debug\net8.0-windows\Player.exe
+.\Orynivo\bin\Debug\net8.0-windows\Orynivo.exe
 ```
 
 Library directories and the desired output device can then be selected in the
@@ -85,21 +88,21 @@ settings window.
 ## Project Structure
 
 ```text
-Player/
+Orynivo/
 ├── Native/AsioBridge/       Native C++ bridge for the Steinberg ASIO SDK
-├── Player/
+├── Orynivo/
 │   ├── Audio/               ASIO, WASAPI, PCM, and DSD playback
 │   ├── Controls/            Custom WPF controls
 │   ├── Library/             SQLite database, scanner, search, and artwork cache
 │   ├── Localization/        German, English, French, and Spanish resources
 │   └── MainWindow.*         Main user interface and navigation
 ├── build.ps1                Builds the bridge and .NET application
-└── Player.sln               Visual Studio solution
+└── Orynivo.sln              Visual Studio solution
 ```
 
 ## Local Data
 
-Player stores its local data under `%LOCALAPPDATA%\Player\`:
+Orynivo stores its local data under `%LOCALAPPDATA%\Orynivo\`:
 
 - `settings.json`: application settings
 - `library.db`: SQLite music library and playback history
@@ -111,7 +114,7 @@ Player stores its local data under `%LOCALAPPDATA%\Player\`:
 These files are not part of the repository.
 
 The note button in the transport bar replaces the current main content with a
-large lyrics view. The current cover is shown dimmed in the background. Player
+large lyrics view. The current cover is shown dimmed in the background. Orynivo
 first uses cached synchronized lyrics, then downloaded or embedded plain lyrics
 as a fallback. Missing lyrics can be requested from the public LRCLIB API and
 are stored in `library.db`; synchronized LRC lines are highlighted and kept in
@@ -152,7 +155,7 @@ artwork, rebasing paths, and rebuilding the search index.
 ## Contributing
 
 Bug reports and reproducible improvement proposals can be submitted through
-[GitHub Issues](https://github.com/bschlaack/Player/issues). For audio issues,
+[GitHub Issues](https://github.com/bschlaack/Orynivo/issues). For audio issues,
 include the output backend, device, file format, and sample rate.
 
 ## Dependencies and Notices

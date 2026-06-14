@@ -4,7 +4,7 @@
 
 Windows audio player with:
 
-- WPF frontend in `Player/`
+- WPF frontend in `Orynivo/`
 - Native ASIO bridge in `Native/AsioBridge/`
 - PCM playback through `ffmpeg`
 - Native DSF/DFF DSD playback through ASIO
@@ -13,39 +13,42 @@ Windows audio player with:
 
 ```powershell
 .\build.ps1
-.\Player\bin\Debug\net8.0-windows\Player.exe
+.\Orynivo\bin\Debug\net8.0-windows\Orynivo.exe
 ```
 
 `build.ps1` builds `AsioBridge.dll` first and then the .NET application.
 
 ## Important Architecture
 
-- `Player/Audio/SteinbergAsioStream.cs`: C# wrapper for the native bridge
-- `Player/Audio/FfmpegAudioPlayer.cs`: PCM path
-- `Player/Audio/DsfAudioPlayer.cs`: native DSF-to-DSD path
-- `Player/Audio/DffAudioPlayer.cs`: native DFF/DSDIFF-to-DSD path
-- `Player/Audio/WasapiAudioPlayer.cs`: WASAPI PCM path
-- `Player/Audio/WasapiDeviceProvider.cs`: WASAPI devices and capability queries
+- `Orynivo/Audio/SteinbergAsioStream.cs`: C# wrapper for the native bridge
+- `Orynivo/Audio/FfmpegAudioPlayer.cs`: PCM path
+- `Orynivo/Audio/DsfAudioPlayer.cs`: native DSF-to-DSD path
+- `Orynivo/Audio/DffAudioPlayer.cs`: native DFF/DSDIFF-to-DSD path
+- `Orynivo/Audio/WasapiAudioPlayer.cs`: WASAPI PCM path
+- `Orynivo/Audio/WasapiDeviceProvider.cs`: WASAPI devices and capability queries
 - `Native/AsioBridge/bridge.cpp`: ASIO initialization, PCM/DSD ring buffers, and callback
-- `Player/SettingsWindow.*`: two-column settings window with navigation on the left and the selected section on the right
-- `Player/ThemeManager.cs`: sets global WPF resources for light and dark themes
-- `Player/Localization/*`: language model and localized German, English, French, and Spanish strings
-- `Player/StartupWindow.*`: lightweight splash screen shown during initial database preparation and migration
-- `Player/CrashLogger.cs`: writes unhandled UI, AppDomain, and task exception reports to `%LOCALAPPDATA%\Player\logs\`
-- `Player/SettingsStore.cs`: persists `%LOCALAPPDATA%\Player\settings.json`
+- `Orynivo/SettingsWindow.*`: two-column settings window with navigation on the left and the selected section on the right
+- `Orynivo/ThemeManager.cs`: sets global WPF resources for light and dark themes
+- `Orynivo/Localization/*`: language model and localized German, English, French, and Spanish strings
+- `Orynivo/StartupWindow.*`: lightweight splash screen shown during initial database preparation and migration
+- `Orynivo/Assets/Orynivo_Logo.png`: embedded full logo used by the splash screen and main sidebar
+- `Orynivo/Assets/Orynivo.ico`: multi-resolution application and window icon generated from `Logo/only_logo_300.png`
+- The process uses the explicit Windows AppUserModelID `Orynivo.AudioPlayer`; the startup window is excluded from the taskbar so the main window owns the taskbar identity
+- `Orynivo/CrashLogger.cs`: writes unhandled UI, AppDomain, and task exception reports to `%LOCALAPPDATA%\Orynivo\logs\`
+- `Orynivo/SettingsStore.cs`: persists `%LOCALAPPDATA%\Orynivo\settings.json`
 - `AppSettings.LastMainView` and `AppSettings.AlbumArtworkView` preserve the selected main view and album mode
 - `AppSettings.Volume` and `AppSettings.LastTrackPath` preserve volume and the last selected or played track; restoration requires both the file and database entry to exist
 - `AppSettings.Theme` stores the `Light` or `Dark` theme
 - `AppSettings.Language` stores `German`, `English`, `French`, or `Spanish`
-- `Player/Library/TrackRecord.cs`: database track model containing tags and technical metadata
-- `Player/Library/PlaylistRecord.cs`: playlist model including denormalized `TrackCount`, `IsSmartPlaylist`, and `FilterCriteria`
-- `Player/Library/SmartPlaylistCriteria.cs`: serialized smart-playlist criteria (`FavoritesOnly`, `Genres`, `Formats`, `Bitrates`)
-- `Player/Library/PlaylistTrackRecord.cs`: playlist entry model with position, optional TrackId reference, and required path
-- `Player/Library/AudioDatabase.cs`: SQLite database layer through `Microsoft.Data.Sqlite`; database at `%LOCALAPPDATA%\Player\library.db`
-- `Player/Library/LibraryScanner.cs`: directory scanner using TagLibSharp; writes through `AudioDatabase.Upsert()`, reports progress, and supports cancellation
-- `Player/Library/LibraryBackupService.cs`: versioned ZIP export/import for the SQLite library, artwork cache, and configured library directories; audio files are not included
-- `Player/Library/LyricsService.cs`: LRCLIB client and LRC parser for downloaded plain or synchronized lyrics
-- `Player/Library/ArtistProfileService.cs`: configurable artist biography and image lookup (Wikipedia or Last.fm); static `Source` and `LastFmApiKey` properties set from `AppSettings`; images cached under `%LOCALAPPDATA%\Player\artist-images\`
+- `Orynivo/Library/TrackRecord.cs`: database track model containing tags and technical metadata
+- `Orynivo/Library/PlaylistRecord.cs`: playlist model including denormalized `TrackCount`, `IsSmartPlaylist`, and `FilterCriteria`
+- `Orynivo/Library/SmartPlaylistCriteria.cs`: serialized smart-playlist criteria (`FavoritesOnly`, `Genres`, `Formats`, `Bitrates`)
+- `Orynivo/Library/PlaylistTrackRecord.cs`: playlist entry model with position, optional TrackId reference, and required path
+- `Orynivo/Library/AudioDatabase.cs`: SQLite database layer through `Microsoft.Data.Sqlite`; database at `%LOCALAPPDATA%\Orynivo\library.db`
+- `Orynivo/Library/LibraryScanner.cs`: directory scanner using TagLibSharp; writes through `AudioDatabase.Upsert()`, reports progress, and supports cancellation
+- `Orynivo/Library/LibraryBackupService.cs`: versioned ZIP export/import for the SQLite library, artwork cache, and configured library directories; audio files are not included
+- `Orynivo/Library/LyricsService.cs`: LRCLIB client and LRC parser for downloaded plain or synchronized lyrics
+- `Orynivo/Library/ArtistProfileService.cs`: configurable artist biography and image lookup (Wikipedia or Last.fm); static `Source` and `LastFmApiKey` properties set from `AppSettings`; images cached under `%LOCALAPPDATA%\Orynivo\artist-images\`
 
 ## Audio Database
 
@@ -54,11 +57,13 @@ Windows audio player with:
 - `artists` contains stable artist IDs plus cached profile biography, image path, source URL, language, and fetch timestamp
 - `artists`, `albums`, and `tracks` each have a direct `is_favorite` flag
 - `albums` contains stable album IDs (`id`, `title`, `artist_id`, `year`, `artwork_id`, `is_favorite`)
-- `artworks` deduplicates artwork by SHA-256 hash; originals and thumbnails live under `%LOCALAPPDATA%\Player\artworks\` as `original`, `thumb_96`, and `thumb_320`
+- `artworks` deduplicates artwork by SHA-256 hash; originals and thumbnails live under `%LOCALAPPDATA%\Orynivo\artworks\` as `original`, `thumb_96`, and `thumb_320`
 - `favorites` is an older generic extension point; visible favorites use the direct flags
 - `play_history` records playback starts and endings, duration, final position, and completion state
 - `AudioDatabase.GetTrackIdAndFavorite(path)` performs a lightweight `id` and `is_favorite` lookup
-- `AudioDatabase.OpenDefault()` creates or opens `%LOCALAPPDATA%\Player\library.db`
+- `AudioDatabase.OpenDefault()` creates or opens `%LOCALAPPDATA%\Orynivo\library.db`
+- On first launch after the rename, missing data is copied from `%LOCALAPPDATA%\Player\` and cached database paths are rebased to `%LOCALAPPDATA%\Orynivo\`
+- Cache-path rebasing is guarded by the `cache_paths_orynivo_v1` database migration marker and must not run on every database open
 - `Upsert()` is idempotent through `INSERT ... ON CONFLICT DO UPDATE`
 - `GetPathTimestamps()` returns paths and modification timestamps for efficient rescans
 - WAL journal mode is enabled
@@ -92,7 +97,7 @@ Windows audio player with:
 - Right-clicking a track, search result, album, or folder node offers existing playlists and **New playlist...**
 - Selecting a playlist immediately adds the track or all album tracks and updates the status bar
 - **New playlist...** opens `NewPlaylistDialog`; a name is required and Enter confirms
-- `Player/NewPlaylistDialog.xaml/.cs` is themed with dynamic brushes and a DWM-colored native title bar
+- `Orynivo/NewPlaylistDialog.xaml/.cs` is themed with dynamic brushes and a DWM-colored native title bar
 - `AppendPlaylistItems()` builds context-menu items dynamically
 - Album artwork cards extend their existing cover menu through `ContextMenu.Opened`
 - `GetPathsForRow()` returns one track path or all album tracks through `GetTrackListByAlbum`
@@ -127,7 +132,8 @@ Windows audio player with:
 - TreeView virtualization uses recycling mode
 - `TrackLite`, `TrackListInfo`, `ArtistInfo`, and `AlbumInfo` remain intentionally small; `TrackRecord` is reserved for complete metadata operations
 - Artwork is deduplicated instead of stored per track
-- `TrackSearchIndex.cs` stores a Lucene.NET index under `%LOCALAPPDATA%\Player\search-index`, supports category-specific fields, partial words, and German umlaut/eszett variants, rebuilds stale indexes, updates incrementally after scans, and removes missing files below rescanned roots
+- `TrackSearchIndex.cs` stores a Lucene.NET index under `%LOCALAPPDATA%\Orynivo\search-index`, supports category-specific fields, partial words, and German umlaut/eszett variants, rebuilds stale indexes, updates incrementally after scans, and removes missing files below rescanned roots
+- Search-index freshness is determined by the stored schema marker; indexed `Field.Store.NO` fields must not be tested through stored-document field access
 
 ## Known Technical Details
 
@@ -151,6 +157,7 @@ Windows audio player with:
 ## UI Guidelines
 
 - The main window uses a modern sidebar, content area, and full-width transport bar
+- The full Orynivo logo appears on a light logo surface in the startup window and at the top of the main sidebar
 - The 220 px sidebar contains Dashboard, local library navigation, playlists, device information, About, and Settings
 - About displays the author, library licenses, and the Steinberg ASIO trademark notice
 - The content header continues the native title-bar/sidebar appearance and shows title, count, search, filters, or album mode controls
@@ -220,7 +227,7 @@ the actual project.
 ## Localization Rule
 
 - Do not hard-code new visible UI text or status/error messages in XAML or code-behind
-- Store all such text under `Player/Localization/`
+- Store all such text under `Orynivo/Localization/`
 - Every new or changed string must be provided in German, English, French, and Spanish
 - A text change is complete only after all supported language resources contain meaningful translations
 
