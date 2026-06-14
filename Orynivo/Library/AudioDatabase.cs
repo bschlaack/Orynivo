@@ -12,7 +12,8 @@ public sealed record ArtistInfo(
     string? ImagePath,
     string? SourceUrl,
     string? ProfileLanguage,
-    long? ProfileFetchedAt);
+    long? ProfileFetchedAt,
+    bool ImageIsManual);
 
 /// <summary>Distinct-Album-Eintrag für die Albumansichten.</summary>
 public sealed record AlbumInfo(
@@ -63,6 +64,7 @@ public sealed record RecentAlbumInfo(long Id, string Title, string Artist, strin
 
 public sealed record CalendarDayData(int Day, double TotalSeconds, IReadOnlyList<string> TopGenres);
 public sealed record ArtistNormalizationResult(int MergedArtists, int UpdatedTracks);
+public sealed record ArtistRenameResult(long ArtistId, string ArtistName, bool Merged);
 
 /// <summary>
 /// Verwaltet die SQLite-Audiodatenbank. Eine Instanz pro Anwendungslaufzeit.
@@ -299,7 +301,8 @@ public sealed class AudioDatabase : IDisposable
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = """
             SELECT id, name, is_favorite, NULL AS biography, image_path,
-                   profile_source_url, profile_language, profile_fetched_at
+                   profile_source_url, profile_language, profile_fetched_at,
+                   image_is_manual
             FROM artists
             ORDER BY CASE WHEN name = '' THEN 1 ELSE 0 END,
                      name COLLATE NOCASE;
@@ -315,7 +318,8 @@ public sealed class AudioDatabase : IDisposable
                 reader.IsDBNull(4) ? null : reader.GetString(4),
                 reader.IsDBNull(5) ? null : reader.GetString(5),
                 reader.IsDBNull(6) ? null : reader.GetString(6),
-                reader.IsDBNull(7) ? null : reader.GetInt64(7)));
+                reader.IsDBNull(7) ? null : reader.GetInt64(7),
+                reader.GetInt32(8) != 0));
         return result;
     }
 
@@ -324,7 +328,8 @@ public sealed class AudioDatabase : IDisposable
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = """
             SELECT id, name, is_favorite, biography, image_path,
-                   profile_source_url, profile_language, profile_fetched_at
+                   profile_source_url, profile_language, profile_fetched_at,
+                   image_is_manual
             FROM artists
             WHERE id = $id
             LIMIT 1;
@@ -339,7 +344,8 @@ public sealed class AudioDatabase : IDisposable
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = """
             SELECT ar.id, ar.name, ar.is_favorite, ar.biography, ar.image_path,
-                   ar.profile_source_url, ar.profile_language, ar.profile_fetched_at
+                   ar.profile_source_url, ar.profile_language, ar.profile_fetched_at,
+                   ar.image_is_manual
             FROM tracks t
             JOIN artists ar ON ar.id = t.artist_id
             WHERE t.path = $path
@@ -361,7 +367,10 @@ public sealed class AudioDatabase : IDisposable
         cmd.CommandText = """
             UPDATE artists
             SET biography = $biography,
-                image_path = COALESCE($image_path, image_path),
+                image_path = CASE
+                    WHEN image_is_manual = 1 THEN image_path
+                    ELSE COALESCE($image_path, image_path)
+                END,
                 profile_source_url = $source_url,
                 profile_language = $language,
                 profile_fetched_at = $fetched_at
@@ -374,6 +383,176 @@ public sealed class AudioDatabase : IDisposable
         Add(cmd, "$fetched_at", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
         Add(cmd, "$id", artistId);
         cmd.ExecuteNonQuery();
+    }
+
+    public void UpdateArtistImage(long artistId, string imagePath)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            UPDATE artists
+            SET image_path = $image_path,
+                image_is_manual = 1
+            WHERE id = $id;
+            """;
+        Add(cmd, "$image_path", imagePath);
+        Add(cmd, "$id", artistId);
+        cmd.ExecuteNonQuery();
+    }
+
+    public ArtistInfo? FindArtistByName(string artistName, long? excludeArtistId = null)
+    {
+        var comparisonKey = ArtistNameNormalizer.CreateComparisonKey(artistName);
+        if (comparisonKey.Length == 0)
+            return null;
+
+        return GetArtistsLite()
+            .FirstOrDefault(artist =>
+                artist.Id != excludeArtistId &&
+                string.Equals(
+                    ArtistNameNormalizer.CreateComparisonKey(artist.Artist),
+                    comparisonKey,
+                    StringComparison.Ordinal));
+    }
+
+    public ArtistRenameResult RenameArtist(long artistId, string artistName)
+    {
+        var normalizedName = ArtistNameNormalizer.NormalizeDisplayName(artistName);
+        if (normalizedName.Length == 0)
+            throw new ArgumentException("Artist name is required.", nameof(artistName));
+        if (FindArtistByName(normalizedName, artistId) is not null)
+            throw new InvalidOperationException("An artist with this name already exists.");
+
+        using var tx = _conn.BeginTransaction();
+        ExecuteInTransaction(tx,
+            "UPDATE artists SET name = $name WHERE id = $id;",
+            ("$name", normalizedName), ("$id", artistId));
+        UpdateDenormalizedArtistNames(tx, artistId, normalizedName);
+        tx.Commit();
+        _artistsByComparisonKey = null;
+        return new ArtistRenameResult(artistId, normalizedName, false);
+    }
+
+    public ArtistRenameResult MergeArtists(
+        long currentArtistId,
+        long matchingArtistId,
+        long preferredArtistId,
+        string artistName)
+    {
+        if (currentArtistId == matchingArtistId)
+            throw new ArgumentException("Two different artists are required.");
+        if (preferredArtistId != currentArtistId && preferredArtistId != matchingArtistId)
+            throw new ArgumentException("The preferred artist must be one of the merged artists.");
+
+        var normalizedName = ArtistNameNormalizer.NormalizeDisplayName(artistName);
+        if (normalizedName.Length == 0)
+            throw new ArgumentException("Artist name is required.", nameof(artistName));
+
+        var survivorId = preferredArtistId;
+        var duplicateId = preferredArtistId == currentArtistId ? matchingArtistId : currentArtistId;
+
+        using var tx = _conn.BeginTransaction();
+        MergeArtistAlbums(tx, survivorId, duplicateId);
+        ExecuteInTransaction(tx,
+            "UPDATE tracks SET artist_id = $survivor WHERE artist_id = $duplicate;",
+            ("$survivor", survivorId), ("$duplicate", duplicateId));
+        ExecuteInTransaction(tx, """
+            UPDATE artists
+            SET is_favorite = MAX(is_favorite, (SELECT is_favorite FROM artists WHERE id = $duplicate))
+            WHERE id = $survivor;
+            """,
+            ("$survivor", survivorId), ("$duplicate", duplicateId));
+        ExecuteInTransaction(tx,
+            "DELETE FROM artists WHERE id = $duplicate;",
+            ("$duplicate", duplicateId));
+        ExecuteInTransaction(tx,
+            "UPDATE artists SET name = $name WHERE id = $survivor;",
+            ("$name", normalizedName), ("$survivor", survivorId));
+        UpdateDenormalizedArtistNames(tx, survivorId, normalizedName);
+        tx.Commit();
+        _artistsByComparisonKey = null;
+        return new ArtistRenameResult(survivorId, normalizedName, true);
+    }
+
+    private void MergeArtistAlbums(SqliteTransaction tx, long survivorId, long duplicateId)
+    {
+        var duplicateAlbums = new List<(long Id, string Title, int? Year)>();
+        using (var command = _conn.CreateCommand())
+        {
+            command.Transaction = tx;
+            command.CommandText = """
+                SELECT id, title, year
+                FROM albums
+                WHERE artist_id = $artist_id;
+                """;
+            Add(command, "$artist_id", duplicateId);
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                duplicateAlbums.Add((
+                    reader.GetInt64(0),
+                    reader.GetString(1),
+                    reader.IsDBNull(2) ? null : reader.GetInt32(2)));
+            }
+        }
+
+        foreach (var duplicateAlbum in duplicateAlbums)
+        {
+            var survivorAlbumId = ExecuteScalarInTransaction(tx, """
+                SELECT id
+                FROM albums
+                WHERE artist_id = $artist_id
+                  AND title = $title COLLATE NOCASE
+                  AND year IS $year
+                LIMIT 1;
+                """,
+                ("$artist_id", survivorId),
+                ("$title", duplicateAlbum.Title),
+                ("$year", duplicateAlbum.Year));
+
+            if (survivorAlbumId is long existingAlbumId)
+            {
+                ExecuteInTransaction(tx,
+                    "UPDATE tracks SET album_id = $survivor_album WHERE album_id = $duplicate_album;",
+                    ("$survivor_album", existingAlbumId), ("$duplicate_album", duplicateAlbum.Id));
+                ExecuteInTransaction(tx, """
+                    UPDATE albums
+                    SET is_favorite = MAX(is_favorite, (SELECT is_favorite FROM albums WHERE id = $duplicate_album)),
+                        artwork_id = COALESCE(artwork_id, (SELECT artwork_id FROM albums WHERE id = $duplicate_album))
+                    WHERE id = $survivor_album;
+                    """,
+                    ("$survivor_album", existingAlbumId), ("$duplicate_album", duplicateAlbum.Id));
+                ExecuteInTransaction(tx,
+                    "DELETE FROM albums WHERE id = $duplicate_album;",
+                    ("$duplicate_album", duplicateAlbum.Id));
+            }
+            else
+            {
+                ExecuteInTransaction(tx,
+                    "UPDATE albums SET artist_id = $survivor WHERE id = $album_id;",
+                    ("$survivor", survivorId), ("$album_id", duplicateAlbum.Id));
+            }
+        }
+    }
+
+    private void UpdateDenormalizedArtistNames(
+        SqliteTransaction tx,
+        long artistId,
+        string artistName)
+    {
+        ExecuteInTransaction(tx, """
+            UPDATE tracks
+            SET artist = $artist_name,
+                sort_artist = NULL
+            WHERE artist_id = $artist_id;
+
+            UPDATE tracks
+            SET album_artist = $artist_name,
+                sort_album_artist = NULL
+            WHERE album_id IN (
+                SELECT id FROM albums WHERE artist_id = $artist_id
+            );
+            """,
+            ("$artist_name", artistName), ("$artist_id", artistId));
     }
 
     /// <summary>
@@ -723,17 +902,21 @@ public sealed class AudioDatabase : IDisposable
 
             foreach (var duplicate in group.Where(artist => artist.Id != survivor.Id))
             {
+                MergeArtistAlbums(tx, survivor.Id, duplicate.Id);
                 ExecuteInTransaction(tx,
                     "UPDATE tracks SET artist_id = $survivor WHERE artist_id = $duplicate;",
-                    ("$survivor", survivor.Id), ("$duplicate", duplicate.Id));
-                ExecuteInTransaction(tx,
-                    "UPDATE albums SET artist_id = $survivor WHERE artist_id = $duplicate;",
                     ("$survivor", survivor.Id), ("$duplicate", duplicate.Id));
                 ExecuteInTransaction(tx, """
                     UPDATE artists
                     SET is_favorite = MAX(is_favorite, (SELECT is_favorite FROM artists WHERE id = $duplicate)),
                         biography = COALESCE(biography, (SELECT biography FROM artists WHERE id = $duplicate)),
-                        image_path = COALESCE(image_path, (SELECT image_path FROM artists WHERE id = $duplicate)),
+                        image_path = CASE
+                            WHEN image_is_manual = 1 THEN image_path
+                            WHEN (SELECT image_is_manual FROM artists WHERE id = $duplicate) = 1
+                                THEN (SELECT image_path FROM artists WHERE id = $duplicate)
+                            ELSE COALESCE(image_path, (SELECT image_path FROM artists WHERE id = $duplicate))
+                        END,
+                        image_is_manual = MAX(image_is_manual, (SELECT image_is_manual FROM artists WHERE id = $duplicate)),
                         profile_source_url = COALESCE(profile_source_url, (SELECT profile_source_url FROM artists WHERE id = $duplicate)),
                         profile_language = COALESCE(profile_language, (SELECT profile_language FROM artists WHERE id = $duplicate)),
                         profile_fetched_at = MAX(profile_fetched_at, (SELECT profile_fetched_at FROM artists WHERE id = $duplicate))
@@ -940,7 +1123,8 @@ public sealed class AudioDatabase : IDisposable
         var parameters = idList.Select((id, i) => { var name = $"$id{i}"; Add(cmd, name, id); return name; }).ToList();
         cmd.CommandText = $"""
             SELECT DISTINCT ar.id, ar.name, ar.is_favorite, NULL AS biography, ar.image_path,
-                            ar.profile_source_url, ar.profile_language, ar.profile_fetched_at
+                            ar.profile_source_url, ar.profile_language, ar.profile_fetched_at,
+                            ar.image_is_manual
             FROM tracks t
             JOIN artists ar ON ar.id = t.artist_id
             WHERE t.id IN ({string.Join(", ", parameters)})
@@ -1271,6 +1455,7 @@ public sealed class AudioDatabase : IDisposable
                 is_favorite INTEGER NOT NULL DEFAULT 0,
                 biography TEXT,
                 image_path TEXT,
+                image_is_manual INTEGER NOT NULL DEFAULT 0,
                 profile_source_url TEXT,
                 profile_language TEXT,
                 profile_fetched_at INTEGER
@@ -1330,6 +1515,7 @@ public sealed class AudioDatabase : IDisposable
         EnsureColumn("artists", "is_favorite", "INTEGER NOT NULL DEFAULT 0");
         EnsureColumn("artists", "biography", "TEXT");
         EnsureColumn("artists", "image_path", "TEXT");
+        EnsureColumn("artists", "image_is_manual", "INTEGER NOT NULL DEFAULT 0");
         EnsureColumn("artists", "profile_source_url", "TEXT");
         EnsureColumn("artists", "profile_language", "TEXT");
         EnsureColumn("artists", "profile_fetched_at", "INTEGER");
@@ -2004,7 +2190,8 @@ public sealed class AudioDatabase : IDisposable
         reader.IsDBNull(4) ? null : reader.GetString(4),
         reader.IsDBNull(5) ? null : reader.GetString(5),
         reader.IsDBNull(6) ? null : reader.GetString(6),
-        reader.IsDBNull(7) ? null : reader.GetInt64(7));
+        reader.IsDBNull(7) ? null : reader.GetInt64(7),
+        reader.GetInt32(8) != 0);
 
     private static void Add(SqliteCommand cmd, string name, object? value)
         => cmd.Parameters.AddWithValue(name, value ?? DBNull.Value);

@@ -52,7 +52,10 @@ Windows audio player with:
 - `Orynivo/Library/LibraryScanner.cs`: directory scanner using TagLibSharp; writes through `AudioDatabase.Upsert()`, reports progress, and supports cancellation
 - `Orynivo/Library/LibraryBackupService.cs`: versioned ZIP export/import for the SQLite library, artwork cache, and configured library directories; audio files are not included
 - `Orynivo/Library/LyricsService.cs`: LRCLIB client and LRC parser for downloaded plain or synchronized lyrics
+- `Orynivo/LyricsSearchWindow.*`: manual LRCLIB search with editable track and artist fields, candidate preview, and explicit replacement of the current track's downloaded lyrics cache
 - `Orynivo/Library/ArtistProfileService.cs`: configurable artist biography and image lookup (Wikipedia or Last.fm); static `Source` and `LastFmApiKey` properties set from `AppSettings`; images cached under `%LOCALAPPDATA%\Orynivo\artist-images\`
+- `Orynivo/Library/ArtistImageSearchService.cs` and `Orynivo/ArtistImageSearchWindow.*`: manual Wikimedia Commons artist-image search with editable query; selecting an image updates `artists.image_path`, sets `image_is_manual`, and preserves the biography source; automatic profile refreshes must not download over manually selected image files
+- `Orynivo/EditArtistNameDialog.*` and `Orynivo/ArtistMergeDialog.*`: artist-info rename flow; collisions require an explicit merge-profile priority choice
 
 ## Audio Database
 
@@ -92,7 +95,11 @@ Windows audio player with:
 - `AudioDatabase.Optimize()` runs `wal_checkpoint(TRUNCATE)`, `VACUUM`, and `ANALYZE`
 - Settings library backup creates a consistent SQLite snapshot, includes album artwork, artist images, and library paths, reports percentage and current-file progress for both export and import, writes to `.tmp` before publishing the completed `.zip`, validates imports in staging, rebases cached image paths, rolls back partial replacements, and reports Lucene index rebuild progress
 - Downloaded lyrics are cached in `tracks.downloaded_lyrics` / `tracks.synced_lyrics`; the transport note button replaces the current main content with a large lyrics view over a dimmed cover background, highlights timestamped LRC lines through the transport timer, and falls back to embedded unsynchronized lyrics
+- The lyrics view can manually search LRCLIB with overridden title and artist text. Selecting a result replaces only the database-cached downloaded/synchronized lyrics and leaves audio-file tags unchanged.
 - Artist views support table and image-card modes; visible artists lazily download localized biographies and images from the configured source (Wikipedia or Last.fm). The transport info button replaces the current main content with the current artist image, biography, and source link. The source label ("Quelle: Wikipedia" / "Quelle: Last.fm") is set dynamically from the stored `SourceUrl`.
+- The artist information view can search Wikimedia Commons using editable text and assign the selected image without replacing the cached biography or its source URL.
+- Artist images remain visible even when no biography is available.
+- The artist information view can rename artists. A matching normalized name opens a merge dialog that asks which artist record and profile data survive; the transaction consolidates duplicate albums, reassigns tracks, preserves favorites and available album artwork, updates denormalized artist names, and rebuilds the Lucene index. Audio-file tags are not changed.
 - Artist names are normalized when scanned: only the primary performer is retained, `feat.`/`ft.` suffixes are removed, and Unicode, whitespace, case, diacritic, and punctuation variants share one normalized artist identity
 - Settings includes **Normalize artist names**, which transactionally merges existing variants, preserves favorites and cached profile data, updates visible track and album-artist names without modifying audio files, and rebuilds the Lucene index
 
@@ -153,6 +160,10 @@ Windows audio player with:
 - Transport uses custom vector icons for previous, play/pause, and next; unavailable queue directions are disabled
 - Seeking is implemented for ASIO PCM, WASAPI PCM, DSF, and DFF
 - Loading a file or folder builds a playback queue; completion advances automatically
+- The transport action buttons for artist information, lyrics, favorite, and shuffle are left-aligned above the position slider; previous/play/next remain independently centered
+- When the transport area becomes narrow, the centered previous/play/next group shifts right only enough to keep a 12 px gap from the left action buttons
+- The position slider keeps the standard thumb size but exposes a 30 px transparent vertical hit area; clicking anywhere in that area updates the seek position while the visible track remains 3 px high
+- Shuffle keeps a per-loaded-queue set of played file paths, so duplicate entries and already played tracks are not selected again; loading any queue again resets that set while the shuffle toggle may remain enabled
 - The playlist table is height-limited and scrollable
 - Volume affects PCM paths; native DSD remains bit-perfect
 - In ASIO DSD mode, `preferredBufferSize` counts samples rather than bytes; `ASIOSTDSDInt8*` writes `preferredBufferSize / 8` bytes per channel

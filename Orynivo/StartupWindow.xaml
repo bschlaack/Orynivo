@@ -13,7 +13,7 @@
     <Border Padding="28" CornerRadius="12" Background="#13142A">
         <StackPanel VerticalAlignment="Center">
             <Border Padding="14,10"
-                    CornerRadius="10,10,0,0">
+                    CornerRadius="0,22,0,22">
                 <Border.Background>
                     <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
                         <GradientStop Color="#FFFFFF" Offset="0"/>

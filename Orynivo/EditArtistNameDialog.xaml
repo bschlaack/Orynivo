@@ -1,0 +1,57 @@
+<Window x:Class="Orynivo.EditArtistNameDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{DynamicResource L_EditArtistName}"
+        Icon="Assets/Orynivo.ico"
+        Width="420"
+        SizeToContent="Height"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppSurfaceBrush}"
+        SourceInitialized="EditArtistNameDialog_OnSourceInitialized">
+    <Grid Margin="24,20,24,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Text="{DynamicResource L_ArtistName}"
+                   FontSize="12"
+                   Foreground="{DynamicResource AppMutedTextBrush}"
+                   Margin="0,0,0,6"/>
+        <TextBox x:Name="NameTextBox"
+                 Grid.Row="1"
+                 Height="34"
+                 Padding="10,0"
+                 VerticalContentAlignment="Center"
+                 Background="{DynamicResource AppInputBrush}"
+                 Foreground="{DynamicResource AppPrimaryTextBrush}"
+                 BorderBrush="{DynamicResource AppInputBorderBrush}"
+                 CaretBrush="{DynamicResource AppPrimaryTextBrush}"
+                 Margin="0,0,0,20"
+                 TextChanged="NameTextBox_OnTextChanged"
+                 KeyDown="NameTextBox_OnKeyDown"/>
+        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button Content="{DynamicResource L_Cancel}"
+                    Width="100"
+                    Height="34"
+                    Margin="0,0,8,0"
+                    IsCancel="True"
+                    Background="{DynamicResource AppButtonBrush}"
+                    Foreground="{DynamicResource AppButtonTextBrush}"
+                    BorderBrush="{DynamicResource AppButtonBorderBrush}"
+                    Click="CancelButton_OnClick"/>
+            <Button x:Name="RenameButton"
+                    Content="{DynamicResource L_RenameArtist}"
+                    Width="120"
+                    Height="34"
+                    IsDefault="True"
+                    Background="#6C63FF"
+                    Foreground="White"
+                    BorderThickness="0"
+                    Click="RenameButton_OnClick"/>
+        </StackPanel>
+    </Grid>
+</Window>

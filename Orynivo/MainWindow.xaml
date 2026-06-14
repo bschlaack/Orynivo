@@ -275,7 +275,9 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Slider">
-                        <Grid VerticalAlignment="Center" ClipToBounds="False">
+                        <Grid VerticalAlignment="Center"
+                              Background="Transparent"
+                              ClipToBounds="False">
                             <Track x:Name="PART_Track" VerticalAlignment="Center">
                                 <Track.DecreaseRepeatButton>
                                     <RepeatButton Command="{x:Static Slider.DecreaseLarge}">
@@ -579,7 +581,7 @@
             <Border Padding="18,16,18,14" BorderThickness="0,0,0,1" BorderBrush="#1E1F38">
                 <StackPanel>
                     <Border Padding="9,7"
-                            CornerRadius="8,8,0,0">
+                            CornerRadius="0,18,0,18">
                         <Border.Background>
                             <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
                                 <GradientStop Color="#FFFFFF" Offset="0"/>
@@ -1080,7 +1082,7 @@
                                 Margin="8"
                                 Padding="10"
                                 Background="{DynamicResource AppSurfaceBrush}"
-                                CornerRadius="8">
+                                CornerRadius="0,20,0,20">
                             <StackPanel>
                                 <Border Width="160"
                                         Height="160"
@@ -1187,7 +1189,7 @@
                                 Margin="8"
                                 Padding="10"
                                 Background="{DynamicResource AppSurfaceBrush}"
-                                CornerRadius="8">
+                                CornerRadius="0,20,0,20">
                             <Grid>
                                 <StackPanel>
                                     <Border Width="180"
@@ -1294,21 +1296,28 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="{DynamicResource L_Lyrics}"
                                    VerticalAlignment="Center"
                                    FontSize="24"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource AppPrimaryTextBrush}"/>
+                        <Button Grid.Column="1"
+                                Padding="12,6"
+                                Margin="0,0,8,0"
+                                Style="{StaticResource HeaderFilterButtonStyle}"
+                                Content="{DynamicResource L_SearchLyrics}"
+                                Click="SearchLyricsButton_OnClick"/>
                         <Button x:Name="RefreshLyricsButton"
-                                Grid.Column="1"
+                                Grid.Column="2"
                                 Style="{StaticResource TransportBtnStyle}"
                                 Margin="0,0,8,0"
                                 ToolTip="{DynamicResource L_RefreshLyrics}"
                                 Click="RefreshLyricsButton_OnClick">
                             <TextBlock Text="↻" FontSize="18"/>
                         </Button>
-                        <Button Grid.Column="2"
+                        <Button Grid.Column="3"
                                 Style="{StaticResource TransportBtnStyle}"
                                 ToolTip="{DynamicResource L_CloseLyrics}"
                                 Click="CloseLyricsButton_OnClick">
@@ -1390,6 +1399,8 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <Button x:Name="ArtistInfoTitleButton"
                                     FontSize="28"
@@ -1397,15 +1408,27 @@
                                     VerticalAlignment="Center"
                                     Style="{StaticResource EntityLinkButtonStyle}"
                                     Click="ArtistInfoTitleButton_OnClick"/>
+                            <Button Grid.Column="1"
+                                    Margin="0,0,8,0"
+                                    Padding="12,6"
+                                    Style="{StaticResource HeaderFilterButtonStyle}"
+                                    Content="{DynamicResource L_EditArtistName}"
+                                    Click="EditArtistNameButton_OnClick"/>
+                            <Button Grid.Column="2"
+                                    Margin="0,0,8,0"
+                                    Padding="12,6"
+                                    Style="{StaticResource HeaderFilterButtonStyle}"
+                                    Content="{DynamicResource L_SearchArtistImage}"
+                                    Click="SearchArtistImageButton_OnClick"/>
                             <Button x:Name="RefreshArtistInfoButton"
-                                    Grid.Column="1"
+                                    Grid.Column="3"
                                     Style="{StaticResource TransportBtnStyle}"
                                     Margin="0,0,8,0"
                                     ToolTip="{DynamicResource L_RefreshArtistInfo}"
                                     Click="RefreshArtistInfoButton_OnClick">
                                 <TextBlock Text="↻" FontSize="18"/>
                             </Button>
-                            <Button Grid.Column="2"
+                            <Button Grid.Column="4"
                                     Style="{StaticResource TransportBtnStyle}"
                                     ToolTip="{DynamicResource L_CloseArtistInfo}"
                                     Click="CloseArtistInfoButton_OnClick">
@@ -1491,9 +1514,6 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="52"/>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <Border Width="42" Height="42" Background="{DynamicResource AppArtworkPlaceholderBrush}" CornerRadius="5">
                         <Image x:Name="NowPlayingArtworkImage" Stretch="UniformToFill"/>
@@ -1515,47 +1535,24 @@
                                    Foreground="#44445A" FontSize="10" Margin="0,2,0,0"
                                    TextTrimming="CharacterEllipsis"/>
                     </StackPanel>
-                    <Button x:Name="ArtistInfoButton"
-                            Grid.Column="2"
-                            Style="{StaticResource TransportBtnStyle}"
-                            Margin="8,0,0,0"
-                            IsEnabled="False"
-                            ToolTip="{DynamicResource L_ShowArtistInfo}"
-                            Click="ArtistInfoButton_OnClick">
-                        <TextBlock Text="i"
-                                   FontFamily="Segoe UI"
-                                   FontStyle="Italic"
-                                   FontWeight="Bold"
-                                   FontSize="15"/>
-                    </Button>
-                    <Button x:Name="LyricsButton"
-                            Grid.Column="3"
-                            Style="{StaticResource TransportBtnStyle}"
-                            Margin="8,0,0,0"
-                            IsEnabled="False"
-                            ToolTip="{DynamicResource L_ShowLyrics}"
-                            Click="LyricsButton_OnClick">
-                        <TextBlock Text="♪"
-                                   FontSize="16"/>
-                    </Button>
-                    <Button x:Name="NowPlayingFavoriteButton"
-                            Grid.Column="4"
-                            Style="{StaticResource TransportBtnStyle}"
-                            Margin="8,0,0,0"
-                            IsEnabled="False"
-                            ToolTip="{DynamicResource L_MarkAsFavorite}"
-                            Click="NowPlayingFavoriteButton_OnClick">
-                        <TextBlock x:Name="NowPlayingFavoriteGlyph"
-                                   Text="♡"
-                                   FontSize="16"/>
-                    </Button>
                 </Grid>
 
                 <!-- Controls -->
-                <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal"
-                                HorizontalAlignment="Center"
-                                Margin="0,0,0,10">
+                <Grid Grid.Column="1" VerticalAlignment="Center">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid x:Name="TransportControlsHeaderGrid"
+                          Margin="0,0,0,10"
+                          Loaded="TransportControlsHeaderGrid_OnLayoutChanged"
+                          SizeChanged="TransportControlsHeaderGrid_OnLayoutChanged">
+                        <StackPanel x:Name="PlaybackControlsPanel"
+                                    Orientation="Horizontal"
+                                    HorizontalAlignment="Center">
+                            <StackPanel.RenderTransform>
+                                <TranslateTransform x:Name="PlaybackControlsTranslate"/>
+                            </StackPanel.RenderTransform>
                         <Button x:Name="PreviousButton"
                                 Style="{StaticResource TransportBtnStyle}"
                                 Margin="0,0,6,0" IsEnabled="False"
@@ -1591,8 +1588,65 @@
                                            Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                             </Grid>
                         </Button>
-                    </StackPanel>
-                    <Grid>
+                        </StackPanel>
+                        <StackPanel x:Name="TransportActionPanel"
+                                    Orientation="Horizontal"
+                                    HorizontalAlignment="Left">
+                            <Button x:Name="ArtistInfoButton"
+                                    Style="{StaticResource TransportBtnStyle}"
+                                    Margin="6,0,0,0"
+                                    IsEnabled="False"
+                                    ToolTip="{DynamicResource L_ShowArtistInfo}"
+                                    Click="ArtistInfoButton_OnClick">
+                                <TextBlock Text="i"
+                                           FontFamily="Segoe UI"
+                                           FontStyle="Italic"
+                                           FontWeight="Bold"
+                                           FontSize="15"/>
+                            </Button>
+                            <Button x:Name="LyricsButton"
+                                    Style="{StaticResource TransportBtnStyle}"
+                                    Margin="6,0,0,0"
+                                    IsEnabled="False"
+                                    ToolTip="{DynamicResource L_ShowLyrics}"
+                                    Click="LyricsButton_OnClick">
+                                <TextBlock Text="♪" FontSize="16"/>
+                            </Button>
+                            <Button x:Name="NowPlayingFavoriteButton"
+                                    Style="{StaticResource TransportBtnStyle}"
+                                    Margin="6,0,0,0"
+                                    IsEnabled="False"
+                                    ToolTip="{DynamicResource L_MarkAsFavorite}"
+                                    Click="NowPlayingFavoriteButton_OnClick">
+                                <TextBlock x:Name="NowPlayingFavoriteGlyph"
+                                           Text="♡"
+                                           FontSize="16"/>
+                            </Button>
+                            <Button x:Name="ShuffleButton"
+                                    Style="{StaticResource TransportBtnStyle}"
+                                    Margin="6,0,0,0"
+                                    ToolTip="{DynamicResource L_Shuffle}"
+                                    Click="ShuffleButton_OnClick">
+                                <Viewbox Width="17" Height="17">
+                                    <Canvas Width="18" Height="18">
+                                        <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                              StrokeThickness="1.8"
+                                              StrokeStartLineCap="Round"
+                                              StrokeEndLineCap="Round"
+                                              Data="M 2 4 H 5 C 9 4 9 14 13 14 H 15"/>
+                                        <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                              StrokeThickness="1.8"
+                                              StrokeStartLineCap="Round"
+                                              StrokeEndLineCap="Round"
+                                              Data="M 2 14 H 5 C 9 14 9 4 13 4 H 15"/>
+                                        <Path Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                              Data="M 14 1 L 18 4 L 14 7 Z M 14 11 L 18 14 L 14 17 Z"/>
+                                    </Canvas>
+                                </Viewbox>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                    <Grid Grid.Row="1">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="42"/>
                             <ColumnDefinition Width="*"/>
@@ -1605,7 +1659,9 @@
                         <Slider x:Name="PositionSlider"
                                 Grid.Column="1"
                                 Style="{StaticResource DarkSliderStyle}"
+                                Height="30"
                                 Minimum="0" Maximum="1" IsEnabled="False"
+                                PreviewMouseLeftButtonDown="PositionSlider_OnPreviewMouseLeftButtonDown"
                                 PreviewMouseLeftButtonUp="PositionSlider_OnPreviewMouseLeftButtonUp"
                                 ValueChanged="PositionSlider_OnValueChanged"/>
                         <TextBlock x:Name="DurationTextBlock"
@@ -1614,7 +1670,7 @@
                                    VerticalAlignment="Center" HorizontalAlignment="Left"
                                    Margin="8,0,0,0" Text="0:00"/>
                     </Grid>
-                </StackPanel>
+                </Grid>
 
                 <!-- Volume -->
                 <StackPanel Grid.Column="2"

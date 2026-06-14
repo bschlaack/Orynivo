@@ -7,6 +7,14 @@ using System.Text.RegularExpressions;
 namespace Orynivo.Library;
 
 public sealed record LyricsDownloadResult(string? PlainLyrics, string? SyncedLyrics);
+public sealed record LyricsSearchResult(
+    long Id,
+    string TrackName,
+    string ArtistName,
+    string? AlbumName,
+    double? Duration,
+    string? PlainLyrics,
+    string? SyncedLyrics);
 public sealed record TimedLyricLine(TimeSpan Time, string Text);
 
 public static partial class LyricsService
@@ -54,6 +62,47 @@ public static partial class LyricsService
         return plain is null && synced is null
             ? null
             : new LyricsDownloadResult(plain, synced);
+    }
+
+    public static async Task<IReadOnlyList<LyricsSearchResult>> SearchAsync(
+        string trackName,
+        string artistName,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(trackName) && string.IsNullOrWhiteSpace(artistName))
+            return [];
+
+        var parameters = new List<string>();
+        if (!string.IsNullOrWhiteSpace(trackName))
+            parameters.Add($"track_name={Uri.EscapeDataString(trackName.Trim())}");
+        if (!string.IsNullOrWhiteSpace(artistName))
+            parameters.Add($"artist_name={Uri.EscapeDataString(artistName.Trim())}");
+
+        using var response = await Client.GetAsync(
+            "https://lrclib.net/api/search?" + string.Join("&", parameters),
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        var results = await JsonSerializer.DeserializeAsync<List<LrclibSearchResponse>>(
+            stream,
+            JsonOptions,
+            cancellationToken);
+        if (results is null)
+            return [];
+
+        return results
+            .Where(result => !result.Instrumental)
+            .Select(result => new LyricsSearchResult(
+                result.Id,
+                result.TrackName,
+                result.ArtistName,
+                result.AlbumName,
+                result.Duration,
+                NullIfWhiteSpace(result.PlainLyrics),
+                NullIfWhiteSpace(result.SyncedLyrics)))
+            .Where(result => result.PlainLyrics is not null || result.SyncedLyrics is not null)
+            .ToList();
     }
 
     public static IReadOnlyList<TimedLyricLine> ParseLrc(string? lyrics)
@@ -107,6 +156,16 @@ public static partial class LyricsService
     private static partial Regex TimestampRegex();
 
     private sealed record LrclibResponse(
+        bool Instrumental,
+        string? PlainLyrics,
+        string? SyncedLyrics);
+
+    private sealed record LrclibSearchResponse(
+        long Id,
+        string TrackName,
+        string ArtistName,
+        string? AlbumName,
+        double? Duration,
         bool Instrumental,
         string? PlainLyrics,
         string? SyncedLyrics);

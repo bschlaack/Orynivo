@@ -70,6 +70,10 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<PlaylistItem> _queue = [];
     private readonly ObservableCollection<LyricLineViewModel> _lyricLines = [];
     private int _queueIndex = -1;
+    private bool _shuffleEnabled;
+    private readonly HashSet<string> _playedQueuePaths = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<int> _shuffleHistory = [];
+    private int _shuffleHistoryPosition = -1;
     private string _currentFilePath = string.Empty;
     private CancellationTokenSource? _lyricsCts;
     private CancellationTokenSource? _artistProfileCts;
@@ -133,6 +137,7 @@ public partial class MainWindow : Window
         public string? SourceUrl { get; set; }
         public string? ProfileLanguage { get; set; }
         public long? ProfileFetchedAt { get; set; }
+        public bool ImageIsManual { get; set; }
         public string EntityType { get; init; } = "Track";
         private ImageSource? _artwork;
         private ImageSource? _thumbnail;
@@ -883,6 +888,7 @@ public partial class MainWindow : Window
                         SourceUrl = a.SourceUrl,
                         ProfileLanguage = a.ProfileLanguage,
                         ProfileFetchedAt = a.ProfileFetchedAt,
+                        ImageIsManual = a.ImageIsManual,
                         EntityType = "Artist",
                         FilePath = ""
                     }).ToList(),
@@ -1316,6 +1322,7 @@ public partial class MainWindow : Window
         SourceUrl = a.SourceUrl,
         ProfileLanguage = a.ProfileLanguage,
         ProfileFetchedAt = a.ProfileFetchedAt,
+        ImageIsManual = a.ImageIsManual,
         EntityType = "Artist"
     };
 
@@ -1779,6 +1786,7 @@ public partial class MainWindow : Window
                 if (string.Equals(_queue[i].FilePath, filePath, StringComparison.OrdinalIgnoreCase))
                 { _queueIndex = i; break; }
             }
+            ResetQueuePlaybackState();
             RefreshQueueNavigationButtons();
 
             await StartPlaybackAsync(filePath);
@@ -1973,6 +1981,7 @@ public partial class MainWindow : Window
             _queue.Add(new PlaylistItem(r.FilePath));
 
         _queueIndex = _queue.IndexOf(_queue.FirstOrDefault(p => p.FilePath == row.FilePath) ?? _queue[0]);
+        ResetQueuePlaybackState();
         RefreshQueueNavigationButtons();
 
         try { await StartPlaybackAsync(row.FilePath); }
@@ -2693,6 +2702,7 @@ public partial class MainWindow : Window
     {
         StopPlayback();
         _currentFilePath = filePath;
+        _playedQueuePaths.Add(filePath);
         _playbackCts     = new CancellationTokenSource();
 
         var ext = Path.GetExtension(filePath);
@@ -2819,10 +2829,9 @@ public partial class MainWindow : Window
 
     private async void PreviousButton_OnClick(object sender, RoutedEventArgs e)
     {
-        if (_queueIndex <= 0 || _queueIndex >= _queue.Count)
+        if (!TryMoveToPreviousQueueIndex())
             return;
 
-        _queueIndex--;
         RefreshQueueNavigationButtons();
 
         try { await StartPlaybackAsync(_queue[_queueIndex].FilePath); }
@@ -2832,10 +2841,9 @@ public partial class MainWindow : Window
 
     private async void NextButton_OnClick(object sender, RoutedEventArgs e)
     {
-        if (_queueIndex < 0 || _queueIndex + 1 >= _queue.Count)
+        if (!TryMoveToNextQueueIndex())
             return;
 
-        _queueIndex++;
         RefreshQueueNavigationButtons();
 
         try { await StartPlaybackAsync(_queue[_queueIndex].FilePath); }
@@ -2894,10 +2902,9 @@ public partial class MainWindow : Window
 
     private async Task<bool> TryPlayNextAsync()
     {
-        if (_queueIndex < 0 || _queueIndex + 1 >= _queue.Count)
+        if (!TryMoveToNextQueueIndex())
             return false;
 
-        _queueIndex++;
         RefreshQueueNavigationButtons();
         try { await StartPlaybackAsync(_queue[_queueIndex].FilePath); return true; }
         catch { return false; }
@@ -2905,8 +2912,128 @@ public partial class MainWindow : Window
 
     private void RefreshQueueNavigationButtons()
     {
+        if (_shuffleEnabled)
+        {
+            PreviousButton.IsEnabled = _shuffleHistoryPosition > 0;
+            NextButton.IsEnabled =
+                _shuffleHistoryPosition + 1 < _shuffleHistory.Count ||
+                HasUnplayedShuffleCandidate();
+            return;
+        }
+
         PreviousButton.IsEnabled = _queueIndex > 0 && _queueIndex < _queue.Count;
         NextButton.IsEnabled = _queueIndex >= 0 && _queueIndex + 1 < _queue.Count;
+    }
+
+    private void ShuffleButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        _shuffleEnabled = !_shuffleEnabled;
+        ResetShuffleHistory();
+        UpdateShuffleButton();
+        RefreshQueueNavigationButtons();
+    }
+
+    private void ResetQueuePlaybackState()
+    {
+        _playedQueuePaths.Clear();
+        ResetShuffleHistory();
+    }
+
+    private void ResetShuffleHistory()
+    {
+        _shuffleHistory.Clear();
+        _shuffleHistoryPosition = -1;
+        if (_queueIndex < 0 || _queueIndex >= _queue.Count)
+            return;
+
+        _shuffleHistory.Add(_queueIndex);
+        _shuffleHistoryPosition = 0;
+    }
+
+    private bool TryMoveToPreviousQueueIndex()
+    {
+        if (!_shuffleEnabled)
+        {
+            if (_queueIndex <= 0 || _queueIndex >= _queue.Count)
+                return false;
+            _queueIndex--;
+            return true;
+        }
+
+        if (_shuffleHistoryPosition <= 0)
+            return false;
+        _shuffleHistoryPosition--;
+        _queueIndex = _shuffleHistory[_shuffleHistoryPosition];
+        return true;
+    }
+
+    private bool TryMoveToNextQueueIndex()
+    {
+        if (!_shuffleEnabled)
+        {
+            if (_queueIndex < 0 || _queueIndex + 1 >= _queue.Count)
+                return false;
+            _queueIndex++;
+            return true;
+        }
+
+        if (_shuffleHistoryPosition + 1 < _shuffleHistory.Count)
+        {
+            _shuffleHistoryPosition++;
+            _queueIndex = _shuffleHistory[_shuffleHistoryPosition];
+            return true;
+        }
+
+        var candidates = Enumerable.Range(0, _queue.Count)
+            .Where(index =>
+                index != _queueIndex &&
+                !_playedQueuePaths.Contains(_queue[index].FilePath))
+            .ToList();
+        if (candidates.Count == 0)
+            return false;
+
+        _queueIndex = candidates[Random.Shared.Next(candidates.Count)];
+        _shuffleHistory.Add(_queueIndex);
+        _shuffleHistoryPosition = _shuffleHistory.Count - 1;
+        return true;
+    }
+
+    private bool HasUnplayedShuffleCandidate() =>
+        Enumerable.Range(0, _queue.Count).Any(index =>
+            index != _queueIndex &&
+            !_playedQueuePaths.Contains(_queue[index].FilePath));
+
+    private void UpdateShuffleButton()
+    {
+        ShuffleButton.Background = new SolidColorBrush(
+            _shuffleEnabled
+                ? System.Windows.Media.Color.FromRgb(0x6C, 0x63, 0xFF)
+                : System.Windows.Media.Color.FromRgb(0x25, 0x26, 0x40));
+        ShuffleButton.Foreground = _shuffleEnabled
+            ? System.Windows.Media.Brushes.White
+            : new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xCC, 0xCC, 0xEE));
+    }
+
+    private void TransportControlsHeaderGrid_OnLayoutChanged(object sender, RoutedEventArgs e) =>
+        Dispatcher.BeginInvoke(UpdateResponsivePlaybackControls);
+
+    private void TransportControlsHeaderGrid_OnLayoutChanged(object sender, SizeChangedEventArgs e) =>
+        Dispatcher.BeginInvoke(UpdateResponsivePlaybackControls);
+
+    private void UpdateResponsivePlaybackControls()
+    {
+        const double gap = 12;
+        var centeredPlaybackLeft =
+            (TransportControlsHeaderGrid.ActualWidth - PlaybackControlsPanel.ActualWidth) / 2;
+        var requiredLeft = TransportActionPanel.ActualWidth + gap;
+        var shift = Math.Max(0, requiredLeft - centeredPlaybackLeft);
+        var maximumShift = Math.Max(
+            0,
+            TransportControlsHeaderGrid.ActualWidth -
+            PlaybackControlsPanel.ActualWidth -
+            centeredPlaybackLeft);
+
+        PlaybackControlsTranslate.X = Math.Min(shift, maximumShift);
     }
 
     private void SetPlayPauseIcon(bool isPlaying)
@@ -2930,8 +3057,15 @@ public partial class MainWindow : Window
 
     private void PositionSlider_OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (_player?.CanSeek == true)
-            _isSeekingWithSlider = true;
+        if (_player?.CanSeek != true || PositionSlider.ActualWidth <= 0)
+            return;
+
+        _isSeekingWithSlider = true;
+        var position = e.GetPosition(PositionSlider);
+        var ratio = Math.Clamp(position.X / PositionSlider.ActualWidth, 0, 1);
+        PositionSlider.Value =
+            PositionSlider.Minimum +
+            ratio * (PositionSlider.Maximum - PositionSlider.Minimum);
     }
 
     private void PositionSlider_OnValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -2974,6 +3108,37 @@ public partial class MainWindow : Window
         if (string.IsNullOrWhiteSpace(_currentFilePath))
             return;
         await LoadLyricsForTrackAsync(_currentFilePath, forceRefresh: true);
+    }
+
+    private void SearchLyricsButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_currentFilePath))
+            return;
+
+        TrackRecord? track;
+        using (var db = AudioDatabase.OpenDefault())
+            track = db.GetByPath(_currentFilePath);
+        if (track is null)
+            return;
+
+        var dialog = new LyricsSearchWindow(track.Title, track.Artist) { Owner = this };
+        if (dialog.ShowDialog() != true || dialog.SelectedResult is not { } selected)
+            return;
+
+        using (var db = AudioDatabase.OpenDefault())
+        {
+            db.UpdateDownloadedLyrics(
+                _currentFilePath,
+                selected.PlainLyrics,
+                selected.SyncedLyrics,
+                "LRCLIB manual");
+        }
+
+        track.DownloadedLyrics = selected.PlainLyrics;
+        track.SyncedLyrics = selected.SyncedLyrics;
+        track.LyricsSource = "LRCLIB manual";
+        track.LyricsFetchedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        ApplyLyrics(track);
     }
 
     private async void ArtistInfoButton_OnClick(object sender, RoutedEventArgs e)
@@ -3043,6 +3208,135 @@ public partial class MainWindow : Window
             await ShowArtistInfoAsync(artistId, forceRefresh: true);
     }
 
+    private async void SearchArtistImageButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (_artistInfoDisplayedId is not long artistId)
+            return;
+
+        ArtistInfo? artist;
+        using (var db = AudioDatabase.OpenDefault())
+            artist = db.GetArtistById(artistId);
+        if (artist is null)
+            return;
+
+        var dialog = new ArtistImageSearchWindow(artist.Artist) { Owner = this };
+        if (dialog.ShowDialog() != true || dialog.SelectedResult is not { } selected)
+            return;
+
+        try
+        {
+            var imagePath = await ArtistImageSearchService.SaveAsync(artistId, selected);
+            using (var db = AudioDatabase.OpenDefault())
+            {
+                db.UpdateArtistImage(artistId, imagePath);
+                artist = db.GetArtistById(artistId);
+            }
+
+            if (artist is null)
+                return;
+
+            ArtistInfoImage.Source = CreateArtworkImage(imagePath, 1000, ignoreCache: true);
+            ArtistInfoImagePlaceholder.Visibility = ArtistInfoImage.Source is null
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            ArtistInfoImageStatusText.Visibility = Visibility.Collapsed;
+            await RefreshVisibleArtistRowAsync(artist);
+        }
+        catch
+        {
+            ArtistInfoImageStatusText.Text = LocalizationManager.Current.ArtistImageDownloadFailed;
+            ArtistInfoImageStatusText.Visibility = Visibility.Visible;
+        }
+    }
+
+    private async void EditArtistNameButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (_artistInfoDisplayedId is not long artistId)
+            return;
+
+        ArtistInfo? artist;
+        using (var db = AudioDatabase.OpenDefault())
+            artist = db.GetArtistById(artistId);
+        if (artist is null)
+            return;
+
+        var editDialog = new EditArtistNameDialog(artist.Artist) { Owner = this };
+        if (editDialog.ShowDialog() != true)
+            return;
+
+        ArtistRenameResult result;
+        long? matchingArtistId = null;
+        try
+        {
+            using (var db = AudioDatabase.OpenDefault())
+            {
+                var matchingArtist = db.FindArtistByName(editDialog.ArtistName, artistId);
+                if (matchingArtist is null)
+                {
+                    result = db.RenameArtist(artistId, editDialog.ArtistName);
+                }
+                else
+                {
+                    matchingArtistId = matchingArtist.Id;
+                    var mergeDialog = new ArtistMergeDialog(
+                        artist.Id,
+                        artist.Artist,
+                        matchingArtist.Id,
+                        matchingArtist.Artist)
+                    {
+                        Owner = this
+                    };
+                    if (mergeDialog.ShowDialog() != true)
+                        return;
+
+                    result = db.MergeArtists(
+                        artist.Id,
+                        matchingArtist.Id,
+                        mergeDialog.PreferredArtistId,
+                        editDialog.ArtistName);
+                }
+            }
+
+            await Task.Run(() =>
+            {
+                using var db = AudioDatabase.OpenDefault();
+                TrackSearchIndex.Rebuild(db.GetAll().ToList());
+            });
+
+            if (_currentArtistId == artistId || _currentArtistId == matchingArtistId)
+            {
+                _currentArtistId = result.ArtistId;
+                _currentArtistName = result.ArtistName;
+            }
+            if (_activeArtistFilterId == artistId || _activeArtistFilterId == matchingArtistId)
+            {
+                _activeArtistFilterId = result.ArtistId;
+                _activeArtistFilterName = result.ArtistName;
+            }
+
+            await ReloadVisibleArtistListAsync();
+            await ShowArtistInfoAsync(result.ArtistId, forceRefresh: false);
+        }
+        catch
+        {
+            ArtistInfoStatusTextBlock.Text = LocalizationManager.Current.ArtistRenameFailed;
+            ArtistInfoStatusTextBlock.Visibility = Visibility.Visible;
+        }
+    }
+
+    private async Task ReloadVisibleArtistListAsync()
+    {
+        if (NavListBox.SelectedItem is not ListBoxItem { Tag: "Artists" })
+            return;
+
+        var rows = await Task.Run(() => QueryRows("Artists"));
+        ApplyColumns("Artists");
+        ContentDataGrid.ItemsSource = rows;
+        ArtistArtworkListBox.ItemsSource = rows;
+        UpdateAlphabetIndex(rows, true);
+        ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(rows.Count);
+    }
+
     private void ArtistInfoSourceButton_OnClick(object sender, RoutedEventArgs e)
     {
         if (string.IsNullOrWhiteSpace(_artistInfoSourceUrl))
@@ -3095,7 +3389,8 @@ public partial class MainWindow : Window
                     artist.Id,
                     artist.Artist,
                     language,
-                    cts.Token);
+                    downloadImage: !artist.ImageIsManual,
+                    cancellationToken: cts.Token);
                 cts.Token.ThrowIfCancellationRequested();
                 using var db = AudioDatabase.OpenDefault();
                 db.UpdateArtistProfile(
@@ -3107,16 +3402,10 @@ public partial class MainWindow : Window
                 artist = db.GetArtistById(artist.Id);
             }
 
-            if (artist is null || string.IsNullOrWhiteSpace(artist.Biography))
-            {
-                ArtistInfoImage.Source = null;
-                ArtistInfoImagePlaceholder.Visibility = Visibility.Visible;
-                ArtistInfoImageStatusText.Visibility = Visibility.Collapsed;
-                ArtistInfoStatusTextBlock.Text = LocalizationManager.Current.ArtistInfoNotFound;
+            if (artist is null)
                 return;
-            }
 
-            ArtistInfoBiographyTextBlock.Text = artist.Biography;
+            ArtistInfoBiographyTextBlock.Text = artist.Biography ?? string.Empty;
             ArtistInfoImage.Source = CreateArtworkImage(artist.ImagePath, 1000, ignoreCache: true);
             if (ArtistInfoImage.Source is null)
             {
@@ -3148,7 +3437,11 @@ public partial class MainWindow : Window
             ArtistInfoSourceButton.Visibility = string.IsNullOrWhiteSpace(_artistInfoSourceUrl)
                 ? Visibility.Collapsed
                 : Visibility.Visible;
-            ArtistInfoStatusTextBlock.Visibility = Visibility.Collapsed;
+            ArtistInfoStatusTextBlock.Text = LocalizationManager.Current.ArtistInfoNotFound;
+            ArtistInfoStatusTextBlock.Visibility =
+                string.IsNullOrWhiteSpace(artist.Biography) && ArtistInfoImage.Source is null
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
             await RefreshVisibleArtistRowAsync(artist);
         }
         catch (OperationCanceledException)
@@ -3193,7 +3486,8 @@ public partial class MainWindow : Window
                 artistId,
                 row.Title ?? string.Empty,
                 language,
-                backgroundToken);
+                downloadImage: !row.ImageIsManual,
+                cancellationToken: backgroundToken);
             using var db = AudioDatabase.OpenDefault();
             db.UpdateArtistProfile(
                 artistId,
@@ -3235,6 +3529,7 @@ public partial class MainWindow : Window
         row.SourceUrl = artist.SourceUrl;
         row.ProfileLanguage = artist.ProfileLanguage;
         row.ProfileFetchedAt = artist.ProfileFetchedAt;
+        row.ImageIsManual = artist.ImageIsManual;
         row.ArtworkPath = artist.ImagePath;
         row.ThumbnailPath = artist.ImagePath;
         row.Artwork = CreateArtworkImage(artist.ImagePath, 600, ignoreCache: true);

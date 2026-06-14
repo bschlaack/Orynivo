@@ -14,7 +14,8 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 - Playback through ASIO or exclusive-mode WASAPI
 - Native stereo DSD playback for DSF and uncompressed DFF files through ASIO
 - PCM playback through `ffmpeg`
-- Seeking, volume control, pause, and an automatic playback queue
+- Seeking, volume control, pause, an automatic playback queue, and shuffle
+  without repeating a track within the currently loaded queue
 - SQLite music library with multiple monitored directories
 - Metadata and embedded artwork extraction through TagLibSharp
 - Artist, album, track, and folder views
@@ -29,7 +30,14 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 - Playback history used for statistics
 - Artwork downloads through the Cover Art Archive and manual MusicBrainz search
 - Embedded or downloaded lyrics with synchronized LRC highlighting during playback
+- Manual LRCLIB lyrics search with editable title and artist, result preview,
+  and explicit replacement of the cached lyrics
 - Cached artist images and localized biographies from Wikipedia/Wikimedia
+- Manual Wikimedia Commons artist-image search with editable search text
+- Manually selected artist images are retained across profile refreshes, renames,
+  and artist merges
+- Artist renaming in the artist information view, including a transactional
+  merge flow with an explicit choice of which artist profile to retain
 - ZIP export and import for the managed library, playlists, history, artwork,
   and configured library directories
 - Light and dark themes
@@ -155,6 +163,8 @@ artwork, rebasing paths, and rebuilding the search index.
   only the provider-neutral integration layer and settings scaffold; an approved
   Qobuz partner API contract and official endpoint documentation are still
   required.
+- Renaming or merging artists updates Orynivo's internal library, album
+  assignments, and search index. It does not modify tags in the audio files.
 - ASIO devices may be unavailable for inspection or playback while another
   application holds them exclusively.
 - The build currently relies on fixed local paths for Visual Studio and the

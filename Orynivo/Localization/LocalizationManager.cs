@@ -45,6 +45,8 @@ public static class LocalizationManager
         resources["L_Favorites"] = Current.Favorites;
         resources["L_AudioTypes"] = Current.AudioTypes;
         resources["L_Bitrate"] = Current.Bitrate;
+        resources["L_Title"] = Current.Title;
+        resources["L_Artist"] = Current.Artist;
         resources["L_NoDeviceSelected"] = Current.NoDeviceSelected;
         resources["L_Table"] = Current.Table;
         resources["L_Artwork"] = Current.Artwork;
@@ -120,6 +122,26 @@ public static class LocalizationManager
         resources["L_QobuzApplicationId"] = Current.QobuzApplicationId;
         resources["L_QobuzIntegrationHint"] = Current.QobuzIntegrationHint;
         resources["L_QobuzCredentialsHint"] = Current.QobuzCredentialsHint;
+        resources["L_SearchArtistImage"] = Current.SearchArtistImage;
+        resources["L_ArtistImageSearchTitle"] = Current.ArtistImageSearchTitle;
+        resources["L_ArtistImageSearchRunning"] = Current.ArtistImageSearchRunning;
+        resources["L_ArtistImageSearchNoResults"] = Current.ArtistImageSearchNoResults;
+        resources["L_ArtistImageSearchQuery"] = Current.ArtistImageSearchQuery;
+        resources["L_ArtistImageSearchFailed"] = Current.ArtistImageSearchFailed;
+        resources["L_UseSelectedArtistImage"] = Current.UseSelectedArtistImage;
+        resources["L_ArtistImageDownloadFailed"] = Current.ArtistImageDownloadFailed;
+        resources["L_EditArtistName"] = Current.EditArtistName;
+        resources["L_ArtistName"] = Current.ArtistName;
+        resources["L_RenameArtist"] = Current.RenameArtist;
+        resources["L_MergeArtistsTitle"] = Current.MergeArtistsTitle;
+        resources["L_Shuffle"] = Current.Shuffle;
+        resources["L_SearchLyrics"] = Current.SearchLyrics;
+        resources["L_LyricsSearchTitle"] = Current.LyricsSearchTitle;
+        resources["L_LyricsSearchRunning"] = Current.LyricsSearchRunning;
+        resources["L_LyricsSearchNoResults"] = Current.LyricsSearchNoResults;
+        resources["L_LyricsSearchFailed"] = Current.LyricsSearchFailed;
+        resources["L_UseSelectedLyrics"] = Current.UseSelectedLyrics;
+        resources["L_SelectLyricsResult"] = Current.SelectLyricsResult;
     }
 
     private static readonly LocalizedStrings German = new(
@@ -238,6 +260,30 @@ public static class LocalizationManager
         , QobuzApplicationId = "Qobuz-Anwendungs-ID"
         , QobuzIntegrationHint = "Die Qobuz-Integration ist vorbereitet. Katalog und Wiedergabe werden aktiviert, sobald ein genehmigter Partnerzugang und die offizielle API-Dokumentation vorliegen."
         , QobuzCredentialsHint = "Geheime Schlüssel und Anmeldetokens werden nicht in settings.json gespeichert, sondern benutzergebunden durch Windows geschützt."
+        , SearchArtistImage = "Künstlerbild suchen"
+        , ArtistImageSearchTitle = "Künstlerbild suchen"
+        , ArtistImageSearchRunning = "Passende Künstlerbilder werden gesucht …"
+        , ArtistImageSearchNoResults = "Keine Künstlerbilder gefunden."
+        , ArtistImageSearchQuery = "Suchbegriff"
+        , ArtistImageSearchFailed = "Die Künstlerbildsuche ist fehlgeschlagen."
+        , UseSelectedArtistImage = "Ausgewähltes Bild übernehmen"
+        , ArtistImageDownloadFailed = "Das ausgewählte Künstlerbild konnte nicht gespeichert werden."
+        , EditArtistName = "Künstlername ändern"
+        , ArtistName = "Künstlername"
+        , RenameArtist = "Umbenennen"
+        , MergeArtistsTitle = "Künstler zusammenführen"
+        , ArtistNameExistsMessage = "Ein Künstler mit dem Namen „{0}“ ist bereits vorhanden. Sollen beide Künstler zusammengeführt werden? Wähle, welcher Datensatz und dessen Profilinformationen erhalten bleiben sollen."
+        , KeepArtistProfile = "„{0}“ priorisieren und zusammenführen"
+        , ArtistRenameFailed = "Der Künstler konnte nicht umbenannt oder zusammengeführt werden."
+        , Shuffle = "Zufallswiedergabe"
+        , SearchLyrics = "Songtext suchen"
+        , LyricsSearchTitle = "Songtext suchen"
+        , LyricsSearchRunning = "Passende Songtexte werden gesucht …"
+        , LyricsSearchNoResults = "Keine passenden Songtexte gefunden."
+        , LyricsSearchFailed = "Die Songtextsuche ist fehlgeschlagen."
+        , UseSelectedLyrics = "Ausgewählten Songtext übernehmen"
+        , SelectLyricsResult = "Wähle links einen Songtext für die Vorschau aus."
+        , SynchronizedLyrics = "Synchronisiert"
     };
 
     private static readonly LocalizedStrings English = new(
@@ -342,6 +388,30 @@ public static class LocalizationManager
         , QobuzApplicationId = "Qobuz application ID"
         , QobuzIntegrationHint = "The Qobuz integration is prepared. Catalog and playback will be enabled when approved partner access and the official API documentation are available."
         , QobuzCredentialsHint = "Secrets and sign-in tokens are not stored in settings.json. Windows protects them for the current user."
+        , SearchArtistImage = "Search artist image"
+        , ArtistImageSearchTitle = "Search artist image"
+        , ArtistImageSearchRunning = "Searching for matching artist images …"
+        , ArtistImageSearchNoResults = "No artist images found."
+        , ArtistImageSearchQuery = "Search term"
+        , ArtistImageSearchFailed = "The artist image search failed."
+        , UseSelectedArtistImage = "Use selected image"
+        , ArtistImageDownloadFailed = "The selected artist image could not be saved."
+        , EditArtistName = "Edit artist name"
+        , ArtistName = "Artist name"
+        , RenameArtist = "Rename"
+        , MergeArtistsTitle = "Merge artists"
+        , ArtistNameExistsMessage = "An artist named “{0}” already exists. Should both artists be merged? Choose which record and profile information should be retained."
+        , KeepArtistProfile = "Prioritize “{0}” and merge"
+        , ArtistRenameFailed = "The artist could not be renamed or merged."
+        , Shuffle = "Shuffle"
+        , SearchLyrics = "Search lyrics"
+        , LyricsSearchTitle = "Search lyrics"
+        , LyricsSearchRunning = "Searching for matching lyrics …"
+        , LyricsSearchNoResults = "No matching lyrics found."
+        , LyricsSearchFailed = "The lyrics search failed."
+        , UseSelectedLyrics = "Use selected lyrics"
+        , SelectLyricsResult = "Select lyrics on the left to preview them."
+        , SynchronizedLyrics = "Synchronized"
     };
 
     private static readonly LocalizedStrings French = new(
@@ -449,6 +519,30 @@ public static class LocalizationManager
         , QobuzApplicationId = "Identifiant d’application Qobuz"
         , QobuzIntegrationHint = "L’intégration Qobuz est préparée. Le catalogue et la lecture seront activés dès qu’un accès partenaire approuvé et la documentation officielle de l’API seront disponibles."
         , QobuzCredentialsHint = "Les secrets et jetons de connexion ne sont pas stockés dans settings.json. Windows les protège pour l’utilisateur actuel."
+        , SearchArtistImage = "Rechercher une image d’artiste"
+        , ArtistImageSearchTitle = "Rechercher une image d’artiste"
+        , ArtistImageSearchRunning = "Recherche d’images d’artiste correspondantes …"
+        , ArtistImageSearchNoResults = "Aucune image d’artiste trouvée."
+        , ArtistImageSearchQuery = "Terme de recherche"
+        , ArtistImageSearchFailed = "La recherche d’images d’artiste a échoué."
+        , UseSelectedArtistImage = "Utiliser l’image sélectionnée"
+        , ArtistImageDownloadFailed = "Impossible d’enregistrer l’image d’artiste sélectionnée."
+        , EditArtistName = "Modifier le nom de l’artiste"
+        , ArtistName = "Nom de l’artiste"
+        , RenameArtist = "Renommer"
+        , MergeArtistsTitle = "Fusionner les artistes"
+        , ArtistNameExistsMessage = "Un artiste nommé « {0} » existe déjà. Faut-il fusionner les deux artistes ? Choisissez l’enregistrement et les informations de profil à conserver."
+        , KeepArtistProfile = "Prioriser « {0} » et fusionner"
+        , ArtistRenameFailed = "Impossible de renommer ou de fusionner l’artiste."
+        , Shuffle = "Lecture aléatoire"
+        , SearchLyrics = "Rechercher des paroles"
+        , LyricsSearchTitle = "Rechercher des paroles"
+        , LyricsSearchRunning = "Recherche de paroles correspondantes …"
+        , LyricsSearchNoResults = "Aucune parole correspondante trouvée."
+        , LyricsSearchFailed = "La recherche de paroles a échoué."
+        , UseSelectedLyrics = "Utiliser les paroles sélectionnées"
+        , SelectLyricsResult = "Sélectionnez des paroles à gauche pour les prévisualiser."
+        , SynchronizedLyrics = "Synchronisées"
     };
 
     private static readonly LocalizedStrings Spanish = new(
@@ -553,6 +647,30 @@ public static class LocalizationManager
         , QobuzApplicationId = "ID de aplicación de Qobuz"
         , QobuzIntegrationHint = "La integración con Qobuz está preparada. El catálogo y la reproducción se activarán cuando estén disponibles un acceso de socio aprobado y la documentación oficial de la API."
         , QobuzCredentialsHint = "Los secretos y tokens de inicio de sesión no se guardan en settings.json. Windows los protege para el usuario actual."
+        , SearchArtistImage = "Buscar imagen del artista"
+        , ArtistImageSearchTitle = "Buscar imagen del artista"
+        , ArtistImageSearchRunning = "Buscando imágenes del artista …"
+        , ArtistImageSearchNoResults = "No se encontraron imágenes del artista."
+        , ArtistImageSearchQuery = "Término de búsqueda"
+        , ArtistImageSearchFailed = "La búsqueda de imágenes del artista ha fallado."
+        , UseSelectedArtistImage = "Usar imagen seleccionada"
+        , ArtistImageDownloadFailed = "No se pudo guardar la imagen del artista seleccionada."
+        , EditArtistName = "Cambiar nombre del artista"
+        , ArtistName = "Nombre del artista"
+        , RenameArtist = "Cambiar nombre"
+        , MergeArtistsTitle = "Combinar artistas"
+        , ArtistNameExistsMessage = "Ya existe un artista llamado «{0}». ¿Se deben combinar ambos artistas? Elige qué registro y datos de perfil deben conservarse."
+        , KeepArtistProfile = "Priorizar «{0}» y combinar"
+        , ArtistRenameFailed = "No se pudo cambiar el nombre ni combinar el artista."
+        , Shuffle = "Reproducción aleatoria"
+        , SearchLyrics = "Buscar letra"
+        , LyricsSearchTitle = "Buscar letra"
+        , LyricsSearchRunning = "Buscando letras coincidentes …"
+        , LyricsSearchNoResults = "No se encontraron letras coincidentes."
+        , LyricsSearchFailed = "La búsqueda de letras ha fallado."
+        , UseSelectedLyrics = "Usar letra seleccionada"
+        , SelectLyricsResult = "Selecciona una letra a la izquierda para previsualizarla."
+        , SynchronizedLyrics = "Sincronizada"
     };
 
     public static LocalizedStrings Current { get; private set; } = German;

@@ -27,6 +27,7 @@ public static class ArtistProfileService
         long artistId,
         string artistName,
         string language,
+        bool downloadImage = true,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(artistName))
@@ -36,20 +37,24 @@ public static class ArtistProfileService
 
         if (Source == ArtistInfoSource.LastFm)
         {
-            var result = await DownloadFromLastFmAsync(artistId, artistName, language, cancellationToken);
+            var result = await DownloadFromLastFmAsync(
+                artistId, artistName, language, downloadImage, cancellationToken);
             if (result is not null)
                 return result;
             // Last.fm hat den Künstler nicht gefunden ("+nodirect", leere Bio, etc.) → Wikipedia
-            return await DownloadFromWikipediaAsync(artistId, artistName, language, cancellationToken);
+            return await DownloadFromWikipediaAsync(
+                artistId, artistName, language, downloadImage, cancellationToken);
         }
 
-        return await DownloadFromWikipediaAsync(artistId, artistName, language, cancellationToken);
+        return await DownloadFromWikipediaAsync(
+            artistId, artistName, language, downloadImage, cancellationToken);
     }
 
     private static async Task<ArtistProfileDownload?> DownloadFromWikipediaAsync(
         long artistId,
         string artistName,
         string language,
+        bool downloadImage,
         CancellationToken cancellationToken)
     {
         var musicTerm = language switch
@@ -71,7 +76,7 @@ public static class ArtistProfileService
         if (string.IsNullOrWhiteSpace(biography) || string.IsNullOrWhiteSpace(sourceUrl))
             return null;
 
-        var imageUrl = GetImageUrl(page.Value);
+        var imageUrl = downloadImage ? GetImageUrl(page.Value) : null;
         var imagePath = imageUrl is null
             ? null
             : await DownloadImageAsync(artistId, imageUrl, cancellationToken);
@@ -82,6 +87,7 @@ public static class ArtistProfileService
         long artistId,
         string artistName,
         string language,
+        bool downloadImage,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(LastFmApiKey))
@@ -128,7 +134,7 @@ public static class ArtistProfileService
 
         LastImageDiagnostic = null;
         string? imagePath = null;
-        if (artistEl.TryGetProperty("image", out var images))
+        if (downloadImage && artistEl.TryGetProperty("image", out var images))
         {
             var preference = new[] { "mega", "extralarge", "large", "medium", "small" };
             var bySize = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -167,14 +173,14 @@ public static class ArtistProfileService
                 }
             }
         }
-        else
+        else if (downloadImage)
         {
             LastImageDiagnostic = "Last.fm: kein 'image'-Feld in der API-Antwort";
         }
 
         // Last.fm deprecated community images in 2019 – fall back to Wikipedia for the image.
         // Try the UI language first, then English (English Wikipedia has the best coverage).
-        if (imagePath is null)
+        if (downloadImage && imagePath is null)
         {
             try
             {

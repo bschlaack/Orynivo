@@ -130,6 +130,8 @@
         <sys:String x:Key="L_Artists" xmlns:sys="clr-namespace:System;assembly=mscorlib">Künstler</sys:String>
         <sys:String x:Key="L_Albums" xmlns:sys="clr-namespace:System;assembly=mscorlib">Alben</sys:String>
         <sys:String x:Key="L_Tracks" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tracks</sys:String>
+        <sys:String x:Key="L_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Titel</sys:String>
+        <sys:String x:Key="L_Artist" xmlns:sys="clr-namespace:System;assembly=mscorlib">Künstler</sys:String>
         <sys:String x:Key="L_FolderStructure" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ordnerstruktur</sys:String>
         <sys:String x:Key="L_Playlists" xmlns:sys="clr-namespace:System;assembly=mscorlib">PLAYLISTS</sys:String>
         <sys:String x:Key="L_Settings" xmlns:sys="clr-namespace:System;assembly=mscorlib">⚙   Einstellungen</sys:String>
@@ -163,6 +165,26 @@
         <sys:String x:Key="L_RefreshArtistInfo" xmlns:sys="clr-namespace:System;assembly=mscorlib">Künstlerinfo neu laden</sys:String>
         <sys:String x:Key="L_CloseArtistInfo" xmlns:sys="clr-namespace:System;assembly=mscorlib">Künstlerinfo schließen</sys:String>
         <sys:String x:Key="L_ArtistInfoSource" xmlns:sys="clr-namespace:System;assembly=mscorlib">Quelle: Wikipedia</sys:String>
+        <sys:String x:Key="L_SearchArtistImage" xmlns:sys="clr-namespace:System;assembly=mscorlib">Künstlerbild suchen</sys:String>
+        <sys:String x:Key="L_ArtistImageSearchTitle" xmlns:sys="clr-namespace:System;assembly=mscorlib">Künstlerbild suchen</sys:String>
+        <sys:String x:Key="L_ArtistImageSearchRunning" xmlns:sys="clr-namespace:System;assembly=mscorlib">Passende Künstlerbilder werden gesucht …</sys:String>
+        <sys:String x:Key="L_ArtistImageSearchNoResults" xmlns:sys="clr-namespace:System;assembly=mscorlib">Keine Künstlerbilder gefunden.</sys:String>
+        <sys:String x:Key="L_ArtistImageSearchQuery" xmlns:sys="clr-namespace:System;assembly=mscorlib">Suchbegriff</sys:String>
+        <sys:String x:Key="L_ArtistImageSearchFailed" xmlns:sys="clr-namespace:System;assembly=mscorlib">Die Künstlerbildsuche ist fehlgeschlagen.</sys:String>
+        <sys:String x:Key="L_UseSelectedArtistImage" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ausgewähltes Bild übernehmen</sys:String>
+        <sys:String x:Key="L_ArtistImageDownloadFailed" xmlns:sys="clr-namespace:System;assembly=mscorlib">Das ausgewählte Künstlerbild konnte nicht gespeichert werden.</sys:String>
+        <sys:String x:Key="L_EditArtistName" xmlns:sys="clr-namespace:System;assembly=mscorlib">Künstlername ändern</sys:String>
+        <sys:String x:Key="L_ArtistName" xmlns:sys="clr-namespace:System;assembly=mscorlib">Künstlername</sys:String>
+        <sys:String x:Key="L_RenameArtist" xmlns:sys="clr-namespace:System;assembly=mscorlib">Umbenennen</sys:String>
+        <sys:String x:Key="L_MergeArtistsTitle" xmlns:sys="clr-namespace:System;assembly=mscorlib">Künstler zusammenführen</sys:String>
+        <sys:String x:Key="L_Shuffle" xmlns:sys="clr-namespace:System;assembly=mscorlib">Zufallswiedergabe</sys:String>
+        <sys:String x:Key="L_SearchLyrics" xmlns:sys="clr-namespace:System;assembly=mscorlib">Songtext suchen</sys:String>
+        <sys:String x:Key="L_LyricsSearchTitle" xmlns:sys="clr-namespace:System;assembly=mscorlib">Songtext suchen</sys:String>
+        <sys:String x:Key="L_LyricsSearchRunning" xmlns:sys="clr-namespace:System;assembly=mscorlib">Passende Songtexte werden gesucht …</sys:String>
+        <sys:String x:Key="L_LyricsSearchNoResults" xmlns:sys="clr-namespace:System;assembly=mscorlib">Keine passenden Songtexte gefunden.</sys:String>
+        <sys:String x:Key="L_LyricsSearchFailed" xmlns:sys="clr-namespace:System;assembly=mscorlib">Die Songtextsuche ist fehlgeschlagen.</sys:String>
+        <sys:String x:Key="L_UseSelectedLyrics" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ausgewählten Songtext übernehmen</sys:String>
+        <sys:String x:Key="L_SelectLyricsResult" xmlns:sys="clr-namespace:System;assembly=mscorlib">Wähle links einen Songtext für die Vorschau aus.</sys:String>
         <sys:String x:Key="L_ShowAllAlbumTracks" xmlns:sys="clr-namespace:System;assembly=mscorlib">Alle Tracks des Albums anzeigen</sys:String>
         <sys:String x:Key="L_OptimizeDatabase" xmlns:sys="clr-namespace:System;assembly=mscorlib">Datenbank optimieren</sys:String>
         <sys:String x:Key="L_RepairAlbumArtwork" xmlns:sys="clr-namespace:System;assembly=mscorlib">Album-Cover reparieren</sys:String>
