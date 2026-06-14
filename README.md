@@ -61,12 +61,13 @@ codec support therefore also depends on that build.
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 - Visual Studio 2022 with the **Desktop development with C++** workload
 - [FFmpeg](https://ffmpeg.org/) with `ffmpeg.exe` and `ffprobe.exe` in `PATH`
-- Steinberg ASIO SDK 2.3 installed at `C:\Dev\asiosdk_2.3`
+- Steinberg ASIO SDK 2.3
 - An installed ASIO driver for ASIO playback
 
-The ASIO SDK path is currently hard-coded in
-`Native/AsioBridge/AsioBridge.vcxproj`. If the SDK is installed elsewhere,
-adjust the include and source paths in that project file.
+The ASIO SDK is not included in the repository. The build script accepts its
+location through `-AsioSdkDir` or the `ASIO_SDK_DIR` environment variable. It
+also checks `third_party\asiosdk`, `external\asiosdk`, and, for compatibility
+with older development environments, `C:\Dev\asiosdk_2.3`.
 
 ## Build
 
@@ -84,7 +85,18 @@ Create a debug build:
 ```
 
 The script builds the native x64 ASIO bridge first and then the WPF
-application.
+application. It discovers a suitable Visual Studio installation through
+`vswhere.exe` and falls back to `MSBuild.exe` from `PATH`.
+
+Paths can be supplied without modifying project files:
+
+```powershell
+.\build.ps1 -AsioSdkDir 'D:\SDKs\asiosdk_2.3'
+.\build.ps1 -Configuration Release
+```
+
+For a persistent local setup, set `ASIO_SDK_DIR`. MSBuild discovery can
+similarly be overridden with `-MSBuildPath` or `MSBUILD_EXE_PATH`.
 
 ## Run
 
@@ -167,8 +179,8 @@ artwork, rebasing paths, and rebuilding the search index.
   assignments, and search index. It does not modify tags in the audio files.
 - ASIO devices may be unavailable for inspection or playback while another
   application holds them exclusively.
-- The build currently relies on fixed local paths for Visual Studio and the
-  ASIO SDK.
+- The Steinberg ASIO SDK must be obtained separately and supplied to the build
+  script; it cannot be distributed with this repository.
 
 ## Contributing
 

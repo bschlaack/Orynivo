@@ -1,3 +1,5 @@
 bin/
 obj/
 _verify_build/
+third_party/asiosdk/
+external/asiosdk/

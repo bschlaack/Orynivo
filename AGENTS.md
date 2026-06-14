@@ -16,7 +16,11 @@ Windows audio player with:
 .\Orynivo\bin\Debug\net8.0-windows\Orynivo.exe
 ```
 
-`build.ps1` builds `AsioBridge.dll` first and then the .NET application.
+`build.ps1` builds `AsioBridge.dll` first and then the .NET application. It
+locates Visual Studio MSBuild through `vswhere.exe` or `PATH`. The ASIO SDK can
+be supplied with `-AsioSdkDir`, `ASIO_SDK_DIR`, or a local
+`third_party/asiosdk` / `external/asiosdk` directory. `-MSBuildPath` and
+`MSBUILD_EXE_PATH` override MSBuild discovery.
 
 ## Important Architecture
 

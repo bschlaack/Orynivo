@@ -17,6 +17,11 @@
     <RootNamespace>AsioBridge</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
+  <PropertyGroup>
+    <AsioSdkDir Condition="'$(AsioSdkDir)'=='' and '$(ASIO_SDK_DIR)'!=''">$(ASIO_SDK_DIR)</AsioSdkDir>
+    <AsioSdkDir Condition="'$(AsioSdkDir)'=='' and Exists('$(MSBuildThisFileDirectory)..\..\third_party\asiosdk\common\asio.cpp')">$(MSBuildThisFileDirectory)..\..\third_party\asiosdk</AsioSdkDir>
+    <AsioSdkDir Condition="'$(AsioSdkDir)'=='' and Exists('$(MSBuildThisFileDirectory)..\..\external\asiosdk\common\asio.cpp')">$(MSBuildThisFileDirectory)..\..\external\asiosdk</AsioSdkDir>
+  </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
@@ -35,7 +40,7 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\Dev\asiosdk_2.3\common;C:\Dev\asiosdk_2.3\host;C:\Dev\asiosdk_2.3\host\pc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(AsioSdkDir)\common;$(AsioSdkDir)\host;$(AsioSdkDir)\host\pc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WINDOWS=1;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -44,9 +49,15 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="bridge.cpp" />
-    <ClCompile Include="C:\Dev\asiosdk_2.3\common\asio.cpp" />
-    <ClCompile Include="C:\Dev\asiosdk_2.3\host\asiodrivers.cpp" />
-    <ClCompile Include="C:\Dev\asiosdk_2.3\host\pc\asiolist.cpp" />
+    <ClCompile Include="$(AsioSdkDir)\common\asio.cpp" />
+    <ClCompile Include="$(AsioSdkDir)\host\asiodrivers.cpp" />
+    <ClCompile Include="$(AsioSdkDir)\host\pc\asiolist.cpp" />
   </ItemGroup>
+  <Target Name="ValidateAsioSdk" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(AsioSdkDir)'==''"
+           Text="AsioSdkDir is not set. Pass /p:AsioSdkDir=..., set ASIO_SDK_DIR, or place the SDK under third_party\asiosdk or external\asiosdk." />
+    <Error Condition="!Exists('$(AsioSdkDir)\common\asio.cpp')"
+           Text="The ASIO SDK was not found at '$(AsioSdkDir)'. Expected common\asio.cpp." />
+  </Target>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
