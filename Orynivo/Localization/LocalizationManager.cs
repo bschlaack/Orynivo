@@ -142,6 +142,19 @@ public static class LocalizationManager
         resources["L_LyricsSearchFailed"] = Current.LyricsSearchFailed;
         resources["L_UseSelectedLyrics"] = Current.UseSelectedLyrics;
         resources["L_SelectLyricsResult"] = Current.SelectLyricsResult;
+        resources["L_InternetRadio"] = Current.InternetRadio;
+        resources["L_OwnRadios"] = Current.OwnRadios;
+        resources["L_RadioDirectory"] = Current.RadioDirectory;
+        resources["L_RadioDirectoryHint"] = Current.RadioDirectoryHint;
+        resources["L_RadioSearch"] = Current.RadioSearch;
+        resources["L_RadioStation"] = Current.RadioStation;
+        resources["L_Country"] = Current.Country;
+        resources["L_PlayRadio"] = Current.PlayRadio;
+        resources["L_AddToOwnRadios"] = Current.AddToOwnRadios;
+        resources["L_DeleteRadio"] = Current.DeleteRadio;
+        resources["L_RadioNowPlaying"] = Current.RadioNowPlaying;
+        resources["L_RadioGenres"] = Current.RadioGenres;
+        resources["L_ClearFilter"] = Current.ClearFilter;
     }
 
     private static readonly LocalizedStrings German = new(
@@ -209,7 +222,7 @@ public static class LocalizationManager
         WasapiOutputDevice = "WASAPI-Ausgabegerät",
         DeviceInfo = "Geräteinfo",
         DatabaseOptimizeHint = "Freigegebene Seiten werden entfernt; danach ist die Datei physisch kleiner.",
-        AsioBridgeMissing = "AsioBridge.dll fehlt. Bitte zuerst build.ps1 ausführen.",
+        AsioBridgeMissing = "Dieser Build enthält keine ASIO-Unterstützung. Bitte WASAPI verwenden.",
         KernelStreamingUnavailable = "Kernel Streaming ist auswählbar, aber noch nicht als Wiedergabe-Backend implementiert.",
         AddMusicDirectory = "Musikverzeichnis hinzufügen",
         TrackCountTooltip = "Anzahl Titel in der Datenbank",
@@ -284,6 +297,25 @@ public static class LocalizationManager
         , UseSelectedLyrics = "Ausgewählten Songtext übernehmen"
         , SelectLyricsResult = "Wähle links einen Songtext für die Vorschau aus."
         , SynchronizedLyrics = "Synchronisiert"
+        , InternetRadio = "Internet Radio"
+        , OwnRadios = "EIGENE RADIOS"
+        , RadioDirectory = "Sender entdecken"
+        , RadioDirectoryHint = "Durchsuche das freie Radio-Browser-Verzeichnis und füge Sender dauerhaft zu deinen eigenen Radios hinzu."
+        , RadioSearch = "Sender suchen"
+        , RadioStation = "Sender"
+        , Country = "Land"
+        , PlayRadio = "Abspielen"
+        , AddToOwnRadios = "Zu eigenen Radios"
+        , DeleteRadio = "Sender löschen"
+        , RadioLoading = "Radiosender werden geladen …"
+        , RadioNoResults = "Keine passenden Radiosender gefunden."
+        , RadioAdded = "Radiosender „{0}“ wurde hinzugefügt."
+        , RadioDeleted = "Radiosender „{0}“ wurde gelöscht."
+        , RadioSearchFailed = "Radiosender konnten nicht geladen werden."
+        , RadioNowPlaying = "JETZT IM RADIO"
+        , RadioMetadataUnavailable = "Der Sender stellt aktuell keine Titelinformationen bereit."
+        , RadioGenres = "Genres"
+        , ClearFilter = "Filter löschen"
     };
 
     private static readonly LocalizedStrings English = new(
@@ -348,7 +380,7 @@ public static class LocalizationManager
     {
         OutputType = "Output type", AsioOutputDevice = "ASIO output device", WasapiOutputDevice = "WASAPI output device",
         DeviceInfo = "Device information", DatabaseOptimizeHint = "Released pages are removed so the file becomes physically smaller.",
-        AsioBridgeMissing = "AsioBridge.dll is missing. Run build.ps1 first.",
+        AsioBridgeMissing = "This build does not include ASIO support. Please use WASAPI.",
         KernelStreamingUnavailable = "Kernel Streaming can be selected but is not implemented as a playback backend yet.",
         AddMusicDirectory = "Add music directory", TrackCountTooltip = "Number of tracks in the database",
         Scan = "Scan", RemoveDirectory = "Remove directory",
@@ -412,6 +444,25 @@ public static class LocalizationManager
         , UseSelectedLyrics = "Use selected lyrics"
         , SelectLyricsResult = "Select lyrics on the left to preview them."
         , SynchronizedLyrics = "Synchronized"
+        , InternetRadio = "Internet Radio"
+        , OwnRadios = "MY RADIOS"
+        , RadioDirectory = "Discover stations"
+        , RadioDirectoryHint = "Search the free Radio Browser directory and permanently add stations to your own radios."
+        , RadioSearch = "Search stations"
+        , RadioStation = "Station"
+        , Country = "Country"
+        , PlayRadio = "Play"
+        , AddToOwnRadios = "Add to my radios"
+        , DeleteRadio = "Delete station"
+        , RadioLoading = "Loading radio stations …"
+        , RadioNoResults = "No matching radio stations found."
+        , RadioAdded = "Radio station “{0}” was added."
+        , RadioDeleted = "Radio station “{0}” was deleted."
+        , RadioSearchFailed = "Radio stations could not be loaded."
+        , RadioNowPlaying = "NOW ON AIR"
+        , RadioMetadataUnavailable = "The station is not currently providing track information."
+        , RadioGenres = "Genres"
+        , ClearFilter = "Clear filter"
     };
 
     private static readonly LocalizedStrings French = new(
@@ -479,7 +530,7 @@ public static class LocalizationManager
     {
         OutputType = "Type de sortie", AsioOutputDevice = "Périphérique de sortie ASIO", WasapiOutputDevice = "Périphérique de sortie WASAPI",
         DeviceInfo = "Informations sur le périphérique", DatabaseOptimizeHint = "Les pages libérées sont supprimées afin de réduire physiquement le fichier.",
-        AsioBridgeMissing = "AsioBridge.dll est introuvable. Exécutez d’abord build.ps1.",
+        AsioBridgeMissing = "Cette version ne comprend pas la prise en charge ASIO. Utilisez WASAPI.",
         KernelStreamingUnavailable = "Kernel Streaming peut être sélectionné, mais ce mode de lecture n’est pas encore implémenté.",
         AddMusicDirectory = "Ajouter un dossier musical", TrackCountTooltip = "Nombre de titres dans la base",
         Scan = "Analyser", RemoveDirectory = "Supprimer le dossier",
@@ -543,6 +594,25 @@ public static class LocalizationManager
         , UseSelectedLyrics = "Utiliser les paroles sélectionnées"
         , SelectLyricsResult = "Sélectionnez des paroles à gauche pour les prévisualiser."
         , SynchronizedLyrics = "Synchronisées"
+        , InternetRadio = "Radio Internet"
+        , OwnRadios = "MES RADIOS"
+        , RadioDirectory = "Découvrir des stations"
+        , RadioDirectoryHint = "Recherchez dans l’annuaire libre Radio Browser et ajoutez durablement des stations à vos radios."
+        , RadioSearch = "Rechercher des stations"
+        , RadioStation = "Station"
+        , Country = "Pays"
+        , PlayRadio = "Écouter"
+        , AddToOwnRadios = "Ajouter à mes radios"
+        , DeleteRadio = "Supprimer la station"
+        , RadioLoading = "Chargement des stations de radio …"
+        , RadioNoResults = "Aucune station de radio correspondante trouvée."
+        , RadioAdded = "La station « {0} » a été ajoutée."
+        , RadioDeleted = "La station « {0} » a été supprimée."
+        , RadioSearchFailed = "Impossible de charger les stations de radio."
+        , RadioNowPlaying = "À L’ANTENNE"
+        , RadioMetadataUnavailable = "La station ne fournit actuellement aucune information sur le titre."
+        , RadioGenres = "Genres"
+        , ClearFilter = "Effacer le filtre"
     };
 
     private static readonly LocalizedStrings Spanish = new(
@@ -607,7 +677,7 @@ public static class LocalizationManager
     {
         OutputType = "Tipo de salida", AsioOutputDevice = "Dispositivo de salida ASIO", WasapiOutputDevice = "Dispositivo de salida WASAPI",
         DeviceInfo = "Información del dispositivo", DatabaseOptimizeHint = "Las páginas liberadas se eliminan para reducir físicamente el archivo.",
-        AsioBridgeMissing = "Falta AsioBridge.dll. Ejecuta primero build.ps1.",
+        AsioBridgeMissing = "Esta compilación no incluye compatibilidad con ASIO. Utiliza WASAPI.",
         KernelStreamingUnavailable = "Kernel Streaming se puede seleccionar, pero todavía no está implementado como backend de reproducción.",
         AddMusicDirectory = "Agregar directorio de música", TrackCountTooltip = "Número de pistas en la base de datos",
         Scan = "Analizar", RemoveDirectory = "Eliminar directorio",
@@ -671,6 +741,25 @@ public static class LocalizationManager
         , UseSelectedLyrics = "Usar letra seleccionada"
         , SelectLyricsResult = "Selecciona una letra a la izquierda para previsualizarla."
         , SynchronizedLyrics = "Sincronizada"
+        , InternetRadio = "Radio por Internet"
+        , OwnRadios = "MIS RADIOS"
+        , RadioDirectory = "Descubrir emisoras"
+        , RadioDirectoryHint = "Busca en el directorio libre Radio Browser y añade emisoras permanentemente a tus radios."
+        , RadioSearch = "Buscar emisoras"
+        , RadioStation = "Emisora"
+        , Country = "País"
+        , PlayRadio = "Reproducir"
+        , AddToOwnRadios = "Añadir a mis radios"
+        , DeleteRadio = "Eliminar emisora"
+        , RadioLoading = "Cargando emisoras de radio …"
+        , RadioNoResults = "No se encontraron emisoras de radio coincidentes."
+        , RadioAdded = "Se añadió la emisora «{0}»."
+        , RadioDeleted = "Se eliminó la emisora «{0}»."
+        , RadioSearchFailed = "No se pudieron cargar las emisoras de radio."
+        , RadioNowPlaying = "AHORA EN ANTENA"
+        , RadioMetadataUnavailable = "La emisora no proporciona información de la pista en este momento."
+        , RadioGenres = "Géneros"
+        , ClearFilter = "Borrar filtro"
     };
 
     public static LocalizedStrings Current { get; private set; } = German;

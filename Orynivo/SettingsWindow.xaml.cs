@@ -26,14 +26,21 @@ public partial class SettingsWindow : Window
     private readonly List<string> _libraryPaths = [];
     private readonly Dictionary<string, CancellationTokenSource> _activeScans = [];
     private readonly Action<List<string>>? _onLibraryPathsChanged;
+    private readonly bool _asioAvailable = SteinbergAsioStream.IsAvailable;
 
     public SettingsWindow(AppSettings settings, Action<List<string>>? onLibraryPathsChanged = null)
     {
         InitializeComponent();
         _settings = settings;
         _onLibraryPathsChanged = onLibraryPathsChanged;
-        OutputBackendComboBox.ItemsSource = Enum.GetValues<OutputBackend>();
-        OutputBackendComboBox.SelectedItem = settings.OutputBackend;
+        var availableBackends = Enum.GetValues<OutputBackend>()
+            .Where(backend => backend != OutputBackend.Asio || _asioAvailable)
+            .ToArray();
+        OutputBackendComboBox.ItemsSource = availableBackends;
+        OutputBackendComboBox.SelectedItem =
+            availableBackends.Contains(settings.OutputBackend)
+                ? settings.OutputBackend
+                : OutputBackend.Wasapi;
         var themeChoices = new[]
         {
             new SettingChoice<AppTheme>(AppTheme.Light, LocalizationManager.Current.ThemeLight),
@@ -71,7 +78,7 @@ public partial class SettingsWindow : Window
     public OutputBackend SelectedOutputBackend =>
         OutputBackendComboBox.SelectedItem is OutputBackend backend
             ? backend
-            : OutputBackend.Asio;
+            : OutputBackend.Wasapi;
     public IReadOnlyList<string> SelectedLibraryPaths => _libraryPaths.AsReadOnly();
     public AppTheme SelectedTheme =>
         ThemeComboBox.SelectedItem is SettingChoice<AppTheme> theme ? theme.Value : AppTheme.Dark;
@@ -160,7 +167,7 @@ public partial class SettingsWindow : Window
                     ? LocalizationManager.Current.NoWasapiDevices
                     : LocalizationManager.Current.SelectAndSave;
             }
-            else
+            else if (SelectedOutputBackend == OutputBackend.Asio)
             {
                 var drivers = SteinbergAsioStream.GetDriverNames();
                 DriverComboBox.ItemsSource = drivers;
@@ -170,12 +177,17 @@ public partial class SettingsWindow : Window
                     ?? drivers.FirstOrDefault(name =>
                         name.Contains("TOPPING", StringComparison.OrdinalIgnoreCase))
                     ?? drivers.FirstOrDefault();
-                DeviceLabelTextBlock.Text = SelectedOutputBackend == OutputBackend.Asio
-                    ? LocalizationManager.Current.AsioOutputDevice
-                    : LocalizationManager.Current.OutputDevice;
+                DeviceLabelTextBlock.Text = LocalizationManager.Current.AsioOutputDevice;
                 StatusTextBlock.Text = drivers.Count == 0
                     ? LocalizationManager.Current.NoAsioDrivers
                     : LocalizationManager.Current.SelectAndSave;
+            }
+            else
+            {
+                DriverComboBox.ItemsSource = null;
+                DriverComboBox.DisplayMemberPath = string.Empty;
+                DeviceLabelTextBlock.Text = LocalizationManager.Current.OutputDevice;
+                StatusTextBlock.Text = LocalizationManager.Current.KernelStreamingUnavailable;
             }
         }
         catch (DllNotFoundException)
@@ -195,7 +207,9 @@ public partial class SettingsWindow : Window
     {
         var backend = SelectedOutputBackend;
         DriverComboBox.IsEnabled = backend != OutputBackend.KernelStreaming;
-        DeviceInfoButton.IsEnabled = backend is OutputBackend.Asio or OutputBackend.Wasapi;
+        DeviceInfoButton.IsEnabled =
+            backend == OutputBackend.Wasapi ||
+            backend == OutputBackend.Asio && _asioAvailable;
         LoadDrivers();
         if (backend == OutputBackend.KernelStreaming)
         {

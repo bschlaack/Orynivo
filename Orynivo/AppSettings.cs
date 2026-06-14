@@ -4,7 +4,7 @@ namespace Orynivo;
 
 public sealed class AppSettings
 {
-    public OutputBackend OutputBackend { get; set; } = OutputBackend.Asio;
+    public OutputBackend OutputBackend { get; set; } = OutputBackend.Wasapi;
     public string? SelectedDriverName { get; set; }
     public string? SelectedWasapiDeviceId { get; set; }
     public string? SelectedWasapiDeviceName { get; set; }

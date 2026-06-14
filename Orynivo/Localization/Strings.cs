@@ -226,4 +226,23 @@ public sealed record LocalizedStrings(
     public string UseSelectedLyrics { get; init; } = "";
     public string SelectLyricsResult { get; init; } = "";
     public string SynchronizedLyrics { get; init; } = "";
+    public string InternetRadio { get; init; } = "";
+    public string OwnRadios { get; init; } = "";
+    public string RadioDirectory { get; init; } = "";
+    public string RadioDirectoryHint { get; init; } = "";
+    public string RadioSearch { get; init; } = "";
+    public string RadioStation { get; init; } = "";
+    public string Country { get; init; } = "";
+    public string PlayRadio { get; init; } = "";
+    public string AddToOwnRadios { get; init; } = "";
+    public string DeleteRadio { get; init; } = "";
+    public string RadioLoading { get; init; } = "";
+    public string RadioNoResults { get; init; } = "";
+    public string RadioAdded { get; init; } = "";
+    public string RadioDeleted { get; init; } = "";
+    public string RadioSearchFailed { get; init; } = "";
+    public string RadioNowPlaying { get; init; } = "";
+    public string RadioMetadataUnavailable { get; init; } = "";
+    public string RadioGenres { get; init; } = "";
+    public string ClearFilter { get; init; } = "";
 }

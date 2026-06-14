@@ -24,6 +24,11 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 - Live A-Z/# quick navigation beside alphabetically sorted artist, album, and track lists
 - Album view with table and virtualized artwork modes
 - Dashboard with recently added albums, playback calendar, and top genres
+- Internet radio search through the free Radio Browser directory, direct
+  playback, persistent personal stations in the sidebar, station logos, and
+  live ICY title/artist metadata when supplied by the stream
+- Multi-select genre filtering for radio search results using normalized
+  station tags
 - Lucene.NET full-text search with partial-word and German umlaut variants
 - Favorites for tracks, albums, and artists
 - Regular and filter-based smart playlists
@@ -38,8 +43,8 @@ plus a multi-resolution Windows application icon based on the standalone logo.
   and artist merges
 - Artist renaming in the artist information view, including a transactional
   merge flow with an explicit choice of which artist profile to retain
-- ZIP export and import for the managed library, playlists, history, artwork,
-  and configured library directories
+- ZIP export and import for the managed library, playlists, personal radio
+  stations, history, artwork, and configured library directories
 - Light and dark themes
 - German, English, French, and Spanish user interfaces
 - Provider-neutral streaming interfaces with a prepared Qobuz configuration
@@ -59,15 +64,16 @@ codec support therefore also depends on that build.
 
 - Windows 10 or Windows 11, x64
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-- Visual Studio 2022 with the **Desktop development with C++** workload
 - [FFmpeg](https://ffmpeg.org/) with `ffmpeg.exe` and `ffprobe.exe` in `PATH`
-- Steinberg ASIO SDK 2.3
-- An installed ASIO driver for ASIO playback
+- Optional for ASIO: Visual Studio 2022 with the **Desktop development with
+  C++** workload, Steinberg ASIO SDK 2.3, and an installed ASIO driver
 
 The ASIO SDK is not included in the repository. The build script accepts its
 location through `-AsioSdkDir` or the `ASIO_SDK_DIR` environment variable. It
 also checks `third_party\asiosdk`, `external\asiosdk`, and, for compatibility
-with older development environments, `C:\Dev\asiosdk_2.3`.
+with older development environments, `C:\Dev\asiosdk_2.3`. When no SDK is
+found, the application is built without the native bridge and ASIO is omitted
+from the output-device selection.
 
 ## Build
 
@@ -93,14 +99,18 @@ Paths can be supplied without modifying project files:
 ```powershell
 .\build.ps1 -AsioSdkDir 'D:\SDKs\asiosdk_2.3'
 .\build.ps1 -Configuration Release
+.\build.ps1 -Configuration Release -SkipAsio
 ```
 
 For a persistent local setup, set `ASIO_SDK_DIR`. MSBuild discovery can
 similarly be overridden with `-MSBuildPath` or `MSBUILD_EXE_PATH`.
+`-RequireAsio` makes a missing SDK fail the build instead of using the
+WASAPI-only fallback.
 
 GitHub Actions verifies Debug and Release builds of the managed WPF project.
 The native ASIO bridge is excluded from hosted CI because the separately
-licensed ASIO SDK is not stored in the repository.
+licensed ASIO SDK is not stored in the repository. Every successful Release
+run uploads a framework-dependent `Orynivo-win-x64` Windows artifact.
 
 ## Run
 
@@ -171,6 +181,8 @@ artwork, rebasing paths, and rebuilding the search index.
 ## Current Limitations
 
 - Native DSD playback is available only through ASIO.
+- Builds without the optional ASIO bridge use WASAPI for playback and do not
+  offer ASIO in Settings.
 - Native DFF playback currently supports only uncompressed stereo files.
 - DST-compressed DFF files are not played natively.
 - Kernel Streaming is represented in the settings model but is not yet
@@ -183,6 +195,8 @@ artwork, rebasing paths, and rebuilding the search index.
   assignments, and search index. It does not modify tags in the audio files.
 - ASIO devices may be unavailable for inspection or playback while another
   application holds them exclusively.
+- Internet radio availability, metadata, and stream formats depend on the
+  external station and the Radio Browser directory.
 - The Steinberg ASIO SDK must be obtained separately and supplied to the build
   script; it cannot be distributed with this repository.
 

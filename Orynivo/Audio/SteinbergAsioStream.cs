@@ -1,3 +1,4 @@
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -6,6 +7,33 @@ namespace Orynivo.Audio;
 public sealed class SteinbergAsioStream : IDisposable
 {
     private bool _disposed;
+
+    public static bool IsAvailable
+    {
+        get
+        {
+            var bridgePath = Path.Combine(AppContext.BaseDirectory, "AsioBridge.dll");
+            if (!File.Exists(bridgePath))
+                return false;
+            try
+            {
+                if (!NativeLibrary.TryLoad(bridgePath, out var handle))
+                    return false;
+                try
+                {
+                    return NativeLibrary.TryGetExport(handle, "asio_get_driver_count", out _);
+                }
+                finally
+                {
+                    NativeLibrary.Free(handle);
+                }
+            }
+            catch (Exception ex) when (ex is BadImageFormatException or DllNotFoundException)
+            {
+                return false;
+            }
+        }
+    }
 
     public SteinbergAsioStream(string driverName, double sampleRate = 192_000, int channels = 2, bool dsd = false)
     {
@@ -23,6 +51,9 @@ public sealed class SteinbergAsioStream : IDisposable
 
     public static IReadOnlyList<string> GetDriverNames()
     {
+        if (!IsAvailable)
+            return [];
+
         var count = Native.asio_get_driver_count();
         var names = new List<string>(Math.Max(0, count));
         for (var index = 0; index < count; index++)

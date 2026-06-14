@@ -1,6 +1,7 @@
 using System.IO;
 using System.Diagnostics;
 using System.Globalization;
+using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Windows;
@@ -66,6 +67,13 @@ public partial class MainWindow : Window
     private bool _isDraggingAlphabetIndex;
     private bool _alphabetScrollUpdatePending;
     private bool _isAlphabetProgrammaticScroll;
+    private readonly RadioBrowserService _radioBrowserService = new();
+    private readonly RadioStreamMetadataService _radioMetadataService = new();
+    private CancellationTokenSource? _radioSearchCts;
+    private CancellationTokenSource? _radioMetadataCts;
+    private static readonly HttpClient RadioImageHttpClient = CreateRadioImageHttpClient();
+    private readonly List<RadioStationViewModel> _radioSearchResults = [];
+    private readonly HashSet<string> _selectedRadioGenres = new(StringComparer.OrdinalIgnoreCase);
 
     private readonly ObservableCollection<PlaylistItem> _queue = [];
     private readonly ObservableCollection<LyricLineViewModel> _lyricLines = [];
@@ -75,6 +83,7 @@ public partial class MainWindow : Window
     private readonly List<int> _shuffleHistory = [];
     private int _shuffleHistoryPosition = -1;
     private string _currentFilePath = string.Empty;
+    private RadioStationRecord? _currentRadioStation;
     private CancellationTokenSource? _lyricsCts;
     private CancellationTokenSource? _artistProfileCts;
     private CancellationTokenSource _backgroundArtistLoadCts = new();
@@ -117,6 +126,30 @@ public partial class MainWindow : Window
         long? ArtistFilterId,
         string? ArtistFilterName,
         string? SearchQuery = null);
+
+    private sealed class RadioStationViewModel
+    {
+        public required string StationUuid { get; init; }
+        public required string Name { get; init; }
+        public required string StreamUrl { get; init; }
+        public string? Homepage { get; init; }
+        public string? Favicon { get; init; }
+        public string? CountryCode { get; init; }
+        public string? Codec { get; init; }
+        public int Bitrate { get; init; }
+        public string? Tags { get; init; }
+        public IReadOnlyList<string> Genres { get; init; } = [];
+        public string FormatSummary => Bitrate > 0
+            ? $"{Codec ?? "Audio"} · {Bitrate} kbps"
+            : Codec ?? "Audio";
+        public string GenreSummary => string.Join(", ", Genres.Take(3));
+
+        public RadioBrowserStation ToBrowserStation() =>
+            new(StationUuid, Name, StreamUrl, Homepage, Favicon, CountryCode, Codec, Bitrate, Tags);
+
+        public RadioStationRecord ToRecord(long id = 0) =>
+            new(id, StationUuid, Name, StreamUrl, Homepage, Favicon, CountryCode, Codec, Bitrate, Tags);
+    }
 
     private sealed class ContentRow : INotifyPropertyChanged
     {
@@ -272,6 +305,7 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         PersistViewState();
+        CancelAndDispose(ref _radioSearchCts);
         StopPlayback();
         base.OnClosed(e);
     }
@@ -289,7 +323,7 @@ public partial class MainWindow : Window
     private void PersistViewState()
     {
         if (NavListBox.SelectedItem is ListBoxItem { Tag: string tag } &&
-            tag is "Dashboard" or "Artists" or "Albums" or "Tracks" or "Folders")
+            tag is "Dashboard" or "InternetRadio" or "Artists" or "Albums" or "Tracks" or "Folders")
         {
             _settings.LastMainView = tag;
         }
@@ -303,6 +337,12 @@ public partial class MainWindow : Window
     private void LoadSettings()
     {
         _settings = _settingsStore.Load();
+        if (_settings.OutputBackend == OutputBackend.Asio && !SteinbergAsioStream.IsAvailable)
+        {
+            _settings.OutputBackend = OutputBackend.Wasapi;
+            _settings.SelectedDriverName = null;
+            _settingsStore.Save(_settings);
+        }
         RefreshSelectedDriverText();
         ApplyArtistInfoSettings();
     }
@@ -383,13 +423,36 @@ public partial class MainWindow : Window
 
     private void LoadNavPlaylists()
     {
-        // Dynamisch hinzugefügte Playlist-Einträge (Index 7+) entfernen; Index 0 = Dashboard
-        while (NavListBox.Items.Count > 7)
-            NavListBox.Items.RemoveAt(NavListBox.Items.Count - 1);
+        foreach (var dynamicItem in NavListBox.Items
+                     .OfType<ListBoxItem>()
+                     .Where(item => item.Tag is string tag &&
+                                    (tag.StartsWith("Radio:", StringComparison.Ordinal) ||
+                                     tag.StartsWith("Playlist:", StringComparison.Ordinal)))
+                     .ToList())
+            NavListBox.Items.Remove(dynamicItem);
 
         try
         {
             using var db = AudioDatabase.OpenDefault();
+            var playlistHeaderIndex = NavListBox.Items.IndexOf(PlaylistsHeaderItem);
+            foreach (var radio in db.GetRadioStations())
+            {
+                var content = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
+                content.Children.Add(new TextBlock
+                {
+                    Text = "◉ ",
+                    Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x6C, 0x63, 0xFF))
+                });
+                content.Children.Add(new TextBlock { Text = radio.Name });
+
+                NavListBox.Items.Insert(playlistHeaderIndex++, new ListBoxItem
+                {
+                    Content = content,
+                    Tag = $"Radio:{radio.Id}",
+                    Style = (Style)FindResource("NavItemStyle")
+                });
+            }
+
             foreach (var pl in db.GetAllPlaylists())
             {
                 object content;
@@ -427,7 +490,7 @@ public partial class MainWindow : Window
             return;
 
         ResetDrilldownState();
-        if (tag is "Artists" or "Albums" or "Tracks" or "Folders")
+        if (tag is "InternetRadio" or "Artists" or "Albums" or "Tracks" or "Folders")
             _settings.LastMainView = tag;
         await ShowTopLevelViewAsync(tag);
     }
@@ -470,6 +533,8 @@ public partial class MainWindow : Window
             "Albums"  => LocalizationManager.Current.Albums,
             "Tracks"  => LocalizationManager.Current.Tracks,
             "Folders" => LocalizationManager.Current.FolderStructure,
+            "InternetRadio" => LocalizationManager.Current.InternetRadio,
+            _ when tag.StartsWith("Radio:", StringComparison.Ordinal) => GetRadioName(tag),
             _         => tag.StartsWith("Playlist:") ? GetPlaylistName(tag) : tag
         };
 
@@ -478,8 +543,13 @@ public partial class MainWindow : Window
         UpdateAlphabetIndex(null, false);
         SearchResultsScrollViewer.Visibility = Visibility.Collapsed;
         DashboardScrollViewer.Visibility = Visibility.Collapsed;
+        InternetRadioView.Visibility = Visibility.Collapsed;
         HideAlbumDetailHeader();
         ContentCountTextBlock.Text  = "";
+        SearchTextBox.Visibility = tag == "InternetRadio" ||
+                                   tag.StartsWith("Radio:", StringComparison.Ordinal)
+            ? Visibility.Collapsed
+            : Visibility.Visible;
         AlbumViewModeBorder.Visibility = tag is "Albums" or "Artists" ? Visibility.Visible : Visibility.Collapsed;
         if (tag is "Albums" or "Artists")
             SetViewModeButtons(tag == "Albums" ? _showAlbumArtworkView : _showArtistArtworkView);
@@ -495,6 +565,26 @@ public partial class MainWindow : Window
             ArtistArtworkListBox.Visibility = Visibility.Collapsed;
             DashboardScrollViewer.Visibility = Visibility.Visible;
             await ShowDashboardAsync();
+        }
+        else if (tag == "InternetRadio")
+        {
+            ContentDataGrid.Visibility = Visibility.Collapsed;
+            FolderTreeView.Visibility = Visibility.Collapsed;
+            AlbumArtworkListBox.Visibility = Visibility.Collapsed;
+            ArtistArtworkListBox.Visibility = Visibility.Collapsed;
+            InternetRadioView.Visibility = Visibility.Visible;
+            if (RadioStationsDataGrid.ItemsSource is null)
+                await SearchRadioStationsAsync();
+        }
+        else if (tag.StartsWith("Radio:", StringComparison.Ordinal) &&
+                 long.TryParse(tag.AsSpan("Radio:".Length), out var radioId))
+        {
+            ContentDataGrid.Visibility = Visibility.Collapsed;
+            FolderTreeView.Visibility = Visibility.Collapsed;
+            AlbumArtworkListBox.Visibility = Visibility.Collapsed;
+            ArtistArtworkListBox.Visibility = Visibility.Collapsed;
+            InternetRadioView.Visibility = Visibility.Visible;
+            await PlaySavedRadioAsync(radioId);
         }
         else if (tag == "Folders")
         {
@@ -811,6 +901,21 @@ public partial class MainWindow : Window
             return db.GetPlaylistById(id)?.Name ?? "Playlist";
         }
         catch { return "Playlist"; }
+    }
+
+    private string GetRadioName(string tag)
+    {
+        if (!long.TryParse(tag.AsSpan("Radio:".Length), out var id))
+            return LocalizationManager.Current.InternetRadio;
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            return db.GetRadioStation(id)?.Name ?? LocalizationManager.Current.InternetRadio;
+        }
+        catch
+        {
+            return LocalizationManager.Current.InternetRadio;
+        }
     }
 
     // ------------------------------------------------------------------
@@ -1234,6 +1339,7 @@ public partial class MainWindow : Window
         ArtistArtworkListBox.Visibility = Visibility.Collapsed;
         SearchResultsScrollViewer.Visibility = Visibility.Visible;
         DashboardScrollViewer.Visibility = Visibility.Collapsed;
+        InternetRadioView.Visibility = Visibility.Collapsed;
         HideAlbumDetailHeader();
 
         var result = await Task.Run(() =>
@@ -2010,6 +2116,7 @@ public partial class MainWindow : Window
         FolderTreeView.Visibility = Visibility.Collapsed;
         SearchResultsScrollViewer.Visibility = Visibility.Collapsed;
         DashboardScrollViewer.Visibility = Visibility.Collapsed;
+        InternetRadioView.Visibility = Visibility.Collapsed;
         UpdateAlphabetIndex(null, false);
 
         await ReloadVisibleAlbumTracksAsync();
@@ -2526,18 +2633,101 @@ public partial class MainWindow : Window
     private void NavListBox_OnPreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
         var item = FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject);
-        if (item?.Tag is not string tag || !tag.StartsWith("Playlist:") ||
+        if (item?.Tag is not string tag)
+        {
+            NavListBox.ContextMenu = null;
+            return;
+        }
+
+        if (tag.StartsWith("Radio:", StringComparison.Ordinal) &&
+            long.TryParse(tag.AsSpan("Radio:".Length), out var radioId))
+        {
+            RadioStationRecord? radio;
+            try
+            {
+                using var db = AudioDatabase.OpenDefault();
+                radio = db.GetRadioStation(radioId);
+            }
+            catch
+            {
+                radio = null;
+            }
+            NavListBox.ContextMenu = radio is null ? null : BuildDeleteRadioContextMenu(radio);
+            return;
+        }
+
+        item.IsSelected = true;
+        if (!tag.StartsWith("Playlist:", StringComparison.Ordinal) ||
             !long.TryParse(tag.AsSpan("Playlist:".Length), out long playlistId))
         {
             NavListBox.ContextMenu = null;
             return;
         }
 
-        item.IsSelected = true;
         string name;
         try { using var db = AudioDatabase.OpenDefault(); name = db.GetPlaylistById(playlistId)?.Name ?? string.Empty; }
         catch { name = string.Empty; }
         NavListBox.ContextMenu = BuildDeletePlaylistContextMenu(playlistId, name);
+    }
+
+    private ContextMenu BuildDeleteRadioContextMenu(RadioStationRecord radio)
+    {
+        var menu = new ContextMenu();
+        if (System.Windows.Application.Current.Resources[typeof(ContextMenu)] is Style contextStyle)
+            menu.Style = contextStyle;
+        var menuItemStyle = System.Windows.Application.Current.Resources[typeof(MenuItem)] as Style;
+        var separatorStyle = System.Windows.Application.Current.Resources[typeof(Separator)] as Style;
+
+        var header = new MenuItem
+        {
+            Header = radio.Name,
+            IsHitTestVisible = false,
+            Focusable = false,
+            FontSize = 11,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x6C, 0x63, 0xFF))
+        };
+        if (menuItemStyle is not null)
+            header.Style = menuItemStyle;
+        menu.Items.Add(header);
+
+        var separator = new Separator();
+        if (separatorStyle is not null)
+            separator.Style = separatorStyle;
+        menu.Items.Add(separator);
+
+        var deleteItem = new MenuItem
+        {
+            Header = LocalizationManager.Current.DeleteRadio,
+            Tag = radio,
+            Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0x6B, 0x6B))
+        };
+        if (menuItemStyle is not null)
+            deleteItem.Style = menuItemStyle;
+        deleteItem.Click += DeleteRadioMenuItem_OnClick;
+        menu.Items.Add(deleteItem);
+        return menu;
+    }
+
+    private void DeleteRadioMenuItem_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: RadioStationRecord radio })
+            return;
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            db.DeleteRadioStation(radio.Id);
+        }
+        catch
+        {
+            return;
+        }
+
+        LoadNavPlaylists();
+        var internetRadioItem = NavListBox.Items.OfType<ListBoxItem>()
+            .FirstOrDefault(item => string.Equals(item.Tag as string, "InternetRadio", StringComparison.Ordinal));
+        NavListBox.SelectedItem = internetRadioItem;
+        StatusTextBlock.Text = string.Format(LocalizationManager.Current.RadioDeleted, radio.Name);
     }
 
     private ContextMenu BuildDeletePlaylistContextMenu(long playlistId, string playlistName)
@@ -2668,6 +2858,425 @@ public partial class MainWindow : Window
     }
 
     // ------------------------------------------------------------------
+    // Internetradio
+    // ------------------------------------------------------------------
+
+    private async void RadioSearchButton_OnClick(object sender, RoutedEventArgs e) =>
+        await SearchRadioStationsAsync();
+
+    private async void RadioSearchTextBox_OnKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+            return;
+        e.Handled = true;
+        await SearchRadioStationsAsync();
+    }
+
+    private async Task SearchRadioStationsAsync()
+    {
+        CancelAndDispose(ref _radioSearchCts);
+        _radioSearchCts = new CancellationTokenSource();
+        var cancellationToken = _radioSearchCts.Token;
+
+        RadioStationsDataGrid.ItemsSource = null;
+        RadioStatusTextBlock.Visibility = Visibility.Visible;
+        RadioStatusTextBlock.Text = LocalizationManager.Current.RadioLoading;
+        try
+        {
+            var stations = await _radioBrowserService.SearchAsync(
+                RadioSearchTextBox.Text,
+                cancellationToken);
+            var rows = stations.Select(station => new RadioStationViewModel
+            {
+                StationUuid = station.StationUuid,
+                Name = station.Name,
+                StreamUrl = station.StreamUrl,
+                Homepage = station.Homepage,
+                Favicon = station.Favicon,
+                CountryCode = station.CountryCode,
+                Codec = station.Codec,
+                Bitrate = station.Bitrate,
+                Tags = station.Tags,
+                Genres = NormalizeRadioGenres(station.Tags)
+            }).ToList();
+            _radioSearchResults.Clear();
+            _radioSearchResults.AddRange(rows);
+            var availableGenres = rows.SelectMany(row => row.Genres)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            _selectedRadioGenres.RemoveWhere(genre => !availableGenres.Contains(genre));
+            BuildRadioGenreFilter();
+            ApplyRadioGenreFilter();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception)
+        {
+            RadioStatusTextBlock.Text = LocalizationManager.Current.RadioSearchFailed;
+        }
+    }
+
+    private void RadioGenreFilterButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        BuildRadioGenreFilter();
+        RadioGenreFilterPopup.IsOpen = !RadioGenreFilterPopup.IsOpen;
+    }
+
+    private void ClearRadioGenreFilterButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        _selectedRadioGenres.Clear();
+        BuildRadioGenreFilter();
+        ApplyRadioGenreFilter();
+    }
+
+    private void BuildRadioGenreFilter()
+    {
+        var options = _radioSearchResults
+            .SelectMany(row => row.Genres)
+            .GroupBy(genre => genre, StringComparer.OrdinalIgnoreCase)
+            .Select(group => (Genre: group.Key, Count: group.Count()))
+            .OrderByDescending(option => option.Count)
+            .ThenBy(option => option.Genre, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+        RadioGenreFilterPanel.Children.Clear();
+        foreach (var option in options)
+        {
+            var checkBox = new WpfCheckBox
+            {
+                Content = $"{option.Genre} ({option.Count})",
+                Tag = option.Genre,
+                IsChecked = _selectedRadioGenres.Contains(option.Genre),
+                Margin = new Thickness(2, 4, 2, 4),
+                Foreground = (WpfBrush)FindResource("AppPrimaryTextBrush")
+            };
+            checkBox.Checked += RadioGenreCheckBox_OnChanged;
+            checkBox.Unchecked += RadioGenreCheckBox_OnChanged;
+            RadioGenreFilterPanel.Children.Add(checkBox);
+        }
+
+        UpdateRadioGenreFilterButton();
+    }
+
+    private void RadioGenreCheckBox_OnChanged(object sender, RoutedEventArgs e)
+    {
+        if (sender is not WpfCheckBox { Tag: string genre } checkBox)
+            return;
+        if (checkBox.IsChecked == true)
+            _selectedRadioGenres.Add(genre);
+        else
+            _selectedRadioGenres.Remove(genre);
+        UpdateRadioGenreFilterButton();
+        ApplyRadioGenreFilter();
+    }
+
+    private void ApplyRadioGenreFilter()
+    {
+        var rows = _selectedRadioGenres.Count == 0
+            ? _radioSearchResults
+            : _radioSearchResults
+                .Where(row => row.Genres.Any(_selectedRadioGenres.Contains))
+                .ToList();
+        RadioStationsDataGrid.ItemsSource = rows;
+        RadioStatusTextBlock.Text = rows.Count == 0
+            ? LocalizationManager.Current.RadioNoResults
+            : string.Empty;
+        RadioStatusTextBlock.Visibility = rows.Count == 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(rows.Count);
+    }
+
+    private void UpdateRadioGenreFilterButton()
+    {
+        RadioGenreFilterButton.Content = _selectedRadioGenres.Count == 0
+            ? LocalizationManager.Current.RadioGenres
+            : $"{LocalizationManager.Current.RadioGenres} ({_selectedRadioGenres.Count})";
+    }
+
+    private static IReadOnlyList<string> NormalizeRadioGenres(string? tags)
+    {
+        if (string.IsNullOrWhiteSpace(tags))
+            return [];
+
+        return tags.Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(NormalizeRadioGenre)
+            .Where(genre => genre is not null)
+            .Cast<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(genre => genre, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string? NormalizeRadioGenre(string tag)
+    {
+        var value = tag.Trim().ToLowerInvariant();
+        if (value.Length < 2 ||
+            value is "aac" or "mp3" or "ogg" or "fm" or "am" or "radio" or "music" or "otr")
+            return null;
+
+        if (value.Contains("news", StringComparison.Ordinal) || value == "information") return "News";
+        if (value.Contains("talk", StringComparison.Ordinal)) return "Talk";
+        if (value.Contains("public radio", StringComparison.Ordinal)) return "Public Radio";
+        if (value.Contains("classical", StringComparison.Ordinal)) return "Classical";
+        if (value.Contains("jazz", StringComparison.Ordinal)) return "Jazz";
+        if (value.Contains("easy listening", StringComparison.Ordinal)) return "Easy Listening";
+        if (value.Contains("adult contemporary", StringComparison.Ordinal)) return "Adult Contemporary";
+        if (value.Contains("top 40", StringComparison.Ordinal) || value == "hits") return "Hits";
+        if (value.Contains("oldies", StringComparison.Ordinal)) return "Oldies";
+        if (value.Contains("80s", StringComparison.Ordinal)) return "80s";
+        if (value.Contains("90s", StringComparison.Ordinal)) return "90s";
+        if (value.Contains("70s", StringComparison.Ordinal)) return "70s";
+        if (value.Contains("hip hop", StringComparison.Ordinal) || value.Contains("hip-hop", StringComparison.Ordinal)) return "Hip-Hop";
+        if (value.Contains("r&b", StringComparison.Ordinal) || value.Contains("soul", StringComparison.Ordinal)) return "R&B / Soul";
+        if (value.Contains("electronic", StringComparison.Ordinal) || value is "edm" or "techno" or "house" or "trance") return "Electronic";
+        if (value.Contains("dance", StringComparison.Ordinal)) return "Dance";
+        if (value.Contains("alternative", StringComparison.Ordinal)) return "Alternative";
+        if (value.Contains("indie", StringComparison.Ordinal)) return "Indie";
+        if (value.Contains("metal", StringComparison.Ordinal)) return "Metal";
+        if (value.Contains("rock", StringComparison.Ordinal)) return "Rock";
+        if (value.Contains("pop", StringComparison.Ordinal)) return "Pop";
+        if (value.Contains("blues", StringComparison.Ordinal)) return "Blues";
+        if (value.Contains("country", StringComparison.Ordinal)) return "Country";
+        if (value.Contains("reggae", StringComparison.Ordinal)) return "Reggae";
+        if (value.Contains("folk", StringComparison.Ordinal)) return "Folk";
+        if (value.Contains("latin", StringComparison.Ordinal)) return "Latin";
+        if (value.Contains("world", StringComparison.Ordinal)) return "World";
+        if (value.Contains("culture", StringComparison.Ordinal)) return "Culture";
+        if (value.Contains("comedy", StringComparison.Ordinal)) return "Comedy";
+        if (value.Contains("sport", StringComparison.Ordinal)) return "Sports";
+        return null;
+    }
+
+    private async void RadioStationsDataGrid_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (FindAncestor<Button>(e.OriginalSource as DependencyObject) is not null ||
+            RadioStationsDataGrid.SelectedItem is not RadioStationViewModel station)
+            return;
+        await PlayRadioAsync(station.ToRecord());
+    }
+
+    private async void PlayRadioButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: RadioStationViewModel station })
+            await PlayRadioAsync(station.ToRecord());
+    }
+
+    private void AddRadioButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: RadioStationViewModel station })
+            return;
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            db.SaveRadioStation(station.ToBrowserStation());
+            LoadNavPlaylists();
+            StatusTextBlock.Text = string.Format(LocalizationManager.Current.RadioAdded, station.Name);
+        }
+        catch (Exception)
+        {
+            StatusTextBlock.Text = LocalizationManager.Current.RadioSearchFailed;
+        }
+    }
+
+    private async Task PlaySavedRadioAsync(long radioId)
+    {
+        RadioStationRecord? station;
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            station = db.GetRadioStation(radioId);
+        }
+        catch
+        {
+            station = null;
+        }
+
+        if (station is not null)
+            await PlayRadioAsync(station);
+    }
+
+    private async Task PlayRadioAsync(RadioStationRecord station)
+    {
+        _queue.Clear();
+        _queueIndex = -1;
+        ResetQueuePlaybackState();
+        RefreshQueueNavigationButtons();
+        _ = _radioBrowserService.RegisterClickAsync(station.StationUuid);
+        try
+        {
+            await StartPlaybackAsync(station.StreamUrl, station);
+        }
+        catch (OperationCanceledException)
+        {
+            StatusTextBlock.Text = LocalizationManager.Current.PlaybackStopped;
+        }
+        catch (Exception ex)
+        {
+            StopPlayback();
+            StatusTextBlock.Text = ex.Message;
+        }
+    }
+
+    private void ShowRadioNowPlaying(RadioStationRecord station, AudioFileInfo info)
+    {
+        RadioNowPlayingPanel.Visibility = Visibility.Visible;
+        RadioNowPlayingStation.Text = station.Name;
+        RadioNowPlayingTitle.Text = LocalizationManager.Current.RadioMetadataUnavailable;
+        RadioNowPlayingArtist.Text = string.Empty;
+        RadioNowPlayingDescription.Text = BuildRadioDescription(station, info, null);
+        RadioNowPlayingLogo.Source = null;
+        NowPlayingArtworkImage.Source = null;
+        _ = LoadRadioLogoAsync(station.Favicon, _playbackCts?.Token ?? CancellationToken.None);
+    }
+
+    private void StartRadioMetadataMonitor(RadioStationRecord station)
+    {
+        CancelAndDispose(ref _radioMetadataCts);
+        _radioMetadataCts = CancellationTokenSource.CreateLinkedTokenSource(
+            _playbackCts?.Token ?? CancellationToken.None);
+        _ = MonitorRadioMetadataAsync(station, _radioMetadataCts.Token);
+    }
+
+    private async Task MonitorRadioMetadataAsync(
+        RadioStationRecord station,
+        CancellationToken cancellationToken)
+    {
+        string? previousSignature = null;
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                var metadata = await _radioMetadataService.ProbeAsync(
+                    station.StreamUrl,
+                    cancellationToken);
+                var signature = metadata is null
+                    ? string.Empty
+                    : $"{metadata.StreamTitle}\n{metadata.Description}\n{metadata.Genre}";
+                if (!string.Equals(signature, previousSignature, StringComparison.Ordinal))
+                {
+                    previousSignature = signature;
+                    await Dispatcher.InvokeAsync(() => UpdateRadioMetadata(station, metadata));
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch
+            {
+                if (previousSignature is null)
+                {
+                    previousSignature = string.Empty;
+                    await Dispatcher.InvokeAsync(() => UpdateRadioMetadata(station, null));
+                }
+            }
+
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(15), cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+        }
+    }
+
+    private void UpdateRadioMetadata(RadioStationRecord station, RadioStreamMetadata? metadata)
+    {
+        if (_currentRadioStation?.StationUuid != station.StationUuid)
+            return;
+
+        var title = metadata?.Title;
+        var artist = metadata?.Artist;
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            RadioNowPlayingTitle.Text = LocalizationManager.Current.RadioMetadataUnavailable;
+            RadioNowPlayingArtist.Text = string.Empty;
+            NowPlayingTitleBlock.Text = station.Name;
+            NowPlayingArtistBlock.Text = LocalizationManager.Current.InternetRadio;
+        }
+        else
+        {
+            RadioNowPlayingTitle.Text = title;
+            RadioNowPlayingArtist.Text = artist ?? metadata!.StationName ?? station.Name;
+            NowPlayingTitleBlock.Text = title;
+            NowPlayingArtistBlock.Text = artist ?? station.Name;
+        }
+
+        RadioNowPlayingDescription.Text = BuildRadioDescription(
+            station,
+            null,
+            metadata);
+    }
+
+    private static string BuildRadioDescription(
+        RadioStationRecord station,
+        AudioFileInfo? info,
+        RadioStreamMetadata? metadata)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(metadata?.Description))
+            parts.Add(metadata.Description);
+        if (!string.IsNullOrWhiteSpace(metadata?.Genre))
+            parts.Add(metadata.Genre);
+        if (!string.IsNullOrWhiteSpace(station.CountryCode))
+            parts.Add(station.CountryCode);
+        if (!string.IsNullOrWhiteSpace(station.Codec))
+            parts.Add(station.Bitrate > 0
+                ? $"{station.Codec} · {station.Bitrate} kbps"
+                : station.Codec);
+        else if (info is not null)
+            parts.Add($"{info.CodecName.ToUpperInvariant()} · {info.SourceSampleRate:N0} Hz");
+        return string.Join("  ·  ", parts.Distinct(StringComparer.OrdinalIgnoreCase));
+    }
+
+    private async Task LoadRadioLogoAsync(string? favicon, CancellationToken cancellationToken)
+    {
+        if (!Uri.TryCreate(favicon, UriKind.Absolute, out var uri))
+            return;
+        try
+        {
+            var bytes = await RadioImageHttpClient.GetByteArrayAsync(uri, cancellationToken);
+            await using var stream = new MemoryStream(bytes);
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.StreamSource = stream;
+            image.DecodePixelWidth = 400;
+            image.EndInit();
+            image.Freeze();
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                RadioNowPlayingLogo.Source = image;
+                NowPlayingArtworkImage.Source = image;
+            }
+        }
+        catch
+        {
+            // A missing or invalid station logo does not affect playback.
+        }
+    }
+
+    private void ClearRadioNowPlaying()
+    {
+        RadioNowPlayingPanel.Visibility = Visibility.Collapsed;
+        RadioNowPlayingLogo.Source = null;
+        RadioNowPlayingStation.Text = string.Empty;
+        RadioNowPlayingTitle.Text = string.Empty;
+        RadioNowPlayingArtist.Text = string.Empty;
+        RadioNowPlayingDescription.Text = string.Empty;
+    }
+
+    private static HttpClient CreateRadioImageHttpClient()
+    {
+        var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("Orynivo/1.0");
+        return client;
+    }
+
+    // ------------------------------------------------------------------
     // Wiedergabe
     // ------------------------------------------------------------------
 
@@ -2693,16 +3302,18 @@ public partial class MainWindow : Window
             StatusTextBlock.Text = LocalizationManager.Current.SelectTrackFirst;
             return;
         }
-        try { await StartPlaybackAsync(_currentFilePath); }
+        try { await StartPlaybackAsync(_currentFilePath, _currentRadioStation); }
         catch (OperationCanceledException) { StatusTextBlock.Text = LocalizationManager.Current.PlaybackStopped; }
         catch (Exception ex) { StopPlayback(); StatusTextBlock.Text = ex.Message; }
     }
 
-    private async Task StartPlaybackAsync(string filePath)
+    private async Task StartPlaybackAsync(string filePath, RadioStationRecord? radioStation = null)
     {
         StopPlayback();
         _currentFilePath = filePath;
-        _playedQueuePaths.Add(filePath);
+        _currentRadioStation = radioStation;
+        if (radioStation is null)
+            _playedQueuePaths.Add(filePath);
         _playbackCts     = new CancellationTokenSource();
 
         var ext = Path.GetExtension(filePath);
@@ -2711,6 +3322,11 @@ public partial class MainWindow : Window
 
         if (_settings.OutputBackend == OutputBackend.Asio)
         {
+            if (!SteinbergAsioStream.IsAvailable)
+            {
+                StatusTextBlock.Text = LocalizationManager.Current.AsioBridgeMissing;
+                return;
+            }
             if (string.IsNullOrWhiteSpace(_settings.SelectedDriverName))
             {
                 StatusTextBlock.Text = LocalizationManager.Current.SelectAsioDevice;
@@ -2749,41 +3365,59 @@ public partial class MainWindow : Window
         _transportTimer.Start();
 
         // Now-playing anzeigen
-        var filename = Path.GetFileNameWithoutExtension(filePath);
+        var filename = radioStation?.Name ?? Path.GetFileNameWithoutExtension(filePath);
         NowPlayingTitleBlock.Text  = filename;
-        NowPlayingArtistBlock.Text = SelectedDriverTextBlock.Text;
+        NowPlayingArtistBlock.Text = radioStation is null
+            ? SelectedDriverTextBlock.Text
+            : LocalizationManager.Current.InternetRadio;
         FileInfoTextBlock.Text     = info.IsDsd && info.ContainerName is "dsf" or "dff"
             ? $"{info.ContainerName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz  ·  DSD nativ"
             : info.IsDsd
                 ? $"DSD → PCM  ·  {info.OutputSampleRate:N0} Hz"
                 : $"{info.CodecName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz  ·  {info.Channels} ch";
-        try
+        if (radioStation is null)
         {
-            using var db = AudioDatabase.OpenDefault();
-            var artworkPaths = db.GetArtworkPathsByTrackPath(filePath);
-            var track = db.GetByPath(filePath);
-            var artist = db.GetArtistByTrackPath(filePath);
-            NowPlayingArtworkImage.Source = CreateArtworkImage(artworkPaths?.Thumb96Path, 96);
-            LyricsBackgroundImage.Source = CreateArtworkImage(
-                artworkPaths?.Thumb320Path ?? artworkPaths?.OriginalPath,
-                900);
-            var trackInfo = db.GetTrackIdAndFavorite(filePath);
-            _currentTrackId = trackInfo?.Id;
-            _currentTrackIsFavorite = trackInfo?.IsFavorite ?? false;
-            _currentArtistId = artist?.Id;
-            _currentArtistName = artist?.Artist;
-            NowPlayingArtistButton.IsEnabled = artist is not null;
-            LyricsButton.IsEnabled = track is not null;
-            ArtistInfoButton.IsEnabled = artist is not null;
-            if (track is not null)
+            try
             {
-                NowPlayingTitleBlock.Text = track.Title ?? filename;
-                NowPlayingArtistBlock.Text = track.Artist ?? string.Empty;
+                using var db = AudioDatabase.OpenDefault();
+                var artworkPaths = db.GetArtworkPathsByTrackPath(filePath);
+                var track = db.GetByPath(filePath);
+                var artist = db.GetArtistByTrackPath(filePath);
+                NowPlayingArtworkImage.Source = CreateArtworkImage(artworkPaths?.Thumb96Path, 96);
+                LyricsBackgroundImage.Source = CreateArtworkImage(
+                    artworkPaths?.Thumb320Path ?? artworkPaths?.OriginalPath,
+                    900);
+                var trackInfo = db.GetTrackIdAndFavorite(filePath);
+                _currentTrackId = trackInfo?.Id;
+                _currentTrackIsFavorite = trackInfo?.IsFavorite ?? false;
+                _currentArtistId = artist?.Id;
+                _currentArtistName = artist?.Artist;
+                NowPlayingArtistButton.IsEnabled = artist is not null;
+                LyricsButton.IsEnabled = track is not null;
+                ArtistInfoButton.IsEnabled = artist is not null;
+                if (track is not null)
+                {
+                    NowPlayingTitleBlock.Text = track.Title ?? filename;
+                    NowPlayingArtistBlock.Text = track.Artist ?? string.Empty;
+                }
             }
+            catch
+            {
+                NowPlayingArtworkImage.Source = null;
+                LyricsBackgroundImage.Source = null;
+                _currentTrackId = null;
+                _currentArtistId = null;
+                _currentArtistName = null;
+                NowPlayingArtistButton.IsEnabled = false;
+                _currentTrackIsFavorite = false;
+                LyricsButton.IsEnabled = false;
+                ArtistInfoButton.IsEnabled = false;
+            }
+            _ = LoadLyricsForTrackAsync(filePath, forceRefresh: false);
         }
-        catch
+        else
         {
-            NowPlayingArtworkImage.Source = null;
+            ShowRadioNowPlaying(radioStation, info);
             LyricsBackgroundImage.Source = null;
             _currentTrackId = null;
             _currentArtistId = null;
@@ -2792,26 +3426,29 @@ public partial class MainWindow : Window
             _currentTrackIsFavorite = false;
             LyricsButton.IsEnabled = false;
             ArtistInfoButton.IsEnabled = false;
+            StartRadioMetadataMonitor(radioStation);
         }
         UpdateNowPlayingFavoriteButton();
-        _ = LoadLyricsForTrackAsync(filePath, forceRefresh: false);
 
         var outputName = _settings.OutputBackend == OutputBackend.Asio
             ? _settings.SelectedDriverName
             : _settings.SelectedWasapiDeviceName;
         StatusTextBlock.Text = string.Format(LocalizationManager.Current.PlaybackThrough, outputName);
 
-        try
+        if (radioStation is null)
         {
-            using var db = AudioDatabase.OpenDefault();
-            _currentPlayHistoryId = db.RecordPlaybackStart(
-                filePath,
-                db.GetTrackIdByPath(filePath),
-                player.Duration.TotalSeconds > 0 ? player.Duration.TotalSeconds : null);
-        }
-        catch
-        {
-            _currentPlayHistoryId = null;
+            try
+            {
+                using var db = AudioDatabase.OpenDefault();
+                _currentPlayHistoryId = db.RecordPlaybackStart(
+                    filePath,
+                    db.GetTrackIdByPath(filePath),
+                    player.Duration.TotalSeconds > 0 ? player.Duration.TotalSeconds : null);
+            }
+            catch
+            {
+                _currentPlayHistoryId = null;
+            }
         }
 
         await player.WaitForCompletionAsync();
@@ -2819,7 +3456,7 @@ public partial class MainWindow : Window
         if (_player == player)
         {
             RecordPlaybackEnd(completed: true);
-            if (!await TryPlayNextAsync())
+            if (radioStation is not null || !await TryPlayNextAsync())
             {
                 StopPlayback();
                 StatusTextBlock.Text = LocalizationManager.Current.PlaybackFinished;
@@ -2854,6 +3491,7 @@ public partial class MainWindow : Window
     private void StopPlayback()
     {
         RecordPlaybackEnd(completed: false);
+        CancelAndDispose(ref _radioMetadataCts);
         _playbackCts?.Cancel();
         _playbackCts?.Dispose();
         _playbackCts = null;
@@ -2881,7 +3519,23 @@ public partial class MainWindow : Window
         LyricsButton.IsEnabled = false;
         ArtistInfoButton.IsEnabled = false;
         ArtistInfoView.Visibility = Visibility.Collapsed;
+        ClearRadioNowPlaying();
         UpdateNowPlayingFavoriteButton();
+    }
+
+    private static void CancelAndDispose(ref CancellationTokenSource? source)
+    {
+        var current = Interlocked.Exchange(ref source, null);
+        if (current is null)
+            return;
+        try
+        {
+            current.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+        current.Dispose();
     }
 
     private void RecordPlaybackEnd(bool completed)

@@ -134,7 +134,8 @@ public sealed class FfmpegAudioPlayer : IAudioPlayer
             var rate = int.Parse(stream.GetProperty("sample_rate").GetString() ?? "0", CultureInfo.InvariantCulture);
             var channels = stream.GetProperty("channels").GetInt32();
             var duration = stream.TryGetProperty("duration", out var durationJson)
-                ? double.Parse(durationJson.GetString() ?? "0", CultureInfo.InvariantCulture) : 0;
+                ? ParseDuration(durationJson)
+                : 0;
             var isDsd = codec.Contains("dsd", StringComparison.OrdinalIgnoreCase);
             return new AudioFileInfo(codec, rate, channels, isDsd ? 176_400 : NormalizePcmRate(rate), isDsd,
                 Path.GetExtension(filePath).TrimStart('.').ToLowerInvariant(), TimeSpan.FromSeconds(duration));
@@ -142,6 +143,15 @@ public sealed class FfmpegAudioPlayer : IAudioPlayer
     }
 
     private static int NormalizePcmRate(int rate) => rate is >= 8_000 and <= 768_000 ? rate : 192_000;
+    private static double ParseDuration(JsonElement value)
+    {
+        if (value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out var number))
+            return number;
+        return value.ValueKind == JsonValueKind.String &&
+               double.TryParse(value.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out number)
+            ? number
+            : 0;
+    }
     private void ApplyVolume(Span<float> samples)
     {
         if (Math.Abs(Volume - 1.0f) < 0.0001f) return;

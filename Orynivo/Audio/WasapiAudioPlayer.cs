@@ -229,7 +229,7 @@ public sealed class WasapiAudioPlayer : IAudioPlayer
         var channels = stream.GetProperty("channels").GetInt32();
         var isDsd = codecName.Contains("dsd", StringComparison.OrdinalIgnoreCase);
         var duration = stream.TryGetProperty("duration", out var durationJson)
-            ? double.Parse(durationJson.GetString() ?? "0", CultureInfo.InvariantCulture)
+            ? ParseDuration(durationJson)
             : 0;
 
         return new AudioFileInfo(
@@ -244,6 +244,16 @@ public sealed class WasapiAudioPlayer : IAudioPlayer
 
     private static int NormalizePcmRate(int sampleRate) =>
         sampleRate is >= 8_000 and <= 768_000 ? sampleRate : 192_000;
+
+    private static double ParseDuration(JsonElement value)
+    {
+        if (value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out var number))
+            return number;
+        return value.ValueKind == JsonValueKind.String &&
+               double.TryParse(value.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out number)
+            ? number
+            : 0;
+    }
 
     private void ApplyVolumeIfNeeded(Span<byte> bytes)
     {

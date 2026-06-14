@@ -4,10 +4,18 @@ param(
 
     [string]$AsioSdkDir = $env:ASIO_SDK_DIR,
 
-    [string]$MSBuildPath = $env:MSBUILD_EXE_PATH
+    [string]$MSBuildPath = $env:MSBUILD_EXE_PATH,
+
+    [switch]$RequireAsio,
+
+    [switch]$SkipAsio
 )
 
 $ErrorActionPreference = 'Stop'
+
+if ($RequireAsio -and $SkipAsio) {
+    throw '-RequireAsio and -SkipAsio cannot be used together.'
+}
 
 function Resolve-MSBuildPath {
     param([string]$ExplicitPath)
@@ -78,24 +86,33 @@ function Resolve-AsioSdkPath {
         }
     }
 
-    throw 'The Steinberg ASIO SDK was not found. Set ASIO_SDK_DIR, pass -AsioSdkDir, or place it under third_party\asiosdk.'
+    return $null
 }
 
-$msbuild = Resolve-MSBuildPath $MSBuildPath
-$asioSdk = Resolve-AsioSdkPath $AsioSdkDir
+$asioSdk = if ($SkipAsio) { $null } else { Resolve-AsioSdkPath $AsioSdkDir }
 $nativeProject = Join-Path $PSScriptRoot 'Native\AsioBridge\AsioBridge.vcxproj'
 $managedProject = Join-Path $PSScriptRoot 'Orynivo\Orynivo.csproj'
 
-Write-Host "MSBuild: $msbuild"
-Write-Host "ASIO SDK: $asioSdk"
+if ($asioSdk) {
+    $msbuild = Resolve-MSBuildPath $MSBuildPath
+    Write-Host "MSBuild: $msbuild"
+    Write-Host "ASIO SDK: $asioSdk"
 
-& $msbuild $nativeProject `
-    /p:Configuration=$Configuration `
-    /p:Platform=x64 `
-    "/p:AsioSdkDir=$asioSdk"
-if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
+    & $msbuild $nativeProject `
+        /p:Configuration=$Configuration `
+        /p:Platform=x64 `
+        "/p:AsioSdkDir=$asioSdk"
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+}
+elseif ($RequireAsio) {
+    throw 'The Steinberg ASIO SDK was not found, but -RequireAsio was specified.'
+}
+else {
+    Write-Host 'Building Orynivo without ASIO support.'
 }
 
-dotnet build $managedProject -c $Configuration
+$includeAsioBridge = if ($null -ne $asioSdk) { 'true' } else { 'false' }
+dotnet build $managedProject -c $Configuration "/p:IncludeAsioBridge=$includeAsioBridge"
 exit $LASTEXITCODE

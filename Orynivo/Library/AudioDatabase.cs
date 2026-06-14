@@ -1567,10 +1567,117 @@ public sealed class AudioDatabase : IDisposable
 
             CREATE INDEX IF NOT EXISTS idx_playlist_tracks_playlist ON playlist_tracks (playlist_id, position);
             CREATE INDEX IF NOT EXISTS idx_playlist_tracks_path     ON playlist_tracks (path);
+
+            CREATE TABLE IF NOT EXISTS radio_stations (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                station_uuid  TEXT NOT NULL UNIQUE,
+                name          TEXT NOT NULL,
+                stream_url    TEXT NOT NULL,
+                homepage      TEXT,
+                favicon       TEXT,
+                country_code  TEXT,
+                codec         TEXT,
+                bitrate       INTEGER NOT NULL DEFAULT 0,
+                tags          TEXT,
+                created_at    INTEGER NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_radio_stations_name
+                ON radio_stations (name COLLATE NOCASE);
             """);
         EnsureColumn("playlists", "is_smart",        "INTEGER NOT NULL DEFAULT 0");
         EnsureColumn("playlists", "filter_criteria",  "TEXT");
     }
+
+    // ------------------------------------------------------------------
+    // Internetradio
+    // ------------------------------------------------------------------
+
+    public long SaveRadioStation(RadioBrowserStation station)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO radio_stations (
+                station_uuid, name, stream_url, homepage, favicon,
+                country_code, codec, bitrate, tags, created_at)
+            VALUES (
+                $uuid, $name, $url, $homepage, $favicon,
+                $country, $codec, $bitrate, $tags, $created)
+            ON CONFLICT(station_uuid) DO UPDATE SET
+                name = excluded.name,
+                stream_url = excluded.stream_url,
+                homepage = excluded.homepage,
+                favicon = excluded.favicon,
+                country_code = excluded.country_code,
+                codec = excluded.codec,
+                bitrate = excluded.bitrate,
+                tags = excluded.tags
+            RETURNING id;
+            """;
+        Add(cmd, "$uuid", station.StationUuid);
+        Add(cmd, "$name", station.Name);
+        Add(cmd, "$url", station.StreamUrl);
+        Add(cmd, "$homepage", station.Homepage);
+        Add(cmd, "$favicon", station.Favicon);
+        Add(cmd, "$country", station.CountryCode);
+        Add(cmd, "$codec", station.Codec);
+        Add(cmd, "$bitrate", station.Bitrate);
+        Add(cmd, "$tags", station.Tags);
+        Add(cmd, "$created", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        return (long)cmd.ExecuteScalar()!;
+    }
+
+    public List<RadioStationRecord> GetRadioStations()
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, station_uuid, name, stream_url, homepage, favicon,
+                   country_code, codec, bitrate, tags
+            FROM radio_stations
+            ORDER BY name COLLATE NOCASE;
+            """;
+        using var reader = cmd.ExecuteReader();
+        var result = new List<RadioStationRecord>();
+        while (reader.Read())
+            result.Add(MapRadioStation(reader));
+        return result;
+    }
+
+    public RadioStationRecord? GetRadioStation(long id)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, station_uuid, name, stream_url, homepage, favicon,
+                   country_code, codec, bitrate, tags
+            FROM radio_stations
+            WHERE id = $id
+            LIMIT 1;
+            """;
+        Add(cmd, "$id", id);
+        using var reader = cmd.ExecuteReader();
+        return reader.Read() ? MapRadioStation(reader) : null;
+    }
+
+    public void DeleteRadioStation(long id)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = "DELETE FROM radio_stations WHERE id = $id;";
+        Add(cmd, "$id", id);
+        cmd.ExecuteNonQuery();
+    }
+
+    private static RadioStationRecord MapRadioStation(SqliteDataReader reader) =>
+        new(
+            reader.GetInt64(0),
+            reader.GetString(1),
+            reader.GetString(2),
+            reader.GetString(3),
+            reader.IsDBNull(4) ? null : reader.GetString(4),
+            reader.IsDBNull(5) ? null : reader.GetString(5),
+            reader.IsDBNull(6) ? null : reader.GetString(6),
+            reader.IsDBNull(7) ? null : reader.GetString(7),
+            reader.GetInt32(8),
+            reader.IsDBNull(9) ? null : reader.GetString(9));
 
     // ------------------------------------------------------------------
     // Playlisten – CRUD

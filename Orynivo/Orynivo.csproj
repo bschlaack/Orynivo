@@ -16,11 +16,25 @@
   <PropertyGroup>
     <PlatformTarget>x64</PlatformTarget>
     <UseWindowsForms>true</UseWindowsForms>
+    <IncludeAsioBridge Condition="'$(IncludeAsioBridge)' == ''">true</IncludeAsioBridge>
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="..\Native\AsioBridge\x64\$(Configuration)\AsioBridge.dll" Link="AsioBridge.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\Native\AsioBridge\x64\$(Configuration)\AsioBridge.dll')" />
+    <None Include="..\Native\AsioBridge\x64\$(Configuration)\AsioBridge.dll"
+          Link="AsioBridge.dll"
+          CopyToOutputDirectory="PreserveNewest"
+          Condition="'$(IncludeAsioBridge)' == 'true' and Exists('..\Native\AsioBridge\x64\$(Configuration)\AsioBridge.dll')" />
   </ItemGroup>
+
+  <Target Name="RemoveDisabledAsioBridge" AfterTargets="Build"
+          Condition="'$(IncludeAsioBridge)' != 'true'">
+    <Delete Files="$(TargetDir)AsioBridge.dll" />
+  </Target>
+
+  <Target Name="RemoveDisabledAsioBridgeFromPublish" AfterTargets="Publish"
+          Condition="'$(IncludeAsioBridge)' != 'true'">
+    <Delete Files="$(PublishDir)AsioBridge.dll" />
+  </Target>
 
   <ItemGroup>
     <Resource Include="Assets\Orynivo.ico" />

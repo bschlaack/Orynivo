@@ -42,3 +42,22 @@ jobs:
           --configuration ${{ matrix.configuration }}
           --no-restore
           --warnaserror
+          /p:IncludeAsioBridge=false
+
+      - name: Publish Windows build
+        if: matrix.configuration == 'Release'
+        run: >
+          dotnet publish Orynivo/Orynivo.csproj
+          --configuration Release
+          --runtime win-x64
+          --self-contained false
+          --output artifacts/Orynivo-win-x64
+          /p:IncludeAsioBridge=false
+
+      - name: Upload Windows build
+        if: matrix.configuration == 'Release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Orynivo-win-x64
+          path: artifacts/Orynivo-win-x64
+          if-no-files-found: error

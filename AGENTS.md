@@ -20,11 +20,16 @@ Windows audio player with:
 locates Visual Studio MSBuild through `vswhere.exe` or `PATH`. The ASIO SDK can
 be supplied with `-AsioSdkDir`, `ASIO_SDK_DIR`, or a local
 `third_party/asiosdk` / `external/asiosdk` directory. `-MSBuildPath` and
-`MSBUILD_EXE_PATH` override MSBuild discovery.
+`MSBUILD_EXE_PATH` override MSBuild discovery. If no SDK is found, the script
+builds without ASIO; `-SkipAsio` forces that mode and `-RequireAsio` makes a
+missing SDK fatal. The managed build receives `IncludeAsioBridge=false` so a
+stale native DLL is removed from build and publish output.
 
 `.github/workflows/dotnet-desktop.yml` builds the managed WPF project in Debug
 and Release. It intentionally does not build the native bridge because the
-separately licensed ASIO SDK is not available on GitHub-hosted runners.
+separately licensed ASIO SDK is not available on GitHub-hosted runners. The
+Release job publishes and uploads a framework-dependent `Orynivo-win-x64`
+artifact.
 
 ## Important Architecture
 
@@ -60,6 +65,9 @@ separately licensed ASIO SDK is not available on GitHub-hosted runners.
 - `Orynivo/Library/LibraryScanner.cs`: directory scanner using TagLibSharp; writes through `AudioDatabase.Upsert()`, reports progress, and supports cancellation
 - `Orynivo/Library/LibraryBackupService.cs`: versioned ZIP export/import for the SQLite library, artwork cache, and configured library directories; audio files are not included
 - `Orynivo/Library/LyricsService.cs`: LRCLIB client and LRC parser for downloaded plain or synchronized lyrics
+- `Orynivo/Library/RadioBrowserService.cs`: Radio Browser client with mirror discovery, station search, and click registration
+- `Orynivo/Library/RadioStationRecord.cs`: persisted personal internet-radio station model
+- `Orynivo/Library/RadioStreamMetadataService.cs`: probes live ICY metadata through `ffprobe`; radio playback refreshes title/artist every 15 seconds
 - `Orynivo/LyricsSearchWindow.*`: manual LRCLIB search with editable track and artist fields, candidate preview, and explicit replacement of the current track's downloaded lyrics cache
 - `Orynivo/Library/ArtistProfileService.cs`: configurable artist biography and image lookup (Wikipedia or Last.fm); static `Source` and `LastFmApiKey` properties set from `AppSettings`; images cached under `%LOCALAPPDATA%\Orynivo\artist-images\`
 - `Orynivo/Library/ArtistImageSearchService.cs` and `Orynivo/ArtistImageSearchWindow.*`: manual Wikimedia Commons artist-image search with editable query; selecting an image updates `artists.image_path`, sets `image_is_manual`, and preserves the biography source; automatic profile refreshes must not download over manually selected image files
@@ -75,6 +83,7 @@ separately licensed ASIO SDK is not available on GitHub-hosted runners.
 - `artworks` deduplicates artwork by SHA-256 hash; originals and thumbnails live under `%LOCALAPPDATA%\Orynivo\artworks\` as `original`, `thumb_96`, and `thumb_320`
 - `favorites` is an older generic extension point; visible favorites use the direct flags
 - `play_history` records playback starts and endings, duration, final position, and completion state
+- `radio_stations` stores personal Radio Browser stations by stable station UUID, including stream URL, logo, country, codec, bitrate, and tags
 - `AudioDatabase.GetTrackIdAndFavorite(path)` performs a lightweight `id` and `is_favorite` lookup
 - `AudioDatabase.OpenDefault()` creates or opens `%LOCALAPPDATA%\Orynivo\library.db`
 - On first launch after the rename, missing data is copied from `%LOCALAPPDATA%\Player\` and cached database paths are rebased to `%LOCALAPPDATA%\Orynivo\`
@@ -157,6 +166,9 @@ separately licensed ASIO SDK is not available on GitHub-hosted runners.
 ## Known Technical Details
 
 - Target platform: `net8.0-windows`, x64
+- `SteinbergAsioStream.IsAvailable` validates that `AsioBridge.dll` exists,
+  loads successfully, and exports the expected API. Missing bridge builds
+  exclude ASIO from Settings and migrate a saved ASIO backend to WASAPI.
 - Native DSD supports `.dsf` and uncompressed stereo `.dff`
 - DST-compressed `.dff` is not played natively
 - Output types represented by settings: `ASIO`, `WASAPI`, `KernelStreaming`
@@ -203,6 +215,10 @@ separately licensed ASIO SDK is not available on GitHub-hosted runners.
 ## Dashboard
 
 - The top sidebar item has tag `"Dashboard"`
+- **Internet Radio** appears directly below Dashboard. It searches Radio Browser, plays streams through the existing FFmpeg PCM path, and adds stations to **Own Radios** above Playlists.
+- Personal radio sidebar entries use `Radio:{id}` tags; right-clicking one offers deletion from `radio_stations`.
+- During radio playback, the Internet Radio page shows a large station logo and live ICY title/artist metadata when supplied by the stream; the transport summary is updated at the same time.
+- Radio search results expose a multi-select genre popup derived from normalized Radio Browser tags. Selected genres use OR semantics, technical tags are excluded, and unavailable selections are removed after a new search.
 - The page contains:
   1. **Recently added albums**: horizontal artwork strip of up to 12 albums; selecting a card opens album tracks and supports Back navigation
   2. **Calendar**: Monday-first month grid with day number, `HH:mm` playback time, top three genres, today highlight, and month navigation
