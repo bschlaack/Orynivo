@@ -28,7 +28,18 @@ plus a multi-resolution Windows application icon based on the standalone logo.
   playback, persistent personal stations in the sidebar, station logos, and
   live ICY title/artist metadata when supplied by the stream
 - Multi-select genre filtering for radio search results using normalized
-  station tags
+  station tags, with filter options built from the complete Radio Browser tag
+  statistics rather than the first result page; selecting a genre runs a new
+  server-side station query
+- Podcast search through the public Apple Podcasts catalog, complete RSS/Atom
+  episode lists sorted newest first, persistent pinned podcasts in the sidebar,
+  category and feed-language filters, played/in-progress state, and automatic
+  resume from the saved position
+- Podcast detail cards with large artwork, feed description and metadata, and
+  total, unheard, and started episode statistics
+- Radio and podcast filter catalogs are shown before a search; after entering a
+  search term, filter options and counts are recalculated from that result set
+- Podcast category and language filters can be used without entering a title
 - Lucene.NET full-text search with partial-word and German umlaut variants
 - Favorites for tracks, albums, and artists
 - Regular and filter-based smart playlists
@@ -44,7 +55,7 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 - Artist renaming in the artist information view, including a transactional
   merge flow with an explicit choice of which artist profile to retain
 - ZIP export and import for the managed library, playlists, personal radio
-  stations, history, artwork, and configured library directories
+  stations, pinned podcasts, history, artwork, and configured library directories
 - Light and dark themes
 - German, English, French, and Spanish user interfaces
 - Provider-neutral streaming interfaces with a prepared Qobuz configuration
@@ -148,6 +159,7 @@ Orynivo stores its local data under `%LOCALAPPDATA%\Orynivo\`:
 - `artworks\`: original artwork and generated thumbnails
 - `artist-images\`: cached Wikipedia/Wikimedia artist images
 - `search-index\`: Lucene.NET search index
+- `catalog-filter-cache.json`: cached radio genres and podcast categories/languages
 
 These files are not part of the repository.
 
@@ -197,6 +209,9 @@ artwork, rebasing paths, and rebuilding the search index.
   application holds them exclusively.
 - Internet radio availability, metadata, and stream formats depend on the
   external station and the Radio Browser directory.
+- Podcast search depends on the Apple Podcasts catalog. Episode availability
+  and audio compatibility depend on each publisher's RSS/Atom feed and media
+  enclosure.
 - The Steinberg ASIO SDK must be obtained separately and supplied to the build
   script; it cannot be distributed with this repository.
 

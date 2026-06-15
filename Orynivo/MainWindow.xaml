@@ -624,6 +624,13 @@
                     </StackPanel>
                 </ListBoxItem>
 
+                <ListBoxItem Tag="Podcasts" Style="{StaticResource NavItemStyle}">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="◍" Width="18" FontSize="13" VerticalAlignment="Center"/>
+                        <TextBlock Text="{DynamicResource L_Podcasts}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </ListBoxItem>
+
                 <ListBoxItem IsHitTestVisible="False" Focusable="False"
                              Foreground="#44445A" FontSize="10" FontWeight="Bold"
                              Padding="24,12,0,4">
@@ -641,13 +648,20 @@
                     <TextBlock Text="{DynamicResource L_OwnRadios}"/>
                 </ListBoxItem>
 
+                <ListBoxItem x:Name="MyPodcastsHeaderItem"
+                             IsHitTestVisible="False" Focusable="False"
+                             Foreground="#44445A" FontSize="10" FontWeight="Bold"
+                             Padding="24,16,0,4">
+                    <TextBlock Text="{DynamicResource L_MyPodcasts}"/>
+                </ListBoxItem>
+
                 <ListBoxItem x:Name="PlaylistsHeaderItem"
                              IsHitTestVisible="False" Focusable="False"
                              Foreground="#44445A" FontSize="10" FontWeight="Bold"
                              Padding="24,16,0,4">
                     <TextBlock Text="{DynamicResource L_Playlists}"/>
                 </ListBoxItem>
-                <!-- Eigene Radios und Playlist-Einträge werden per Code ergänzt. -->
+                <!-- Eigene Radios, Podcasts und Playlist-Einträge werden per Code ergänzt. -->
             </ListBox>
 
             <!-- Status -->
@@ -1082,6 +1096,355 @@
                                Foreground="{DynamicResource AppSecondaryTextBrush}"
                                TextWrapping="Wrap"
                                TextAlignment="Center"/>
+                </Grid>
+            </Grid>
+
+            <Grid x:Name="PodcastView"
+                  Grid.Row="1"
+                  Visibility="Collapsed"
+                  Background="{DynamicResource AppContentBrush}"
+                  Panel.ZIndex="15">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <Border Margin="28,24,28,14"
+                        Padding="20"
+                        Background="{DynamicResource AppSurfaceBrush}"
+                        BorderBrush="{DynamicResource AppGridLineBrush}"
+                        BorderThickness="1"
+                        CornerRadius="0,20,0,20">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="{DynamicResource L_PodcastDirectory}"
+                                       FontSize="20"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppPrimaryTextBrush}"/>
+                            <TextBlock Text="{DynamicResource L_PodcastDirectoryHint}"
+                                       Margin="0,7,20,0"
+                                       Foreground="{DynamicResource AppSecondaryTextBrush}"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <TextBlock Grid.Column="1"
+                                   Text="◍"
+                                   FontSize="38"
+                                   Foreground="#6C63FF"
+                                   VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+
+                <Grid Grid.Row="1" Margin="28,0,28,14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="PodcastSearchTextBox"
+                             Height="36"
+                             Padding="10,0"
+                             VerticalContentAlignment="Center"
+                             Background="{DynamicResource AppInputBrush}"
+                             Foreground="{DynamicResource AppPrimaryTextBrush}"
+                             BorderBrush="{DynamicResource AppInputBorderBrush}"
+                             ToolTip="{DynamicResource L_PodcastSearch}"
+                             KeyDown="PodcastSearchTextBox_OnKeyDown"/>
+                    <Button x:Name="PodcastCategoryFilterButton"
+                            Grid.Column="1"
+                            Margin="10,0,0,0"
+                            Padding="14,7"
+                            Style="{StaticResource HeaderFilterButtonStyle}"
+                            Content="{DynamicResource L_PodcastCategories}"
+                            Click="PodcastCategoryFilterButton_OnClick"/>
+                    <Button x:Name="PodcastLanguageFilterButton"
+                            Grid.Column="2"
+                            Margin="10,0,0,0"
+                            Padding="14,7"
+                            Style="{StaticResource HeaderFilterButtonStyle}"
+                            Content="{DynamicResource L_PodcastLanguages}"
+                            Click="PodcastLanguageFilterButton_OnClick"/>
+                    <Button Grid.Column="3"
+                            Margin="10,0,0,0"
+                            Padding="18,7"
+                            Style="{StaticResource HeaderFilterButtonStyle}"
+                            Content="{DynamicResource L_PodcastSearch}"
+                            Click="PodcastSearchButton_OnClick"/>
+                </Grid>
+
+                <Popup x:Name="PodcastCategoryFilterPopup"
+                       PlacementTarget="{Binding ElementName=PodcastCategoryFilterButton}"
+                       Placement="Bottom"
+                       StaysOpen="False"
+                       AllowsTransparency="True">
+                    <Border Margin="0,8,0,0"
+                            Width="320"
+                            MaxHeight="420"
+                            Padding="14"
+                            CornerRadius="10"
+                            Background="{DynamicResource AppSurfaceBrush}"
+                            BorderBrush="{DynamicResource AppInputBorderBrush}"
+                            BorderThickness="1">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{DynamicResource L_PodcastCategories}"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource AppPrimaryTextBrush}"/>
+                                <Button Grid.Column="1"
+                                        Padding="9,4"
+                                        Style="{StaticResource HeaderFilterButtonStyle}"
+                                        Content="{DynamicResource L_ClearFilter}"
+                                        Click="ClearPodcastCategoryFilterButton_OnClick"/>
+                            </Grid>
+                            <ScrollViewer Grid.Row="1"
+                                          Margin="0,10,0,0"
+                                          VerticalScrollBarVisibility="Auto">
+                                <StackPanel x:Name="PodcastCategoryFilterPanel"/>
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
+                </Popup>
+
+                <Popup x:Name="PodcastLanguageFilterPopup"
+                       PlacementTarget="{Binding ElementName=PodcastLanguageFilterButton}"
+                       Placement="Bottom"
+                       StaysOpen="False"
+                       AllowsTransparency="True">
+                    <Border Margin="0,8,0,0"
+                            Width="280"
+                            MaxHeight="420"
+                            Padding="14"
+                            CornerRadius="10"
+                            Background="{DynamicResource AppSurfaceBrush}"
+                            BorderBrush="{DynamicResource AppInputBorderBrush}"
+                            BorderThickness="1">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{DynamicResource L_PodcastLanguages}"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource AppPrimaryTextBrush}"/>
+                                <Button Grid.Column="1"
+                                        Padding="9,4"
+                                        Style="{StaticResource HeaderFilterButtonStyle}"
+                                        Content="{DynamicResource L_ClearFilter}"
+                                        Click="ClearPodcastLanguageFilterButton_OnClick"/>
+                            </Grid>
+                            <ScrollViewer Grid.Row="1"
+                                          Margin="0,10,0,0"
+                                          VerticalScrollBarVisibility="Auto">
+                                <StackPanel x:Name="PodcastLanguageFilterPanel"/>
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
+                </Popup>
+
+                <Grid Grid.Row="2" Margin="28,0,28,24">
+                    <DataGrid x:Name="PodcastsDataGrid"
+                              Background="{DynamicResource AppContentBrush}"
+                              BorderThickness="0"
+                              RowHeight="64"
+                              GridLinesVisibility="Horizontal"
+                              HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              SelectionMode="Single"
+                              CanUserResizeRows="False"
+                              MouseDoubleClick="PodcastsDataGrid_OnMouseDoubleClick">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Width="78">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Border Width="48"
+                                                Height="48"
+                                                CornerRadius="8"
+                                                Background="{DynamicResource AppArtworkPlaceholderBrush}"
+                                                ClipToBounds="True">
+                                            <Grid>
+                                                <TextBlock Text="◍"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource AppMutedTextBrush}"/>
+                                                <Image Source="{Binding ArtworkUrl}" Stretch="UniformToFill"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Header="{DynamicResource L_Podcast}"
+                                                Binding="{Binding Name}"
+                                                Width="*"/>
+                            <DataGridTextColumn Header="{DynamicResource L_PodcastAuthor}"
+                                                Binding="{Binding Author}"
+                                                Width="220"/>
+                            <DataGridTextColumn Header="{DynamicResource L_Genre}"
+                                                Binding="{Binding Genre}"
+                                                Width="150"/>
+                            <DataGridTextColumn Header="{DynamicResource L_PodcastLanguage}"
+                                                Binding="{Binding LanguageDisplay}"
+                                                Width="110"/>
+                            <DataGridTemplateColumn Width="160">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="{DynamicResource L_ShowEpisodes}"
+                                                Tag="{Binding}"
+                                                Padding="10,5"
+                                                Style="{StaticResource HeaderFilterButtonStyle}"
+                                                Click="ShowPodcastEpisodesButton_OnClick"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Width="180">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="{DynamicResource L_AddToMyPodcasts}"
+                                                Tag="{Binding}"
+                                                Padding="10,5"
+                                                Style="{StaticResource HeaderFilterButtonStyle}"
+                                                Click="AddPodcastButton_OnClick"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <TextBlock x:Name="PodcastStatusTextBlock"
+                               Margin="12"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource AppSecondaryTextBrush}"
+                               TextWrapping="Wrap"
+                               TextAlignment="Center"/>
+                </Grid>
+
+                <Grid x:Name="PodcastEpisodesView"
+                      Grid.Row="0"
+                      Grid.RowSpan="3"
+                      Visibility="Collapsed"
+                      Background="{DynamicResource AppContentBrush}"
+                      Panel.ZIndex="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Border Margin="28,24,28,14"
+                            Padding="24"
+                            Background="{DynamicResource AppSurfaceBrush}"
+                            BorderBrush="#6C63FF"
+                            BorderThickness="1"
+                            CornerRadius="0,24,0,24">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="166"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Button x:Name="PodcastEpisodesBackButton"
+                                    Padding="12,7"
+                                    Margin="0,0,16,0"
+                                    VerticalAlignment="Center"
+                                    Style="{StaticResource HeaderFilterButtonStyle}"
+                                    Content="{DynamicResource L_Back}"
+                                    Click="PodcastEpisodesBackButton_OnClick"/>
+                            <Border Grid.Column="1"
+                                    Width="150"
+                                    Height="150"
+                                    Background="{DynamicResource AppArtworkPlaceholderBrush}"
+                                    CornerRadius="0,20,0,20"
+                                    ClipToBounds="True">
+                                <Image x:Name="PodcastEpisodesArtwork" Stretch="UniformToFill"/>
+                            </Border>
+                            <StackPanel Grid.Column="2" Margin="16,0,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="{DynamicResource L_PodcastOverview}"
+                                           FontSize="12"
+                                           FontWeight="Bold"
+                                           Foreground="#6C63FF"/>
+                                <TextBlock x:Name="PodcastEpisodesTitle"
+                                           Margin="0,5,0,0"
+                                           FontSize="28"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                           TextWrapping="Wrap"/>
+                                <TextBlock x:Name="PodcastEpisodesAuthor"
+                                           Margin="0,4,0,0"
+                                           Foreground="{DynamicResource AppSecondaryTextBrush}"/>
+                                <TextBlock x:Name="PodcastEpisodesStatistics"
+                                           Margin="0,12,0,0"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                           TextWrapping="Wrap"/>
+                                <TextBlock x:Name="PodcastEpisodesMetadata"
+                                           Margin="0,6,0,0"
+                                           Foreground="{DynamicResource AppSecondaryTextBrush}"
+                                           TextWrapping="Wrap"/>
+                                <TextBlock x:Name="PodcastEpisodesDescription"
+                                           Margin="0,10,0,0"
+                                           MaxHeight="48"
+                                           Foreground="{DynamicResource AppMutedTextBrush}"
+                                           TextWrapping="Wrap"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Grid Grid.Row="1" Margin="28,0,28,24">
+                        <DataGrid x:Name="PodcastEpisodesDataGrid"
+                                  Background="{DynamicResource AppContentBrush}"
+                                  BorderThickness="0"
+                                  RowHeight="54"
+                                  GridLinesVisibility="Horizontal"
+                                  HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  SelectionMode="Single"
+                                  CanUserResizeRows="False"
+                                  MouseDoubleClick="PodcastEpisodesDataGrid_OnMouseDoubleClick">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="{DynamicResource L_PodcastStatus}"
+                                                    Binding="{Binding Status}"
+                                                    Width="90"/>
+                                <DataGridTextColumn Header="{DynamicResource L_Title}"
+                                                    Binding="{Binding Title}"
+                                                    Width="*"/>
+                                <DataGridTextColumn Header="{DynamicResource L_Published}"
+                                                    Binding="{Binding Published}"
+                                                    Width="120"/>
+                                <DataGridTextColumn Header="{DynamicResource L_Duration}"
+                                                    Binding="{Binding Duration}"
+                                                    Width="90"/>
+                                <DataGridTextColumn Header="{DynamicResource L_Progress}"
+                                                    Binding="{Binding Progress}"
+                                                    Width="130"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <TextBlock x:Name="PodcastEpisodesStatusTextBlock"
+                                   Margin="12"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource AppSecondaryTextBrush}"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"/>
+                    </Grid>
                 </Grid>
             </Grid>
 

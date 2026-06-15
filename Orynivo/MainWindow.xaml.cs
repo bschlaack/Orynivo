@@ -2,8 +2,10 @@ using System.IO;
 using System.Diagnostics;
 using System.Globalization;
 using System.Net.Http;
+using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -69,11 +71,25 @@ public partial class MainWindow : Window
     private bool _isAlphabetProgrammaticScroll;
     private readonly RadioBrowserService _radioBrowserService = new();
     private readonly RadioStreamMetadataService _radioMetadataService = new();
+    private readonly PodcastService _podcastService = new();
+    private readonly CatalogFilterCache _catalogFilterCache = new();
+    private CatalogFilterCacheData _catalogFilterCacheData = new();
     private CancellationTokenSource? _radioSearchCts;
+    private CancellationTokenSource? _podcastSearchCts;
+    private CancellationTokenSource? _podcastFeedCts;
     private CancellationTokenSource? _radioMetadataCts;
     private static readonly HttpClient RadioImageHttpClient = CreateRadioImageHttpClient();
     private readonly List<RadioStationViewModel> _radioSearchResults = [];
     private readonly HashSet<string> _selectedRadioGenres = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<PodcastViewModel> _podcastSearchResults = [];
+    private readonly HashSet<string> _selectedPodcastCategories = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _selectedPodcastLanguages = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<CatalogFilterOption> _radioGenreCatalog = [];
+    private readonly List<CatalogFilterOption> _podcastCategoryCatalog = [];
+    private readonly List<CatalogFilterOption> _podcastLanguageCatalog = [];
+    private bool _radioFilterCatalogLoading;
+    private bool _podcastFilterCatalogLoading;
+    private bool _podcastLanguagesLoading;
 
     private readonly ObservableCollection<PlaylistItem> _queue = [];
     private readonly ObservableCollection<LyricLineViewModel> _lyricLines = [];
@@ -84,6 +100,9 @@ public partial class MainWindow : Window
     private int _shuffleHistoryPosition = -1;
     private string _currentFilePath = string.Empty;
     private RadioStationRecord? _currentRadioStation;
+    private PodcastPlayback? _currentPodcastPlayback;
+    private PodcastRecord? _activePodcast;
+    private DateTimeOffset _lastPodcastProgressSave = DateTimeOffset.MinValue;
     private CancellationTokenSource? _lyricsCts;
     private CancellationTokenSource? _artistProfileCts;
     private CancellationTokenSource _backgroundArtistLoadCts = new();
@@ -120,6 +139,7 @@ public partial class MainWindow : Window
     private sealed record FolderTag(bool IsFile, string FilePath, string FolderPath);
     private sealed record PlaylistMenuTag(long PlaylistId, IReadOnlyList<string> Paths);
     private sealed record RemovePlaylistEntryTag(long PlaylistEntryId);
+    private sealed record PodcastPlayback(PodcastRecord Podcast, PodcastEpisode Episode);
     private sealed record NavigationState(
         string View,
         long? SelectedId,
@@ -149,6 +169,36 @@ public partial class MainWindow : Window
 
         public RadioStationRecord ToRecord(long id = 0) =>
             new(id, StationUuid, Name, StreamUrl, Homepage, Favicon, CountryCode, Codec, Bitrate, Tags);
+    }
+
+    private sealed class PodcastViewModel
+    {
+        public long CollectionId { get; init; }
+        public required string Name { get; init; }
+        public string? Author { get; init; }
+        public required string FeedUrl { get; init; }
+        public string? ArtworkUrl { get; init; }
+        public string? Genre { get; init; }
+        public IReadOnlyList<string> Genres { get; init; } = [];
+        public IReadOnlyList<string> GenreIds { get; init; } = [];
+        public string? Language { get; set; }
+        public string LanguageDisplay => FormatPodcastLanguage(Language);
+
+        public PodcastSearchResult ToSearchResult() =>
+            new(CollectionId, Name, Author, FeedUrl, ArtworkUrl, Genre, Genres, GenreIds, Language);
+
+        public PodcastRecord ToRecord(long id = 0) =>
+            new(id, CollectionId, Name, Author, FeedUrl, ArtworkUrl, Genre);
+    }
+
+    private sealed class PodcastEpisodeViewModel
+    {
+        public required PodcastEpisode Episode { get; init; }
+        public required string Title { get; init; }
+        public required string Published { get; init; }
+        public required string Duration { get; init; }
+        public required string Progress { get; init; }
+        public required string Status { get; init; }
     }
 
     private sealed class ContentRow : INotifyPropertyChanged
@@ -262,6 +312,7 @@ public partial class MainWindow : Window
             new MouseButtonEventHandler(PositionSlider_OnPreviewMouseLeftButtonDown),
             handledEventsToo: true);
         LoadSettings();
+        LoadCatalogFilterCache();
         LoadNavPlaylists();
         _showAlbumArtworkView = _settings.AlbumArtworkView;
         _showArtistArtworkView = _settings.ArtistArtworkView;
@@ -306,6 +357,8 @@ public partial class MainWindow : Window
     {
         PersistViewState();
         CancelAndDispose(ref _radioSearchCts);
+        CancelAndDispose(ref _podcastSearchCts);
+        CancelAndDispose(ref _podcastFeedCts);
         StopPlayback();
         base.OnClosed(e);
     }
@@ -323,7 +376,7 @@ public partial class MainWindow : Window
     private void PersistViewState()
     {
         if (NavListBox.SelectedItem is ListBoxItem { Tag: string tag } &&
-            tag is "Dashboard" or "InternetRadio" or "Artists" or "Albums" or "Tracks" or "Folders")
+            tag is "Dashboard" or "InternetRadio" or "Podcasts" or "Artists" or "Albums" or "Tracks" or "Folders")
         {
             _settings.LastMainView = tag;
         }
@@ -427,6 +480,7 @@ public partial class MainWindow : Window
                      .OfType<ListBoxItem>()
                      .Where(item => item.Tag is string tag &&
                                     (tag.StartsWith("Radio:", StringComparison.Ordinal) ||
+                                     tag.StartsWith("Podcast:", StringComparison.Ordinal) ||
                                      tag.StartsWith("Playlist:", StringComparison.Ordinal)))
                      .ToList())
             NavListBox.Items.Remove(dynamicItem);
@@ -434,7 +488,7 @@ public partial class MainWindow : Window
         try
         {
             using var db = AudioDatabase.OpenDefault();
-            var playlistHeaderIndex = NavListBox.Items.IndexOf(PlaylistsHeaderItem);
+            var podcastHeaderIndex = NavListBox.Items.IndexOf(MyPodcastsHeaderItem);
             foreach (var radio in db.GetRadioStations())
             {
                 var content = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
@@ -445,10 +499,29 @@ public partial class MainWindow : Window
                 });
                 content.Children.Add(new TextBlock { Text = radio.Name });
 
-                NavListBox.Items.Insert(playlistHeaderIndex++, new ListBoxItem
+                NavListBox.Items.Insert(podcastHeaderIndex++, new ListBoxItem
                 {
                     Content = content,
                     Tag = $"Radio:{radio.Id}",
+                    Style = (Style)FindResource("NavItemStyle")
+                });
+            }
+
+            var playlistHeaderIndex = NavListBox.Items.IndexOf(PlaylistsHeaderItem);
+            foreach (var podcast in db.GetPodcasts())
+            {
+                var content = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
+                content.Children.Add(new TextBlock
+                {
+                    Text = "◍ ",
+                    Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x6C, 0x63, 0xFF))
+                });
+                content.Children.Add(new TextBlock { Text = podcast.Name });
+
+                NavListBox.Items.Insert(playlistHeaderIndex++, new ListBoxItem
+                {
+                    Content = content,
+                    Tag = $"Podcast:{podcast.Id}",
                     Style = (Style)FindResource("NavItemStyle")
                 });
             }
@@ -490,7 +563,7 @@ public partial class MainWindow : Window
             return;
 
         ResetDrilldownState();
-        if (tag is "InternetRadio" or "Artists" or "Albums" or "Tracks" or "Folders")
+        if (tag is "InternetRadio" or "Podcasts" or "Artists" or "Albums" or "Tracks" or "Folders")
             _settings.LastMainView = tag;
         await ShowTopLevelViewAsync(tag);
     }
@@ -534,7 +607,9 @@ public partial class MainWindow : Window
             "Tracks"  => LocalizationManager.Current.Tracks,
             "Folders" => LocalizationManager.Current.FolderStructure,
             "InternetRadio" => LocalizationManager.Current.InternetRadio,
+            "Podcasts" => LocalizationManager.Current.Podcasts,
             _ when tag.StartsWith("Radio:", StringComparison.Ordinal) => GetRadioName(tag),
+            _ when tag.StartsWith("Podcast:", StringComparison.Ordinal) => GetPodcastName(tag),
             _         => tag.StartsWith("Playlist:") ? GetPlaylistName(tag) : tag
         };
 
@@ -544,10 +619,13 @@ public partial class MainWindow : Window
         SearchResultsScrollViewer.Visibility = Visibility.Collapsed;
         DashboardScrollViewer.Visibility = Visibility.Collapsed;
         InternetRadioView.Visibility = Visibility.Collapsed;
+        PodcastView.Visibility = Visibility.Collapsed;
+        PodcastEpisodesView.Visibility = Visibility.Collapsed;
         HideAlbumDetailHeader();
         ContentCountTextBlock.Text  = "";
-        SearchTextBox.Visibility = tag == "InternetRadio" ||
-                                   tag.StartsWith("Radio:", StringComparison.Ordinal)
+        SearchTextBox.Visibility = tag is "InternetRadio" or "Podcasts" ||
+                                   tag.StartsWith("Radio:", StringComparison.Ordinal) ||
+                                   tag.StartsWith("Podcast:", StringComparison.Ordinal)
             ? Visibility.Collapsed
             : Visibility.Visible;
         AlbumViewModeBorder.Visibility = tag is "Albums" or "Artists" ? Visibility.Visible : Visibility.Collapsed;
@@ -573,8 +651,29 @@ public partial class MainWindow : Window
             AlbumArtworkListBox.Visibility = Visibility.Collapsed;
             ArtistArtworkListBox.Visibility = Visibility.Collapsed;
             InternetRadioView.Visibility = Visibility.Visible;
+            await EnsureRadioFilterCatalogAsync();
             if (RadioStationsDataGrid.ItemsSource is null)
                 await SearchRadioStationsAsync();
+        }
+        else if (tag == "Podcasts")
+        {
+            ContentDataGrid.Visibility = Visibility.Collapsed;
+            FolderTreeView.Visibility = Visibility.Collapsed;
+            AlbumArtworkListBox.Visibility = Visibility.Collapsed;
+            ArtistArtworkListBox.Visibility = Visibility.Collapsed;
+            PodcastView.Visibility = Visibility.Visible;
+            PodcastEpisodesView.Visibility = Visibility.Collapsed;
+            await EnsurePodcastFilterCatalogAsync();
+        }
+        else if (tag.StartsWith("Podcast:", StringComparison.Ordinal) &&
+                 long.TryParse(tag.AsSpan("Podcast:".Length), out var podcastId))
+        {
+            ContentDataGrid.Visibility = Visibility.Collapsed;
+            FolderTreeView.Visibility = Visibility.Collapsed;
+            AlbumArtworkListBox.Visibility = Visibility.Collapsed;
+            ArtistArtworkListBox.Visibility = Visibility.Collapsed;
+            PodcastView.Visibility = Visibility.Visible;
+            await ShowSavedPodcastAsync(podcastId);
         }
         else if (tag.StartsWith("Radio:", StringComparison.Ordinal) &&
                  long.TryParse(tag.AsSpan("Radio:".Length), out var radioId))
@@ -915,6 +1014,21 @@ public partial class MainWindow : Window
         catch
         {
             return LocalizationManager.Current.InternetRadio;
+        }
+    }
+
+    private string GetPodcastName(string tag)
+    {
+        if (!long.TryParse(tag.AsSpan("Podcast:".Length), out var id))
+            return LocalizationManager.Current.Podcasts;
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            return db.GetPodcast(id)?.Name ?? LocalizationManager.Current.Podcasts;
+        }
+        catch
+        {
+            return LocalizationManager.Current.Podcasts;
         }
     }
 
@@ -1340,6 +1454,7 @@ public partial class MainWindow : Window
         SearchResultsScrollViewer.Visibility = Visibility.Visible;
         DashboardScrollViewer.Visibility = Visibility.Collapsed;
         InternetRadioView.Visibility = Visibility.Collapsed;
+        PodcastView.Visibility = Visibility.Collapsed;
         HideAlbumDetailHeader();
 
         var result = await Task.Run(() =>
@@ -2117,6 +2232,7 @@ public partial class MainWindow : Window
         SearchResultsScrollViewer.Visibility = Visibility.Collapsed;
         DashboardScrollViewer.Visibility = Visibility.Collapsed;
         InternetRadioView.Visibility = Visibility.Collapsed;
+        PodcastView.Visibility = Visibility.Collapsed;
         UpdateAlphabetIndex(null, false);
 
         await ReloadVisibleAlbumTracksAsync();
@@ -2656,6 +2772,23 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (tag.StartsWith("Podcast:", StringComparison.Ordinal) &&
+            long.TryParse(tag.AsSpan("Podcast:".Length), out var podcastId))
+        {
+            PodcastRecord? podcast;
+            try
+            {
+                using var db = AudioDatabase.OpenDefault();
+                podcast = db.GetPodcast(podcastId);
+            }
+            catch
+            {
+                podcast = null;
+            }
+            NavListBox.ContextMenu = podcast is null ? null : BuildDeletePodcastContextMenu(podcast);
+            return;
+        }
+
         item.IsSelected = true;
         if (!tag.StartsWith("Playlist:", StringComparison.Ordinal) ||
             !long.TryParse(tag.AsSpan("Playlist:".Length), out long playlistId))
@@ -2728,6 +2861,66 @@ public partial class MainWindow : Window
             .FirstOrDefault(item => string.Equals(item.Tag as string, "InternetRadio", StringComparison.Ordinal));
         NavListBox.SelectedItem = internetRadioItem;
         StatusTextBlock.Text = string.Format(LocalizationManager.Current.RadioDeleted, radio.Name);
+    }
+
+    private ContextMenu BuildDeletePodcastContextMenu(PodcastRecord podcast)
+    {
+        var menu = new ContextMenu();
+        if (System.Windows.Application.Current.Resources[typeof(ContextMenu)] is Style contextStyle)
+            menu.Style = contextStyle;
+        var menuItemStyle = System.Windows.Application.Current.Resources[typeof(MenuItem)] as Style;
+        var separatorStyle = System.Windows.Application.Current.Resources[typeof(Separator)] as Style;
+
+        var header = new MenuItem
+        {
+            Header = podcast.Name,
+            IsHitTestVisible = false,
+            Focusable = false,
+            FontSize = 11,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x6C, 0x63, 0xFF))
+        };
+        if (menuItemStyle is not null)
+            header.Style = menuItemStyle;
+        menu.Items.Add(header);
+
+        var separator = new Separator();
+        if (separatorStyle is not null)
+            separator.Style = separatorStyle;
+        menu.Items.Add(separator);
+
+        var deleteItem = new MenuItem
+        {
+            Header = LocalizationManager.Current.DeletePodcast,
+            Tag = podcast,
+            Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0x6B, 0x6B))
+        };
+        if (menuItemStyle is not null)
+            deleteItem.Style = menuItemStyle;
+        deleteItem.Click += DeletePodcastMenuItem_OnClick;
+        menu.Items.Add(deleteItem);
+        return menu;
+    }
+
+    private void DeletePodcastMenuItem_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: PodcastRecord podcast })
+            return;
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            db.DeletePodcast(podcast.Id);
+        }
+        catch
+        {
+            return;
+        }
+
+        LoadNavPlaylists();
+        var podcastsItem = NavListBox.Items.OfType<ListBoxItem>()
+            .FirstOrDefault(item => string.Equals(item.Tag as string, "Podcasts", StringComparison.Ordinal));
+        NavListBox.SelectedItem = podcastsItem;
+        StatusTextBlock.Text = string.Format(LocalizationManager.Current.PodcastDeleted, podcast.Name);
     }
 
     private ContextMenu BuildDeletePlaylistContextMenu(long playlistId, string playlistName)
@@ -2861,6 +3054,60 @@ public partial class MainWindow : Window
     // Internetradio
     // ------------------------------------------------------------------
 
+    private void LoadCatalogFilterCache()
+    {
+        _catalogFilterCacheData = _catalogFilterCache.Load();
+        if (_catalogFilterCacheData.RadioGenres.Any(option => option.Count is not null))
+            _catalogFilterCacheData.RadioGenresUpdatedAt = null;
+        _radioGenreCatalog.Clear();
+        _radioGenreCatalog.AddRange(_catalogFilterCacheData.RadioGenres
+            .Select(option => new CatalogFilterOption(option.Value)));
+        _podcastCategoryCatalog.Clear();
+        _podcastCategoryCatalog.AddRange(_catalogFilterCacheData.PodcastCategories);
+        _podcastLanguageCatalog.Clear();
+        _podcastLanguageCatalog.AddRange(_catalogFilterCacheData.PodcastLanguages);
+        if (_podcastCategoryCatalog.Any(option => string.IsNullOrWhiteSpace(option.Key)))
+            _catalogFilterCacheData.PodcastCategoriesUpdatedAt = null;
+        BuildRadioGenreFilter();
+        BuildPodcastCategoryFilter();
+        BuildPodcastLanguageFilter();
+    }
+
+    private async Task EnsureRadioFilterCatalogAsync()
+    {
+        BuildRadioGenreFilter();
+        if (_radioFilterCatalogLoading ||
+            CatalogFilterCache.IsFresh(_catalogFilterCacheData.RadioGenresUpdatedAt))
+            return;
+
+        _radioFilterCatalogLoading = true;
+        try
+        {
+            var tags = await _radioBrowserService.GetTagsAsync();
+            var options = tags
+                .Select(tag => (Genre: NormalizeRadioGenre(tag.Name), tag.StationCount))
+                .Where(item => item.Genre is not null)
+                .GroupBy(item => item.Genre!, StringComparer.OrdinalIgnoreCase)
+                .Select(group => new CatalogFilterOption(group.Key))
+                .OrderBy(option => option.Value, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+            _radioGenreCatalog.Clear();
+            _radioGenreCatalog.AddRange(options);
+            _catalogFilterCacheData.RadioGenres = options;
+            _catalogFilterCacheData.RadioGenresUpdatedAt = DateTimeOffset.UtcNow;
+            _catalogFilterCache.Save(_catalogFilterCacheData);
+            BuildRadioGenreFilter();
+        }
+        catch
+        {
+            // Existing cached filter data remains usable.
+        }
+        finally
+        {
+            _radioFilterCatalogLoading = false;
+        }
+    }
+
     private async void RadioSearchButton_OnClick(object sender, RoutedEventArgs e) =>
         await SearchRadioStationsAsync();
 
@@ -2885,6 +3132,7 @@ public partial class MainWindow : Window
         {
             var stations = await _radioBrowserService.SearchAsync(
                 RadioSearchTextBox.Text,
+                _selectedRadioGenres,
                 cancellationToken);
             var rows = stations.Select(station => new RadioStationViewModel
             {
@@ -2901,9 +3149,6 @@ public partial class MainWindow : Window
             }).ToList();
             _radioSearchResults.Clear();
             _radioSearchResults.AddRange(rows);
-            var availableGenres = rows.SelectMany(row => row.Genres)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            _selectedRadioGenres.RemoveWhere(genre => !availableGenres.Contains(genre));
             BuildRadioGenreFilter();
             ApplyRadioGenreFilter();
         }
@@ -2922,31 +3167,36 @@ public partial class MainWindow : Window
         RadioGenreFilterPopup.IsOpen = !RadioGenreFilterPopup.IsOpen;
     }
 
-    private void ClearRadioGenreFilterButton_OnClick(object sender, RoutedEventArgs e)
+    private async void ClearRadioGenreFilterButton_OnClick(object sender, RoutedEventArgs e)
     {
         _selectedRadioGenres.Clear();
         BuildRadioGenreFilter();
-        ApplyRadioGenreFilter();
+        await SearchRadioStationsAsync();
     }
 
     private void BuildRadioGenreFilter()
     {
-        var options = _radioSearchResults
-            .SelectMany(row => row.Genres)
-            .GroupBy(genre => genre, StringComparer.OrdinalIgnoreCase)
-            .Select(group => (Genre: group.Key, Count: group.Count()))
-            .OrderByDescending(option => option.Count)
-            .ThenBy(option => option.Genre, StringComparer.CurrentCultureIgnoreCase)
-            .ToList();
+        var useCatalog = string.IsNullOrWhiteSpace(RadioSearchTextBox.Text);
+        var options = useCatalog && _radioGenreCatalog.Count > 0
+            ? _radioGenreCatalog
+            : _radioSearchResults
+                .SelectMany(row => row.Genres)
+                .GroupBy(genre => genre, StringComparer.OrdinalIgnoreCase)
+                .Select(group => new CatalogFilterOption(group.Key, group.Count()))
+                .OrderByDescending(option => option.Count)
+                .ThenBy(option => option.Value, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
 
         RadioGenreFilterPanel.Children.Clear();
         foreach (var option in options)
         {
             var checkBox = new WpfCheckBox
             {
-                Content = $"{option.Genre} ({option.Count})",
-                Tag = option.Genre,
-                IsChecked = _selectedRadioGenres.Contains(option.Genre),
+                Content = option.Count is > 0
+                    ? $"{option.Value} ({option.Count:N0})"
+                    : option.Value,
+                Tag = option.Value,
+                IsChecked = _selectedRadioGenres.Contains(option.Value),
                 Margin = new Thickness(2, 4, 2, 4),
                 Foreground = (WpfBrush)FindResource("AppPrimaryTextBrush")
             };
@@ -2958,7 +3208,7 @@ public partial class MainWindow : Window
         UpdateRadioGenreFilterButton();
     }
 
-    private void RadioGenreCheckBox_OnChanged(object sender, RoutedEventArgs e)
+    private async void RadioGenreCheckBox_OnChanged(object sender, RoutedEventArgs e)
     {
         if (sender is not WpfCheckBox { Tag: string genre } checkBox)
             return;
@@ -2967,16 +3217,12 @@ public partial class MainWindow : Window
         else
             _selectedRadioGenres.Remove(genre);
         UpdateRadioGenreFilterButton();
-        ApplyRadioGenreFilter();
+        await SearchRadioStationsAsync();
     }
 
     private void ApplyRadioGenreFilter()
     {
-        var rows = _selectedRadioGenres.Count == 0
-            ? _radioSearchResults
-            : _radioSearchResults
-                .Where(row => row.Genres.Any(_selectedRadioGenres.Contains))
-                .ToList();
+        var rows = _radioSearchResults;
         RadioStationsDataGrid.ItemsSource = rows;
         RadioStatusTextBlock.Text = rows.Count == 0
             ? LocalizationManager.Current.RadioNoResults
@@ -3277,6 +3523,690 @@ public partial class MainWindow : Window
     }
 
     // ------------------------------------------------------------------
+    // Podcasts
+    // ------------------------------------------------------------------
+
+    private Task EnsurePodcastFilterCatalogAsync()
+    {
+        BuildPodcastCategoryFilter();
+        BuildPodcastLanguageFilter();
+        if (_podcastFilterCatalogLoading ||
+            (CatalogFilterCache.IsFresh(_catalogFilterCacheData.PodcastCategoriesUpdatedAt) &&
+             CatalogFilterCache.IsFresh(_catalogFilterCacheData.PodcastLanguagesUpdatedAt)))
+            return Task.CompletedTask;
+
+        _podcastFilterCatalogLoading = true;
+        _ = RefreshPodcastFilterCatalogAsync();
+        return Task.CompletedTask;
+    }
+
+    private async Task RefreshPodcastFilterCatalogAsync()
+    {
+        try
+        {
+            if (!CatalogFilterCache.IsFresh(_catalogFilterCacheData.PodcastCategoriesUpdatedAt))
+            {
+                var categories = await _podcastService.GetCategoryCatalogAsync();
+                var options = categories
+                    .Select(category => new CatalogFilterOption(
+                        category.Name,
+                        Key: category.Id))
+                    .ToList();
+                _podcastCategoryCatalog.Clear();
+                _podcastCategoryCatalog.AddRange(options);
+                _catalogFilterCacheData.PodcastCategories = options;
+                _catalogFilterCacheData.PodcastCategoriesUpdatedAt = DateTimeOffset.UtcNow;
+                _catalogFilterCache.Save(_catalogFilterCacheData);
+                BuildPodcastCategoryFilter();
+            }
+
+            if (!CatalogFilterCache.IsFresh(_catalogFilterCacheData.PodcastLanguagesUpdatedAt))
+            {
+                var feedUrls = (await _podcastService.GetPopularFeedUrlsAsync()).ToHashSet(
+                    StringComparer.OrdinalIgnoreCase);
+                try
+                {
+                    using var db = AudioDatabase.OpenDefault();
+                    foreach (var podcast in db.GetPodcasts())
+                        feedUrls.Add(podcast.FeedUrl);
+                }
+                catch
+                {
+                }
+
+                var languages = new System.Collections.Concurrent.ConcurrentDictionary<string, byte>(
+                    StringComparer.OrdinalIgnoreCase);
+                await Parallel.ForEachAsync(
+                    feedUrls,
+                    new ParallelOptions { MaxDegreeOfParallelism = 10 },
+                    async (feedUrl, token) =>
+                    {
+                        var language = await _podcastService.GetFeedLanguageAsync(feedUrl, token);
+                        if (language is not null)
+                            languages.TryAdd(language, 0);
+                    });
+                MergePodcastLanguagesIntoCache(languages.Keys);
+                _catalogFilterCacheData.PodcastLanguagesUpdatedAt = DateTimeOffset.UtcNow;
+                _catalogFilterCache.Save(_catalogFilterCacheData);
+                BuildPodcastLanguageFilter();
+            }
+        }
+        catch
+        {
+            // Existing cached filter data remains usable.
+        }
+        finally
+        {
+            _podcastFilterCatalogLoading = false;
+        }
+    }
+
+    private void MergePodcastLanguagesIntoCache(IEnumerable<string> languages)
+    {
+        var values = _podcastLanguageCatalog
+            .Select(option => option.Value)
+            .Concat(languages)
+            .Where(language => !string.IsNullOrWhiteSpace(language))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(FormatPodcastLanguage, StringComparer.CurrentCultureIgnoreCase)
+            .Select(language => new CatalogFilterOption(language))
+            .ToList();
+        _podcastLanguageCatalog.Clear();
+        _podcastLanguageCatalog.AddRange(values);
+        _catalogFilterCacheData.PodcastLanguages = values;
+    }
+
+    private async void PodcastSearchButton_OnClick(object sender, RoutedEventArgs e) =>
+        await SearchPodcastsAsync();
+
+    private async void PodcastSearchTextBox_OnKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+            return;
+        e.Handled = true;
+        await SearchPodcastsAsync();
+    }
+
+    private async Task SearchPodcastsAsync()
+    {
+        CancelAndDispose(ref _podcastSearchCts);
+        _podcastSearchCts = new CancellationTokenSource();
+        var cancellationToken = _podcastSearchCts.Token;
+
+        if (string.IsNullOrWhiteSpace(PodcastSearchTextBox.Text) &&
+            _selectedPodcastCategories.Count == 0 &&
+            _selectedPodcastLanguages.Count == 0)
+        {
+            _podcastSearchResults.Clear();
+            PodcastsDataGrid.ItemsSource = null;
+            PodcastStatusTextBlock.Text = string.Empty;
+            PodcastStatusTextBlock.Visibility = Visibility.Collapsed;
+            ContentCountTextBlock.Text = string.Empty;
+            BuildPodcastCategoryFilter();
+            BuildPodcastLanguageFilter();
+            return;
+        }
+
+        PodcastsDataGrid.ItemsSource = null;
+        PodcastStatusTextBlock.Visibility = Visibility.Visible;
+        PodcastStatusTextBlock.Text = LocalizationManager.Current.PodcastLoading;
+        try
+        {
+            var selectedGenreIds = _podcastCategoryCatalog
+                .Where(option => _selectedPodcastCategories.Contains(option.Value))
+                .Select(option => option.Key)
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Cast<string>()
+                .ToList();
+            var hasSearch = !string.IsNullOrWhiteSpace(PodcastSearchTextBox.Text);
+            IReadOnlyList<PodcastSearchResult> podcasts;
+            if (!hasSearch &&
+                selectedGenreIds.Count == 0 &&
+                _selectedPodcastLanguages.Count > 0)
+            {
+                podcasts = await _podcastService.GetPopularPodcastsAsync(cancellationToken);
+            }
+            else
+            {
+                podcasts = await _podcastService.SearchAsync(
+                    PodcastSearchTextBox.Text,
+                    selectedGenreIds,
+                    cancellationToken);
+            }
+            var rows = podcasts.Select(podcast => new PodcastViewModel
+            {
+                CollectionId = podcast.CollectionId,
+                Name = podcast.Name,
+                Author = podcast.Author,
+                FeedUrl = podcast.FeedUrl,
+                ArtworkUrl = podcast.ArtworkUrl,
+                Genre = podcast.Genre,
+                Genres = podcast.Genres,
+                GenreIds = podcast.GenreIds,
+                Language = podcast.Language
+            }).ToList();
+            _podcastSearchResults.Clear();
+            _podcastSearchResults.AddRange(rows);
+            _podcastLanguagesLoading = rows.Count > 0;
+            if (rows.Count == 0)
+                PrunePodcastLanguageSelection();
+            BuildPodcastCategoryFilter();
+            BuildPodcastLanguageFilter();
+            ApplyPodcastFilters();
+
+            if (rows.Count > 0)
+            {
+                PodcastStatusTextBlock.Visibility = Visibility.Visible;
+                PodcastStatusTextBlock.Text = LocalizationManager.Current.PodcastLanguagesLoading;
+                await Parallel.ForEachAsync(
+                    rows,
+                    new ParallelOptions
+                    {
+                        MaxDegreeOfParallelism = 6,
+                        CancellationToken = cancellationToken
+                    },
+                    async (row, token) =>
+                    {
+                        row.Language = await _podcastService.GetFeedLanguageAsync(
+                            row.FeedUrl,
+                            token);
+                    });
+                var availableLanguages = rows
+                    .Select(row => row.Language)
+                    .Where(language => language is not null)
+                    .Cast<string>()
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                MergePodcastLanguagesIntoCache(availableLanguages);
+                _catalogFilterCache.Save(_catalogFilterCacheData);
+                _podcastLanguagesLoading = false;
+                PrunePodcastLanguageSelection();
+                BuildPodcastLanguageFilter();
+                ApplyPodcastFilters();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _podcastLanguagesLoading = false;
+        }
+        catch
+        {
+            _podcastLanguagesLoading = false;
+            PodcastStatusTextBlock.Text = LocalizationManager.Current.PodcastSearchFailed;
+        }
+    }
+
+    private void PodcastCategoryFilterButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        BuildPodcastCategoryFilter();
+        PodcastCategoryFilterPopup.IsOpen = !PodcastCategoryFilterPopup.IsOpen;
+    }
+
+    private void PodcastLanguageFilterButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        BuildPodcastLanguageFilter();
+        PodcastLanguageFilterPopup.IsOpen = !PodcastLanguageFilterPopup.IsOpen;
+    }
+
+    private async void ClearPodcastCategoryFilterButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        _selectedPodcastCategories.Clear();
+        BuildPodcastCategoryFilter();
+        await SearchPodcastsAsync();
+    }
+
+    private async void ClearPodcastLanguageFilterButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        _selectedPodcastLanguages.Clear();
+        BuildPodcastLanguageFilter();
+        await SearchPodcastsAsync();
+    }
+
+    private void BuildPodcastCategoryFilter()
+    {
+        var useCatalog = string.IsNullOrWhiteSpace(PodcastSearchTextBox.Text);
+        var options = useCatalog && _podcastCategoryCatalog.Count > 0
+            ? _podcastCategoryCatalog
+            : _podcastSearchResults
+                .SelectMany(row => row.Genres)
+                .GroupBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .Select(group => new CatalogFilterOption(group.Key, group.Count()))
+                .OrderByDescending(option => option.Count)
+                .ThenBy(option => option.Value, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+        BuildPodcastFilterOptions(
+            PodcastCategoryFilterPanel,
+            options,
+            _selectedPodcastCategories,
+            PodcastCategoryCheckBox_OnChanged,
+            value => value);
+        UpdatePodcastFilterButtons();
+    }
+
+    private void PruneRadioGenreSelection()
+    {
+        var available = string.IsNullOrWhiteSpace(RadioSearchTextBox.Text)
+            ? _radioGenreCatalog.Select(option => option.Value)
+            : _radioSearchResults.SelectMany(row => row.Genres);
+        var values = available.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        _selectedRadioGenres.RemoveWhere(value => !values.Contains(value));
+    }
+
+    private void PrunePodcastCategorySelection()
+    {
+        var available = string.IsNullOrWhiteSpace(PodcastSearchTextBox.Text)
+            ? _podcastCategoryCatalog.Select(option => option.Value)
+            : _podcastSearchResults.SelectMany(row => row.Genres);
+        var values = available.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        _selectedPodcastCategories.RemoveWhere(value => !values.Contains(value));
+    }
+
+    private void PrunePodcastLanguageSelection()
+    {
+        var available = string.IsNullOrWhiteSpace(PodcastSearchTextBox.Text)
+            ? _podcastLanguageCatalog.Select(option => option.Value)
+            : _podcastSearchResults
+                .Select(row => row.Language)
+                .Where(language => language is not null)
+                .Cast<string>();
+        var values = available.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        _selectedPodcastLanguages.RemoveWhere(value => !values.Contains(value));
+    }
+
+    private void BuildPodcastLanguageFilter()
+    {
+        var useCatalog = string.IsNullOrWhiteSpace(PodcastSearchTextBox.Text);
+        var options = useCatalog && _podcastLanguageCatalog.Count > 0
+            ? _podcastLanguageCatalog
+            : _podcastSearchResults
+                .Where(row => !string.IsNullOrWhiteSpace(row.Language))
+                .GroupBy(row => row.Language!, StringComparer.OrdinalIgnoreCase)
+                .Select(group => new CatalogFilterOption(group.Key, group.Count()))
+                .OrderBy(
+                    option => FormatPodcastLanguage(option.Value),
+                    StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+        BuildPodcastFilterOptions(
+            PodcastLanguageFilterPanel,
+            options,
+            _selectedPodcastLanguages,
+            PodcastLanguageCheckBox_OnChanged,
+            FormatPodcastLanguage);
+        UpdatePodcastFilterButtons();
+    }
+
+    private void BuildPodcastFilterOptions(
+        System.Windows.Controls.Panel panel,
+        IReadOnlyList<CatalogFilterOption> options,
+        IReadOnlySet<string> selected,
+        RoutedEventHandler changedHandler,
+        Func<string, string> displayName)
+    {
+        panel.Children.Clear();
+        foreach (var option in options)
+        {
+            var checkBox = new WpfCheckBox
+            {
+                Content = option.Count is > 0
+                    ? $"{displayName(option.Value)} ({option.Count:N0})"
+                    : displayName(option.Value),
+                Tag = option.Value,
+                IsChecked = selected.Contains(option.Value),
+                Margin = new Thickness(2, 4, 2, 4),
+                Foreground = (WpfBrush)FindResource("AppPrimaryTextBrush")
+            };
+            checkBox.Checked += changedHandler;
+            checkBox.Unchecked += changedHandler;
+            panel.Children.Add(checkBox);
+        }
+    }
+
+    private async void PodcastCategoryCheckBox_OnChanged(object sender, RoutedEventArgs e)
+    {
+        UpdatePodcastSelection(sender, _selectedPodcastCategories);
+        UpdatePodcastFilterButtons();
+        await SearchPodcastsAsync();
+    }
+
+    private async void PodcastLanguageCheckBox_OnChanged(object sender, RoutedEventArgs e)
+    {
+        UpdatePodcastSelection(sender, _selectedPodcastLanguages);
+        UpdatePodcastFilterButtons();
+        await SearchPodcastsAsync();
+    }
+
+    private static void UpdatePodcastSelection(object sender, HashSet<string> selection)
+    {
+        if (sender is not WpfCheckBox { Tag: string value } checkBox)
+            return;
+        if (checkBox.IsChecked == true)
+            selection.Add(value);
+        else
+            selection.Remove(value);
+    }
+
+    private void ApplyPodcastFilters()
+    {
+        var rows = _podcastSearchResults
+            .Where(row =>
+                (_podcastLanguagesLoading ||
+                 _selectedPodcastLanguages.Count == 0 ||
+                 (row.Language is not null && _selectedPodcastLanguages.Contains(row.Language))))
+            .ToList();
+        PodcastsDataGrid.ItemsSource = rows;
+        PodcastsDataGrid.Items.Refresh();
+        PodcastStatusTextBlock.Text = rows.Count == 0
+            ? LocalizationManager.Current.PodcastNoResults
+            : string.Empty;
+        PodcastStatusTextBlock.Visibility = rows.Count == 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(rows.Count);
+    }
+
+    private void UpdatePodcastFilterButtons()
+    {
+        PodcastCategoryFilterButton.Content = _selectedPodcastCategories.Count == 0
+            ? LocalizationManager.Current.PodcastCategories
+            : $"{LocalizationManager.Current.PodcastCategories} ({_selectedPodcastCategories.Count})";
+        PodcastLanguageFilterButton.Content = _selectedPodcastLanguages.Count == 0
+            ? LocalizationManager.Current.PodcastLanguages
+            : $"{LocalizationManager.Current.PodcastLanguages} ({_selectedPodcastLanguages.Count})";
+    }
+
+    private static string FormatPodcastLanguage(string? language)
+    {
+        if (string.IsNullOrWhiteSpace(language))
+            return string.Empty;
+        try
+        {
+            var culture = CultureInfo.GetCultureInfo(language);
+            var name = culture.DisplayName;
+            return $"{name} ({culture.TwoLetterISOLanguageName.ToUpperInvariant()})";
+        }
+        catch (CultureNotFoundException)
+        {
+            return language.ToUpperInvariant();
+        }
+    }
+
+    private async void PodcastsDataGrid_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (FindAncestor<Button>(e.OriginalSource as DependencyObject) is not null ||
+            PodcastsDataGrid.SelectedItem is not PodcastViewModel podcast)
+            return;
+        await ShowPodcastEpisodesAsync(podcast.ToRecord());
+    }
+
+    private async void ShowPodcastEpisodesButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: PodcastViewModel podcast })
+            await ShowPodcastEpisodesAsync(podcast.ToRecord());
+    }
+
+    private void AddPodcastButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: PodcastViewModel podcast })
+            return;
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            db.SavePodcast(podcast.ToSearchResult());
+            LoadNavPlaylists();
+            StatusTextBlock.Text = string.Format(LocalizationManager.Current.PodcastAdded, podcast.Name);
+        }
+        catch
+        {
+            StatusTextBlock.Text = LocalizationManager.Current.PodcastSearchFailed;
+        }
+    }
+
+    private async Task ShowSavedPodcastAsync(long podcastId)
+    {
+        PodcastRecord? podcast;
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            podcast = db.GetPodcast(podcastId);
+        }
+        catch
+        {
+            podcast = null;
+        }
+
+        if (podcast is null)
+        {
+            PodcastsDataGrid.ItemsSource = null;
+            PodcastStatusTextBlock.Visibility = Visibility.Visible;
+            PodcastStatusTextBlock.Text = LocalizationManager.Current.PodcastNoResults;
+            return;
+        }
+
+        await ShowPodcastEpisodesAsync(podcast, showBackButton: false);
+    }
+
+    private async Task ShowPodcastEpisodesAsync(
+        PodcastRecord podcast,
+        bool showBackButton = true)
+    {
+        CancelAndDispose(ref _podcastFeedCts);
+        _podcastFeedCts = new CancellationTokenSource();
+        var cancellationToken = _podcastFeedCts.Token;
+        _activePodcast = podcast;
+        PodcastEpisodesView.Visibility = Visibility.Visible;
+        PodcastEpisodesBackButton.Visibility = showBackButton
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        PodcastEpisodesTitle.Text = podcast.Name;
+        PodcastEpisodesAuthor.Text = podcast.Author ?? string.Empty;
+        PodcastEpisodesStatistics.Text = string.Empty;
+        PodcastEpisodesMetadata.Text = string.Empty;
+        PodcastEpisodesDescription.Text = string.Empty;
+        PodcastEpisodesArtwork.Source = null;
+        PodcastEpisodesDataGrid.ItemsSource = null;
+        PodcastEpisodesStatusTextBlock.Visibility = Visibility.Visible;
+        PodcastEpisodesStatusTextBlock.Text = LocalizationManager.Current.PodcastEpisodesLoading;
+        _ = LoadPodcastHeaderArtworkAsync(podcast.ArtworkUrl, cancellationToken);
+        try
+        {
+            var feed = await _podcastService.GetFeedAsync(
+                podcast.FeedUrl,
+                cancellationToken);
+            var progress = podcast.Id > 0
+                ? await Task.Run(() =>
+                {
+                    using var db = AudioDatabase.OpenDefault();
+                    return db.GetPodcastEpisodeProgress(podcast.Id);
+                }, cancellationToken)
+                : new Dictionary<string, PodcastEpisodeProgress>(StringComparer.Ordinal);
+            var rows = feed.Episodes.Select(episode => CreatePodcastEpisodeRow(episode, progress))
+                .ToList();
+            PodcastEpisodesDataGrid.ItemsSource = rows;
+            PodcastEpisodesStatusTextBlock.Text = rows.Count == 0
+                ? LocalizationManager.Current.PodcastNoEpisodes
+                : string.Empty;
+            PodcastEpisodesStatusTextBlock.Visibility = rows.Count == 0
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(rows.Count);
+            UpdatePodcastHeader(podcast, feed, progress);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch
+        {
+            PodcastEpisodesStatusTextBlock.Visibility = Visibility.Visible;
+            PodcastEpisodesStatusTextBlock.Text = LocalizationManager.Current.PodcastFeedFailed;
+        }
+    }
+
+    private void UpdatePodcastHeader(
+        PodcastRecord podcast,
+        PodcastFeed feed,
+        IReadOnlyDictionary<string, PodcastEpisodeProgress> progress)
+    {
+        var completed = feed.Episodes.Count(episode =>
+            progress.TryGetValue(episode.EpisodeKey, out var item) && item.IsCompleted);
+        var started = feed.Episodes.Count(episode =>
+            progress.TryGetValue(episode.EpisodeKey, out var item) &&
+            !item.IsCompleted &&
+            item.PositionSeconds > 0);
+        var unheard = Math.Max(0, feed.Episodes.Count - completed);
+        PodcastEpisodesStatistics.Text = string.Join(
+            "  ·  ",
+            string.Format(LocalizationManager.Current.PodcastEpisodeTotal, feed.Episodes.Count),
+            string.Format(LocalizationManager.Current.PodcastEpisodeUnheard, unheard),
+            string.Format(LocalizationManager.Current.PodcastEpisodeStarted, started));
+
+        var metadata = new List<string>();
+        var categories = feed.Categories.Count > 0
+            ? feed.Categories
+            : string.IsNullOrWhiteSpace(podcast.Genre) ? [] : [podcast.Genre];
+        if (categories.Count > 0)
+            metadata.Add(string.Join(", ", categories.Take(3)));
+        if (!string.IsNullOrWhiteSpace(feed.Language))
+            metadata.Add(FormatPodcastLanguage(feed.Language));
+        if (feed.Episodes.FirstOrDefault()?.PublishedAt is DateTimeOffset latest)
+        {
+            metadata.Add(string.Format(
+                LocalizationManager.Current.PodcastLatestEpisode,
+                latest.ToLocalTime().ToString("d", CultureInfo.CurrentCulture)));
+        }
+        PodcastEpisodesMetadata.Text = string.Join("  ·  ", metadata);
+        PodcastEpisodesDescription.Text = NormalizePodcastDescription(feed.Description);
+        PodcastEpisodesDescription.ToolTip = PodcastEpisodesDescription.Text;
+    }
+
+    private static string NormalizePodcastDescription(string? description)
+    {
+        if (string.IsNullOrWhiteSpace(description))
+            return string.Empty;
+        var withoutTags = Regex.Replace(description, "<[^>]+>", " ");
+        return Regex.Replace(WebUtility.HtmlDecode(withoutTags), @"\s+", " ").Trim();
+    }
+
+    private PodcastEpisodeViewModel CreatePodcastEpisodeRow(
+        PodcastEpisode episode,
+        IReadOnlyDictionary<string, PodcastEpisodeProgress> progressByEpisode)
+    {
+        progressByEpisode.TryGetValue(episode.EpisodeKey, out var progress);
+        var duration = progress?.DurationSeconds is > 0
+            ? TimeSpan.FromSeconds(progress.DurationSeconds.Value)
+            : episode.FeedDuration;
+        var position = progress?.PositionSeconds is > 0
+            ? TimeSpan.FromSeconds(progress.PositionSeconds)
+            : TimeSpan.Zero;
+        var status = progress?.IsCompleted == true
+            ? LocalizationManager.Current.PodcastPlayed
+            : position > TimeSpan.Zero
+                ? LocalizationManager.Current.PodcastInProgress
+                : LocalizationManager.Current.PodcastUnplayed;
+        return new PodcastEpisodeViewModel
+        {
+            Episode = episode,
+            Title = episode.Title,
+            Published = episode.PublishedAt?.ToLocalTime().ToString("d", CultureInfo.CurrentCulture) ?? string.Empty,
+            Duration = duration is null ? string.Empty : FormatTime(duration.Value),
+            Progress = position <= TimeSpan.Zero
+                ? string.Empty
+                : duration is null
+                    ? FormatTime(position)
+                    : $"{FormatTime(position)} / {FormatTime(duration.Value)}",
+            Status = status
+        };
+    }
+
+    private async void PodcastEpisodesDataGrid_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (_activePodcast is null ||
+            PodcastEpisodesDataGrid.SelectedItem is not PodcastEpisodeViewModel row)
+            return;
+        await PlayPodcastEpisodeAsync(_activePodcast, row.Episode);
+    }
+
+    private void PodcastEpisodesBackButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        CancelAndDispose(ref _podcastFeedCts);
+        PodcastEpisodesView.Visibility = Visibility.Collapsed;
+        _activePodcast = null;
+        ContentCountTextBlock.Text = PodcastsDataGrid.Items.Count > 0
+            ? LocalizationManager.FormatEntryCount(PodcastsDataGrid.Items.Count)
+            : string.Empty;
+    }
+
+    private async Task PlayPodcastEpisodeAsync(PodcastRecord podcast, PodcastEpisode episode)
+    {
+        _queue.Clear();
+        _queueIndex = -1;
+        ResetQueuePlaybackState();
+        RefreshQueueNavigationButtons();
+        try
+        {
+            await StartPlaybackAsync(
+                episode.AudioUrl,
+                podcastPlayback: new PodcastPlayback(podcast, episode));
+        }
+        catch (OperationCanceledException)
+        {
+            StatusTextBlock.Text = LocalizationManager.Current.PlaybackStopped;
+        }
+        catch
+        {
+            StopPlayback();
+            PodcastEpisodesStatusTextBlock.Visibility = Visibility.Visible;
+            PodcastEpisodesStatusTextBlock.Text = LocalizationManager.Current.PodcastFeedFailed;
+        }
+    }
+
+    private async Task LoadPodcastArtworkAsync(string? artworkUrl, CancellationToken cancellationToken)
+    {
+        if (!Uri.TryCreate(artworkUrl, UriKind.Absolute, out var uri))
+            return;
+        try
+        {
+            var bytes = await RadioImageHttpClient.GetByteArrayAsync(uri, cancellationToken);
+            await using var stream = new MemoryStream(bytes);
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.StreamSource = stream;
+            image.DecodePixelWidth = 400;
+            image.EndInit();
+            image.Freeze();
+            if (!cancellationToken.IsCancellationRequested)
+                NowPlayingArtworkImage.Source = image;
+        }
+        catch
+        {
+            // Missing podcast artwork does not affect playback.
+        }
+    }
+
+    private async Task LoadPodcastHeaderArtworkAsync(string? artworkUrl, CancellationToken cancellationToken)
+    {
+        if (!Uri.TryCreate(artworkUrl, UriKind.Absolute, out var uri))
+            return;
+        try
+        {
+            var bytes = await RadioImageHttpClient.GetByteArrayAsync(uri, cancellationToken);
+            await using var stream = new MemoryStream(bytes);
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.StreamSource = stream;
+            image.DecodePixelWidth = 160;
+            image.EndInit();
+            image.Freeze();
+            if (!cancellationToken.IsCancellationRequested)
+                PodcastEpisodesArtwork.Source = image;
+        }
+        catch
+        {
+            // Missing podcast artwork does not affect the episode list.
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Wiedergabe
     // ------------------------------------------------------------------
 
@@ -3302,17 +4232,21 @@ public partial class MainWindow : Window
             StatusTextBlock.Text = LocalizationManager.Current.SelectTrackFirst;
             return;
         }
-        try { await StartPlaybackAsync(_currentFilePath, _currentRadioStation); }
+        try { await StartPlaybackAsync(_currentFilePath, _currentRadioStation, _currentPodcastPlayback); }
         catch (OperationCanceledException) { StatusTextBlock.Text = LocalizationManager.Current.PlaybackStopped; }
         catch (Exception ex) { StopPlayback(); StatusTextBlock.Text = ex.Message; }
     }
 
-    private async Task StartPlaybackAsync(string filePath, RadioStationRecord? radioStation = null)
+    private async Task StartPlaybackAsync(
+        string filePath,
+        RadioStationRecord? radioStation = null,
+        PodcastPlayback? podcastPlayback = null)
     {
         StopPlayback();
         _currentFilePath = filePath;
         _currentRadioStation = radioStation;
-        if (radioStation is null)
+        _currentPodcastPlayback = podcastPlayback;
+        if (radioStation is null && podcastPlayback is null)
             _playedQueuePaths.Add(filePath);
         _playbackCts     = new CancellationTokenSource();
 
@@ -3356,6 +4290,28 @@ public partial class MainWindow : Window
 
         _player        = player;
         _player.Volume = (float)VolumeSlider.Value;
+        if (podcastPlayback is not null &&
+            podcastPlayback.Podcast.Id > 0 &&
+            player.CanSeek)
+        {
+            try
+            {
+                using var db = AudioDatabase.OpenDefault();
+                var progress = db.GetPodcastEpisodeProgress(
+                    podcastPlayback.Podcast.Id,
+                    podcastPlayback.Episode.EpisodeKey);
+                if (progress is { IsCompleted: false, PositionSeconds: > 5 } &&
+                    progress.PositionSeconds < Math.Max(0, player.Duration.TotalSeconds - 10))
+                {
+                    await player.SeekAsync(TimeSpan.FromSeconds(progress.PositionSeconds));
+                }
+            }
+            catch
+            {
+                // A corrupt or unavailable resume point must not prevent playback.
+            }
+        }
+        _lastPodcastProgressSave = DateTimeOffset.UtcNow;
         PlayButton.IsEnabled   = false;
         PlayButton.IsEnabled   = true;
         SetPlayPauseIcon(isPlaying: true);
@@ -3365,17 +4321,20 @@ public partial class MainWindow : Window
         _transportTimer.Start();
 
         // Now-playing anzeigen
-        var filename = radioStation?.Name ?? Path.GetFileNameWithoutExtension(filePath);
+        var filename = podcastPlayback?.Episode.Title ??
+                       radioStation?.Name ??
+                       Path.GetFileNameWithoutExtension(filePath);
         NowPlayingTitleBlock.Text  = filename;
-        NowPlayingArtistBlock.Text = radioStation is null
-            ? SelectedDriverTextBlock.Text
-            : LocalizationManager.Current.InternetRadio;
+        NowPlayingArtistBlock.Text = podcastPlayback?.Podcast.Name ??
+                                     (radioStation is null
+                                         ? SelectedDriverTextBlock.Text
+                                         : LocalizationManager.Current.InternetRadio);
         FileInfoTextBlock.Text     = info.IsDsd && info.ContainerName is "dsf" or "dff"
             ? $"{info.ContainerName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz  ·  DSD nativ"
             : info.IsDsd
                 ? $"DSD → PCM  ·  {info.OutputSampleRate:N0} Hz"
                 : $"{info.CodecName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz  ·  {info.Channels} ch";
-        if (radioStation is null)
+        if (radioStation is null && podcastPlayback is null)
         {
             try
             {
@@ -3415,7 +4374,20 @@ public partial class MainWindow : Window
             }
             _ = LoadLyricsForTrackAsync(filePath, forceRefresh: false);
         }
-        else
+        else if (podcastPlayback is not null)
+        {
+            _currentTrackId = null;
+            _currentArtistId = null;
+            _currentArtistName = null;
+            _currentTrackIsFavorite = false;
+            NowPlayingArtistButton.IsEnabled = false;
+            LyricsButton.IsEnabled = false;
+            ArtistInfoButton.IsEnabled = false;
+            _ = LoadPodcastArtworkAsync(
+                podcastPlayback.Podcast.ArtworkUrl,
+                _playbackCts?.Token ?? CancellationToken.None);
+        }
+        else if (radioStation is not null)
         {
             ShowRadioNowPlaying(radioStation, info);
             LyricsBackgroundImage.Source = null;
@@ -3435,7 +4407,7 @@ public partial class MainWindow : Window
             : _settings.SelectedWasapiDeviceName;
         StatusTextBlock.Text = string.Format(LocalizationManager.Current.PlaybackThrough, outputName);
 
-        if (radioStation is null)
+        if (radioStation is null && podcastPlayback is null)
         {
             try
             {
@@ -3456,7 +4428,8 @@ public partial class MainWindow : Window
         if (_player == player)
         {
             RecordPlaybackEnd(completed: true);
-            if (radioStation is not null || !await TryPlayNextAsync())
+            SavePodcastProgress(completed: true);
+            if (radioStation is not null || podcastPlayback is not null || !await TryPlayNextAsync())
             {
                 StopPlayback();
                 StatusTextBlock.Text = LocalizationManager.Current.PlaybackFinished;
@@ -3491,6 +4464,7 @@ public partial class MainWindow : Window
     private void StopPlayback()
     {
         RecordPlaybackEnd(completed: false);
+        SavePodcastProgress(completed: false);
         CancelAndDispose(ref _radioMetadataCts);
         _playbackCts?.Cancel();
         _playbackCts?.Dispose();
@@ -3516,6 +4490,8 @@ public partial class MainWindow : Window
         _currentArtistId = null;
         _currentArtistName = null;
         _currentTrackIsFavorite = false;
+        _currentRadioStation = null;
+        _currentPodcastPlayback = null;
         LyricsButton.IsEnabled = false;
         ArtistInfoButton.IsEnabled = false;
         ArtistInfoView.Visibility = Visibility.Collapsed;
@@ -3552,6 +4528,93 @@ public partial class MainWindow : Window
         {
             _currentPlayHistoryId = null;
         }
+    }
+
+    private void SavePodcastProgress(bool completed)
+    {
+        if (_currentPodcastPlayback is not { Podcast.Id: > 0 } playback ||
+            _player is null)
+            return;
+
+        var duration = _player.Duration.TotalSeconds > 0
+            ? _player.Duration.TotalSeconds
+            : playback.Episode.FeedDuration?.TotalSeconds;
+        var position = completed && duration is > 0
+            ? duration.Value
+            : _player.Position.TotalSeconds;
+        var isCompleted = completed ||
+                          (duration is > 0 && position / duration.Value >= 0.95);
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            db.SavePodcastEpisodeProgress(
+                playback.Podcast.Id,
+                playback.Episode.EpisodeKey,
+                position,
+                duration,
+                isCompleted);
+            UpdateVisiblePodcastEpisodeProgress(
+                playback.Episode.EpisodeKey,
+                position,
+                duration,
+                isCompleted);
+        }
+        catch
+        {
+        }
+
+        _lastPodcastProgressSave = DateTimeOffset.UtcNow;
+        if (isCompleted)
+            _currentPodcastPlayback = null;
+    }
+
+    private void UpdateVisiblePodcastEpisodeProgress(
+        string episodeKey,
+        double positionSeconds,
+        double? durationSeconds,
+        bool completed)
+    {
+        if (PodcastEpisodesDataGrid.ItemsSource is not IEnumerable<PodcastEpisodeViewModel> rows)
+            return;
+        var row = rows.FirstOrDefault(item =>
+            string.Equals(item.Episode.EpisodeKey, episodeKey, StringComparison.Ordinal));
+        if (row is null)
+            return;
+
+        var replacement = CreatePodcastEpisodeRow(
+            row.Episode,
+            new Dictionary<string, PodcastEpisodeProgress>(StringComparer.Ordinal)
+            {
+                [episodeKey] = new(
+                    episodeKey,
+                    positionSeconds,
+                    durationSeconds,
+                    completed)
+            });
+        if (PodcastEpisodesDataGrid.ItemsSource is IList<PodcastEpisodeViewModel> list)
+        {
+            var index = list.IndexOf(row);
+            if (index >= 0)
+            {
+                list[index] = replacement;
+                PodcastEpisodesDataGrid.Items.Refresh();
+                UpdateVisiblePodcastStatistics(list);
+            }
+        }
+    }
+
+    private void UpdateVisiblePodcastStatistics(IEnumerable<PodcastEpisodeViewModel> source)
+    {
+        var rows = source.ToList();
+        var completed = rows.Count(row =>
+            string.Equals(row.Status, LocalizationManager.Current.PodcastPlayed, StringComparison.Ordinal));
+        var started = rows.Count(row =>
+            string.Equals(row.Status, LocalizationManager.Current.PodcastInProgress, StringComparison.Ordinal));
+        PodcastEpisodesStatistics.Text = string.Join(
+            "  ·  ",
+            string.Format(LocalizationManager.Current.PodcastEpisodeTotal, rows.Count),
+            string.Format(LocalizationManager.Current.PodcastEpisodeUnheard, rows.Count - completed),
+            string.Format(LocalizationManager.Current.PodcastEpisodeStarted, started));
     }
 
     private async Task<bool> TryPlayNextAsync()
@@ -3736,6 +4799,11 @@ public partial class MainWindow : Window
         PositionSlider.Maximum    = Math.Max(1, _player.Duration.TotalSeconds);
         if (!_isSeekingWithSlider)
             PositionSlider.Value = Math.Min(PositionSlider.Maximum, _player.Position.TotalSeconds);
+        if (_currentPodcastPlayback is not null &&
+            DateTimeOffset.UtcNow - _lastPodcastProgressSave >= TimeSpan.FromSeconds(5))
+        {
+            SavePodcastProgress(completed: false);
+        }
         UpdateActiveLyric(_player.Position);
     }
 

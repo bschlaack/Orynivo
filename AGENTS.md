@@ -68,6 +68,9 @@ artifact.
 - `Orynivo/Library/RadioBrowserService.cs`: Radio Browser client with mirror discovery, station search, and click registration
 - `Orynivo/Library/RadioStationRecord.cs`: persisted personal internet-radio station model
 - `Orynivo/Library/RadioStreamMetadataService.cs`: probes live ICY metadata through `ffprobe`; radio playback refreshes title/artist every 15 seconds
+- `Orynivo/Library/PodcastService.cs`: searches the public Apple Podcasts catalog and resolves all playable episodes from podcast RSS/Atom feeds, newest first
+- `Orynivo/Library/CatalogFilterCache.cs`: persists radio-genre and podcast category/language catalogs in `%LOCALAPPDATA%\Orynivo\catalog-filter-cache.json`; catalog data is refreshed after seven days while stale data remains usable
+- `Orynivo/Library/PodcastRecord.cs`: podcast catalog, persisted subscription, and episode models
 - `Orynivo/LyricsSearchWindow.*`: manual LRCLIB search with editable track and artist fields, candidate preview, and explicit replacement of the current track's downloaded lyrics cache
 - `Orynivo/Library/ArtistProfileService.cs`: configurable artist biography and image lookup (Wikipedia or Last.fm); static `Source` and `LastFmApiKey` properties set from `AppSettings`; images cached under `%LOCALAPPDATA%\Orynivo\artist-images\`
 - `Orynivo/Library/ArtistImageSearchService.cs` and `Orynivo/ArtistImageSearchWindow.*`: manual Wikimedia Commons artist-image search with editable query; selecting an image updates `artists.image_path`, sets `image_is_manual`, and preserves the biography source; automatic profile refreshes must not download over manually selected image files
@@ -84,6 +87,8 @@ artifact.
 - `favorites` is an older generic extension point; visible favorites use the direct flags
 - `play_history` records playback starts and endings, duration, final position, and completion state
 - `radio_stations` stores personal Radio Browser stations by stable station UUID, including stream URL, logo, country, codec, bitrate, and tags
+- `podcasts` stores pinned podcasts by Apple collection ID, including author, RSS feed URL, artwork URL, and genre
+- `podcast_episode_progress` stores resume position, known duration, completion state, and update time per pinned podcast episode; RSS GUID is the preferred episode key and the audio URL is the fallback
 - `AudioDatabase.GetTrackIdAndFavorite(path)` performs a lightweight `id` and `is_favorite` lookup
 - `AudioDatabase.OpenDefault()` creates or opens `%LOCALAPPDATA%\Orynivo\library.db`
 - On first launch after the rename, missing data is copied from `%LOCALAPPDATA%\Player\` and cached database paths are rebased to `%LOCALAPPDATA%\Orynivo\`
@@ -217,6 +222,15 @@ artifact.
 - The top sidebar item has tag `"Dashboard"`
 - **Internet Radio** appears directly below Dashboard. It searches Radio Browser, plays streams through the existing FFmpeg PCM path, and adds stations to **Own Radios** above Playlists.
 - Personal radio sidebar entries use `Radio:{id}` tags; right-clicking one offers deletion from `radio_stations`.
+- **Podcasts** appears directly below Internet Radio. It searches Apple Podcasts without credentials and reads playable episodes from the selected podcast's RSS/Atom feed.
+- Double-clicking a podcast search result or selecting a pinned podcast opens its complete episode list, sorted from newest to oldest. Playback starts only when an episode is double-clicked.
+- Podcast search results support combinable multi-select category and language filters. Categories come from Apple's complete regional podcast genre taxonomy and are available before a search. Languages are detected from RSS/Atom `language` or `xml:lang` metadata for regional top podcasts, pinned podcasts, and subsequent search results. Values within one filter use OR semantics, while category and language filters combine with AND semantics.
+- Internet-radio genres are loaded from Radio Browser's complete tag statistics instead of the first station-result page. Initial catalog options intentionally omit counts because normalized genre groups overlap multiple raw tags. Selecting genres performs Radio Browser tag queries (OR across selected genres) and may load up to 10,000 stations per genre.
+- Podcast category selections work without a title query by sending the cached Apple genre IDs to the catalog search. Language-only filtering uses the regional top 100 podcasts as its starting set and then evaluates feed languages.
+- The cached catalog options are used only while the radio or podcast search field is empty. After a text search, visible filter values and counts are rebuilt from that search result; clearing the search restores the cached catalog options.
+- Pinned podcasts appear under **My Podcasts** with `Podcast:{id}` tags. The context menu removes them from `podcasts`.
+- Podcast progress is saved about every five seconds and when playback stops. Incomplete episodes resume at the saved position; episodes reaching 95 percent or ending normally are shown as played.
+- The podcast episode view uses the same violet-blue accent border as the radio now-playing card and a 150 px podcast image. Its header shows total, unheard, and started episode counts plus feed categories, language, latest publication date, and a shortened feed description.
 - During radio playback, the Internet Radio page shows a large station logo and live ICY title/artist metadata when supplied by the stream; the transport summary is updated at the same time.
 - Radio search results expose a multi-select genre popup derived from normalized Radio Browser tags. Selected genres use OR semantics, technical tags are excluded, and unavailable selections are removed after a new search.
 - The page contains:
@@ -262,6 +276,10 @@ behavior changes.
 Update `README.md` whenever features, requirements, build steps, supported
 formats, or known limitations change so the public GitHub documentation matches
 the actual project.
+
+Keep `CHANGELOG.md` updated for every notable user-visible, architectural,
+build, compatibility, or bug-fix change. Add ongoing work under **Unreleased**
+and move those entries into a dated version section when preparing a release.
 
 ## Localization Rule
 
