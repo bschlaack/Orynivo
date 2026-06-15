@@ -112,6 +112,7 @@ public partial class MainWindow : Window
     private int _dashboardYear;
     private int _dashboardMonth;
     private StackPanel? _calendarInner;
+    private bool _suppressNavSelectionChanged;
 
     private static readonly System.Windows.Media.Color[] _genreColors =
     [
@@ -559,6 +560,8 @@ public partial class MainWindow : Window
 
     private async void NavListBox_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (_suppressNavSelectionChanged)
+            return;
         if (NavListBox.SelectedItem is not ListBoxItem { Tag: string tag })
             return;
 
@@ -4407,20 +4410,46 @@ public partial class MainWindow : Window
             : _settings.SelectedWasapiDeviceName;
         StatusTextBlock.Text = string.Format(LocalizationManager.Current.PlaybackThrough, outputName);
 
-        if (radioStation is null && podcastPlayback is null)
+        try
         {
-            try
+            using var db = AudioDatabase.OpenDefault();
+            if (radioStation is not null)
             {
-                using var db = AudioDatabase.OpenDefault();
+                _currentPlayHistoryId = db.RecordPlaybackStart(
+                    filePath,
+                    null,
+                    null,
+                    mediaType: "radio",
+                    title: radioStation.Name,
+                    subtitle: LocalizationManager.Current.InternetRadio,
+                    externalId: radioStation.StationUuid);
+            }
+            else if (podcastPlayback is not null)
+            {
+                _currentPlayHistoryId = db.RecordPlaybackStart(
+                    filePath,
+                    null,
+                    player.Duration.TotalSeconds > 0
+                        ? player.Duration.TotalSeconds
+                        : podcastPlayback.Episode.FeedDuration?.TotalSeconds,
+                    mediaType: "podcast",
+                    title: podcastPlayback.Episode.Title,
+                    subtitle: podcastPlayback.Podcast.Name,
+                    externalId: podcastPlayback.Episode.EpisodeKey);
+            }
+            else
+            {
                 _currentPlayHistoryId = db.RecordPlaybackStart(
                     filePath,
                     db.GetTrackIdByPath(filePath),
-                    player.Duration.TotalSeconds > 0 ? player.Duration.TotalSeconds : null);
+                    player.Duration.TotalSeconds > 0 ? player.Duration.TotalSeconds : null,
+                    title: NowPlayingTitleBlock.Text,
+                    subtitle: NowPlayingArtistBlock.Text);
             }
-            catch
-            {
-                _currentPlayHistoryId = null;
-            }
+        }
+        catch
+        {
+            _currentPlayHistoryId = null;
         }
 
         await player.WaitForCompletionAsync();
@@ -5826,7 +5855,16 @@ public partial class MainWindow : Window
             BorderBrush     = (WpfBrush)FindResource("AppGridLineBrush"),
             BorderThickness = new Thickness(1),
             CornerRadius    = new CornerRadius(4),
-            Padding         = new Thickness(4)
+            Padding         = new Thickness(4),
+            Cursor          = data is not null && data.TotalSeconds > 0
+                ? WpfCursors.Hand
+                : WpfCursors.Arrow,
+            ToolTip         = data is not null && data.TotalSeconds > 0
+                ? string.Format(
+                    LocalizationManager.Current.DailyHistoryTitle,
+                    new DateTime(_dashboardYear, _dashboardMonth, day)
+                        .ToString("D", CultureInfo.CurrentCulture))
+                : null
         };
 
         var stack = new StackPanel();
@@ -5845,7 +5883,7 @@ public partial class MainWindow : Window
             var ts = TimeSpan.FromSeconds(data.TotalSeconds);
             stack.Children.Add(new TextBlock
             {
-                Text       = $"{(int)ts.TotalHours:D2}:{ts.Minutes:D2}",
+                Text       = FormatDashboardDuration(ts),
                 FontSize   = 10,
                 Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x54, 0xA0, 0xFF)),
                 HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
@@ -5853,14 +5891,30 @@ public partial class MainWindow : Window
             });
 
             foreach (var genre in data.TopGenres.Take(3))
-                stack.Children.Add(new TextBlock
+            {
+                var genreButton = new Button
                 {
-                    Text         = genre,
-                    FontSize     = 9,
-                    Foreground   = (WpfBrush)FindResource("AppSecondaryTextBrush"),
-                    TextTrimming = TextTrimming.CharacterEllipsis,
-                    HorizontalAlignment = System.Windows.HorizontalAlignment.Center
-                });
+                    Content = genre,
+                    FontSize = 9,
+                    Foreground = (WpfBrush)FindResource("AppSecondaryTextBrush"),
+                    Style = (Style)FindResource("EntityLinkButtonStyle"),
+                    HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
+                    Padding = new Thickness(2, 0, 2, 0),
+                    Tag = genre
+                };
+                genreButton.Click += DashboardGenreButton_OnClick;
+                stack.Children.Add(genreButton);
+            }
+        }
+
+        if (data is not null && data.TotalSeconds > 0)
+        {
+            var date = new DateTime(_dashboardYear, _dashboardMonth, day);
+            border.MouseLeftButtonUp += async (_, e) =>
+            {
+                e.Handled = true;
+                await ShowDailyHistoryAsync(date);
+            };
         }
 
         border.Child = stack;
@@ -5895,17 +5949,20 @@ public partial class MainWindow : Window
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            var labelTb = new TextBlock
+            var labelButton = new Button
             {
-                Text         = $"{i + 1}. {genre}",
-                FontSize     = 12,
-                Foreground   = (WpfBrush)FindResource("AppPrimaryTextBrush"),
-                TextTrimming = TextTrimming.CharacterEllipsis,
+                Content = $"{i + 1}. {genre}",
+                FontSize = 12,
+                Foreground = (WpfBrush)FindResource("AppPrimaryTextBrush"),
+                Style = (Style)FindResource("EntityLinkButtonStyle"),
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin       = new Thickness(0, 0, 12, 0)
+                HorizontalContentAlignment = System.Windows.HorizontalAlignment.Left,
+                Margin = new Thickness(0, 0, 12, 0),
+                Tag = genre
             };
-            Grid.SetColumn(labelTb, 0);
-            row.Children.Add(labelTb);
+            labelButton.Click += DashboardGenreButton_OnClick;
+            Grid.SetColumn(labelButton, 0);
+            row.Children.Add(labelButton);
 
             double fraction = maxSecs > 0 ? secs / maxSecs : 0;
             var barHost = new Grid { VerticalAlignment = VerticalAlignment.Center };
@@ -5936,7 +5993,7 @@ public partial class MainWindow : Window
             var ts = TimeSpan.FromSeconds(secs);
             var durationTb = new TextBlock
             {
-                Text      = $"{(int)ts.TotalHours:D2}:{ts.Minutes:D2}",
+                Text      = FormatDashboardDuration(ts),
                 FontSize  = 11,
                 Foreground = (WpfBrush)FindResource("AppSecondaryTextBrush"),
                 VerticalAlignment = VerticalAlignment.Center,
@@ -5949,6 +6006,112 @@ public partial class MainWindow : Window
         }
 
         DashboardPanel.Children.Add(panel);
+    }
+
+    private async void DashboardGenreButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string genre } || string.IsNullOrWhiteSpace(genre))
+            return;
+        e.Handled = true;
+
+        _trackFavoritesOnly = false;
+        _selectedTrackGenres.Clear();
+        _selectedTrackGenres.Add(genre);
+        _selectedTrackFormats.Clear();
+        _selectedTrackBitrates.Clear();
+        _expandedTrackFilterSections.Add(LocalizationManager.Current.Genre);
+        ResetDrilldownState();
+        _settings.LastMainView = "Tracks";
+
+        var tracksItem = NavListBox.Items
+            .OfType<ListBoxItem>()
+            .FirstOrDefault(item =>
+                string.Equals(item.Tag as string, "Tracks", StringComparison.Ordinal));
+        if (tracksItem is null)
+            return;
+        if (ReferenceEquals(NavListBox.SelectedItem, tracksItem))
+            await ShowTopLevelViewAsync("Tracks");
+        else
+            NavListBox.SelectedItem = tracksItem;
+    }
+
+    private static string FormatDashboardDuration(TimeSpan value) =>
+        $"{(int)value.TotalHours:D2}:{value.Minutes:D2}:{value.Seconds:D2}";
+
+    private async Task ShowDailyHistoryAsync(DateTime date)
+    {
+        var entries = await Task.Run(() =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            return db.GetHistoryForDay(date);
+        });
+
+        var dialog = new DailyHistoryDialog(date, entries)
+        {
+            Owner = this
+        };
+        if (dialog.ShowDialog() != true || dialog.SelectedEntry is not { } entry)
+            return;
+
+        switch (dialog.SelectedAction)
+        {
+            case DailyHistoryAction.Track:
+                await OpenHistoryTrackAsync(entry);
+                break;
+            case DailyHistoryAction.Album when entry.AlbumId is long albumId:
+                _navigationStack.Push(new NavigationState("Dashboard", null, null, null));
+                await ShowAlbumTracksAsync(
+                    albumId,
+                    entry.Album ?? LocalizationManager.Current.Unknown);
+                break;
+            case DailyHistoryAction.Artist when entry.ArtistId is long artistId:
+                _navigationStack.Push(new NavigationState("Dashboard", null, null, null));
+                await ShowArtistAlbumsAsync(
+                    artistId,
+                    entry.Artist ?? LocalizationManager.Current.Unknown);
+                break;
+        }
+    }
+
+    private async Task OpenHistoryTrackAsync(DailyHistoryEntry entry)
+    {
+        if (entry.TrackId is null || !File.Exists(entry.Path))
+            return;
+
+        _trackFavoritesOnly = false;
+        _selectedTrackGenres.Clear();
+        _selectedTrackFormats.Clear();
+        _selectedTrackBitrates.Clear();
+        ResetDrilldownState();
+        _settings.LastMainView = "Tracks";
+
+        var tracksItem = NavListBox.Items
+            .OfType<ListBoxItem>()
+            .FirstOrDefault(item =>
+                string.Equals(item.Tag as string, "Tracks", StringComparison.Ordinal));
+        if (tracksItem is not null && !ReferenceEquals(NavListBox.SelectedItem, tracksItem))
+        {
+            _suppressNavSelectionChanged = true;
+            try
+            {
+                NavListBox.SelectedItem = tracksItem;
+            }
+            finally
+            {
+                _suppressNavSelectionChanged = false;
+            }
+        }
+
+        await ShowTopLevelViewAsync("Tracks");
+        var rows = (ContentDataGrid.ItemsSource as IEnumerable<ContentRow>)?.ToList() ?? [];
+        var row = rows.FirstOrDefault(item =>
+            string.Equals(item.FilePath, entry.Path, StringComparison.OrdinalIgnoreCase));
+        if (row is null)
+            return;
+
+        ContentDataGrid.SelectedItem = row;
+        ContentDataGrid.ScrollIntoView(row);
+        await PlayTrackFromRowsAsync(row, rows);
     }
 
     private async void CalendarPrev_OnClick(object sender, RoutedEventArgs e)

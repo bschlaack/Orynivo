@@ -132,6 +132,14 @@
         <sys:String x:Key="L_Tracks" xmlns:sys="clr-namespace:System;assembly=mscorlib">Tracks</sys:String>
         <sys:String x:Key="L_Title" xmlns:sys="clr-namespace:System;assembly=mscorlib">Titel</sys:String>
         <sys:String x:Key="L_Artist" xmlns:sys="clr-namespace:System;assembly=mscorlib">Künstler</sys:String>
+        <sys:String x:Key="L_Album" xmlns:sys="clr-namespace:System;assembly=mscorlib">Album</sys:String>
+        <sys:String x:Key="L_Duration" xmlns:sys="clr-namespace:System;assembly=mscorlib">Dauer</sys:String>
+        <sys:String x:Key="L_DailyHistoryTitle" xmlns:sys="clr-namespace:System;assembly=mscorlib">Hörverlauf</sys:String>
+        <sys:String x:Key="L_PlayedAt" xmlns:sys="clr-namespace:System;assembly=mscorlib">Gehört um</sys:String>
+        <sys:String x:Key="L_ListenedDuration" xmlns:sys="clr-namespace:System;assembly=mscorlib">Gehört</sys:String>
+        <sys:String x:Key="L_MediaType" xmlns:sys="clr-namespace:System;assembly=mscorlib">Typ</sys:String>
+        <sys:String x:Key="L_Close" xmlns:sys="clr-namespace:System;assembly=mscorlib">Schließen</sys:String>
+        <sys:String x:Key="L_DailyHistoryNoEntries" xmlns:sys="clr-namespace:System;assembly=mscorlib">Für diesen Tag sind keine Wiedergaben vorhanden.</sys:String>
         <sys:String x:Key="L_FolderStructure" xmlns:sys="clr-namespace:System;assembly=mscorlib">Ordnerstruktur</sys:String>
         <sys:String x:Key="L_Playlists" xmlns:sys="clr-namespace:System;assembly=mscorlib">PLAYLISTS</sys:String>
         <sys:String x:Key="L_Settings" xmlns:sys="clr-namespace:System;assembly=mscorlib">⚙   Einstellungen</sys:String>

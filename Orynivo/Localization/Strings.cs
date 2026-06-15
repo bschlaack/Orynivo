@@ -279,4 +279,10 @@ public sealed record LocalizedStrings(
     public string PodcastEpisodeUnheard { get; init; } = "";
     public string PodcastEpisodeStarted { get; init; } = "";
     public string PodcastLatestEpisode { get; init; } = "";
+    public string DailyHistoryTitle { get; init; } = "";
+    public string PlayedAt { get; init; } = "";
+    public string ListenedDuration { get; init; } = "";
+    public string MediaType { get; init; } = "";
+    public string Close { get; init; } = "";
+    public string DailyHistoryNoEntries { get; init; } = "";
 }

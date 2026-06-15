@@ -47,6 +47,8 @@ public static class LocalizationManager
         resources["L_Bitrate"] = Current.Bitrate;
         resources["L_Title"] = Current.Title;
         resources["L_Artist"] = Current.Artist;
+        resources["L_Album"] = Current.Album;
+        resources["L_Duration"] = Current.Duration;
         resources["L_NoDeviceSelected"] = Current.NoDeviceSelected;
         resources["L_Table"] = Current.Table;
         resources["L_Artwork"] = Current.Artwork;
@@ -173,6 +175,12 @@ public static class LocalizationManager
         resources["L_PodcastLanguages"] = Current.PodcastLanguages;
         resources["L_PodcastLanguage"] = Current.PodcastLanguage;
         resources["L_PodcastOverview"] = Current.PodcastOverview;
+        resources["L_DailyHistoryTitle"] = Current.DailyHistoryTitle;
+        resources["L_PlayedAt"] = Current.PlayedAt;
+        resources["L_ListenedDuration"] = Current.ListenedDuration;
+        resources["L_MediaType"] = Current.MediaType;
+        resources["L_Close"] = Current.Close;
+        resources["L_DailyHistoryNoEntries"] = Current.DailyHistoryNoEntries;
     }
 
     private static readonly LocalizedStrings German = new(
@@ -368,6 +376,12 @@ public static class LocalizationManager
         , PodcastEpisodeUnheard = "{0:N0} noch nicht gehört"
         , PodcastEpisodeStarted = "{0:N0} begonnen"
         , PodcastLatestEpisode = "Neueste Folge: {0}"
+        , DailyHistoryTitle = "Hörverlauf – {0}"
+        , PlayedAt = "Gehört um"
+        , ListenedDuration = "Gehört"
+        , MediaType = "Typ"
+        , Close = "Schließen"
+        , DailyHistoryNoEntries = "Für diesen Tag sind keine Wiedergaben vorhanden."
     };
 
     private static readonly LocalizedStrings English = new(
@@ -549,6 +563,12 @@ public static class LocalizationManager
         , PodcastEpisodeUnheard = "{0:N0} not yet played"
         , PodcastEpisodeStarted = "{0:N0} started"
         , PodcastLatestEpisode = "Latest episode: {0}"
+        , DailyHistoryTitle = "Listening history – {0}"
+        , PlayedAt = "Played at"
+        , ListenedDuration = "Listened"
+        , MediaType = "Type"
+        , Close = "Close"
+        , DailyHistoryNoEntries = "There are no playback entries for this day."
     };
 
     private static readonly LocalizedStrings French = new(
@@ -733,6 +753,12 @@ public static class LocalizationManager
         , PodcastEpisodeUnheard = "{0:N0} non écoutés"
         , PodcastEpisodeStarted = "{0:N0} commencés"
         , PodcastLatestEpisode = "Dernier épisode : {0}"
+        , DailyHistoryTitle = "Historique d’écoute – {0}"
+        , PlayedAt = "Écouté à"
+        , ListenedDuration = "Durée écoutée"
+        , MediaType = "Type"
+        , Close = "Fermer"
+        , DailyHistoryNoEntries = "Aucune lecture n’est enregistrée pour ce jour."
     };
 
     private static readonly LocalizedStrings Spanish = new(
@@ -914,6 +940,12 @@ public static class LocalizationManager
         , PodcastEpisodeUnheard = "{0:N0} sin escuchar"
         , PodcastEpisodeStarted = "{0:N0} empezados"
         , PodcastLatestEpisode = "Último episodio: {0}"
+        , DailyHistoryTitle = "Historial de escucha – {0}"
+        , PlayedAt = "Escuchado a las"
+        , ListenedDuration = "Tiempo escuchado"
+        , MediaType = "Tipo"
+        , Close = "Cerrar"
+        , DailyHistoryNoEntries = "No hay reproducciones registradas para este día."
     };
 
     public static LocalizedStrings Current { get; private set; } = German;

@@ -63,6 +63,19 @@ public sealed record TrackLite(
 public sealed record RecentAlbumInfo(long Id, string Title, string Artist, string? ThumbPath);
 
 public sealed record CalendarDayData(int Day, double TotalSeconds, IReadOnlyList<string> TopGenres);
+public sealed record DailyHistoryEntry(
+    long Id,
+    long? TrackId,
+    string Path,
+    DateTime StartedAt,
+    double ListenedSeconds,
+    double? DurationSeconds,
+    string MediaType,
+    string Title,
+    string? Artist,
+    string? Album,
+    long? ArtistId,
+    long? AlbumId);
 public sealed record ArtistNormalizationResult(int MergedArtists, int UpdatedTracks);
 public sealed record ArtistRenameResult(long ArtistId, string ArtistName, bool Merged);
 
@@ -830,18 +843,33 @@ public sealed class AudioDatabase : IDisposable
         return value is null || value is DBNull ? null : Convert.ToInt64(value);
     }
 
-    public long RecordPlaybackStart(string path, long? trackId, double? durationSeconds)
+    public long RecordPlaybackStart(
+        string path,
+        long? trackId,
+        double? durationSeconds,
+        string mediaType = "track",
+        string? title = null,
+        string? subtitle = null,
+        string? externalId = null)
     {
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO play_history (track_id, path, started_at, duration_seconds)
-            VALUES ($track_id, $path, $started_at, $duration_seconds)
+            INSERT INTO play_history (
+                track_id, path, started_at, duration_seconds,
+                media_type, title, subtitle, external_id)
+            VALUES (
+                $track_id, $path, $started_at, $duration_seconds,
+                $media_type, $title, $subtitle, $external_id)
             RETURNING id;
             """;
         Add(cmd, "$track_id", trackId);
         Add(cmd, "$path", path);
         Add(cmd, "$started_at", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
         Add(cmd, "$duration_seconds", durationSeconds);
+        Add(cmd, "$media_type", mediaType);
+        Add(cmd, "$title", title);
+        Add(cmd, "$subtitle", subtitle);
+        Add(cmd, "$external_id", externalId);
         return (long)cmd.ExecuteScalar()!;
     }
 
@@ -1497,7 +1525,11 @@ public sealed class AudioDatabase : IDisposable
                 ended_at         INTEGER,
                 duration_seconds REAL,
                 position_seconds REAL,
-                completed        INTEGER NOT NULL DEFAULT 0
+                completed        INTEGER NOT NULL DEFAULT 0,
+                media_type       TEXT NOT NULL DEFAULT 'track',
+                title            TEXT,
+                subtitle         TEXT,
+                external_id      TEXT
             );
 
             CREATE INDEX IF NOT EXISTS idx_albums_artist        ON albums (artist_id);
@@ -1523,6 +1555,10 @@ public sealed class AudioDatabase : IDisposable
         EnsureColumn("artworks", "original_path", "TEXT");
         EnsureColumn("artworks", "thumb_96_path", "TEXT");
         EnsureColumn("artworks", "thumb_320_path", "TEXT");
+        EnsureColumn("play_history", "media_type", "TEXT NOT NULL DEFAULT 'track'");
+        EnsureColumn("play_history", "title", "TEXT");
+        EnsureColumn("play_history", "subtitle", "TEXT");
+        EnsureColumn("play_history", "external_id", "TEXT");
 
         if (!string.Equals(GetMeta("normalized_library_v1"), "done", StringComparison.Ordinal))
         {
@@ -2614,6 +2650,62 @@ public sealed class AudioDatabase : IDisposable
             })
             .OrderBy(x => x.Day)
             .ToList();
+    }
+
+    public List<DailyHistoryEntry> GetHistoryForDay(DateTime date)
+    {
+        var localDate = DateTime.SpecifyKind(date.Date, DateTimeKind.Unspecified);
+        var nextLocalDate = localDate.AddDays(1);
+        var start = new DateTimeOffset(localDate, TimeZoneInfo.Local.GetUtcOffset(localDate))
+            .ToUnixTimeSeconds();
+        var end = new DateTimeOffset(nextLocalDate, TimeZoneInfo.Local.GetUtcOffset(nextLocalDate))
+            .ToUnixTimeSeconds();
+
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT ph.id,
+                   ph.track_id,
+                   ph.path,
+                   ph.started_at,
+                   COALESCE(ph.position_seconds, 0),
+                   ph.duration_seconds,
+                   ph.media_type,
+                   COALESCE(t.title, ph.title, t.file_name, ph.path),
+                   COALESCE(ar.name, t.artist, ph.subtitle),
+                   COALESCE(a.title, t.album),
+                   t.artist_id,
+                   t.album_id
+            FROM play_history ph
+            LEFT JOIN tracks t ON t.id = ph.track_id
+            LEFT JOIN artists ar ON ar.id = t.artist_id
+            LEFT JOIN albums a ON a.id = t.album_id
+            WHERE ph.started_at >= $start
+              AND ph.started_at < $end
+              AND COALESCE(ph.position_seconds, 0) > 0
+            ORDER BY ph.started_at DESC, ph.id DESC;
+            """;
+        cmd.Parameters.AddWithValue("$start", start);
+        cmd.Parameters.AddWithValue("$end", end);
+
+        using var r = cmd.ExecuteReader();
+        var result = new List<DailyHistoryEntry>();
+        while (r.Read())
+        {
+            result.Add(new DailyHistoryEntry(
+                r.GetInt64(0),
+                r.IsDBNull(1) ? null : r.GetInt64(1),
+                r.GetString(2),
+                DateTimeOffset.FromUnixTimeSeconds(r.GetInt64(3)).LocalDateTime,
+                r.GetDouble(4),
+                r.IsDBNull(5) ? null : r.GetDouble(5),
+                r.GetString(6),
+                r.GetString(7),
+                r.IsDBNull(8) ? null : r.GetString(8),
+                r.IsDBNull(9) ? null : r.GetString(9),
+                r.IsDBNull(10) ? null : r.GetInt64(10),
+                r.IsDBNull(11) ? null : r.GetInt64(11)));
+        }
+        return result;
     }
 
     public List<(string Genre, double Seconds)> GetTopGenres(int limit = 10)

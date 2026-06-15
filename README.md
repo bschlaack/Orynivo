@@ -23,7 +23,11 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 - Conservative artist-name normalization for `feat.` credits and unambiguous case, accent, spacing, and punctuation variants, with a repair action for existing libraries
 - Live A-Z/# quick navigation beside alphabetically sorted artist, album, and track lists
 - Album view with table and virtualized artwork modes
-- Dashboard with recently added albums, playback calendar, and top genres
+- Dashboard with recently added albums, second-precision playback calendar,
+  and linked top genres that open the matching filtered track list
+- Clickable populated calendar days with a modal daily listening history;
+  local title, album, and artist links open the corresponding library view,
+  and title links immediately start playback
 - Internet radio search through the free Radio Browser directory, direct
   playback, persistent personal stations in the sidebar, station logos, and
   live ICY title/artist metadata when supplied by the stream
@@ -43,7 +47,8 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 - Lucene.NET full-text search with partial-word and German umlaut variants
 - Favorites for tracks, albums, and artists
 - Regular and filter-based smart playlists
-- Playback history used for statistics
+- Playback history for local tracks, podcast episodes, and internet-radio
+  sessions, including position and completion state
 - Artwork downloads through the Cover Art Archive and manual MusicBrainz search
 - Embedded or downloaded lyrics with synchronized LRC highlighting during playback
 - Manual LRCLIB lyrics search with editable title and artist, result preview,

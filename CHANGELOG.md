@@ -8,6 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Modal daily playback history opened from populated Dashboard calendar days,
+  including playback time, media type, title, artist, album, listened duration,
+  and total duration.
+- Daily-history links for playing local tracks and opening the corresponding
+  album or artist view.
+- Playback-history entries for podcast episodes and internet-radio sessions,
+  including media type, display metadata, external identifiers, duration, final
+  position, and completion state.
 - Podcast discovery through the regional Apple Podcasts catalog.
 - Persistent **My Podcasts** sidebar entries with removal through the context menu.
 - Complete RSS/Atom episode lists sorted from newest to oldest.
@@ -23,6 +31,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Dashboard calendar and top-genre durations now use `HH:mm:ss`.
+- Dashboard calendar genres and Top 10 genre labels now open Tracks with the
+  clicked genre filter preselected.
+- Dashboard calendar listening time now includes local tracks, podcasts, and
+  internet radio while music genre statistics remain track-only.
 - Internet-radio genre selections now run server-side Radio Browser queries
   instead of filtering only the first 100 loaded stations.
 - Multiple selected radio genres use OR semantics and can load up to 10,000

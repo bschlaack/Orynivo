@@ -48,6 +48,7 @@ artifact.
 - `Orynivo/Assets/Orynivo.ico`: multi-resolution application and window icon generated from `Logo/only_logo_300.png`
 - The process uses the explicit Windows AppUserModelID `Orynivo.AudioPlayer`; the startup window is excluded from the taskbar so the main window owns the taskbar identity
 - `Orynivo/CrashLogger.cs`: writes unhandled UI, AppDomain, and task exception reports to `%LOCALAPPDATA%\Orynivo\logs\`
+- `Orynivo/DailyHistoryDialog.*`: themed modal dashboard dialog that lists playback-history entries for a selected calendar day and returns track, album, or artist navigation actions to the main window
 - `Orynivo/SettingsStore.cs`: persists `%LOCALAPPDATA%\Orynivo\settings.json`
 - `Orynivo/Streaming/IStreamingCatalog.cs` and `IStreamingPlaybackProvider.cs`: provider-neutral contracts for future streaming catalog and playback integrations
 - `Orynivo/Streaming/QobuzStreamingProvider.cs`: inactive Qobuz scaffold; do not add unofficial endpoints, enable it only with approved partner API documentation
@@ -85,7 +86,7 @@ artifact.
 - `albums` contains stable album IDs (`id`, `title`, `artist_id`, `year`, `artwork_id`, `is_favorite`)
 - `artworks` deduplicates artwork by SHA-256 hash; originals and thumbnails live under `%LOCALAPPDATA%\Orynivo\artworks\` as `original`, `thumb_96`, and `thumb_320`
 - `favorites` is an older generic extension point; visible favorites use the direct flags
-- `play_history` records playback starts and endings, duration, final position, and completion state
+- `play_history` records local tracks, podcast episodes, and internet-radio sessions with media type, display title/subtitle, optional external ID, playback start/end, duration, final position, and completion state
 - `radio_stations` stores personal Radio Browser stations by stable station UUID, including stream URL, logo, country, codec, bitrate, and tags
 - `podcasts` stores pinned podcasts by Apple collection ID, including author, RSS feed URL, artwork URL, and genre
 - `podcast_episode_progress` stores resume position, known duration, completion state, and update time per pinned podcast episode; RSS GUID is the preferred episode key and the audio URL is the fallback
@@ -235,9 +236,13 @@ artifact.
 - Radio search results expose a multi-select genre popup derived from normalized Radio Browser tags. Selected genres use OR semantics, technical tags are excluded, and unavailable selections are removed after a new search.
 - The page contains:
   1. **Recently added albums**: horizontal artwork strip of up to 12 albums; selecting a card opens album tracks and supports Back navigation
-  2. **Calendar**: Monday-first month grid with day number, `HH:mm` playback time, top three genres, today highlight, and month navigation
-  3. **Top 10 genres**: descending proportional bars with `HH:mm` duration and `_genreColors`
+  2. **Calendar**: Monday-first month grid with day number, `HH:mm:ss` playback time, top three linked genres, today highlight, and month navigation
+  3. **Top 10 genres**: descending proportional bars with `HH:mm:ss` duration, linked genre labels, and `_genreColors`
+- Clicking a calendar day with playback opens a modal history table with playback time, media type, title, artist, album, listened duration, and total duration
+- Local-track title links in daily history open Tracks, select the title, and start playback; album and artist links open their existing drill-down views
 - Data comes from `GetRecentAlbums`, `GetCalendarData`, and `GetTopGenres`
+- Dashboard calendar playback time includes tracks, podcasts, and internet radio; top-genre statistics remain limited to local tracks because they require library genre metadata
+- Clicking a dashboard genre opens Tracks with only that genre facet selected; other track filters are cleared and the genre filter section is expanded
 - `RecentAlbumInfo` and `CalendarDayData` are records in `AudioDatabase.cs`
 - `_dashboardYear`, `_dashboardMonth`, `_calendarInner`, and `_genreColors` hold dashboard state
 - Month navigation rebuilds the dashboard so the section title changes
