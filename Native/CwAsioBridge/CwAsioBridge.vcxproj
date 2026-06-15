@@ -12,15 +12,13 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
-    <ProjectGuid>{0E34C595-0B68-4E07-B221-C742A893C2A8}</ProjectGuid>
+    <ProjectGuid>{9D7CB4D6-1562-4A14-8182-CCAA8F9162B7}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>AsioBridge</RootNamespace>
+    <RootNamespace>CwAsioBridge</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <PropertyGroup>
-    <AsioSdkDir Condition="'$(AsioSdkDir)'=='' and '$(ASIO_SDK_DIR)'!=''">$(ASIO_SDK_DIR)</AsioSdkDir>
-    <AsioSdkDir Condition="'$(AsioSdkDir)'=='' and Exists('$(MSBuildThisFileDirectory)..\..\third_party\asiosdk\common\asio.cpp')">$(MSBuildThisFileDirectory)..\..\third_party\asiosdk</AsioSdkDir>
-    <AsioSdkDir Condition="'$(AsioSdkDir)'=='' and Exists('$(MSBuildThisFileDirectory)..\..\external\asiosdk\common\asio.cpp')">$(MSBuildThisFileDirectory)..\..\external\asiosdk</AsioSdkDir>
+    <CwAsioDir>$(MSBuildThisFileDirectory)..\..\third_party\cwasio</CwAsioDir>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
@@ -40,24 +38,25 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>$(AsioSdkDir)\common;$(AsioSdkDir)\host;$(AsioSdkDir)\host\pc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>ORYNIVO_STEINBERG_ASIO=1;WINDOWS=1;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(CwAsioDir)\src;$(CwAsioDir)\src\asio;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>ORYNIVO_CWASIO=1;WINDOWS=1;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>ole32.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ole32.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="bridge.cpp" />
-    <ClCompile Include="$(AsioSdkDir)\common\asio.cpp" />
-    <ClCompile Include="$(AsioSdkDir)\host\asiodrivers.cpp" />
-    <ClCompile Include="$(AsioSdkDir)\host\pc\asiolist.cpp" />
+    <ClCompile Include="..\AsioBridge\bridge.cpp" />
+    <ClCompile Include="$(CwAsioDir)\src\cwASIO.c">
+      <CompileAs>CompileAsC</CompileAs>
+    </ClCompile>
+    <ClCompile Include="$(CwAsioDir)\src\asio\asio.c">
+      <CompileAs>CompileAsC</CompileAs>
+    </ClCompile>
   </ItemGroup>
-  <Target Name="ValidateAsioSdk" BeforeTargets="PrepareForBuild">
-    <Error Condition="'$(AsioSdkDir)'==''"
-           Text="AsioSdkDir is not set. Pass /p:AsioSdkDir=..., set ASIO_SDK_DIR, or place the SDK under third_party\asiosdk or external\asiosdk." />
-    <Error Condition="!Exists('$(AsioSdkDir)\common\asio.cpp')"
-           Text="The ASIO SDK was not found at '$(AsioSdkDir)'. Expected common\asio.cpp." />
+  <Target Name="ValidateCwAsio" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('$(CwAsioDir)\src\cwASIO.c')"
+           Text="Vendored cwASIO sources were not found under third_party\cwasio." />
   </Target>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

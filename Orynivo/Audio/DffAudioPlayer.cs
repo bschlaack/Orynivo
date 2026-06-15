@@ -32,19 +32,25 @@ public sealed class DffAudioPlayer : IAudioPlayer
 
     public static async Task<(DffAudioPlayer AudioPlayer, AudioFileInfo Info)> CreateAsync(
         string filePath,
+        OutputBackend backend,
         string driverName,
         CancellationToken cancellationToken = default)
     {
         var file = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
         try
         {
-            var header = await ReadHeaderAsync(file, cancellationToken).ConfigureAwait(false);
+            var header = await ReadHeaderAsync(file, cancellationToken);
             if (header.Channels != 2)
             {
                 throw new NotSupportedException("Native DFF-Wiedergabe unterstützt derzeit nur Stereo-Dateien.");
             }
 
-            var stream = new SteinbergAsioStream(driverName, header.FileInfo.OutputSampleRate, header.Channels, dsd: true);
+            var stream = new SteinbergAsioStream(
+                backend,
+                driverName,
+                header.FileInfo.OutputSampleRate,
+                header.Channels,
+                dsd: true);
             stream.Start();
             return (new DffAudioPlayer(stream, file, header.Channels, header.DataStartPosition, header.DataEndPosition, header.FileInfo), header.FileInfo);
         }

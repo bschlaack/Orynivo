@@ -36,6 +36,15 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore Orynivo/Orynivo.csproj
 
+      - name: Build cwASIO bridge
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $installation = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          $msbuild = Join-Path $installation.Trim() 'MSBuild\Current\Bin\amd64\MSBuild.exe'
+          & $msbuild Native/CwAsioBridge/CwAsioBridge.vcxproj /p:Configuration=${{ matrix.configuration }} /p:Platform=x64
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Build application
         run: >
           dotnet build Orynivo/Orynivo.csproj
@@ -43,6 +52,7 @@ jobs:
           --no-restore
           --warnaserror
           /p:IncludeAsioBridge=false
+          /p:IncludeCwAsioBridge=true
 
       - name: Publish Windows build
         if: matrix.configuration == 'Release'
@@ -53,6 +63,7 @@ jobs:
           --self-contained false
           --output artifacts/Orynivo-win-x64
           /p:IncludeAsioBridge=false
+          /p:IncludeCwAsioBridge=true
 
       - name: Upload Windows build
         if: matrix.configuration == 'Release'

@@ -63,6 +63,19 @@ public sealed record TrackLite(
 public sealed record RecentAlbumInfo(long Id, string Title, string Artist, string? ThumbPath);
 
 public sealed record CalendarDayData(int Day, double TotalSeconds, IReadOnlyList<string> TopGenres);
+public sealed record DailyHistoryEntry(
+    long Id,
+    long? TrackId,
+    string Path,
+    DateTime StartedAt,
+    double ListenedSeconds,
+    double? DurationSeconds,
+    string MediaType,
+    string Title,
+    string? Artist,
+    string? Album,
+    long? ArtistId,
+    long? AlbumId);
 public sealed record ArtistNormalizationResult(int MergedArtists, int UpdatedTracks);
 public sealed record ArtistRenameResult(long ArtistId, string ArtistName, bool Merged);
 
@@ -830,18 +843,33 @@ public sealed class AudioDatabase : IDisposable
         return value is null || value is DBNull ? null : Convert.ToInt64(value);
     }
 
-    public long RecordPlaybackStart(string path, long? trackId, double? durationSeconds)
+    public long RecordPlaybackStart(
+        string path,
+        long? trackId,
+        double? durationSeconds,
+        string mediaType = "track",
+        string? title = null,
+        string? subtitle = null,
+        string? externalId = null)
     {
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = """
-            INSERT INTO play_history (track_id, path, started_at, duration_seconds)
-            VALUES ($track_id, $path, $started_at, $duration_seconds)
+            INSERT INTO play_history (
+                track_id, path, started_at, duration_seconds,
+                media_type, title, subtitle, external_id)
+            VALUES (
+                $track_id, $path, $started_at, $duration_seconds,
+                $media_type, $title, $subtitle, $external_id)
             RETURNING id;
             """;
         Add(cmd, "$track_id", trackId);
         Add(cmd, "$path", path);
         Add(cmd, "$started_at", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
         Add(cmd, "$duration_seconds", durationSeconds);
+        Add(cmd, "$media_type", mediaType);
+        Add(cmd, "$title", title);
+        Add(cmd, "$subtitle", subtitle);
+        Add(cmd, "$external_id", externalId);
         return (long)cmd.ExecuteScalar()!;
     }
 
@@ -1497,7 +1525,11 @@ public sealed class AudioDatabase : IDisposable
                 ended_at         INTEGER,
                 duration_seconds REAL,
                 position_seconds REAL,
-                completed        INTEGER NOT NULL DEFAULT 0
+                completed        INTEGER NOT NULL DEFAULT 0,
+                media_type       TEXT NOT NULL DEFAULT 'track',
+                title            TEXT,
+                subtitle         TEXT,
+                external_id      TEXT
             );
 
             CREATE INDEX IF NOT EXISTS idx_albums_artist        ON albums (artist_id);
@@ -1523,6 +1555,10 @@ public sealed class AudioDatabase : IDisposable
         EnsureColumn("artworks", "original_path", "TEXT");
         EnsureColumn("artworks", "thumb_96_path", "TEXT");
         EnsureColumn("artworks", "thumb_320_path", "TEXT");
+        EnsureColumn("play_history", "media_type", "TEXT NOT NULL DEFAULT 'track'");
+        EnsureColumn("play_history", "title", "TEXT");
+        EnsureColumn("play_history", "subtitle", "TEXT");
+        EnsureColumn("play_history", "external_id", "TEXT");
 
         if (!string.Equals(GetMeta("normalized_library_v1"), "done", StringComparison.Ordinal))
         {
@@ -1584,6 +1620,30 @@ public sealed class AudioDatabase : IDisposable
 
             CREATE INDEX IF NOT EXISTS idx_radio_stations_name
                 ON radio_stations (name COLLATE NOCASE);
+
+            CREATE TABLE IF NOT EXISTS podcasts (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                collection_id  INTEGER NOT NULL UNIQUE,
+                name           TEXT NOT NULL,
+                author         TEXT,
+                feed_url       TEXT NOT NULL,
+                artwork_url    TEXT,
+                genre          TEXT,
+                created_at     INTEGER NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_podcasts_name
+                ON podcasts (name COLLATE NOCASE);
+
+            CREATE TABLE IF NOT EXISTS podcast_episode_progress (
+                podcast_id       INTEGER NOT NULL REFERENCES podcasts(id) ON DELETE CASCADE,
+                episode_key      TEXT NOT NULL,
+                position_seconds REAL NOT NULL DEFAULT 0,
+                duration_seconds REAL,
+                is_completed     INTEGER NOT NULL DEFAULT 0,
+                updated_at       INTEGER NOT NULL,
+                PRIMARY KEY (podcast_id, episode_key)
+            );
             """);
         EnsureColumn("playlists", "is_smart",        "INTEGER NOT NULL DEFAULT 0");
         EnsureColumn("playlists", "filter_criteria",  "TEXT");
@@ -1678,6 +1738,157 @@ public sealed class AudioDatabase : IDisposable
             reader.IsDBNull(7) ? null : reader.GetString(7),
             reader.GetInt32(8),
             reader.IsDBNull(9) ? null : reader.GetString(9));
+
+    // ------------------------------------------------------------------
+    // Podcasts
+    // ------------------------------------------------------------------
+
+    public long SavePodcast(PodcastSearchResult podcast)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO podcasts (
+                collection_id, name, author, feed_url, artwork_url, genre, created_at)
+            VALUES (
+                $collectionId, $name, $author, $feedUrl, $artworkUrl, $genre, $created)
+            ON CONFLICT(collection_id) DO UPDATE SET
+                name = excluded.name,
+                author = excluded.author,
+                feed_url = excluded.feed_url,
+                artwork_url = excluded.artwork_url,
+                genre = excluded.genre
+            RETURNING id;
+            """;
+        Add(cmd, "$collectionId", podcast.CollectionId);
+        Add(cmd, "$name", podcast.Name);
+        Add(cmd, "$author", podcast.Author);
+        Add(cmd, "$feedUrl", podcast.FeedUrl);
+        Add(cmd, "$artworkUrl", podcast.ArtworkUrl);
+        Add(cmd, "$genre", podcast.Genre);
+        Add(cmd, "$created", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        return (long)cmd.ExecuteScalar()!;
+    }
+
+    public List<PodcastRecord> GetPodcasts()
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, collection_id, name, author, feed_url, artwork_url, genre
+            FROM podcasts
+            ORDER BY name COLLATE NOCASE;
+            """;
+        using var reader = cmd.ExecuteReader();
+        var result = new List<PodcastRecord>();
+        while (reader.Read())
+            result.Add(MapPodcast(reader));
+        return result;
+    }
+
+    public PodcastRecord? GetPodcast(long id)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, collection_id, name, author, feed_url, artwork_url, genre
+            FROM podcasts
+            WHERE id = $id
+            LIMIT 1;
+            """;
+        Add(cmd, "$id", id);
+        using var reader = cmd.ExecuteReader();
+        return reader.Read() ? MapPodcast(reader) : null;
+    }
+
+    public void DeletePodcast(long id)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = "DELETE FROM podcasts WHERE id = $id;";
+        Add(cmd, "$id", id);
+        cmd.ExecuteNonQuery();
+    }
+
+    private static PodcastRecord MapPodcast(SqliteDataReader reader) =>
+        new(
+            reader.GetInt64(0),
+            reader.GetInt64(1),
+            reader.GetString(2),
+            reader.IsDBNull(3) ? null : reader.GetString(3),
+            reader.GetString(4),
+            reader.IsDBNull(5) ? null : reader.GetString(5),
+            reader.IsDBNull(6) ? null : reader.GetString(6));
+
+    public Dictionary<string, PodcastEpisodeProgress> GetPodcastEpisodeProgress(long podcastId)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT episode_key, position_seconds, duration_seconds, is_completed
+            FROM podcast_episode_progress
+            WHERE podcast_id = $podcastId;
+            """;
+        Add(cmd, "$podcastId", podcastId);
+        using var reader = cmd.ExecuteReader();
+        var result = new Dictionary<string, PodcastEpisodeProgress>(StringComparer.Ordinal);
+        while (reader.Read())
+        {
+            var progress = new PodcastEpisodeProgress(
+                reader.GetString(0),
+                reader.GetDouble(1),
+                reader.IsDBNull(2) ? null : reader.GetDouble(2),
+                reader.GetInt32(3) != 0);
+            result[progress.EpisodeKey] = progress;
+        }
+        return result;
+    }
+
+    public PodcastEpisodeProgress? GetPodcastEpisodeProgress(long podcastId, string episodeKey)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT episode_key, position_seconds, duration_seconds, is_completed
+            FROM podcast_episode_progress
+            WHERE podcast_id = $podcastId AND episode_key = $episodeKey
+            LIMIT 1;
+            """;
+        Add(cmd, "$podcastId", podcastId);
+        Add(cmd, "$episodeKey", episodeKey);
+        using var reader = cmd.ExecuteReader();
+        return reader.Read()
+            ? new PodcastEpisodeProgress(
+                reader.GetString(0),
+                reader.GetDouble(1),
+                reader.IsDBNull(2) ? null : reader.GetDouble(2),
+                reader.GetInt32(3) != 0)
+            : null;
+    }
+
+    public void SavePodcastEpisodeProgress(
+        long podcastId,
+        string episodeKey,
+        double positionSeconds,
+        double? durationSeconds,
+        bool isCompleted)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO podcast_episode_progress (
+                podcast_id, episode_key, position_seconds, duration_seconds,
+                is_completed, updated_at)
+            VALUES (
+                $podcastId, $episodeKey, $position, $duration,
+                $completed, $updated)
+            ON CONFLICT(podcast_id, episode_key) DO UPDATE SET
+                position_seconds = excluded.position_seconds,
+                duration_seconds = excluded.duration_seconds,
+                is_completed = excluded.is_completed,
+                updated_at = excluded.updated_at;
+            """;
+        Add(cmd, "$podcastId", podcastId);
+        Add(cmd, "$episodeKey", episodeKey);
+        Add(cmd, "$position", Math.Max(0, positionSeconds));
+        Add(cmd, "$duration", durationSeconds);
+        Add(cmd, "$completed", isCompleted ? 1 : 0);
+        Add(cmd, "$updated", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        cmd.ExecuteNonQuery();
+    }
 
     // ------------------------------------------------------------------
     // Playlisten – CRUD
@@ -2439,6 +2650,62 @@ public sealed class AudioDatabase : IDisposable
             })
             .OrderBy(x => x.Day)
             .ToList();
+    }
+
+    public List<DailyHistoryEntry> GetHistoryForDay(DateTime date)
+    {
+        var localDate = DateTime.SpecifyKind(date.Date, DateTimeKind.Unspecified);
+        var nextLocalDate = localDate.AddDays(1);
+        var start = new DateTimeOffset(localDate, TimeZoneInfo.Local.GetUtcOffset(localDate))
+            .ToUnixTimeSeconds();
+        var end = new DateTimeOffset(nextLocalDate, TimeZoneInfo.Local.GetUtcOffset(nextLocalDate))
+            .ToUnixTimeSeconds();
+
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT ph.id,
+                   ph.track_id,
+                   ph.path,
+                   ph.started_at,
+                   COALESCE(ph.position_seconds, 0),
+                   ph.duration_seconds,
+                   ph.media_type,
+                   COALESCE(t.title, ph.title, t.file_name, ph.path),
+                   COALESCE(ar.name, t.artist, ph.subtitle),
+                   COALESCE(a.title, t.album),
+                   t.artist_id,
+                   t.album_id
+            FROM play_history ph
+            LEFT JOIN tracks t ON t.id = ph.track_id
+            LEFT JOIN artists ar ON ar.id = t.artist_id
+            LEFT JOIN albums a ON a.id = t.album_id
+            WHERE ph.started_at >= $start
+              AND ph.started_at < $end
+              AND COALESCE(ph.position_seconds, 0) > 0
+            ORDER BY ph.started_at DESC, ph.id DESC;
+            """;
+        cmd.Parameters.AddWithValue("$start", start);
+        cmd.Parameters.AddWithValue("$end", end);
+
+        using var r = cmd.ExecuteReader();
+        var result = new List<DailyHistoryEntry>();
+        while (r.Read())
+        {
+            result.Add(new DailyHistoryEntry(
+                r.GetInt64(0),
+                r.IsDBNull(1) ? null : r.GetInt64(1),
+                r.GetString(2),
+                DateTimeOffset.FromUnixTimeSeconds(r.GetInt64(3)).LocalDateTime,
+                r.GetDouble(4),
+                r.IsDBNull(5) ? null : r.GetDouble(5),
+                r.GetString(6),
+                r.GetString(7),
+                r.IsDBNull(8) ? null : r.GetString(8),
+                r.IsDBNull(9) ? null : r.GetString(9),
+                r.IsDBNull(10) ? null : r.GetInt64(10),
+                r.IsDBNull(11) ? null : r.GetInt64(11)));
+        }
+        return result;
     }
 
     public List<(string Genre, double Seconds)> GetTopGenres(int limit = 10)

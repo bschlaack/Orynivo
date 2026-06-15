@@ -47,6 +47,8 @@ public static class LocalizationManager
         resources["L_Bitrate"] = Current.Bitrate;
         resources["L_Title"] = Current.Title;
         resources["L_Artist"] = Current.Artist;
+        resources["L_Album"] = Current.Album;
+        resources["L_Duration"] = Current.Duration;
         resources["L_NoDeviceSelected"] = Current.NoDeviceSelected;
         resources["L_Table"] = Current.Table;
         resources["L_Artwork"] = Current.Artwork;
@@ -104,6 +106,7 @@ public static class LocalizationManager
         resources["L_ShowAllAlbumTracks"] = Current.ShowAllAlbumTracks;
         resources["L_OutputType"] = Current.OutputType;
         resources["L_AsioOutputDevice"] = Current.AsioOutputDevice;
+        resources["L_CwAsioOutputDevice"] = Current.CwAsioOutputDevice;
         resources["L_DeviceInfo"] = Current.DeviceInfo;
         resources["L_DatabaseOptimizeHint"] = Current.DatabaseOptimizeHint;
         resources["L_NormalizeArtists"] = Current.NormalizeArtists;
@@ -155,6 +158,43 @@ public static class LocalizationManager
         resources["L_RadioNowPlaying"] = Current.RadioNowPlaying;
         resources["L_RadioGenres"] = Current.RadioGenres;
         resources["L_ClearFilter"] = Current.ClearFilter;
+        resources["L_Podcasts"] = Current.Podcasts;
+        resources["L_MyPodcasts"] = Current.MyPodcasts;
+        resources["L_SidebarSections"] = Current.SidebarSections;
+        resources["L_SidebarSectionsHint"] = Current.SidebarSectionsHint;
+        resources["L_PlexServers"] = Current.PlexServers;
+        resources["L_PlexServersHint"] = Current.PlexServersHint;
+        resources["L_AddPlexServer"] = Current.AddPlexServer;
+        resources["L_PlexServerDialogTitle"] = Current.PlexServerDialogTitle;
+        resources["L_PlexServerName"] = Current.PlexServerName;
+        resources["L_PlexServerUrl"] = Current.PlexServerUrl;
+        resources["L_PlexToken"] = Current.PlexToken;
+        resources["L_PlexTestConnection"] = Current.PlexTestConnection;
+        resources["L_LoadMore"] = Current.LoadMore;
+        resources["L_PodcastInfo"] = Current.PodcastInfo;
+        resources["L_ClosePodcastInfo"] = Current.ClosePodcastInfo;
+        resources["L_PodcastDirectory"] = Current.PodcastDirectory;
+        resources["L_PodcastDirectoryHint"] = Current.PodcastDirectoryHint;
+        resources["L_PodcastSearch"] = Current.PodcastSearch;
+        resources["L_Podcast"] = Current.Podcast;
+        resources["L_PodcastAuthor"] = Current.PodcastAuthor;
+        resources["L_PlayLatestEpisode"] = Current.PlayLatestEpisode;
+        resources["L_AddToMyPodcasts"] = Current.AddToMyPodcasts;
+        resources["L_DeletePodcast"] = Current.DeletePodcast;
+        resources["L_ShowEpisodes"] = Current.ShowEpisodes;
+        resources["L_Published"] = Current.Published;
+        resources["L_Progress"] = Current.Progress;
+        resources["L_PodcastStatus"] = Current.PodcastStatus;
+        resources["L_PodcastCategories"] = Current.PodcastCategories;
+        resources["L_PodcastLanguages"] = Current.PodcastLanguages;
+        resources["L_PodcastLanguage"] = Current.PodcastLanguage;
+        resources["L_PodcastOverview"] = Current.PodcastOverview;
+        resources["L_DailyHistoryTitle"] = Current.DailyHistoryTitle;
+        resources["L_PlayedAt"] = Current.PlayedAt;
+        resources["L_ListenedDuration"] = Current.ListenedDuration;
+        resources["L_MediaType"] = Current.MediaType;
+        resources["L_Close"] = Current.Close;
+        resources["L_DailyHistoryNoEntries"] = Current.DailyHistoryNoEntries;
     }
 
     private static readonly LocalizedStrings German = new(
@@ -219,6 +259,9 @@ public static class LocalizationManager
     {
         OutputType = "Ausgabeart",
         AsioOutputDevice = "ASIO-Ausgabegerät",
+        CwAsioOutputDevice = "cwASIO-Ausgabegerät",
+        SteinbergAsio = "Steinberg ASIO",
+        CwAsio = "cwASIO",
         WasapiOutputDevice = "WASAPI-Ausgabegerät",
         DeviceInfo = "Geräteinfo",
         DatabaseOptimizeHint = "Freigegebene Seiten werden entfernt; danach ist die Datei physisch kleiner.",
@@ -299,6 +342,14 @@ public static class LocalizationManager
         , SynchronizedLyrics = "Synchronisiert"
         , InternetRadio = "Internet Radio"
         , OwnRadios = "EIGENE RADIOS"
+        , SidebarSections = "Sidebar-Bereiche"
+        , SidebarSectionsHint = "Legt fest, welche aufklappbaren Bereiche in der Hauptnavigation angezeigt werden."
+        , PodcastInfo = "Podcast-Informationen"
+        , ShowPodcastInfo = "Podcast-Informationen anzeigen"
+        , ClosePodcastInfo = "Podcast-Informationen schließen"
+        , PodcastPublishedOn = "Veröffentlicht am {0}"
+        , PodcastEpisodeDuration = "Laufzeit {0}"
+        , PodcastDescriptionUnavailable = "Für diese Folge ist keine Zusammenfassung verfügbar."
         , RadioDirectory = "Sender entdecken"
         , RadioDirectoryHint = "Durchsuche das freie Radio-Browser-Verzeichnis und füge Sender dauerhaft zu deinen eigenen Radios hinzu."
         , RadioSearch = "Sender suchen"
@@ -316,6 +367,64 @@ public static class LocalizationManager
         , RadioMetadataUnavailable = "Der Sender stellt aktuell keine Titelinformationen bereit."
         , RadioGenres = "Genres"
         , ClearFilter = "Filter löschen"
+        , Podcasts = "Podcasts"
+        , MyPodcasts = "MEINE PODCASTS"
+        , PodcastDirectory = "Podcasts entdecken"
+        , PodcastDirectoryHint = "Durchsuche das Apple-Podcast-Verzeichnis, pinne Podcasts dauerhaft an und spiele die neueste Episode aus dem RSS-Feed ab."
+        , PodcastSearch = "Podcasts suchen"
+        , Podcast = "Podcast"
+        , PodcastAuthor = "Autor"
+        , PlayLatestEpisode = "Neueste abspielen"
+        , AddToMyPodcasts = "Zu meinen Podcasts"
+        , DeletePodcast = "Podcast löschen"
+        , PodcastLoading = "Podcasts werden geladen …"
+        , PodcastNoResults = "Keine passenden Podcasts gefunden."
+        , PodcastAdded = "Podcast „{0}“ wurde hinzugefügt."
+        , PodcastDeleted = "Podcast „{0}“ wurde gelöscht."
+        , PodcastSearchFailed = "Podcasts konnten nicht geladen werden."
+        , PodcastFeedFailed = "Im Podcast-Feed wurde keine abspielbare Episode gefunden."
+        , ShowEpisodes = "Folgen anzeigen"
+        , Published = "Veröffentlicht"
+        , Progress = "Fortschritt"
+        , PodcastStatus = "Status"
+        , PodcastUnplayed = "Neu"
+        , PodcastInProgress = "Begonnen"
+        , PodcastPlayed = "Gehört"
+        , PodcastEpisodesLoading = "Podcast-Folgen werden geladen …"
+        , PodcastNoEpisodes = "In diesem Feed wurden keine abspielbaren Folgen gefunden."
+        , PodcastCategories = "Kategorien"
+        , PodcastLanguages = "Sprachen"
+        , PodcastLanguage = "Sprache"
+        , PodcastLanguagesLoading = "Podcast-Sprachen werden aus den Feeds ermittelt …"
+        , PodcastOverview = "PODCAST-ÜBERSICHT"
+        , PodcastEpisodeTotal = "{0:N0} Folgen insgesamt"
+        , PodcastEpisodeUnheard = "{0:N0} noch nicht gehört"
+        , PodcastEpisodeStarted = "{0:N0} begonnen"
+        , PodcastLatestEpisode = "Neueste Folge: {0}"
+        , DailyHistoryTitle = "Hörverlauf – {0}"
+        , PlayedAt = "Gehört um"
+        , ListenedDuration = "Gehört"
+        , MediaType = "Typ"
+        , Close = "Schließen"
+        , DailyHistoryNoEntries = "Für diesen Tag sind keine Wiedergaben vorhanden."
+        , PlexServers = "PLEX-SERVER"
+        , PlexServersHint = "Richte einen oder mehrere Plex Media Server ein. Zugriffstokens werden geschützt für das aktuelle Windows-Benutzerkonto gespeichert."
+        , AddPlexServer = "Plex-Server hinzufügen"
+        , PlexServerDialogTitle = "Plex-Server"
+        , PlexServerName = "Anzeigename"
+        , PlexServerUrl = "Server-URL"
+        , PlexToken = "X-Plex-Token (optional)"
+        , PlexTestConnection = "Verbindung testen"
+        , PlexTestingConnection = "Verbindung wird geprüft …"
+        , PlexConnectionSuccessful = "Verbindung erfolgreich. {0:N0} Audio-Bibliotheken gefunden."
+        , PlexConnectionFailed = "Verbindung fehlgeschlagen: {0}"
+        , PlexServerFieldsRequired = "Name und Server-URL sind erforderlich."
+        , PlexServerUrlInvalid = "Bitte eine gültige HTTP- oder HTTPS-URL eingeben."
+        , PlexEditServer = "Bearbeiten"
+        , PlexRemoveServer = "Entfernen"
+        , PlexNoAudioLibraries = "Keine Audio-Bibliotheken gefunden."
+        , PlexLoading = "Plex-Inhalte werden geladen …"
+        , LoadMore = "Mehr laden"
     };
 
     private static readonly LocalizedStrings English = new(
@@ -379,6 +488,7 @@ public static class LocalizationManager
         "An unexpected error occurred. The crash report could not be saved. Orynivo will now close.")
     {
         OutputType = "Output type", AsioOutputDevice = "ASIO output device", WasapiOutputDevice = "WASAPI output device",
+        CwAsioOutputDevice = "cwASIO output device", SteinbergAsio = "Steinberg ASIO", CwAsio = "cwASIO",
         DeviceInfo = "Device information", DatabaseOptimizeHint = "Released pages are removed so the file becomes physically smaller.",
         AsioBridgeMissing = "This build does not include ASIO support. Please use WASAPI.",
         KernelStreamingUnavailable = "Kernel Streaming can be selected but is not implemented as a playback backend yet.",
@@ -446,6 +556,14 @@ public static class LocalizationManager
         , SynchronizedLyrics = "Synchronized"
         , InternetRadio = "Internet Radio"
         , OwnRadios = "MY RADIOS"
+        , SidebarSections = "Sidebar sections"
+        , SidebarSectionsHint = "Choose which collapsible sections are shown in the main navigation."
+        , PodcastInfo = "Podcast information"
+        , ShowPodcastInfo = "Show podcast information"
+        , ClosePodcastInfo = "Close podcast information"
+        , PodcastPublishedOn = "Published on {0}"
+        , PodcastEpisodeDuration = "Duration {0}"
+        , PodcastDescriptionUnavailable = "No summary is available for this episode."
         , RadioDirectory = "Discover stations"
         , RadioDirectoryHint = "Search the free Radio Browser directory and permanently add stations to your own radios."
         , RadioSearch = "Search stations"
@@ -463,6 +581,64 @@ public static class LocalizationManager
         , RadioMetadataUnavailable = "The station is not currently providing track information."
         , RadioGenres = "Genres"
         , ClearFilter = "Clear filter"
+        , Podcasts = "Podcasts"
+        , MyPodcasts = "MY PODCASTS"
+        , PodcastDirectory = "Discover podcasts"
+        , PodcastDirectoryHint = "Search the Apple Podcasts directory, pin podcasts permanently, and play the latest episode from the RSS feed."
+        , PodcastSearch = "Search podcasts"
+        , Podcast = "Podcast"
+        , PodcastAuthor = "Author"
+        , PlayLatestEpisode = "Play latest"
+        , AddToMyPodcasts = "Add to my podcasts"
+        , DeletePodcast = "Delete podcast"
+        , PodcastLoading = "Loading podcasts …"
+        , PodcastNoResults = "No matching podcasts found."
+        , PodcastAdded = "Podcast “{0}” was added."
+        , PodcastDeleted = "Podcast “{0}” was deleted."
+        , PodcastSearchFailed = "Podcasts could not be loaded."
+        , PodcastFeedFailed = "No playable episode was found in the podcast feed."
+        , ShowEpisodes = "Show episodes"
+        , Published = "Published"
+        , Progress = "Progress"
+        , PodcastStatus = "Status"
+        , PodcastUnplayed = "New"
+        , PodcastInProgress = "Started"
+        , PodcastPlayed = "Played"
+        , PodcastEpisodesLoading = "Loading podcast episodes …"
+        , PodcastNoEpisodes = "No playable episodes were found in this feed."
+        , PodcastCategories = "Categories"
+        , PodcastLanguages = "Languages"
+        , PodcastLanguage = "Language"
+        , PodcastLanguagesLoading = "Detecting podcast languages from the feeds …"
+        , PodcastOverview = "PODCAST OVERVIEW"
+        , PodcastEpisodeTotal = "{0:N0} episodes total"
+        , PodcastEpisodeUnheard = "{0:N0} not yet played"
+        , PodcastEpisodeStarted = "{0:N0} started"
+        , PodcastLatestEpisode = "Latest episode: {0}"
+        , DailyHistoryTitle = "Listening history – {0}"
+        , PlayedAt = "Played at"
+        , ListenedDuration = "Listened"
+        , MediaType = "Type"
+        , Close = "Close"
+        , DailyHistoryNoEntries = "There are no playback entries for this day."
+        , PlexServers = "PLEX SERVERS"
+        , PlexServersHint = "Configure one or more Plex Media Servers. Access tokens are protected for the current Windows user account."
+        , AddPlexServer = "Add Plex server"
+        , PlexServerDialogTitle = "Plex server"
+        , PlexServerName = "Display name"
+        , PlexServerUrl = "Server URL"
+        , PlexToken = "X-Plex-Token (optional)"
+        , PlexTestConnection = "Test connection"
+        , PlexTestingConnection = "Testing connection…"
+        , PlexConnectionSuccessful = "Connection successful. Found {0:N0} audio libraries."
+        , PlexConnectionFailed = "Connection failed: {0}"
+        , PlexServerFieldsRequired = "Name and server URL are required."
+        , PlexServerUrlInvalid = "Enter a valid HTTP or HTTPS URL."
+        , PlexEditServer = "Edit"
+        , PlexRemoveServer = "Remove"
+        , PlexNoAudioLibraries = "No audio libraries found."
+        , PlexLoading = "Loading Plex content…"
+        , LoadMore = "Load more"
     };
 
     private static readonly LocalizedStrings French = new(
@@ -529,6 +705,7 @@ public static class LocalizationManager
         "Une erreur inattendue s’est produite. Le rapport n’a pas pu être enregistré. Orynivo va maintenant se fermer.")
     {
         OutputType = "Type de sortie", AsioOutputDevice = "Périphérique de sortie ASIO", WasapiOutputDevice = "Périphérique de sortie WASAPI",
+        CwAsioOutputDevice = "Périphérique de sortie cwASIO", SteinbergAsio = "Steinberg ASIO", CwAsio = "cwASIO",
         DeviceInfo = "Informations sur le périphérique", DatabaseOptimizeHint = "Les pages libérées sont supprimées afin de réduire physiquement le fichier.",
         AsioBridgeMissing = "Cette version ne comprend pas la prise en charge ASIO. Utilisez WASAPI.",
         KernelStreamingUnavailable = "Kernel Streaming peut être sélectionné, mais ce mode de lecture n’est pas encore implémenté.",
@@ -596,6 +773,14 @@ public static class LocalizationManager
         , SynchronizedLyrics = "Synchronisées"
         , InternetRadio = "Radio Internet"
         , OwnRadios = "MES RADIOS"
+        , SidebarSections = "Sections de la barre latérale"
+        , SidebarSectionsHint = "Choisissez les sections repliables affichées dans la navigation principale."
+        , PodcastInfo = "Informations sur le podcast"
+        , ShowPodcastInfo = "Afficher les informations du podcast"
+        , ClosePodcastInfo = "Fermer les informations du podcast"
+        , PodcastPublishedOn = "Publié le {0}"
+        , PodcastEpisodeDuration = "Durée {0}"
+        , PodcastDescriptionUnavailable = "Aucun résumé n’est disponible pour cet épisode."
         , RadioDirectory = "Découvrir des stations"
         , RadioDirectoryHint = "Recherchez dans l’annuaire libre Radio Browser et ajoutez durablement des stations à vos radios."
         , RadioSearch = "Rechercher des stations"
@@ -613,6 +798,64 @@ public static class LocalizationManager
         , RadioMetadataUnavailable = "La station ne fournit actuellement aucune information sur le titre."
         , RadioGenres = "Genres"
         , ClearFilter = "Effacer le filtre"
+        , Podcasts = "Podcasts"
+        , MyPodcasts = "MES PODCASTS"
+        , PodcastDirectory = "Découvrir des podcasts"
+        , PodcastDirectoryHint = "Recherchez dans l’annuaire Apple Podcasts, épinglez durablement des podcasts et écoutez le dernier épisode du flux RSS."
+        , PodcastSearch = "Rechercher des podcasts"
+        , Podcast = "Podcast"
+        , PodcastAuthor = "Auteur"
+        , PlayLatestEpisode = "Écouter le dernier"
+        , AddToMyPodcasts = "Ajouter à mes podcasts"
+        , DeletePodcast = "Supprimer le podcast"
+        , PodcastLoading = "Chargement des podcasts …"
+        , PodcastNoResults = "Aucun podcast correspondant trouvé."
+        , PodcastAdded = "Le podcast « {0} » a été ajouté."
+        , PodcastDeleted = "Le podcast « {0} » a été supprimé."
+        , PodcastSearchFailed = "Impossible de charger les podcasts."
+        , PodcastFeedFailed = "Aucun épisode lisible n’a été trouvé dans le flux du podcast."
+        , ShowEpisodes = "Afficher les épisodes"
+        , Published = "Publié"
+        , Progress = "Progression"
+        , PodcastStatus = "Statut"
+        , PodcastUnplayed = "Nouveau"
+        , PodcastInProgress = "Commencé"
+        , PodcastPlayed = "Écouté"
+        , PodcastEpisodesLoading = "Chargement des épisodes …"
+        , PodcastNoEpisodes = "Aucun épisode lisible n’a été trouvé dans ce flux."
+        , PodcastCategories = "Catégories"
+        , PodcastLanguages = "Langues"
+        , PodcastLanguage = "Langue"
+        , PodcastLanguagesLoading = "Détection des langues depuis les flux …"
+        , PodcastOverview = "APERÇU DU PODCAST"
+        , PodcastEpisodeTotal = "{0:N0} épisodes au total"
+        , PodcastEpisodeUnheard = "{0:N0} non écoutés"
+        , PodcastEpisodeStarted = "{0:N0} commencés"
+        , PodcastLatestEpisode = "Dernier épisode : {0}"
+        , DailyHistoryTitle = "Historique d’écoute – {0}"
+        , PlayedAt = "Écouté à"
+        , ListenedDuration = "Durée écoutée"
+        , MediaType = "Type"
+        , Close = "Fermer"
+        , DailyHistoryNoEntries = "Aucune lecture n’est enregistrée pour ce jour."
+        , PlexServers = "SERVEURS PLEX"
+        , PlexServersHint = "Configurez un ou plusieurs serveurs Plex Media Server. Les jetons d’accès sont protégés pour le compte Windows actuel."
+        , AddPlexServer = "Ajouter un serveur Plex"
+        , PlexServerDialogTitle = "Serveur Plex"
+        , PlexServerName = "Nom affiché"
+        , PlexServerUrl = "URL du serveur"
+        , PlexToken = "X-Plex-Token (facultatif)"
+        , PlexTestConnection = "Tester la connexion"
+        , PlexTestingConnection = "Test de la connexion…"
+        , PlexConnectionSuccessful = "Connexion réussie. {0:N0} bibliothèques audio trouvées."
+        , PlexConnectionFailed = "Échec de la connexion : {0}"
+        , PlexServerFieldsRequired = "Le nom et l’URL du serveur sont obligatoires."
+        , PlexServerUrlInvalid = "Saisissez une URL HTTP ou HTTPS valide."
+        , PlexEditServer = "Modifier"
+        , PlexRemoveServer = "Supprimer"
+        , PlexNoAudioLibraries = "Aucune bibliothèque audio trouvée."
+        , PlexLoading = "Chargement du contenu Plex…"
+        , LoadMore = "Charger plus"
     };
 
     private static readonly LocalizedStrings Spanish = new(
@@ -676,6 +919,7 @@ public static class LocalizationManager
         "Se produjo un error inesperado. No se pudo guardar el informe. Orynivo se cerrará ahora.")
     {
         OutputType = "Tipo de salida", AsioOutputDevice = "Dispositivo de salida ASIO", WasapiOutputDevice = "Dispositivo de salida WASAPI",
+        CwAsioOutputDevice = "Dispositivo de salida cwASIO", SteinbergAsio = "Steinberg ASIO", CwAsio = "cwASIO",
         DeviceInfo = "Información del dispositivo", DatabaseOptimizeHint = "Las páginas liberadas se eliminan para reducir físicamente el archivo.",
         AsioBridgeMissing = "Esta compilación no incluye compatibilidad con ASIO. Utiliza WASAPI.",
         KernelStreamingUnavailable = "Kernel Streaming se puede seleccionar, pero todavía no está implementado como backend de reproducción.",
@@ -743,6 +987,14 @@ public static class LocalizationManager
         , SynchronizedLyrics = "Sincronizada"
         , InternetRadio = "Radio por Internet"
         , OwnRadios = "MIS RADIOS"
+        , SidebarSections = "Secciones de la barra lateral"
+        , SidebarSectionsHint = "Elige qué secciones desplegables se muestran en la navegación principal."
+        , PodcastInfo = "Información del podcast"
+        , ShowPodcastInfo = "Mostrar información del podcast"
+        , ClosePodcastInfo = "Cerrar información del podcast"
+        , PodcastPublishedOn = "Publicado el {0}"
+        , PodcastEpisodeDuration = "Duración {0}"
+        , PodcastDescriptionUnavailable = "No hay ningún resumen disponible para este episodio."
         , RadioDirectory = "Descubrir emisoras"
         , RadioDirectoryHint = "Busca en el directorio libre Radio Browser y añade emisoras permanentemente a tus radios."
         , RadioSearch = "Buscar emisoras"
@@ -760,6 +1012,64 @@ public static class LocalizationManager
         , RadioMetadataUnavailable = "La emisora no proporciona información de la pista en este momento."
         , RadioGenres = "Géneros"
         , ClearFilter = "Borrar filtro"
+        , Podcasts = "Podcasts"
+        , MyPodcasts = "MIS PODCASTS"
+        , PodcastDirectory = "Descubrir podcasts"
+        , PodcastDirectoryHint = "Busca en el directorio de Apple Podcasts, fija podcasts de forma permanente y reproduce el episodio más reciente del canal RSS."
+        , PodcastSearch = "Buscar podcasts"
+        , Podcast = "Podcast"
+        , PodcastAuthor = "Autor"
+        , PlayLatestEpisode = "Reproducir el último"
+        , AddToMyPodcasts = "Añadir a mis podcasts"
+        , DeletePodcast = "Eliminar podcast"
+        , PodcastLoading = "Cargando podcasts …"
+        , PodcastNoResults = "No se encontraron podcasts coincidentes."
+        , PodcastAdded = "Se añadió el podcast «{0}»."
+        , PodcastDeleted = "Se eliminó el podcast «{0}»."
+        , PodcastSearchFailed = "No se pudieron cargar los podcasts."
+        , PodcastFeedFailed = "No se encontró ningún episodio reproducible en el canal del podcast."
+        , ShowEpisodes = "Mostrar episodios"
+        , Published = "Publicado"
+        , Progress = "Progreso"
+        , PodcastStatus = "Estado"
+        , PodcastUnplayed = "Nuevo"
+        , PodcastInProgress = "Empezado"
+        , PodcastPlayed = "Escuchado"
+        , PodcastEpisodesLoading = "Cargando episodios del podcast …"
+        , PodcastNoEpisodes = "No se encontraron episodios reproducibles en este canal."
+        , PodcastCategories = "Categorías"
+        , PodcastLanguages = "Idiomas"
+        , PodcastLanguage = "Idioma"
+        , PodcastLanguagesLoading = "Detectando los idiomas desde los canales …"
+        , PodcastOverview = "RESUMEN DEL PODCAST"
+        , PodcastEpisodeTotal = "{0:N0} episodios en total"
+        , PodcastEpisodeUnheard = "{0:N0} sin escuchar"
+        , PodcastEpisodeStarted = "{0:N0} empezados"
+        , PodcastLatestEpisode = "Último episodio: {0}"
+        , DailyHistoryTitle = "Historial de escucha – {0}"
+        , PlayedAt = "Escuchado a las"
+        , ListenedDuration = "Tiempo escuchado"
+        , MediaType = "Tipo"
+        , Close = "Cerrar"
+        , DailyHistoryNoEntries = "No hay reproducciones registradas para este día."
+        , PlexServers = "SERVIDORES PLEX"
+        , PlexServersHint = "Configura uno o varios Plex Media Server. Los tokens de acceso se protegen para la cuenta actual de Windows."
+        , AddPlexServer = "Añadir servidor Plex"
+        , PlexServerDialogTitle = "Servidor Plex"
+        , PlexServerName = "Nombre para mostrar"
+        , PlexServerUrl = "URL del servidor"
+        , PlexToken = "X-Plex-Token (opcional)"
+        , PlexTestConnection = "Probar conexión"
+        , PlexTestingConnection = "Probando la conexión…"
+        , PlexConnectionSuccessful = "Conexión correcta. Se encontraron {0:N0} bibliotecas de audio."
+        , PlexConnectionFailed = "Error de conexión: {0}"
+        , PlexServerFieldsRequired = "El nombre y la URL del servidor son obligatorios."
+        , PlexServerUrlInvalid = "Introduce una URL HTTP o HTTPS válida."
+        , PlexEditServer = "Editar"
+        , PlexRemoveServer = "Eliminar"
+        , PlexNoAudioLibraries = "No se encontraron bibliotecas de audio."
+        , PlexLoading = "Cargando contenido de Plex…"
+        , LoadMore = "Cargar más"
     };
 
     public static LocalizedStrings Current { get; private set; } = German;

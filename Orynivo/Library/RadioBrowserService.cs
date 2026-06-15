@@ -16,6 +16,8 @@ public sealed record RadioBrowserStation(
     int Bitrate,
     string? Tags);
 
+public sealed record RadioBrowserTag(string Name, int StationCount);
+
 public sealed class RadioBrowserService
 {
     private static readonly HttpClient HttpClient = CreateHttpClient();
@@ -23,23 +25,33 @@ public sealed class RadioBrowserService
 
     public async Task<IReadOnlyList<RadioBrowserStation>> SearchAsync(
         string? searchText,
+        IReadOnlyCollection<string>? tags = null,
         CancellationToken cancellationToken = default)
     {
-        var parameters = new List<string>
+        var requestedTags = tags is { Count: > 0 } ? tags : [string.Empty];
+        var allRows = new List<StationDto>();
+        foreach (var tag in requestedTags)
         {
-            "hidebroken=true",
-            "order=clickcount",
-            "reverse=true",
-            "limit=100"
-        };
-        if (!string.IsNullOrWhiteSpace(searchText))
-            parameters.Add($"name={Uri.EscapeDataString(searchText.Trim())}");
+            var parameters = new List<string>
+            {
+                "hidebroken=true",
+                "order=clickcount",
+                "reverse=true",
+                $"limit={(tags is { Count: > 0 } ? 10000 : 100)}"
+            };
+            if (!string.IsNullOrWhiteSpace(searchText))
+                parameters.Add($"name={Uri.EscapeDataString(searchText.Trim())}");
+            if (!string.IsNullOrWhiteSpace(tag))
+            {
+                parameters.Add($"tag={Uri.EscapeDataString(GetTagQuery(tag))}");
+                parameters.Add("tagExact=false");
+            }
+            allRows.AddRange(await GetAsync<List<StationDto>>(
+                $"/json/stations/search?{string.Join("&", parameters)}",
+                cancellationToken));
+        }
 
-        var rows = await GetAsync<List<StationDto>>(
-            $"/json/stations/search?{string.Join("&", parameters)}",
-            cancellationToken);
-
-        return rows
+        return allRows
             .Where(row =>
                 !string.IsNullOrWhiteSpace(row.StationUuid) &&
                 !string.IsNullOrWhiteSpace(row.Name) &&
@@ -74,6 +86,18 @@ public sealed class RadioBrowserService
         {
             // Click counting must never prevent playback.
         }
+    }
+
+    public async Task<IReadOnlyList<RadioBrowserTag>> GetTagsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await GetAsync<List<TagDto>>(
+            "/json/tags?order=stationcount&reverse=true&hidebroken=true&limit=100000",
+            cancellationToken);
+        return rows
+            .Where(row => !string.IsNullOrWhiteSpace(row.Name) && row.StationCount > 0)
+            .Select(row => new RadioBrowserTag(row.Name!.Trim(), row.StationCount))
+            .ToList();
     }
 
     private async Task<T> GetAsync<T>(string path, CancellationToken cancellationToken)
@@ -148,6 +172,17 @@ public sealed class RadioBrowserService
     private static string? NullIfWhiteSpace(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
+    private static string GetTagQuery(string genre) =>
+        genre switch
+        {
+            "R&B / Soul" => "soul",
+            "Hip-Hop" => "hip hop",
+            "Public Radio" => "public radio",
+            "Easy Listening" => "easy listening",
+            "Adult Contemporary" => "adult contemporary",
+            _ => genre.ToLowerInvariant()
+        };
+
     private sealed class StationDto
     {
         [JsonPropertyName("stationuuid")]
@@ -179,5 +214,14 @@ public sealed class RadioBrowserService
 
         [JsonPropertyName("tags")]
         public string? Tags { get; init; }
+    }
+
+    private sealed class TagDto
+    {
+        [JsonPropertyName("name")]
+        public string? Name { get; init; }
+
+        [JsonPropertyName("stationcount")]
+        public int StationCount { get; init; }
     }
 }

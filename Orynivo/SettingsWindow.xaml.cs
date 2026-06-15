@@ -7,6 +7,7 @@ using Color  = System.Windows.Media.Color;
 using Orynivo.Audio;
 using Orynivo.Library;
 using Orynivo.Localization;
+using Orynivo.Streaming;
 using UiLanguage = Orynivo.Localization.Language;
 using System.Runtime.InteropServices;
 using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
@@ -24,23 +25,34 @@ public partial class SettingsWindow : Window
 
     private readonly AppSettings _settings;
     private readonly List<string> _libraryPaths = [];
+    private readonly List<PlexServerSettings> _plexServers = [];
+    private readonly Dictionary<string, string> _plexTokens = [];
     private readonly Dictionary<string, CancellationTokenSource> _activeScans = [];
     private readonly Action<List<string>>? _onLibraryPathsChanged;
-    private readonly bool _asioAvailable = SteinbergAsioStream.IsAvailable;
+    private readonly bool _steinbergAsioAvailable = SteinbergAsioStream.IsAvailable;
+    private readonly bool _cwAsioAvailable = SteinbergAsioStream.IsCwAsioAvailable;
 
     public SettingsWindow(AppSettings settings, Action<List<string>>? onLibraryPathsChanged = null)
     {
         InitializeComponent();
         _settings = settings;
         _onLibraryPathsChanged = onLibraryPathsChanged;
-        var availableBackends = Enum.GetValues<OutputBackend>()
-            .Where(backend => backend != OutputBackend.Asio || _asioAvailable)
+        var availableBackends = new[]
+        {
+            new SettingChoice<OutputBackend>(OutputBackend.Asio, LocalizationManager.Current.SteinbergAsio),
+            new SettingChoice<OutputBackend>(OutputBackend.CwAsio, LocalizationManager.Current.CwAsio),
+            new SettingChoice<OutputBackend>(OutputBackend.Wasapi, "WASAPI"),
+            new SettingChoice<OutputBackend>(OutputBackend.KernelStreaming, "Kernel Streaming")
+        }
+            .Where(choice =>
+                choice.Value != OutputBackend.Asio || _steinbergAsioAvailable)
+            .Where(choice =>
+                choice.Value != OutputBackend.CwAsio || _cwAsioAvailable)
             .ToArray();
         OutputBackendComboBox.ItemsSource = availableBackends;
         OutputBackendComboBox.SelectedItem =
-            availableBackends.Contains(settings.OutputBackend)
-                ? settings.OutputBackend
-                : OutputBackend.Wasapi;
+            availableBackends.FirstOrDefault(choice => choice.Value == settings.OutputBackend)
+            ?? availableBackends.First(choice => choice.Value == OutputBackend.Wasapi);
         var themeChoices = new[]
         {
             new SettingChoice<AppTheme>(AppTheme.Light, LocalizationManager.Current.ThemeLight),
@@ -57,6 +69,11 @@ public partial class SettingsWindow : Window
         };
         LanguageComboBox.ItemsSource = languageChoices;
         LanguageComboBox.SelectedItem = languageChoices.First(choice => choice.Value == settings.Language);
+        ShowLocalLibrarySectionCheckBox.IsChecked = settings.ShowLocalLibrarySection;
+        ShowOwnRadiosSectionCheckBox.IsChecked = settings.ShowOwnRadiosSection;
+        ShowMyPodcastsSectionCheckBox.IsChecked = settings.ShowMyPodcastsSection;
+        ShowPlexSectionCheckBox.IsChecked = settings.ShowPlexSection;
+        ShowPlaylistsSectionCheckBox.IsChecked = settings.ShowPlaylistsSection;
         ArtistInfoSourceComboBox.ItemsSource = Enum.GetValues<ArtistInfoSource>();
         ArtistInfoSourceComboBox.SelectedItem = settings.ArtistInfoSource;
         LastFmApiKeyTextBox.Text = settings.LastFmApiKey ?? string.Empty;
@@ -65,7 +82,15 @@ public partial class SettingsWindow : Window
             ? Visibility.Visible
             : Visibility.Collapsed;
         _libraryPaths.AddRange(settings.LibraryPaths);
+        _plexServers.AddRange((settings.PlexServers ?? []).Select(ClonePlexServer));
+        try
+        {
+            foreach (var credential in new WindowsPlexCredentialStore().LoadAll())
+                _plexTokens[credential.Key] = credential.Value;
+        }
+        catch { }
         RebuildDirectoryList();
+        RebuildPlexServerList();
         LoadDrivers();
         NavListBox.SelectedIndex = 1; // "Ausgabegerät" als Standard
     }
@@ -76,8 +101,8 @@ public partial class SettingsWindow : Window
     public string? SelectedWasapiDeviceName =>
         DriverComboBox.SelectedItem is WasapiDeviceInfo device ? device.Name : null;
     public OutputBackend SelectedOutputBackend =>
-        OutputBackendComboBox.SelectedItem is OutputBackend backend
-            ? backend
+        OutputBackendComboBox.SelectedItem is SettingChoice<OutputBackend> choice
+            ? choice.Value
             : OutputBackend.Wasapi;
     public IReadOnlyList<string> SelectedLibraryPaths => _libraryPaths.AsReadOnly();
     public AppTheme SelectedTheme =>
@@ -88,6 +113,119 @@ public partial class SettingsWindow : Window
         ArtistInfoSourceComboBox.SelectedItem is ArtistInfoSource src ? src : ArtistInfoSource.Wikipedia;
     public string SelectedLastFmApiKey => LastFmApiKeyTextBox.Text.Trim();
     public string SelectedQobuzApplicationId => QobuzApplicationIdTextBox.Text.Trim();
+    public IReadOnlyList<PlexServerSettings> SelectedPlexServers =>
+        _plexServers.Select(ClonePlexServer).ToList().AsReadOnly();
+    public IReadOnlyDictionary<string, string> SelectedPlexTokens => _plexTokens;
+    public bool ShowLocalLibrarySection => ShowLocalLibrarySectionCheckBox.IsChecked == true;
+    public bool ShowOwnRadiosSection => ShowOwnRadiosSectionCheckBox.IsChecked == true;
+    public bool ShowMyPodcastsSection => ShowMyPodcastsSectionCheckBox.IsChecked == true;
+    public bool ShowPlexSection => ShowPlexSectionCheckBox.IsChecked == true;
+    public bool ShowPlaylistsSection => ShowPlaylistsSectionCheckBox.IsChecked == true;
+
+    private static PlexServerSettings ClonePlexServer(PlexServerSettings server) => new()
+    {
+        Id = server.Id,
+        Name = server.Name,
+        BaseUrl = server.BaseUrl
+    };
+
+    private void RebuildPlexServerList()
+    {
+        PlexServersPanel.Children.Clear();
+        foreach (var server in _plexServers)
+        {
+            var row = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var description = new StackPanel();
+            description.Children.Add(new TextBlock
+            {
+                Text = server.Name,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = (System.Windows.Media.Brush)FindResource("AppPrimaryTextBrush"),
+                TextTrimming = TextTrimming.CharacterEllipsis
+            });
+            description.Children.Add(new TextBlock
+            {
+                Text = server.BaseUrl,
+                FontSize = 11,
+                Foreground = (System.Windows.Media.Brush)FindResource("AppMutedTextBrush"),
+                TextTrimming = TextTrimming.CharacterEllipsis
+            });
+            row.Children.Add(description);
+
+            var editButton = new Button
+            {
+                Content = LocalizationManager.Current.PlexEditServer,
+                Tag = server.Id,
+                Width = 80,
+                Height = 28,
+                Margin = new Thickness(8, 0, 0, 0),
+                Style = (Style)FindResource("SettingsButtonStyle")
+            };
+            editButton.Click += EditPlexServerButton_OnClick;
+            Grid.SetColumn(editButton, 1);
+            row.Children.Add(editButton);
+
+            var removeButton = new Button
+            {
+                Content = LocalizationManager.Current.PlexRemoveServer,
+                Tag = server.Id,
+                Width = 80,
+                Height = 28,
+                Margin = new Thickness(8, 0, 0, 0),
+                Style = (Style)FindResource("SettingsButtonStyle")
+            };
+            removeButton.Click += RemovePlexServerButton_OnClick;
+            Grid.SetColumn(removeButton, 2);
+            row.Children.Add(removeButton);
+            PlexServersPanel.Children.Add(row);
+        }
+    }
+
+    private void AddPlexServerButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new PlexServerDialog { Owner = this };
+        if (dialog.ShowDialog() != true)
+            return;
+
+        _plexServers.Add(dialog.Server);
+        _plexTokens[dialog.Server.Id] = dialog.Token;
+        RebuildPlexServerList();
+    }
+
+    private void EditPlexServerButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string id })
+            return;
+        var index = _plexServers.FindIndex(server => server.Id == id);
+        if (index < 0)
+            return;
+
+        var dialog = new PlexServerDialog(
+            _plexServers[index],
+            _plexTokens.GetValueOrDefault(id))
+        {
+            Owner = this
+        };
+        if (dialog.ShowDialog() != true)
+            return;
+
+        _plexServers[index] = dialog.Server;
+        _plexTokens[id] = dialog.Token;
+        RebuildPlexServerList();
+    }
+
+    private void RemovePlexServerButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string id })
+            return;
+        _plexServers.RemoveAll(server => server.Id == id);
+        _plexTokens.Remove(id);
+        RebuildPlexServerList();
+    }
 
     protected override void OnClosed(EventArgs e)
     {
@@ -167,9 +305,9 @@ public partial class SettingsWindow : Window
                     ? LocalizationManager.Current.NoWasapiDevices
                     : LocalizationManager.Current.SelectAndSave;
             }
-            else if (SelectedOutputBackend == OutputBackend.Asio)
+            else if (SelectedOutputBackend is OutputBackend.Asio or OutputBackend.CwAsio)
             {
-                var drivers = SteinbergAsioStream.GetDriverNames();
+                var drivers = SteinbergAsioStream.GetDriverNames(SelectedOutputBackend);
                 DriverComboBox.ItemsSource = drivers;
                 DriverComboBox.DisplayMemberPath = string.Empty;
                 DriverComboBox.SelectedItem = drivers.FirstOrDefault(name =>
@@ -177,7 +315,9 @@ public partial class SettingsWindow : Window
                     ?? drivers.FirstOrDefault(name =>
                         name.Contains("TOPPING", StringComparison.OrdinalIgnoreCase))
                     ?? drivers.FirstOrDefault();
-                DeviceLabelTextBlock.Text = LocalizationManager.Current.AsioOutputDevice;
+                DeviceLabelTextBlock.Text = SelectedOutputBackend == OutputBackend.CwAsio
+                    ? LocalizationManager.Current.CwAsioOutputDevice
+                    : LocalizationManager.Current.AsioOutputDevice;
                 StatusTextBlock.Text = drivers.Count == 0
                     ? LocalizationManager.Current.NoAsioDrivers
                     : LocalizationManager.Current.SelectAndSave;
@@ -209,7 +349,8 @@ public partial class SettingsWindow : Window
         DriverComboBox.IsEnabled = backend != OutputBackend.KernelStreaming;
         DeviceInfoButton.IsEnabled =
             backend == OutputBackend.Wasapi ||
-            backend == OutputBackend.Asio && _asioAvailable;
+            backend == OutputBackend.Asio && _steinbergAsioAvailable ||
+            backend == OutputBackend.CwAsio && _cwAsioAvailable;
         LoadDrivers();
         if (backend == OutputBackend.KernelStreaming)
         {
@@ -224,7 +365,7 @@ public partial class SettingsWindow : Window
         {
             if (DriverComboBox.SelectedItem is string driverName)
             {
-                var info = SteinbergAsioStream.GetDeviceInfo(driverName);
+                var info = SteinbergAsioStream.GetDeviceInfo(SelectedOutputBackend, driverName);
                 new DeviceInfoWindow(info) { Owner = this }.ShowDialog();
             }
             else if (DriverComboBox.SelectedItem is WasapiDeviceInfo wasapiDevice)

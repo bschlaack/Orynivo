@@ -4,17 +4,35 @@
         Title="{DynamicResource L_About}"
         Icon="Assets/Orynivo.ico"
         Width="560"
-        Height="460"
+        Height="540"
         MinWidth="480"
-        MinHeight="360"
+        MinHeight="440"
         Background="{DynamicResource AppContentBrush}"
         Foreground="{DynamicResource AppPrimaryTextBrush}"
         SourceInitialized="AboutWindow_OnSourceInitialized">
+    <Window.Resources>
+        <Style x:Key="LicenseTextStyle" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,0,0,6"/>
+            <Setter Property="LineHeight" Value="20"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+    </Window.Resources>
     <Grid>
         <StackPanel Margin="22">
-            <TextBlock Text="Orynivo"
-                       FontSize="22"
-                       FontWeight="Bold"/>
+            <Border Width="320"
+                    Padding="18,12"
+                    HorizontalAlignment="Center"
+                    CornerRadius="0,24,0,24">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
+                        <GradientStop Color="#FFFFFF" Offset="0"/>
+                        <GradientStop Color="#7268A7" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Image Height="64"
+                       Source="Assets/Orynivo_Logo.png"
+                       Stretch="Uniform"/>
+            </Border>
             <TextBlock Margin="0,18,0,4"
                        FontWeight="SemiBold"
                        Text="{DynamicResource L_Author}"/>
@@ -25,12 +43,20 @@
                        Text="{DynamicResource L_Licenses}"/>
 
             <StackPanel>
-                <TextBlock Text="ASIO is a trademark and software of Steinberg Media Technologies GmbH."/>
-                <TextBlock Text="Lucene.NET 4.8.0-beta00017 — Apache License 2.0"/>
-                <TextBlock Text="Microsoft.Data.Sqlite 9.0.5 — MIT License" Margin="0,6,0,0"/>
-                <TextBlock Text="NAudio 2.3.0 — MIT License" Margin="0,6,0,0"/>
-                <TextBlock Text="TagLibSharp 2.3.0 — LGPL-2.1 License" Margin="0,6,0,0"/>
-                <TextBlock Text="SQLitePCLRaw / e_sqlite3 — Apache License 2.0" Margin="0,6,0,0"/>
+                <TextBlock Text="ASIO is a trademark and software of Steinberg Media Technologies GmbH."
+                           Style="{StaticResource LicenseTextStyle}"/>
+                <TextBlock Text="cwASIO — MIT License"
+                           Style="{StaticResource LicenseTextStyle}"/>
+                <TextBlock Text="Lucene.NET 4.8.0-beta00017 — Apache License 2.0"
+                           Style="{StaticResource LicenseTextStyle}"/>
+                <TextBlock Text="Microsoft.Data.Sqlite 9.0.5 — MIT License"
+                           Style="{StaticResource LicenseTextStyle}"/>
+                <TextBlock Text="NAudio 2.3.0 — MIT License"
+                           Style="{StaticResource LicenseTextStyle}"/>
+                <TextBlock Text="TagLibSharp 2.3.0 — LGPL-2.1 License"
+                           Style="{StaticResource LicenseTextStyle}"/>
+                <TextBlock Text="SQLitePCLRaw / e_sqlite3 — Apache License 2.0"
+                           Style="{StaticResource LicenseTextStyle}"/>
             </StackPanel>
         </StackPanel>
     </Grid>
