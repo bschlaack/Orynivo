@@ -158,6 +158,60 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+        <Style x:Key="SettingsCheckBoxStyle" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid Background="Transparent">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="18"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border x:Name="CheckBorder"
+                                    Width="16"
+                                    Height="16"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Center"
+                                    Background="{DynamicResource AppInputBrush}"
+                                    BorderBrush="{DynamicResource AppInputBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="3">
+                                <Path x:Name="CheckMark"
+                                      Width="9"
+                                      Height="7"
+                                      Data="M 0 3.5 L 3 6.5 L 9 0"
+                                      Stroke="White"
+                                      StrokeThickness="2"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      StrokeLineJoin="Round"
+                                      Visibility="Collapsed"/>
+                            </Border>
+                            <ContentPresenter Grid.Column="1"
+                                              Margin="8,0,0,0"
+                                              VerticalAlignment="Center"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="CheckBorder" Property="BorderBrush" Value="#6C63FF"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="CheckBorder" Property="Background" Value="#6C63FF"/>
+                                <Setter TargetName="CheckBorder" Property="BorderBrush" Value="#6C63FF"/>
+                                <Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.55"/>
+                                <Setter Property="Cursor" Value="Arrow"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
     <Grid>
         <Grid.ColumnDefinitions>
@@ -463,7 +517,26 @@
                     <TextBlock Text="{DynamicResource L_QobuzCredentialsHint}"
                                FontSize="11"
                                Foreground="{DynamicResource AppMutedTextBrush}"
-                               TextWrapping="Wrap"/>
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,24"/>
+
+                    <TextBlock Text="{DynamicResource L_PlexServers}"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,8"/>
+                    <TextBlock Text="{DynamicResource L_PlexServersHint}"
+                               FontSize="11"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,12"/>
+                    <StackPanel x:Name="PlexServersPanel"/>
+                    <Button Width="140"
+                            Height="30"
+                            HorizontalAlignment="Left"
+                            Margin="0,8,0,0"
+                            Style="{StaticResource SettingsButtonStyle}"
+                            Content="{DynamicResource L_AddPlexServer}"
+                            Click="AddPlexServerButton_OnClick"/>
                 </StackPanel>
 
                 <!-- Panel: Künstlerinfos -->
@@ -528,7 +601,38 @@
                     <ComboBox x:Name="LanguageComboBox"
                               Height="30"
                               HorizontalAlignment="Stretch"
-                              Style="{StaticResource SettingsComboBoxStyle}"/>
+                              Style="{StaticResource SettingsComboBoxStyle}"
+                              Margin="0,0,0,20"/>
+
+                    <TextBlock Text="{DynamicResource L_SidebarSections}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+                    <TextBlock Text="{DynamicResource L_SidebarSectionsHint}"
+                               FontSize="11"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,8"/>
+                    <CheckBox x:Name="ShowLocalLibrarySectionCheckBox"
+                              Content="{DynamicResource L_LocalLibrary}"
+                              Style="{StaticResource SettingsCheckBoxStyle}"
+                              Margin="0,4"/>
+                    <CheckBox x:Name="ShowOwnRadiosSectionCheckBox"
+                              Content="{DynamicResource L_OwnRadios}"
+                              Style="{StaticResource SettingsCheckBoxStyle}"
+                              Margin="0,4"/>
+                    <CheckBox x:Name="ShowMyPodcastsSectionCheckBox"
+                              Content="{DynamicResource L_MyPodcasts}"
+                              Style="{StaticResource SettingsCheckBoxStyle}"
+                              Margin="0,4"/>
+                    <CheckBox x:Name="ShowPlexSectionCheckBox"
+                              Content="{DynamicResource L_PlexServers}"
+                              Style="{StaticResource SettingsCheckBoxStyle}"
+                              Margin="0,4"/>
+                    <CheckBox x:Name="ShowPlaylistsSectionCheckBox"
+                              Content="{DynamicResource L_Playlists}"
+                              Style="{StaticResource SettingsCheckBoxStyle}"
+                              Margin="0,4"/>
                 </StackPanel>
 
             </Grid>

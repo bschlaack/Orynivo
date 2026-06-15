@@ -22,6 +22,7 @@ using Orynivo.Audio;
 using Orynivo.Controls;
 using Orynivo.Library;
 using Orynivo.Localization;
+using Orynivo.Streaming;
 using Button = System.Windows.Controls.Button;
 using WpfImage = System.Windows.Controls.Image;
 using WpfCursors = System.Windows.Input.Cursors;
@@ -32,6 +33,21 @@ namespace Orynivo;
 
 public partial class MainWindow : Window
 {
+    private int _plexNavigationLoadVersion;
+    private const int PlexPageSize = 500;
+    private readonly PlexServerClient _plexClient = new();
+    private PlexServerSettings? _activePlexServer;
+    private string? _activePlexToken;
+    private string? _activePlexSectionKey;
+    private string? _activePlexSectionTitle;
+    private string _activePlexView = "Artists";
+    private int _plexLoadedCount;
+    private int _plexTotalCount;
+    private CancellationTokenSource? _plexViewCts;
+    private readonly Dictionary<string, ContentRow> _plexTracksByUrl =
+        new(StringComparer.Ordinal);
+    private readonly Stack<PlexNavigationState> _plexNavigationStack = [];
+
     // ------------------------------------------------------------------
     // Felder
     // ------------------------------------------------------------------
@@ -138,6 +154,11 @@ public partial class MainWindow : Window
          "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"];
 
     private sealed record FolderTag(bool IsFile, string FilePath, string FolderPath);
+    private sealed record PlexFolderTag(string Key, bool IsTrack, ContentRow? Track);
+    private sealed record PlexNavigationState(
+        string Title,
+        string View,
+        IReadOnlyList<ContentRow> Rows);
     private sealed record PlaylistMenuTag(long PlaylistId, IReadOnlyList<string> Paths);
     private sealed record RemovePlaylistEntryTag(long PlaylistEntryId);
     private sealed record PodcastPlayback(PodcastRecord Podcast, PodcastEpisode Episode);
@@ -223,6 +244,7 @@ public partial class MainWindow : Window
         public long? ProfileFetchedAt { get; set; }
         public bool ImageIsManual { get; set; }
         public string EntityType { get; init; } = "Track";
+        public string? ExternalId { get; init; }
         private ImageSource? _artwork;
         private ImageSource? _thumbnail;
         public ImageSource? Artwork
@@ -360,6 +382,7 @@ public partial class MainWindow : Window
         CancelAndDispose(ref _radioSearchCts);
         CancelAndDispose(ref _podcastSearchCts);
         CancelAndDispose(ref _podcastFeedCts);
+        CancelAndDispose(ref _plexViewCts);
         StopPlayback();
         base.OnClosed(e);
     }
@@ -367,6 +390,7 @@ public partial class MainWindow : Window
     private void SelectInitialView()
     {
         var tag = _settings.LastMainView;
+        ApplySidebarNavigationSettings();
         var item = NavListBox.Items
             .OfType<ListBoxItem>()
             .FirstOrDefault(i => string.Equals(i.Tag as string, tag, StringComparison.Ordinal));
@@ -494,6 +518,7 @@ public partial class MainWindow : Window
                      .Where(item => item.Tag is string tag &&
                                     (tag.StartsWith("Radio:", StringComparison.Ordinal) ||
                                      tag.StartsWith("Podcast:", StringComparison.Ordinal) ||
+                                     tag.StartsWith("Plex", StringComparison.Ordinal) ||
                                      tag.StartsWith("Playlist:", StringComparison.Ordinal)))
                      .ToList())
             NavListBox.Items.Remove(dynamicItem);
@@ -510,7 +535,7 @@ public partial class MainWindow : Window
                     Text = "◉ ",
                     Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x6C, 0x63, 0xFF))
                 });
-                content.Children.Add(new TextBlock { Text = radio.Name });
+                content.Children.Add(CreateSidebarEntryText(radio.Name));
 
                 NavListBox.Items.Insert(podcastHeaderIndex++, new ListBoxItem
                 {
@@ -520,7 +545,7 @@ public partial class MainWindow : Window
                 });
             }
 
-            var playlistHeaderIndex = NavListBox.Items.IndexOf(PlaylistsHeaderItem);
+            var plexHeaderIndex = NavListBox.Items.IndexOf(PlexHeaderItem);
             foreach (var podcast in db.GetPodcasts())
             {
                 var content = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
@@ -529,15 +554,17 @@ public partial class MainWindow : Window
                     Text = "◍ ",
                     Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x6C, 0x63, 0xFF))
                 });
-                content.Children.Add(new TextBlock { Text = podcast.Name });
+                content.Children.Add(CreateSidebarEntryText(podcast.Name));
 
-                NavListBox.Items.Insert(playlistHeaderIndex++, new ListBoxItem
+                NavListBox.Items.Insert(plexHeaderIndex++, new ListBoxItem
                 {
                     Content = content,
                     Tag = $"Podcast:{podcast.Id}",
                     Style = (Style)FindResource("NavItemStyle")
                 });
             }
+
+            LoadPlexNavigationAsync();
 
             foreach (var pl in db.GetAllPlaylists())
             {
@@ -551,12 +578,12 @@ public partial class MainWindow : Window
                         Foreground = new System.Windows.Media.SolidColorBrush(
                                          System.Windows.Media.Color.FromRgb(0xFF, 0xCC, 0x00))
                     });
-                    sp.Children.Add(new TextBlock { Text = pl.Name });
+                    sp.Children.Add(CreateSidebarEntryText(pl.Name));
                     content = sp;
                 }
                 else
                 {
-                    content = pl.Name;
+                    content = CreateSidebarEntryText(pl.Name);
                 }
 
                 NavListBox.Items.Add(new ListBoxItem
@@ -568,6 +595,193 @@ public partial class MainWindow : Window
             }
         }
         catch { /* DB noch nicht angelegt */ }
+
+        ApplySidebarNavigationSettings();
+    }
+
+    private async void LoadPlexNavigationAsync()
+    {
+        var loadVersion = ++_plexNavigationLoadVersion;
+        foreach (var item in NavListBox.Items
+                     .OfType<ListBoxItem>()
+                     .Where(item => item.Tag is string tag &&
+                                    tag.StartsWith("Plex", StringComparison.Ordinal))
+                     .ToList())
+            NavListBox.Items.Remove(item);
+
+        Dictionary<string, string> tokens;
+        try
+        {
+            tokens = await new WindowsPlexCredentialStore().LoadAllAsync();
+        }
+        catch
+        {
+            tokens = [];
+        }
+        if (loadVersion != _plexNavigationLoadVersion)
+            return;
+
+        var insertIndex = NavListBox.Items.IndexOf(PlaylistsHeaderItem);
+        var client = new PlexServerClient();
+        foreach (var server in _settings.PlexServers ?? [])
+        {
+            NavListBox.Items.Insert(insertIndex++, new ListBoxItem
+            {
+                Content = CreateSidebarEntryText(server.Name),
+                Tag = $"PlexServer:{server.Id}",
+                IsEnabled = false,
+                FontWeight = FontWeights.SemiBold,
+                Style = (Style)FindResource("NavItemStyle")
+            });
+
+            try
+            {
+                var libraries = await client.GetAudioLibrariesAsync(
+                    server,
+                    tokens.GetValueOrDefault(server.Id));
+                if (loadVersion != _plexNavigationLoadVersion)
+                    return;
+                foreach (var library in libraries)
+                    NavListBox.Items.Insert(insertIndex++, CreatePlexLibraryItem(
+                        server.Id,
+                        library.Key,
+                        library.Title));
+            }
+            catch { }
+        }
+
+        ApplySidebarNavigationSettings();
+    }
+
+    private ListBoxItem CreatePlexLibraryItem(string serverId, string libraryKey, string title)
+    {
+        var text = CreateSidebarEntryText($"   {title}");
+        text.Foreground = (WpfBrush)FindResource("AppMutedTextBrush");
+        return new ListBoxItem
+        {
+            Content = text,
+            Tag = $"PlexLibrary:{serverId}:{libraryKey}",
+            Style = (Style)FindResource("NavItemStyle")
+        };
+    }
+
+    private TextBlock CreateSidebarEntryText(string text) => new()
+    {
+        Text = text,
+        Style = (Style)FindResource("NavItemTextStyle")
+    };
+
+    private void NavListBox_OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject) is not
+            { Tag: string tag } ||
+            !tag.StartsWith("Section:", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var section = tag["Section:".Length..];
+        SetSidebarSectionExpanded(section, !IsSidebarSectionExpanded(section));
+        ApplySidebarNavigationSettings();
+        e.Handled = true;
+    }
+
+    private void ApplySidebarNavigationSettings()
+    {
+        SetSidebarSectionVisibility(
+            LocalLibraryHeaderItem,
+            "LocalLibrary",
+            _settings.ShowLocalLibrarySection,
+            staticItems: [ArtistsNavItem, AlbumsNavItem, TracksNavItem, FoldersNavItem]);
+        SetSidebarSectionVisibility(
+            OwnRadiosHeaderItem,
+            "OwnRadios",
+            _settings.ShowOwnRadiosSection,
+            dynamicPrefix: "Radio:");
+        SetSidebarSectionVisibility(
+            MyPodcastsHeaderItem,
+            "MyPodcasts",
+            _settings.ShowMyPodcastsSection,
+            dynamicPrefix: "Podcast:");
+        SetSidebarSectionVisibility(
+            PlexHeaderItem,
+            "Plex",
+            _settings.ShowPlexSection,
+            dynamicPrefix: "Plex");
+        SetSidebarSectionVisibility(
+            PlaylistsHeaderItem,
+            "Playlists",
+            _settings.ShowPlaylistsSection,
+            dynamicPrefix: "Playlist:");
+    }
+
+    private void SetSidebarSectionVisibility(
+        ListBoxItem header,
+        string section,
+        bool isVisible,
+        IReadOnlyList<ListBoxItem>? staticItems = null,
+        string? dynamicPrefix = null)
+    {
+        header.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
+        var showItems = isVisible && IsSidebarSectionExpanded(section);
+        var arrow = section switch
+        {
+            "LocalLibrary" => LocalLibraryHeaderArrow,
+            "OwnRadios" => OwnRadiosHeaderArrow,
+            "MyPodcasts" => MyPodcastsHeaderArrow,
+            "Plex" => PlexHeaderArrow,
+            "Playlists" => PlaylistsHeaderArrow,
+            _ => null
+        };
+        if (arrow is not null)
+            arrow.RenderTransform = new RotateTransform(showItems ? 180 : 0);
+
+        if (staticItems is not null)
+        {
+            foreach (var item in staticItems)
+                item.Visibility = showItems ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        if (dynamicPrefix is null)
+            return;
+
+        foreach (var item in NavListBox.Items.OfType<ListBoxItem>())
+        {
+            if (item.Tag is string tag && tag.StartsWith(dynamicPrefix, StringComparison.Ordinal))
+                item.Visibility = showItems ? Visibility.Visible : Visibility.Collapsed;
+        }
+    }
+
+    private bool IsSidebarSectionExpanded(string section) => section switch
+    {
+        "LocalLibrary" => _settings.IsLocalLibrarySectionExpanded,
+        "OwnRadios" => _settings.IsOwnRadiosSectionExpanded,
+        "MyPodcasts" => _settings.IsMyPodcastsSectionExpanded,
+        "Plex" => _settings.IsPlexSectionExpanded,
+        "Playlists" => _settings.IsPlaylistsSectionExpanded,
+        _ => false
+    };
+
+    private void SetSidebarSectionExpanded(string section, bool isExpanded)
+    {
+        switch (section)
+        {
+            case "LocalLibrary":
+                _settings.IsLocalLibrarySectionExpanded = isExpanded;
+                break;
+            case "OwnRadios":
+                _settings.IsOwnRadiosSectionExpanded = isExpanded;
+                break;
+            case "MyPodcasts":
+                _settings.IsMyPodcastsSectionExpanded = isExpanded;
+                break;
+            case "Plex":
+                _settings.IsPlexSectionExpanded = isExpanded;
+                break;
+            case "Playlists":
+                _settings.IsPlaylistsSectionExpanded = isExpanded;
+                break;
+        }
     }
 
     private async void NavListBox_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -604,6 +818,7 @@ public partial class MainWindow : Window
         _activeArtistFilterId = null;
         _activeArtistFilterName = null;
         _navigationStack.Clear();
+        _plexNavigationStack.Clear();
         BackButton.Visibility = Visibility.Collapsed;
     }
 
@@ -611,6 +826,7 @@ public partial class MainWindow : Window
     {
         LyricsView.Visibility = Visibility.Collapsed;
         ArtistInfoView.Visibility = Visibility.Collapsed;
+        PodcastInfoView.Visibility = Visibility.Collapsed;
         _activePlaylistId = tag.StartsWith("Playlist:") &&
                             long.TryParse(tag.AsSpan("Playlist:".Length), out long parsedPid)
             ? parsedPid : null;
@@ -623,6 +839,8 @@ public partial class MainWindow : Window
             "Folders" => LocalizationManager.Current.FolderStructure,
             "InternetRadio" => LocalizationManager.Current.InternetRadio,
             "Podcasts" => LocalizationManager.Current.Podcasts,
+            _ when tag.StartsWith("PlexLibrary:", StringComparison.Ordinal) =>
+                _activePlexSectionTitle ?? LocalizationManager.Current.PlexServers,
             _ when tag.StartsWith("Radio:", StringComparison.Ordinal) => GetRadioName(tag),
             _ when tag.StartsWith("Podcast:", StringComparison.Ordinal) => GetPodcastName(tag),
             _         => tag.StartsWith("Playlist:") ? GetPlaylistName(tag) : tag
@@ -640,10 +858,14 @@ public partial class MainWindow : Window
         ContentCountTextBlock.Text  = "";
         SearchTextBox.Visibility = tag is "InternetRadio" or "Podcasts" ||
                                    tag.StartsWith("Radio:", StringComparison.Ordinal) ||
-                                   tag.StartsWith("Podcast:", StringComparison.Ordinal)
+                                   tag.StartsWith("Podcast:", StringComparison.Ordinal) ||
+                                   tag.StartsWith("PlexLibrary:", StringComparison.Ordinal)
             ? Visibility.Collapsed
             : Visibility.Visible;
         AlbumViewModeBorder.Visibility = tag is "Albums" or "Artists" ? Visibility.Visible : Visibility.Collapsed;
+        PlexViewModeBorder.Visibility = tag.StartsWith("PlexLibrary:", StringComparison.Ordinal)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         if (tag is "Albums" or "Artists")
             SetViewModeButtons(tag == "Albums" ? _showAlbumArtworkView : _showArtistArtworkView);
         TrackFilterButton.Visibility = tag == "Tracks" ? Visibility.Visible : Visibility.Collapsed;
@@ -699,6 +921,10 @@ public partial class MainWindow : Window
             ArtistArtworkListBox.Visibility = Visibility.Collapsed;
             InternetRadioView.Visibility = Visibility.Visible;
             await PlaySavedRadioAsync(radioId);
+        }
+        else if (tag.StartsWith("PlexLibrary:", StringComparison.Ordinal))
+        {
+            await ShowPlexLibraryAsync(tag);
         }
         else if (tag == "Folders")
         {
@@ -772,6 +998,253 @@ public partial class MainWindow : Window
         AlbumArtworkListBox.Margin = new Thickness(0);
         ArtistArtworkListBox.Margin = new Thickness(0);
         Dispatcher.BeginInvoke(UpdateActiveAlphabetButton, DispatcherPriority.Loaded);
+    }
+
+    private async Task ShowPlexLibraryAsync(string tag)
+    {
+        var parts = tag.Split(':', 3);
+        if (parts.Length != 3)
+            return;
+
+        _activePlexServer = (_settings.PlexServers ?? [])
+            .FirstOrDefault(server => string.Equals(server.Id, parts[1], StringComparison.Ordinal));
+        if (_activePlexServer is null)
+            return;
+
+        _activePlexSectionKey = parts[2];
+        _activePlexSectionTitle = NavListBox.Items.OfType<ListBoxItem>()
+            .FirstOrDefault(item => string.Equals(item.Tag as string, tag, StringComparison.Ordinal))
+            ?.Content is TextBlock text
+                ? text.Text.Trim()
+                : _activePlexServer.Name;
+        try
+        {
+            _activePlexToken = new WindowsPlexCredentialStore()
+                .LoadAll()
+                .GetValueOrDefault(_activePlexServer.Id);
+        }
+        catch
+        {
+            _activePlexToken = null;
+        }
+
+        _activePlexView = "Artists";
+        _plexNavigationStack.Clear();
+        _updatingViewMode = true;
+        PlexArtistsViewRadioButton.IsChecked = true;
+        _updatingViewMode = false;
+        ContentTitleTextBlock.Text = _activePlexSectionTitle;
+        await LoadPlexViewAsync(reset: true);
+    }
+
+    private async void PlexViewModeRadioButton_OnChecked(object sender, RoutedEventArgs e)
+    {
+        if (!IsLoaded || _updatingViewMode ||
+            sender is not System.Windows.Controls.RadioButton { Tag: string view } ||
+            _activePlexServer is null)
+        {
+            return;
+        }
+
+        _activePlexView = view;
+        await LoadPlexViewAsync(reset: true);
+    }
+
+    private async void PlexLoadMoreButton_OnClick(object sender, RoutedEventArgs e)
+        => await LoadPlexViewAsync(reset: false);
+
+    private async Task LoadPlexViewAsync(bool reset)
+    {
+        if (_activePlexServer is null || string.IsNullOrWhiteSpace(_activePlexSectionKey))
+            return;
+
+        CancelAndDispose(ref _plexViewCts);
+        _plexViewCts = new CancellationTokenSource();
+        var cancellationToken = _plexViewCts.Token;
+        if (reset)
+        {
+            _plexLoadedCount = 0;
+            _plexTotalCount = 0;
+        }
+
+        ContentDataGrid.Visibility = _activePlexView == "Folders"
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        FolderTreeView.Visibility = _activePlexView == "Folders"
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        AlbumArtworkListBox.Visibility = Visibility.Collapsed;
+        ArtistArtworkListBox.Visibility = Visibility.Collapsed;
+        SearchResultsScrollViewer.Visibility = Visibility.Collapsed;
+        PlexLoadMoreButton.Visibility = Visibility.Collapsed;
+        StatusTextBlock.Text = LocalizationManager.Current.PlexLoading;
+
+        try
+        {
+            if (_activePlexView == "Folders")
+            {
+                await BuildPlexFolderTreeAsync(cancellationToken);
+                ContentCountTextBlock.Text = string.Empty;
+                StatusTextBlock.Text = string.Empty;
+                return;
+            }
+
+            var mediaType = _activePlexView switch
+            {
+                "Artists" => 8,
+                "Albums" => 9,
+                _ => 10
+            };
+            var page = await _plexClient.GetLibraryItemsAsync(
+                _activePlexServer,
+                _activePlexToken,
+                _activePlexSectionKey,
+                mediaType,
+                _plexLoadedCount,
+                PlexPageSize,
+                cancellationToken);
+            var newRows = page.Items.Select(ToPlexContentRow).ToList();
+            var rows = reset
+                ? newRows
+                : ((ContentDataGrid.ItemsSource as IEnumerable<ContentRow>) ?? [])
+                    .Concat(newRows)
+                    .ToList();
+            _plexLoadedCount = rows.Count;
+            _plexTotalCount = page.TotalSize;
+            ApplyColumns("Plex" + _activePlexView);
+            ContentDataGrid.ItemsSource = rows;
+            UpdateAlphabetIndex(rows, _activePlexView is "Artists" or "Albums" or "Tracks");
+            ContentCountTextBlock.Text = $"{_plexLoadedCount:N0} / {_plexTotalCount:N0}";
+            PlexLoadMoreButton.Visibility = _plexLoadedCount < _plexTotalCount
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            StatusTextBlock.Text = string.Empty;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            StatusTextBlock.Text = string.Format(
+                LocalizationManager.Current.PlexConnectionFailed,
+                ex.Message);
+        }
+    }
+
+    private ContentRow ToPlexContentRow(PlexMediaItem item)
+    {
+        var entityType = _activePlexView switch
+        {
+            "Artists" => "PlexArtist",
+            "Albums" => "PlexAlbum",
+            _ => "PlexTrack"
+        };
+        var row = new ContentRow
+        {
+            ExternalId = item.RatingKey,
+            Title = item.Title,
+            Artist = item.Artist,
+            Album = item.Album,
+            Year = item.Year?.ToString(),
+            Duration = item.DurationMilliseconds is long duration
+                ? FormatSeconds(duration / 1000d)
+                : string.Empty,
+            Format = item.Format?.ToUpperInvariant(),
+            FilePath = item.PartKey is not null &&
+                       _activePlexServer is not null
+                ? PlexServerClient.CreateStreamUrl(
+                    _activePlexServer,
+                    item.PartKey,
+                    _activePlexToken)
+                : string.Empty,
+            EntityType = entityType
+        };
+        if (entityType == "PlexTrack" && row.FilePath.Length > 0)
+            _plexTracksByUrl[row.FilePath] = row;
+        return row;
+    }
+
+    private async Task ShowPlexChildrenAsync(ContentRow parent)
+    {
+        if (_activePlexServer is null || string.IsNullOrWhiteSpace(parent.ExternalId))
+            return;
+
+        StatusTextBlock.Text = LocalizationManager.Current.PlexLoading;
+        try
+        {
+            var page = await _plexClient.GetChildrenAsync(
+                _activePlexServer,
+                _activePlexToken,
+                parent.ExternalId);
+            _plexNavigationStack.Push(new PlexNavigationState(
+                ContentTitleTextBlock.Text,
+                _activePlexView,
+                (ContentDataGrid.ItemsSource as IEnumerable<ContentRow>)?.ToList() ?? []));
+            BackButton.Visibility = Visibility.Visible;
+            _activePlexView = parent.EntityType == "PlexArtist" ? "Albums" : "Tracks";
+            var rows = page.Items.Select(ToPlexContentRow).ToList();
+            ApplyColumns("Plex" + _activePlexView);
+            ContentDataGrid.ItemsSource = rows;
+            ContentTitleTextBlock.Text = parent.Title ?? _activePlexSectionTitle;
+            ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(rows.Count);
+            PlexViewModeBorder.Visibility = Visibility.Collapsed;
+            StatusTextBlock.Text = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            StatusTextBlock.Text = string.Format(
+                LocalizationManager.Current.PlexConnectionFailed,
+                ex.Message);
+        }
+    }
+
+    private async Task BuildPlexFolderTreeAsync(CancellationToken cancellationToken)
+    {
+        FolderTreeView.Items.Clear();
+        var page = await _plexClient.GetFoldersAsync(
+            _activePlexServer!,
+            _activePlexToken,
+            _activePlexSectionKey!,
+            null,
+            cancellationToken);
+        foreach (var folder in page.Items)
+            FolderTreeView.Items.Add(CreatePlexFolderItem(folder));
+    }
+
+    private TreeViewItem CreatePlexFolderItem(PlexMediaItem item)
+    {
+        var row = item.PartKey is null ? null : ToPlexContentRow(item);
+        var treeItem = new TreeViewItem
+        {
+            Header = item.Title,
+            Tag = new PlexFolderTag(item.Key, row is not null, row)
+        };
+        if (row is not null)
+            return treeItem;
+
+        var placeholder = new TreeViewItem();
+        treeItem.Items.Add(placeholder);
+        treeItem.Expanded += async (_, _) =>
+        {
+            if (treeItem.Items.Count != 1 || treeItem.Items[0] != placeholder)
+                return;
+            try
+            {
+                var page = await _plexClient.GetFoldersAsync(
+                    _activePlexServer!,
+                    _activePlexToken,
+                    _activePlexSectionKey!,
+                    item.Key);
+                treeItem.Items.Clear();
+                foreach (var child in page.Items)
+                    treeItem.Items.Add(CreatePlexFolderItem(child));
+            }
+            catch
+            {
+                treeItem.Items.Clear();
+            }
+        };
+        return treeItem;
     }
 
     private static string GetAlphabetIndexKey(string? value)
@@ -1098,6 +1571,7 @@ public partial class MainWindow : Window
                         Artist   = t?.Artist,
                         Album    = t?.Album,
                         Duration = t is not null ? FormatSeconds(t.Duration) : "",
+                        Format   = t?.Format?.ToUpperInvariant(),
                         FilePath = pt.Path
                     };
                 }).ToList();
@@ -1450,6 +1924,7 @@ public partial class MainWindow : Window
     {
         LyricsView.Visibility = Visibility.Collapsed;
         ArtistInfoView.Visibility = Visibility.Collapsed;
+        PodcastInfoView.Visibility = Visibility.Collapsed;
         if (string.IsNullOrWhiteSpace(query))
         {
             if (NavListBox.SelectedItem is ListBoxItem { Tag: string tag })
@@ -1568,7 +2043,8 @@ public partial class MainWindow : Window
             (LocalizationManager.Current.Title, nameof(ContentRow.Title), 240),
             (LocalizationManager.Current.Artist, nameof(ContentRow.Artist), 180),
             (LocalizationManager.Current.Album, nameof(ContentRow.Album), 220),
-            (LocalizationManager.Current.Duration, nameof(ContentRow.Duration), 90));
+            (LocalizationManager.Current.Duration, nameof(ContentRow.Duration), 90),
+            (LocalizationManager.Current.Format, nameof(ContentRow.Format), 80));
         ConfigureSearchGrid(SearchAlbumsDataGrid,
             (LocalizationManager.Current.Album, nameof(ContentRow.Title), 260),
             (LocalizationManager.Current.AlbumArtist, nameof(ContentRow.Artist), 220),
@@ -1752,6 +2228,21 @@ public partial class MainWindow : Window
         ContentDataGrid.Columns.Clear();
         switch (view)
         {
+            case "PlexArtists":
+                Add(LocalizationManager.Current.Artist, nameof(ContentRow.Title), 0, star: true);
+                break;
+            case "PlexAlbums":
+                Add(LocalizationManager.Current.Album, nameof(ContentRow.Title), 0, star: true);
+                Add(LocalizationManager.Current.AlbumArtist, nameof(ContentRow.Artist), 220);
+                Add(LocalizationManager.Current.Year, nameof(ContentRow.Year), 70, right: true);
+                break;
+            case "PlexTracks":
+                Add(LocalizationManager.Current.Title, nameof(ContentRow.Title), 0, star: true);
+                Add(LocalizationManager.Current.Artist, nameof(ContentRow.Artist), 180);
+                Add(LocalizationManager.Current.Album, nameof(ContentRow.Album), 180);
+                Add(LocalizationManager.Current.Duration, nameof(ContentRow.Duration), 70, right: true);
+                Add(LocalizationManager.Current.Format, nameof(ContentRow.Format), 80);
+                break;
             case "Artists":
                 AddFavorite();
                 AddThumbnail();
@@ -1771,6 +2262,7 @@ public partial class MainWindow : Window
                 AddEntityLink(LocalizationManager.Current.Artist, nameof(ContentRow.Artist), 180, false, "Artist");
                 AddEntityLink(LocalizationManager.Current.Album, nameof(ContentRow.Album), 160, false, "Album");
                 Add(LocalizationManager.Current.Duration, nameof(ContentRow.Duration), 70, right: true);
+                Add(LocalizationManager.Current.Format, nameof(ContentRow.Format), 70);
                 break;
             default: // Tracks
                 AddFavorite();
@@ -1997,6 +2489,27 @@ public partial class MainWindow : Window
 
     private async void FolderTreeView_OnMouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
+        if (FolderTreeView.SelectedItem is TreeViewItem
+            {
+                Tag: PlexFolderTag { IsTrack: true, Track: not null } plexTag
+            } plexTreeItem)
+        {
+            e.Handled = true;
+            var parent = ItemsControl.ItemsControlFromItemContainer(plexTreeItem);
+            var siblingTracks = parent?.Items
+                .OfType<TreeViewItem>()
+                .Select(item => item.Tag)
+                .OfType<PlexFolderTag>()
+                .Where(tag => tag.IsTrack && tag.Track is not null)
+                .Select(tag => tag.Track!)
+                .ToList() ?? [];
+            if (siblingTracks.Count == 0)
+                siblingTracks.Add(plexTag.Track);
+
+            await PlayTrackFromRowsAsync(plexTag.Track, siblingTracks);
+            return;
+        }
+
         if (FolderTreeView.SelectedItem is not TreeViewItem { Tag: FolderTag { IsFile: true } tag })
             return;
         e.Handled = true;
@@ -2187,6 +2700,11 @@ public partial class MainWindow : Window
 
     private async Task HandleContentRowDoubleClickAsync(ContentRow row)
     {
+        if (row.EntityType is "PlexArtist" or "PlexAlbum")
+        {
+            await ShowPlexChildrenAsync(row);
+            return;
+        }
 
         if (row.EntityType == "Artist" && row.Id is long artistId)
         {
@@ -2427,6 +2945,26 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (_plexNavigationStack.Count > 0)
+        {
+            var plexState = _plexNavigationStack.Pop();
+            _activePlexView = plexState.View;
+            ContentTitleTextBlock.Text = plexState.Title;
+            ApplyColumns("Plex" + plexState.View);
+            ContentDataGrid.ItemsSource = plexState.Rows;
+            ContentDataGrid.Visibility = Visibility.Visible;
+            FolderTreeView.Visibility = Visibility.Collapsed;
+            PlexViewModeBorder.Visibility = _plexNavigationStack.Count == 0
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(plexState.Rows.Count);
+            UpdateAlphabetIndex(plexState.Rows, true);
+            BackButton.Visibility = _plexNavigationStack.Count > 0
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+            return;
+        }
+
         if (_navigationStack.Count == 0)
             return;
 
@@ -2439,6 +2977,14 @@ public partial class MainWindow : Window
 
         switch (state.View)
         {
+            case string plexView when plexView.StartsWith("PlexLibrary:", StringComparison.Ordinal):
+                PlexViewModeBorder.Visibility = Visibility.Visible;
+                await ShowPlexLibraryAsync(plexView);
+                BackButton.Visibility = _navigationStack.Count > 0
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
+                return;
+
             case "Dashboard":
                 ContentTitleTextBlock.Text = LocalizationManager.Current.Dashboard;
                 UpdateAlphabetIndex(null, false);
@@ -2574,6 +3120,11 @@ public partial class MainWindow : Window
         }
 
         ContentDataGrid.SelectedItem = contentRow;
+        if (contentRow.EntityType.StartsWith("Plex", StringComparison.Ordinal))
+        {
+            ContentDataGrid.ContextMenu = null;
+            return;
+        }
 
         bool isTrack = !string.IsNullOrEmpty(contentRow.FilePath);
         bool isAlbum = contentRow.EntityType == "Album";
@@ -4175,32 +4726,25 @@ public partial class MainWindow : Window
 
     private async Task LoadPodcastArtworkAsync(string? artworkUrl, CancellationToken cancellationToken)
     {
-        if (!Uri.TryCreate(artworkUrl, UriKind.Absolute, out var uri))
-            return;
-        try
-        {
-            var bytes = await RadioImageHttpClient.GetByteArrayAsync(uri, cancellationToken);
-            await using var stream = new MemoryStream(bytes);
-            var image = new BitmapImage();
-            image.BeginInit();
-            image.CacheOption = BitmapCacheOption.OnLoad;
-            image.StreamSource = stream;
-            image.DecodePixelWidth = 400;
-            image.EndInit();
-            image.Freeze();
-            if (!cancellationToken.IsCancellationRequested)
-                NowPlayingArtworkImage.Source = image;
-        }
-        catch
-        {
-            // Missing podcast artwork does not affect playback.
-        }
+        var image = await DownloadPodcastImageAsync(artworkUrl, 400, cancellationToken);
+        if (image is not null && !cancellationToken.IsCancellationRequested)
+            NowPlayingArtworkImage.Source = image;
     }
 
     private async Task LoadPodcastHeaderArtworkAsync(string? artworkUrl, CancellationToken cancellationToken)
     {
+        var image = await DownloadPodcastImageAsync(artworkUrl, 160, cancellationToken);
+        if (image is not null && !cancellationToken.IsCancellationRequested)
+            PodcastEpisodesArtwork.Source = image;
+    }
+
+    private static async Task<BitmapImage?> DownloadPodcastImageAsync(
+        string? artworkUrl,
+        int decodePixelWidth,
+        CancellationToken cancellationToken)
+    {
         if (!Uri.TryCreate(artworkUrl, UriKind.Absolute, out var uri))
-            return;
+            return null;
         try
         {
             var bytes = await RadioImageHttpClient.GetByteArrayAsync(uri, cancellationToken);
@@ -4209,15 +4753,14 @@ public partial class MainWindow : Window
             image.BeginInit();
             image.CacheOption = BitmapCacheOption.OnLoad;
             image.StreamSource = stream;
-            image.DecodePixelWidth = 160;
+            image.DecodePixelWidth = decodePixelWidth;
             image.EndInit();
             image.Freeze();
-            if (!cancellationToken.IsCancellationRequested)
-                PodcastEpisodesArtwork.Source = image;
+            return image;
         }
         catch
         {
-            // Missing podcast artwork does not affect the episode list.
+            return null;
         }
     }
 
@@ -4363,6 +4906,7 @@ public partial class MainWindow : Window
                 : $"{info.CodecName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz  ·  {info.Channels} ch";
         if (radioStation is null && podcastPlayback is null)
         {
+            var isPlexTrack = _plexTracksByUrl.TryGetValue(filePath, out var plexTrack);
             try
             {
                 using var db = AudioDatabase.OpenDefault();
@@ -4381,6 +4925,7 @@ public partial class MainWindow : Window
                 NowPlayingArtistButton.IsEnabled = artist is not null;
                 LyricsButton.IsEnabled = track is not null;
                 ArtistInfoButton.IsEnabled = artist is not null;
+                ArtistInfoButton.ToolTip = LocalizationManager.Current.ShowArtistInfo;
                 if (track is not null)
                 {
                     NowPlayingTitleBlock.Text = track.Title ?? filename;
@@ -4399,7 +4944,24 @@ public partial class MainWindow : Window
                 LyricsButton.IsEnabled = false;
                 ArtistInfoButton.IsEnabled = false;
             }
-            _ = LoadLyricsForTrackAsync(filePath, forceRefresh: false);
+            if (isPlexTrack && plexTrack is not null)
+            {
+                NowPlayingTitleBlock.Text = plexTrack.Title ?? filename;
+                NowPlayingArtistBlock.Text = plexTrack.Artist ?? string.Empty;
+                NowPlayingArtworkImage.Source = null;
+                LyricsBackgroundImage.Source = null;
+                _currentTrackId = null;
+                _currentArtistId = null;
+                _currentArtistName = plexTrack.Artist;
+                _currentTrackIsFavorite = false;
+                NowPlayingArtistButton.IsEnabled = false;
+                LyricsButton.IsEnabled = false;
+                ArtistInfoButton.IsEnabled = false;
+            }
+            else
+            {
+                _ = LoadLyricsForTrackAsync(filePath, forceRefresh: false);
+            }
         }
         else if (podcastPlayback is not null)
         {
@@ -4409,7 +4971,8 @@ public partial class MainWindow : Window
             _currentTrackIsFavorite = false;
             NowPlayingArtistButton.IsEnabled = false;
             LyricsButton.IsEnabled = false;
-            ArtistInfoButton.IsEnabled = false;
+            ArtistInfoButton.IsEnabled = true;
+            ArtistInfoButton.ToolTip = LocalizationManager.Current.ShowPodcastInfo;
             _ = LoadPodcastArtworkAsync(
                 podcastPlayback.Podcast.ArtworkUrl,
                 _playbackCts?.Token ?? CancellationToken.None);
@@ -4425,6 +4988,7 @@ public partial class MainWindow : Window
             _currentTrackIsFavorite = false;
             LyricsButton.IsEnabled = false;
             ArtistInfoButton.IsEnabled = false;
+            ArtistInfoButton.ToolTip = LocalizationManager.Current.ShowArtistInfo;
             StartRadioMetadataMonitor(radioStation);
         }
         UpdateNowPlayingFavoriteButton();
@@ -4547,6 +5111,8 @@ public partial class MainWindow : Window
         _currentPodcastPlayback = null;
         LyricsButton.IsEnabled = false;
         ArtistInfoButton.IsEnabled = false;
+        ArtistInfoButton.ToolTip = LocalizationManager.Current.ShowArtistInfo;
+        PodcastInfoView.Visibility = Visibility.Collapsed;
         ArtistInfoView.Visibility = Visibility.Collapsed;
         ClearRadioNowPlaying();
         UpdateNowPlayingFavoriteButton();
@@ -4863,6 +5429,7 @@ public partial class MainWindow : Window
     private void LyricsButton_OnClick(object sender, RoutedEventArgs e)
     {
         ArtistInfoView.Visibility = Visibility.Collapsed;
+        PodcastInfoView.Visibility = Visibility.Collapsed;
         LyricsView.Visibility = LyricsView.Visibility == Visibility.Visible
             ? Visibility.Collapsed
             : Visibility.Visible;
@@ -4918,10 +5485,24 @@ public partial class MainWindow : Window
 
     private async void ArtistInfoButton_OnClick(object sender, RoutedEventArgs e)
     {
+        if (_currentPodcastPlayback is { } podcastPlayback)
+        {
+            LyricsView.Visibility = Visibility.Collapsed;
+            ArtistInfoView.Visibility = Visibility.Collapsed;
+            PodcastInfoView.Visibility = PodcastInfoView.Visibility == Visibility.Visible
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+            if (PodcastInfoView.Visibility == Visibility.Visible)
+                ShowPodcastInfo(podcastPlayback);
+            UpdateBackButtonForDetailView();
+            return;
+        }
+
         if (_currentArtistId is not long artistId || string.IsNullOrWhiteSpace(_currentArtistName))
             return;
 
         LyricsView.Visibility = Visibility.Collapsed;
+        PodcastInfoView.Visibility = Visibility.Collapsed;
         ArtistInfoView.Visibility = ArtistInfoView.Visibility == Visibility.Visible
             ? Visibility.Collapsed
             : Visibility.Visible;
@@ -4931,6 +5512,9 @@ public partial class MainWindow : Window
     }
 
     private void CloseArtistInfoButton_OnClick(object sender, RoutedEventArgs e)
+        => CloseNowPlayingDetailViews();
+
+    private void ClosePodcastInfoButton_OnClick(object sender, RoutedEventArgs e)
         => CloseNowPlayingDetailViews();
 
     private async void ArtistInfoTitleButton_OnClick(object sender, RoutedEventArgs e)
@@ -4952,6 +5536,7 @@ public partial class MainWindow : Window
         {
             e.Handled = true;
             LyricsView.Visibility = Visibility.Collapsed;
+            PodcastInfoView.Visibility = Visibility.Collapsed;
             ArtistInfoView.Visibility = Visibility.Visible;
             UpdateBackButtonForDetailView();
             await ShowArtistInfoAsync(artistId, forceRefresh: false);
@@ -4963,6 +5548,7 @@ public partial class MainWindow : Window
         BackButton.Visibility =
             LyricsView.Visibility == Visibility.Visible ||
             ArtistInfoView.Visibility == Visibility.Visible ||
+            PodcastInfoView.Visibility == Visibility.Visible ||
             _navigationStack.Count > 0
                 ? Visibility.Visible
                 : Visibility.Collapsed;
@@ -4972,6 +5558,7 @@ public partial class MainWindow : Window
     {
         LyricsView.Visibility = Visibility.Collapsed;
         ArtistInfoView.Visibility = Visibility.Collapsed;
+        PodcastInfoView.Visibility = Visibility.Collapsed;
         BackButton.Visibility = _navigationStack.Count > 0
             ? Visibility.Visible
             : Visibility.Collapsed;
@@ -5520,12 +6107,24 @@ public partial class MainWindow : Window
             _settings.ArtistInfoSource       = window.SelectedArtistInfoSource;
             _settings.LastFmApiKey           = window.SelectedLastFmApiKey;
             _settings.QobuzApplicationId      = window.SelectedQobuzApplicationId;
+            _settings.PlexServers             = window.SelectedPlexServers.ToList();
+            _settings.ShowLocalLibrarySection = window.ShowLocalLibrarySection;
+            _settings.ShowOwnRadiosSection    = window.ShowOwnRadiosSection;
+            _settings.ShowMyPodcastsSection   = window.ShowMyPodcastsSection;
+            _settings.ShowPlexSection         = window.ShowPlexSection;
+            _settings.ShowPlaylistsSection    = window.ShowPlaylistsSection;
+            try
+            {
+                new WindowsPlexCredentialStore().SaveAll(window.SelectedPlexTokens);
+            }
+            catch { }
             _settingsStore.Save(_settings);
             ThemeManager.Apply(_settings.Theme);
             LocalizationManager.Apply(_settings.Language);
             ApplyArtistInfoSettings();
             RefreshSelectedDriverText();
             LoadNavPlaylists();
+            ApplySidebarNavigationSettings();
 
             StatusTextBlock.Text = _settings.OutputBackend switch
             {
@@ -5943,6 +6542,51 @@ public partial class MainWindow : Window
 
         border.Child = stack;
         return border;
+    }
+
+    private void ShowPodcastInfo(PodcastPlayback playback)
+    {
+        var episode = playback.Episode;
+        PodcastInfoImage.Source = null;
+        PodcastInfoImagePlaceholder.Visibility = Visibility.Visible;
+        PodcastInfoPodcastName.Text = playback.Podcast.Name;
+        PodcastInfoEpisodeTitle.Text = episode.Title;
+
+        var metadata = new List<string>();
+        if (episode.PublishedAt is { } publishedAt)
+            metadata.Add(string.Format(
+                LocalizationManager.Current.PodcastPublishedOn,
+                publishedAt.ToLocalTime().ToString("d")));
+        if (episode.FeedDuration is { } duration && duration > TimeSpan.Zero)
+            metadata.Add(string.Format(
+                LocalizationManager.Current.PodcastEpisodeDuration,
+                FormatTime(duration)));
+        if (!string.IsNullOrWhiteSpace(playback.Podcast.Author))
+            metadata.Add(playback.Podcast.Author);
+        if (!string.IsNullOrWhiteSpace(playback.Podcast.Genre))
+            metadata.Add(playback.Podcast.Genre);
+        PodcastInfoMetadata.Text = string.Join("  ·  ", metadata);
+
+        var description = NormalizePodcastDescription(episode.Description);
+        PodcastInfoDescription.Text = string.IsNullOrWhiteSpace(description)
+            ? LocalizationManager.Current.PodcastDescriptionUnavailable
+            : description;
+
+        _ = LoadPodcastInfoArtworkAsync(
+            playback.Podcast.ArtworkUrl,
+            _playbackCts?.Token ?? CancellationToken.None);
+    }
+
+    private async Task LoadPodcastInfoArtworkAsync(
+        string? artworkUrl,
+        CancellationToken cancellationToken)
+    {
+        var image = await DownloadPodcastImageAsync(artworkUrl, 600, cancellationToken);
+        if (image is null || cancellationToken.IsCancellationRequested)
+            return;
+
+        PodcastInfoImage.Source = image;
+        PodcastInfoImagePlaceholder.Visibility = Visibility.Collapsed;
     }
 
     private void DashboardBuildTopGenres(List<(string Genre, double Seconds)> genres)

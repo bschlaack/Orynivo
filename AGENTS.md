@@ -58,6 +58,9 @@ therefore contains cwASIO support without Steinberg SDK files.
 - `Orynivo/Streaming/IStreamingCatalog.cs` and `IStreamingPlaybackProvider.cs`: provider-neutral contracts for future streaming catalog and playback integrations
 - `Orynivo/Streaming/QobuzStreamingProvider.cs`: inactive Qobuz scaffold; do not add unofficial endpoints, enable it only with approved partner API documentation
 - `Orynivo/Streaming/WindowsStreamingCredentialStore.cs`: stores future provider secrets and tokens in `%LOCALAPPDATA%\Orynivo\streaming-credentials.dat` using Windows DPAPI for the current user
+- `Orynivo/Streaming/PlexServerClient.cs`: queries configured Plex Media Servers, exposes only music library sections (`type=artist`), pages artists/albums/tracks, resolves drill-down children, browses folders lazily, and builds authenticated direct-part URLs
+- `Orynivo/Streaming/WindowsPlexCredentialStore.cs`: stores per-server Plex access tokens in `%LOCALAPPDATA%\Orynivo\plex-credentials.dat` using Windows DPAPI for the current user
+- `AppSettings.PlexServers` stores Plex server IDs, display names, and base URLs; Plex tokens must not be added to `settings.json`
 - `AppSettings.QobuzApplicationId` stores only the non-secret Qobuz application identifier; client secrets and tokens must not be added to `settings.json`
 - `AppSettings.LastMainView` and `AppSettings.AlbumArtworkView` preserve the selected main view and album mode
 - `AppSettings.Volume` and `AppSettings.LastTrackPath` preserve volume and the last selected or played track; restoration requires both the file and database entry to exist
@@ -209,6 +212,9 @@ therefore contains cwASIO support without Steinberg SDK files.
 - The main window uses a modern sidebar, content area, and full-width transport bar
 - The full Orynivo logo appears on a light logo surface in the startup window and at the top of the main sidebar
 - The 220 px sidebar contains Dashboard, local library navigation, playlists, device information, About, and Settings
+- Local library, personal radio, pinned podcast, Plex server, and playlist sidebar groups use independently expandable accordion headers; expansion state is persisted
+- `AppSettings.ShowLocalLibrarySection`, `ShowOwnRadiosSection`, `ShowMyPodcastsSection`, `ShowPlexSection`, and `ShowPlaylistsSection` control group visibility from Settings > Appearance and default to visible
+- `AppSettings.IsLocalLibrarySectionExpanded`, `IsOwnRadiosSectionExpanded`, `IsMyPodcastsSectionExpanded`, `IsPlexSectionExpanded`, and `IsPlaylistsSectionExpanded` persist independent sidebar accordion states
 - About displays the author, library licenses, and the Steinberg ASIO trademark notice
 - The content header continues the native title-bar/sidebar appearance and shows title, count, search, filters, or album mode controls
 - The bottom transport bar shows artwork and track information, favorite state, playback controls, position, and volume
@@ -216,6 +222,10 @@ therefore contains cwASIO support without Steinberg SDK files.
 - Settings navigation reuses the main sidebar theme resources
 - All Settings buttons use the shared themed button style, including dynamic scan and remove buttons
 - Settings ComboBoxes use fully themed templates; device information follows the active theme and title-bar color
+- The Plex server editor uses themed inputs and buttons plus a DWM-colored native title bar; Plex credential persistence must not synchronously wait on asynchronous file I/O from the UI thread
+- Selecting a Plex audio library exposes Artists, Albums, Tracks, and Folders modes; lists load in pages of 500, artist/album rows drill down to children, and folder nodes query Plex only when expanded
+- Plex track rows reuse the main track table and playback path; Plex access tokens remain memory-only in generated stream URLs and must never be written to settings, documentation, logs, or source
+- Starting a Plex track from the folder tree queues only direct track siblings from that same tree level; subfolder tracks are excluded and the existing shuffle state applies to that sibling queue
 - DSD capability states use explicit supported and unsupported theme colors
 - A splash screen is shown while initial database preparation runs
 - Device information displays channels, buffer sizes, PCM rates, DSD levels, and readable raw formats
@@ -241,6 +251,7 @@ therefore contains cwASIO support without Steinberg SDK files.
 - Pinned podcasts appear under **My Podcasts** with `Podcast:{id}` tags. The context menu removes them from `podcasts`.
 - Podcast progress is saved about every five seconds and when playback stops. Incomplete episodes resume at the saved position; episodes reaching 95 percent or ending normally are shown as played.
 - The podcast episode view uses the same violet-blue accent border as the radio now-playing card and a 150 px podcast image. Its header shows total, unheard, and started episode counts plus feed categories, language, latest publication date, and a shortened feed description.
+- During podcast playback, the transport info button opens a dedicated detail view with centered podcast artwork, podcast and episode titles, publication metadata, duration, genre, and the episode RSS summary
 - During radio playback, the Internet Radio page shows a large station logo and live ICY title/artist metadata when supplied by the stream; the transport summary is updated at the same time.
 - Radio search results expose a multi-select genre popup derived from normalized Radio Browser tags. Selected genres use OR semantics, technical tags are excluded, and unavailable selections are removed after a new search.
 - The page contains:

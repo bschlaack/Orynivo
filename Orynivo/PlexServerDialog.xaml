@@ -1,0 +1,178 @@
+<Window x:Class="Orynivo.PlexServerDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{DynamicResource L_PlexServerDialogTitle}"
+        Icon="Assets/Orynivo.ico"
+        Width="460"
+        SizeToContent="Height"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppSurfaceBrush}"
+        Foreground="{DynamicResource AppPrimaryTextBrush}"
+        SourceInitialized="PlexServerDialog_OnSourceInitialized">
+    <Window.Resources>
+        <Style x:Key="PlexDialogButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource AppButtonBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppButtonTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppButtonBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder"
+                                        Property="Background"
+                                        Value="{DynamicResource AppButtonHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder"
+                                        Property="Background"
+                                        Value="{DynamicResource AppButtonPressedBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.55"/>
+                                <Setter Property="Cursor" Value="Arrow"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="PlexDialogAccentButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#6C63FF"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="#6C63FF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder"
+                                        Property="Background"
+                                        Value="#7B73FF"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder"
+                                        Property="Background"
+                                        Value="#5C54E8"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.55"/>
+                                <Setter Property="Cursor" Value="Arrow"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+    <Grid Margin="24,20,24,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="{DynamicResource L_PlexServerName}"
+                   Foreground="{DynamicResource AppMutedTextBrush}"
+                   Margin="0,0,0,6"/>
+        <TextBox x:Name="NameTextBox"
+                 Grid.Row="1"
+                 Height="34"
+                 Padding="10,0"
+                 VerticalContentAlignment="Center"
+                 Background="{DynamicResource AppInputBrush}"
+                 Foreground="{DynamicResource AppPrimaryTextBrush}"
+                 BorderBrush="{DynamicResource AppInputBorderBrush}"
+                 CaretBrush="{DynamicResource AppPrimaryTextBrush}"
+                 Margin="0,0,0,14"/>
+
+        <TextBlock Grid.Row="2"
+                   Text="{DynamicResource L_PlexServerUrl}"
+                   Foreground="{DynamicResource AppMutedTextBrush}"
+                   Margin="0,0,0,6"/>
+        <TextBox x:Name="UrlTextBox"
+                 Grid.Row="3"
+                 Height="34"
+                 Padding="10,0"
+                 VerticalContentAlignment="Center"
+                 Background="{DynamicResource AppInputBrush}"
+                 Foreground="{DynamicResource AppPrimaryTextBrush}"
+                 BorderBrush="{DynamicResource AppInputBorderBrush}"
+                 CaretBrush="{DynamicResource AppPrimaryTextBrush}"
+                 Margin="0,0,0,14"/>
+
+        <TextBlock Grid.Row="4"
+                   Text="{DynamicResource L_PlexToken}"
+                   Foreground="{DynamicResource AppMutedTextBrush}"
+                   Margin="0,0,0,6"/>
+        <PasswordBox x:Name="TokenPasswordBox"
+                     Grid.Row="5"
+                     Height="34"
+                     Padding="10,0"
+                     VerticalContentAlignment="Center"
+                     Background="{DynamicResource AppInputBrush}"
+                     Foreground="{DynamicResource AppPrimaryTextBrush}"
+                     BorderBrush="{DynamicResource AppInputBorderBrush}"
+                     CaretBrush="{DynamicResource AppPrimaryTextBrush}"
+                     Margin="0,0,0,8"/>
+
+        <TextBlock x:Name="StatusTextBlock"
+                   Grid.Row="6"
+                   MinHeight="18"
+                   Foreground="{DynamicResource AppMutedTextBrush}"
+                   TextWrapping="Wrap"
+                   Margin="0,0,0,16"/>
+
+        <Grid Grid.Row="7">
+            <Button x:Name="TestConnectionButton"
+                    Content="{DynamicResource L_PlexTestConnection}"
+                    Width="132"
+                    Height="34"
+                    HorizontalAlignment="Left"
+                    Style="{StaticResource PlexDialogButtonStyle}"
+                    Click="TestConnectionButton_OnClick"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="{DynamicResource L_Cancel}"
+                        Width="90"
+                        Height="34"
+                        Margin="0,0,8,0"
+                        IsCancel="True"
+                        Style="{StaticResource PlexDialogButtonStyle}"/>
+                <Button Content="{DynamicResource L_Save}"
+                        Width="90"
+                        Height="34"
+                        IsDefault="True"
+                        Style="{StaticResource PlexDialogAccentButtonStyle}"
+                        Click="SaveButton_OnClick"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

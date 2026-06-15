@@ -4,10 +4,20 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.4.0] - 2026-06-15
 
 ### Fixed
 
+- Plex folder playback now queues only the tracks on the selected file's
+  immediate folder level, continues with sibling entries, and respects shuffle
+  without recursively adding tracks from subfolders.
+- Prevented the application from freezing after saving or reopening Plex server
+  settings by removing synchronous waits on asynchronous credential file I/O.
+- Applied the active light or dark theme to the Plex server dialog title bar,
+  input fields, and all dialog buttons.
+- Standardized line spacing throughout the About dialog license list.
+- Fixed dark-theme text and check-mark styling for the sidebar visibility
+  options under **Settings > Appearance**.
 - Fixed native DSF playback from drives that return partial asynchronous reads
   by preserving complete per-channel DSF blocks and stopping at the declared
   data chunk boundary.
@@ -16,6 +26,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Plex music-library browsing with switchable artist, album, track, and lazy
+  folder views, artist/album drill-down, paginated large result sets, and
+  playback through the existing audio path.
+- Audio-format columns in track search results and playlist/favorites-based
+  track lists.
+- Configurable multi-server Plex integration with Windows user-bound encrypted
+  access tokens and connection testing under **Settings > Streaming services**.
+- A hideable Plex sidebar accordion below podcasts that lists configured
+  servers and only their music libraries.
+- Podcast details through the transport info button during episode playback,
+  showing centered podcast artwork, episode metadata, and the RSS summary.
+- Accordion sections for local library, personal radios, pinned podcasts, and
+  playlists in the main sidebar, with per-section visibility options under
+  **Settings > Appearance**, independent expansion, and persisted open states.
 - MIT-licensed cwASIO output backend with PCM and native DSD support through
   the existing bridge and playback paths.
 - Separate **Steinberg ASIO** and **cwASIO** choices in Settings; availability
@@ -45,6 +69,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- The About dialog now displays the Orynivo logo above the author and license
+  information.
 - Dashboard calendar and top-genre durations now use `HH:mm:ss`.
 - Dashboard calendar genres and Top 10 genre labels now open Tracks with the
   clicked genre filter preselected.

@@ -7,6 +7,7 @@ using Color  = System.Windows.Media.Color;
 using Orynivo.Audio;
 using Orynivo.Library;
 using Orynivo.Localization;
+using Orynivo.Streaming;
 using UiLanguage = Orynivo.Localization.Language;
 using System.Runtime.InteropServices;
 using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
@@ -24,6 +25,8 @@ public partial class SettingsWindow : Window
 
     private readonly AppSettings _settings;
     private readonly List<string> _libraryPaths = [];
+    private readonly List<PlexServerSettings> _plexServers = [];
+    private readonly Dictionary<string, string> _plexTokens = [];
     private readonly Dictionary<string, CancellationTokenSource> _activeScans = [];
     private readonly Action<List<string>>? _onLibraryPathsChanged;
     private readonly bool _steinbergAsioAvailable = SteinbergAsioStream.IsAvailable;
@@ -66,6 +69,11 @@ public partial class SettingsWindow : Window
         };
         LanguageComboBox.ItemsSource = languageChoices;
         LanguageComboBox.SelectedItem = languageChoices.First(choice => choice.Value == settings.Language);
+        ShowLocalLibrarySectionCheckBox.IsChecked = settings.ShowLocalLibrarySection;
+        ShowOwnRadiosSectionCheckBox.IsChecked = settings.ShowOwnRadiosSection;
+        ShowMyPodcastsSectionCheckBox.IsChecked = settings.ShowMyPodcastsSection;
+        ShowPlexSectionCheckBox.IsChecked = settings.ShowPlexSection;
+        ShowPlaylistsSectionCheckBox.IsChecked = settings.ShowPlaylistsSection;
         ArtistInfoSourceComboBox.ItemsSource = Enum.GetValues<ArtistInfoSource>();
         ArtistInfoSourceComboBox.SelectedItem = settings.ArtistInfoSource;
         LastFmApiKeyTextBox.Text = settings.LastFmApiKey ?? string.Empty;
@@ -74,7 +82,15 @@ public partial class SettingsWindow : Window
             ? Visibility.Visible
             : Visibility.Collapsed;
         _libraryPaths.AddRange(settings.LibraryPaths);
+        _plexServers.AddRange((settings.PlexServers ?? []).Select(ClonePlexServer));
+        try
+        {
+            foreach (var credential in new WindowsPlexCredentialStore().LoadAll())
+                _plexTokens[credential.Key] = credential.Value;
+        }
+        catch { }
         RebuildDirectoryList();
+        RebuildPlexServerList();
         LoadDrivers();
         NavListBox.SelectedIndex = 1; // "Ausgabegerät" als Standard
     }
@@ -97,6 +113,119 @@ public partial class SettingsWindow : Window
         ArtistInfoSourceComboBox.SelectedItem is ArtistInfoSource src ? src : ArtistInfoSource.Wikipedia;
     public string SelectedLastFmApiKey => LastFmApiKeyTextBox.Text.Trim();
     public string SelectedQobuzApplicationId => QobuzApplicationIdTextBox.Text.Trim();
+    public IReadOnlyList<PlexServerSettings> SelectedPlexServers =>
+        _plexServers.Select(ClonePlexServer).ToList().AsReadOnly();
+    public IReadOnlyDictionary<string, string> SelectedPlexTokens => _plexTokens;
+    public bool ShowLocalLibrarySection => ShowLocalLibrarySectionCheckBox.IsChecked == true;
+    public bool ShowOwnRadiosSection => ShowOwnRadiosSectionCheckBox.IsChecked == true;
+    public bool ShowMyPodcastsSection => ShowMyPodcastsSectionCheckBox.IsChecked == true;
+    public bool ShowPlexSection => ShowPlexSectionCheckBox.IsChecked == true;
+    public bool ShowPlaylistsSection => ShowPlaylistsSectionCheckBox.IsChecked == true;
+
+    private static PlexServerSettings ClonePlexServer(PlexServerSettings server) => new()
+    {
+        Id = server.Id,
+        Name = server.Name,
+        BaseUrl = server.BaseUrl
+    };
+
+    private void RebuildPlexServerList()
+    {
+        PlexServersPanel.Children.Clear();
+        foreach (var server in _plexServers)
+        {
+            var row = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var description = new StackPanel();
+            description.Children.Add(new TextBlock
+            {
+                Text = server.Name,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = (System.Windows.Media.Brush)FindResource("AppPrimaryTextBrush"),
+                TextTrimming = TextTrimming.CharacterEllipsis
+            });
+            description.Children.Add(new TextBlock
+            {
+                Text = server.BaseUrl,
+                FontSize = 11,
+                Foreground = (System.Windows.Media.Brush)FindResource("AppMutedTextBrush"),
+                TextTrimming = TextTrimming.CharacterEllipsis
+            });
+            row.Children.Add(description);
+
+            var editButton = new Button
+            {
+                Content = LocalizationManager.Current.PlexEditServer,
+                Tag = server.Id,
+                Width = 80,
+                Height = 28,
+                Margin = new Thickness(8, 0, 0, 0),
+                Style = (Style)FindResource("SettingsButtonStyle")
+            };
+            editButton.Click += EditPlexServerButton_OnClick;
+            Grid.SetColumn(editButton, 1);
+            row.Children.Add(editButton);
+
+            var removeButton = new Button
+            {
+                Content = LocalizationManager.Current.PlexRemoveServer,
+                Tag = server.Id,
+                Width = 80,
+                Height = 28,
+                Margin = new Thickness(8, 0, 0, 0),
+                Style = (Style)FindResource("SettingsButtonStyle")
+            };
+            removeButton.Click += RemovePlexServerButton_OnClick;
+            Grid.SetColumn(removeButton, 2);
+            row.Children.Add(removeButton);
+            PlexServersPanel.Children.Add(row);
+        }
+    }
+
+    private void AddPlexServerButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new PlexServerDialog { Owner = this };
+        if (dialog.ShowDialog() != true)
+            return;
+
+        _plexServers.Add(dialog.Server);
+        _plexTokens[dialog.Server.Id] = dialog.Token;
+        RebuildPlexServerList();
+    }
+
+    private void EditPlexServerButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string id })
+            return;
+        var index = _plexServers.FindIndex(server => server.Id == id);
+        if (index < 0)
+            return;
+
+        var dialog = new PlexServerDialog(
+            _plexServers[index],
+            _plexTokens.GetValueOrDefault(id))
+        {
+            Owner = this
+        };
+        if (dialog.ShowDialog() != true)
+            return;
+
+        _plexServers[index] = dialog.Server;
+        _plexTokens[id] = dialog.Token;
+        RebuildPlexServerList();
+    }
+
+    private void RemovePlexServerButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string id })
+            return;
+        _plexServers.RemoveAll(server => server.Id == id);
+        _plexTokens.Remove(id);
+        RebuildPlexServerList();
+    }
 
     protected override void OnClosed(EventArgs e)
     {

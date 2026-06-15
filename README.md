@@ -19,6 +19,9 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 - SQLite music library with multiple monitored directories
 - Metadata and embedded artwork extraction through TagLibSharp
 - Artist, album, track, and folder views
+- Space-saving accordion sections in the main sidebar, with configurable
+  visibility and persisted independent expansion for library, personal radio,
+  podcast, and playlist sections
 - Linked artist and album names for direct navigation to artist albums and album tracks
 - Conservative artist-name normalization for `feat.` credits and unambiguous case, accent, spacing, and punctuation variants, with a repair action for existing libraries
 - Live A-Z/# quick navigation beside alphabetically sorted artist, album, and track lists
@@ -41,6 +44,8 @@ plus a multi-resolution Windows application icon based on the standalone logo.
   resume from the saved position
 - Podcast detail cards with large artwork, feed description and metadata, and
   total, unheard, and started episode statistics
+- A transport info view for the currently playing podcast episode with centered
+  podcast artwork, publication data, duration, genre, and RSS summary
 - Radio and podcast filter catalogs are shown before a search; after entering a
   search term, filter options and counts are recalculated from that result set
 - Podcast category and language filters can be used without entering a title
@@ -63,6 +68,9 @@ plus a multi-resolution Windows application icon based on the standalone logo.
   stations, pinned podcasts, history, artwork, and configured library directories
 - Light and dark themes
 - German, English, French, and Spanish user interfaces
+- Multiple Plex Media Server configurations with protected access tokens and
+  music-library discovery, artist/album/track browsing, folder navigation, and
+  playback
 - Provider-neutral streaming interfaces with a prepared Qobuz configuration
   page for future approved partner API access
 
@@ -164,6 +172,7 @@ Orynivo stores its local data under `%LOCALAPPDATA%\Orynivo\`:
 
 - `settings.json`: application settings
 - `streaming-credentials.dat`: Windows user-bound encrypted streaming secrets
+- `plex-credentials.dat`: Windows user-bound encrypted Plex access tokens
 - `library.db`: SQLite music library and playback history
 - `logs\`: timestamped crash reports for unhandled application errors
 - `artworks\`: original artwork and generated thumbnails
@@ -213,6 +222,9 @@ artwork, rebasing paths, and rebuilding the search index.
   only the provider-neutral integration layer and settings scaffold; an approved
   Qobuz partner API contract and official endpoint documentation are still
   required.
+- Plex browsing is paginated to keep very large libraries responsive. Playback
+  availability depends on the selected Plex part being directly accessible and
+  decodable by the installed FFmpeg build.
 - Renaming or merging artists updates Orynivo's internal library, album
   assignments, and search index. It does not modify tags in the audio files.
 - ASIO devices may be unavailable for inspection or playback while another

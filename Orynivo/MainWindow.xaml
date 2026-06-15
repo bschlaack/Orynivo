@@ -14,6 +14,7 @@
             <Setter Property="Padding" Value="0" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="MaxWidth" Value="220"/>
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
@@ -22,8 +23,10 @@
                                 Background="Transparent"
                                 BorderThickness="3,0,0,0"
                                 BorderBrush="Transparent"
-                                Padding="21,8,12,8">
-                            <ContentPresenter VerticalAlignment="Center" />
+                                Padding="21,8,12,8"
+                                ClipToBounds="True">
+                            <ContentPresenter VerticalAlignment="Center"
+                                              HorizontalAlignment="Stretch"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsSelected" Value="True">
@@ -43,6 +46,42 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+        </Style>
+
+        <Style x:Key="NavSectionHeaderStyle" TargetType="ListBoxItem">
+            <Setter Property="Foreground" Value="{DynamicResource AppMutedTextBrush}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="MaxWidth" Value="220"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                Padding="24,12,14,5"
+                                ClipToBounds="True">
+                            <ContentPresenter VerticalAlignment="Center"
+                                              HorizontalAlignment="Stretch"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AppNavHoverBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AppNavHoverTextBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="NavItemTextStyle" TargetType="TextBlock">
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="TextWrapping" Value="NoWrap"/>
+            <Setter Property="MaxWidth" Value="170"/>
         </Style>
 
         <!-- Transport secondary button -->
@@ -606,7 +645,10 @@
                      BorderThickness="0"
                      Padding="0,8,0,8"
                      FontSize="13"
+                     ClipToBounds="True"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                      SelectionChanged="NavListBox_OnSelectionChanged"
+                     PreviewMouseLeftButtonDown="NavListBox_OnPreviewMouseLeftButtonDown"
                      PreviewMouseLeftButtonUp="NavListBox_OnPreviewMouseLeftButtonUp"
                      PreviewMouseRightButtonDown="NavListBox_OnPreviewMouseRightButtonDown">
 
@@ -631,35 +673,123 @@
                     </StackPanel>
                 </ListBoxItem>
 
-                <ListBoxItem IsHitTestVisible="False" Focusable="False"
-                             Foreground="#44445A" FontSize="10" FontWeight="Bold"
-                             Padding="24,12,0,4">
-                    <TextBlock Text="{DynamicResource L_LocalLibrary}"/>
+                <ListBoxItem x:Name="LocalLibraryHeaderItem"
+                             Tag="Section:LocalLibrary"
+                             FontSize="10"
+                             FontWeight="Bold"
+                             Style="{StaticResource NavSectionHeaderStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{DynamicResource L_LocalLibrary}"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <Path x:Name="LocalLibraryHeaderArrow"
+                              Grid.Column="1"
+                              Width="8"
+                              Height="5"
+                              Data="M 0 0 L 4 5 L 8 0"
+                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                              StrokeThickness="1.4"
+                              RenderTransformOrigin="0.5,0.5"/>
+                    </Grid>
                 </ListBoxItem>
-                <ListBoxItem Tag="Artists"  Style="{StaticResource NavItemStyle}"><TextBlock Text="{DynamicResource L_Artists}"/></ListBoxItem>
-                <ListBoxItem Tag="Albums"   Style="{StaticResource NavItemStyle}"><TextBlock Text="{DynamicResource L_Albums}"/></ListBoxItem>
-                <ListBoxItem Tag="Tracks"   Style="{StaticResource NavItemStyle}"><TextBlock Text="{DynamicResource L_Tracks}"/></ListBoxItem>
-                <ListBoxItem Tag="Folders"  Style="{StaticResource NavItemStyle}"><TextBlock Text="{DynamicResource L_FolderStructure}"/></ListBoxItem>
+                <ListBoxItem x:Name="ArtistsNavItem" Tag="Artists" Style="{StaticResource NavItemStyle}"><TextBlock Text="{DynamicResource L_Artists}" Style="{StaticResource NavItemTextStyle}"/></ListBoxItem>
+                <ListBoxItem x:Name="AlbumsNavItem" Tag="Albums" Style="{StaticResource NavItemStyle}"><TextBlock Text="{DynamicResource L_Albums}" Style="{StaticResource NavItemTextStyle}"/></ListBoxItem>
+                <ListBoxItem x:Name="TracksNavItem" Tag="Tracks" Style="{StaticResource NavItemStyle}"><TextBlock Text="{DynamicResource L_Tracks}" Style="{StaticResource NavItemTextStyle}"/></ListBoxItem>
+                <ListBoxItem x:Name="FoldersNavItem" Tag="Folders" Style="{StaticResource NavItemStyle}"><TextBlock Text="{DynamicResource L_FolderStructure}" Style="{StaticResource NavItemTextStyle}"/></ListBoxItem>
 
                 <ListBoxItem x:Name="OwnRadiosHeaderItem"
-                             IsHitTestVisible="False" Focusable="False"
-                             Foreground="#44445A" FontSize="10" FontWeight="Bold"
-                             Padding="24,16,0,4">
-                    <TextBlock Text="{DynamicResource L_OwnRadios}"/>
+                             Tag="Section:OwnRadios"
+                             FontSize="10"
+                             FontWeight="Bold"
+                             Style="{StaticResource NavSectionHeaderStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{DynamicResource L_OwnRadios}"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <Path x:Name="OwnRadiosHeaderArrow"
+                              Grid.Column="1"
+                              Width="8"
+                              Height="5"
+                              Data="M 0 0 L 4 5 L 8 0"
+                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                              StrokeThickness="1.4"
+                              RenderTransformOrigin="0.5,0.5"/>
+                    </Grid>
                 </ListBoxItem>
 
                 <ListBoxItem x:Name="MyPodcastsHeaderItem"
-                             IsHitTestVisible="False" Focusable="False"
-                             Foreground="#44445A" FontSize="10" FontWeight="Bold"
-                             Padding="24,16,0,4">
-                    <TextBlock Text="{DynamicResource L_MyPodcasts}"/>
+                             Tag="Section:MyPodcasts"
+                             FontSize="10"
+                             FontWeight="Bold"
+                             Style="{StaticResource NavSectionHeaderStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{DynamicResource L_MyPodcasts}"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <Path x:Name="MyPodcastsHeaderArrow"
+                              Grid.Column="1"
+                              Width="8"
+                              Height="5"
+                              Data="M 0 0 L 4 5 L 8 0"
+                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                              StrokeThickness="1.4"
+                              RenderTransformOrigin="0.5,0.5"/>
+                    </Grid>
+                </ListBoxItem>
+
+                <ListBoxItem x:Name="PlexHeaderItem"
+                             Tag="Section:Plex"
+                             FontSize="10"
+                             FontWeight="Bold"
+                             Style="{StaticResource NavSectionHeaderStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{DynamicResource L_PlexServers}"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <Path x:Name="PlexHeaderArrow"
+                              Grid.Column="1"
+                              Width="8"
+                              Height="5"
+                              Data="M 0 0 L 4 5 L 8 0"
+                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                              StrokeThickness="1.4"
+                              RenderTransformOrigin="0.5,0.5"/>
+                    </Grid>
                 </ListBoxItem>
 
                 <ListBoxItem x:Name="PlaylistsHeaderItem"
-                             IsHitTestVisible="False" Focusable="False"
-                             Foreground="#44445A" FontSize="10" FontWeight="Bold"
-                             Padding="24,16,0,4">
-                    <TextBlock Text="{DynamicResource L_Playlists}"/>
+                             Tag="Section:Playlists"
+                             FontSize="10"
+                             FontWeight="Bold"
+                             Style="{StaticResource NavSectionHeaderStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{DynamicResource L_Playlists}"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <Path x:Name="PlaylistsHeaderArrow"
+                              Grid.Column="1"
+                              Width="8"
+                              Height="5"
+                              Data="M 0 0 L 4 5 L 8 0"
+                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                              StrokeThickness="1.4"
+                              RenderTransformOrigin="0.5,0.5"/>
+                    </Grid>
                 </ListBoxItem>
                 <!-- Eigene Radios, Podcasts und Playlist-Einträge werden per Code ergänzt. -->
             </ListBox>
@@ -812,6 +942,49 @@
                                          MinWidth="88"
                                          Content="{DynamicResource L_Artwork}"
                                          Checked="AlbumViewModeRadioButton_OnChecked"/>
+                        </StackPanel>
+                    </Border>
+                    <Border x:Name="PlexViewModeBorder"
+                            Grid.Column="6"
+                            Margin="20,0,0,0"
+                            Padding="3"
+                            Background="#252640"
+                            CornerRadius="9"
+                            Visibility="Collapsed">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton x:Name="PlexArtistsViewRadioButton"
+                                         GroupName="PlexViewMode"
+                                         Style="{StaticResource ViewModeRadioStyle}"
+                                         MinWidth="76"
+                                         Content="{DynamicResource L_Artists}"
+                                         IsChecked="True"
+                                         Tag="Artists"
+                                         Checked="PlexViewModeRadioButton_OnChecked"/>
+                            <RadioButton GroupName="PlexViewMode"
+                                         Style="{StaticResource ViewModeRadioStyle}"
+                                         MinWidth="76"
+                                         Content="{DynamicResource L_Albums}"
+                                         Tag="Albums"
+                                         Checked="PlexViewModeRadioButton_OnChecked"/>
+                            <RadioButton GroupName="PlexViewMode"
+                                         Style="{StaticResource ViewModeRadioStyle}"
+                                         MinWidth="76"
+                                         Content="{DynamicResource L_Tracks}"
+                                         Tag="Tracks"
+                                         Checked="PlexViewModeRadioButton_OnChecked"/>
+                            <RadioButton GroupName="PlexViewMode"
+                                         Style="{StaticResource ViewModeRadioStyle}"
+                                         MinWidth="92"
+                                         Content="{DynamicResource L_FolderStructure}"
+                                         Tag="Folders"
+                                         Checked="PlexViewModeRadioButton_OnChecked"/>
+                            <Button x:Name="PlexLoadMoreButton"
+                                    Margin="5,0,0,0"
+                                    Padding="10,3"
+                                    Visibility="Collapsed"
+                                    Style="{StaticResource HeaderFilterButtonStyle}"
+                                    Content="{DynamicResource L_LoadMore}"
+                                    Click="PlexLoadMoreButton_OnClick"/>
                         </StackPanel>
                     </Border>
                 </Grid>
@@ -2007,6 +2180,94 @@
                                    Foreground="White"/>
                     </Grid>
                 </Grid>
+            </Grid>
+
+            <!-- Podcast-Infoansicht -->
+            <Grid x:Name="PodcastInfoView"
+                  Grid.Row="1"
+                  Visibility="Collapsed"
+                  Background="{DynamicResource AppContentBrush}"
+                  Panel.ZIndex="21">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <Grid Margin="60,30,60,50">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid Grid.Row="0">
+                            <TextBlock Text="{DynamicResource L_PodcastInfo}"
+                                       FontSize="28"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource AppPrimaryTextBrush}"/>
+                            <Button HorizontalAlignment="Right"
+                                    Style="{StaticResource TransportBtnStyle}"
+                                    ToolTip="{DynamicResource L_ClosePodcastInfo}"
+                                    Click="ClosePodcastInfoButton_OnClick">
+                                <TextBlock Text="×" FontSize="20"/>
+                            </Button>
+                        </Grid>
+                        <Border Grid.Row="1"
+                                Width="300"
+                                Height="300"
+                                Margin="0,28,0,22"
+                                HorizontalAlignment="Center"
+                                Background="{DynamicResource AppArtworkPlaceholderBrush}"
+                                CornerRadius="12"
+                                ClipToBounds="True">
+                            <Grid>
+                                <Image x:Name="PodcastInfoImage"
+                                       Stretch="UniformToFill"/>
+                                <TextBlock x:Name="PodcastInfoImagePlaceholder"
+                                           Text="◍"
+                                           FontSize="72"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource AppMutedTextBrush}"/>
+                            </Grid>
+                        </Border>
+                        <TextBlock x:Name="PodcastInfoPodcastName"
+                                   Grid.Row="2"
+                                   MaxWidth="900"
+                                   HorizontalAlignment="Center"
+                                   TextAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   FontSize="24"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource AppPrimaryTextBrush}"/>
+                        <TextBlock x:Name="PodcastInfoEpisodeTitle"
+                                   Grid.Row="3"
+                                   MaxWidth="900"
+                                   Margin="0,12,0,0"
+                                   HorizontalAlignment="Center"
+                                   TextAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   FontSize="19"
+                                   FontWeight="SemiBold"
+                                   Foreground="#6C63FF"/>
+                        <TextBlock x:Name="PodcastInfoMetadata"
+                                   Grid.Row="4"
+                                   Margin="0,10,0,24"
+                                   HorizontalAlignment="Center"
+                                   TextAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource AppMutedTextBrush}"/>
+                        <TextBlock x:Name="PodcastInfoDescription"
+                                   Grid.Row="5"
+                                   MaxWidth="900"
+                                   HorizontalAlignment="Center"
+                                   TextWrapping="Wrap"
+                                   FontSize="18"
+                                   LineHeight="28"
+                                   Foreground="{DynamicResource AppPrimaryTextBrush}"/>
+                    </Grid>
+                </ScrollViewer>
             </Grid>
 
             <!-- Künstlerinfoansicht -->
