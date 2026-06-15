@@ -134,6 +134,7 @@
         <sys:String x:Key="L_Artist" xmlns:sys="clr-namespace:System;assembly=mscorlib">Künstler</sys:String>
         <sys:String x:Key="L_Album" xmlns:sys="clr-namespace:System;assembly=mscorlib">Album</sys:String>
         <sys:String x:Key="L_Duration" xmlns:sys="clr-namespace:System;assembly=mscorlib">Dauer</sys:String>
+        <sys:String x:Key="L_CwAsioOutputDevice" xmlns:sys="clr-namespace:System;assembly=mscorlib">cwASIO-Ausgabegerät</sys:String>
         <sys:String x:Key="L_DailyHistoryTitle" xmlns:sys="clr-namespace:System;assembly=mscorlib">Hörverlauf</sys:String>
         <sys:String x:Key="L_PlayedAt" xmlns:sys="clr-namespace:System;assembly=mscorlib">Gehört um</sys:String>
         <sys:String x:Key="L_ListenedDuration" xmlns:sys="clr-namespace:System;assembly=mscorlib">Gehört</sys:String>

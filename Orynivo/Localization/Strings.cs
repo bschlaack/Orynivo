@@ -142,6 +142,9 @@ public sealed record LocalizedStrings(
 {
     public string OutputType { get; init; } = "";
     public string AsioOutputDevice { get; init; } = "";
+    public string CwAsioOutputDevice { get; init; } = "";
+    public string SteinbergAsio { get; init; } = "";
+    public string CwAsio { get; init; } = "";
     public string WasapiOutputDevice { get; init; } = "";
     public string DeviceInfo { get; init; } = "";
     public string DatabaseOptimizeHint { get; init; } = "";

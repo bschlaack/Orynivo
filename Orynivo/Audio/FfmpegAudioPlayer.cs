@@ -34,10 +34,13 @@ public sealed class FfmpegAudioPlayer : IAudioPlayer
     public float Volume { get; set; } = 1.0f;
 
     public static async Task<(FfmpegAudioPlayer AudioPlayer, AudioFileInfo Info)> CreateAsync(
-        string filePath, string driverName, CancellationToken cancellationToken = default)
+        string filePath,
+        OutputBackend backend,
+        string driverName,
+        CancellationToken cancellationToken = default)
     {
         var info = await ProbeAsync(filePath, cancellationToken);
-        var stream = new SteinbergAsioStream(driverName, info.OutputSampleRate, 2);
+        var stream = new SteinbergAsioStream(backend, driverName, info.OutputSampleRate, 2);
         stream.Start();
         return (new FfmpegAudioPlayer(stream, StartFfmpeg(filePath, info.OutputSampleRate, TimeSpan.Zero), filePath, info), info);
     }

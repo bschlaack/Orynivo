@@ -26,6 +26,7 @@
 
             <StackPanel>
                 <TextBlock Text="ASIO is a trademark and software of Steinberg Media Technologies GmbH."/>
+                <TextBlock Text="cwASIO — MIT License" Margin="0,6,0,0"/>
                 <TextBlock Text="Lucene.NET 4.8.0-beta00017 — Apache License 2.0"/>
                 <TextBlock Text="Microsoft.Data.Sqlite 9.0.5 — MIT License" Margin="0,6,0,0"/>
                 <TextBlock Text="NAudio 2.3.0 — MIT License" Margin="0,6,0,0"/>

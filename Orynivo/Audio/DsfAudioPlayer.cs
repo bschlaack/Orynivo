@@ -37,19 +37,25 @@ public sealed class DsfAudioPlayer : IAudioPlayer
 
     public static async Task<(DsfAudioPlayer AudioPlayer, AudioFileInfo Info)> CreateAsync(
         string filePath,
+        OutputBackend backend,
         string driverName,
         CancellationToken cancellationToken = default)
     {
         var file = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
         try
         {
-            var info = await ReadHeaderAsync(file, cancellationToken).ConfigureAwait(false);
+            var info = await ReadHeaderAsync(file, cancellationToken);
             if (info.Channels != 2)
             {
                 throw new NotSupportedException("Native DSD playback currently supports stereo DSF files only.");
             }
 
-            var stream = new SteinbergAsioStream(driverName, info.FileInfo.OutputSampleRate, info.Channels, dsd: true);
+            var stream = new SteinbergAsioStream(
+                backend,
+                driverName,
+                info.FileInfo.OutputSampleRate,
+                info.Channels,
+                dsd: true);
             stream.Start();
             return (new DsfAudioPlayer(stream, file, info.Channels, info.BlockSizePerChannel, info.DataStartPosition, info.DataLength, info.FileInfo), info.FileInfo);
         }
@@ -105,27 +111,33 @@ public sealed class DsfAudioPlayer : IAudioPlayer
     {
         var planarBlock = new byte[_blockSizePerChannel * _channels];
         var interleaved = new byte[planarBlock.Length];
+        var dataEndPosition = _dataStartPosition + _dataLength;
 
-        while (!_cts.IsCancellationRequested)
+        while (!_cts.IsCancellationRequested && _file.Position < dataEndPosition)
         {
             if (_paused)
             {
                 await Task.Delay(10, _cts.Token).ConfigureAwait(false);
                 continue;
             }
-            var bytesRead = await _file.ReadAsync(planarBlock, _cts.Token).ConfigureAwait(false);
-            if (bytesRead == 0)
+
+            var bytesRemaining = dataEndPosition - _file.Position;
+            if (bytesRemaining < planarBlock.Length)
             {
                 break;
             }
 
-            var completeChannelBytes = bytesRead / _channels;
-            if (completeChannelBytes == 0)
+            var bytesRead = await _file.ReadAtLeastAsync(
+                planarBlock,
+                planarBlock.Length,
+                throwOnEndOfStream: false,
+                _cts.Token).ConfigureAwait(false);
+            if (bytesRead != planarBlock.Length)
             {
                 break;
             }
 
-            for (var byteIndex = 0; byteIndex < completeChannelBytes; byteIndex++)
+            for (var byteIndex = 0; byteIndex < _blockSizePerChannel; byteIndex++)
             {
                 for (var channel = 0; channel < _channels; channel++)
                 {
@@ -134,12 +146,22 @@ public sealed class DsfAudioPlayer : IAudioPlayer
                 }
             }
 
-            var usableBytes = completeChannelBytes * _channels;
-            var accepted = _stream.WriteDsdInterleaved(interleaved.AsSpan(0, usableBytes));
-            while (accepted < usableBytes && !_cts.IsCancellationRequested)
+            var accepted = 0;
+            while (accepted < interleaved.Length && !_cts.IsCancellationRequested)
             {
-                await Task.Delay(2, _cts.Token).ConfigureAwait(false);
-                accepted += _stream.WriteDsdInterleaved(interleaved.AsSpan(accepted, usableBytes - accepted));
+                var written = _stream.WriteDsdInterleaved(interleaved.AsSpan(accepted));
+                if (written < 0)
+                {
+                    throw new IOException();
+                }
+
+                if (written == 0)
+                {
+                    await Task.Delay(2, _cts.Token).ConfigureAwait(false);
+                    continue;
+                }
+
+                accepted += written;
             }
         }
     }

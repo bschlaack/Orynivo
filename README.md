@@ -81,15 +81,18 @@ codec support therefore also depends on that build.
 - Windows 10 or Windows 11, x64
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 - [FFmpeg](https://ffmpeg.org/) with `ffmpeg.exe` and `ffprobe.exe` in `PATH`
-- Optional for ASIO: Visual Studio 2022 with the **Desktop development with
-  C++** workload, Steinberg ASIO SDK 2.3, and an installed ASIO driver
+- For cwASIO: Visual Studio 2022 with the **Desktop development with C++**
+  workload and an installed ASIO driver
+- Optional for the separate Steinberg bridge: Steinberg ASIO SDK 2.3
 
-The ASIO SDK is not included in the repository. The build script accepts its
+The MIT-licensed cwASIO sources are included under `third_party/cwasio`, so the
+normal build provides ASIO support without the Steinberg SDK. The Steinberg
+ASIO SDK is not included in the repository. The build script accepts its
 location through `-AsioSdkDir` or the `ASIO_SDK_DIR` environment variable. It
 also checks `third_party\asiosdk`, `external\asiosdk`, and, for compatibility
 with older development environments, `C:\Dev\asiosdk_2.3`. When no SDK is
-found, the application is built without the native bridge and ASIO is omitted
-from the output-device selection.
+found, only **cwASIO** is offered. When the SDK is available, Settings offers
+both **Steinberg ASIO** and **cwASIO**.
 
 ## Build
 
@@ -106,8 +109,8 @@ Create a debug build:
 .\build.ps1
 ```
 
-The script builds the native x64 ASIO bridge first and then the WPF
-application. It discovers a suitable Visual Studio installation through
+The script builds the native x64 cwASIO bridge, optionally builds the Steinberg
+bridge, and then builds the WPF application. It discovers Visual Studio through
 `vswhere.exe` and falls back to `MSBuild.exe` from `PATH`.
 
 Paths can be supplied without modifying project files:
@@ -116,17 +119,17 @@ Paths can be supplied without modifying project files:
 .\build.ps1 -AsioSdkDir 'D:\SDKs\asiosdk_2.3'
 .\build.ps1 -Configuration Release
 .\build.ps1 -Configuration Release -SkipAsio
+.\build.ps1 -Configuration Release -SkipAsio -SkipCwAsio
 ```
 
 For a persistent local setup, set `ASIO_SDK_DIR`. MSBuild discovery can
 similarly be overridden with `-MSBuildPath` or `MSBUILD_EXE_PATH`.
-`-RequireAsio` makes a missing SDK fail the build instead of using the
-WASAPI-only fallback.
+`-RequireAsio` makes a missing Steinberg SDK fail the build. `-SkipAsio`
+disables only the Steinberg bridge; `-SkipCwAsio` disables cwASIO.
 
-GitHub Actions verifies Debug and Release builds of the managed WPF project.
-The native ASIO bridge is excluded from hosted CI because the separately
-licensed ASIO SDK is not stored in the repository. Every successful Release
-run uploads a framework-dependent `Orynivo-win-x64` Windows artifact.
+GitHub Actions builds cwASIO and the managed WPF project in Debug and Release.
+The Steinberg bridge remains excluded because its SDK is not stored in the
+repository. Release artifacts therefore include `CwAsioBridge.dll`.
 
 ## Run
 
@@ -142,6 +145,8 @@ settings window.
 ```text
 Orynivo/
 ├── Native/AsioBridge/       Native C++ bridge for the Steinberg ASIO SDK
+├── Native/CwAsioBridge/     Native C++ bridge built against cwASIO
+├── third_party/cwasio/      Vendored cwASIO sources under the MIT License
 ├── Orynivo/
 │   ├── Audio/               ASIO, WASAPI, PCM, and DSD playback
 │   ├── Controls/            Custom WPF controls
@@ -149,7 +154,7 @@ Orynivo/
 │   ├── Localization/        German, English, French, and Spanish resources
 │   ├── Streaming/           Provider-neutral catalog, playback, and credential contracts
 │   └── MainWindow.*         Main user interface and navigation
-├── build.ps1                Builds the bridge and .NET application
+├── build.ps1                Builds native bridges and the .NET application
 └── Orynivo.sln              Visual Studio solution
 ```
 

@@ -8,11 +8,19 @@
 #include <string>
 #include <vector>
 #include <windows.h>
+#ifdef ORYNIVO_CWASIO
+extern "C"
+{
+#include "cwASIO.h"
+#include "asio.h"
+}
+#else
 #include "asiosys.h"
 #include "asio.h"
 #include "asiodrivers.h"
 
 extern bool loadAsioDriver(char* name);
+#endif
 
 namespace
 {
@@ -40,10 +48,63 @@ namespace
         size_t availableSamples = 0;
         std::mutex mutex;
         bool initialized = false;
+        bool driverLoaded = false;
+        bool driverInitialized = false;
         bool dsdMode = false;
     };
 
     BridgeState g_state;
+
+#ifdef ORYNIVO_CWASIO
+    struct DriverEntry
+    {
+        std::string name;
+        std::string id;
+    };
+
+    bool collectDriver(void* context, const char* name, const char* id, const char*)
+    {
+        if (context && name && id && *id)
+        {
+            static_cast<std::vector<DriverEntry>*>(context)->push_back({ name, id });
+        }
+        return true;
+    }
+
+    std::vector<DriverEntry> getDrivers()
+    {
+        std::vector<DriverEntry> drivers;
+        cwASIOenumerate(collectDriver, &drivers);
+        return drivers;
+    }
+
+    bool loadDriver(const char* name)
+    {
+        const auto drivers = getDrivers();
+        const auto driver = std::find_if(
+            drivers.begin(),
+            drivers.end(),
+            [name](const DriverEntry& item) { return item.name == name; });
+        return driver != drivers.end() &&
+               ASIOLoad(driver->id.c_str(), driver->name.c_str()) == ASE_OK;
+    }
+
+    void unloadDriver()
+    {
+        ASIOUnload();
+    }
+#else
+    bool loadDriver(const char* name)
+    {
+        char mutableName[kDriverNameLength]{};
+        strncpy_s(mutableName, name, _TRUNCATE);
+        return loadAsioDriver(mutableName);
+    }
+
+    void unloadDriver()
+    {
+    }
+#endif
 
     long framesPerCallback()
     {
@@ -236,8 +297,12 @@ extern "C"
 {
     __declspec(dllexport) int asio_get_driver_count()
     {
+#ifdef ORYNIVO_CWASIO
+        return static_cast<int>(getDrivers().size());
+#else
         AsioDrivers drivers;
         return static_cast<int>(drivers.asioGetNumDev());
+#endif
     }
 
     __declspec(dllexport) int asio_get_driver_name(int index, char* buffer, int bufferLength)
@@ -247,8 +312,18 @@ extern "C"
             return -1;
         }
 
+#ifdef ORYNIVO_CWASIO
+        const auto drivers = getDrivers();
+        if (index < 0 || static_cast<size_t>(index) >= drivers.size())
+        {
+            return -1;
+        }
+        strncpy_s(buffer, bufferLength, drivers[static_cast<size_t>(index)].name.c_str(), _TRUNCATE);
+        return 0;
+#else
         AsioDrivers drivers;
         return drivers.asioGetDriverName(index, buffer, bufferLength);
+#endif
     }
 
     __declspec(dllexport) int asio_open(const char* driverName, double sampleRate, int outputChannels, int dsdMode)
@@ -258,23 +333,43 @@ extern "C"
             return -1;
         }
 
-        char mutableName[kDriverNameLength]{};
-        strncpy_s(mutableName, driverName, _TRUNCATE);
-        if (!loadAsioDriver(mutableName))
+        if (!loadDriver(driverName))
         {
             return -2;
         }
+        g_state.driverLoaded = true;
+
+        const auto failOpen = [](int code, bool buffersCreated = false)
+        {
+            if (buffersCreated)
+            {
+                ASIODisposeBuffers();
+            }
+            if (g_state.driverInitialized)
+            {
+                ASIOExit();
+            }
+            if (g_state.driverLoaded)
+            {
+                unloadDriver();
+            }
+            g_state.driverLoaded = false;
+            g_state.driverInitialized = false;
+            g_state.dsdMode = false;
+            return code;
+        };
 
         g_state.driverInfo.sysRef = GetDesktopWindow();
         if (ASIOInit(&g_state.driverInfo) != ASE_OK)
         {
-            return -3;
+            return failOpen(-3);
         }
+        g_state.driverInitialized = true;
 
         if (ASIOGetChannels(&g_state.inputChannels, &g_state.outputChannels) != ASE_OK ||
             g_state.outputChannels < outputChannels)
         {
-            return -4;
+            return failOpen(-4);
         }
 
         g_state.dsdMode = dsdMode != 0;
@@ -284,7 +379,7 @@ extern "C"
             if (ASIOFuture(kAsioSetIoFormat, &requestedFormat) != ASE_SUCCESS ||
                 requestedFormat.FormatType != kASIODSDFormat)
             {
-                return -10;
+                return failOpen(-10);
             }
         }
 
@@ -292,12 +387,12 @@ extern "C"
             ASIOSetSampleRate(sampleRate) != ASE_OK ||
             ASIOGetSampleRate(&g_state.sampleRate) != ASE_OK)
         {
-            return -5;
+            return failOpen(-5);
         }
 
         if (ASIOGetBufferSize(&g_state.minBufferSize, &g_state.maxBufferSize, &g_state.preferredBufferSize, &g_state.granularity) != ASE_OK)
         {
-            return -6;
+            return failOpen(-6);
         }
 
         g_state.outputChannelsInUse = outputChannels;
@@ -316,7 +411,7 @@ extern "C"
 
         if (ASIOCreateBuffers(g_state.bufferInfos, g_state.outputChannelsInUse, g_state.preferredBufferSize, &g_state.callbacks) != ASE_OK)
         {
-            return -7;
+            return failOpen(-7);
         }
 
         for (long channel = 0; channel < g_state.outputChannelsInUse; ++channel)
@@ -325,14 +420,14 @@ extern "C"
             g_state.channelInfos[channel].isInput = ASIOFalse;
             if (ASIOGetChannelInfo(&g_state.channelInfos[channel]) != ASE_OK)
             {
-                return -8;
+                return failOpen(-8, true);
             }
 
             if (g_state.dsdMode &&
                 g_state.channelInfos[channel].type != ASIOSTDSDInt8LSB1 &&
                 g_state.channelInfos[channel].type != ASIOSTDSDInt8MSB1)
             {
-                return -11;
+                return failOpen(-11, true);
             }
         }
 
@@ -413,14 +508,24 @@ extern "C"
 
     __declspec(dllexport) void asio_close()
     {
-        if (!g_state.initialized)
+        if (!g_state.initialized && !g_state.driverLoaded)
         {
             return;
         }
 
-        ASIOStop();
-        ASIODisposeBuffers();
-        ASIOExit();
+        if (g_state.initialized)
+        {
+            ASIOStop();
+            ASIODisposeBuffers();
+        }
+        if (g_state.driverInitialized)
+        {
+            ASIOExit();
+        }
+        if (g_state.driverLoaded)
+        {
+            unloadDriver();
+        }
         std::lock_guard<std::mutex> lock(g_state.mutex);
         g_state.ring.clear();
         g_state.dsdRing.clear();
@@ -428,6 +533,8 @@ extern "C"
         g_state.writeIndex = 0;
         g_state.availableSamples = 0;
         g_state.outputChannelsInUse = 0;
+        g_state.driverLoaded = false;
+        g_state.driverInitialized = false;
         g_state.dsdMode = false;
         g_state.initialized = false;
     }
@@ -444,9 +551,7 @@ extern "C"
             return -1;
         }
 
-        char mutableName[kDriverNameLength]{};
-        strncpy_s(mutableName, driverName, _TRUNCATE);
-        if (!loadAsioDriver(mutableName))
+        if (!loadDriver(driverName))
         {
             return -2;
         }
@@ -455,6 +560,7 @@ extern "C"
         driverInfo.sysRef = GetDesktopWindow();
         if (ASIOInit(&driverInfo) != ASE_OK)
         {
+            unloadDriver();
             return -3;
         }
 
@@ -468,6 +574,7 @@ extern "C"
         if (ASIOGetChannels(&inputChannels, &outputChannels) != ASE_OK)
         {
             ASIOExit();
+            unloadDriver();
             return -4;
         }
 
@@ -518,6 +625,7 @@ extern "C"
         if (ASIOGetBufferSize(&minBufferSize, &maxBufferSize, &preferredBufferSize, &granularity) != ASE_OK)
         {
             ASIOExit();
+            unloadDriver();
             return -4;
         }
 
@@ -545,6 +653,7 @@ extern "C"
         const auto pcmTypes = channelTypesForCurrentMode(outputChannels);
 
         ASIOExit();
+        unloadDriver();
 
         std::ostringstream result;
         result << "driver=" << driverInfo.name

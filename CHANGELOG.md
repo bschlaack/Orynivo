@@ -6,8 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed native DSF playback from drives that return partial asynchronous reads
+  by preserving complete per-channel DSF blocks and stopping at the declared
+  data chunk boundary.
+- Fixed cwASIO playback with legacy Windows ASIO drivers that reject the
+  optional cwASIO instance-name extension, affecting both PCM and native DSD.
+
 ### Added
 
+- MIT-licensed cwASIO output backend with PCM and native DSD support through
+  the existing bridge and playback paths.
+- Separate **Steinberg ASIO** and **cwASIO** choices in Settings; availability
+  follows the corresponding native bridge DLL.
+- cwASIO native builds and Release artifacts in GitHub Actions without
+  requiring the separately distributed Steinberg SDK.
 - Modal daily playback history opened from populated Dashboard calendar days,
   including playback time, media type, title, artist, album, listened duration,
   and total duration.

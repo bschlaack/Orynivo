@@ -5,7 +5,8 @@
 Windows audio player with:
 
 - WPF frontend in `Orynivo/`
-- Native ASIO bridge in `Native/AsioBridge/`
+- Native Steinberg ASIO bridge in `Native/AsioBridge/`
+- MIT-licensed cwASIO bridge in `Native/CwAsioBridge/`
 - PCM playback through `ffmpeg`
 - Native DSF/DFF DSD playback through ASIO
 
@@ -16,30 +17,34 @@ Windows audio player with:
 .\Orynivo\bin\Debug\net8.0-windows\Orynivo.exe
 ```
 
-`build.ps1` builds `AsioBridge.dll` first and then the .NET application. It
+`build.ps1` always builds the vendored MIT-licensed `CwAsioBridge.dll`, then
+builds `AsioBridge.dll` when the Steinberg SDK is available, and finally builds
+the .NET application. It
 locates Visual Studio MSBuild through `vswhere.exe` or `PATH`. The ASIO SDK can
 be supplied with `-AsioSdkDir`, `ASIO_SDK_DIR`, or a local
 `third_party/asiosdk` / `external/asiosdk` directory. `-MSBuildPath` and
 `MSBUILD_EXE_PATH` override MSBuild discovery. If no SDK is found, the script
-builds without ASIO; `-SkipAsio` forces that mode and `-RequireAsio` makes a
-missing SDK fatal. The managed build receives `IncludeAsioBridge=false` so a
-stale native DLL is removed from build and publish output.
+builds without the Steinberg bridge; `-SkipAsio` forces that mode and
+`-RequireAsio` makes a missing SDK fatal. `-SkipCwAsio` additionally disables
+the cwASIO bridge. Managed build properties remove disabled native DLLs from
+build and publish output.
 
-`.github/workflows/dotnet-desktop.yml` builds the managed WPF project in Debug
-and Release. It intentionally does not build the native bridge because the
-separately licensed ASIO SDK is not available on GitHub-hosted runners. The
-Release job publishes and uploads a framework-dependent `Orynivo-win-x64`
-artifact.
+`.github/workflows/dotnet-desktop.yml` builds the cwASIO bridge and managed WPF
+project in Debug and Release. It intentionally excludes only the Steinberg
+bridge because that SDK is not stored in the repository. The Release artifact
+therefore contains cwASIO support without Steinberg SDK files.
 
 ## Important Architecture
 
-- `Orynivo/Audio/SteinbergAsioStream.cs`: C# wrapper for the native bridge
+- `Orynivo/Audio/SteinbergAsioStream.cs`: runtime-selecting C# wrapper for `AsioBridge.dll` and `CwAsioBridge.dll`
 - `Orynivo/Audio/FfmpegAudioPlayer.cs`: PCM path
 - `Orynivo/Audio/DsfAudioPlayer.cs`: native DSF-to-DSD path
 - `Orynivo/Audio/DffAudioPlayer.cs`: native DFF/DSDIFF-to-DSD path
 - `Orynivo/Audio/WasapiAudioPlayer.cs`: WASAPI PCM path
 - `Orynivo/Audio/WasapiDeviceProvider.cs`: WASAPI devices and capability queries
-- `Native/AsioBridge/bridge.cpp`: ASIO initialization, PCM/DSD ring buffers, and callback
+- `Native/AsioBridge/bridge.cpp`: shared Steinberg/cwASIO initialization, PCM/DSD ring buffers, and callback
+- `Native/CwAsioBridge/CwAsioBridge.vcxproj`: builds the shared bridge against vendored cwASIO
+- `third_party/cwasio/`: pinned MIT-licensed cwASIO host and compatibility sources
 - `Orynivo/SettingsWindow.*`: two-column settings window with navigation on the left and the selected section on the right
 - `Orynivo/ThemeManager.cs`: sets global WPF resources for light and dark themes
 - `Orynivo/Localization/*`: language model and localized German, English, French, and Spanish strings
@@ -172,13 +177,17 @@ artifact.
 ## Known Technical Details
 
 - Target platform: `net8.0-windows`, x64
-- `SteinbergAsioStream.IsAvailable` validates that `AsioBridge.dll` exists,
-  loads successfully, and exports the expected API. Missing bridge builds
-  exclude ASIO from Settings and migrate a saved ASIO backend to WASAPI.
+- `SteinbergAsioStream.IsBackendAvailable()` validates each native bridge and
+  loads its shared export API dynamically. Settings shows **Steinberg ASIO**
+  only when `AsioBridge.dll` exists and **cwASIO** only when
+  `CwAsioBridge.dll` exists. A missing selected backend migrates to the other
+  ASIO implementation when available, otherwise to WASAPI.
+- `OutputBackend` values are persisted numerically; existing values remain
+  `Asio=0`, `Wasapi=1`, and `KernelStreaming=2`, while `CwAsio=3` is appended.
 - Native DSD supports `.dsf` and uncompressed stereo `.dff`
 - DST-compressed `.dff` is not played natively
-- Output types represented by settings: `ASIO`, `WASAPI`, `KernelStreaming`
-- ASIO and WASAPI are implemented; Kernel Streaming is not
+- Output types represented by settings: Steinberg `ASIO`, `CwAsio`, `WASAPI`, `KernelStreaming`
+- Steinberg ASIO, cwASIO, and WASAPI are implemented; Kernel Streaming is not
 - WASAPI handles PCM only; native DSD remains ASIO-only
 - WASAPI runs exclusively and selects the first supported stereo format from 32-bit float, 24-bit PCM, and 16-bit PCM
 - WASAPI pause keeps the exclusive AudioClient running and supplies silence so drivers do not loop the final endpoint buffer; buffered audio remains available for resume

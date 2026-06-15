@@ -393,7 +393,17 @@ public partial class MainWindow : Window
         _settings = _settingsStore.Load();
         if (_settings.OutputBackend == OutputBackend.Asio && !SteinbergAsioStream.IsAvailable)
         {
-            _settings.OutputBackend = OutputBackend.Wasapi;
+            _settings.OutputBackend = SteinbergAsioStream.IsCwAsioAvailable
+                ? OutputBackend.CwAsio
+                : OutputBackend.Wasapi;
+            _settings.SelectedDriverName = null;
+            _settingsStore.Save(_settings);
+        }
+        else if (_settings.OutputBackend == OutputBackend.CwAsio && !SteinbergAsioStream.IsCwAsioAvailable)
+        {
+            _settings.OutputBackend = SteinbergAsioStream.IsAvailable
+                ? OutputBackend.Asio
+                : OutputBackend.Wasapi;
             _settings.SelectedDriverName = null;
             _settingsStore.Save(_settings);
         }
@@ -463,7 +473,9 @@ public partial class MainWindow : Window
         SelectedDriverTextBlock.Text = _settings.OutputBackend switch
         {
             OutputBackend.Asio when !string.IsNullOrWhiteSpace(_settings.SelectedDriverName) =>
-                $"{_settings.SelectedDriverName}  ·  ASIO",
+                $"{_settings.SelectedDriverName}  ·  Steinberg ASIO",
+            OutputBackend.CwAsio when !string.IsNullOrWhiteSpace(_settings.SelectedDriverName) =>
+                $"{_settings.SelectedDriverName}  ·  cwASIO",
             OutputBackend.Wasapi when !string.IsNullOrWhiteSpace(_settings.SelectedWasapiDeviceName) =>
                 $"{_settings.SelectedWasapiDeviceName}  ·  WASAPI",
             OutputBackend.KernelStreaming => "KernelStreaming",
@@ -4257,9 +4269,9 @@ public partial class MainWindow : Window
         IAudioPlayer player;
         AudioFileInfo info;
 
-        if (_settings.OutputBackend == OutputBackend.Asio)
+        if (_settings.OutputBackend is OutputBackend.Asio or OutputBackend.CwAsio)
         {
-            if (!SteinbergAsioStream.IsAvailable)
+            if (!SteinbergAsioStream.IsBackendAvailable(_settings.OutputBackend))
             {
                 StatusTextBlock.Text = LocalizationManager.Current.AsioBridgeMissing;
                 return;
@@ -4270,11 +4282,23 @@ public partial class MainWindow : Window
                 return;
             }
             if (ext.Equals(".dsf", StringComparison.OrdinalIgnoreCase))
-                (player, info) = await DsfAudioPlayer.CreateAsync(filePath, _settings.SelectedDriverName, _playbackCts.Token);
+                (player, info) = await DsfAudioPlayer.CreateAsync(
+                    filePath,
+                    _settings.OutputBackend,
+                    _settings.SelectedDriverName,
+                    _playbackCts.Token);
             else if (ext.Equals(".dff", StringComparison.OrdinalIgnoreCase))
-                (player, info) = await DffAudioPlayer.CreateAsync(filePath, _settings.SelectedDriverName, _playbackCts.Token);
+                (player, info) = await DffAudioPlayer.CreateAsync(
+                    filePath,
+                    _settings.OutputBackend,
+                    _settings.SelectedDriverName,
+                    _playbackCts.Token);
             else
-                (player, info) = await FfmpegAudioPlayer.CreateAsync(filePath, _settings.SelectedDriverName, _playbackCts.Token);
+                (player, info) = await FfmpegAudioPlayer.CreateAsync(
+                    filePath,
+                    _settings.OutputBackend,
+                    _settings.SelectedDriverName,
+                    _playbackCts.Token);
         }
         else if (_settings.OutputBackend == OutputBackend.Wasapi)
         {
@@ -4405,7 +4429,7 @@ public partial class MainWindow : Window
         }
         UpdateNowPlayingFavoriteButton();
 
-        var outputName = _settings.OutputBackend == OutputBackend.Asio
+        var outputName = _settings.OutputBackend is OutputBackend.Asio or OutputBackend.CwAsio
             ? _settings.SelectedDriverName
             : _settings.SelectedWasapiDeviceName;
         StatusTextBlock.Text = string.Format(LocalizationManager.Current.PlaybackThrough, outputName);
@@ -5505,7 +5529,7 @@ public partial class MainWindow : Window
 
             StatusTextBlock.Text = _settings.OutputBackend switch
             {
-                OutputBackend.Asio when string.IsNullOrWhiteSpace(_settings.SelectedDriverName) =>
+                OutputBackend.Asio or OutputBackend.CwAsio when string.IsNullOrWhiteSpace(_settings.SelectedDriverName) =>
                     LocalizationManager.Current.SelectAsioDevice,
                 OutputBackend.Wasapi when string.IsNullOrWhiteSpace(_settings.SelectedWasapiDeviceId) =>
                     LocalizationManager.Current.SelectWasapiDevice,
