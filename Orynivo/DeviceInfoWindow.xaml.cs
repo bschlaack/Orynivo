@@ -1,17 +1,26 @@
-using System.Windows;
-using System.Windows.Controls;
+using Avalonia.Controls;
+using Avalonia.Media;
 using Orynivo.Audio;
 using Orynivo.Localization;
-using System.Runtime.InteropServices;
-using WpfApplication = System.Windows.Application;
+using AvaloniaApp = Avalonia.Application;
 
 namespace Orynivo;
 
 public partial class DeviceInfoWindow : Window
 {
+    /// <summary>
+    /// Initializes a runtime-loader instance without device data.
+    /// </summary>
+    public DeviceInfoWindow()
+    {
+        InitializeComponent();
+        Opened += (_, _) => WindowChrome.ApplyTheme(this);
+    }
+
     public DeviceInfoWindow(AsioDeviceInfo info)
     {
         InitializeComponent();
+        Opened += (_, _) => WindowChrome.ApplyTheme(this);
 
         DriverNameTextBlock.Text = info.DriverName;
         SummaryTextBlock.Text =
@@ -26,12 +35,12 @@ public partial class DeviceInfoWindow : Window
         {
             var sampleRate = dsdRate * 44_100;
             var supported = info.SupportedDsdSampleRates.Contains(sampleRate);
+            var brushKey = supported ? "AppDsdSupportedBrush" : "AppDsdUnsupportedBrush";
             DsdRatesPanel.Children.Add(new TextBlock
             {
                 Text = dsdRate.ToString(),
-                Margin = new Thickness(0, 0, 12, 0),
-                Foreground = (System.Windows.Media.Brush)FindResource(
-                    supported ? "AppDsdSupportedBrush" : "AppDsdUnsupportedBrush")
+                Margin = new Avalonia.Thickness(0, 0, 12, 0),
+                Foreground = AvaloniaApp.Current!.Resources[brushKey] as IBrush
             });
         }
 
@@ -48,34 +57,10 @@ public partial class DeviceInfoWindow : Window
                 : LocalizationManager.Current.DeviceProbeInconclusive;
     }
 
-    private void DeviceInfoWindow_OnSourceInitialized(object sender, EventArgs e)
-    {
-        try
-        {
-            var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-            if (handle == IntPtr.Zero)
-                return;
-
-            const int DwmwaCaptionColor = 35;
-            const int DwmwaTextColor = 36;
-            var dark = WpfApplication.Current.Resources["AppHeaderBrush"] is System.Windows.Media.SolidColorBrush b &&
-                       b.Color == System.Windows.Media.Color.FromRgb(0x13, 0x14, 0x2A);
-            var captionColor = dark ? ColorRef(0x13, 0x14, 0x2A) : ColorRef(0xEA, 0xEA, 0xF5);
-            var textColor = dark ? ColorRef(0xFF, 0xFF, 0xFF) : ColorRef(0x13, 0x14, 0x2A);
-            _ = DwmSetWindowAttribute(handle, DwmwaCaptionColor, ref captionColor, sizeof(int));
-            _ = DwmSetWindowAttribute(handle, DwmwaTextColor, ref textColor, sizeof(int));
-        }
-        catch { }
-    }
-
-    private static int ColorRef(byte r, byte g, byte b) => r | (g << 8) | (b << 16);
-
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int dwAttribute, ref int pvAttribute, int cbAttribute);
-
     public DeviceInfoWindow(WasapiDeviceCapabilities info)
     {
         InitializeComponent();
+        Opened += (_, _) => WindowChrome.ApplyTheme(this);
 
         DriverNameTextBlock.Text = info.Name;
         SummaryTextBlock.Text = string.Format(
@@ -91,7 +76,7 @@ public partial class DeviceInfoWindow : Window
         DsdRatesPanel.Children.Add(new TextBlock
         {
             Text = LocalizationManager.Current.WasapiDsdNotRelevant,
-            Foreground = (System.Windows.Media.Brush)FindResource("AppDsdUnsupportedBrush")
+            Foreground = AvaloniaApp.Current!.Resources["AppDsdUnsupportedBrush"] as IBrush
         });
 
         PcmFormatsTextBlock.Text = info.ExclusivePcmFormats.Count == 0

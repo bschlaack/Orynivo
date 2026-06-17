@@ -1,5 +1,5 @@
 using System.Globalization;
-using WpfApplication = System.Windows.Application;
+using AvaloniaApp = Avalonia.Application;
 
 namespace Orynivo.Localization;
 
@@ -48,7 +48,7 @@ public static class LocalizationManager
             _ => German
         };
 
-        var resources = WpfApplication.Current.Resources;
+        var resources = AvaloniaApp.Current!.Resources;
         resources["L_LocalLibrary"] = Current.LocalLibrary;
         resources["L_Artists"] = Current.Artists;
         resources["L_Albums"] = Current.Albums;
@@ -314,6 +314,16 @@ public static class LocalizationManager
         WasapiDsdNotRelevant = "Für WASAPI in Orynivo nicht relevant.",
         NativeDsdUsesAsio = "Native DSD-Wiedergabe läuft in Orynivo über ASIO.",
         Dashboard = "Dashboard", ThemeLight = "Hell", ThemeDark = "Dunkel",
+        DashboardIntroTitle = "Dein Hörüberblick",
+        DashboardIntroHint = "Sieh zuletzt hinzugefügte Alben, Hörzeiten im Kalender und deine meistgehörten Genres auf einen Blick.",
+        ArtistsIntroTitle = "Künstler entdecken",
+        ArtistsIntroHint = "Durchstöbere deine Bibliothek nach Künstlern, öffne Alben direkt und pflege Favoriten sowie Künstlerbilder.",
+        AlbumsIntroTitle = "Alben durchsuchen",
+        AlbumsIntroHint = "Wechsle zwischen Tabellen- und Artwork-Ansicht, öffne Albumtracks und ergänze fehlende Cover.",
+        TracksIntroTitle = "Tracks verwalten",
+        TracksIntroHint = "Suche, filtere und spiele deine lokale Musikbibliothek mit Genre-, Format- und Bitraten-Facetten.",
+        FoldersIntroTitle = "Ordnerstruktur",
+        FoldersIntroHint = "Navigiere deine Musik entlang der eingebundenen Bibliotheksordner und spiele Tracks direkt aus ihrem Ordnerkontext.",
         LanguageGerman = "Deutsch", LanguageEnglish = "Englisch", LanguageFrench = "Französisch", LanguageSpanish = "Spanisch",
         PcmIntegerFormat = "{0}-Bit PCM, Little Endian ({1})",
         PcmContainerFormat = "{0}-Bit PCM im {1}-Bit-Container, Little Endian ({2})",
@@ -530,6 +540,16 @@ public static class LocalizationManager
         WasapiDsdNotRelevant = "Not relevant for WASAPI in this player.",
         NativeDsdUsesAsio = "Native DSD playback in this player uses ASIO.",
         Dashboard = "Dashboard", ThemeLight = "Light", ThemeDark = "Dark",
+        DashboardIntroTitle = "Your listening overview",
+        DashboardIntroHint = "See recently added albums, calendar listening time, and your top genres at a glance.",
+        ArtistsIntroTitle = "Discover artists",
+        ArtistsIntroHint = "Browse your library by artist, open albums directly, and manage favorites and artist images.",
+        AlbumsIntroTitle = "Browse albums",
+        AlbumsIntroHint = "Switch between table and artwork views, open album tracks, and fill in missing covers.",
+        TracksIntroTitle = "Manage tracks",
+        TracksIntroHint = "Search, filter, and play your local music library with genre, format, and bitrate facets.",
+        FoldersIntroTitle = "Folder structure",
+        FoldersIntroHint = "Navigate your music through configured library folders and play tracks from their folder context.",
         LanguageGerman = "German", LanguageEnglish = "English", LanguageFrench = "French", LanguageSpanish = "Spanish",
         PcmIntegerFormat = "{0}-bit PCM, little endian ({1})",
         PcmContainerFormat = "{0}-bit PCM in a {1}-bit container, little endian ({2})",
@@ -749,6 +769,16 @@ public static class LocalizationManager
         WasapiDsdNotRelevant = "Non pertinent pour WASAPI dans ce lecteur.",
         NativeDsdUsesAsio = "La lecture DSD native de ce lecteur utilise ASIO.",
         Dashboard = "Tableau de bord", ThemeLight = "Clair", ThemeDark = "Sombre",
+        DashboardIntroTitle = "Vue d'ensemble d'écoute",
+        DashboardIntroHint = "Consultez les albums récemment ajoutés, le temps d’écoute dans le calendrier et vos genres principaux.",
+        ArtistsIntroTitle = "Découvrir les artistes",
+        ArtistsIntroHint = "Parcourez votre bibliothèque par artiste, ouvrez les albums et gérez les favoris et images d’artiste.",
+        AlbumsIntroTitle = "Parcourir les albums",
+        AlbumsIntroHint = "Passez de la table aux pochettes, ouvrez les titres d’un album et complétez les couvertures manquantes.",
+        TracksIntroTitle = "Gérer les titres",
+        TracksIntroHint = "Recherchez, filtrez et écoutez votre bibliothèque locale par genre, format et débit.",
+        FoldersIntroTitle = "Arborescence",
+        FoldersIntroHint = "Naviguez dans vos dossiers de bibliothèque et lancez les titres depuis leur contexte de dossier.",
         LanguageGerman = "Allemand", LanguageEnglish = "Anglais", LanguageFrench = "Français", LanguageSpanish = "Espagnol",
         PcmIntegerFormat = "PCM {0} bits, petit-boutiste ({1})",
         PcmContainerFormat = "PCM {0} bits dans un conteneur {1} bits, petit-boutiste ({2})",
@@ -965,6 +995,16 @@ public static class LocalizationManager
         WasapiDsdNotRelevant = "No es relevante para WASAPI en este reproductor.",
         NativeDsdUsesAsio = "La reproducción DSD nativa de este reproductor utiliza ASIO.",
         Dashboard = "Panel", ThemeLight = "Claro", ThemeDark = "Oscuro",
+        DashboardIntroTitle = "Resumen de escucha",
+        DashboardIntroHint = "Consulta álbumes añadidos recientemente, tiempo de escucha en el calendario y tus géneros principales.",
+        ArtistsIntroTitle = "Descubrir artistas",
+        ArtistsIntroHint = "Explora tu biblioteca por artista, abre álbumes directamente y gestiona favoritos e imágenes.",
+        AlbumsIntroTitle = "Explorar álbumes",
+        AlbumsIntroHint = "Cambia entre tabla y carátulas, abre pistas del álbum y completa portadas que falten.",
+        TracksIntroTitle = "Gestionar pistas",
+        TracksIntroHint = "Busca, filtra y reproduce tu biblioteca local con facetas de género, formato y bitrate.",
+        FoldersIntroTitle = "Estructura de carpetas",
+        FoldersIntroHint = "Navega tu música por las carpetas configuradas y reproduce pistas desde su contexto de carpeta.",
         LanguageGerman = "Alemán", LanguageEnglish = "Inglés", LanguageFrench = "Francés", LanguageSpanish = "Español",
         PcmIntegerFormat = "PCM de {0} bits, little endian ({1})",
         PcmContainerFormat = "PCM de {0} bits en contenedor de {1} bits, little endian ({2})",

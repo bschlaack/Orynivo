@@ -1,6 +1,5 @@
 using System.IO;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
+using SkiaSharp;
 
 namespace Orynivo.Library;
 
@@ -53,21 +52,16 @@ public static class ArtworkCache
     {
         try
         {
-            using var stream = new MemoryStream(data);
-            var decoder = BitmapDecoder.Create(
-                stream,
-                BitmapCreateOptions.IgnoreColorProfile,
-                BitmapCacheOption.OnLoad);
-            var source = decoder.Frames[0];
-            var scale = Math.Min(size / (double)source.PixelWidth, size / (double)source.PixelHeight);
+            using var bitmap = SKBitmap.Decode(data);
+            if (bitmap is null) return;
+            var scale = Math.Min(size / (double)bitmap.Width, size / (double)bitmap.Height);
             if (scale > 1) scale = 1;
-            var transformed = new TransformedBitmap(source, new ScaleTransform(scale, scale));
-            transformed.Freeze();
-
-            var encoder = new JpegBitmapEncoder { QualityLevel = 88 };
-            encoder.Frames.Add(BitmapFrame.Create(transformed));
+            var newW = Math.Max(1, (int)Math.Round(bitmap.Width * scale));
+            var newH = Math.Max(1, (int)Math.Round(bitmap.Height * scale));
+            using var scaled = bitmap.Resize(new SKImageInfo(newW, newH), SKFilterQuality.High);
+            using var encoded = scaled.Encode(SKEncodedImageFormat.Jpeg, 88);
             using var output = File.Create(path);
-            encoder.Save(output);
+            encoded.SaveTo(output);
         }
         catch
         {

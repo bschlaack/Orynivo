@@ -4,7 +4,7 @@
 
 Windows audio player with:
 
-- WPF frontend in `Orynivo/`
+- Avalonia UI 11 frontend in `Orynivo/`
 - Native Steinberg ASIO bridge in `Native/AsioBridge/`
 - MIT-licensed cwASIO bridge in `Native/CwAsioBridge/`
 - PCM playback through `ffmpeg`
@@ -29,10 +29,10 @@ builds without the Steinberg bridge; `-SkipAsio` forces that mode and
 the cwASIO bridge. Managed build properties remove disabled native DLLs from
 build and publish output.
 
-`.github/workflows/dotnet-desktop.yml` builds the cwASIO bridge and managed WPF
-project in Debug and Release. It intentionally excludes only the Steinberg
-bridge because that SDK is not stored in the repository. The Release artifact
-therefore contains cwASIO support without Steinberg SDK files.
+`.github/workflows/dotnet-desktop.yml` builds the cwASIO bridge and managed
+Avalonia project in Debug and Release. It intentionally excludes only the
+Steinberg bridge because that SDK is not stored in the repository. The Release
+artifact therefore contains cwASIO support without Steinberg SDK files.
 
 ## Important Architecture
 
@@ -46,8 +46,9 @@ therefore contains cwASIO support without Steinberg SDK files.
 - `Native/AsioBridge/bridge.cpp`: shared Steinberg/cwASIO initialization, PCM/DSD ring buffers, and callback
 - `Native/CwAsioBridge/CwAsioBridge.vcxproj`: builds the shared bridge against vendored cwASIO
 - `third_party/cwasio/`: pinned MIT-licensed cwASIO host and compatibility sources
-- `Orynivo/SettingsWindow.*`: two-column settings window with navigation on the left and the selected section on the right
-- `Orynivo/ThemeManager.cs`: sets global WPF resources for light and dark themes
+- `Orynivo/SettingsWindow.*`: two-column settings window with navigation on the
+  left and the selected section on the right
+- `Orynivo/ThemeManager.cs`: sets global Avalonia resources for light and dark themes
 - `Orynivo/Localization/*`: language model and localized German, English, French, and Spanish strings
 - `Orynivo/StartupWindow.*`: lightweight splash screen shown during initial database preparation and migration
 - `Orynivo/Assets/Orynivo_Logo.png`: embedded full logo used by the splash screen and main sidebar
@@ -63,7 +64,9 @@ therefore contains cwASIO support without Steinberg SDK files.
 - `Orynivo/Streaming/WindowsPlexCredentialStore.cs`: stores per-server Plex access tokens in `%LOCALAPPDATA%\Orynivo\plex-credentials.dat` using Windows DPAPI for the current user
 - `AppSettings.PlexServers` stores Plex server IDs, display names, and base URLs; Plex tokens must not be added to `settings.json`
 - `AppSettings.QobuzApplicationId` stores only the non-secret Qobuz application identifier; client secrets and tokens must not be added to `settings.json`
-- `AppSettings.LastMainView` and `AppSettings.AlbumArtworkView` preserve the selected main view and album mode
+- `AppSettings.LastMainView`, `AppSettings.AlbumArtworkView`, and
+  `AppSettings.ArtistArtworkView` preserve the selected main view and entity
+  artwork/table modes
 - `AppSettings.Volume` and `AppSettings.LastTrackPath` preserve volume and the last selected or played track; restoration requires both the file and database entry to exist
 - `AppSettings.Theme` stores the `Light` or `Dark` theme
 - `AppSettings.Language` stores `German`, `English`, `French`, or `Spanish`
@@ -140,14 +143,16 @@ therefore contains cwASIO support without Steinberg SDK files.
 - Right-clicking a track, search result, album, or folder node offers existing playlists and **New playlist...**
 - Selecting a playlist immediately adds the track or all album tracks and updates the status bar
 - **New playlist...** opens `NewPlaylistDialog`; a name is required and Enter confirms
-- `Orynivo/NewPlaylistDialog.xaml/.cs` is themed with dynamic brushes and a DWM-colored native title bar
+- `Orynivo/NewPlaylistDialog.axaml/.cs` is themed with dynamic brushes and a
+  DWM-colored native title bar
 - `AppendPlaylistItems()` builds context-menu items dynamically
 - Album artwork cards extend their existing cover menu through `ContextMenu.Opened`
 - `GetPathsForRow()` returns one track path or all album tracks through `GetTrackListByAlbum`
 - `PlaylistMenuTag(long PlaylistId, IReadOnlyList<string> Paths)` stores paths directly
 - Folder nodes recursively collect tracks through `GetTrackPathsUnderDirectory`; empty folders have no menu
 - Main-window context menus use application theme resources and a custom border template without the default white icon strip
-- Dynamically created menu objects must receive their styles explicitly from `Application.Current.Resources[typeof(...)]`
+- Dynamically created menu objects receive their styles through Avalonia
+  `ControlTheme` resources looked up via `TryGetResource`
 - **Delete playlist** appears in the sidebar playlist context menu, removes the database record, refreshes the sidebar, and returns to Tracks if needed
 - **Remove from playlist** appears only for regular playlist entries with a `PlaylistEntryId`
 - `_activePlaylistId` is set by `ShowTopLevelViewAsync` only for playlist views
@@ -171,8 +176,8 @@ therefore contains cwASIO support without Steinberg SDK files.
 - `GetTrackListByIds(ids)` batches large ID sets to stay below SQLite variable limits
 - `GetTracksByDirectory(dirPath)` uses an SQL prefix query plus a direct-child filter
 - `GetTrackPathsUnderDirectory(rootPath)` returns all recursive track paths below a root
-- Folder-tree lazy loading uses an in-memory parent-to-children map and creates WPF items only when expanded
-- TreeView virtualization uses recycling mode
+- Folder-tree lazy loading uses an in-memory parent-to-children map and creates
+  items only when expanded
 - `TrackLite`, `TrackListInfo`, `ArtistInfo`, and `AlbumInfo` remain intentionally small; `TrackRecord` is reserved for complete metadata operations
 - Artwork is deduplicated instead of stored per track
 - `TrackSearchIndex.cs` stores a Lucene.NET index under `%LOCALAPPDATA%\Orynivo\search-index`, supports category-specific fields, partial words, and German umlaut/eszett variants, rebuilds stale indexes, updates incrementally after scans, and removes missing files below rescanned roots
@@ -218,11 +223,20 @@ therefore contains cwASIO support without Steinberg SDK files.
 - `AppSettings.IsLocalLibrarySectionExpanded`, `IsOwnRadiosSectionExpanded`, `IsMyPodcastsSectionExpanded`, `IsPlexSectionExpanded`, and `IsPlaylistsSectionExpanded` persist independent sidebar accordion states
 - About displays the author, library licenses, and the Steinberg ASIO trademark notice
 - The content header continues the native title-bar/sidebar appearance and shows title, count, search, filters, or album mode controls
+- Main library views keep the plain content header for title, count, search,
+  filters, and mode controls. Directly below it, Dashboard, Artists, Albums,
+  Tracks, Folder structure, and equivalent library overview views use a shared
+  compact accent-bordered intro card (`#6C63FF`, `CornerRadius="0,24,0,24"`)
+  with a short view-specific headline and explanatory text. Search and filter
+  controls stay outside and above that card in the plain header layout; A-Z
+  indexes stay aligned with the content/table area, not the intro card.
 - The bottom transport bar shows artwork and track information, favorite state, playback controls, position, and volume
 - Settings uses a two-column layout with navigation on the left and content on the right
 - Settings navigation reuses the main sidebar theme resources
 - All Settings buttons use the shared themed button style, including dynamic scan and remove buttons
-- Settings ComboBoxes use fully themed templates; device information follows the active theme and title-bar color
+- Settings ComboBoxes use fully themed templates, inputs should stretch to the
+  available content width, and device information follows the active theme and
+  title-bar color
 - The Plex server editor uses themed inputs and buttons plus a DWM-colored native title bar; Plex credential persistence must not synchronously wait on asynchronous file I/O from the UI thread
 - Selecting a Plex audio library exposes Artists, Albums, Tracks, and Folders modes; lists load in pages of 500, artist/album rows drill down to children, and folder nodes query Plex only when expanded
 - Plex track rows reuse the main track table and playback path; Plex access tokens remain memory-only in generated stream URLs and must never be written to settings, documentation, logs, or source
@@ -231,11 +245,14 @@ therefore contains cwASIO support without Steinberg SDK files.
 - A splash screen is shown while initial database preparation runs
 - Device information displays channels, buffer sizes, PCM rates, DSD levels, and readable raw formats
 - Supported Windows versions use DWM-colored native title bars; older versions keep the OS default
-- Light and dark themes switch global dynamic resources for tables, artwork, surfaces, text, transport, navigation, separators, and scrollbars
+- Light and dark themes switch global dynamic resources for tables, artwork,
+  surfaces, text, transport controls, navigation, separators, and scrollbars;
+  transport buttons must not use fixed dark-only colors
 - Visible primary text and runtime messages use `LocalizationManager`
 - Empty artwork areas use a dedicated placeholder resource
-- Tables, lists, and trees must not expose white WPF default backgrounds in dark mode
-- MainWindow also overrides DataGrid and ScrollViewer backgrounds locally
+- Tables, lists, and trees must not expose default-white backgrounds in dark mode
+- DataGrid and ScrollViewer backgrounds are overridden via Avalonia styles in
+  `MainWindow.axaml`
 - DataGrid row headers remain disabled through `HeadersVisibility="Column"`
 
 ## Dashboard
@@ -259,30 +276,48 @@ therefore contains cwASIO support without Steinberg SDK files.
   1. **Recently added albums**: horizontal artwork strip of up to 12 albums; selecting a card opens album tracks and supports Back navigation
   2. **Calendar**: Monday-first month grid with day number, `HH:mm:ss` playback time, top three linked genres, today highlight, and month navigation
   3. **Top 10 genres**: descending proportional bars with `HH:mm:ss` duration, linked genre labels, and `_genreColors`
-- Clicking a calendar day with playback opens a modal history table with playback time, media type, title, artist, album, listened duration, and total duration
-- Local-track title links in daily history open Tracks, select the title, and start playback; album and artist links open their existing drill-down views
+- Clicking a calendar day with playback opens a modal history table with playback
+  time, media type, title, artist, album, listened duration, and total duration
+- Local-track title links in daily history open Tracks, select the title, and
+  start playback; album and artist links open their existing drill-down views.
+  Daily-history cells without an available action must render as plain text, not
+  disabled link-style buttons.
 - Data comes from `GetRecentAlbums`, `GetCalendarData`, and `GetTopGenres`
 - Dashboard calendar playback time includes tracks, podcasts, and internet radio; top-genre statistics remain limited to local tracks because they require library genre metadata
 - Clicking a dashboard genre opens Tracks with only that genre facet selected; other track filters are cleared and the genre filter section is expanded
 - `RecentAlbumInfo` and `CalendarDayData` are records in `AudioDatabase.cs`
 - `_dashboardYear`, `_dashboardMonth`, `_calendarInner`, and `_genreColors` hold dashboard state
 - Month navigation rebuilds the dashboard so the section title changes
-- Dashboard code must fully qualify `System.Windows.HorizontalAlignment` and `System.Windows.Media.Brushes` where member-name resolution would otherwise conflict
+- Dashboard code uses `HorizontalAlignment` and `Brushes` from `Avalonia.Layout`
+  and `Avalonia.Media`; no WPF namespaces are present
 
 ## Main Content Views
 
-- **Artists**: distinct alphabetical artist list; double-click opens albums containing that artist
-- **Albums**: normalized unique-title list with favorite, 96 px thumbnail, album, album artist, and year, plus a switchable artwork grid using 320 px thumbnails
+- **Artists**: distinct alphabetical artist list with table and artwork-card
+  modes; double-click opens albums containing that artist
+- **Albums**: normalized unique-title list with favorite, 96 px thumbnail,
+  album, album artist, and year, plus a switchable artwork grid using 320 px
+  thumbnails
 - Album views show the album artist rather than combining track artists; when multiple album artists exist, the first is used
 - Album images are converted to `ImageSource` only when visible elements load
 - `ContentRow` implements `INotifyPropertyChanged` so asynchronously loaded artwork appears immediately
 - **Now Playing**: shows a 96 px thumbnail and track favorite button; the button is disabled when the current file has no database track
-- `VirtualizingWrapPanel.cs` materializes only visible artwork cards
+- `VirtualizingWrapPanel.cs` is an Avalonia `Panel` subclass that lays out
+  fixed-size artwork cards from the top-left; sparse artist/album card result
+  sets must not be vertically centered. It uses `StyledProperty` for
+  `ItemWidth` and `ItemHeight`
 - **Album tracks**: `GetTrackListByAlbum(albumId)` sorts by disc, track number, and file name; playback queues all visible album tracks
 - When album tracks are opened from an artist drill-down, the list initially contains only tracks by that artist; a localized **Show all album tracks** switch removes the artist filter and rebuilds the visible playback queue
 - The album-track view has a centered header with a large 240 px cover, album title, album artist, and optional year; artwork can be searched, reassigned, or deleted
-- **Favorites**: artist, album, and track lists and album cards can toggle their direct favorite flags
-- **Back navigation**: drill-downs remember the previous selection and use a themed pill-shaped chevron button
+- **Favorites**: artist, album, and track lists and album cards can toggle their
+  direct favorite flags; Artists and Albums expose a Favorites-only header
+  toggle that applies to both table and artwork-card modes
+- **Back navigation**: the main header Back chevron tracks a session-wide
+  navigation stack for sidebar navigation, search results, album tracks, artist
+  drill-downs, dashboard links, playlists, podcasts, radio, folder, and Plex
+  library views. It is hidden on the initial view until a real return target
+  exists. Plex child browsing may additionally use its existing intra-Plex stack
+  before returning through the global stack.
 - Visible artist and album names act as links across tables, search results, artwork cards, album headers, artist profiles, dashboard cards, and Now Playing; artist links open the artist's albums and album links open the album's tracks
 - Explicit sidebar navigation clears drill-down filters, including when the already selected item is clicked again
 - **Tracks**: title-sorted list with combinable Favorites, Genre, Audio Type, and Bitrate facets; counts reflect the other active filters and unavailable unselected values are hidden
@@ -305,7 +340,8 @@ comments (`///`). Write comments in **English**.
 - Non-void methods need a `<returns>` tag.
 - Use `<see cref="…"/>` for cross-references and `<see langword="…"/>` for keywords like
   `true`, `false`, and `null`.
-- Generated files (under `obj/`) and XAML code-behind auto-properties are exempt.
+- Generated files (under `obj/`) and AXAML code-behind auto-properties are
+  exempt.
 
 When adding or changing C# code, add or update the XML comments for all affected members
 in the same edit. Never leave a newly introduced public or internal declaration without a
@@ -335,3 +371,5 @@ and move those entries into a dated version section when preparing a release.
 
 - Settings inputs use a label on its own row with the field below it using the available width
 - Do not place new ComboBoxes or similar inputs beside labels in special layouts unless there is a clear functional reason
+- Settings checkbox labels should use the compact settings typography and must
+  not inherit oversized default control text.

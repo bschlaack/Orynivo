@@ -1,7 +1,7 @@
 # Orynivo
 
-A native Windows audio player with a WPF user interface, local music library,
-and ASIO and WASAPI playback.
+A native Windows audio player with an Avalonia UI interface, local music
+library, and ASIO and WASAPI playback.
 
 The application uses the Orynivo wordmark in the startup screen and sidebar,
 plus a multi-resolution Windows application icon based on the standalone logo.
@@ -23,9 +23,13 @@ plus a multi-resolution Windows application icon based on the standalone logo.
   visibility and persisted independent expansion for library, personal radio,
   podcast, and playlist sections
 - Linked artist and album names for direct navigation to artist albums and album tracks
+- Session-wide Back navigation across sidebar views, search results, dashboard
+  links, artist/album drill-downs, playlists, podcasts, radio, folders, and Plex
+  library views
 - Conservative artist-name normalization for `feat.` credits and unambiguous case, accent, spacing, and punctuation variants, with a repair action for existing libraries
 - Live A-Z/# quick navigation beside alphabetically sorted artist, album, and track lists
-- Album view with table and virtualized artwork modes
+- Artist and album views with table and virtualized artwork modes, including
+  Favorites-only filtering in both modes
 - Dashboard with recently added albums, second-precision playback calendar,
   and linked top genres that open the matching filtered track list
 - Clickable populated calendar days with a modal daily listening history;
@@ -120,7 +124,7 @@ Create a debug build:
 ```
 
 The script builds the native x64 cwASIO bridge, optionally builds the Steinberg
-bridge, and then builds the WPF application. It discovers Visual Studio through
+bridge, and then builds the .NET application. It discovers Visual Studio through
 `vswhere.exe` and falls back to `MSBuild.exe` from `PATH`.
 
 Paths can be supplied without modifying project files:
@@ -137,9 +141,9 @@ similarly be overridden with `-MSBuildPath` or `MSBUILD_EXE_PATH`.
 `-RequireAsio` makes a missing Steinberg SDK fail the build. `-SkipAsio`
 disables only the Steinberg bridge; `-SkipCwAsio` disables cwASIO.
 
-GitHub Actions builds cwASIO and the managed WPF project in Debug and Release.
-The Steinberg bridge remains excluded because its SDK is not stored in the
-repository. Release artifacts therefore include `CwAsioBridge.dll`.
+GitHub Actions builds cwASIO and the managed Avalonia project in Debug and
+Release. The Steinberg bridge remains excluded because its SDK is not stored in
+the repository. Release artifacts therefore include `CwAsioBridge.dll`.
 
 ## Run
 
@@ -159,7 +163,7 @@ Orynivo/
 ├── third_party/cwasio/      Vendored cwASIO sources under the MIT License
 ├── Orynivo/
 │   ├── Audio/               ASIO, WASAPI, PCM, and DSD playback
-│   ├── Controls/            Custom WPF controls
+│   ├── Controls/            Custom Avalonia controls
 │   ├── Library/             SQLite database, scanner, search, and artwork cache
 │   ├── Localization/        German, English, French, and Spanish resources
 │   ├── Streaming/           Provider-neutral catalog, playback, and credential contracts
@@ -247,6 +251,9 @@ include the output backend, device, file format, and sample rate.
 
 ## Dependencies and Notices
 
+- Avalonia 11.2.0, MIT License
+- Avalonia.Controls.DataGrid 11.2.0, MIT License
+- SkiaSharp 2.88.9, MIT License
 - Lucene.NET 4.8.0-beta00017, Apache License 2.0
 - Microsoft.Data.Sqlite 9.0.5, MIT License
 - NAudio 2.3.0, MIT License

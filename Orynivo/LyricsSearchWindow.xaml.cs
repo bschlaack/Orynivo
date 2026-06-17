@@ -1,8 +1,7 @@
 using System.Collections.ObjectModel;
-using System.Runtime.InteropServices;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Threading;
+using Avalonia.Controls;
+using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Orynivo.Library;
 using Orynivo.Localization;
 
@@ -37,6 +36,14 @@ public partial class LyricsSearchWindow : Window
 
     public LyricsSearchResult? SelectedResult { get; private set; }
 
+    /// <summary>
+    /// Initializes a runtime-loader instance with empty lyrics search fields.
+    /// </summary>
+    public LyricsSearchWindow()
+        : this(string.Empty, string.Empty)
+    {
+    }
+
     public LyricsSearchWindow(string? trackName, string? artistName)
     {
         InitializeComponent();
@@ -49,13 +56,11 @@ public partial class LyricsSearchWindow : Window
             _busyFrameIndex = (_busyFrameIndex + 1) % _busyFrames.Length;
             BusyIndicatorTextBlock.Text = _busyFrames[_busyFrameIndex];
         };
-        Loaded += LyricsSearchWindow_OnLoaded;
+        Opened += (_, _) => WindowChrome.ApplyTheme(this);
+        Loaded += async (_, _) => await SearchAsync();
     }
 
-    private async void LyricsSearchWindow_OnLoaded(object sender, RoutedEventArgs e) =>
-        await SearchAsync();
-
-    private async void SearchAgainButton_OnClick(object sender, RoutedEventArgs e) =>
+    private async void SearchAgainButton_OnClick(object? sender, RoutedEventArgs e) =>
         await SearchAsync();
 
     private async Task SearchAsync()
@@ -63,13 +68,13 @@ public partial class LyricsSearchWindow : Window
         _results.Clear();
         PreviewTextBlock.Text = LocalizationManager.Current.SelectLyricsResult;
         StatusTextBlock.Text = LocalizationManager.Current.LyricsSearchRunning;
-        BusyIndicatorTextBlock.Visibility = Visibility.Visible;
+        BusyIndicatorTextBlock.IsVisible = true;
         _busyTimer.Start();
         try
         {
             var results = await LyricsService.SearchAsync(
-                TrackNameTextBox.Text,
-                ArtistNameTextBox.Text);
+                TrackNameTextBox.Text ?? string.Empty,
+                ArtistNameTextBox.Text ?? string.Empty);
             foreach (var result in results)
                 _results.Add(new ResultViewModel(result));
             StatusTextBlock.Text = _results.Count == 0
@@ -83,11 +88,11 @@ public partial class LyricsSearchWindow : Window
         finally
         {
             _busyTimer.Stop();
-            BusyIndicatorTextBlock.Visibility = Visibility.Collapsed;
+            BusyIndicatorTextBlock.IsVisible = false;
         }
     }
 
-    private void ResultsListBox_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void ResultsListBox_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (ResultsListBox.SelectedItem is not ResultViewModel selected)
             return;
@@ -97,41 +102,11 @@ public partial class LyricsSearchWindow : Window
             LocalizationManager.Current.LyricsSearchNoResults;
     }
 
-    private void UseSelectedLyricsButton_OnClick(object sender, RoutedEventArgs e)
+    private void UseSelectedLyricsButton_OnClick(object? sender, RoutedEventArgs e)
     {
         if (ResultsListBox.SelectedItem is not ResultViewModel selected)
             return;
         SelectedResult = selected.Result;
-        DialogResult = true;
+        Close(true);
     }
-
-    private void LyricsSearchWindow_OnSourceInitialized(object sender, EventArgs e)
-    {
-        try
-        {
-            var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-            if (handle == IntPtr.Zero)
-                return;
-            const int DwmwaCaptionColor = 35;
-            const int DwmwaTextColor = 36;
-            var dark = System.Windows.Application.Current.Resources["AppHeaderBrush"] is System.Windows.Media.SolidColorBrush brush &&
-                       brush.Color == System.Windows.Media.Color.FromRgb(0x13, 0x14, 0x2A);
-            var captionColor = dark ? ColorRef(0x13, 0x14, 0x2A) : ColorRef(0xEA, 0xEA, 0xF5);
-            var textColor = dark ? ColorRef(0xFF, 0xFF, 0xFF) : ColorRef(0x13, 0x14, 0x2A);
-            _ = DwmSetWindowAttribute(handle, DwmwaCaptionColor, ref captionColor, sizeof(int));
-            _ = DwmSetWindowAttribute(handle, DwmwaTextColor, ref textColor, sizeof(int));
-        }
-        catch
-        {
-        }
-    }
-
-    private static int ColorRef(byte r, byte g, byte b) => r | (g << 8) | (b << 16);
-
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(
-        IntPtr hwnd,
-        int dwAttribute,
-        ref int pvAttribute,
-        int cbAttribute);
 }

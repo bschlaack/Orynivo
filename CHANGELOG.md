@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Migrated the entire frontend from WPF to Avalonia UI 11.2 for cross-platform
+  compatibility. The target framework remains `net8.0-windows` to preserve
+  Windows-only features (ASIO, DPAPI). All XAML files are now AXAML; styles use
+  `ControlTheme` with pseudo-class selectors instead of WPF `ControlTemplate`
+  triggers; `FuncDataTemplate<T>` replaces `FrameworkElementFactory`; and
+  thumbnail generation in `ArtworkCache` is rewritten with SkiaSharp.
+  New NuGet packages: `Avalonia.Fonts.Inter`, `SkiaSharp`.
+
 ### Added
 
 - Automatic FFmpeg download: when `ffmpeg.exe` and `ffprobe.exe` are not found in
@@ -18,6 +28,83 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Restored visible text in Avalonia table/list navigation and restored vector
+  glyph rendering in themed buttons after the Avalonia UI 11.2 migration.
+- Fixed Avalonia transport controls after the migration: the play/pause glyph is
+  centered, transport sliders show their track background again, sidebar
+  accordion headers toggle reliably, and album/artist artwork tiles lazy-load
+  visible images without eagerly decoding every card.
+- Moved album and artist artwork tile bitmap decoding off the UI thread,
+  reduced tile title text sizes, and enlarged the table/artwork view switcher.
+- Reduced album and artist artwork view stalls by binding artwork cards in
+  incremental pages and loading only the visible page's images.
+- Increased the transport play/pause glyph to 20 px and reduced default button
+  and dropdown text sizes for better visual consistency.
+- Fixed track-filter popup rows so facet counts stay visible in a fixed right
+  column and checkbox changes apply the selected state only once.
+- Rebalanced the Tracks table layout with calmer row/header sizing, proportional
+  title/artist/album columns, and spacing between the table and A-Z index.
+- Harmonized DataGrid cell font sizes so link/button columns match regular text
+  columns.
+- Restored the global header search box in regular library views after its
+  Avalonia visibility condition was inverted.
+- Restored the folder-structure view by eagerly populating root nodes and
+  falling back to detected library roots when configured roots do not match the
+  scanned track paths exactly.
+- Removed the WPF-style placeholder row from folder nodes so expanding a folder
+  shows its actual child folders and tracks under Avalonia.
+- The folder-structure expand/collapse glyphs now use themed text and accent
+  colors instead of the default dark template paths, including non-template
+  ToggleButton glyph paths.
+- The folder-structure chevrons now also override Avalonia Fluent's
+  `TreeViewItemForeground` resources, which are used directly by the default
+  chevron path.
+- Increased the Tracks table column-header row height so the first visible row
+  no longer looks cramped against the header.
+- Fixed clipping in the Tracks favorite column by giving the favorite button
+  fixed centered icon bounds.
+- Fixed transport and volume slider thumbs staying centered by binding the
+  custom slider template track to the slider minimum, maximum, value, and
+  orientation.
+- Centered the missing-cover text and search button inside album artwork cards.
+- Increased album artwork card height and tightened the favorite button bounds
+  so the favorite glyph stays inside the card.
+- Matched the Internet Radio and Podcast discovery cards with the accented
+  podcast detail border and aligned their top spacing.
+- Added a shared accent-bordered intro card below the plain main header so
+  Dashboard, Artists, Albums, Tracks, and Folder structure match the Radio and
+  Podcast view style without moving search/filter controls into the card.
+- Kept the library intro card compact and aligned the A-Z index with the content
+  area instead of the intro card.
+- Added a session-wide navigation history so the main header Back button returns
+  through sidebar navigation, search results, album tracks, artist drill-downs,
+  dashboard links, playlists, podcasts, radio, folder, and Plex library views.
+- Kept the global Back button hidden on the initial view and restyled it as a
+  subtle light-blue left chevron.
+- Top-aligned the main header title and global Back chevron so taller controls
+  on the right no longer shift headings vertically between views.
+- Added Favorites-only header toggles for Artists and Albums that apply to both
+  table and artwork-card modes.
+- The Artists/Albums Favorites-only checkbox now uses the dark header theme with
+  a visible light-blue outline and stable hover text color.
+- Artwork card views now keep sparse artist and album card sets aligned from the
+  top-left instead of centering them vertically.
+- Transport-bar buttons now use dynamic light/dark theme resources instead of
+  fixed dark colors, including hover and disabled states.
+- Fixed the daily-history dialog close button typography/alignment and render
+  non-actionable history title, artist, and album cells as plain text instead of
+  disabled link buttons.
+- Reduced Settings appearance checkbox label typography to match the rest of
+  the settings dialog.
+- Expanded the Settings output-device dropdowns to use the available dialog
+  width.
+- Fixed a crash when opening a dashboard calendar day's listening history under
+  Avalonia UI 11.2 by removing an invalid zero row-header width from the dialog
+  DataGrid.
+- Fixed dark-theme text colors in the dashboard daily-history dialog table and
+  link buttons.
+- Removed nullable and Avalonia runtime-loader build warnings from the migrated
+  Avalonia UI dialogs and main-window search/navigation code.
 - Fixed a race condition in the DFF and DSF audio players where `SeekAsync`
   could write to `FileStream.Position` while `PumpAsync` was concurrently
   reading from the same stream, causing corrupted reads or exceptions.
@@ -46,6 +133,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   data chunk boundary.
 - Fixed cwASIO playback with legacy Windows ASIO drivers that reject the
   optional cwASIO instance-name extension, affecting both PCM and native DSD.
+- Podcast filters no longer require a podcast title before returning results.
+- Radio genres no longer show misleading counts produced by summing
+  overlapping normalized tags.
+- Radio genre filters no longer return only matches from the initial
+  100-station result page.
+- Radio Browser tag queries now use compatible lowercase search values.
+- Cached podcast categories without Apple genre IDs are refreshed
+  automatically.
 
 ### Added
 
@@ -113,17 +208,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   internet-radio now-playing card.
 - The podcast episode Back button is hidden when the view was opened directly
   from **My Podcasts**.
-
-### Fixed
-
-- Podcast filters no longer require a podcast title before returning results.
-- Radio genres no longer show misleading counts produced by summing
-  overlapping normalized tags.
-- Radio genre filters no longer return only matches from the initial
-  100-station result page.
-- Radio Browser tag queries now use compatible lowercase search values.
-- Cached podcast categories without Apple genre IDs are refreshed
-  automatically.
 
 ## [0.3.0] - 2026-06-14
 

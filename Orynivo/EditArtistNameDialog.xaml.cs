@@ -1,67 +1,46 @@
-using System.Runtime.InteropServices;
-using System.Windows;
-using System.Windows.Input;
-using KeyEventArgs = System.Windows.Input.KeyEventArgs;
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 
 namespace Orynivo;
 
 public partial class EditArtistNameDialog : Window
 {
-    public string ArtistName => NameTextBox.Text.Trim();
+    public string ArtistName => NameTextBox.Text?.Trim() ?? string.Empty;
+
+    /// <summary>
+    /// Initializes a runtime-loader instance with an empty artist name.
+    /// </summary>
+    public EditArtistNameDialog()
+        : this(string.Empty)
+    {
+    }
 
     public EditArtistNameDialog(string artistName)
     {
         InitializeComponent();
         NameTextBox.Text = artistName;
-        Loaded += (_, _) =>
+        Opened += (_, _) =>
         {
+            WindowChrome.ApplyTheme(this);
             NameTextBox.Focus();
             NameTextBox.SelectAll();
         };
+        KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Escape) Close(false);
+        };
     }
 
-    private void NameTextBox_OnTextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e) =>
-        RenameButton.IsEnabled = !string.IsNullOrWhiteSpace(NameTextBox.Text);
+    private void NameTextBox_OnTextChanged(object? sender, TextChangedEventArgs e)
+        => RenameButton.IsEnabled = !string.IsNullOrWhiteSpace(NameTextBox.Text);
 
-    private void NameTextBox_OnKeyDown(object sender, KeyEventArgs e)
+    private void NameTextBox_OnKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter && RenameButton.IsEnabled)
-            DialogResult = true;
+            Close(true);
     }
 
-    private void RenameButton_OnClick(object sender, RoutedEventArgs e) => DialogResult = true;
-    private void CancelButton_OnClick(object sender, RoutedEventArgs e) => DialogResult = false;
-    private void EditArtistNameDialog_OnSourceInitialized(object sender, EventArgs e) =>
-        ApplyTitleBarColors();
-
-    private void ApplyTitleBarColors()
-    {
-        try
-        {
-            var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-            if (handle == IntPtr.Zero)
-                return;
-
-            const int DwmwaCaptionColor = 35;
-            const int DwmwaTextColor = 36;
-            var dark = System.Windows.Application.Current.Resources["AppHeaderBrush"] is System.Windows.Media.SolidColorBrush brush &&
-                       brush.Color == System.Windows.Media.Color.FromRgb(0x13, 0x14, 0x2A);
-            var captionColor = dark ? ColorRef(0x13, 0x14, 0x2A) : ColorRef(0xEA, 0xEA, 0xF5);
-            var textColor = dark ? ColorRef(0xFF, 0xFF, 0xFF) : ColorRef(0x13, 0x14, 0x2A);
-            _ = DwmSetWindowAttribute(handle, DwmwaCaptionColor, ref captionColor, sizeof(int));
-            _ = DwmSetWindowAttribute(handle, DwmwaTextColor, ref textColor, sizeof(int));
-        }
-        catch
-        {
-        }
-    }
-
-    private static int ColorRef(byte r, byte g, byte b) => r | (g << 8) | (b << 16);
-
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(
-        IntPtr hwnd,
-        int dwAttribute,
-        ref int pvAttribute,
-        int cbAttribute);
+    private void RenameButton_OnClick(object? sender, RoutedEventArgs e) => Close(true);
+    private void CancelButton_OnClick(object? sender, RoutedEventArgs e) => Close(false);
 }

@@ -1,13 +1,10 @@
-using System.Windows;
+using Avalonia.Controls;
 
 namespace Orynivo;
 
 public partial class StartupWindow : Window
 {
-    public StartupWindow()
-    {
-        InitializeComponent();
-    }
+    public StartupWindow() => InitializeComponent();
 
     public string Status
     {

@@ -1,0 +1,54 @@
+<Window x:Class="Orynivo.AboutWindow"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{DynamicResource L_About}"
+        Icon="avares://Orynivo/Assets/Orynivo.ico"
+        Width="560"
+        Height="540"
+        MinWidth="480"
+        MinHeight="440"
+        Background="{DynamicResource AppContentBrush}"
+        Foreground="{DynamicResource AppPrimaryTextBrush}">
+    <Window.Styles>
+        <Style Selector="TextBlock.license">
+            <Setter Property="Margin" Value="0,0,0,6"/>
+            <Setter Property="LineHeight" Value="20"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+    </Window.Styles>
+    <StackPanel Margin="22">
+        <Border Width="320"
+                Padding="18,12"
+                HorizontalAlignment="Center"
+                CornerRadius="0,24,0,24">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0%,50%" EndPoint="100%,50%">
+                    <GradientStop Color="#FFFFFF" Offset="0"/>
+                    <GradientStop Color="#7268A7" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.Background>
+            <Image Height="64"
+                   Source="avares://Orynivo/Assets/Orynivo_Logo.png"
+                   Stretch="Uniform"/>
+        </Border>
+        <TextBlock Margin="0,18,0,4"
+                   FontWeight="SemiBold"
+                   Text="{DynamicResource L_Author}"/>
+        <TextBlock Text="Björn Schlaack"/>
+
+        <TextBlock Margin="0,22,0,10"
+                   FontWeight="SemiBold"
+                   Text="{DynamicResource L_Licenses}"/>
+
+        <StackPanel>
+            <TextBlock Classes="license" Text="ASIO is a trademark and software of Steinberg Media Technologies GmbH."/>
+            <TextBlock Classes="license" Text="cwASIO — MIT License"/>
+            <TextBlock Classes="license" Text="Avalonia — MIT License"/>
+            <TextBlock Classes="license" Text="Lucene.NET 4.8.0-beta00017 — Apache License 2.0"/>
+            <TextBlock Classes="license" Text="Microsoft.Data.Sqlite 9.0.5 — MIT License"/>
+            <TextBlock Classes="license" Text="NAudio 2.3.0 — MIT License"/>
+            <TextBlock Classes="license" Text="TagLibSharp 2.3.0 — LGPL-2.1 License"/>
+            <TextBlock Classes="license" Text="SQLitePCLRaw / e_sqlite3 — Apache License 2.0"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

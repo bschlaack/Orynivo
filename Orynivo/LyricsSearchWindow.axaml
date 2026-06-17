@@ -1,23 +1,24 @@
-<Window x:Class="Orynivo.LyricsSearchWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+﻿<Window x:Class="Orynivo.LyricsSearchWindow"
+        xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="{DynamicResource L_LyricsSearchTitle}"
-        Icon="Assets/Orynivo.ico"
+        Icon="avares://Orynivo/Assets/Orynivo.ico"
         Width="700"
         Height="650"
         MinWidth="560"
         MinHeight="480"
         Background="{DynamicResource AppContentBrush}"
-        Foreground="{DynamicResource AppPrimaryTextBrush}"
-        SourceInitialized="LyricsSearchWindow_OnSourceInitialized">
-    <Window.Resources>
-        <Style x:Key="DialogButtonStyle" TargetType="Button">
+        Foreground="{DynamicResource AppPrimaryTextBrush}">
+    <Window.Styles>
+        <Style Selector="Button.accent">
             <Setter Property="Background" Value="#6C63FF"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
         </Style>
-    </Window.Resources>
+        <Style Selector="ListBoxItem">
+        </Style>
+    </Window.Styles>
     <Grid Margin="18">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -54,11 +55,11 @@
                          Padding="8,0"
                          VerticalContentAlignment="Center"/>
             </StackPanel>
-            <Button Grid.Column="3"
+            <Button Classes="accent"
+                    Grid.Column="3"
                     Width="110"
                     Height="30"
                     Margin="12,20,0,0"
-                    Style="{StaticResource DialogButtonStyle}"
                     Content="{DynamicResource L_SearchAgain}"
                     Click="SearchAgainButton_OnClick"/>
         </Grid>
@@ -71,13 +72,7 @@
             <ListBox x:Name="ResultsListBox"
                      Background="Transparent"
                      BorderThickness="0"
-                     HorizontalContentAlignment="Stretch"
                      SelectionChanged="ResultsListBox_OnSelectionChanged">
-                <ListBox.ItemContainerStyle>
-                    <Style TargetType="ListBoxItem">
-                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                    </Style>
-                </ListBox.ItemContainerStyle>
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <Border Margin="0,0,0,8"
@@ -114,12 +109,12 @@
                 </ScrollViewer>
             </Border>
         </Grid>
-        <Button Grid.Row="3"
+        <Button Classes="accent"
+                Grid.Row="3"
                 Width="240"
                 Height="32"
                 Margin="0,12,0,0"
                 HorizontalAlignment="Right"
-                Style="{StaticResource DialogButtonStyle}"
                 Content="{DynamicResource L_UseSelectedLyrics}"
                 Click="UseSelectedLyricsButton_OnClick"/>
     </Grid>
