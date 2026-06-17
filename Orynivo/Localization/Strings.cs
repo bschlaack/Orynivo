@@ -318,4 +318,6 @@ public sealed record LocalizedStrings(
     public string PlexNoAudioLibraries { get; init; } = "";
     public string PlexLoading { get; init; } = "";
     public string LoadMore { get; init; } = "";
+    public string FfmpegDownloading { get; init; } = "";
+    public string FfmpegDownloadFailed { get; init; } = "";
 }

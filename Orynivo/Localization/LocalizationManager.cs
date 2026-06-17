@@ -442,6 +442,8 @@ public static class LocalizationManager
         , PlexNoAudioLibraries = "Keine Audio-Bibliotheken gefunden."
         , PlexLoading = "Plex-Inhalte werden geladen …"
         , LoadMore = "Mehr laden"
+        , FfmpegDownloading = "FFmpeg wird heruntergeladen …"
+        , FfmpegDownloadFailed = "FFmpeg konnte nicht heruntergeladen werden. Bitte manuell installieren: ffmpeg.org"
     };
 
     private static readonly LocalizedStrings English = new(
@@ -656,6 +658,8 @@ public static class LocalizationManager
         , PlexNoAudioLibraries = "No audio libraries found."
         , PlexLoading = "Loading Plex content…"
         , LoadMore = "Load more"
+        , FfmpegDownloading = "Downloading FFmpeg …"
+        , FfmpegDownloadFailed = "FFmpeg could not be downloaded. Please install it manually: ffmpeg.org"
     };
 
     private static readonly LocalizedStrings French = new(
@@ -873,6 +877,8 @@ public static class LocalizationManager
         , PlexNoAudioLibraries = "Aucune bibliothèque audio trouvée."
         , PlexLoading = "Chargement du contenu Plex…"
         , LoadMore = "Charger plus"
+        , FfmpegDownloading = "Téléchargement de FFmpeg …"
+        , FfmpegDownloadFailed = "FFmpeg n'a pas pu être téléchargé. Veuillez l'installer manuellement : ffmpeg.org"
     };
 
     private static readonly LocalizedStrings Spanish = new(
@@ -1087,6 +1093,8 @@ public static class LocalizationManager
         , PlexNoAudioLibraries = "No se encontraron bibliotecas de audio."
         , PlexLoading = "Cargando contenido de Plex…"
         , LoadMore = "Cargar más"
+        , FfmpegDownloading = "Descargando FFmpeg …"
+        , FfmpegDownloadFailed = "No se pudo descargar FFmpeg. Instálelo manualmente: ffmpeg.org"
     };
 
     /// <summary>Gets the currently active <see cref="LocalizedStrings"/> instance.</summary>

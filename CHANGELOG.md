@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Automatic FFmpeg download: when `ffmpeg.exe` and `ffprobe.exe` are not found in
+  the application directory or the system PATH, Orynivo downloads the BtbN
+  LGPL-essential Windows build from GitHub Releases on first start, extracts the
+  binaries next to the application executable, and makes them available for the
+  current process session. A localised progress indicator is shown in the startup
+  screen. If the download fails, a warning dialog is displayed and the application
+  starts without audio playback capability.
+
 ### Fixed
 
 - Fixed a race condition in the DFF and DSF audio players where `SeekAsync`

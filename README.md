@@ -81,14 +81,16 @@ The user interface recognizes, among others:
 `DSF`, `DFF`, `FLAC`, `MP3`, `WAV`, `AIFF`, `M4A`, `AAC`, `OGG`, `Opus`, and
 `WMA`.
 
-PCM formats are decoded by the locally installed version of `ffmpeg`. Actual
-codec support therefore also depends on that build.
+PCM formats are decoded by `ffmpeg`, which Orynivo downloads automatically on
+first start if not already installed. Actual codec support depends on the build.
 
 ## Requirements
 
 - Windows 10 or Windows 11, x64
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-- [FFmpeg](https://ffmpeg.org/) with `ffmpeg.exe` and `ffprobe.exe` in `PATH`
+- [FFmpeg](https://ffmpeg.org/) — downloaded automatically on first start if not
+  already present. To use a specific build instead, place `ffmpeg.exe` and
+  `ffprobe.exe` in `PATH` or next to `Orynivo.exe`.
 - For cwASIO: Visual Studio 2022 with the **Desktop development with C++**
   workload and an installed ASIO driver
 - Optional for the separate Steinberg bridge: Steinberg ASIO SDK 2.3

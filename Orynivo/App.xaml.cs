@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Threading;
 using System.Runtime.InteropServices;
+using Orynivo.Audio;
 using Orynivo.Library;
 using Orynivo.Localization;
 
@@ -26,6 +27,16 @@ public partial class App : System.Windows.Application
             var settings = new SettingsStore().Load();
             ThemeManager.Apply(settings.Theme);
             LocalizationManager.Apply(settings.Language);
+
+            var ffmpegAvailable = await FfmpegLocator.EnsureAvailableAsync(
+                new Progress<string>(status => startup.Status = status));
+            if (!ffmpegAvailable)
+                System.Windows.MessageBox.Show(
+                    LocalizationManager.Current.FfmpegDownloadFailed,
+                    "Orynivo",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+
             startup.Status = LocalizationManager.Current.StartupPreparingLibrary;
             await Task.Run(() =>
             {

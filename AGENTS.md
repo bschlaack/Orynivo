@@ -38,6 +38,7 @@ therefore contains cwASIO support without Steinberg SDK files.
 
 - `Orynivo/Audio/SteinbergAsioStream.cs`: runtime-selecting C# wrapper for `AsioBridge.dll` and `CwAsioBridge.dll`
 - `Orynivo/Audio/FfmpegAudioPlayer.cs`: PCM path
+- `Orynivo/Audio/FfmpegLocator.cs`: checks `AppContext.BaseDirectory` and PATH for `ffmpeg.exe`/`ffprobe.exe` at startup; when absent, downloads the BtbN LGPL-essential Windows build from GitHub Releases, extracts the binaries next to the executable, and prepends the directory to the current-process PATH
 - `Orynivo/Audio/DsfAudioPlayer.cs`: native DSF-to-DSD path
 - `Orynivo/Audio/DffAudioPlayer.cs`: native DFF/DSDIFF-to-DSD path
 - `Orynivo/Audio/WasapiAudioPlayer.cs`: WASAPI PCM path
