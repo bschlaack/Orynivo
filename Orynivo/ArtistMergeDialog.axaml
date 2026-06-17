@@ -1,14 +1,13 @@
 <Window x:Class="Orynivo.ArtistMergeDialog"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="{DynamicResource L_MergeArtistsTitle}"
-        Icon="Assets/Orynivo.ico"
+        Icon="avares://Orynivo/Assets/Orynivo.ico"
         Width="540"
         SizeToContent="Height"
-        ResizeMode="NoResize"
+        CanResize="False"
         WindowStartupLocation="CenterOwner"
-        Background="{DynamicResource AppSurfaceBrush}"
-        SourceInitialized="ArtistMergeDialog_OnSourceInitialized">
+        Background="{DynamicResource AppSurfaceBrush}">
     <Grid Margin="24">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -40,7 +39,6 @@
                 Height="34"
                 HorizontalAlignment="Right"
                 Content="{DynamicResource L_Cancel}"
-                IsCancel="True"
                 Background="{DynamicResource AppButtonBrush}"
                 Foreground="{DynamicResource AppButtonTextBrush}"
                 BorderBrush="{DynamicResource AppButtonBorderBrush}"

@@ -4,14 +4,30 @@ using System.Text;
 
 namespace Orynivo.Audio;
 
+/// <summary>
+/// Managed wrapper around <c>AsioBridge.dll</c> (Steinberg ASIO) or <c>CwAsioBridge.dll</c> (cwASIO).
+/// Opens a driver, starts the stream, and accepts interleaved 32-bit float PCM or raw DSD bytes.
+/// One instance represents one active ASIO session; dispose to close the driver.
+/// </summary>
 public sealed class SteinbergAsioStream : IDisposable
 {
     private readonly NativeApi _native;
     private bool _disposed;
 
+    /// <summary>Gets a value indicating whether <c>AsioBridge.dll</c> is present and loadable.</summary>
     public static bool IsAvailable => IsBackendAvailable(OutputBackend.Asio);
+    /// <summary>Gets a value indicating whether <c>CwAsioBridge.dll</c> is present and loadable.</summary>
     public static bool IsCwAsioAvailable => IsBackendAvailable(OutputBackend.CwAsio);
 
+    /// <summary>
+    /// Opens the specified ASIO driver and configures it for the given sample rate, channel count,
+    /// and PCM or DSD mode.
+    /// </summary>
+    /// <param name="backend">Which native bridge to load (<see cref="OutputBackend.Asio"/> or <see cref="OutputBackend.CwAsio"/>).</param>
+    /// <param name="driverName">ASIO driver name as returned by <see cref="GetDriverNames"/>.</param>
+    /// <param name="sampleRate">Target sample rate in Hz. For DSD this is the DSD bit rate (e.g. 2 822 400).</param>
+    /// <param name="channels">Number of output channels; must match a configuration the driver supports.</param>
+    /// <param name="dsd">Pass <see langword="true"/> to open the driver in native DSD mode.</param>
     public SteinbergAsioStream(
         OutputBackend backend,
         string driverName,
@@ -35,11 +51,19 @@ public sealed class SteinbergAsioStream : IDisposable
         IsDsd = dsd;
     }
 
+    /// <summary>Gets the number of output channels the driver was opened with.</summary>
     public int Channels { get; }
+    /// <summary>Gets the sample rate in Hz the driver was opened with.</summary>
     public double SampleRate { get; }
+    /// <summary>Gets a value indicating whether the stream is in native DSD mode.</summary>
     public bool IsDsd { get; }
+    /// <summary>Gets the driver's preferred buffer size in samples.</summary>
     public int PreferredBufferSize => _native.GetPreferredBufferSize();
 
+    /// <summary>
+    /// Returns <see langword="true"/> when the native bridge DLL for <paramref name="backend"/> is present and can be loaded.
+    /// </summary>
+    /// <param name="backend">The backend to probe.</param>
     public static bool IsBackendAvailable(OutputBackend backend)
     {
         try
@@ -53,6 +77,11 @@ public sealed class SteinbergAsioStream : IDisposable
         }
     }
 
+    /// <summary>
+    /// Returns the list of installed ASIO driver names for the given backend,
+    /// or an empty list when the backend is unavailable.
+    /// </summary>
+    /// <param name="backend">The backend to query.</param>
     public static IReadOnlyList<string> GetDriverNames(OutputBackend backend)
     {
         if (!IsBackendAvailable(backend))
@@ -70,6 +99,12 @@ public sealed class SteinbergAsioStream : IDisposable
         return names;
     }
 
+    /// <summary>
+    /// Queries the driver for detailed capability information without opening it for playback.
+    /// </summary>
+    /// <param name="backend">The backend that owns the driver.</param>
+    /// <param name="driverName">Driver name as returned by <see cref="GetDriverNames"/>.</param>
+    /// <returns>An <see cref="AsioDeviceInfo"/> describing the driver's channel, buffer, and format capabilities.</returns>
     public static AsioDeviceInfo GetDeviceInfo(OutputBackend backend, string driverName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(driverName);
@@ -101,12 +136,18 @@ public sealed class SteinbergAsioStream : IDisposable
             ParseCsvStrings(values.GetValueOrDefault("dsdTypes")));
     }
 
+    /// <summary>Starts the ASIO stream. Must be called before writing samples.</summary>
     public void Start()
     {
         ThrowIfDisposed();
         ThrowIfFailed(_native.Start(), "start ASIO stream");
     }
 
+    /// <summary>
+    /// Writes interleaved 32-bit float PCM samples to the ASIO output buffer.
+    /// </summary>
+    /// <param name="samples">Interleaved samples; length must be a multiple of <see cref="Channels"/>.</param>
+    /// <returns>Number of samples actually accepted by the driver buffer.</returns>
     public int WriteInterleaved(ReadOnlySpan<float> samples)
     {
         ThrowIfDisposed();
@@ -115,6 +156,11 @@ public sealed class SteinbergAsioStream : IDisposable
         return _native.WriteInterleaved(samples.ToArray(), samples.Length);
     }
 
+    /// <summary>
+    /// Writes interleaved raw DSD bytes to the ASIO output buffer. Only valid when <see cref="IsDsd"/> is <see langword="true"/>.
+    /// </summary>
+    /// <param name="bytes">Interleaved DSD bytes; length must be a multiple of <see cref="Channels"/>.</param>
+    /// <returns>Number of bytes actually accepted by the driver buffer.</returns>
     public int WriteDsdInterleaved(ReadOnlySpan<byte> bytes)
     {
         ThrowIfDisposed();
@@ -125,6 +171,7 @@ public sealed class SteinbergAsioStream : IDisposable
         return _native.WriteDsdInterleaved(bytes.ToArray(), bytes.Length);
     }
 
+    /// <summary>Stops the ASIO stream.</summary>
     public void Stop()
     {
         ThrowIfDisposed();

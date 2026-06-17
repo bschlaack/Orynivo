@@ -1,54 +1,53 @@
-<Window x:Class="Orynivo.MainWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+﻿<Window x:Class="Orynivo.MainWindow"
+        xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:Orynivo.Controls"
-        Title="Orynivo" Icon="Assets/Orynivo.ico" Height="760" Width="1100"
+        xmlns:conv="using:Avalonia.Data.Converters"
+        Title="Orynivo" Icon="avares://Orynivo/Assets/Orynivo.ico"
+        Height="760" Width="1100"
         WindowState="Maximized"
         MinHeight="600" MinWidth="800">
     <Window.Resources>
 
         <!-- Sidebar nav item -->
-        <Style x:Key="NavItemStyle" TargetType="ListBoxItem">
-            <Setter Property="Foreground" Value="{DynamicResource AppNavTextBrush}" />
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Padding" Value="0" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <ControlTheme x:Key="NavItemTheme" TargetType="ListBoxItem">
+            <Setter Property="Foreground" Value="{DynamicResource AppNavTextBrush}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="MaxWidth" Value="220"/>
-            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ListBoxItem">
-                        <Border x:Name="Bd"
-                                Background="Transparent"
-                                BorderThickness="3,0,0,0"
-                                BorderBrush="Transparent"
-                                Padding="21,8,12,8"
-                                ClipToBounds="True">
-                            <ContentPresenter VerticalAlignment="Center"
-                                              HorizontalAlignment="Stretch"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AppNavSelectedBrush}" />
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="#6C63FF" />
-                                <Setter Property="Foreground" Value="{DynamicResource AppNavSelectedTextBrush}" />
-                            </Trigger>
-                            <MultiTrigger>
-                                <MultiTrigger.Conditions>
-                                    <Condition Property="IsMouseOver" Value="True" />
-                                    <Condition Property="IsSelected" Value="False" />
-                                </MultiTrigger.Conditions>
-                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AppNavHoverBrush}" />
-                                <Setter Property="Foreground" Value="{DynamicResource AppNavHoverTextBrush}" />
-                            </MultiTrigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
+                <ControlTemplate>
+                    <Border x:Name="Bd"
+                            Background="Transparent"
+                            BorderThickness="3,0,0,0"
+                            BorderBrush="Transparent"
+                            Padding="21,8,12,8"
+                            ClipToBounds="True">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          VerticalAlignment="Center"
+                                          HorizontalAlignment="Stretch"/>
+                    </Border>
+                </ControlTemplate>
             </Setter>
-        </Style>
+            <Style Selector="^:selected /template/ Border#Bd">
+                <Setter Property="Background" Value="{DynamicResource AppNavSelectedBrush}"/>
+                <Setter Property="BorderBrush" Value="#6C63FF"/>
+            </Style>
+            <Style Selector="^:selected">
+                <Setter Property="Foreground" Value="{DynamicResource AppNavSelectedTextBrush}"/>
+            </Style>
+            <Style Selector="^:pointerover:not(:selected) /template/ Border#Bd">
+                <Setter Property="Background" Value="{DynamicResource AppNavHoverBrush}"/>
+            </Style>
+            <Style Selector="^:pointerover:not(:selected)">
+                <Setter Property="Foreground" Value="{DynamicResource AppNavHoverTextBrush}"/>
+            </Style>
+        </ControlTheme>
 
-        <Style x:Key="NavSectionHeaderStyle" TargetType="ListBoxItem">
+        <ControlTheme x:Key="NavSectionHeaderTheme" TargetType="ListBoxItem">
             <Setter Property="Foreground" Value="{DynamicResource AppMutedTextBrush}"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Padding" Value="0"/>
@@ -58,483 +57,391 @@
             <Setter Property="Focusable" Value="False"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ListBoxItem">
-                        <Border x:Name="Bd"
-                                Background="{TemplateBinding Background}"
-                                Padding="24,12,14,5"
-                                ClipToBounds="True">
-                            <ContentPresenter VerticalAlignment="Center"
-                                              HorizontalAlignment="Stretch"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AppNavHoverBrush}"/>
-                                <Setter Property="Foreground" Value="{DynamicResource AppNavHoverTextBrush}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
+                <ControlTemplate>
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            Padding="24,12,14,5"
+                            ClipToBounds="True">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          VerticalAlignment="Center"
+                                          HorizontalAlignment="Stretch"/>
+                    </Border>
+                </ControlTemplate>
             </Setter>
-        </Style>
-
-        <Style x:Key="NavItemTextStyle" TargetType="TextBlock">
-            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-            <Setter Property="TextWrapping" Value="NoWrap"/>
-            <Setter Property="MaxWidth" Value="170"/>
-        </Style>
+            <Style Selector="^:pointerover /template/ Border#Bd">
+                <Setter Property="Background" Value="{DynamicResource AppNavHoverBrush}"/>
+            </Style>
+            <Style Selector="^:pointerover">
+                <Setter Property="Foreground" Value="{DynamicResource AppNavHoverTextBrush}"/>
+            </Style>
+        </ControlTheme>
 
         <!-- Transport secondary button -->
-        <Style x:Key="TransportBtnStyle" TargetType="Button">
-            <Setter Property="Background" Value="#252640" />
-            <Setter Property="Foreground" Value="#CCCCEE" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Width" Value="34" />
-            <Setter Property="Height" Value="34" />
-            <Setter Property="FontSize" Value="16" />
-            <Setter Property="Cursor" Value="Hand" />
+        <ControlTheme x:Key="TransportBtnTheme" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource AppTransportButtonBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppTransportButtonTextBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="34"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
-                                CornerRadius="17">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#343654"/>
-                                <Setter Property="Foreground" Value="White"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Bd" Property="Background" Value="#20213A"/>
-                                <Setter Property="Foreground" Value="#3A3A55"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
+                <ControlTemplate>
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                            CornerRadius="17">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
             </Setter>
-        </Style>
+            <Style Selector="^:pointerover /template/ Border#Bd">
+                <Setter Property="Background" Value="{DynamicResource AppTransportButtonHoverBrush}"/>
+            </Style>
+            <Style Selector="^:pointerover">
+                <Setter Property="Foreground" Value="{DynamicResource AppTransportButtonHoverTextBrush}"/>
+            </Style>
+            <Style Selector="^:disabled /template/ Border#Bd">
+                <Setter Property="Background" Value="{DynamicResource AppTransportButtonDisabledBrush}"/>
+            </Style>
+            <Style Selector="^:disabled">
+                <Setter Property="Foreground" Value="{DynamicResource AppTransportButtonDisabledTextBrush}"/>
+            </Style>
+        </ControlTheme>
 
         <!-- Transport primary button (play/pause) -->
-        <Style x:Key="PlayBtnStyle" TargetType="Button">
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Width" Value="44" />
-            <Setter Property="Height" Value="44" />
-            <Setter Property="FontSize" Value="18" />
-            <Setter Property="Cursor" Value="Hand" />
+        <ControlTheme x:Key="PlayBtnTheme" TargetType="Button">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="{DynamicResource AppTransportPlayBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="44"/>
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="#6C63FF" CornerRadius="22">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#7B73FF"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Bd" Property="Background" Value="#2A2B45"/>
-                                <Setter Property="Foreground" Value="#3A3A55"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
+                <ControlTemplate>
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="22">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
             </Setter>
-        </Style>
+            <Style Selector="^:pointerover /template/ Border#Bd">
+                <Setter Property="Background" Value="{DynamicResource AppTransportPlayHoverBrush}"/>
+            </Style>
+            <Style Selector="^:disabled /template/ Border#Bd">
+                <Setter Property="Background" Value="{DynamicResource AppTransportPlayDisabledBrush}"/>
+            </Style>
+            <Style Selector="^:disabled">
+                <Setter Property="Foreground" Value="{DynamicResource AppTransportPlayDisabledTextBrush}"/>
+            </Style>
+        </ControlTheme>
 
         <!-- Settings button -->
-        <Style x:Key="SidebarBtnStyle" TargetType="Button">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Foreground" Value="{DynamicResource AppNavTextBrush}" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="HorizontalContentAlignment" Value="Left" />
-            <Setter Property="Cursor" Value="Hand" />
+        <ControlTheme x:Key="SidebarBtnTheme" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppNavTextBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
-                                Padding="24,14">
-                            <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AppNavHoverBrush}"/>
-                                <Setter Property="Foreground" Value="{DynamicResource AppNavHoverTextBrush}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
+                <ControlTemplate>
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                            Padding="24,14">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          HorizontalAlignment="Left"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
             </Setter>
-        </Style>
+            <Style Selector="^:pointerover /template/ Border#Bd">
+                <Setter Property="Background" Value="{DynamicResource AppNavHoverBrush}"/>
+            </Style>
+            <Style Selector="^:pointerover">
+                <Setter Property="Foreground" Value="{DynamicResource AppNavHoverTextBrush}"/>
+            </Style>
+        </ControlTheme>
 
         <!-- Back navigation button -->
-        <Style x:Key="HeaderIconButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="#DDDDF5"/>
-            <Setter Property="Foreground" Value="#4B4B78"/>
+        <ControlTheme x:Key="HeaderIconButtonTheme" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#8FA7FF"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd"
-                                Background="{TemplateBinding Background}"
-                                CornerRadius="8">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#D1D1F0"/>
-                                <Setter Property="Foreground" Value="#13142A"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#C5C5EA"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
+                <ControlTemplate>
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="4">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
             </Setter>
-        </Style>
+            <Style Selector="^:pointerover /template/ Border#Bd">
+                <Setter Property="Background" Value="#252640"/>
+            </Style>
+            <Style Selector="^:pointerover">
+                <Setter Property="Foreground" Value="#B5C4FF"/>
+            </Style>
+            <Style Selector="^:pressed /template/ Border#Bd">
+                <Setter Property="Background" Value="#303251"/>
+            </Style>
+        </ControlTheme>
 
         <!-- Header filter button -->
-        <Style x:Key="HeaderFilterButtonStyle" TargetType="Button">
+        <ControlTheme x:Key="HeaderFilterButtonTheme" TargetType="Button">
             <Setter Property="Background" Value="{DynamicResource AppButtonBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource AppButtonTextBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource AppButtonBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="11"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="8">
-                            <ContentPresenter Margin="{TemplateBinding Padding}"
-                                              HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AppButtonHoverBrush}"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AppButtonPressedBrush}"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Bd" Property="Opacity" Value="0.38"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
+                <ControlTemplate>
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="8">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          Margin="{TemplateBinding Padding}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
             </Setter>
-            <Style.Triggers>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Cursor" Value="Arrow"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
+            <Style Selector="^:pointerover /template/ Border#Bd">
+                <Setter Property="Background" Value="{DynamicResource AppButtonHoverBrush}"/>
+            </Style>
+            <Style Selector="^:pressed /template/ Border#Bd">
+                <Setter Property="Background" Value="{DynamicResource AppButtonPressedBrush}"/>
+            </Style>
+            <Style Selector="^:disabled /template/ Border#Bd">
+                <Setter Property="Opacity" Value="0.38"/>
+            </Style>
+            <Style Selector="^:disabled">
+                <Setter Property="Cursor" Value="Arrow"/>
+            </Style>
+        </ControlTheme>
 
-        <Style x:Key="TrackFilterExpanderStyle" TargetType="Expander">
+        <ControlTheme x:Key="HeaderCheckBoxTheme" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{DynamicResource AppSecondaryTextBrush}"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="7"
+                                VerticalAlignment="Center">
+                        <Border x:Name="Box"
+                                Width="16"
+                                Height="16"
+                                Background="{DynamicResource AppInputBrush}"
+                                BorderBrush="#8FA7FF"
+                                BorderThickness="1.2"
+                                CornerRadius="4">
+                            <Path x:Name="CheckMark"
+                                  Data="M 3 8 L 6.3 11.2 L 13 4.5"
+                                  Stroke="White"
+                                  StrokeThickness="1.9"
+                                  StrokeLineCap="Round"
+                                  StrokeJoin="Round"
+                                  IsVisible="False"/>
+                        </Border>
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          VerticalAlignment="Center"/>
+                    </StackPanel>
+                </ControlTemplate>
+            </Setter>
+            <Style Selector="^:pointerover">
+                <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+            </Style>
+            <Style Selector="^:pointerover /template/ Border#Box">
+                <Setter Property="BorderBrush" Value="#B5C4FF"/>
+                <Setter Property="Background" Value="#252640"/>
+            </Style>
+            <Style Selector="^:checked /template/ Border#Box">
+                <Setter Property="Background" Value="#6C63FF"/>
+                <Setter Property="BorderBrush" Value="#8FA7FF"/>
+            </Style>
+            <Style Selector="^:checked /template/ Path#CheckMark">
+                <Setter Property="IsVisible" Value="True"/>
+            </Style>
+        </ControlTheme>
+
+        <ControlTheme x:Key="TrackFilterExpanderTheme" TargetType="Expander">
             <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Expander">
-                        <StackPanel>
-                            <ToggleButton x:Name="HeaderSite"
-                                          IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}"
-                                          Background="{DynamicResource AppButtonBrush}"
-                                          Foreground="{DynamicResource AppButtonTextBrush}"
-                                          BorderBrush="{DynamicResource AppButtonBorderBrush}"
-                                          BorderThickness="1"
-                                          Cursor="Hand">
-                                <ToggleButton.Template>
-                                    <ControlTemplate TargetType="ToggleButton">
-                                        <Border x:Name="Bd"
-                                                Background="{TemplateBinding Background}"
-                                                BorderBrush="{TemplateBinding BorderBrush}"
-                                                BorderThickness="{TemplateBinding BorderThickness}"
-                                                CornerRadius="8"
-                                                Padding="10,8">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                </Grid.ColumnDefinitions>
-                                                <Path x:Name="Arrow"
-                                                      Width="10"
-                                                      Height="10"
-                                                      Margin="0,0,10,0"
-                                                      VerticalAlignment="Center"
-                                                      Data="M 1 3 L 5 7 L 9 3"
-                                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"
-                                                      StrokeThickness="1.8"
-                                                      StrokeStartLineCap="Round"
-                                                      StrokeEndLineCap="Round"
-                                                      StrokeLineJoin="Round"/>
-                                                <ContentPresenter Grid.Column="1"
-                                                                  Content="{Binding Header, RelativeSource={RelativeSource AncestorType=Expander}}"
-                                                                  VerticalAlignment="Center"/>
-                                            </Grid>
-                                        </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AppButtonHoverBrush}"/>
-                                            </Trigger>
-                                            <Trigger Property="IsPressed" Value="True">
-                                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AppButtonPressedBrush}"/>
-                                            </Trigger>
-                                            <Trigger Property="IsChecked" Value="True">
-                                                <Setter TargetName="Arrow" Property="Data" Value="M 1 7 L 5 3 L 9 7"/>
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </ToggleButton.Template>
-                            </ToggleButton>
-                            <ContentPresenter x:Name="ExpandSite"
-                                              Margin="10,6,0,0"
-                                              Visibility="Collapsed"/>
-                        </StackPanel>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsExpanded" Value="True">
-                                <Setter TargetName="ExpandSite" Property="Visibility" Value="Visible"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
+                <ControlTemplate>
+                    <StackPanel>
+                        <ToggleButton x:Name="PART_ToggleButton"
+                                      IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                                      Background="{DynamicResource AppButtonBrush}"
+                                      Foreground="{DynamicResource AppButtonTextBrush}"
+                                      BorderBrush="{DynamicResource AppButtonBorderBrush}"
+                                      BorderThickness="1"
+                                      Content="{TemplateBinding Header}"
+                                      Cursor="Hand">
+                            <ToggleButton.Theme>
+                                <ControlTheme TargetType="ToggleButton">
+                                    <Setter Property="Template">
+                                        <ControlTemplate TargetType="ToggleButton">
+                                            <Border x:Name="Bd"
+                                                    Background="{TemplateBinding Background}"
+                                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                                    CornerRadius="8"
+                                                    Padding="10,8">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Path x:Name="Arrow"
+                                                          Width="10"
+                                                          Height="10"
+                                                          Margin="0,0,10,0"
+                                                          VerticalAlignment="Center"
+                                                          Data="M 1 3 L 5 7 L 9 3"
+                                                          Stroke="{TemplateBinding Foreground}"
+                                                          StrokeThickness="1.8"
+                                                          StrokeLineCap="Round"
+                                                          StrokeJoin="Round"/>
+                                                    <ContentPresenter Grid.Column="1"
+                                                                      Content="{TemplateBinding Content}"
+                                                                      VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Setter>
+                                    <Style Selector="^:pointerover /template/ Border#Bd">
+                                        <Setter Property="Background" Value="{DynamicResource AppButtonHoverBrush}"/>
+                                    </Style>
+                                    <Style Selector="^:pressed /template/ Border#Bd">
+                                        <Setter Property="Background" Value="{DynamicResource AppButtonPressedBrush}"/>
+                                    </Style>
+                                    <Style Selector="^:checked /template/ Path#Arrow">
+                                        <Setter Property="Data" Value="M 1 7 L 5 3 L 9 7"/>
+                                    </Style>
+                                </ControlTheme>
+                            </ToggleButton.Theme>
+                        </ToggleButton>
+                        <ContentPresenter x:Name="ExpandSite"
+                                          Margin="10,6,0,0"
+                                          IsVisible="False"
+                                          Content="{TemplateBinding Content}"/>
+                    </StackPanel>
+                </ControlTemplate>
             </Setter>
-        </Style>
+            <Style Selector="^:expanded /template/ ContentPresenter#ExpandSite">
+                <Setter Property="IsVisible" Value="True"/>
+            </Style>
+        </ControlTheme>
 
         <!-- Dark slider (transport bar) -->
-        <Style x:Key="DarkSliderStyle" TargetType="Slider">
-            <Setter Property="IsMoveToPointEnabled" Value="True"/>
+        <ControlTheme x:Key="DarkSliderTheme" TargetType="Slider">
             <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Slider">
-                        <Grid VerticalAlignment="Center"
-                              Background="Transparent"
-                              ClipToBounds="False">
-                            <Track x:Name="PART_Track" VerticalAlignment="Center">
-                                <Track.DecreaseRepeatButton>
-                                    <RepeatButton Command="{x:Static Slider.DecreaseLarge}">
-                                        <RepeatButton.Template>
-                                            <ControlTemplate TargetType="RepeatButton">
-                                                <Border Height="3" VerticalAlignment="Center"
-                                                        Background="#6C63FF" CornerRadius="1.5"/>
-                                            </ControlTemplate>
-                                        </RepeatButton.Template>
-                                    </RepeatButton>
-                                </Track.DecreaseRepeatButton>
-                                <Track.Thumb>
-                                    <Thumb Width="14" Height="14">
-                                        <Thumb.Template>
-                                            <ControlTemplate TargetType="Thumb">
-                                                <Ellipse x:Name="El" Width="14" Height="14" Fill="White"/>
-                                                <ControlTemplate.Triggers>
-                                                    <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter TargetName="El" Property="Fill" Value="#DDDDFF"/>
-                                                    </Trigger>
-                                                </ControlTemplate.Triggers>
-                                            </ControlTemplate>
-                                        </Thumb.Template>
-                                    </Thumb>
-                                </Track.Thumb>
-                                <Track.IncreaseRepeatButton>
-                                    <RepeatButton Command="{x:Static Slider.IncreaseLarge}">
-                                        <RepeatButton.Template>
-                                            <ControlTemplate TargetType="RepeatButton">
-                                                <Border Height="3" VerticalAlignment="Center"
-                                                        Background="#2E2F4A" CornerRadius="1.5"/>
-                                            </ControlTemplate>
-                                        </RepeatButton.Template>
-                                    </RepeatButton>
-                                </Track.IncreaseRepeatButton>
-                            </Track>
-                        </Grid>
-                    </ControlTemplate>
-                </Setter.Value>
+                <ControlTemplate>
+                    <Grid Height="30"
+                          VerticalAlignment="Center"
+                          Background="Transparent">
+                        <Border Height="3"
+                                VerticalAlignment="Center"
+                                Background="#2E2F4A"
+                                CornerRadius="1.5"/>
+                        <Track Name="PART_Track"
+                               Minimum="{TemplateBinding Minimum}"
+                               Maximum="{TemplateBinding Maximum}"
+                               Value="{TemplateBinding Value}"
+                               Orientation="{TemplateBinding Orientation}"
+                               VerticalAlignment="Center">
+                            <Track.DecreaseButton>
+                                <RepeatButton>
+                                    <RepeatButton.Template>
+                                        <ControlTemplate TargetType="RepeatButton">
+                                            <Border Height="3" VerticalAlignment="Center"
+                                                    Background="#6C63FF" CornerRadius="1.5"/>
+                                        </ControlTemplate>
+                                    </RepeatButton.Template>
+                                </RepeatButton>
+                            </Track.DecreaseButton>
+                            <Track.Thumb>
+                                <Thumb Width="14"
+                                       Height="14"
+                                       VerticalAlignment="Center">
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Ellipse x:Name="El"
+                                                     Width="14"
+                                                     Height="14"
+                                                     Fill="White"
+                                                     Stroke="#6C63FF"
+                                                     StrokeThickness="1"/>
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                            <Track.IncreaseButton>
+                                <RepeatButton>
+                                    <RepeatButton.Template>
+                                        <ControlTemplate TargetType="RepeatButton">
+                                            <Border Height="3" VerticalAlignment="Center"
+                                                    Background="#2E2F4A" CornerRadius="1.5"/>
+                                        </ControlTemplate>
+                                    </RepeatButton.Template>
+                                </RepeatButton>
+                            </Track.IncreaseButton>
+                        </Track>
+                    </Grid>
+                </ControlTemplate>
             </Setter>
-        </Style>
+        </ControlTheme>
 
-        <!-- DataGrid column header -->
-        <Style TargetType="DataGrid">
-            <Setter Property="Background" Value="{DynamicResource AppContentBrush}"/>
-            <Setter Property="RowBackground" Value="{DynamicResource AppContentBrush}"/>
-            <Setter Property="AlternatingRowBackground" Value="{DynamicResource AppSurfaceBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource AppGridLineBrush}"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="HeadersVisibility" Value="Column"/>
-            <Setter Property="ScrollViewer.Background" Value="{DynamicResource AppContentBrush}"/>
-        </Style>
-        <Style TargetType="DataGridColumnHeader">
-            <Setter Property="Background" Value="{DynamicResource AppColumnHeaderBrush}"/>
-            <Setter Property="Foreground" Value="{DynamicResource AppMutedTextBrush}"/>
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="14,9"/>
-            <Setter Property="BorderThickness" Value="0,0,0,1"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource AppGridLineBrush}"/>
-            <Setter Property="SeparatorBrush" Value="{DynamicResource AppGridLineBrush}"/>
-        </Style>
-
-        <!-- DataGrid row -->
-        <Style TargetType="DataGridRow">
-            <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource AppSurfaceHoverBrush}"/>
-                </Trigger>
-                <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource AppSurfaceSelectedBrush}"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <!-- TreeView item -->
-        <Style TargetType="TreeViewItem">
-            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
-            <Setter Property="Padding"    Value="4,5"/>
-            <Style.Triggers>
-                <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource AppSurfaceSelectedBrush}"/>
-                </Trigger>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource AppSurfaceHoverBrush}"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
-
-        <!-- DataGrid cell -->
-        <Style TargetType="DataGridCell">
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="14,0"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="DataGridCell">
-                        <Border Padding="{TemplateBinding Padding}"
-                                Background="Transparent">
-                            <ContentPresenter VerticalAlignment="Center"/>
-                        </Border>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Theme ScrollBar -->
-        <Style TargetType="ScrollBar">
-            <Setter Property="Width" Value="16"/>
-            <Setter Property="MinWidth" Value="16"/>
-            <Setter Property="Background" Value="{DynamicResource AppScrollbarTrackBrush}"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ScrollBar">
-                        <Grid Background="{TemplateBinding Background}">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="18"/>
-                                <RowDefinition Height="*"/>
-                                <RowDefinition Height="18"/>
-                            </Grid.RowDefinitions>
-                            <RepeatButton Grid.Row="0"
-                                          Command="{x:Static ScrollBar.LineUpCommand}"
-                                          Background="Transparent"
-                                          BorderThickness="0"
-                                          Focusable="False">
-                                <Path Width="7"
-                                      Height="4"
-                                      Data="M 0 4 L 3.5 0 L 7 4"
-                                      Stroke="{DynamicResource AppScrollbarThumbBrush}"
-                                      StrokeThickness="1.5"
-                                      StrokeLineJoin="Round"/>
-                            </RepeatButton>
-                            <Track x:Name="PART_Track"
-                                   Grid.Row="1"
-                                   IsDirectionReversed="True">
-                                <Track.DecreaseRepeatButton>
-                                    <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}" Opacity="0"/>
-                                </Track.DecreaseRepeatButton>
-                                <Track.Thumb>
-                                    <Thumb MinHeight="42">
-                                        <Thumb.Template>
-                                            <ControlTemplate TargetType="Thumb">
-                                                <Border x:Name="Bd"
-                                                        Margin="2"
-                                                        Background="{DynamicResource AppScrollbarThumbBrush}"
-                                                        CornerRadius="5"/>
-                                                <ControlTemplate.Triggers>
-                                                    <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AppScrollbarThumbHoverBrush}"/>
-                                                    </Trigger>
-                                                </ControlTemplate.Triggers>
-                                            </ControlTemplate>
-                                        </Thumb.Template>
-                                    </Thumb>
-                                </Track.Thumb>
-                                <Track.IncreaseRepeatButton>
-                                    <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}" Opacity="0"/>
-                                </Track.IncreaseRepeatButton>
-                            </Track>
-                            <RepeatButton Grid.Row="2"
-                                          Command="{x:Static ScrollBar.LineDownCommand}"
-                                          Background="Transparent"
-                                          BorderThickness="0"
-                                          Focusable="False">
-                                <Path Width="7"
-                                      Height="4"
-                                      Data="M 0 0 L 3.5 4 L 7 0"
-                                      Stroke="{DynamicResource AppScrollbarThumbBrush}"
-                                      StrokeThickness="1.5"
-                                      StrokeLineJoin="Round"/>
-                            </RepeatButton>
-                        </Grid>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="AlphabetIndexButtonStyle" TargetType="Button">
+        <ControlTheme x:Key="AlphabetIndexButtonTheme" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="{DynamicResource AppSecondaryTextBrush}"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontSize" Value="9.5"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Padding" Value="2,0"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd"
-                                Margin="3,1"
-                                Background="{TemplateBinding Background}"
-                                CornerRadius="4">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AppNavHoverBrush}"/>
-                                <Setter Property="Foreground" Value="#6C63FF"/>
-                            </Trigger>
-                            <Trigger Property="IsDefault" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#6C63FF"/>
-                                <Setter Property="Foreground" Value="White"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Foreground" Value="{DynamicResource AppMutedTextBrush}"/>
-                                <Setter Property="Opacity" Value="0.3"/>
-                                <Setter Property="Cursor" Value="Arrow"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
+                <ControlTemplate>
+                    <Border x:Name="Bd"
+                            Margin="2,1"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="3">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
             </Setter>
-        </Style>
+            <Style Selector="^:pointerover /template/ Border#Bd">
+                <Setter Property="Background" Value="{DynamicResource AppNavHoverBrush}"/>
+            </Style>
+            <Style Selector="^:pointerover">
+                <Setter Property="Foreground" Value="#6C63FF"/>
+            </Style>
+            <Style Selector="^[IsDefault=true] /template/ Border#Bd">
+                <Setter Property="Background" Value="#6C63FF"/>
+            </Style>
+            <Style Selector="^[IsDefault=true]">
+                <Setter Property="Foreground" Value="White"/>
+            </Style>
+            <Style Selector="^:disabled">
+                <Setter Property="Foreground" Value="{DynamicResource AppMutedTextBrush}"/>
+                <Setter Property="Opacity" Value="0.3"/>
+                <Setter Property="Cursor" Value="Arrow"/>
+            </Style>
+        </ControlTheme>
 
-        <Style x:Key="EntityLinkButtonStyle" TargetType="Button">
+        <ControlTheme x:Key="EntityLinkButtonTheme" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
             <Setter Property="BorderThickness" Value="0"/>
@@ -542,59 +449,173 @@
             <Setter Property="HorizontalContentAlignment" Value="Left"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <TextBlock x:Name="Text"
-                                   Text="{TemplateBinding Content}"
-                                   Foreground="{TemplateBinding Foreground}"
-                                   HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                   TextTrimming="CharacterEllipsis"/>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Text" Property="Foreground" Value="#6C63FF"/>
-                                <Setter TargetName="Text" Property="TextDecorations" Value="Underline"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
+                <ControlTemplate>
+                    <TextBlock x:Name="Text"
+                               Text="{TemplateBinding Content}"
+                               Foreground="{TemplateBinding Foreground}"
+                               FontSize="{TemplateBinding FontSize}"
+                               FontWeight="{TemplateBinding FontWeight}"
+                               HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                               TextTrimming="CharacterEllipsis"/>
+                </ControlTemplate>
             </Setter>
-        </Style>
+            <Style Selector="^:pointerover /template/ TextBlock#Text">
+                <Setter Property="Foreground" Value="#6C63FF"/>
+                <Setter Property="TextDecorations" Value="Underline"/>
+            </Style>
+        </ControlTheme>
 
-        <!-- Segmentierter Ansichtsumschalter -->
-        <Style x:Key="ViewModeRadioStyle" TargetType="RadioButton">
+        <!-- Segmented view mode switcher -->
+        <ControlTheme x:Key="ViewModeRadioTheme" TargetType="RadioButton">
             <Setter Property="Foreground" Value="#666688"/>
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Padding" Value="18,7"/>
+            <Setter Property="Padding" Value="22,9"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="MinHeight" Value="36"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="Bd"
-                                Background="{TemplateBinding Background}"
-                                CornerRadius="6">
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#6C63FF"/>
-                                <Setter Property="Foreground" Value="White"/>
-                            </Trigger>
-                            <MultiTrigger>
-                                <MultiTrigger.Conditions>
-                                    <Condition Property="IsMouseOver" Value="True"/>
-                                    <Condition Property="IsChecked" Value="False"/>
-                                </MultiTrigger.Conditions>
-                                <Setter TargetName="Bd" Property="Background" Value="#DDDDF5"/>
-                            </MultiTrigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
+                <ControlTemplate>
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="6">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
             </Setter>
-        </Style>
-
+            <Style Selector="^:checked /template/ Border#Bd">
+                <Setter Property="Background" Value="#6C63FF"/>
+            </Style>
+            <Style Selector="^:checked">
+                <Setter Property="Foreground" Value="White"/>
+            </Style>
+            <Style Selector="^:pointerover:not(:checked) /template/ Border#Bd">
+                <Setter Property="Background" Value="#DDDDF5"/>
+            </Style>
+        </ControlTheme>
 
     </Window.Resources>
+
+    <Window.Styles>
+        <!-- Implicit DataGrid styles -->
+        <Style Selector="DataGrid">
+            <Setter Property="Background" Value="{DynamicResource AppContentBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppGridLineBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="HeadersVisibility" Value="Column"/>
+        </Style>
+        <Style Selector="Button">
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+        <Style Selector="ComboBox">
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+        <Style Selector="ComboBoxItem">
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
+        <Style Selector="DataGridColumnHeader">
+            <Setter Property="Background" Value="{DynamicResource AppColumnHeaderBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppSecondaryTextBrush}"/>
+            <Setter Property="FontSize" Value="10.5"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="12,11"/>
+            <Setter Property="MinHeight" Value="42"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppGridLineBrush}"/>
+        </Style>
+        <Style Selector="DataGridRow">
+            <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+        </Style>
+        <Style Selector="DataGridRow:pointerover">
+            <Setter Property="Background" Value="{DynamicResource AppSurfaceHoverBrush}"/>
+        </Style>
+        <Style Selector="DataGridRow:selected">
+            <Setter Property="Background" Value="{DynamicResource AppSurfaceSelectedBrush}"/>
+        </Style>
+        <Style Selector="DataGridCell">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border Padding="{TemplateBinding Padding}"
+                            Background="Transparent">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="DataGridCell TextBlock">
+            <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=DataGridCell}}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="DataGridCell Button">
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+        <Style Selector="ListBox#NavListBox ListBoxItem TextBlock">
+            <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+        </Style>
+        <Style Selector="TreeViewItem">
+            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+            <Setter Property="Padding" Value="4,5"/>
+        </Style>
+        <Style Selector="TreeViewItem /template/ ToggleButton">
+            <Setter Property="Foreground" Value="{DynamicResource AppSecondaryTextBrush}"/>
+        </Style>
+        <Style Selector="TreeViewItem /template/ ToggleButton:pointerover">
+            <Setter Property="Foreground" Value="#6C63FF"/>
+        </Style>
+        <Style Selector="TreeViewItem ToggleButton">
+            <Setter Property="Foreground" Value="{DynamicResource AppSecondaryTextBrush}"/>
+        </Style>
+        <Style Selector="TreeViewItem ToggleButton:pointerover">
+            <Setter Property="Foreground" Value="#6C63FF"/>
+        </Style>
+        <Style Selector="TreeViewItem /template/ PathIcon">
+            <Setter Property="Foreground" Value="{DynamicResource AppSecondaryTextBrush}"/>
+        </Style>
+        <Style Selector="TreeViewItem /template/ ToggleButton Path">
+            <Setter Property="Fill" Value="{DynamicResource AppSecondaryTextBrush}"/>
+            <Setter Property="Stroke" Value="{DynamicResource AppSecondaryTextBrush}"/>
+        </Style>
+        <Style Selector="TreeViewItem /template/ ToggleButton:pointerover Path">
+            <Setter Property="Fill" Value="#6C63FF"/>
+            <Setter Property="Stroke" Value="#6C63FF"/>
+        </Style>
+        <Style Selector="TreeViewItem ToggleButton Path">
+            <Setter Property="Fill" Value="{DynamicResource AppSecondaryTextBrush}"/>
+            <Setter Property="Stroke" Value="{DynamicResource AppSecondaryTextBrush}"/>
+        </Style>
+        <Style Selector="TreeViewItem ToggleButton:pointerover Path">
+            <Setter Property="Fill" Value="#6C63FF"/>
+            <Setter Property="Stroke" Value="#6C63FF"/>
+        </Style>
+        <Style Selector="TreeViewItem:selected">
+            <Setter Property="Background" Value="{DynamicResource AppSurfaceSelectedBrush}"/>
+        </Style>
+        <Style Selector="TreeViewItem:pointerover">
+            <Setter Property="Background" Value="{DynamicResource AppSurfaceHoverBrush}"/>
+        </Style>
+        <!-- Active lyrics line -->
+        <Style Selector="TextBlock.active">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="30"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Opacity" Value="1"/>
+        </Style>
+        <!-- NavItemText helper -->
+        <Style Selector="TextBlock.navItemText">
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="TextWrapping" Value="NoWrap"/>
+            <Setter Property="MaxWidth" Value="170"/>
+        </Style>
+    </Window.Styles>
 
     <Grid>
         <Grid.ColumnDefinitions>
@@ -622,13 +643,13 @@
                     <Border Padding="9,7"
                             CornerRadius="0,18,0,18">
                         <Border.Background>
-                            <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
+                            <LinearGradientBrush StartPoint="0%,50%" EndPoint="100%,50%">
                                 <GradientStop Color="#FFFFFF" Offset="0"/>
                                 <GradientStop Color="#7268A7" Offset="1"/>
                             </LinearGradientBrush>
                         </Border.Background>
                         <Image Height="38"
-                               Source="Assets/Orynivo_Logo.png"
+                               Source="avares://Orynivo/Assets/Orynivo_Logo.png"
                                Stretch="Uniform"/>
                     </Border>
                     <TextBlock x:Name="SelectedDriverTextBlock"
@@ -648,25 +669,23 @@
                      ClipToBounds="True"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                      SelectionChanged="NavListBox_OnSelectionChanged"
-                     PreviewMouseLeftButtonDown="NavListBox_OnPreviewMouseLeftButtonDown"
-                     PreviewMouseLeftButtonUp="NavListBox_OnPreviewMouseLeftButtonUp"
-                     PreviewMouseRightButtonDown="NavListBox_OnPreviewMouseRightButtonDown">
+                     PointerReleased="NavListBox_OnPreviewMouseLeftButtonUp">
 
-                <ListBoxItem Tag="Dashboard" Style="{StaticResource NavItemStyle}">
+                <ListBoxItem Tag="Dashboard" Theme="{StaticResource NavItemTheme}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="⊞" Width="18" FontSize="13" VerticalAlignment="Center"/>
                         <TextBlock Text="{DynamicResource L_Dashboard}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </ListBoxItem>
 
-                <ListBoxItem Tag="InternetRadio" Style="{StaticResource NavItemStyle}">
+                <ListBoxItem Tag="InternetRadio" Theme="{StaticResource NavItemTheme}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="◉" Width="18" FontSize="13" VerticalAlignment="Center"/>
                         <TextBlock Text="{DynamicResource L_InternetRadio}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </ListBoxItem>
 
-                <ListBoxItem Tag="Podcasts" Style="{StaticResource NavItemStyle}">
+                <ListBoxItem Tag="Podcasts" Theme="{StaticResource NavItemTheme}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="◍" Width="18" FontSize="13" VerticalAlignment="Center"/>
                         <TextBlock Text="{DynamicResource L_Podcasts}" VerticalAlignment="Center"/>
@@ -677,11 +696,11 @@
                              Tag="Section:LocalLibrary"
                              FontSize="10"
                              FontWeight="Bold"
-                             Style="{StaticResource NavSectionHeaderStyle}">
-                    <Grid>
+                             Theme="{StaticResource NavSectionHeaderTheme}">
+                    <Grid HorizontalAlignment="Stretch">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="20"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="{DynamicResource L_LocalLibrary}"
                                    TextTrimming="CharacterEllipsis"/>
@@ -689,26 +708,29 @@
                               Grid.Column="1"
                               Width="8"
                               Height="5"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center"
                               Data="M 0 0 L 4 5 L 8 0"
                               Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
                               StrokeThickness="1.4"
-                              RenderTransformOrigin="0.5,0.5"/>
+                              StrokeLineCap="Round"
+                              StrokeJoin="Round"/>
                     </Grid>
                 </ListBoxItem>
-                <ListBoxItem x:Name="ArtistsNavItem" Tag="Artists" Style="{StaticResource NavItemStyle}"><TextBlock Text="{DynamicResource L_Artists}" Style="{StaticResource NavItemTextStyle}"/></ListBoxItem>
-                <ListBoxItem x:Name="AlbumsNavItem" Tag="Albums" Style="{StaticResource NavItemStyle}"><TextBlock Text="{DynamicResource L_Albums}" Style="{StaticResource NavItemTextStyle}"/></ListBoxItem>
-                <ListBoxItem x:Name="TracksNavItem" Tag="Tracks" Style="{StaticResource NavItemStyle}"><TextBlock Text="{DynamicResource L_Tracks}" Style="{StaticResource NavItemTextStyle}"/></ListBoxItem>
-                <ListBoxItem x:Name="FoldersNavItem" Tag="Folders" Style="{StaticResource NavItemStyle}"><TextBlock Text="{DynamicResource L_FolderStructure}" Style="{StaticResource NavItemTextStyle}"/></ListBoxItem>
+                <ListBoxItem x:Name="ArtistsNavItem" Tag="Artists" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_Artists}" Classes="navItemText"/></ListBoxItem>
+                <ListBoxItem x:Name="AlbumsNavItem" Tag="Albums" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_Albums}" Classes="navItemText"/></ListBoxItem>
+                <ListBoxItem x:Name="TracksNavItem" Tag="Tracks" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_Tracks}" Classes="navItemText"/></ListBoxItem>
+                <ListBoxItem x:Name="FoldersNavItem" Tag="Folders" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_FolderStructure}" Classes="navItemText"/></ListBoxItem>
 
                 <ListBoxItem x:Name="OwnRadiosHeaderItem"
                              Tag="Section:OwnRadios"
                              FontSize="10"
                              FontWeight="Bold"
-                             Style="{StaticResource NavSectionHeaderStyle}">
-                    <Grid>
+                             Theme="{StaticResource NavSectionHeaderTheme}">
+                    <Grid HorizontalAlignment="Stretch">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="20"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="{DynamicResource L_OwnRadios}"
                                    TextTrimming="CharacterEllipsis"/>
@@ -716,10 +738,13 @@
                               Grid.Column="1"
                               Width="8"
                               Height="5"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center"
                               Data="M 0 0 L 4 5 L 8 0"
                               Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
                               StrokeThickness="1.4"
-                              RenderTransformOrigin="0.5,0.5"/>
+                              StrokeLineCap="Round"
+                              StrokeJoin="Round"/>
                     </Grid>
                 </ListBoxItem>
 
@@ -727,11 +752,11 @@
                              Tag="Section:MyPodcasts"
                              FontSize="10"
                              FontWeight="Bold"
-                             Style="{StaticResource NavSectionHeaderStyle}">
-                    <Grid>
+                             Theme="{StaticResource NavSectionHeaderTheme}">
+                    <Grid HorizontalAlignment="Stretch">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="20"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="{DynamicResource L_MyPodcasts}"
                                    TextTrimming="CharacterEllipsis"/>
@@ -739,10 +764,13 @@
                               Grid.Column="1"
                               Width="8"
                               Height="5"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center"
                               Data="M 0 0 L 4 5 L 8 0"
                               Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
                               StrokeThickness="1.4"
-                              RenderTransformOrigin="0.5,0.5"/>
+                              StrokeLineCap="Round"
+                              StrokeJoin="Round"/>
                     </Grid>
                 </ListBoxItem>
 
@@ -750,11 +778,11 @@
                              Tag="Section:Plex"
                              FontSize="10"
                              FontWeight="Bold"
-                             Style="{StaticResource NavSectionHeaderStyle}">
-                    <Grid>
+                             Theme="{StaticResource NavSectionHeaderTheme}">
+                    <Grid HorizontalAlignment="Stretch">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="20"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="{DynamicResource L_PlexServers}"
                                    TextTrimming="CharacterEllipsis"/>
@@ -762,10 +790,13 @@
                               Grid.Column="1"
                               Width="8"
                               Height="5"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center"
                               Data="M 0 0 L 4 5 L 8 0"
                               Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
                               StrokeThickness="1.4"
-                              RenderTransformOrigin="0.5,0.5"/>
+                              StrokeLineCap="Round"
+                              StrokeJoin="Round"/>
                     </Grid>
                 </ListBoxItem>
 
@@ -773,11 +804,11 @@
                              Tag="Section:Playlists"
                              FontSize="10"
                              FontWeight="Bold"
-                             Style="{StaticResource NavSectionHeaderStyle}">
-                    <Grid>
+                             Theme="{StaticResource NavSectionHeaderTheme}">
+                    <Grid HorizontalAlignment="Stretch">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="20"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="{DynamicResource L_Playlists}"
                                    TextTrimming="CharacterEllipsis"/>
@@ -785,13 +816,16 @@
                               Grid.Column="1"
                               Width="8"
                               Height="5"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center"
                               Data="M 0 0 L 4 5 L 8 0"
                               Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
                               StrokeThickness="1.4"
-                              RenderTransformOrigin="0.5,0.5"/>
+                              StrokeLineCap="Round"
+                              StrokeJoin="Round"/>
                     </Grid>
                 </ListBoxItem>
-                <!-- Eigene Radios, Podcasts und Playlist-Einträge werden per Code ergänzt. -->
+                <!-- Own radios, podcasts and playlist entries are added in code -->
             </ListBox>
 
             <!-- Status -->
@@ -801,11 +835,11 @@
                        Foreground="#44445A" FontSize="10"
                        TextWrapping="Wrap"/>
 
-            <!-- Einstellungen -->
+            <!-- About -->
             <Button Grid.Row="3"
                     HorizontalAlignment="Stretch"
                     FontSize="13"
-                    Style="{StaticResource SidebarBtnStyle}"
+                    Theme="{StaticResource SidebarBtnTheme}"
                     Click="AboutButton_OnClick">
                 <StackPanel Orientation="Horizontal"
                             VerticalAlignment="Center">
@@ -821,7 +855,7 @@
             <Button Grid.Row="4"
                     HorizontalAlignment="Stretch"
                     FontSize="13"
-                    Style="{StaticResource SidebarBtnStyle}"
+                    Theme="{StaticResource SidebarBtnTheme}"
                     Click="SettingsButton_OnClick">
                 <StackPanel Orientation="Horizontal"
                             VerticalAlignment="Center">
@@ -841,6 +875,7 @@
         <Grid Grid.Column="1" Grid.Row="0" Background="{DynamicResource AppContentBrush}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
@@ -849,144 +884,153 @@
                     BorderThickness="0,0,0,1" BorderBrush="{DynamicResource AppHeaderBorderBrush}"
                     Padding="24,16">
                 <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <Button x:Name="BackButton"
-                            Width="34"
-                            Height="30"
-                            Margin="0,0,12,0"
-                            Visibility="Collapsed"
-                            Style="{StaticResource HeaderIconButtonStyle}"
-                            Click="BackButton_OnClick"
-                            ToolTip="{DynamicResource L_Back}">
-                        <Path Data="M 12 6 L 6 12 L 12 18"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                              StrokeThickness="2.2"
-                              StrokeStartLineCap="Round"
-                              StrokeEndLineCap="Round"
-                              StrokeLineJoin="Round"
-                              Width="18"
-                              Height="18"
-                              Stretch="Uniform"/>
-                    </Button>
-                    <TextBlock x:Name="ContentTitleTextBlock"
-                               Grid.Column="1"
-                               FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource AppPrimaryTextBrush}"
-                               VerticalAlignment="Center"/>
-                    <Button x:Name="TrackFilterButton"
-                            Grid.Column="2"
-                            Margin="14,0,0,0"
-                            Padding="12,5"
-                            VerticalAlignment="Center"
-                            Visibility="Collapsed"
-                            Style="{StaticResource HeaderFilterButtonStyle}"
-                            Content="{DynamicResource L_Filter}"
-                            Click="TrackFilterButton_OnClick"/>
-                    <Button x:Name="SaveSmartPlaylistButton"
-                            Grid.Column="3"
-                            Margin="8,0,0,0"
-                            Padding="12,5"
-                            VerticalAlignment="Center"
-                            Visibility="Collapsed"
-                            IsEnabled="False"
-                            Style="{StaticResource HeaderFilterButtonStyle}"
-                            ToolTip="{DynamicResource L_SaveSmartPlaylistDisabledTooltip}"
-                            ToolTipService.ShowOnDisabled="True"
-                            Click="SaveSmartPlaylistButton_OnClick">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="⚡" Margin="0,0,5,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="{DynamicResource L_SaveSmartPlaylist}" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Button>
-                    <TextBlock x:Name="ContentCountTextBlock"
-                               Grid.Column="4"
-                               Margin="14,0,0,0"
-                               FontSize="12" Foreground="{DynamicResource AppMutedTextBrush}"
-                               VerticalAlignment="Center"/>
-                    <TextBox x:Name="SearchTextBox"
-                             Grid.Column="5"
-                             Width="240"
-                             Height="30"
-                             Margin="20,0,0,0"
-                             VerticalContentAlignment="Center"
-                             Background="{DynamicResource AppInputBrush}"
-                             Foreground="{DynamicResource AppPrimaryTextBrush}"
-                             BorderBrush="{DynamicResource AppInputBorderBrush}"
-                             ToolTip="{DynamicResource L_Search}"
-                             TextChanged="SearchTextBox_OnTextChanged"/>
-                    <Border x:Name="AlbumViewModeBorder"
-                            Grid.Column="6"
-                            Margin="20,0,0,0"
-                            Padding="3"
-                            Background="#252640"
-                            CornerRadius="9"
-                            Visibility="Collapsed">
-                        <StackPanel Orientation="Horizontal">
-                            <RadioButton x:Name="AlbumTableViewRadioButton"
-                                         GroupName="AlbumViewMode"
-                                         Style="{StaticResource ViewModeRadioStyle}"
-                                         MinWidth="88"
-                                         Content="{DynamicResource L_Table}"
-                                         IsChecked="True"
-                                         Checked="AlbumViewModeRadioButton_OnChecked"/>
-                            <RadioButton x:Name="AlbumArtworkViewRadioButton"
-                                         GroupName="AlbumViewMode"
-                                         Style="{StaticResource ViewModeRadioStyle}"
-                                         MinWidth="88"
-                                         Content="{DynamicResource L_Artwork}"
-                                         Checked="AlbumViewModeRadioButton_OnChecked"/>
-                        </StackPanel>
-                    </Border>
-                    <Border x:Name="PlexViewModeBorder"
-                            Grid.Column="6"
-                            Margin="20,0,0,0"
-                            Padding="3"
-                            Background="#252640"
-                            CornerRadius="9"
-                            Visibility="Collapsed">
-                        <StackPanel Orientation="Horizontal">
-                            <RadioButton x:Name="PlexArtistsViewRadioButton"
-                                         GroupName="PlexViewMode"
-                                         Style="{StaticResource ViewModeRadioStyle}"
-                                         MinWidth="76"
-                                         Content="{DynamicResource L_Artists}"
-                                         IsChecked="True"
-                                         Tag="Artists"
-                                         Checked="PlexViewModeRadioButton_OnChecked"/>
-                            <RadioButton GroupName="PlexViewMode"
-                                         Style="{StaticResource ViewModeRadioStyle}"
-                                         MinWidth="76"
-                                         Content="{DynamicResource L_Albums}"
-                                         Tag="Albums"
-                                         Checked="PlexViewModeRadioButton_OnChecked"/>
-                            <RadioButton GroupName="PlexViewMode"
-                                         Style="{StaticResource ViewModeRadioStyle}"
-                                         MinWidth="76"
-                                         Content="{DynamicResource L_Tracks}"
-                                         Tag="Tracks"
-                                         Checked="PlexViewModeRadioButton_OnChecked"/>
-                            <RadioButton GroupName="PlexViewMode"
-                                         Style="{StaticResource ViewModeRadioStyle}"
-                                         MinWidth="92"
-                                         Content="{DynamicResource L_FolderStructure}"
-                                         Tag="Folders"
-                                         Checked="PlexViewModeRadioButton_OnChecked"/>
-                            <Button x:Name="PlexLoadMoreButton"
-                                    Margin="5,0,0,0"
-                                    Padding="10,3"
-                                    Visibility="Collapsed"
-                                    Style="{StaticResource HeaderFilterButtonStyle}"
-                                    Content="{DynamicResource L_LoadMore}"
-                                    Click="PlexLoadMoreButton_OnClick"/>
-                        </StackPanel>
-                    </Border>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button x:Name="BackButton"
+                                Width="24"
+                                Height="24"
+                                Margin="0,-1,10,0"
+                                VerticalAlignment="Top"
+                                IsVisible="False"
+                                Theme="{StaticResource HeaderIconButtonTheme}"
+                                Click="BackButton_OnClick"
+                                ToolTip.Tip="{DynamicResource L_Back}">
+                            <Path Data="M 14 5 L 7 12 L 14 19"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="2"
+                                  StrokeLineCap="Round"
+                                  StrokeJoin="Round"
+                                  Width="16"
+                                  Height="16"
+                                  Stretch="Uniform"/>
+                        </Button>
+                        <TextBlock x:Name="ContentTitleTextBlock"
+                                   Grid.Column="1"
+                                   FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                   VerticalAlignment="Top"/>
+                        <TextBlock x:Name="ContentCountTextBlock"
+                                Grid.Column="2"
+                                Margin="14,0,0,0"
+                                   FontSize="12" Foreground="{DynamicResource AppMutedTextBrush}"
+                                   VerticalAlignment="Center"/>
+                        <CheckBox x:Name="EntityFavoritesOnlyCheckBox"
+                                Grid.Column="3"
+                                Margin="14,0,0,0"
+                                VerticalAlignment="Center"
+                                IsVisible="False"
+                                Theme="{StaticResource HeaderCheckBoxTheme}"
+                                Content="{DynamicResource L_Favorites}"
+                                IsCheckedChanged="EntityFavoritesOnlyCheckBox_OnChanged"/>
+                        <Button x:Name="TrackFilterButton"
+                                Grid.Column="4"
+                                Margin="14,0,0,0"
+                                Padding="12,5"
+                                VerticalAlignment="Center"
+                                IsVisible="False"
+                                Theme="{StaticResource HeaderFilterButtonTheme}"
+                                Content="{DynamicResource L_Filter}"
+                                Click="TrackFilterButton_OnClick"/>
+                        <Button x:Name="SaveSmartPlaylistButton"
+                                Grid.Column="5"
+                                Margin="8,0,0,0"
+                                Padding="12,5"
+                                VerticalAlignment="Center"
+                                IsVisible="False"
+                                IsEnabled="False"
+                                Theme="{StaticResource HeaderFilterButtonTheme}"
+                                ToolTip.Tip="{DynamicResource L_SaveSmartPlaylistDisabledTooltip}"
+                                Click="SaveSmartPlaylistButton_OnClick">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="⚡" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="{DynamicResource L_SaveSmartPlaylist}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <TextBox x:Name="SearchTextBox"
+                                Grid.Column="6"
+                                 Width="240"
+                                 Height="30"
+                                 Margin="20,0,0,0"
+                                 VerticalContentAlignment="Center"
+                                 Background="{DynamicResource AppInputBrush}"
+                                 Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                 BorderBrush="{DynamicResource AppInputBorderBrush}"
+                                 Watermark="{DynamicResource L_Search}"
+                                 ToolTip.Tip="{DynamicResource L_Search}"
+                                 TextChanged="SearchTextBox_OnTextChanged"/>
+                        <Border x:Name="AlbumViewModeBorder"
+                                Grid.Column="7"
+                                Margin="20,0,0,0"
+                                Padding="4"
+                                Background="#252640"
+                                CornerRadius="10"
+                                IsVisible="False">
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton x:Name="AlbumTableViewRadioButton"
+                                             GroupName="AlbumViewMode"
+                                             Theme="{StaticResource ViewModeRadioTheme}"
+                                             MinWidth="104"
+                                             Content="{DynamicResource L_Table}"
+                                             IsChecked="True"
+                                             IsCheckedChanged="AlbumViewModeRadioButton_OnChecked"/>
+                                <RadioButton x:Name="AlbumArtworkViewRadioButton"
+                                             GroupName="AlbumViewMode"
+                                             Theme="{StaticResource ViewModeRadioTheme}"
+                                             MinWidth="104"
+                                             Content="{DynamicResource L_Artwork}"
+                                             IsCheckedChanged="AlbumViewModeRadioButton_OnChecked"/>
+                            </StackPanel>
+                        </Border>
+                        <Border x:Name="PlexViewModeBorder"
+                                Grid.Column="7"
+                                Margin="20,0,0,0"
+                                Padding="3"
+                                Background="#252640"
+                                CornerRadius="9"
+                                IsVisible="False">
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton x:Name="PlexArtistsViewRadioButton"
+                                             GroupName="PlexViewMode"
+                                             Theme="{StaticResource ViewModeRadioTheme}"
+                                             MinWidth="76"
+                                             Content="{DynamicResource L_Artists}"
+                                             IsChecked="True"
+                                             Tag="Artists"
+                                             IsCheckedChanged="PlexViewModeRadioButton_OnChecked"/>
+                                <RadioButton GroupName="PlexViewMode"
+                                             Theme="{StaticResource ViewModeRadioTheme}"
+                                             MinWidth="76"
+                                             Content="{DynamicResource L_Albums}"
+                                             Tag="Albums"
+                                             IsCheckedChanged="PlexViewModeRadioButton_OnChecked"/>
+                                <RadioButton GroupName="PlexViewMode"
+                                             Theme="{StaticResource ViewModeRadioTheme}"
+                                             MinWidth="76"
+                                             Content="{DynamicResource L_Tracks}"
+                                             Tag="Tracks"
+                                             IsCheckedChanged="PlexViewModeRadioButton_OnChecked"/>
+                                <RadioButton GroupName="PlexViewMode"
+                                             Theme="{StaticResource ViewModeRadioTheme}"
+                                             MinWidth="92"
+                                             Content="{DynamicResource L_FolderStructure}"
+                                             Tag="Folders"
+                                             IsCheckedChanged="PlexViewModeRadioButton_OnChecked"/>
+                                <Button x:Name="PlexLoadMoreButton"
+                                        Margin="5,0,0,0"
+                                        Padding="10,3"
+                                        IsVisible="False"
+                                        Theme="{StaticResource HeaderFilterButtonTheme}"
+                                        Content="{DynamicResource L_LoadMore}"
+                                        Click="PlexLoadMoreButton_OnClick"/>
+                            </StackPanel>
+                        </Border>
                 </Grid>
             </Border>
 
@@ -994,8 +1038,7 @@
                    Grid.Row="0"
                    PlacementTarget="{Binding ElementName=TrackFilterButton}"
                    Placement="Bottom"
-                   StaysOpen="False"
-                   AllowsTransparency="True">
+                   IsLightDismissEnabled="True">
                 <Border Margin="0,8,0,0"
                         Width="640"
                         MaxHeight="430"
@@ -1011,10 +1054,43 @@
                 </Border>
             </Popup>
 
+            <Border x:Name="LibraryIntroCard"
+                    Grid.Row="1"
+                    Height="96"
+                    Margin="28,16,28,10"
+                    Padding="24,16"
+                    Background="{DynamicResource AppSurfaceBrush}"
+                    BorderBrush="#6C63FF"
+                    BorderThickness="1"
+                    CornerRadius="0,24,0,24"
+                    IsVisible="False">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock x:Name="LibraryIntroTitleTextBlock"
+                                   FontSize="18"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource AppPrimaryTextBrush}"/>
+                        <TextBlock x:Name="LibraryIntroHintTextBlock"
+                                   Margin="0,6,20,0"
+                                   Foreground="{DynamicResource AppSecondaryTextBrush}"
+                                   TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <TextBlock x:Name="LibraryIntroIconTextBlock"
+                               Grid.Column="1"
+                               FontSize="30"
+                               Foreground="#6C63FF"
+                               VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+
             <!-- Dashboard -->
             <ScrollViewer x:Name="DashboardScrollViewer"
-                          Grid.Row="1"
-                          Visibility="Collapsed"
+                          Grid.Row="2"
+                          IsVisible="False"
                           Background="{DynamicResource AppContentBrush}"
                           VerticalScrollBarVisibility="Auto">
                 <StackPanel x:Name="DashboardPanel" Margin="28,24,28,28"/>
@@ -1022,9 +1098,10 @@
 
             <Grid x:Name="InternetRadioView"
                   Grid.Row="1"
-                  Visibility="Collapsed"
+                  Grid.RowSpan="2"
+                  IsVisible="False"
                   Background="{DynamicResource AppContentBrush}"
-                  Panel.ZIndex="15">
+                  ZIndex="15">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
@@ -1035,7 +1112,7 @@
                 <Border x:Name="RadioNowPlayingPanel"
                         Margin="28,24,28,14"
                         Padding="24"
-                        Visibility="Collapsed"
+                        IsVisible="False"
                         Background="{DynamicResource AppSurfaceBrush}"
                         BorderBrush="#6C63FF"
                         BorderThickness="1"
@@ -1092,12 +1169,12 @@
                 </Border>
 
                 <Border Grid.Row="1"
-                        Margin="28,0,28,14"
-                        Padding="20"
+                        Margin="28,24,28,14"
+                        Padding="24"
                         Background="{DynamicResource AppSurfaceBrush}"
-                        BorderBrush="{DynamicResource AppGridLineBrush}"
+                        BorderBrush="#6C63FF"
                         BorderThickness="1"
-                        CornerRadius="0,20,0,20">
+                        CornerRadius="0,24,0,24">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -1134,19 +1211,19 @@
                              Background="{DynamicResource AppInputBrush}"
                              Foreground="{DynamicResource AppPrimaryTextBrush}"
                              BorderBrush="{DynamicResource AppInputBorderBrush}"
-                             ToolTip="{DynamicResource L_RadioSearch}"
+                             ToolTip.Tip="{DynamicResource L_RadioSearch}"
                              KeyDown="RadioSearchTextBox_OnKeyDown"/>
                     <Button x:Name="RadioGenreFilterButton"
                             Grid.Column="1"
                             Margin="10,0,0,0"
                             Padding="14,7"
-                            Style="{StaticResource HeaderFilterButtonStyle}"
+                            Theme="{StaticResource HeaderFilterButtonTheme}"
                             Content="{DynamicResource L_RadioGenres}"
                             Click="RadioGenreFilterButton_OnClick"/>
                     <Button Grid.Column="2"
                             Margin="10,0,0,0"
                             Padding="18,7"
-                            Style="{StaticResource HeaderFilterButtonStyle}"
+                            Theme="{StaticResource HeaderFilterButtonTheme}"
                             Content="{DynamicResource L_RadioSearch}"
                             Click="RadioSearchButton_OnClick"/>
                 </Grid>
@@ -1154,8 +1231,7 @@
                 <Popup x:Name="RadioGenreFilterPopup"
                        PlacementTarget="{Binding ElementName=RadioGenreFilterButton}"
                        Placement="Bottom"
-                       StaysOpen="False"
-                       AllowsTransparency="True">
+                       IsLightDismissEnabled="True">
                     <Border Margin="0,8,0,0"
                             Width="320"
                             MaxHeight="420"
@@ -1180,7 +1256,7 @@
                                            VerticalAlignment="Center"/>
                                 <Button Grid.Column="1"
                                         Padding="9,4"
-                                        Style="{StaticResource HeaderFilterButtonStyle}"
+                                        Theme="{StaticResource HeaderFilterButtonTheme}"
                                         Content="{DynamicResource L_ClearFilter}"
                                         Click="ClearRadioGenreFilterButton_OnClick"/>
                             </Grid>
@@ -1204,8 +1280,7 @@
                               AutoGenerateColumns="False"
                               IsReadOnly="True"
                               SelectionMode="Single"
-                              CanUserResizeRows="False"
-                              MouseDoubleClick="RadioStationsDataGrid_OnMouseDoubleClick">
+                              DoubleTapped="RadioStationsDataGrid_OnMouseDoubleClick">
                         <DataGrid.Columns>
                             <DataGridTemplateColumn Width="70">
                                 <DataGridTemplateColumn.CellTemplate>
@@ -1244,7 +1319,7 @@
                                         <Button Content="{DynamicResource L_PlayRadio}"
                                                 Tag="{Binding}"
                                                 Padding="10,5"
-                                                Style="{StaticResource HeaderFilterButtonStyle}"
+                                                Theme="{StaticResource HeaderFilterButtonTheme}"
                                                 Click="PlayRadioButton_OnClick"/>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
@@ -1255,7 +1330,7 @@
                                         <Button Content="{DynamicResource L_AddToOwnRadios}"
                                                 Tag="{Binding}"
                                                 Padding="10,5"
-                                                Style="{StaticResource HeaderFilterButtonStyle}"
+                                                Theme="{StaticResource HeaderFilterButtonTheme}"
                                                 Click="AddRadioButton_OnClick"/>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
@@ -1274,9 +1349,10 @@
 
             <Grid x:Name="PodcastView"
                   Grid.Row="1"
-                  Visibility="Collapsed"
+                  Grid.RowSpan="2"
+                  IsVisible="False"
                   Background="{DynamicResource AppContentBrush}"
-                  Panel.ZIndex="15">
+                  ZIndex="15">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
@@ -1284,11 +1360,11 @@
                 </Grid.RowDefinitions>
 
                 <Border Margin="28,24,28,14"
-                        Padding="20"
+                        Padding="24"
                         Background="{DynamicResource AppSurfaceBrush}"
-                        BorderBrush="{DynamicResource AppGridLineBrush}"
+                        BorderBrush="#6C63FF"
                         BorderThickness="1"
-                        CornerRadius="0,20,0,20">
+                        CornerRadius="0,24,0,24">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -1326,26 +1402,26 @@
                              Background="{DynamicResource AppInputBrush}"
                              Foreground="{DynamicResource AppPrimaryTextBrush}"
                              BorderBrush="{DynamicResource AppInputBorderBrush}"
-                             ToolTip="{DynamicResource L_PodcastSearch}"
+                             ToolTip.Tip="{DynamicResource L_PodcastSearch}"
                              KeyDown="PodcastSearchTextBox_OnKeyDown"/>
                     <Button x:Name="PodcastCategoryFilterButton"
                             Grid.Column="1"
                             Margin="10,0,0,0"
                             Padding="14,7"
-                            Style="{StaticResource HeaderFilterButtonStyle}"
+                            Theme="{StaticResource HeaderFilterButtonTheme}"
                             Content="{DynamicResource L_PodcastCategories}"
                             Click="PodcastCategoryFilterButton_OnClick"/>
                     <Button x:Name="PodcastLanguageFilterButton"
                             Grid.Column="2"
                             Margin="10,0,0,0"
                             Padding="14,7"
-                            Style="{StaticResource HeaderFilterButtonStyle}"
+                            Theme="{StaticResource HeaderFilterButtonTheme}"
                             Content="{DynamicResource L_PodcastLanguages}"
                             Click="PodcastLanguageFilterButton_OnClick"/>
                     <Button Grid.Column="3"
                             Margin="10,0,0,0"
                             Padding="18,7"
-                            Style="{StaticResource HeaderFilterButtonStyle}"
+                            Theme="{StaticResource HeaderFilterButtonTheme}"
                             Content="{DynamicResource L_PodcastSearch}"
                             Click="PodcastSearchButton_OnClick"/>
                 </Grid>
@@ -1353,8 +1429,7 @@
                 <Popup x:Name="PodcastCategoryFilterPopup"
                        PlacementTarget="{Binding ElementName=PodcastCategoryFilterButton}"
                        Placement="Bottom"
-                       StaysOpen="False"
-                       AllowsTransparency="True">
+                       IsLightDismissEnabled="True">
                     <Border Margin="0,8,0,0"
                             Width="320"
                             MaxHeight="420"
@@ -1378,7 +1453,7 @@
                                            Foreground="{DynamicResource AppPrimaryTextBrush}"/>
                                 <Button Grid.Column="1"
                                         Padding="9,4"
-                                        Style="{StaticResource HeaderFilterButtonStyle}"
+                                        Theme="{StaticResource HeaderFilterButtonTheme}"
                                         Content="{DynamicResource L_ClearFilter}"
                                         Click="ClearPodcastCategoryFilterButton_OnClick"/>
                             </Grid>
@@ -1394,8 +1469,7 @@
                 <Popup x:Name="PodcastLanguageFilterPopup"
                        PlacementTarget="{Binding ElementName=PodcastLanguageFilterButton}"
                        Placement="Bottom"
-                       StaysOpen="False"
-                       AllowsTransparency="True">
+                       IsLightDismissEnabled="True">
                     <Border Margin="0,8,0,0"
                             Width="280"
                             MaxHeight="420"
@@ -1419,7 +1493,7 @@
                                            Foreground="{DynamicResource AppPrimaryTextBrush}"/>
                                 <Button Grid.Column="1"
                                         Padding="9,4"
-                                        Style="{StaticResource HeaderFilterButtonStyle}"
+                                        Theme="{StaticResource HeaderFilterButtonTheme}"
                                         Content="{DynamicResource L_ClearFilter}"
                                         Click="ClearPodcastLanguageFilterButton_OnClick"/>
                             </Grid>
@@ -1442,8 +1516,7 @@
                               AutoGenerateColumns="False"
                               IsReadOnly="True"
                               SelectionMode="Single"
-                              CanUserResizeRows="False"
-                              MouseDoubleClick="PodcastsDataGrid_OnMouseDoubleClick">
+                              DoubleTapped="PodcastsDataGrid_OnMouseDoubleClick">
                         <DataGrid.Columns>
                             <DataGridTemplateColumn Width="78">
                                 <DataGridTemplateColumn.CellTemplate>
@@ -1482,7 +1555,7 @@
                                         <Button Content="{DynamicResource L_ShowEpisodes}"
                                                 Tag="{Binding}"
                                                 Padding="10,5"
-                                                Style="{StaticResource HeaderFilterButtonStyle}"
+                                                Theme="{StaticResource HeaderFilterButtonTheme}"
                                                 Click="ShowPodcastEpisodesButton_OnClick"/>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
@@ -1493,7 +1566,7 @@
                                         <Button Content="{DynamicResource L_AddToMyPodcasts}"
                                                 Tag="{Binding}"
                                                 Padding="10,5"
-                                                Style="{StaticResource HeaderFilterButtonStyle}"
+                                                Theme="{StaticResource HeaderFilterButtonTheme}"
                                                 Click="AddPodcastButton_OnClick"/>
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
@@ -1512,9 +1585,9 @@
                 <Grid x:Name="PodcastEpisodesView"
                       Grid.Row="0"
                       Grid.RowSpan="3"
-                      Visibility="Collapsed"
+                      IsVisible="False"
                       Background="{DynamicResource AppContentBrush}"
-                      Panel.ZIndex="2">
+                      ZIndex="2">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
@@ -1536,7 +1609,7 @@
                                     Padding="12,7"
                                     Margin="0,0,16,0"
                                     VerticalAlignment="Center"
-                                    Style="{StaticResource HeaderFilterButtonStyle}"
+                                    Theme="{StaticResource HeaderFilterButtonTheme}"
                                     Content="{DynamicResource L_Back}"
                                     Click="PodcastEpisodesBackButton_OnClick"/>
                             <Border Grid.Column="1"
@@ -1590,8 +1663,7 @@
                                   AutoGenerateColumns="False"
                                   IsReadOnly="True"
                                   SelectionMode="Single"
-                                  CanUserResizeRows="False"
-                                  MouseDoubleClick="PodcastEpisodesDataGrid_OnMouseDoubleClick">
+                                  DoubleTapped="PodcastEpisodesDataGrid_OnMouseDoubleClick">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="{DynamicResource L_PodcastStatus}"
                                                     Binding="{Binding Status}"
@@ -1621,7 +1693,7 @@
                 </Grid>
             </Grid>
 
-            <Grid Grid.Row="1">
+            <Grid Grid.Row="2">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
@@ -1629,7 +1701,7 @@
 
                 <Border x:Name="AlbumDetailHeader"
                         Grid.Row="0"
-                        Visibility="Collapsed"
+                        IsVisible="False"
                         Margin="24,22,24,18"
                         Padding="22"
                         HorizontalAlignment="Center"
@@ -1663,18 +1735,9 @@
                             </Border.ContextMenu>
                             <Grid>
                                 <Image Source="{Binding Artwork}" Stretch="UniformToFill"/>
-                                <StackPanel HorizontalAlignment="Center"
+                                <StackPanel IsVisible="{Binding Artwork, Converter={x:Static conv:ObjectConverters.IsNull}}"
+                                            HorizontalAlignment="Center"
                                             VerticalAlignment="Center">
-                                    <StackPanel.Style>
-                                        <Style TargetType="StackPanel">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Artwork}" Value="{x:Null}">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </StackPanel.Style>
                                     <TextBlock Text="{DynamicResource L_CoverNotFound}"
                                                Foreground="{DynamicResource AppMutedTextBrush}"
                                                HorizontalAlignment="Center"
@@ -1696,14 +1759,14 @@
                                     Tag="{Binding}"
                                     FontSize="28"
                                     FontWeight="SemiBold"
-                                    Style="{StaticResource EntityLinkButtonStyle}"
+                                    Theme="{StaticResource EntityLinkButtonTheme}"
                                     Click="AlbumLinkButton_OnClick"/>
                             <Button Content="{Binding Artist}"
                                     Tag="{Binding}"
                                     Margin="0,10,0,0"
                                     FontSize="17"
                                     Foreground="{DynamicResource AppSecondaryTextBrush}"
-                                    Style="{StaticResource EntityLinkButtonStyle}"
+                                    Theme="{StaticResource EntityLinkButtonTheme}"
                                     Click="ArtistLinkButton_OnClick"/>
                             <TextBlock Text="{Binding Year}"
                                        Margin="0,8,0,0"
@@ -1714,16 +1777,15 @@
                                     Margin="0,22,0,0"
                                     Padding="14,7"
                                     HorizontalAlignment="Left"
-                                    Style="{StaticResource HeaderFilterButtonStyle}"
+                                    Theme="{StaticResource HeaderFilterButtonTheme}"
                                     Click="SearchCoverButton_OnClick"/>
                             <CheckBox x:Name="ShowAllAlbumTracksCheckBox"
                                       Margin="0,18,0,0"
                                       HorizontalAlignment="Left"
                                       Foreground="{DynamicResource AppPrimaryTextBrush}"
                                       Content="{DynamicResource L_ShowAllAlbumTracks}"
-                                      Visibility="Collapsed"
-                                      Checked="ShowAllAlbumTracksCheckBox_OnChanged"
-                                      Unchecked="ShowAllAlbumTracksCheckBox_OnChanged"/>
+                                      IsVisible="False"
+                                      IsCheckedChanged="ShowAllAlbumTracksCheckBox_OnChanged"/>
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -1733,22 +1795,22 @@
                           Grid.Row="1"
                           Background="{DynamicResource AppContentBrush}"
                           BorderThickness="0"
-                          RowHeight="38"
+                          RowHeight="40"
+                          ColumnHeaderHeight="44"
                           GridLinesVisibility="Horizontal"
                           HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
                           AutoGenerateColumns="False"
                           IsReadOnly="True"
                           SelectionMode="Single"
-                          FontSize="13"
-                          CanUserResizeRows="False"
+                          FontSize="12"
                           LoadingRow="ContentDataGrid_OnLoadingRow"
-                          MouseDoubleClick="ContentDataGrid_OnMouseDoubleClick"
-                          PreviewMouseRightButtonDown="ContentDataGrid_OnPreviewMouseRightButtonDown"/>
+                          DoubleTapped="ContentDataGrid_OnMouseDoubleClick"
+                          PointerPressed="ContentDataGrid_OnPreviewMouseRightButtonDown"/>
             </Grid>
 
             <ScrollViewer x:Name="SearchResultsScrollViewer"
-                          Grid.Row="1"
-                          Visibility="Collapsed"
+                          Grid.Row="2"
+                          IsVisible="False"
                           Background="{DynamicResource AppContentBrush}"
                           VerticalScrollBarVisibility="Auto">
                 <StackPanel Margin="18">
@@ -1772,10 +1834,10 @@
                                       HeadersVisibility="Column"
                                       GridLinesVisibility="Horizontal"
                                       HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
-                                      MouseDoubleClick="SearchTracksDataGrid_OnMouseDoubleClick"
-                                      PreviewMouseRightButtonDown="SearchTracksDataGrid_OnPreviewMouseRightButtonDown"/>
+                                      DoubleTapped="SearchTracksDataGrid_OnMouseDoubleClick"
+                                      PointerPressed="SearchTracksDataGrid_OnPreviewMouseRightButtonDown"/>
                             <TextBlock x:Name="SearchTracksEmptyTextBlock"
-                                       Visibility="Collapsed"
+                                       IsVisible="False"
                                        Foreground="{DynamicResource AppSecondaryTextBrush}"
                                        Margin="2,10,0,0"
                                        TextWrapping="Wrap"/>
@@ -1801,10 +1863,10 @@
                                       HeadersVisibility="Column"
                                       GridLinesVisibility="Horizontal"
                                       HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
-                                      MouseDoubleClick="SearchAlbumsDataGrid_OnMouseDoubleClick"
-                                      PreviewMouseRightButtonDown="SearchAlbumsDataGrid_OnPreviewMouseRightButtonDown"/>
+                                      DoubleTapped="SearchAlbumsDataGrid_OnMouseDoubleClick"
+                                      PointerPressed="SearchAlbumsDataGrid_OnPreviewMouseRightButtonDown"/>
                             <TextBlock x:Name="SearchAlbumsEmptyTextBlock"
-                                       Visibility="Collapsed"
+                                       IsVisible="False"
                                        Foreground="{DynamicResource AppSecondaryTextBrush}"
                                        Margin="2,10,0,0"
                                        TextWrapping="Wrap"/>
@@ -1829,9 +1891,9 @@
                                       HeadersVisibility="Column"
                                       GridLinesVisibility="Horizontal"
                                       HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
-                                      MouseDoubleClick="SearchArtistsDataGrid_OnMouseDoubleClick"/>
+                                      DoubleTapped="SearchArtistsDataGrid_OnMouseDoubleClick"/>
                             <TextBlock x:Name="SearchArtistsEmptyTextBlock"
-                                       Visibility="Collapsed"
+                                       IsVisible="False"
                                        Foreground="{DynamicResource AppSecondaryTextBrush}"
                                        Margin="2,10,0,0"
                                        TextWrapping="Wrap"/>
@@ -1840,48 +1902,44 @@
                 </StackPanel>
             </ScrollViewer>
 
-            <!-- Folder TreeView (nur für Ordnerstruktur) -->
+            <!-- Folder TreeView -->
             <TreeView x:Name="FolderTreeView"
-                      Grid.Row="1"
+                      Grid.Row="2"
                       Background="{DynamicResource AppContentBrush}"
                       BorderThickness="0"
                       FontSize="13"
-                      Visibility="Collapsed"
-                      VirtualizingStackPanel.IsVirtualizing="True"
-                      VirtualizingStackPanel.VirtualizationMode="Recycling"
-                      ScrollViewer.CanContentScroll="True"
-                      MouseDoubleClick="FolderTreeView_OnMouseDoubleClick"
-                      PreviewMouseRightButtonDown="FolderTreeView_OnPreviewMouseRightButtonDown"/>
+                      IsVisible="False"
+                      DoubleTapped="FolderTreeView_OnMouseDoubleClick"
+                      PointerPressed="FolderTreeView_OnPreviewMouseRightButtonDown"/>
 
-            <!-- Album-Artworkansicht -->
+            <!-- Album artwork view -->
             <ListBox x:Name="AlbumArtworkListBox"
-                     Grid.Row="1"
-                     Visibility="Collapsed"
+                     Grid.Row="2"
+                     IsVisible="False"
                      Background="{DynamicResource AppContentBrush}"
                      BorderThickness="0"
-                     ScrollViewer.CanContentScroll="True"
-                     ScrollViewer.IsDeferredScrollingEnabled="False"
-                     VirtualizingPanel.IsVirtualizing="True"
-                     VirtualizingPanel.VirtualizationMode="Recycling"
-                     MouseDoubleClick="AlbumArtworkListBox_OnMouseDoubleClick">
+                     DoubleTapped="AlbumArtworkListBox_OnMouseDoubleClick">
                 <ListBox.ItemsPanel>
                     <ItemsPanelTemplate>
                         <controls:VirtualizingWrapPanel Margin="16"
+                                                        HorizontalAlignment="Left"
+                                                        VerticalAlignment="Top"
                                                         ItemWidth="196"
-                                                        ItemHeight="270"/>
+                                                        ItemHeight="292"/>
                     </ItemsPanelTemplate>
                 </ListBox.ItemsPanel>
-                <ListBox.ItemContainerStyle>
-                    <Style TargetType="ListBoxItem">
-                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                <ListBox.ItemContainerTheme>
+                    <ControlTheme TargetType="ListBoxItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                        <Setter Property="VerticalContentAlignment" Value="Top"/>
                         <Setter Property="Padding" Value="0"/>
                         <Setter Property="BorderThickness" Value="0"/>
-                        <EventSetter Event="Loaded" Handler="AlbumArtworkItem_OnLoaded"/>
-                    </Style>
-                </ListBox.ItemContainerStyle>
+                    </ControlTheme>
+                </ListBox.ItemContainerTheme>
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <Border Width="180"
+                                MinHeight="276"
                                 Margin="8"
                                 Padding="10"
                                 Background="{DynamicResource AppSurfaceBrush}"
@@ -1892,7 +1950,7 @@
                                         Background="#E4E4F0"
                                         CornerRadius="6">
                                     <Border.ContextMenu>
-                                        <ContextMenu Opened="AlbumArtworkContextMenu_OnOpened">
+                                        <ContextMenu Opening="AlbumArtworkContextMenu_OnOpened">
                                             <MenuItem Header="{DynamicResource L_DeleteCover}"
                                                       Tag="{Binding}"
                                                       Click="DeleteCoverMenuItem_OnClick"/>
@@ -1904,18 +1962,24 @@
                                     <Grid>
                                         <Image Source="{Binding Artwork}"
                                                Stretch="UniformToFill"/>
-                                        <StackPanel x:Name="MissingArtworkPanel"
+                                        <StackPanel IsVisible="{Binding Artwork, Converter={x:Static conv:ObjectConverters.IsNull}}"
+                                                    Width="140"
                                                     HorizontalAlignment="Center"
-                                                    VerticalAlignment="Center"
-                                                    Visibility="Collapsed">
+                                                    VerticalAlignment="Center">
                                             <TextBlock Text="{DynamicResource L_CoverNotFound}"
                                                        Foreground="{DynamicResource AppMutedTextBrush}"
                                                        HorizontalAlignment="Center"
+                                                       TextAlignment="Center"
+                                                       TextWrapping="Wrap"
                                                        Margin="0,0,0,8"/>
                                             <Button Content="{DynamicResource L_SearchCover}"
                                                     Tag="{Binding}"
                                                     Width="110"
                                                     Height="28"
+                                                    HorizontalAlignment="Center"
+                                                    HorizontalContentAlignment="Center"
+                                                    VerticalContentAlignment="Center"
+                                                    Padding="0"
                                                     Background="#6C63FF"
                                                     Foreground="White"
                                                     BorderThickness="0"
@@ -1927,65 +1991,68 @@
                                 <Button Content="{Binding Title}"
                                         Tag="{Binding}"
                                         Margin="0,10,0,0"
+                                        FontSize="12"
                                         FontWeight="SemiBold"
-                                        Style="{StaticResource EntityLinkButtonStyle}"
+                                        Theme="{StaticResource EntityLinkButtonTheme}"
                                         Click="AlbumLinkButton_OnClick"/>
                                 <Button Content="{Binding Artist}"
                                         Tag="{Binding}"
                                         Margin="0,3,0,0"
+                                        FontSize="11"
                                         Foreground="{DynamicResource AppSecondaryTextBrush}"
-                                        Style="{StaticResource EntityLinkButtonStyle}"
+                                        Theme="{StaticResource EntityLinkButtonTheme}"
                                         Click="ArtistLinkButton_OnClick"/>
                                 <TextBlock Text="{Binding Year}"
                                            Margin="0,3,0,0"
-                                               Foreground="{DynamicResource AppMutedTextBrush}"/>
+                                           FontSize="11"
+                                           Foreground="{DynamicResource AppMutedTextBrush}"/>
                                 <Button Content="{Binding FavoriteGlyph}"
                                         Tag="{Binding}"
-                                        Margin="0,6,0,0"
+                                        Width="28"
+                                        Height="24"
+                                        MinWidth="0"
+                                        MinHeight="0"
+                                        Margin="0,2,0,0"
+                                        Padding="0"
                                         HorizontalAlignment="Left"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
                                         Background="Transparent"
                                         BorderThickness="0"
                                         Foreground="#6C63FF"
-                                        FontSize="16"
+                                        FontSize="15"
                                         Cursor="Hand"
                                         Click="FavoriteButton_OnClick"/>
                             </StackPanel>
                         </Border>
-                        <DataTemplate.Triggers>
-                            <DataTrigger Binding="{Binding Artwork}" Value="{x:Null}">
-                                <Setter TargetName="MissingArtworkPanel" Property="Visibility" Value="Visible"/>
-                            </DataTrigger>
-                        </DataTemplate.Triggers>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
 
-            <!-- Künstler-Bildansicht -->
+            <!-- Artist artwork view -->
             <ListBox x:Name="ArtistArtworkListBox"
-                     Grid.Row="1"
-                     Visibility="Collapsed"
+                     Grid.Row="2"
+                     IsVisible="False"
                      Background="{DynamicResource AppContentBrush}"
                      BorderThickness="0"
-                     ScrollViewer.CanContentScroll="True"
-                     ScrollViewer.IsDeferredScrollingEnabled="False"
-                     VirtualizingPanel.IsVirtualizing="True"
-                     VirtualizingPanel.VirtualizationMode="Recycling"
-                     MouseDoubleClick="ArtistArtworkListBox_OnMouseDoubleClick">
+                     DoubleTapped="ArtistArtworkListBox_OnMouseDoubleClick">
                 <ListBox.ItemsPanel>
                     <ItemsPanelTemplate>
                         <controls:VirtualizingWrapPanel Margin="16"
+                                                        HorizontalAlignment="Left"
+                                                        VerticalAlignment="Top"
                                                         ItemWidth="216"
                                                         ItemHeight="260"/>
                     </ItemsPanelTemplate>
                 </ListBox.ItemsPanel>
-                <ListBox.ItemContainerStyle>
-                    <Style TargetType="ListBoxItem">
-                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                <ListBox.ItemContainerTheme>
+                    <ControlTheme TargetType="ListBoxItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+                        <Setter Property="VerticalContentAlignment" Value="Top"/>
                         <Setter Property="Padding" Value="0"/>
                         <Setter Property="BorderThickness" Value="0"/>
-                        <EventSetter Event="Loaded" Handler="ArtistArtworkItem_OnLoaded"/>
-                    </Style>
-                </ListBox.ItemContainerStyle>
+                    </ControlTheme>
+                </ListBox.ItemContainerTheme>
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <Border Width="200"
@@ -2007,27 +2074,17 @@
                                                        FontSize="42"
                                                        HorizontalAlignment="Center"
                                                        VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource AppMutedTextBrush}">
-                                                <TextBlock.Style>
-                                                    <Style TargetType="TextBlock">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding Artwork}" Value="{x:Null}">
-                                                                <Setter Property="Visibility" Value="Visible"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </TextBlock.Style>
-                                            </TextBlock>
+                                                       Foreground="{DynamicResource AppMutedTextBrush}"
+                                                       IsVisible="{Binding Artwork, Converter={x:Static conv:ObjectConverters.IsNull}}"/>
                                         </Grid>
                                     </Border>
                                     <Button Content="{Binding Title}"
                                             Tag="{Binding}"
                                             Margin="0,10,0,0"
-                                            FontSize="15"
+                                            FontSize="12"
                                             FontWeight="SemiBold"
                                             HorizontalContentAlignment="Center"
-                                            Style="{StaticResource EntityLinkButtonStyle}"
+                                            Theme="{StaticResource EntityLinkButtonTheme}"
                                             Click="ArtistLinkButton_OnClick"/>
                                     <Button Content="{Binding FavoriteGlyph}"
                                             Tag="{Binding}"
@@ -2036,11 +2093,11 @@
                                             Background="Transparent"
                                             BorderThickness="0"
                                             Foreground="#6C63FF"
-                                            FontSize="17"
+                                            FontSize="15"
                                             Cursor="Hand"
                                             Click="FavoriteButton_OnClick"/>
                                 </StackPanel>
-                                <!-- Info-Button als Overlay oben links über dem Bild -->
+                                <!-- Info button overlay top-left -->
                                 <Button Content="ℹ"
                                         Tag="{Binding}"
                                         HorizontalAlignment="Left"
@@ -2050,7 +2107,7 @@
                                         Background="Transparent"
                                         BorderThickness="0"
                                         Foreground="#6C63FF"
-                                        FontSize="15"
+                                        FontSize="13"
                                         Cursor="Hand"
                                         Click="ArtistInfoListButton_OnClick"/>
                             </Grid>
@@ -2060,30 +2117,31 @@
             </ListBox>
 
             <Border x:Name="AlphabetIndexBorder"
-                    Grid.Row="1"
-                    Width="34"
-                    Margin="0,0,16,0"
+                    Grid.Row="2"
+                    Width="30"
+                    Margin="0,0,8,0"
                     HorizontalAlignment="Right"
-                    Visibility="Collapsed"
-                    Background="{DynamicResource AppSurfaceBrush}"
+                    IsVisible="False"
+                    Background="{DynamicResource AppContentBrush}"
                     BorderBrush="{DynamicResource AppGridLineBrush}"
                     BorderThickness="1,0,0,0"
-                    PreviewMouseLeftButtonDown="AlphabetIndexBorder_OnPreviewMouseLeftButtonDown"
-                    PreviewMouseLeftButtonUp="AlphabetIndexBorder_OnPreviewMouseLeftButtonUp"
-                    PreviewMouseMove="AlphabetIndexBorder_OnPreviewMouseMove"
-                    Panel.ZIndex="10">
+                    PointerPressed="AlphabetIndexBorder_OnPreviewMouseLeftButtonDown"
+                    PointerReleased="AlphabetIndexBorder_OnPreviewMouseLeftButtonUp"
+                    PointerMoved="AlphabetIndexBorder_OnPreviewMouseMove"
+                    ZIndex="10">
                 <UniformGrid x:Name="AlphabetIndexPanel"
                              Rows="27"
                              Columns="1"
                              Margin="0,4"/>
             </Border>
 
-            <!-- Songtextansicht -->
+            <!-- Lyrics view -->
             <Grid x:Name="LyricsView"
                   Grid.Row="1"
-                  Visibility="Collapsed"
+                  Grid.RowSpan="2"
+                  IsVisible="False"
                   Background="{DynamicResource AppContentBrush}"
-                  Panel.ZIndex="20"
+                  ZIndex="20"
                   ClipToBounds="True">
                 <Image x:Name="LyricsBackgroundImage"
                        Stretch="Uniform"
@@ -2109,20 +2167,20 @@
                         <Button Grid.Column="1"
                                 Padding="12,6"
                                 Margin="0,0,8,0"
-                                Style="{StaticResource HeaderFilterButtonStyle}"
+                                Theme="{StaticResource HeaderFilterButtonTheme}"
                                 Content="{DynamicResource L_SearchLyrics}"
                                 Click="SearchLyricsButton_OnClick"/>
                         <Button x:Name="RefreshLyricsButton"
                                 Grid.Column="2"
-                                Style="{StaticResource TransportBtnStyle}"
+                                Theme="{StaticResource TransportBtnTheme}"
                                 Margin="0,0,8,0"
-                                ToolTip="{DynamicResource L_RefreshLyrics}"
+                                ToolTip.Tip="{DynamicResource L_RefreshLyrics}"
                                 Click="RefreshLyricsButton_OnClick">
                             <TextBlock Text="↻" FontSize="18"/>
                         </Button>
                         <Button Grid.Column="3"
-                                Style="{StaticResource TransportBtnStyle}"
-                                ToolTip="{DynamicResource L_CloseLyrics}"
+                                Theme="{StaticResource TransportBtnTheme}"
+                                ToolTip.Tip="{DynamicResource L_CloseLyrics}"
                                 Click="CloseLyricsButton_OnClick">
                             <TextBlock Text="×" FontSize="20"/>
                         </Button>
@@ -2133,39 +2191,27 @@
                                  BorderThickness="0"
                                  Padding="80,26,80,60"
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                            <ListBox.ItemContainerStyle>
-                                <Style TargetType="ListBoxItem">
+                            <ListBox.ItemContainerTheme>
+                                <ControlTheme TargetType="ListBoxItem">
                                     <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                                     <Setter Property="Focusable" Value="False"/>
                                     <Setter Property="IsHitTestVisible" Value="False"/>
                                     <Setter Property="Background" Value="Transparent"/>
                                     <Setter Property="Padding" Value="0"/>
                                     <Setter Property="Margin" Value="0,5"/>
-                                </Style>
-                            </ListBox.ItemContainerStyle>
+                                </ControlTheme>
+                            </ListBox.ItemContainerTheme>
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <TextBlock Text="{Binding Text}"
                                                Padding="16,10"
                                                TextWrapping="Wrap"
-                                               TextAlignment="Center">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Foreground" Value="#B8B8D0"/>
-                                                <Setter Property="Opacity" Value="0.78"/>
-                                                <Setter Property="FontSize" Value="24"/>
-                                                <Setter Property="FontWeight" Value="Medium"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsActive}" Value="True">
-                                                        <Setter Property="Foreground" Value="White"/>
-                                                        <Setter Property="FontSize" Value="30"/>
-                                                        <Setter Property="FontWeight" Value="Bold"/>
-                                                        <Setter Property="Opacity" Value="1"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
+                                               TextAlignment="Center"
+                                               Foreground="#B8B8D0"
+                                               Opacity="0.78"
+                                               FontSize="24"
+                                               FontWeight="Medium"
+                                               Classes.active="{Binding IsActive}"/>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
@@ -2182,12 +2228,13 @@
                 </Grid>
             </Grid>
 
-            <!-- Podcast-Infoansicht -->
+            <!-- Podcast info view -->
             <Grid x:Name="PodcastInfoView"
                   Grid.Row="1"
-                  Visibility="Collapsed"
+                  Grid.RowSpan="2"
+                  IsVisible="False"
                   Background="{DynamicResource AppContentBrush}"
-                  Panel.ZIndex="21">
+                  ZIndex="21">
                 <ScrollViewer VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled">
                     <Grid Margin="60,30,60,50">
@@ -2206,8 +2253,8 @@
                                        VerticalAlignment="Center"
                                        Foreground="{DynamicResource AppPrimaryTextBrush}"/>
                             <Button HorizontalAlignment="Right"
-                                    Style="{StaticResource TransportBtnStyle}"
-                                    ToolTip="{DynamicResource L_ClosePodcastInfo}"
+                                    Theme="{StaticResource TransportBtnTheme}"
+                                    ToolTip.Tip="{DynamicResource L_ClosePodcastInfo}"
                                     Click="ClosePodcastInfoButton_OnClick">
                                 <TextBlock Text="×" FontSize="20"/>
                             </Button>
@@ -2270,12 +2317,13 @@
                 </ScrollViewer>
             </Grid>
 
-            <!-- Künstlerinfoansicht -->
+            <!-- Artist info view -->
             <Grid x:Name="ArtistInfoView"
                   Grid.Row="1"
-                  Visibility="Collapsed"
+                  Grid.RowSpan="2"
+                  IsVisible="False"
                   Background="{DynamicResource AppContentBrush}"
-                  Panel.ZIndex="21">
+                  ZIndex="21">
                 <ScrollViewer VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled">
                     <Grid Margin="60,30,60,50">
@@ -2297,31 +2345,31 @@
                                     FontSize="28"
                                     FontWeight="SemiBold"
                                     VerticalAlignment="Center"
-                                    Style="{StaticResource EntityLinkButtonStyle}"
+                                    Theme="{StaticResource EntityLinkButtonTheme}"
                                     Click="ArtistInfoTitleButton_OnClick"/>
                             <Button Grid.Column="1"
                                     Margin="0,0,8,0"
                                     Padding="12,6"
-                                    Style="{StaticResource HeaderFilterButtonStyle}"
+                                    Theme="{StaticResource HeaderFilterButtonTheme}"
                                     Content="{DynamicResource L_EditArtistName}"
                                     Click="EditArtistNameButton_OnClick"/>
                             <Button Grid.Column="2"
                                     Margin="0,0,8,0"
                                     Padding="12,6"
-                                    Style="{StaticResource HeaderFilterButtonStyle}"
+                                    Theme="{StaticResource HeaderFilterButtonTheme}"
                                     Content="{DynamicResource L_SearchArtistImage}"
                                     Click="SearchArtistImageButton_OnClick"/>
                             <Button x:Name="RefreshArtistInfoButton"
                                     Grid.Column="3"
-                                    Style="{StaticResource TransportBtnStyle}"
+                                    Theme="{StaticResource TransportBtnTheme}"
                                     Margin="0,0,8,0"
-                                    ToolTip="{DynamicResource L_RefreshArtistInfo}"
+                                    ToolTip.Tip="{DynamicResource L_RefreshArtistInfo}"
                                     Click="RefreshArtistInfoButton_OnClick">
                                 <TextBlock Text="↻" FontSize="18"/>
                             </Button>
                             <Button Grid.Column="4"
-                                    Style="{StaticResource TransportBtnStyle}"
-                                    ToolTip="{DynamicResource L_CloseArtistInfo}"
+                                    Theme="{StaticResource TransportBtnTheme}"
+                                    ToolTip.Tip="{DynamicResource L_CloseArtistInfo}"
                                     Click="CloseArtistInfoButton_OnClick">
                                 <TextBlock Text="×" FontSize="20"/>
                             </Button>
@@ -2352,7 +2400,7 @@
                                                Margin="0,8,0,0"
                                                HorizontalAlignment="Center"
                                                Foreground="{DynamicResource AppMutedTextBrush}"
-                                               Visibility="Collapsed"/>
+                                               IsVisible="False"/>
                                 </StackPanel>
                             </Grid>
                         </Border>
@@ -2370,8 +2418,8 @@
                                 Margin="0,26,0,0"
                                 Padding="14,7"
                                 HorizontalAlignment="Center"
-                                Visibility="Collapsed"
-                                Style="{StaticResource HeaderFilterButtonStyle}"
+                                IsVisible="False"
+                                Theme="{StaticResource HeaderFilterButtonTheme}"
                                 Content="{DynamicResource L_ArtistInfoSource}"
                                 Click="ArtistInfoSourceButton_OnClick"/>
                     </Grid>
@@ -2410,20 +2458,20 @@
                         <Image x:Name="NowPlayingArtworkImage" Stretch="UniformToFill"/>
                     </Border>
                     <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
-                    <TextBlock x:Name="NowPlayingTitleBlock"
+                        <TextBlock x:Name="NowPlayingTitleBlock"
                                    Foreground="{DynamicResource AppTransportPrimaryTextBrush}" FontSize="13" FontWeight="SemiBold"
                                    TextTrimming="CharacterEllipsis"/>
                         <Button x:Name="NowPlayingArtistButton"
                                 Content="{Binding Text, ElementName=NowPlayingArtistBlock}"
-                                Foreground="#6666AA"
+                                Foreground="{DynamicResource AppSecondaryTextBrush}"
                                 FontSize="11"
                                 Margin="0,2,0,0"
                                 IsEnabled="False"
-                                Style="{StaticResource EntityLinkButtonStyle}"
+                                Theme="{StaticResource EntityLinkButtonTheme}"
                                 Click="NowPlayingArtistButton_OnClick"/>
-                        <TextBlock x:Name="NowPlayingArtistBlock" Visibility="Collapsed"/>
+                        <TextBlock x:Name="NowPlayingArtistBlock" IsVisible="False"/>
                         <TextBlock x:Name="FileInfoTextBlock"
-                                   Foreground="#44445A" FontSize="10" Margin="0,2,0,0"
+                                   Foreground="{DynamicResource AppMutedTextBrush}" FontSize="10" Margin="0,2,0,0"
                                    TextTrimming="CharacterEllipsis"/>
                     </StackPanel>
                 </Grid>
@@ -2437,57 +2485,71 @@
                     <Grid x:Name="TransportControlsHeaderGrid"
                           Margin="0,0,0,10"
                           Loaded="TransportControlsHeaderGrid_OnLayoutChanged"
-                          SizeChanged="TransportControlsHeaderGrid_OnLayoutChanged">
+                          SizeChanged="TransportControlsHeaderGrid_OnSizeChanged">
                         <StackPanel x:Name="PlaybackControlsPanel"
                                     Orientation="Horizontal"
                                     HorizontalAlignment="Center">
                             <StackPanel.RenderTransform>
-                                <TranslateTransform x:Name="PlaybackControlsTranslate"/>
+                                <TranslateTransform/>
                             </StackPanel.RenderTransform>
-                        <Button x:Name="PreviousButton"
-                                Style="{StaticResource TransportBtnStyle}"
-                                Margin="0,0,6,0" IsEnabled="False"
-                                Click="PreviousButton_OnClick">
-                            <Grid Width="16" Height="16">
-                                <Rectangle Width="2" Height="12"
-                                           HorizontalAlignment="Left"
-                                           Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
-                                <Path Data="M 14 2 L 8 8 L 14 14 Z M 8 2 L 2 8 L 8 14 Z"
-                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
-                            </Grid>
-                        </Button>
-                        <Button x:Name="PlayButton"
-                                Style="{StaticResource PlayBtnStyle}"
-                                Margin="6,0"
-                                Click="PlayButton_OnClick">
-                            <Path x:Name="PlayPauseIcon"
-                                  Data="M 4 2 L 14 8 L 4 14 Z"
-                                  Width="16"
-                                  Height="16"
-                                  Stretch="Uniform"
-                                  Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
-                        </Button>
-                        <Button x:Name="NextButton"
-                                Style="{StaticResource TransportBtnStyle}"
-                                Margin="6,0,0,0" IsEnabled="False"
-                                Click="NextButton_OnClick">
-                            <Grid Width="16" Height="16">
-                                <Path Data="M 2 2 L 8 8 L 2 14 Z M 8 2 L 14 8 L 8 14 Z"
-                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
-                                <Rectangle Width="2" Height="12"
-                                           HorizontalAlignment="Right"
-                                           Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
-                            </Grid>
-                        </Button>
+                            <Button x:Name="PreviousButton"
+                                    Theme="{StaticResource TransportBtnTheme}"
+                                    Margin="0,0,6,0" IsEnabled="False"
+                                    Click="PreviousButton_OnClick">
+                                <Grid Width="16"
+                                      Height="16"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center">
+                                    <Rectangle Width="2" Height="12"
+                                               HorizontalAlignment="Left"
+                                               VerticalAlignment="Center"
+                                               Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                    <Path Data="M 14 2 L 8 8 L 14 14 Z M 8 2 L 2 8 L 8 14 Z"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                </Grid>
+                            </Button>
+                            <Button x:Name="PlayButton"
+                                    Theme="{StaticResource PlayBtnTheme}"
+                                    Margin="6,0"
+                                    Click="PlayButton_OnClick">
+                                <Canvas Width="20"
+                                        Height="20"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center">
+                                    <Path x:Name="PlayPauseIcon"
+                                          Data="M 8 4 L 17 10 L 8 16 Z"
+                                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                </Canvas>
+                            </Button>
+                            <Button x:Name="NextButton"
+                                    Theme="{StaticResource TransportBtnTheme}"
+                                    Margin="6,0,0,0" IsEnabled="False"
+                                    Click="NextButton_OnClick">
+                                <Grid Width="16"
+                                      Height="16"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center">
+                                    <Path Data="M 2 2 L 8 8 L 2 14 Z M 8 2 L 14 8 L 8 14 Z"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                    <Rectangle Width="2" Height="12"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Center"
+                                               Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                </Grid>
+                            </Button>
                         </StackPanel>
                         <StackPanel x:Name="TransportActionPanel"
                                     Orientation="Horizontal"
                                     HorizontalAlignment="Left">
                             <Button x:Name="ArtistInfoButton"
-                                    Style="{StaticResource TransportBtnStyle}"
+                                    Theme="{StaticResource TransportBtnTheme}"
                                     Margin="6,0,0,0"
                                     IsEnabled="False"
-                                    ToolTip="{DynamicResource L_ShowArtistInfo}"
+                                    ToolTip.Tip="{DynamicResource L_ShowArtistInfo}"
                                     Click="ArtistInfoButton_OnClick">
                                 <TextBlock Text="i"
                                            FontFamily="Segoe UI"
@@ -2496,39 +2558,37 @@
                                            FontSize="15"/>
                             </Button>
                             <Button x:Name="LyricsButton"
-                                    Style="{StaticResource TransportBtnStyle}"
+                                    Theme="{StaticResource TransportBtnTheme}"
                                     Margin="6,0,0,0"
                                     IsEnabled="False"
-                                    ToolTip="{DynamicResource L_ShowLyrics}"
+                                    ToolTip.Tip="{DynamicResource L_ShowLyrics}"
                                     Click="LyricsButton_OnClick">
                                 <TextBlock Text="♪" FontSize="16"/>
                             </Button>
                             <Button x:Name="NowPlayingFavoriteButton"
-                                    Style="{StaticResource TransportBtnStyle}"
+                                    Theme="{StaticResource TransportBtnTheme}"
                                     Margin="6,0,0,0"
                                     IsEnabled="False"
-                                    ToolTip="{DynamicResource L_MarkAsFavorite}"
+                                    ToolTip.Tip="{DynamicResource L_MarkAsFavorite}"
                                     Click="NowPlayingFavoriteButton_OnClick">
                                 <TextBlock x:Name="NowPlayingFavoriteGlyph"
                                            Text="♡"
                                            FontSize="16"/>
                             </Button>
                             <Button x:Name="ShuffleButton"
-                                    Style="{StaticResource TransportBtnStyle}"
+                                    Theme="{StaticResource TransportBtnTheme}"
                                     Margin="6,0,0,0"
-                                    ToolTip="{DynamicResource L_Shuffle}"
+                                    ToolTip.Tip="{DynamicResource L_Shuffle}"
                                     Click="ShuffleButton_OnClick">
                                 <Viewbox Width="17" Height="17">
                                     <Canvas Width="18" Height="18">
                                         <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                                               StrokeThickness="1.8"
-                                              StrokeStartLineCap="Round"
-                                              StrokeEndLineCap="Round"
+                                              StrokeLineCap="Round"
                                               Data="M 2 4 H 5 C 9 4 9 14 13 14 H 15"/>
                                         <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                                               StrokeThickness="1.8"
-                                              StrokeStartLineCap="Round"
-                                              StrokeEndLineCap="Round"
+                                              StrokeLineCap="Round"
                                               Data="M 2 14 H 5 C 9 14 9 4 13 4 H 15"/>
                                         <Path Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                                               Data="M 14 1 L 18 4 L 14 7 Z M 14 11 L 18 14 L 14 17 Z"/>
@@ -2549,11 +2609,11 @@
                                    Margin="0,0,8,0" Text="0:00"/>
                         <Slider x:Name="PositionSlider"
                                 Grid.Column="1"
-                                Style="{StaticResource DarkSliderStyle}"
+                                Theme="{StaticResource DarkSliderTheme}"
                                 Height="30"
                                 Minimum="0" Maximum="1" IsEnabled="False"
-                                PreviewMouseLeftButtonDown="PositionSlider_OnPreviewMouseLeftButtonDown"
-                                PreviewMouseLeftButtonUp="PositionSlider_OnPreviewMouseLeftButtonUp"
+                                PointerPressed="PositionSlider_OnPreviewMouseLeftButtonDown"
+                                PointerReleased="PositionSlider_OnPreviewMouseLeftButtonUp"
                                 ValueChanged="PositionSlider_OnValueChanged"/>
                         <TextBlock x:Name="DurationTextBlock"
                                    Grid.Column="2"
@@ -2571,7 +2631,7 @@
                     <TextBlock Text="🔊" Foreground="#6666AA" FontSize="13"
                                VerticalAlignment="Center" Margin="0,0,10,0"/>
                     <Slider x:Name="VolumeSlider"
-                            Style="{StaticResource DarkSliderStyle}"
+                            Theme="{StaticResource DarkSliderTheme}"
                             Width="100" Minimum="0" Maximum="1" Value="1"
                             VerticalAlignment="Center"
                             ValueChanged="VolumeSlider_OnValueChanged"/>

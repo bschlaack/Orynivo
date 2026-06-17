@@ -1,18 +1,18 @@
 using System.IO;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Media;
-using Button = System.Windows.Controls.Button;
-using Color  = System.Windows.Media.Color;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Styling;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Interactivity;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Avalonia.Platform.Storage;
 using Orynivo.Audio;
 using Orynivo.Library;
 using Orynivo.Localization;
 using Orynivo.Streaming;
+using AvaloniaApp = Avalonia.Application;
 using UiLanguage = Orynivo.Localization.Language;
-using System.Runtime.InteropServices;
-using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
-using SaveFileDialog = Microsoft.Win32.SaveFileDialog;
-using WpfMessageBox = System.Windows.MessageBox;
 
 namespace Orynivo;
 
@@ -32,6 +32,14 @@ public partial class SettingsWindow : Window
     private readonly bool _steinbergAsioAvailable = SteinbergAsioStream.IsAvailable;
     private readonly bool _cwAsioAvailable = SteinbergAsioStream.IsCwAsioAvailable;
 
+    /// <summary>
+    /// Initializes a runtime-loader instance with default settings.
+    /// </summary>
+    public SettingsWindow()
+        : this(new AppSettings())
+    {
+    }
+
     public SettingsWindow(AppSettings settings, Action<List<string>>? onLibraryPathsChanged = null)
     {
         InitializeComponent();
@@ -44,10 +52,8 @@ public partial class SettingsWindow : Window
             new SettingChoice<OutputBackend>(OutputBackend.Wasapi, "WASAPI"),
             new SettingChoice<OutputBackend>(OutputBackend.KernelStreaming, "Kernel Streaming")
         }
-            .Where(choice =>
-                choice.Value != OutputBackend.Asio || _steinbergAsioAvailable)
-            .Where(choice =>
-                choice.Value != OutputBackend.CwAsio || _cwAsioAvailable)
+            .Where(choice => choice.Value != OutputBackend.Asio || _steinbergAsioAvailable)
+            .Where(choice => choice.Value != OutputBackend.CwAsio || _cwAsioAvailable)
             .ToArray();
         OutputBackendComboBox.ItemsSource = availableBackends;
         OutputBackendComboBox.SelectedItem =
@@ -78,9 +84,7 @@ public partial class SettingsWindow : Window
         ArtistInfoSourceComboBox.SelectedItem = settings.ArtistInfoSource;
         LastFmApiKeyTextBox.Text = settings.LastFmApiKey ?? string.Empty;
         QobuzApplicationIdTextBox.Text = settings.QobuzApplicationId ?? string.Empty;
-        LastFmPanel.Visibility = settings.ArtistInfoSource == ArtistInfoSource.LastFm
-            ? Visibility.Visible
-            : Visibility.Collapsed;
+        LastFmPanel.IsVisible = settings.ArtistInfoSource == ArtistInfoSource.LastFm;
         _libraryPaths.AddRange(settings.LibraryPaths);
         _plexServers.AddRange((settings.PlexServers ?? []).Select(ClonePlexServer));
         try
@@ -92,7 +96,8 @@ public partial class SettingsWindow : Window
         RebuildDirectoryList();
         RebuildPlexServerList();
         LoadDrivers();
-        NavListBox.SelectedIndex = 1; // "Ausgabegerät" als Standard
+        NavListBox.SelectedIndex = 1;
+        Opened += (_, _) => WindowChrome.ApplyTheme(this);
     }
 
     public string? SelectedDriverName => DriverComboBox.SelectedItem as string;
@@ -111,8 +116,8 @@ public partial class SettingsWindow : Window
         LanguageComboBox.SelectedItem is SettingChoice<UiLanguage> language ? language.Value : UiLanguage.German;
     public ArtistInfoSource SelectedArtistInfoSource =>
         ArtistInfoSourceComboBox.SelectedItem is ArtistInfoSource src ? src : ArtistInfoSource.Wikipedia;
-    public string SelectedLastFmApiKey => LastFmApiKeyTextBox.Text.Trim();
-    public string SelectedQobuzApplicationId => QobuzApplicationIdTextBox.Text.Trim();
+    public string SelectedLastFmApiKey => LastFmApiKeyTextBox.Text?.Trim() ?? string.Empty;
+    public string SelectedQobuzApplicationId => QobuzApplicationIdTextBox.Text?.Trim() ?? string.Empty;
     public IReadOnlyList<PlexServerSettings> SelectedPlexServers =>
         _plexServers.Select(ClonePlexServer).ToList().AsReadOnly();
     public IReadOnlyDictionary<string, string> SelectedPlexTokens => _plexTokens;
@@ -129,9 +134,25 @@ public partial class SettingsWindow : Window
         BaseUrl = server.BaseUrl
     };
 
+    private Button CreateStyledButton(string content, double width, double height, Thickness margin = default)
+    {
+        var btn = new Button
+        {
+            Content = content,
+            Width = width,
+            Height = height,
+            Margin = margin
+        };
+        if (TryGetResource("SettingsButtonTheme", ThemeVariant.Default, out var res) && res is ControlTheme theme)
+            btn.Theme = theme;
+        return btn;
+    }
+
     private void RebuildPlexServerList()
     {
         PlexServersPanel.Children.Clear();
+        var primaryBrush = AvaloniaApp.Current!.Resources["AppPrimaryTextBrush"] as IBrush;
+        var mutedBrush = AvaloniaApp.Current!.Resources["AppMutedTextBrush"] as IBrush;
         foreach (var server in _plexServers)
         {
             var row = new Grid { Margin = new Thickness(0, 0, 0, 8) };
@@ -143,82 +164,61 @@ public partial class SettingsWindow : Window
             description.Children.Add(new TextBlock
             {
                 Text = server.Name,
-                FontWeight = FontWeights.SemiBold,
-                Foreground = (System.Windows.Media.Brush)FindResource("AppPrimaryTextBrush"),
+                FontWeight = FontWeight.SemiBold,
+                Foreground = primaryBrush,
                 TextTrimming = TextTrimming.CharacterEllipsis
             });
             description.Children.Add(new TextBlock
             {
                 Text = server.BaseUrl,
                 FontSize = 11,
-                Foreground = (System.Windows.Media.Brush)FindResource("AppMutedTextBrush"),
+                Foreground = mutedBrush,
                 TextTrimming = TextTrimming.CharacterEllipsis
             });
             row.Children.Add(description);
 
-            var editButton = new Button
-            {
-                Content = LocalizationManager.Current.PlexEditServer,
-                Tag = server.Id,
-                Width = 80,
-                Height = 28,
-                Margin = new Thickness(8, 0, 0, 0),
-                Style = (Style)FindResource("SettingsButtonStyle")
-            };
+            var editButton = CreateStyledButton(LocalizationManager.Current.PlexEditServer, 80, 28, new Thickness(8, 0, 0, 0));
+            editButton.Tag = server.Id;
             editButton.Click += EditPlexServerButton_OnClick;
             Grid.SetColumn(editButton, 1);
             row.Children.Add(editButton);
 
-            var removeButton = new Button
-            {
-                Content = LocalizationManager.Current.PlexRemoveServer,
-                Tag = server.Id,
-                Width = 80,
-                Height = 28,
-                Margin = new Thickness(8, 0, 0, 0),
-                Style = (Style)FindResource("SettingsButtonStyle")
-            };
+            var removeButton = CreateStyledButton(LocalizationManager.Current.PlexRemoveServer, 80, 28, new Thickness(8, 0, 0, 0));
+            removeButton.Tag = server.Id;
             removeButton.Click += RemovePlexServerButton_OnClick;
             Grid.SetColumn(removeButton, 2);
             row.Children.Add(removeButton);
+
             PlexServersPanel.Children.Add(row);
         }
     }
 
-    private void AddPlexServerButton_OnClick(object sender, RoutedEventArgs e)
+    private async void AddPlexServerButton_OnClick(object? sender, RoutedEventArgs e)
     {
-        var dialog = new PlexServerDialog { Owner = this };
-        if (dialog.ShowDialog() != true)
+        var dialog = new PlexServerDialog();
+        if (await dialog.ShowDialog<bool?>(this) != true)
             return;
-
         _plexServers.Add(dialog.Server);
         _plexTokens[dialog.Server.Id] = dialog.Token;
         RebuildPlexServerList();
     }
 
-    private void EditPlexServerButton_OnClick(object sender, RoutedEventArgs e)
+    private async void EditPlexServerButton_OnClick(object? sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: string id })
             return;
         var index = _plexServers.FindIndex(server => server.Id == id);
         if (index < 0)
             return;
-
-        var dialog = new PlexServerDialog(
-            _plexServers[index],
-            _plexTokens.GetValueOrDefault(id))
-        {
-            Owner = this
-        };
-        if (dialog.ShowDialog() != true)
+        var dialog = new PlexServerDialog(_plexServers[index], _plexTokens.GetValueOrDefault(id));
+        if (await dialog.ShowDialog<bool?>(this) != true)
             return;
-
         _plexServers[index] = dialog.Server;
         _plexTokens[id] = dialog.Token;
         RebuildPlexServerList();
     }
 
-    private void RemovePlexServerButton_OnClick(object sender, RoutedEventArgs e)
+    private void RemovePlexServerButton_OnClick(object? sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: string id })
             return;
@@ -234,54 +234,24 @@ public partial class SettingsWindow : Window
         base.OnClosed(e);
     }
 
-    private void SettingsWindow_OnSourceInitialized(object sender, EventArgs e)
-    {
-        try
-        {
-            var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-            if (handle == IntPtr.Zero)
-                return;
-
-            const int DwmwaCaptionColor = 35;
-            const int DwmwaTextColor = 36;
-            var captionColor = _settings.Theme == AppTheme.Dark
-                ? ColorRef(0x13, 0x14, 0x2A)
-                : ColorRef(0xEA, 0xEA, 0xF5);
-            var textColor = _settings.Theme == AppTheme.Dark
-                ? ColorRef(0xFF, 0xFF, 0xFF)
-                : ColorRef(0x13, 0x14, 0x2A);
-            _ = DwmSetWindowAttribute(handle, DwmwaCaptionColor, ref captionColor, sizeof(int));
-            _ = DwmSetWindowAttribute(handle, DwmwaTextColor, ref textColor, sizeof(int));
-        }
-        catch { }
-    }
-
-    private static int ColorRef(byte r, byte g, byte b) => r | (g << 8) | (b << 16);
-
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int dwAttribute, ref int pvAttribute, int cbAttribute);
-
     // ------------------------------------------------------------------
     // Navigation
     // ------------------------------------------------------------------
 
-    private void NavListBox_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void NavListBox_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (NavListBox.SelectedItem is not ListBoxItem { Tag: string tag })
             return;
-
-        AudioDevicePanel.Visibility = tag == "AudioDevice" ? Visibility.Visible : Visibility.Collapsed;
-        LibraryPanel.Visibility     = tag == "Library"      ? Visibility.Visible : Visibility.Collapsed;
-        StreamingPanel.Visibility   = tag == "Streaming"    ? Visibility.Visible : Visibility.Collapsed;
-        AppearancePanel.Visibility  = tag == "Appearance"   ? Visibility.Visible : Visibility.Collapsed;
-        ArtistInfoPanel.Visibility  = tag == "ArtistInfo"   ? Visibility.Visible : Visibility.Collapsed;
+        AudioDevicePanel.IsVisible = tag == "AudioDevice";
+        LibraryPanel.IsVisible     = tag == "Library";
+        StreamingPanel.IsVisible   = tag == "Streaming";
+        AppearancePanel.IsVisible  = tag == "Appearance";
+        ArtistInfoPanel.IsVisible  = tag == "ArtistInfo";
     }
 
-    private void ArtistInfoSourceComboBox_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void ArtistInfoSourceComboBox_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        LastFmPanel.Visibility = SelectedArtistInfoSource == ArtistInfoSource.LastFm
-            ? Visibility.Visible
-            : Visibility.Collapsed;
+        LastFmPanel.IsVisible = SelectedArtistInfoSource == ArtistInfoSource.LastFm;
     }
 
     // ------------------------------------------------------------------
@@ -296,7 +266,7 @@ public partial class SettingsWindow : Window
             {
                 var devices = WasapiDeviceProvider.GetRenderDevices();
                 DriverComboBox.ItemsSource = devices;
-                DriverComboBox.DisplayMemberPath = nameof(WasapiDeviceInfo.Name);
+                DriverComboBox.DisplayMemberBinding = new Avalonia.Data.Binding(nameof(WasapiDeviceInfo.Name));
                 DriverComboBox.SelectedItem = devices.FirstOrDefault(device =>
                     string.Equals(device.Id, _settings.SelectedWasapiDeviceId, StringComparison.Ordinal))
                     ?? devices.FirstOrDefault();
@@ -309,7 +279,7 @@ public partial class SettingsWindow : Window
             {
                 var drivers = SteinbergAsioStream.GetDriverNames(SelectedOutputBackend);
                 DriverComboBox.ItemsSource = drivers;
-                DriverComboBox.DisplayMemberPath = string.Empty;
+                DriverComboBox.DisplayMemberBinding = null;
                 DriverComboBox.SelectedItem = drivers.FirstOrDefault(name =>
                     string.Equals(name, _settings.SelectedDriverName, StringComparison.Ordinal))
                     ?? drivers.FirstOrDefault(name =>
@@ -325,7 +295,7 @@ public partial class SettingsWindow : Window
             else
             {
                 DriverComboBox.ItemsSource = null;
-                DriverComboBox.DisplayMemberPath = string.Empty;
+                DriverComboBox.DisplayMemberBinding = null;
                 DeviceLabelTextBlock.Text = LocalizationManager.Current.OutputDevice;
                 StatusTextBlock.Text = LocalizationManager.Current.KernelStreamingUnavailable;
             }
@@ -336,21 +306,19 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void DriverComboBox_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void DriverComboBox_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        DeviceInfoButton.Visibility = DriverComboBox.SelectedItem is string or WasapiDeviceInfo
-            ? Visibility.Visible
-            : Visibility.Collapsed;
+        DeviceInfoButton.IsVisible = DriverComboBox.SelectedItem is string or WasapiDeviceInfo;
     }
 
-    private void OutputBackendComboBox_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void OutputBackendComboBox_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         var backend = SelectedOutputBackend;
         DriverComboBox.IsEnabled = backend != OutputBackend.KernelStreaming;
         DeviceInfoButton.IsEnabled =
             backend == OutputBackend.Wasapi ||
-            backend == OutputBackend.Asio && _steinbergAsioAvailable ||
-            backend == OutputBackend.CwAsio && _cwAsioAvailable;
+            (backend == OutputBackend.Asio && _steinbergAsioAvailable) ||
+            (backend == OutputBackend.CwAsio && _cwAsioAvailable);
         LoadDrivers();
         if (backend == OutputBackend.KernelStreaming)
         {
@@ -359,19 +327,19 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private void DeviceInfoButton_OnClick(object sender, RoutedEventArgs e)
+    private async void DeviceInfoButton_OnClick(object? sender, RoutedEventArgs e)
     {
         try
         {
             if (DriverComboBox.SelectedItem is string driverName)
             {
                 var info = SteinbergAsioStream.GetDeviceInfo(SelectedOutputBackend, driverName);
-                new DeviceInfoWindow(info) { Owner = this }.ShowDialog();
+                await new DeviceInfoWindow(info).ShowDialog(this);
             }
             else if (DriverComboBox.SelectedItem is WasapiDeviceInfo wasapiDevice)
             {
                 var info = WasapiDeviceProvider.GetCapabilities(wasapiDevice.Id);
-                new DeviceInfoWindow(info) { Owner = this }.ShowDialog();
+                await new DeviceInfoWindow(info).ShowDialog(this);
             }
         }
         catch (Exception ex)
@@ -384,21 +352,19 @@ public partial class SettingsWindow : Window
     // Bibliothek
     // ------------------------------------------------------------------
 
-    private void AddDirectoryButton_OnClick(object sender, RoutedEventArgs e)
+    private async void AddDirectoryButton_OnClick(object? sender, RoutedEventArgs e)
     {
-        using var dialog = new System.Windows.Forms.FolderBrowserDialog
+        var topLevel = TopLevel.GetTopLevel(this)!;
+        var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
-            Description = LocalizationManager.Current.AddMusicDirectory,
-            UseDescriptionForTitle = true
-        };
-
-        if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+            Title = LocalizationManager.Current.AddMusicDirectory,
+            AllowMultiple = false
+        });
+        if (folders.Count == 0)
             return;
-
-        var path = dialog.SelectedPath;
-        if (_libraryPaths.Contains(path, StringComparer.OrdinalIgnoreCase))
+        var path = folders[0].TryGetLocalPath() ?? string.Empty;
+        if (string.IsNullOrEmpty(path) || _libraryPaths.Contains(path, StringComparer.OrdinalIgnoreCase))
             return;
-
         _libraryPaths.Add(path);
         RebuildDirectoryList();
         _onLibraryPathsChanged?.Invoke(_libraryPaths.ToList());
@@ -428,11 +394,10 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private UIElement BuildDirectoryRow(string path)
+    private Control BuildDirectoryRow(string path)
     {
         var outer = new StackPanel { Margin = new Thickness(0, 0, 0, 4) };
 
-        // --- Kopfzeile: Pfad | Scannen | × ---
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -444,9 +409,9 @@ public partial class SettingsWindow : Window
             Text = path,
             VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis,
-            Margin = new Thickness(0, 0, 8, 0),
-            ToolTip = path
+            Margin = new Thickness(0, 0, 8, 0)
         };
+        ToolTip.SetTip(pathBlock, path);
         Grid.SetColumn(pathBlock, 0);
 
         var countBlock = new TextBlock
@@ -455,30 +420,17 @@ public partial class SettingsWindow : Window
             VerticalAlignment = VerticalAlignment.Center,
             Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)),
             FontSize = 11,
-            Margin = new Thickness(0, 0, 10, 0),
-            ToolTip = LocalizationManager.Current.TrackCountTooltip
+            Margin = new Thickness(0, 0, 10, 0)
         };
+        ToolTip.SetTip(countBlock, LocalizationManager.Current.TrackCountTooltip);
         Grid.SetColumn(countBlock, 1);
 
-        var scanBtn = new Button
-        {
-            Content = LocalizationManager.Current.Scan,
-            Width = 80,
-            Height = 26,
-            Margin = new Thickness(0, 0, 4, 0),
-            Style = (Style)FindResource("SettingsButtonStyle")
-        };
+        var scanBtn = CreateStyledButton(LocalizationManager.Current.Scan, 80, 26, new Thickness(0, 0, 4, 0));
         Grid.SetColumn(scanBtn, 2);
 
-        var removeBtn = new Button
-        {
-            Content = "×",
-            Width = 26,
-            Height = 26,
-            FontSize = 14,
-            ToolTip = LocalizationManager.Current.RemoveDirectory,
-            Style = (Style)FindResource("SettingsButtonStyle")
-        };
+        var removeBtn = CreateStyledButton("×", 26, 26);
+        removeBtn.FontSize = 14;
+        ToolTip.SetTip(removeBtn, LocalizationManager.Current.RemoveDirectory);
         Grid.SetColumn(removeBtn, 3);
 
         grid.Children.Add(pathBlock);
@@ -488,17 +440,15 @@ public partial class SettingsWindow : Window
 
         _ = RefreshCountAsync(path, countBlock);
 
-        // --- Statuszeile ---
         var statusBlock = new TextBlock
         {
             TextWrapping = TextWrapping.Wrap,
             Foreground = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55)),
             FontSize = 11,
             Margin = new Thickness(0, 2, 0, 0),
-            Visibility = Visibility.Collapsed
+            IsVisible = false
         };
 
-        // --- Scan-Handler ---
         scanBtn.Click += async (_, _) =>
         {
             if (_activeScans.ContainsKey(path))
@@ -506,24 +456,20 @@ public partial class SettingsWindow : Window
                 _activeScans[path].Cancel();
                 return;
             }
-
             if (!Directory.Exists(path))
             {
-                statusBlock.Visibility = Visibility.Visible;
+                statusBlock.IsVisible = true;
                 statusBlock.Text = LocalizationManager.Current.FolderNotFound;
                 return;
             }
-
             var cts = new CancellationTokenSource();
             _activeScans[path] = cts;
             UpdateBackupButtonAvailability();
             scanBtn.Content = LocalizationManager.Current.Cancel;
-            statusBlock.Visibility = Visibility.Visible;
+            statusBlock.IsVisible = true;
             statusBlock.Text = LocalizationManager.Current.ScanRunning;
-
             var progress = new Progress<ScanProgress>(p =>
                 statusBlock.Text = $"{p.Current}/{p.Total} – {Path.GetFileName(p.CurrentFile)}");
-
             try
             {
                 var result = await LibraryScanner.ScanAsync(path, progress, cts.Token);
@@ -532,10 +478,7 @@ public partial class SettingsWindow : Window
                     : string.Empty;
                 statusBlock.Text = string.Format(
                     LocalizationManager.Current.ScanCompleted,
-                    result.Total,
-                    result.Added,
-                    result.Updated,
-                    failed);
+                    result.Total, result.Added, result.Updated, failed);
             }
             catch (OperationCanceledException)
             {
@@ -555,7 +498,6 @@ public partial class SettingsWindow : Window
             }
         };
 
-        // --- Entfernen-Handler ---
         removeBtn.Click += (_, _) =>
         {
             if (_activeScans.TryGetValue(path, out var cts))
@@ -574,7 +516,7 @@ public partial class SettingsWindow : Window
         return outer;
     }
 
-    private async void OptimizeDatabaseButton_OnClick(object sender, RoutedEventArgs e)
+    private async void OptimizeDatabaseButton_OnClick(object? sender, RoutedEventArgs e)
     {
         OptimizeDatabaseButton.IsEnabled = false;
         SetBackupButtonsEnabled(false);
@@ -599,7 +541,7 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private async void RepairAlbumArtworkButton_OnClick(object sender, RoutedEventArgs e)
+    private async void RepairAlbumArtworkButton_OnClick(object? sender, RoutedEventArgs e)
     {
         RepairAlbumArtworkButton.IsEnabled = false;
         SetBackupButtonsEnabled(false);
@@ -624,7 +566,7 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private async void NormalizeArtistsButton_OnClick(object sender, RoutedEventArgs e)
+    private async void NormalizeArtistsButton_OnClick(object? sender, RoutedEventArgs e)
     {
         NormalizeArtistsButton.IsEnabled = false;
         SetBackupButtonsEnabled(false);
@@ -646,8 +588,7 @@ public partial class SettingsWindow : Window
         catch (Exception ex)
         {
             DatabaseMaintenanceStatusTextBlock.Text = string.Format(
-                LocalizationManager.Current.ArtistNormalizationFailed,
-                ex.Message);
+                LocalizationManager.Current.ArtistNormalizationFailed, ex.Message);
         }
         finally
         {
@@ -656,7 +597,7 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private async void DownloadMissingArtworkButton_OnClick(object sender, RoutedEventArgs e)
+    private async void DownloadMissingArtworkButton_OnClick(object? sender, RoutedEventArgs e)
     {
         DownloadMissingArtworkButton.IsEnabled = false;
         SetBackupButtonsEnabled(false);
@@ -682,44 +623,45 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private async void ExportLibraryButton_OnClick(object sender, RoutedEventArgs e)
+    private async void ExportLibraryButton_OnClick(object? sender, RoutedEventArgs e)
     {
         if (!CanStartLibraryBackupOperation())
             return;
-
-        var dialog = new SaveFileDialog
+        var topLevel = TopLevel.GetTopLevel(this)!;
+        var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
             Title = LocalizationManager.Current.ExportLibrary,
-            Filter = LocalizationManager.Current.LibraryArchiveFilter,
-            DefaultExt = ".zip",
-            AddExtension = true,
-            FileName = $"Orynivo-library-{DateTime.Now:yyyyMMdd-HHmm}.zip"
-        };
-        if (dialog.ShowDialog(this) != true)
+            FileTypeChoices = [new FilePickerFileType("ZIP") { Patterns = ["*.zip"] }],
+            DefaultExtension = "zip",
+            SuggestedFileName = $"Orynivo-library-{DateTime.Now:yyyyMMdd-HHmm}.zip"
+        });
+        if (file is null)
+            return;
+        var filePath = file.TryGetLocalPath() ?? string.Empty;
+        if (string.IsNullOrEmpty(filePath))
             return;
 
         SetLibraryOperationControlsEnabled(false);
         LibraryBackupStatusTextBlock.Text = LocalizationManager.Current.LibraryExporting;
         LibraryExportProgressBar.Value = 0;
-        LibraryExportProgressBar.Visibility = Visibility.Visible;
+        LibraryExportProgressBar.IsVisible = true;
         var progress = new Progress<LibraryExportProgress>(value =>
         {
             LibraryExportProgressBar.Value = value.Percentage;
             LibraryBackupStatusTextBlock.Text = string.Format(
                 LocalizationManager.Current.LibraryExportProgress,
-                value.Percentage,
-                value.CurrentFile ?? string.Empty);
+                value.Percentage, value.CurrentFile ?? string.Empty);
         });
         try
         {
-            await LibraryBackupService.ExportAsync(dialog.FileName, _libraryPaths, progress);
+            await LibraryBackupService.ExportAsync(filePath, _libraryPaths, progress);
             LibraryExportProgressBar.Value = 100;
             LibraryBackupStatusTextBlock.Text =
-                string.Format(LocalizationManager.Current.LibraryExported, dialog.FileName);
+                string.Format(LocalizationManager.Current.LibraryExported, filePath);
         }
         catch (Exception ex)
         {
-            LibraryExportProgressBar.Visibility = Visibility.Collapsed;
+            LibraryExportProgressBar.IsVisible = false;
             LibraryBackupStatusTextBlock.Text =
                 string.Format(LocalizationManager.Current.LibraryExportFailed, ex.Message);
         }
@@ -729,50 +671,47 @@ public partial class SettingsWindow : Window
         }
     }
 
-    private async void ImportLibraryButton_OnClick(object sender, RoutedEventArgs e)
+    private async void ImportLibraryButton_OnClick(object? sender, RoutedEventArgs e)
     {
         if (!CanStartLibraryBackupOperation())
             return;
-
-        var dialog = new OpenFileDialog
+        var topLevel = TopLevel.GetTopLevel(this)!;
+        var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = LocalizationManager.Current.ImportLibrary,
-            Filter = LocalizationManager.Current.LibraryArchiveFilter,
-            DefaultExt = ".zip",
-            CheckFileExists = true,
-            Multiselect = false
-        };
-        if (dialog.ShowDialog(this) != true)
+            FileTypeFilter = [new FilePickerFileType("ZIP") { Patterns = ["*.zip"] }],
+            AllowMultiple = false
+        });
+        if (files.Count == 0)
+            return;
+        var filePath = files[0].TryGetLocalPath() ?? string.Empty;
+        if (string.IsNullOrEmpty(filePath))
             return;
 
-        var confirmation = WpfMessageBox.Show(
-            this,
+        var confirmed = await AppMessageBox.ConfirmAsync(
             LocalizationManager.Current.LibraryImportConfirm,
             LocalizationManager.Current.ImportLibrary,
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning,
-            MessageBoxResult.No);
-        if (confirmation != MessageBoxResult.Yes)
+            this);
+        if (!confirmed)
             return;
 
         SetLibraryOperationControlsEnabled(false);
         LibraryBackupStatusTextBlock.Text = LocalizationManager.Current.LibraryImporting;
         LibraryExportProgressBar.Value = 0;
-        LibraryExportProgressBar.Visibility = Visibility.Visible;
+        LibraryExportProgressBar.IsVisible = true;
         var progress = new Progress<LibraryImportProgress>(value =>
         {
             LibraryExportProgressBar.Value = value.Percentage;
             LibraryBackupStatusTextBlock.Text = string.Format(
                 LocalizationManager.Current.LibraryImportProgress,
-                value.Percentage,
-                value.CurrentFile ?? string.Empty);
+                value.Percentage, value.CurrentFile ?? string.Empty);
         });
         try
         {
             if (Owner is MainWindow mainWindow)
                 mainWindow.PrepareForLibraryImport();
 
-            var importedPaths = await LibraryBackupService.ImportAsync(dialog.FileName, progress);
+            var importedPaths = await LibraryBackupService.ImportAsync(filePath, progress);
             LibraryExportProgressBar.Value = 100;
             _libraryPaths.Clear();
             _libraryPaths.AddRange(importedPaths);
@@ -781,17 +720,15 @@ public partial class SettingsWindow : Window
             RebuildDirectoryList();
             LibraryBackupStatusTextBlock.Text = LocalizationManager.Current.LibraryImported;
 
-            WpfMessageBox.Show(
-                this,
+            await AppMessageBox.ShowAsync(
                 LocalizationManager.Current.LibraryImported,
                 LocalizationManager.Current.ImportLibrary,
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
-            System.Windows.Application.Current.Shutdown();
+                this);
+            (AvaloniaApp.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Shutdown();
         }
         catch (Exception ex)
         {
-            LibraryExportProgressBar.Visibility = Visibility.Collapsed;
+            LibraryExportProgressBar.IsVisible = false;
             LibraryBackupStatusTextBlock.Text =
                 string.Format(LocalizationManager.Current.LibraryImportFailed, ex.Message);
             SetLibraryOperationControlsEnabled(true);
@@ -807,7 +744,6 @@ public partial class SettingsWindow : Window
             !DownloadMissingArtworkButton.IsEnabled;
         if (_activeScans.Count == 0 && !maintenanceActive)
             return true;
-
         LibraryBackupStatusTextBlock.Text = LocalizationManager.Current.LibraryOperationScanActive;
         return false;
     }
@@ -843,7 +779,6 @@ public partial class SettingsWindow : Window
     // Dialog
     // ------------------------------------------------------------------
 
-    private void SaveButton_OnClick(object sender, RoutedEventArgs e) => DialogResult = true;
-
-    private void CancelButton_OnClick(object sender, RoutedEventArgs e) => DialogResult = false;
+    private void SaveButton_OnClick(object? sender, RoutedEventArgs e) => Close(true);
+    private void CancelButton_OnClick(object? sender, RoutedEventArgs e) => Close(false);
 }

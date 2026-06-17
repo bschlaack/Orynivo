@@ -3,6 +3,14 @@ using System.Text.Json;
 
 namespace Orynivo.Library;
 
+/// <summary>
+/// Live ICY metadata snapshot for an internet radio stream.
+/// </summary>
+/// <param name="StreamTitle">Raw <c>StreamTitle</c> ICY tag, typically in "Artist - Title" format.</param>
+/// <param name="StationName">Station name from the <c>icy-name</c> header.</param>
+/// <param name="Description">Station description from <c>icy-description</c>.</param>
+/// <param name="Genre">Genre from the <c>icy-genre</c> header.</param>
+/// <param name="Homepage">Station homepage URL from <c>icy-url</c>.</param>
 public sealed record RadioStreamMetadata(
     string? StreamTitle,
     string? StationName,
@@ -10,7 +18,10 @@ public sealed record RadioStreamMetadata(
     string? Genre,
     string? Homepage)
 {
+    /// <summary>Artist portion parsed from <see cref="StreamTitle"/>, or <see langword="null"/>.</summary>
     public string? Artist => SplitStreamTitle().Artist;
+
+    /// <summary>Track title portion parsed from <see cref="StreamTitle"/>, or the full value if no separator was found.</summary>
     public string? Title => SplitStreamTitle().Title;
 
     private (string? Artist, string? Title) SplitStreamTitle()
@@ -37,8 +48,17 @@ public sealed record RadioStreamMetadata(
     }
 }
 
+/// <summary>
+/// Probes a live radio stream URL with <c>ffprobe</c> to extract ICY metadata tags.
+/// </summary>
 public sealed class RadioStreamMetadataService
 {
+    /// <summary>
+    /// Runs <c>ffprobe</c> against <paramref name="streamUrl"/> and returns the extracted ICY tags,
+    /// or <see langword="null"/> when the probe fails or returns no tags.
+    /// </summary>
+    /// <param name="streamUrl">Direct stream URL to probe.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public async Task<RadioStreamMetadata?> ProbeAsync(
         string streamUrl,
         CancellationToken cancellationToken = default)

@@ -4,6 +4,7 @@ using Microsoft.Data.Sqlite;
 
 namespace Orynivo.Library;
 
+/// <summary>Artist row joined from the <c>artists</c> table, including optional biography and image data.</summary>
 public sealed record ArtistInfo(
     long Id,
     string Artist,
@@ -15,7 +16,7 @@ public sealed record ArtistInfo(
     long? ProfileFetchedAt,
     bool ImageIsManual);
 
-/// <summary>Distinct-Album-Eintrag für die Albumansichten.</summary>
+/// <summary>Distinct album entry used by the album-grid and album-list views.</summary>
 public sealed record AlbumInfo(
     long Id,
     string Album,
@@ -25,7 +26,7 @@ public sealed record AlbumInfo(
     string? ThumbnailPath,
     bool IsFavorite);
 
-/// <summary>Schlanker Track-Datensatz für die Haupt-Trackliste.</summary>
+/// <summary>Lightweight track row for the main track list; omits cover data and lyrics.</summary>
 public sealed record TrackListInfo(
     string Path,
     string FileName,
@@ -40,6 +41,7 @@ public sealed record TrackListInfo(
     long Id,
     bool IsFavorite);
 
+/// <summary>Minimal track row for filter/facet building; carries only classification fields.</summary>
 public sealed record TrackFacetInfo(
     long Id,
     bool IsFavorite,
@@ -47,9 +49,10 @@ public sealed record TrackFacetInfo(
     string? Format,
     int? Bitrate);
 
+/// <summary>File-system paths for the three artwork variants stored per album (original, 96-px thumb, 320-px thumb).</summary>
 public sealed record ArtworkPaths(string? OriginalPath, string? Thumb96Path, string? Thumb320Path);
 
-/// <summary>Schlanker Track-Datensatz für listenbasierte Ansichten (kein Cover, keine Texte).</summary>
+/// <summary>Minimal track row for list-based views that do not need cover art or lyrics text.</summary>
 public sealed record TrackLite(
     string  Path,
     string  FileName,
@@ -57,12 +60,17 @@ public sealed record TrackLite(
     int?    DiscNumber,
     int?    TrackNumber)
 {
+    /// <summary>Returns <see cref="Title"/> when set, otherwise falls back to <see cref="FileName"/>.</summary>
     public string DisplayName => Title ?? FileName;
 }
 
+/// <summary>Album summary entry used by the dashboard's Recently Added widget.</summary>
 public sealed record RecentAlbumInfo(long Id, string Title, string Artist, string? ThumbPath);
 
+/// <summary>Aggregated listening data for a single calendar day.</summary>
 public sealed record CalendarDayData(int Day, double TotalSeconds, IReadOnlyList<string> TopGenres);
+
+/// <summary>Single row from the listening-history log, enriched with track and artist display fields.</summary>
 public sealed record DailyHistoryEntry(
     long Id,
     long? TrackId,
@@ -76,18 +84,27 @@ public sealed record DailyHistoryEntry(
     string? Album,
     long? ArtistId,
     long? AlbumId);
+
+/// <summary>Result returned after an artist-name normalisation run.</summary>
 public sealed record ArtistNormalizationResult(int MergedArtists, int UpdatedTracks);
+
+/// <summary>Result returned after renaming or merging an artist.</summary>
 public sealed record ArtistRenameResult(long ArtistId, string ArtistName, bool Merged);
 
 /// <summary>
-/// Verwaltet die SQLite-Audiodatenbank. Eine Instanz pro Anwendungslaufzeit.
-/// Die DB-Datei liegt unter %LOCALAPPDATA%\Orynivo\library.db.
+/// Manages the SQLite audio library database. One instance per application lifetime.
+/// The database file is stored at <c>%LOCALAPPDATA%\Orynivo\library.db</c>.
 /// </summary>
 public sealed class AudioDatabase : IDisposable
 {
     private readonly SqliteConnection _conn;
     private Dictionary<string, (long Id, string Name)>? _artistsByComparisonKey;
 
+    /// <summary>
+    /// Opens (or creates) the SQLite database at <paramref name="dbPath"/>,
+    /// applies connection pragmas, and ensures the schema is up to date.
+    /// </summary>
+    /// <param name="dbPath">Absolute path to the <c>.db</c> file.</param>
     public AudioDatabase(string dbPath)
     {
         Directory.CreateDirectory(System.IO.Path.GetDirectoryName(dbPath)!);
@@ -101,6 +118,7 @@ public sealed class AudioDatabase : IDisposable
     // Öffentliche Factory für den Standard-Speicherort
     // ------------------------------------------------------------------
 
+    /// <summary>Opens the database at the default data path (<c>%LOCALAPPDATA%\Orynivo\library.db</c>).</summary>
     public static AudioDatabase OpenDefault()
     {
         var path = AppPaths.GetDataPath("library.db");
@@ -148,6 +166,11 @@ public sealed class AudioDatabase : IDisposable
     // Einfügen / Aktualisieren
     // ------------------------------------------------------------------
 
+    /// <summary>
+    /// Inserts or updates a track and its associated artist, album, and artwork records in a single transaction.
+    /// Artist and album artist names are normalised before being written.
+    /// </summary>
+    /// <param name="track">The track record to upsert.</param>
     public void Upsert(TrackRecord track)
     {
         track.Artist = ArtistNameNormalizer.NormalizeDisplayName(track.Artist);

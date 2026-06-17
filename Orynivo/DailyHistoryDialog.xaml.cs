@@ -1,8 +1,9 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
-using System.Runtime.InteropServices;
-using System.Windows;
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using Orynivo.Library;
 using Orynivo.Localization;
 
@@ -31,14 +32,25 @@ public partial class DailyHistoryDialog : Window
         public bool CanOpenTrack => Entry.TrackId.HasValue && File.Exists(Entry.Path);
         public bool CanOpenArtist => Entry.ArtistId.HasValue;
         public bool CanOpenAlbum => Entry.AlbumId.HasValue;
+        public bool IsPlainTitle => !CanOpenTrack;
+        public bool IsPlainArtist => !CanOpenArtist;
+        public bool IsPlainAlbum => !CanOpenAlbum;
     }
 
     public string DialogTitle { get; }
     public ObservableCollection<HistoryRow> Rows { get; }
-    public Visibility EmptyVisibility => Rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-    public Visibility GridVisibility => Rows.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+    public bool ShowEmpty => Rows.Count == 0;
+    public bool ShowGrid => Rows.Count > 0;
     public DailyHistoryAction SelectedAction { get; private set; }
     public DailyHistoryEntry? SelectedEntry { get; private set; }
+
+    /// <summary>
+    /// Initializes a runtime-loader instance for an empty history day.
+    /// </summary>
+    public DailyHistoryDialog()
+        : this(DateTime.Today, Array.Empty<DailyHistoryEntry>())
+    {
+    }
 
     public DailyHistoryDialog(DateTime date, IReadOnlyList<DailyHistoryEntry> entries)
     {
@@ -48,6 +60,11 @@ public partial class DailyHistoryDialog : Window
         Rows = new ObservableCollection<HistoryRow>(entries.Select(CreateRow));
         InitializeComponent();
         DataContext = this;
+        Opened += (_, _) => WindowChrome.ApplyTheme(this);
+        KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Escape) Close(false);
+        };
     }
 
     private static HistoryRow CreateRow(DailyHistoryEntry entry) => new()
@@ -75,48 +92,23 @@ public partial class DailyHistoryDialog : Window
         return $"{(int)value.TotalHours:D2}:{value.Minutes:D2}:{value.Seconds:D2}";
     }
 
-    private void TrackButton_OnClick(object sender, RoutedEventArgs e) =>
+    private void TrackButton_OnClick(object? sender, RoutedEventArgs e) =>
         SelectAction(sender, DailyHistoryAction.Track);
 
-    private void AlbumButton_OnClick(object sender, RoutedEventArgs e) =>
+    private void AlbumButton_OnClick(object? sender, RoutedEventArgs e) =>
         SelectAction(sender, DailyHistoryAction.Album);
 
-    private void ArtistButton_OnClick(object sender, RoutedEventArgs e) =>
+    private void ArtistButton_OnClick(object? sender, RoutedEventArgs e) =>
         SelectAction(sender, DailyHistoryAction.Artist);
 
-    private void SelectAction(object sender, DailyHistoryAction action)
+    private void SelectAction(object? sender, DailyHistoryAction action)
     {
-        if (sender is not FrameworkElement { DataContext: HistoryRow row })
+        if (sender is not Control { DataContext: HistoryRow row })
             return;
         SelectedAction = action;
         SelectedEntry = row.Entry;
-        DialogResult = true;
+        Close(true);
     }
 
-    private void CloseButton_OnClick(object sender, RoutedEventArgs e) => DialogResult = false;
-
-    private void DailyHistoryDialog_OnSourceInitialized(object sender, EventArgs e)
-    {
-        try
-        {
-            var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-            if (handle == IntPtr.Zero)
-                return;
-            const int DwmwaCaptionColor = 35;
-            const int DwmwaTextColor = 36;
-            var captionColor = ColorRef(0x13, 0x14, 0x2A);
-            var textColor = ColorRef(0xFF, 0xFF, 0xFF);
-            _ = DwmSetWindowAttribute(handle, DwmwaCaptionColor, ref captionColor, sizeof(int));
-            _ = DwmSetWindowAttribute(handle, DwmwaTextColor, ref textColor, sizeof(int));
-        }
-        catch
-        {
-        }
-    }
-
-    private static int ColorRef(byte r, byte g, byte b) => r | (g << 8) | (b << 16);
-
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(
-        IntPtr hwnd, int dwAttribute, ref int pvAttribute, int cbAttribute);
+    private void CloseButton_OnClick(object? sender, RoutedEventArgs e) => Close(false);
 }

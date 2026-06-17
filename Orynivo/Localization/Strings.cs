@@ -1,5 +1,9 @@
 namespace Orynivo.Localization;
 
+/// <summary>
+/// Holds all localised UI strings for a single language.
+/// One instance per language is created in <see cref="LocalizationManager"/>.
+/// </summary>
 public sealed record LocalizedStrings(
     string LocalLibrary,
     string Artists,
@@ -185,6 +189,16 @@ public sealed record LocalizedStrings(
     public string WasapiDsdNotRelevant { get; init; } = "";
     public string NativeDsdUsesAsio { get; init; } = "";
     public string Dashboard { get; init; } = "";
+    public string DashboardIntroTitle { get; init; } = "";
+    public string DashboardIntroHint { get; init; } = "";
+    public string ArtistsIntroTitle { get; init; } = "";
+    public string ArtistsIntroHint { get; init; } = "";
+    public string AlbumsIntroTitle { get; init; } = "";
+    public string AlbumsIntroHint { get; init; } = "";
+    public string TracksIntroTitle { get; init; } = "";
+    public string TracksIntroHint { get; init; } = "";
+    public string FoldersIntroTitle { get; init; } = "";
+    public string FoldersIntroHint { get; init; } = "";
     public string ThemeLight { get; init; } = "";
     public string ThemeDark { get; init; } = "";
     public string LanguageGerman { get; init; } = "";
@@ -314,4 +328,6 @@ public sealed record LocalizedStrings(
     public string PlexNoAudioLibraries { get; init; } = "";
     public string PlexLoading { get; init; } = "";
     public string LoadMore { get; init; } = "";
+    public string FfmpegDownloading { get; init; } = "";
+    public string FfmpegDownloadFailed { get; init; } = "";
 }

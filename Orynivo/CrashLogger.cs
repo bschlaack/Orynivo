@@ -6,11 +6,22 @@ using System.Text;
 
 namespace Orynivo;
 
+/// <summary>
+/// Writes structured crash reports for unhandled exceptions to
+/// <c>%LOCALAPPDATA%\Orynivo\logs\</c>.
+/// </summary>
 public static class CrashLogger
 {
     private static readonly object Sync = new();
     private static int _fileSequence;
 
+    /// <summary>
+    /// Serialises <paramref name="exception"/> together with environment metadata into a timestamped
+    /// log file and returns the file path.
+    /// </summary>
+    /// <param name="exception">The unhandled exception to record.</param>
+    /// <param name="source">Label identifying the handler that caught the exception (e.g. <c>"UI thread"</c>).</param>
+    /// <returns>Absolute path of the written log file, or an empty string if writing failed.</returns>
     public static string Log(Exception exception, string source)
     {
         ArgumentNullException.ThrowIfNull(exception);

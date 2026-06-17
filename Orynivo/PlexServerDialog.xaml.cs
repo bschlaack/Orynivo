@@ -1,5 +1,6 @@
-using System.Runtime.InteropServices;
-using System.Windows;
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using Orynivo.Localization;
 using Orynivo.Streaming;
 
@@ -9,20 +10,36 @@ public partial class PlexServerDialog : Window
 {
     private readonly string _serverId;
 
+    /// <summary>
+    /// Initializes a runtime-loader instance for a new Plex server.
+    /// </summary>
+    public PlexServerDialog()
+        : this(null, null)
+    {
+    }
+
     public PlexServerDialog(PlexServerSettings? server = null, string? token = null)
     {
         InitializeComponent();
         _serverId = server?.Id ?? Guid.NewGuid().ToString("N");
         NameTextBox.Text = server?.Name ?? string.Empty;
         UrlTextBox.Text = server?.BaseUrl ?? string.Empty;
-        TokenPasswordBox.Password = token ?? string.Empty;
-        Loaded += (_, _) => NameTextBox.Focus();
+        TokenTextBox.Text = token ?? string.Empty;
+        Opened += (_, _) =>
+        {
+            WindowChrome.ApplyTheme(this);
+            NameTextBox.Focus();
+        };
+        KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Escape) Close(false);
+        };
     }
 
     public PlexServerSettings Server { get; private set; } = new();
-    public string Token => TokenPasswordBox.Password.Trim();
+    public string Token => TokenTextBox.Text?.Trim() ?? string.Empty;
 
-    private async void TestConnectionButton_OnClick(object sender, RoutedEventArgs e)
+    private async void TestConnectionButton_OnClick(object? sender, RoutedEventArgs e)
     {
         if (!TryCreateServer(out var server))
             return;
@@ -49,20 +66,22 @@ public partial class PlexServerDialog : Window
         }
     }
 
-    private void SaveButton_OnClick(object sender, RoutedEventArgs e)
+    private void SaveButton_OnClick(object? sender, RoutedEventArgs e)
     {
         if (!TryCreateServer(out var server))
             return;
 
         Server = server;
-        DialogResult = true;
+        Close(true);
     }
+
+    private void CancelButton_OnClick(object? sender, RoutedEventArgs e) => Close(false);
 
     private bool TryCreateServer(out PlexServerSettings server)
     {
         server = new PlexServerSettings();
-        var name = NameTextBox.Text.Trim();
-        var url = UrlTextBox.Text.Trim();
+        var name = NameTextBox.Text?.Trim() ?? string.Empty;
+        var url = UrlTextBox.Text?.Trim() ?? string.Empty;
         if (name.Length == 0 || url.Length == 0)
         {
             StatusTextBlock.Text = LocalizationManager.Current.PlexServerFieldsRequired;
@@ -86,51 +105,4 @@ public partial class PlexServerDialog : Window
             return false;
         }
     }
-
-    private void PlexServerDialog_OnSourceInitialized(object sender, EventArgs e)
-        => ApplyTitleBarColors();
-
-    private void ApplyTitleBarColors()
-    {
-        try
-        {
-            var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
-            if (handle == IntPtr.Zero)
-                return;
-
-            const int DwmwaCaptionColor = 35;
-            const int DwmwaTextColor = 36;
-            var dark = System.Windows.Application.Current.Resources["AppHeaderBrush"] is
-                           System.Windows.Media.SolidColorBrush brush &&
-                       brush.Color == System.Windows.Media.Color.FromRgb(0x13, 0x14, 0x2A);
-            var captionColor = dark
-                ? ColorRef(0x13, 0x14, 0x2A)
-                : ColorRef(0xEA, 0xEA, 0xF5);
-            var textColor = dark
-                ? ColorRef(0xFF, 0xFF, 0xFF)
-                : ColorRef(0x13, 0x14, 0x2A);
-            _ = DwmSetWindowAttribute(
-                handle,
-                DwmwaCaptionColor,
-                ref captionColor,
-                sizeof(int));
-            _ = DwmSetWindowAttribute(
-                handle,
-                DwmwaTextColor,
-                ref textColor,
-                sizeof(int));
-        }
-        catch
-        {
-        }
-    }
-
-    private static int ColorRef(byte r, byte g, byte b) => r | (g << 8) | (b << 16);
-
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(
-        IntPtr handle,
-        int attribute,
-        ref int value,
-        int valueSize);
 }

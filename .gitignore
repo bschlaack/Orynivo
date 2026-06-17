@@ -1,5 +1,6 @@
 bin/
 obj/
+artifacts/
 Native/AsioBridge/**/x64/
 Native/CwAsioBridge/**/x64/
 _verify_build/

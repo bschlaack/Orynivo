@@ -1,31 +1,56 @@
-using System.Windows;
-using System.Windows.Threading;
-using System.Runtime.InteropServices;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Threading;
+using Orynivo.Audio;
 using Orynivo.Library;
 using Orynivo.Localization;
+using System.Runtime.InteropServices;
 
 namespace Orynivo;
 
-public partial class App : System.Windows.Application
+public partial class App : Application
 {
     private const string AppUserModelId = "Orynivo.AudioPlayer";
     private int _fatalExceptionHandling;
 
-    protected override async void OnStartup(StartupEventArgs e)
+    public override void Initialize()
     {
-        RegisterCrashHandlers();
-        base.OnStartup(e);
-        SetCurrentProcessExplicitAppUserModelID(AppUserModelId);
-        AppPaths.MigrateLegacyData();
+        Avalonia.Markup.Xaml.AvaloniaXamlLoader.Load(this);
+    }
 
-        var startup = new StartupWindow();
-        startup.Show();
+    public override void OnFrameworkInitializationCompleted()
+    {
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            RegisterCrashHandlers();
+            if (OperatingSystem.IsWindows())
+                SetCurrentProcessExplicitAppUserModelID(AppUserModelId);
+            AppPaths.MigrateLegacyData();
 
+            var startup = new StartupWindow();
+            startup.Show();
+
+            _ = InitializeAsync(desktop, startup);
+        }
+        base.OnFrameworkInitializationCompleted();
+    }
+
+    private async Task InitializeAsync(
+        IClassicDesktopStyleApplicationLifetime desktop,
+        StartupWindow startup)
+    {
         try
         {
             var settings = new SettingsStore().Load();
             ThemeManager.Apply(settings.Theme);
             LocalizationManager.Apply(settings.Language);
+
+            var ffmpegAvailable = await FfmpegLocator.EnsureAvailableAsync(
+                new Progress<string>(status => startup.Status = status));
+            if (!ffmpegAvailable)
+                await AppMessageBox.ShowAsync(LocalizationManager.Current.FfmpegDownloadFailed);
+
             startup.Status = LocalizationManager.Current.StartupPreparingLibrary;
             await Task.Run(() =>
             {
@@ -35,8 +60,12 @@ public partial class App : System.Windows.Application
             });
 
             var main = new MainWindow();
-            MainWindow = main;
+            desktop.MainWindow = main;
             main.Show();
+        }
+        catch (Exception ex)
+        {
+            HandleFatalException(ex, "Startup");
         }
         finally
         {
@@ -50,7 +79,7 @@ public partial class App : System.Windows.Application
 
     private void RegisterCrashHandlers()
     {
-        DispatcherUnhandledException += OnDispatcherUnhandledException;
+        Dispatcher.UIThread.UnhandledException += OnDispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += OnAppDomainUnhandledException;
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
     }
@@ -58,7 +87,7 @@ public partial class App : System.Windows.Application
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
         e.Handled = true;
-        HandleFatalException(e.Exception, "WPF Dispatcher");
+        HandleFatalException(e.Exception, "Avalonia UI Thread");
     }
 
     private void OnAppDomainUnhandledException(object? sender, UnhandledExceptionEventArgs e)
@@ -85,18 +114,15 @@ public partial class App : System.Windows.Application
             var message = string.IsNullOrWhiteSpace(logPath)
                 ? LocalizationManager.Current.CrashMessageWithoutLog
                 : string.Format(LocalizationManager.Current.CrashMessage, logPath);
-            System.Windows.MessageBox.Show(
-                message,
-                LocalizationManager.Current.CrashTitle,
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
+            _ = AppMessageBox.ShowAsync(message, LocalizationManager.Current.CrashTitle);
         }
-        catch
-        {
-        }
+        catch { }
         finally
         {
-            Shutdown(-1);
+            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                desktop.Shutdown(-1);
+            else
+                Environment.Exit(-1);
         }
     }
 }

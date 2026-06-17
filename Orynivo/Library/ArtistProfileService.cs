@@ -7,22 +7,46 @@ using Orynivo;
 
 namespace Orynivo.Library;
 
+/// <summary>Downloaded artist biography and optional image from Wikipedia or Last.fm.</summary>
+/// <param name="Biography">Extracted biography text.</param>
+/// <param name="ImagePath">Absolute path to the downloaded artist image, or <see langword="null"/>.</param>
+/// <param name="SourceUrl">Canonical URL of the source page.</param>
+/// <param name="Language">BCP 47 language code of the content, e.g. <c>en</c>, <c>de</c>.</param>
 public sealed record ArtistProfileDownload(
     string Biography,
     string? ImagePath,
     string SourceUrl,
     string Language);
 
+/// <summary>
+/// Downloads artist biographies and images from Wikipedia or Last.fm.
+/// Falls back to Wikipedia when Last.fm returns no result.
+/// Throttles requests to avoid rate-limit errors.
+/// </summary>
 public static class ArtistProfileService
 {
     private static readonly HttpClient Client = CreateClient();
     private static readonly SemaphoreSlim _throttle = new(1, 1);
     private static DateTimeOffset _lastRequest = DateTimeOffset.MinValue;
 
+    /// <summary>Active biography and image source; configurable from settings.</summary>
     public static ArtistInfoSource Source { get; set; } = ArtistInfoSource.Wikipedia;
+
+    /// <summary>Last.fm API key; required when <see cref="Source"/> is <see cref="ArtistInfoSource.LastFm"/>.</summary>
     public static string? LastFmApiKey { get; set; }
+
+    /// <summary>Diagnostic message from the most recent image download attempt, or <see langword="null"/> on success.</summary>
     public static string? LastImageDiagnostic { get; private set; }
 
+    /// <summary>
+    /// Downloads a biography and optional image for the given artist from the configured source.
+    /// Returns <see langword="null"/> when the artist cannot be found or <paramref name="artistName"/> is empty.
+    /// </summary>
+    /// <param name="artistId">Database artist ID used to name the image file on disk.</param>
+    /// <param name="artistName">Artist name to search for.</param>
+    /// <param name="language">Preferred content language (<c>en</c>, <c>de</c>, or <c>fr</c>).</param>
+    /// <param name="downloadImage">Whether to also attempt downloading an artist image.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public static async Task<ArtistProfileDownload?> DownloadAsync(
         long artistId,
         string artistName,

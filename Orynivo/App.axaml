@@ -1,0 +1,253 @@
+<Application x:Class="Orynivo.App"
+             xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Styles>
+        <FluentTheme />
+        <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
+    </Application.Styles>
+    <Application.Resources>
+        <ResourceDictionary>
+            <!-- ── Theme brushes (overwritten at runtime by ThemeManager) ── -->
+            <SolidColorBrush x:Key="AppSidebarBrush"             Color="#13142A"/>
+            <SolidColorBrush x:Key="AppHeaderBrush"              Color="#13142A"/>
+            <SolidColorBrush x:Key="AppHeaderBorderBrush"        Color="#1E1F38"/>
+            <SolidColorBrush x:Key="AppContentBrush"             Color="#18192E"/>
+            <SolidColorBrush x:Key="AppSurfaceBrush"             Color="#20213A"/>
+            <SolidColorBrush x:Key="AppSurfaceHoverBrush"        Color="#292B47"/>
+            <SolidColorBrush x:Key="AppSurfaceSelectedBrush"     Color="#343654"/>
+            <SolidColorBrush x:Key="AppNavHoverBrush"            Color="#1F2038"/>
+            <SolidColorBrush x:Key="AppNavSelectedBrush"         Color="#252640"/>
+            <SolidColorBrush x:Key="AppNavTextBrush"             Color="#9999BB"/>
+            <SolidColorBrush x:Key="AppNavHoverTextBrush"        Color="#CCCCEE"/>
+            <SolidColorBrush x:Key="AppNavSelectedTextBrush"     Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="AppPrimaryTextBrush"         Color="#F7F7FF"/>
+            <SolidColorBrush x:Key="AppSecondaryTextBrush"       Color="#A0A0C8"/>
+            <SolidColorBrush x:Key="AppMutedTextBrush"           Color="#7777AA"/>
+            <SolidColorBrush x:Key="AppGridLineBrush"            Color="#2A2C46"/>
+            <SolidColorBrush x:Key="AppColumnHeaderBrush"        Color="#20213A"/>
+            <SolidColorBrush x:Key="AppTransportBrush"           Color="#13142A"/>
+            <SolidColorBrush x:Key="AppTransportBorderBrush"     Color="#1E1F38"/>
+            <SolidColorBrush x:Key="AppTransportPrimaryTextBrush" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="AppTransportButtonBrush"     Color="#252640"/>
+            <SolidColorBrush x:Key="AppTransportButtonHoverBrush" Color="#343654"/>
+            <SolidColorBrush x:Key="AppTransportButtonDisabledBrush" Color="#20213A"/>
+            <SolidColorBrush x:Key="AppTransportButtonTextBrush" Color="#CCCCEE"/>
+            <SolidColorBrush x:Key="AppTransportButtonHoverTextBrush" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="AppTransportButtonDisabledTextBrush" Color="#3A3A55"/>
+            <SolidColorBrush x:Key="AppTransportPlayBrush"       Color="#6C63FF"/>
+            <SolidColorBrush x:Key="AppTransportPlayHoverBrush"  Color="#7B73FF"/>
+            <SolidColorBrush x:Key="AppTransportPlayDisabledBrush" Color="#2A2B45"/>
+            <SolidColorBrush x:Key="AppTransportPlayDisabledTextBrush" Color="#3A3A55"/>
+            <SolidColorBrush x:Key="AppArtworkPlaceholderBrush"  Color="#252640"/>
+            <SolidColorBrush x:Key="AppScrollbarTrackBrush"      Color="#20213A"/>
+            <SolidColorBrush x:Key="AppScrollbarThumbBrush"      Color="#343654"/>
+            <SolidColorBrush x:Key="AppScrollbarThumbHoverBrush" Color="#45486B"/>
+            <SolidColorBrush x:Key="AppButtonBrush"              Color="#252640"/>
+            <SolidColorBrush x:Key="AppButtonHoverBrush"         Color="#343654"/>
+            <SolidColorBrush x:Key="AppButtonPressedBrush"       Color="#3E4162"/>
+            <SolidColorBrush x:Key="AppButtonTextBrush"          Color="#F7F7FF"/>
+            <SolidColorBrush x:Key="AppButtonBorderBrush"        Color="#343654"/>
+            <SolidColorBrush x:Key="AppInputBrush"               Color="#20213A"/>
+            <SolidColorBrush x:Key="AppInputBorderBrush"         Color="#343654"/>
+            <SolidColorBrush x:Key="AppDsdSupportedBrush"        Color="#F7F7FF"/>
+            <SolidColorBrush x:Key="AppDsdUnsupportedBrush"      Color="#5B5D79"/>
+            <SolidColorBrush x:Key="TreeViewItemForeground" Color="#A0A0C8"/>
+            <SolidColorBrush x:Key="TreeViewItemForegroundPointerOver" Color="#F7F7FF"/>
+            <SolidColorBrush x:Key="TreeViewItemForegroundPressed" Color="#F7F7FF"/>
+            <SolidColorBrush x:Key="TreeViewItemForegroundSelected" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="TreeViewItemBackgroundSelected" Color="#343654"/>
+            <SolidColorBrush x:Key="TreeViewItemBackgroundPointerOver" Color="#292B47"/>
+
+            <!-- ── Global control overrides ── -->
+
+            <!-- ContextMenu -->
+            <ControlTheme x:Key="{x:Type ContextMenu}" TargetType="ContextMenu">
+                <Setter Property="Background"      Value="{DynamicResource AppSurfaceBrush}"/>
+                <Setter Property="BorderBrush"     Value="{DynamicResource AppInputBorderBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Padding"         Value="0,4"/>
+            </ControlTheme>
+
+            <!-- MenuItem -->
+            <ControlTheme x:Key="{x:Type MenuItem}" TargetType="MenuItem">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+                <Setter Property="Padding"    Value="14,7"/>
+                <Setter Property="Template">
+                    <ControlTemplate>
+                        <Border Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter Content="{TemplateBinding Header}"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter>
+                <Style Selector="^:pointerover /template/ Border#Bd">
+                    <Setter Property="Background" Value="{DynamicResource AppSurfaceHoverBrush}"/>
+                </Style>
+                <Style Selector="^:disabled">
+                    <Setter Property="Foreground" Value="{DynamicResource AppMutedTextBrush}"/>
+                </Style>
+            </ControlTheme>
+
+            <!-- Separator -->
+            <ControlTheme x:Key="{x:Type Separator}" TargetType="Separator">
+                <Setter Property="Template">
+                    <ControlTemplate>
+                        <Border Height="1" Margin="8,4"
+                                Background="{DynamicResource AppGridLineBrush}"/>
+                    </ControlTemplate>
+                </Setter>
+            </ControlTheme>
+
+            <!-- ScrollBar Thumb -->
+            <ControlTheme x:Key="AppScrollBarThumb" TargetType="Thumb">
+                <Setter Property="Template">
+                    <ControlTemplate>
+                        <Border Name="ThumbBd" Margin="2"
+                                Background="{DynamicResource AppScrollbarThumbBrush}"
+                                CornerRadius="5"/>
+                    </ControlTemplate>
+                </Setter>
+                <Style Selector="^:pointerover /template/ Border#ThumbBd">
+                    <Setter Property="Background" Value="{DynamicResource AppScrollbarThumbHoverBrush}"/>
+                </Style>
+            </ControlTheme>
+
+            <!-- ScrollBar -->
+            <ControlTheme x:Key="{x:Type ScrollBar}" TargetType="ScrollBar">
+                <Setter Property="Width"      Value="16"/>
+                <Setter Property="MinWidth"   Value="16"/>
+                <Setter Property="Background" Value="{DynamicResource AppScrollbarTrackBrush}"/>
+                <Setter Property="Template">
+                    <ControlTemplate>
+                        <Grid Background="{TemplateBinding Background}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="18"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="18"/>
+                            </Grid.RowDefinitions>
+                            <RepeatButton Grid.Row="0" Background="Transparent"
+                                          BorderThickness="0" Focusable="False">
+                                <Path Width="7" Height="4" Data="M 0 4 L 3.5 0 L 7 4"
+                                      Stroke="{DynamicResource AppScrollbarThumbBrush}"
+                                      StrokeThickness="1.5"/>
+                            </RepeatButton>
+                            <Track Name="PART_Track" Grid.Row="1" IsDirectionReversed="True">
+                                <Track.DecreaseButton>
+                                    <RepeatButton Opacity="0" Focusable="False"/>
+                                </Track.DecreaseButton>
+                                <Track.Thumb>
+                                    <Thumb MinHeight="42"
+                                           Theme="{StaticResource AppScrollBarThumb}"/>
+                                </Track.Thumb>
+                                <Track.IncreaseButton>
+                                    <RepeatButton Opacity="0" Focusable="False"/>
+                                </Track.IncreaseButton>
+                            </Track>
+                            <RepeatButton Grid.Row="2" Background="Transparent"
+                                          BorderThickness="0" Focusable="False">
+                                <Path Width="7" Height="4" Data="M 0 0 L 3.5 4 L 7 0"
+                                      Stroke="{DynamicResource AppScrollbarThumbBrush}"
+                                      StrokeThickness="1.5"/>
+                            </RepeatButton>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter>
+            </ControlTheme>
+
+            <!-- ── Localisation string resources (initial German; overwritten by LocalizationManager) ── -->
+            <x:String x:Key="L_LocalLibrary">LOKALE BIBLIOTHEK</x:String>
+            <x:String x:Key="L_Artists">Künstler</x:String>
+            <x:String x:Key="L_Albums">Alben</x:String>
+            <x:String x:Key="L_Tracks">Tracks</x:String>
+            <x:String x:Key="L_Title">Titel</x:String>
+            <x:String x:Key="L_Artist">Künstler</x:String>
+            <x:String x:Key="L_Album">Album</x:String>
+            <x:String x:Key="L_Duration">Dauer</x:String>
+            <x:String x:Key="L_CwAsioOutputDevice">cwASIO-Ausgabegerät</x:String>
+            <x:String x:Key="L_DailyHistoryTitle">Hörverlauf</x:String>
+            <x:String x:Key="L_PlayedAt">Gehört um</x:String>
+            <x:String x:Key="L_ListenedDuration">Gehört</x:String>
+            <x:String x:Key="L_MediaType">Typ</x:String>
+            <x:String x:Key="L_Close">Schließen</x:String>
+            <x:String x:Key="L_DailyHistoryNoEntries">Für diesen Tag sind keine Wiedergaben vorhanden.</x:String>
+            <x:String x:Key="L_FolderStructure">Ordnerstruktur</x:String>
+            <x:String x:Key="L_Playlists">PLAYLISTS</x:String>
+            <x:String x:Key="L_Settings">⚙   Einstellungen</x:String>
+            <x:String x:Key="L_Table">Tabelle</x:String>
+            <x:String x:Key="L_Artwork">Artwork</x:String>
+            <x:String x:Key="L_Appearance">Darstellung</x:String>
+            <x:String x:Key="L_ColorScheme">Farbschema</x:String>
+            <x:String x:Key="L_Language">Sprache</x:String>
+            <x:String x:Key="L_Playback">WIEDERGABE</x:String>
+            <x:String x:Key="L_OutputDevice">Ausgabegerät</x:String>
+            <x:String x:Key="L_Library">BIBLIOTHEK</x:String>
+            <x:String x:Key="L_Directories">Verzeichnisse</x:String>
+            <x:String x:Key="L_AddDirectory">+ Verzeichnis hinzufügen</x:String>
+            <x:String x:Key="L_Streaming">STREAMING</x:String>
+            <x:String x:Key="L_StreamingServices">Streamingdienste</x:String>
+            <x:String x:Key="L_Qobuz">Qobuz</x:String>
+            <x:String x:Key="L_QobuzApplicationId">Qobuz-Anwendungs-ID</x:String>
+            <x:String x:Key="L_QobuzIntegrationHint">Die Qobuz-Integration ist vorbereitet. Katalog und Wiedergabe werden nach Freigabe des Partnerzugangs aktiviert.</x:String>
+            <x:String x:Key="L_QobuzCredentialsHint">Geheime Schlüssel und Anmeldetokens werden benutzergebunden durch Windows geschützt.</x:String>
+            <x:String x:Key="L_DatabaseMaintenance">Datenbankwartung</x:String>
+            <x:String x:Key="L_LibraryBackup">Bibliothek sichern</x:String>
+            <x:String x:Key="L_LibraryBackupHint">Datenbank, Playlists, Verlauf und Cover als ZIP exportieren. Audiodateien sind nicht enthalten.</x:String>
+            <x:String x:Key="L_ExportLibrary">Bibliothek exportieren</x:String>
+            <x:String x:Key="L_ImportLibrary">Bibliothek importieren</x:String>
+            <x:String x:Key="L_Lyrics">Songtext</x:String>
+            <x:String x:Key="L_ShowLyrics">Songtext anzeigen</x:String>
+            <x:String x:Key="L_RefreshLyrics">Songtext neu laden</x:String>
+            <x:String x:Key="L_CloseLyrics">Songtext schließen</x:String>
+            <x:String x:Key="L_ArtistInfo">Künstlerinfo</x:String>
+            <x:String x:Key="L_ShowArtistInfo">Künstlerinfo anzeigen</x:String>
+            <x:String x:Key="L_RefreshArtistInfo">Künstlerinfo neu laden</x:String>
+            <x:String x:Key="L_CloseArtistInfo">Künstlerinfo schließen</x:String>
+            <x:String x:Key="L_ArtistInfoSource">Quelle: Wikipedia</x:String>
+            <x:String x:Key="L_SearchArtistImage">Künstlerbild suchen</x:String>
+            <x:String x:Key="L_ArtistImageSearchTitle">Künstlerbild suchen</x:String>
+            <x:String x:Key="L_ArtistImageSearchRunning">Passende Künstlerbilder werden gesucht …</x:String>
+            <x:String x:Key="L_ArtistImageSearchNoResults">Keine Künstlerbilder gefunden.</x:String>
+            <x:String x:Key="L_ArtistImageSearchQuery">Suchbegriff</x:String>
+            <x:String x:Key="L_ArtistImageSearchFailed">Die Künstlerbildsuche ist fehlgeschlagen.</x:String>
+            <x:String x:Key="L_UseSelectedArtistImage">Ausgewähltes Bild übernehmen</x:String>
+            <x:String x:Key="L_ArtistImageDownloadFailed">Das ausgewählte Künstlerbild konnte nicht gespeichert werden.</x:String>
+            <x:String x:Key="L_EditArtistName">Künstlername ändern</x:String>
+            <x:String x:Key="L_ArtistName">Künstlername</x:String>
+            <x:String x:Key="L_RenameArtist">Umbenennen</x:String>
+            <x:String x:Key="L_MergeArtistsTitle">Künstler zusammenführen</x:String>
+            <x:String x:Key="L_Shuffle">Zufallswiedergabe</x:String>
+            <x:String x:Key="L_SearchLyrics">Songtext suchen</x:String>
+            <x:String x:Key="L_LyricsSearchTitle">Songtext suchen</x:String>
+            <x:String x:Key="L_LyricsSearchRunning">Passende Songtexte werden gesucht …</x:String>
+            <x:String x:Key="L_LyricsSearchNoResults">Keine passenden Songtexte gefunden.</x:String>
+            <x:String x:Key="L_LyricsSearchFailed">Die Songtextsuche ist fehlgeschlagen.</x:String>
+            <x:String x:Key="L_UseSelectedLyrics">Ausgewählten Songtext übernehmen</x:String>
+            <x:String x:Key="L_SelectLyricsResult">Wähle links einen Songtext für die Vorschau aus.</x:String>
+            <x:String x:Key="L_ShowAllAlbumTracks">Alle Tracks des Albums anzeigen</x:String>
+            <x:String x:Key="L_OptimizeDatabase">Datenbank optimieren</x:String>
+            <x:String x:Key="L_RepairAlbumArtwork">Album-Cover reparieren</x:String>
+            <x:String x:Key="L_Save">Speichern</x:String>
+            <x:String x:Key="L_Cancel">Abbrechen</x:String>
+            <x:String x:Key="L_About">Über Orynivo</x:String>
+            <x:String x:Key="L_Author">Autor</x:String>
+            <x:String x:Key="L_Licenses">Lizenzen</x:String>
+            <x:String x:Key="L_DeviceInfo">Geräteinformationen</x:String>
+            <x:String x:Key="L_DevicePcmSampleRates">PCM-Abtastraten</x:String>
+            <x:String x:Key="L_DeviceDsdRates">DSD-Raten</x:String>
+            <x:String x:Key="L_DevicePcmFormats">PCM-Formate</x:String>
+            <x:String x:Key="L_DeviceDsdFormats">DSD-Formate</x:String>
+            <x:String x:Key="L_NewPlaylistDialogTitle">Neue Playlist</x:String>
+            <x:String x:Key="L_NewPlaylistNameLabel">Playlist-Name</x:String>
+            <x:String x:Key="L_CreatePlaylist">Erstellen</x:String>
+            <x:String x:Key="L_PlexServerDialogTitle">Plex-Server konfigurieren</x:String>
+            <x:String x:Key="L_PlexServerName">Servername</x:String>
+            <x:String x:Key="L_PlexServerUrl">Server-URL</x:String>
+            <x:String x:Key="L_PlexToken">Plex-Token</x:String>
+            <x:String x:Key="L_PlexTestConnection">Verbindung testen</x:String>
+            <x:String x:Key="L_StartupPreparingLibrary">Bibliothek wird vorbereitet …</x:String>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

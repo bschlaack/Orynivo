@@ -4,10 +4,26 @@ using System.Text.Json;
 
 namespace Orynivo.Library;
 
+/// <summary>A cover-art search result from MusicBrainz and the Cover Art Archive.</summary>
+/// <param name="ReleaseId">MusicBrainz release UUID.</param>
+/// <param name="Title">Album title as returned by MusicBrainz.</param>
+/// <param name="Artist">First credited artist, or <see langword="null"/> if unavailable.</param>
+/// <param name="ImageData">Raw image bytes downloaded from the Cover Art Archive.</param>
+/// <param name="MimeType">MIME type reported by the Cover Art Archive response.</param>
 public sealed record CoverSearchResult(string ReleaseId, string Title, string? Artist, byte[] ImageData, string? MimeType);
 
+/// <summary>
+/// Searches MusicBrainz by album title and downloads front-cover images from the Cover Art Archive.
+/// </summary>
 public static class MusicBrainzCoverSearch
 {
+    /// <summary>
+    /// Queries MusicBrainz for releases matching <paramref name="albumTitle"/> and fetches up to
+    /// 12 front-cover images from the Cover Art Archive.
+    /// </summary>
+    /// <param name="albumTitle">Album title to search for.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Matched releases for which a front cover was available.</returns>
     public static async Task<List<CoverSearchResult>> SearchByAlbumTitleAsync(
         string albumTitle,
         CancellationToken cancellationToken = default)

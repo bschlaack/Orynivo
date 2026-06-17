@@ -12,10 +12,21 @@ using IODirectory = System.IO.Directory;
 
 namespace Orynivo.Library;
 
+/// <summary>Category-split search results returned by <see cref="TrackSearchIndex.SearchByCategory"/>.</summary>
+/// <param name="Tracks">Track-field hits.</param>
+/// <param name="Albums">Album-field hits.</param>
+/// <param name="Artists">Artist-field hits.</param>
 public sealed record SearchResultIds(SearchHitIds Tracks, SearchHitIds Albums, SearchHitIds Artists);
 
+/// <summary>Ordered list of database IDs and their Lucene relevance scores from a single-category search.</summary>
+/// <param name="Ids">Database IDs in score-descending order.</param>
+/// <param name="Scores">Relevance score keyed by database ID.</param>
 public sealed record SearchHitIds(List<long> Ids, IReadOnlyDictionary<long, float> Scores);
 
+/// <summary>
+/// Manages a Lucene.NET full-text index under <c>%LOCALAPPDATA%\Orynivo\search-index\</c>.
+/// Supports partial-word matching and German umlaut/eszett normalisation across title, album, and artist fields.
+/// </summary>
 public static class TrackSearchIndex
 {
     private const LuceneVersion Version = LuceneVersion.LUCENE_48;
@@ -23,9 +34,11 @@ public static class TrackSearchIndex
 
     private static string Root => AppPaths.GetDataPath("search-index");
 
+    /// <summary>Returns <see langword="true"/> when the index directory exists and contains files.</summary>
     public static bool Exists()
         => IODirectory.Exists(Root) && IODirectory.EnumerateFiles(Root).Any();
 
+    /// <summary>Returns <see langword="true"/> when the index contains no documents.</summary>
     public static bool IsEmpty()
     {
         if (!Exists())
@@ -39,6 +52,7 @@ public static class TrackSearchIndex
         return reader.NumDocs == 0;
     }
 
+    /// <summary>Returns <see langword="true"/> when the index schema version matches the current version.</summary>
     public static bool IsCurrent()
     {
         if (IsEmpty())
@@ -53,6 +67,9 @@ public static class TrackSearchIndex
         return doc.Get("schema") == SchemaVersion;
     }
 
+    /// <summary>Deletes the existing index and rebuilds it from <paramref name="tracks"/>.</summary>
+    /// <param name="tracks">All tracks to index.</param>
+    /// <param name="progress">Optional callback receiving (current, total, fileName).</param>
     public static void Rebuild(
         IEnumerable<TrackRecord> tracks,
         Action<int, int, string?>? progress = null)
@@ -79,6 +96,8 @@ public static class TrackSearchIndex
         writer.Commit();
     }
 
+    /// <summary>Upserts index documents for the given tracks without a full rebuild.</summary>
+    /// <param name="tracks">Tracks to add or update.</param>
     public static void UpdateMany(IEnumerable<TrackRecord> tracks)
     {
         IODirectory.CreateDirectory(Root);
@@ -91,6 +110,12 @@ public static class TrackSearchIndex
         writer.Commit();
     }
 
+    /// <summary>
+    /// Removes index documents for paths under <paramref name="rootPath"/> that are not in
+    /// <paramref name="existingPaths"/>, keeping the index consistent after a rescan.
+    /// </summary>
+    /// <param name="rootPath">Library root that was scanned.</param>
+    /// <param name="existingPaths">Paths still present on disk after the scan.</param>
     public static void RemoveMissingUnderRoot(string rootPath, IEnumerable<string> existingPaths)
     {
         if (!Exists())
@@ -118,6 +143,9 @@ public static class TrackSearchIndex
         writer.Commit();
     }
 
+    /// <summary>Searches all index fields and returns matching track database IDs in relevance order.</summary>
+    /// <param name="queryText">Free-text query; partial words are matched.</param>
+    /// <param name="maxResults">Maximum number of results to return.</param>
     public static List<long> Search(string queryText, int maxResults = 500)
     {
         if (string.IsNullOrWhiteSpace(queryText) || !Exists())
@@ -142,6 +170,11 @@ public static class TrackSearchIndex
         return result;
     }
 
+    /// <summary>
+    /// Searches the index per category (tracks, albums, artists) and returns scored IDs for each.
+    /// </summary>
+    /// <param name="queryText">Free-text query; partial words are matched.</param>
+    /// <param name="maxResults">Maximum results per category.</param>
     public static SearchResultIds SearchByCategory(string queryText, int maxResults = 500)
     {
         if (string.IsNullOrWhiteSpace(queryText) || !Exists())
