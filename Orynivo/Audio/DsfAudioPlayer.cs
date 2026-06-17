@@ -17,13 +17,14 @@ public sealed class DsfAudioPlayer : IAudioPlayer
     private readonly SteinbergAsioStream _stream;
     private readonly FileStream _file;
     private readonly CancellationTokenSource _cts = new();
+    private readonly SemaphoreSlim _seekGate = new(1, 1);
     private readonly Task _pumpTask;
     private readonly int _channels;
     private readonly int _blockSizePerChannel;
     private readonly long _dataStartPosition;
     private readonly long _dataLength;
     private readonly AudioFileInfo _info;
-    private bool _paused;
+    private volatile bool _paused;
     private bool _disposed;
 
     private DsfAudioPlayer(
@@ -101,12 +102,19 @@ public sealed class DsfAudioPlayer : IAudioPlayer
     /// <inheritdoc/>
     public void Resume() => _paused = false;
     /// <inheritdoc/>
-    public Task SeekAsync(TimeSpan position)
+    public async Task SeekAsync(TimeSpan position)
     {
         var byteOffsetPerChannel = (long)(Math.Clamp(position.TotalSeconds, 0, Duration.TotalSeconds) * _info.SourceSampleRate / 8);
         byteOffsetPerChannel -= byteOffsetPerChannel % _blockSizePerChannel;
-        _file.Position = _dataStartPosition + (byteOffsetPerChannel * _channels);
-        return Task.CompletedTask;
+        await _seekGate.WaitAsync(_cts.Token).ConfigureAwait(false);
+        try
+        {
+            _file.Position = _dataStartPosition + (byteOffsetPerChannel * _channels);
+        }
+        finally
+        {
+            _seekGate.Release();
+        }
     }
 
     public void Dispose()
@@ -127,6 +135,7 @@ public sealed class DsfAudioPlayer : IAudioPlayer
 
         _file.Dispose();
         _stream.Dispose();
+        _seekGate.Dispose();
         _cts.Dispose();
         _disposed = true;
     }
@@ -145,17 +154,23 @@ public sealed class DsfAudioPlayer : IAudioPlayer
                 continue;
             }
 
-            var bytesRemaining = dataEndPosition - _file.Position;
-            if (bytesRemaining < planarBlock.Length)
+            await _seekGate.WaitAsync(_cts.Token).ConfigureAwait(false);
+            int bytesRead;
+            try
             {
-                break;
+                if (dataEndPosition - _file.Position < planarBlock.Length)
+                    break;
+                bytesRead = await _file.ReadAtLeastAsync(
+                    planarBlock,
+                    planarBlock.Length,
+                    throwOnEndOfStream: false,
+                    _cts.Token).ConfigureAwait(false);
+            }
+            finally
+            {
+                _seekGate.Release();
             }
 
-            var bytesRead = await _file.ReadAtLeastAsync(
-                planarBlock,
-                planarBlock.Length,
-                throwOnEndOfStream: false,
-                _cts.Token).ConfigureAwait(false);
             if (bytesRead != planarBlock.Length)
             {
                 break;

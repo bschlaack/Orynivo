@@ -4,6 +4,19 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- Fixed a race condition in the DFF and DSF audio players where `SeekAsync`
+  could write to `FileStream.Position` while `PumpAsync` was concurrently
+  reading from the same stream, causing corrupted reads or exceptions.
+  A `SemaphoreSlim` now serialises file seeks and reads, matching the guard
+  already used by the WASAPI and FFmpeg ASIO players.
+- Fixed a missing `volatile` modifier on the `_paused` field in the DFF, DSF,
+  and FFmpeg ASIO players, which could prevent pause/resume from taking effect
+  immediately due to CPU cache visibility.
+
 ## [0.4.0] - 2026-06-15
 
 ### Fixed

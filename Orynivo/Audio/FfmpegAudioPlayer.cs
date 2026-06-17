@@ -19,7 +19,7 @@ public sealed class FfmpegAudioPlayer : IAudioPlayer
     private readonly SemaphoreSlim _processGate = new(1, 1);
     private readonly Task _pumpTask;
     private Process _process;
-    private bool _paused;
+    private volatile bool _paused;
     private long _framesWritten;
     private bool _disposed;
 

@@ -14,12 +14,13 @@ public sealed class DffAudioPlayer : IAudioPlayer
     private readonly SteinbergAsioStream _stream;
     private readonly FileStream _file;
     private readonly CancellationTokenSource _cts = new();
+    private readonly SemaphoreSlim _seekGate = new(1, 1);
     private readonly Task _pumpTask;
     private readonly long _dataEndPosition;
     private readonly long _dataStartPosition;
     private readonly int _channels;
     private readonly AudioFileInfo _info;
-    private bool _paused;
+    private volatile bool _paused;
     private bool _disposed;
 
     private DffAudioPlayer(
@@ -93,12 +94,19 @@ public sealed class DffAudioPlayer : IAudioPlayer
     /// <inheritdoc/>
     public void Resume() => _paused = false;
     /// <inheritdoc/>
-    public Task SeekAsync(TimeSpan position)
+    public async Task SeekAsync(TimeSpan position)
     {
         var bytes = (long)(Math.Clamp(position.TotalSeconds, 0, Duration.TotalSeconds) * _info.SourceSampleRate / 8) * _channels;
         bytes -= bytes % _channels;
-        _file.Position = _dataStartPosition + bytes;
-        return Task.CompletedTask;
+        await _seekGate.WaitAsync(_cts.Token).ConfigureAwait(false);
+        try
+        {
+            _file.Position = _dataStartPosition + bytes;
+        }
+        finally
+        {
+            _seekGate.Release();
+        }
     }
 
     public void Dispose()
@@ -119,6 +127,7 @@ public sealed class DffAudioPlayer : IAudioPlayer
 
         _file.Dispose();
         _stream.Dispose();
+        _seekGate.Dispose();
         _cts.Dispose();
         _disposed = true;
     }
@@ -134,9 +143,20 @@ public sealed class DffAudioPlayer : IAudioPlayer
                 await Task.Delay(10, _cts.Token).ConfigureAwait(false);
                 continue;
             }
-            var remaining = _dataEndPosition - _file.Position;
-            var bytesToRead = (int)Math.Min(buffer.Length, remaining);
-            var bytesRead = await _file.ReadAsync(buffer.AsMemory(0, bytesToRead), _cts.Token).ConfigureAwait(false);
+
+            await _seekGate.WaitAsync(_cts.Token).ConfigureAwait(false);
+            int bytesRead;
+            try
+            {
+                var remaining = _dataEndPosition - _file.Position;
+                var bytesToRead = (int)Math.Min(buffer.Length, remaining);
+                bytesRead = await _file.ReadAsync(buffer.AsMemory(0, bytesToRead), _cts.Token).ConfigureAwait(false);
+            }
+            finally
+            {
+                _seekGate.Release();
+            }
+
             if (bytesRead == 0)
             {
                 break;
