@@ -5,6 +5,16 @@ using System.Text.Json.Serialization;
 
 namespace Orynivo.Library;
 
+/// <summary>A radio station entry returned by the Radio Browser API.</summary>
+/// <param name="StationUuid">Stable Radio Browser station UUID.</param>
+/// <param name="Name">Display name of the station.</param>
+/// <param name="StreamUrl">Direct playback URL.</param>
+/// <param name="Homepage">Optional station homepage.</param>
+/// <param name="Favicon">Optional logo URL.</param>
+/// <param name="CountryCode">ISO 3166-1 alpha-2 country code.</param>
+/// <param name="Codec">Audio codec, e.g. <c>MP3</c>.</param>
+/// <param name="Bitrate">Stream bitrate in kbps.</param>
+/// <param name="Tags">Comma-separated genre and keyword tags.</param>
 public sealed record RadioBrowserStation(
     string StationUuid,
     string Name,
@@ -16,13 +26,27 @@ public sealed record RadioBrowserStation(
     int Bitrate,
     string? Tags);
 
+/// <summary>A genre tag from the Radio Browser tag statistics endpoint.</summary>
+/// <param name="Name">Raw tag name.</param>
+/// <param name="StationCount">Number of active stations carrying this tag.</param>
 public sealed record RadioBrowserTag(string Name, int StationCount);
 
+/// <summary>
+/// Client for the Radio Browser community directory.
+/// Performs mirror discovery via DNS, searches stations, and registers click events.
+/// </summary>
 public sealed class RadioBrowserService
 {
     private static readonly HttpClient HttpClient = CreateHttpClient();
     private IReadOnlyList<string>? _servers;
 
+    /// <summary>
+    /// Searches Radio Browser stations by optional name text and/or genre tags.
+    /// When <paramref name="tags"/> are provided each tag is queried independently and results are deduplicated.
+    /// </summary>
+    /// <param name="searchText">Optional free-text name filter.</param>
+    /// <param name="tags">Optional genre tags; each tag may return up to 10,000 stations.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public async Task<IReadOnlyList<RadioBrowserStation>> SearchAsync(
         string? searchText,
         IReadOnlyCollection<string>? tags = null,
@@ -71,6 +95,9 @@ public sealed class RadioBrowserService
             .ToList();
     }
 
+    /// <summary>Notifies Radio Browser of a station click to update its popularity counter. Silently ignored on failure.</summary>
+    /// <param name="stationUuid">UUID of the station that started playing.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public async Task RegisterClickAsync(string stationUuid, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(stationUuid))
@@ -88,6 +115,8 @@ public sealed class RadioBrowserService
         }
     }
 
+    /// <summary>Returns the complete Radio Browser tag statistics, sorted by station count descending.</summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public async Task<IReadOnlyList<RadioBrowserTag>> GetTagsAsync(
         CancellationToken cancellationToken = default)
     {

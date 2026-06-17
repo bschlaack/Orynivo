@@ -3,6 +3,12 @@ using System.IO;
 
 namespace Orynivo.Audio;
 
+/// <summary>
+/// Plays DFF (DSDIFF) files as native DSD via <see cref="SteinbergAsioStream"/>.
+/// Reads the DSDIFF chunk structure, bit-reverses each byte on the fly, and streams
+/// interleaved DSD bytes directly to the ASIO driver.
+/// Use <see cref="CreateAsync"/> to construct an instance.
+/// </summary>
 public sealed class DffAudioPlayer : IAudioPlayer
 {
     private readonly SteinbergAsioStream _stream;
@@ -30,6 +36,15 @@ public sealed class DffAudioPlayer : IAudioPlayer
         _pumpTask = Task.Run(PumpAsync);
     }
 
+    /// <summary>
+    /// Opens the DFF file, parses its DSDIFF header, initialises an ASIO stream in DSD mode,
+    /// and returns the ready-to-play player together with the probed file info.
+    /// </summary>
+    /// <param name="filePath">Absolute path to the <c>.dff</c> file.</param>
+    /// <param name="backend">ASIO backend to use (<see cref="OutputBackend.Asio"/> or <see cref="OutputBackend.CwAsio"/>).</param>
+    /// <param name="driverName">Name of the ASIO driver as returned by <see cref="SteinbergAsioStream.GetDriverNames"/>.</param>
+    /// <param name="cancellationToken">Cancellation token for the async header read.</param>
+    /// <exception cref="NotSupportedException">Thrown for non-stereo or DST-compressed DFF files.</exception>
     public static async Task<(DffAudioPlayer AudioPlayer, AudioFileInfo Info)> CreateAsync(
         string filePath,
         OutputBackend backend,
@@ -61,14 +76,23 @@ public sealed class DffAudioPlayer : IAudioPlayer
         }
     }
 
+    /// <inheritdoc/>
     public async Task WaitForCompletionAsync() => await _pumpTask.ConfigureAwait(false);
+    /// <inheritdoc/>
     public TimeSpan Duration => _info.Duration;
+    /// <inheritdoc/>
     public TimeSpan Position => TimeSpan.FromSeconds((double)Math.Max(0, _file.Position - _dataStartPosition) * 8 / _channels / _info.SourceSampleRate);
+    /// <inheritdoc/>
     public bool IsPaused => _paused;
+    /// <inheritdoc/>
     public bool CanSeek => true;
+    /// <inheritdoc/>
     public float Volume { get; set; } = 1.0f;
+    /// <inheritdoc/>
     public void Pause() => _paused = true;
+    /// <inheritdoc/>
     public void Resume() => _paused = false;
+    /// <inheritdoc/>
     public Task SeekAsync(TimeSpan position)
     {
         var bytes = (long)(Math.Clamp(position.TotalSeconds, 0, Duration.TotalSeconds) * _info.SourceSampleRate / 8) * _channels;

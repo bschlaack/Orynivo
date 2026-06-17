@@ -6,6 +6,13 @@ using System.Text.RegularExpressions;
 
 namespace Orynivo.Library;
 
+/// <summary>A single image result from a Wikimedia Commons search.</summary>
+/// <param name="Title">Cleaned file title (without "File:" prefix or extension).</param>
+/// <param name="Attribution">Attribution text from the image metadata, or <see langword="null"/>.</param>
+/// <param name="License">Short licence identifier, e.g. <c>CC BY-SA 4.0</c>, or <see langword="null"/>.</param>
+/// <param name="SourceUrl">Wikimedia Commons description page URL.</param>
+/// <param name="ImageData">Raw image bytes of the 600 px thumbnail.</param>
+/// <param name="MimeType">MIME type of <paramref name="ImageData"/>.</param>
 public sealed record ArtistImageSearchResult(
     string Title,
     string? Attribution,
@@ -14,10 +21,16 @@ public sealed record ArtistImageSearchResult(
     byte[] ImageData,
     string? MimeType);
 
+/// <summary>
+/// Searches Wikimedia Commons for artist images and downloads 600 px thumbnails.
+/// </summary>
 public static class ArtistImageSearchService
 {
     private static readonly HttpClient Client = CreateClient();
 
+    /// <summary>Searches Wikimedia Commons for images matching <paramref name="query"/> and returns up to 12 results.</summary>
+    /// <param name="query">Free-text search query.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public static async Task<List<ArtistImageSearchResult>> SearchAsync(
         string query,
         CancellationToken cancellationToken = default)
@@ -88,6 +101,14 @@ public static class ArtistImageSearchService
         return results;
     }
 
+    /// <summary>
+    /// Writes the image from <paramref name="result"/> to the artist-images directory, replacing any existing
+    /// image for <paramref name="artistId"/>, and returns the saved file path.
+    /// </summary>
+    /// <param name="artistId">Database artist ID used as the file name stem.</param>
+    /// <param name="result">Image to save.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Absolute path of the saved image file.</returns>
     public static async Task<string> SaveAsync(
         long artistId,
         ArtistImageSearchResult result,

@@ -1,5 +1,9 @@
 namespace Orynivo.Localization;
 
+/// <summary>
+/// Holds all localised UI strings for a single language.
+/// One instance per language is created in <see cref="LocalizationManager"/>.
+/// </summary>
 public sealed record LocalizedStrings(
     string LocalLibrary,
     string Artists,

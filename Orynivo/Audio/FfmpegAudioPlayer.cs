@@ -5,6 +5,11 @@ using System.Text.Json;
 
 namespace Orynivo.Audio;
 
+/// <summary>
+/// Plays audio files via ffmpeg decoded to 32-bit float PCM and streamed to an ASIO device
+/// using <see cref="SteinbergAsioStream"/>. Tracks playback position against rendered sample
+/// frames. Use <see cref="CreateAsync"/> to construct an instance.
+/// </summary>
 public sealed class FfmpegAudioPlayer : IAudioPlayer
 {
     private readonly SteinbergAsioStream _stream;
@@ -27,12 +32,25 @@ public sealed class FfmpegAudioPlayer : IAudioPlayer
         _pumpTask = Task.Run(PumpAsync);
     }
 
+    /// <inheritdoc/>
     public TimeSpan Duration => _info.Duration;
+    /// <inheritdoc/>
     public TimeSpan Position => TimeSpan.FromSeconds((double)Interlocked.Read(ref _framesWritten) / _info.OutputSampleRate);
+    /// <inheritdoc/>
     public bool IsPaused => _paused;
+    /// <inheritdoc/>
     public bool CanSeek => Duration > TimeSpan.Zero;
+    /// <inheritdoc/>
     public float Volume { get; set; } = 1.0f;
 
+    /// <summary>
+    /// Probes the file with ffprobe, opens an ASIO stream, launches the ffmpeg decode pipeline,
+    /// and returns the ready-to-play player together with the probed file info.
+    /// </summary>
+    /// <param name="filePath">Absolute path to the audio file to play.</param>
+    /// <param name="backend">ASIO backend to use (<see cref="OutputBackend.Asio"/> or <see cref="OutputBackend.CwAsio"/>).</param>
+    /// <param name="driverName">Name of the ASIO driver as returned by <see cref="SteinbergAsioStream.GetDriverNames"/>.</param>
+    /// <param name="cancellationToken">Cancellation token for the ffprobe probe step.</param>
     public static async Task<(FfmpegAudioPlayer AudioPlayer, AudioFileInfo Info)> CreateAsync(
         string filePath,
         OutputBackend backend,
@@ -45,9 +63,12 @@ public sealed class FfmpegAudioPlayer : IAudioPlayer
         return (new FfmpegAudioPlayer(stream, StartFfmpeg(filePath, info.OutputSampleRate, TimeSpan.Zero), filePath, info), info);
     }
 
+    /// <inheritdoc/>
     public void Pause() => _paused = true;
+    /// <inheritdoc/>
     public void Resume() => _paused = false;
 
+    /// <inheritdoc/>
     public async Task SeekAsync(TimeSpan position)
     {
         if (!CanSeek) return;
@@ -63,6 +84,7 @@ public sealed class FfmpegAudioPlayer : IAudioPlayer
         finally { _processGate.Release(); }
     }
 
+    /// <inheritdoc/>
     public async Task WaitForCompletionAsync() => await _pumpTask.ConfigureAwait(false);
 
     public void Dispose()

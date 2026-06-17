@@ -1,5 +1,9 @@
 namespace Orynivo.Audio;
 
+/// <summary>
+/// Feeds a continuous sine wave into a <see cref="SteinbergAsioStream"/> for ASIO device testing.
+/// Dispose to stop the feed.
+/// </summary>
 public sealed class SineWaveFeeder : IDisposable
 {
     private readonly SteinbergAsioStream _stream;
@@ -7,6 +11,10 @@ public sealed class SineWaveFeeder : IDisposable
     private readonly Task _worker;
     private double _phase;
 
+    /// <summary>Starts feeding a sine wave into <paramref name="stream"/>.</summary>
+    /// <param name="stream">The ASIO stream to write into.</param>
+    /// <param name="frequencyHz">Sine wave frequency in Hz.</param>
+    /// <param name="gain">Amplitude scale factor (0.0–1.0).</param>
     public SineWaveFeeder(SteinbergAsioStream stream, double frequencyHz = 440, float gain = 0.05f)
     {
         _stream = stream;
@@ -15,7 +23,10 @@ public sealed class SineWaveFeeder : IDisposable
         _worker = Task.Run(FeedLoopAsync);
     }
 
+    /// <summary>Sine wave frequency in Hz.</summary>
     public double FrequencyHz { get; }
+
+    /// <summary>Amplitude scale factor.</summary>
     public float Gain { get; }
 
     public void Dispose()

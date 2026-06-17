@@ -8,6 +8,11 @@ using Size = System.Windows.Size;
 
 namespace Orynivo.Controls;
 
+/// <summary>
+/// A virtualizing WPF panel that arranges items in a wrapping grid and implements
+/// <see cref="IScrollInfo"/> for smooth vertical scrolling. Only items within the
+/// visible viewport are realised by the item container generator.
+/// </summary>
 public sealed class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
 {
     private Size _extent;
@@ -15,22 +20,26 @@ public sealed class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
     private Point _offset;
     private ScrollViewer? _scrollOwner;
 
+    /// <summary>Gets or sets the fixed width of every item cell in device-independent pixels.</summary>
     public double ItemWidth
     {
         get => (double)GetValue(ItemWidthProperty);
         set => SetValue(ItemWidthProperty, value);
     }
 
+    /// <summary>Dependency property backing <see cref="ItemWidth"/>.</summary>
     public static readonly DependencyProperty ItemWidthProperty =
         DependencyProperty.Register(nameof(ItemWidth), typeof(double), typeof(VirtualizingWrapPanel),
             new FrameworkPropertyMetadata(200d, FrameworkPropertyMetadataOptions.AffectsMeasure));
 
+    /// <summary>Gets or sets the fixed height of every item cell in device-independent pixels.</summary>
     public double ItemHeight
     {
         get => (double)GetValue(ItemHeightProperty);
         set => SetValue(ItemHeightProperty, value);
     }
 
+    /// <summary>Dependency property backing <see cref="ItemHeight"/>.</summary>
     public static readonly DependencyProperty ItemHeightProperty =
         DependencyProperty.Register(nameof(ItemHeight), typeof(double), typeof(VirtualizingWrapPanel),
             new FrameworkPropertyMetadata(255d, FrameworkPropertyMetadataOptions.AffectsMeasure));
@@ -138,33 +147,55 @@ public sealed class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
         }
     }
 
+    /// <inheritdoc/>
     public bool CanHorizontallyScroll { get; set; }
+    /// <inheritdoc/>
     public bool CanVerticallyScroll { get; set; } = true;
+    /// <inheritdoc/>
     public double ExtentWidth => _extent.Width;
+    /// <inheritdoc/>
     public double ExtentHeight => _extent.Height;
+    /// <inheritdoc/>
     public double ViewportWidth => _viewport.Width;
+    /// <inheritdoc/>
     public double ViewportHeight => _viewport.Height;
+    /// <inheritdoc/>
     public double HorizontalOffset => _offset.X;
+    /// <inheritdoc/>
     public double VerticalOffset => _offset.Y;
+    /// <inheritdoc/>
     public ScrollViewer ScrollOwner
     {
         get => _scrollOwner!;
         set => _scrollOwner = value;
     }
 
+    /// <inheritdoc/>
     public void LineUp() => SetVerticalOffset(VerticalOffset - ItemHeight);
+    /// <inheritdoc/>
     public void LineDown() => SetVerticalOffset(VerticalOffset + ItemHeight);
+    /// <inheritdoc/>
     public void LineLeft() { }
+    /// <inheritdoc/>
     public void LineRight() { }
+    /// <inheritdoc/>
     public void MouseWheelUp() => SetVerticalOffset(VerticalOffset - ItemHeight);
+    /// <inheritdoc/>
     public void MouseWheelDown() => SetVerticalOffset(VerticalOffset + ItemHeight);
+    /// <inheritdoc/>
     public void MouseWheelLeft() { }
+    /// <inheritdoc/>
     public void MouseWheelRight() { }
+    /// <inheritdoc/>
     public void PageUp() => SetVerticalOffset(VerticalOffset - ViewportHeight);
+    /// <inheritdoc/>
     public void PageDown() => SetVerticalOffset(VerticalOffset + ViewportHeight);
+    /// <inheritdoc/>
     public void PageLeft() { }
+    /// <inheritdoc/>
     public void PageRight() { }
 
+    /// <inheritdoc/>
     public Rect MakeVisible(Visual visual, Rect rectangle)
     {
         if (visual is not UIElement element)
@@ -185,8 +216,10 @@ public sealed class VirtualizingWrapPanel : VirtualizingPanel, IScrollInfo
         return new Rect(0, itemTop - VerticalOffset, ItemWidth, ItemHeight);
     }
 
+    /// <inheritdoc/>
     public void SetHorizontalOffset(double offset) { }
 
+    /// <inheritdoc/>
     public void SetVerticalOffset(double offset)
     {
         offset = Math.Max(0, Math.Min(offset, Math.Max(0, ExtentHeight - ViewportHeight)));

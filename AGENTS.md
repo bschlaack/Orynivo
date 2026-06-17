@@ -293,6 +293,23 @@ therefore contains cwASIO support without Steinberg SDK files.
 - **Save smart playlist**: available in Tracks only when filters are active; opens `NewPlaylistDialog`, serializes criteria, and calls `CreateSmartPlaylist`
 - Tracks, albums, search results, and folder-tree nodes support playlist context menus
 
+## XML Documentation Comments
+
+All public and internal C# types, members, and parameters must carry XML documentation
+comments (`///`). Write comments in **English**.
+
+- Every `class`, `interface`, `enum`, `record`, `struct`, and `delegate` needs a `<summary>`.
+- Every public or internal method and property needs a `<summary>`.
+- Every method parameter needs a `<param name="…">` tag.
+- Non-void methods need a `<returns>` tag.
+- Use `<see cref="…"/>` for cross-references and `<see langword="…"/>` for keywords like
+  `true`, `false`, and `null`.
+- Generated files (under `obj/`) and XAML code-behind auto-properties are exempt.
+
+When adding or changing C# code, add or update the XML comments for all affected members
+in the same edit. Never leave a newly introduced public or internal declaration without a
+`<summary>`.
+
 ## Maintenance Requirement
 
 Keep this file updated whenever architecture, build behavior, or user-visible

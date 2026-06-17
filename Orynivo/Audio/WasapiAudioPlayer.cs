@@ -7,6 +7,11 @@ using NAudio.Wave;
 
 namespace Orynivo.Audio;
 
+/// <summary>
+/// WASAPI exclusive-mode PCM player using ffmpeg as the decoder and NAudio for device output.
+/// Tracks playback position against actually rendered samples to keep transport display accurate.
+/// Use <see cref="CreateAsync"/> to construct an instance.
+/// </summary>
 public sealed class WasapiAudioPlayer : IAudioPlayer
 {
     private readonly string _filePath;
@@ -59,6 +64,14 @@ public sealed class WasapiAudioPlayer : IAudioPlayer
     public bool CanSeek => Duration > TimeSpan.Zero;
     public float Volume { get; set; } = 1.0f;
 
+    /// <summary>
+    /// Probes the file, selects an exclusive-mode format, initialises the WASAPI device, starts the
+    /// ffmpeg pump, and returns the ready-to-play player together with the probed file info.
+    /// </summary>
+    /// <param name="filePath">Absolute path to the audio file to play.</param>
+    /// <param name="deviceId">MMDevice ID of the target render device.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <exception cref="NotSupportedException">Thrown for DSD files, which require ASIO.</exception>
     public static async Task<(WasapiAudioPlayer AudioPlayer, AudioFileInfo Info)> CreateAsync(
         string filePath,
         string deviceId,

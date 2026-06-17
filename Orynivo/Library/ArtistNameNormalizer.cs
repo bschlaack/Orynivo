@@ -4,8 +4,17 @@ using System.Text.RegularExpressions;
 
 namespace Orynivo.Library;
 
+/// <summary>
+/// Normalises raw artist name strings for consistent display and identity comparison.
+/// Strips featured-artist suffixes and trailing separators; builds diacritic-free comparison keys.
+/// </summary>
 internal static partial class ArtistNameNormalizer
 {
+    /// <summary>
+    /// Returns the primary artist name with featured-artist annotations and trailing separators removed.
+    /// Unicode is normalised to NFC form and internal whitespace is collapsed.
+    /// </summary>
+    /// <param name="value">Raw artist name from a tag or database field.</param>
     public static string NormalizeDisplayName(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -19,6 +28,12 @@ internal static partial class ArtistNameNormalizer
         return TrailingSeparatorRegex().Replace(name, string.Empty).Trim();
     }
 
+    /// <summary>
+    /// Builds a lowercase, diacritic-free, punctuation-stripped key suitable for identity comparison
+    /// across Unicode and case variants. Falls back to a <c>raw:</c>-prefixed value when only
+    /// non-letter/digit characters remain.
+    /// </summary>
+    /// <param name="value">Raw artist name to convert.</param>
     public static string CreateComparisonKey(string? value)
     {
         var displayName = NormalizeDisplayName(value);

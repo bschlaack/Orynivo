@@ -5,15 +5,34 @@ using Microsoft.Data.Sqlite;
 
 namespace Orynivo.Library;
 
+/// <summary>Progress snapshot for a library export operation.</summary>
+/// <param name="Percentage">Completion percentage in the range 0–100.</param>
+/// <param name="CurrentFile">Name of the file currently being processed.</param>
 public sealed record LibraryExportProgress(int Percentage, string? CurrentFile);
+
+/// <summary>Progress snapshot for a library import operation.</summary>
+/// <param name="Percentage">Completion percentage in the range 0–100.</param>
+/// <param name="CurrentFile">Name of the file currently being processed.</param>
 public sealed record LibraryImportProgress(int Percentage, string? CurrentFile);
 
+/// <summary>
+/// Exports and imports the library as a versioned ZIP archive containing the SQLite database,
+/// album artwork, and artist images. Audio files are not included.
+/// </summary>
 public static class LibraryBackupService
 {
     private const int CurrentFormatVersion = 1;
 
     private static string DataRoot => AppPaths.DataRoot;
 
+    /// <summary>
+    /// Asynchronously exports the current library to a ZIP archive at <paramref name="destinationPath"/>.
+    /// Writes to a temporary file first and replaces the destination only on success.
+    /// </summary>
+    /// <param name="destinationPath">Target <c>.zip</c> file path.</param>
+    /// <param name="libraryPaths">Library directory paths to embed in the manifest.</param>
+    /// <param name="progress">Optional export progress callback.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public static Task ExportAsync(
         string destinationPath,
         IReadOnlyList<string> libraryPaths,
@@ -23,6 +42,14 @@ public static class LibraryBackupService
             () => Export(destinationPath, libraryPaths, DataRoot, progress, cancellationToken),
             cancellationToken);
 
+    /// <summary>
+    /// Asynchronously validates and imports a library archive, replacing the current database and artwork.
+    /// Rolls back all changes when any step fails.
+    /// </summary>
+    /// <param name="archivePath">Path to the <c>.zip</c> archive created by <see cref="ExportAsync"/>.</param>
+    /// <param name="progress">Optional import progress callback.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Library directory paths stored in the archive manifest.</returns>
     public static Task<IReadOnlyList<string>> ImportAsync(
         string archivePath,
         IProgress<LibraryImportProgress>? progress = null,

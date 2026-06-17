@@ -5,9 +5,23 @@ using TagLib;
 
 namespace Orynivo.Library;
 
+/// <summary>Incremental progress report emitted during a library scan or repair operation.</summary>
+/// <param name="Current">Number of files processed so far.</param>
+/// <param name="Total">Total number of files to process.</param>
+/// <param name="CurrentFile">Path or label of the file currently being processed.</param>
 public readonly record struct ScanProgress(int Current, int Total, string CurrentFile);
+
+/// <summary>Summary of a completed library scan.</summary>
+/// <param name="Total">Total files discovered.</param>
+/// <param name="Added">New files added to the library.</param>
+/// <param name="Updated">Existing files whose metadata was updated.</param>
+/// <param name="Failed">Files that could not be processed.</param>
 public readonly record struct ScanResult(int Total, int Added, int Updated, int Failed);
 
+/// <summary>
+/// Scans library directories with TagLibSharp, upserts track metadata into the database,
+/// and maintains the Lucene search index.
+/// </summary>
 public static class LibraryScanner
 {
     private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -16,17 +30,37 @@ public static class LibraryScanner
         ".m4a", ".aac", ".ogg", ".opus", ".wma"
     };
 
+    /// <summary>
+    /// Asynchronously scans <paramref name="rootPath"/> for audio files, skipping unchanged files,
+    /// and upserts changed or new tracks into the database.
+    /// </summary>
+    /// <param name="rootPath">Root directory to scan recursively.</param>
+    /// <param name="progress">Optional progress callback.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public static Task<ScanResult> ScanAsync(
         string rootPath,
         IProgress<ScanProgress>? progress = null,
         CancellationToken cancellationToken = default)
         => Task.Run(() => Scan(rootPath, progress, cancellationToken), cancellationToken);
 
+    /// <summary>
+    /// Re-reads embedded artwork from a sample file for each album that is missing artwork in the database.
+    /// </summary>
+    /// <param name="progress">Optional progress callback.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Number of albums whose artwork was successfully repaired.</returns>
     public static Task<int> RepairMissingAlbumArtworkAsync(
         IProgress<ScanProgress>? progress = null,
         CancellationToken cancellationToken = default)
         => Task.Run(() => RepairMissingAlbumArtwork(progress, cancellationToken), cancellationToken);
 
+    /// <summary>
+    /// Downloads front-cover images from the Cover Art Archive for albums that have a MusicBrainz release ID
+    /// but no artwork in the database.
+    /// </summary>
+    /// <param name="progress">Optional progress callback.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Number of album covers successfully downloaded.</returns>
     public static async Task<int> DownloadMissingAlbumArtworkAsync(
         IProgress<ScanProgress>? progress = null,
         CancellationToken cancellationToken = default)

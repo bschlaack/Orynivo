@@ -7,10 +7,22 @@ using System.Xml.Linq;
 
 namespace Orynivo.Library;
 
+/// <summary>
+/// Client for the Apple Podcasts / iTunes Search API and RSS feed parsing.
+/// Provides podcast discovery, popular-chart retrieval, feed language detection,
+/// category catalogue loading, and full episode-feed parsing.
+/// </summary>
 public sealed class PodcastService
 {
     private static readonly HttpClient HttpClient = CreateHttpClient();
 
+    /// <summary>
+    /// Searches the Apple Podcasts catalogue and returns deduplicated results.
+    /// When <paramref name="genreIds"/> is provided one request is made per genre ID.
+    /// </summary>
+    /// <param name="searchText">Free-text search query; pass <see langword="null"/> or empty to browse by genre only.</param>
+    /// <param name="genreIds">Optional Apple Podcasts genre IDs to filter results by.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public async Task<IReadOnlyList<PodcastSearchResult>> SearchAsync(
         string? searchText,
         IReadOnlyCollection<string>? genreIds = null,
@@ -35,6 +47,10 @@ public sealed class PodcastService
         return MapSearchResults(results);
     }
 
+    /// <summary>
+    /// Returns the top-100 podcasts from the Apple Podcasts chart for the current locale.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public async Task<IReadOnlyList<PodcastSearchResult>> GetPopularPodcastsAsync(
         CancellationToken cancellationToken = default)
     {
@@ -82,6 +98,13 @@ public sealed class PodcastService
             .Select(group => group.First())
             .ToList();
 
+    /// <summary>
+    /// Fetches only the response headers and the first few bytes of an RSS feed to read
+    /// its language declaration, normalised to a two-letter ISO code.
+    /// Returns <see langword="null"/> when the feed is unreachable or carries no language tag.
+    /// </summary>
+    /// <param name="feedUrl">URL of the RSS/Atom feed.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public async Task<string?> GetFeedLanguageAsync(
         string feedUrl,
         CancellationToken cancellationToken = default)
@@ -115,6 +138,11 @@ public sealed class PodcastService
         }
     }
 
+    /// <summary>
+    /// Returns the full iTunes Podcasts genre tree for the current store country as a flat,
+    /// alphabetically sorted list of <see cref="PodcastCategory"/> records.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public async Task<IReadOnlyList<PodcastCategory>> GetCategoryCatalogAsync(
         CancellationToken cancellationToken = default)
     {
@@ -135,6 +163,10 @@ public sealed class PodcastService
             .ToList();
     }
 
+    /// <summary>
+    /// Returns the RSS feed URLs for the top-100 podcasts in the current store country.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public async Task<IReadOnlyList<string>> GetPopularFeedUrlsAsync(
         CancellationToken cancellationToken = default)
     {
@@ -154,6 +186,12 @@ public sealed class PodcastService
             .ToList() ?? [];
     }
 
+    /// <summary>
+    /// Downloads and parses an RSS or Atom feed and returns a <see cref="PodcastFeed"/> with
+    /// episodes sorted newest-first. Supports both <c>&lt;item&gt;</c> (RSS) and <c>&lt;entry&gt;</c> (Atom) elements.
+    /// </summary>
+    /// <param name="feedUrl">URL of the RSS/Atom feed.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public async Task<PodcastFeed> GetFeedAsync(
         string feedUrl,
         CancellationToken cancellationToken = default)

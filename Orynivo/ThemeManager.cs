@@ -5,8 +5,14 @@ using WpfColorConverter = System.Windows.Media.ColorConverter;
 
 namespace Orynivo;
 
+/// <summary>
+/// Applies a light or dark colour scheme by writing named <see cref="SolidColorBrush"/> resources
+/// into <see cref="System.Windows.Application.Current"/> resources so all controls pick them up dynamically.
+/// </summary>
 public static class ThemeManager
 {
+    /// <summary>Switches the global WPF resource dictionary to the specified theme.</summary>
+    /// <param name="theme">The theme to activate.</param>
     public static void Apply(AppTheme theme)
     {
         var resources = WpfApplication.Current.Resources;

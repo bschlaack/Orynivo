@@ -3,8 +3,12 @@ using NAudio.Wave;
 
 namespace Orynivo.Audio;
 
+/// <summary>
+/// Factory and query methods for active WASAPI render devices.
+/// </summary>
 public static class WasapiDeviceProvider
 {
+    /// <summary>Returns all currently active WASAPI render endpoints.</summary>
     public static IReadOnlyList<WasapiDeviceInfo> GetRenderDevices()
     {
         using var enumerator = new MMDeviceEnumerator();
@@ -14,12 +18,19 @@ public static class WasapiDeviceProvider
             .ToArray();
     }
 
+    /// <summary>Opens and returns the <see cref="MMDevice"/> for the given device ID. Caller must dispose.</summary>
+    /// <param name="id">MMDevice ID as returned by <see cref="GetRenderDevices"/>.</param>
     public static MMDevice GetRenderDevice(string id)
     {
         var enumerator = new MMDeviceEnumerator();
         return enumerator.GetDevice(id);
     }
 
+    /// <summary>
+    /// Queries the exclusive-mode PCM capabilities of the device with the given ID.
+    /// </summary>
+    /// <param name="id">MMDevice ID as returned by <see cref="GetRenderDevices"/>.</param>
+    /// <returns>Capability snapshot including supported sample rates and bit depths.</returns>
     public static WasapiDeviceCapabilities GetCapabilities(string id)
     {
         using var device = GetRenderDevice(id);

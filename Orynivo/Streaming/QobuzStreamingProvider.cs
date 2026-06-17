@@ -1,16 +1,27 @@
 namespace Orynivo.Streaming;
 
+/// <summary>
+/// Inactive scaffold for Qobuz catalogue and playback access.
+/// All operations throw until official partner API access is configured.
+/// </summary>
 public sealed class QobuzStreamingProvider : IStreamingCatalog, IStreamingPlaybackProvider
 {
     private readonly string _applicationId;
 
+    /// <summary>Initialises the provider with the application identifier from settings.</summary>
+    /// <param name="applicationId">Non-secret Qobuz application identifier.</param>
     public QobuzStreamingProvider(string applicationId)
     {
         _applicationId = applicationId.Trim();
     }
 
+    /// <inheritdoc/>
     public StreamingProvider Provider => StreamingProvider.Qobuz;
+
+    /// <inheritdoc/>
     public bool IsConfigured => !string.IsNullOrWhiteSpace(_applicationId);
+
+    /// <inheritdoc/>
     public bool IsPlaybackAvailable => false;
 
     public Task<StreamingSearchResult> SearchAsync(

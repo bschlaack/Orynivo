@@ -3,14 +3,31 @@ using WpfApplication = System.Windows.Application;
 
 namespace Orynivo.Localization;
 
+/// <summary>
+/// Manages the active UI language. Call <see cref="Apply"/> to switch languages at runtime;
+/// read <see cref="Current"/> to access the active string set.
+/// </summary>
 public static class LocalizationManager
 {
+    /// <summary>
+    /// Returns a pluralised entry-count string using the current language's singular and plural forms.
+    /// </summary>
+    /// <param name="count">Number of entries to format.</param>
     public static string FormatEntryCount(int count) =>
         count == 1 ? string.Format(Current.CountEntrySingular, count) : string.Format(Current.CountEntries, count);
 
+    /// <summary>
+    /// Returns a pluralised track-count string using the current language's singular and plural forms.
+    /// </summary>
+    /// <param name="count">Number of tracks to format.</param>
     public static string FormatTrackCount(int count) =>
         count == 1 ? string.Format(Current.CountTrackSingular, count) : string.Format(Current.CountTracks, count);
 
+    /// <summary>
+    /// Applies <paramref name="language"/> by updating <see cref="System.Globalization.CultureInfo.CurrentCulture"/>,
+    /// <see cref="Current"/>, and all <c>L_*</c> resource keys in <see cref="System.Windows.Application.Current"/>'s resource dictionary.
+    /// </summary>
+    /// <param name="language">The language to activate.</param>
     public static void Apply(Language language)
     {
         var culture = language switch
@@ -1072,5 +1089,6 @@ public static class LocalizationManager
         , LoadMore = "Cargar más"
     };
 
+    /// <summary>Gets the currently active <see cref="LocalizedStrings"/> instance.</summary>
     public static LocalizedStrings Current { get; private set; } = German;
 }

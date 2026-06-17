@@ -4,12 +4,27 @@ using System.Windows.Media.Imaging;
 
 namespace Orynivo.Library;
 
+/// <summary>
+/// Manages the on-disk artwork file cache under <c>%LOCALAPPDATA%\Orynivo\artworks\</c>.
+/// Artwork is stored once per SHA-256 hash as an original and two JPEG thumbnails (96 px and 320 px).
+/// </summary>
 public static class ArtworkCache
 {
+    /// <summary>Absolute paths to the original and thumbnail files for a cached artwork entry.</summary>
+    /// <param name="OriginalPath">Full-resolution original image file.</param>
+    /// <param name="Thumb96Path">96 px JPEG thumbnail.</param>
+    /// <param name="Thumb320Path">320 px JPEG thumbnail.</param>
     public sealed record StoredArtwork(string OriginalPath, string Thumb96Path, string Thumb320Path);
 
     private static readonly string Root = AppPaths.GetDataPath("artworks");
 
+    /// <summary>
+    /// Writes the original image and both thumbnails to disk if they do not already exist,
+    /// then returns the resulting paths.
+    /// </summary>
+    /// <param name="hash">SHA-256 hex hash of <paramref name="data"/>, used as the file name stem.</param>
+    /// <param name="data">Raw image bytes.</param>
+    /// <param name="mimeType">MIME type used to choose the file extension (defaults to JPEG).</param>
     public static StoredArtwork EnsureFiles(string hash, byte[] data, string? mimeType)
     {
         var ext = MimeToExtension(mimeType);

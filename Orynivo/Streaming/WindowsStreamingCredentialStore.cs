@@ -5,6 +5,10 @@ using System.Text.Json;
 
 namespace Orynivo.Streaming;
 
+/// <summary>
+/// Persists streaming provider credentials in <c>%LOCALAPPDATA%\Orynivo\streaming-credentials.dat</c>
+/// using Windows DPAPI (<see cref="System.Security.Cryptography.ProtectedData"/>) scoped to the current user.
+/// </summary>
 public sealed class WindowsStreamingCredentialStore : IStreamingCredentialStore
 {
     private static readonly byte[] Entropy =
