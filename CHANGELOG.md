@@ -4,6 +4,25 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Added real-time DSF/DFF-to-PCM playback through exclusive-mode WASAPI. The
+  conversion uses FFmpeg without temporary files, prefers PCM rates in the
+  44.1 kHz family, and falls back to common 48 kHz-family rates supported by
+  the selected endpoint.
+- Added localized transport and status-bar indicators in German, English,
+  French, and Spanish when DSD is being converted to PCM, including the active
+  PCM output sample rate.
+
+### Fixed
+
+- Fixed search and other text inputs switching to a white focused background
+  while retaining white text in the dark theme. Normal, hover, focused,
+  placeholder, and border colors now follow Orynivo's active light or dark
+  input palette.
+
 ## [0.5.0] - 2026-06-17
 
 ### Changed

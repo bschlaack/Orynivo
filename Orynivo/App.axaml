@@ -49,6 +49,18 @@
             <SolidColorBrush x:Key="AppButtonBorderBrush"        Color="#343654"/>
             <SolidColorBrush x:Key="AppInputBrush"               Color="#20213A"/>
             <SolidColorBrush x:Key="AppInputBorderBrush"         Color="#343654"/>
+            <SolidColorBrush x:Key="TextControlBackground"       Color="#20213A"/>
+            <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#20213A"/>
+            <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#20213A"/>
+            <SolidColorBrush x:Key="TextControlForeground"       Color="#F7F7FF"/>
+            <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#F7F7FF"/>
+            <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#F7F7FF"/>
+            <SolidColorBrush x:Key="TextControlBorderBrush"      Color="#343654"/>
+            <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#45486B"/>
+            <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#6C63FF"/>
+            <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#7777AA"/>
+            <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver" Color="#7777AA"/>
+            <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#7777AA"/>
             <SolidColorBrush x:Key="AppDsdSupportedBrush"        Color="#F7F7FF"/>
             <SolidColorBrush x:Key="AppDsdUnsupportedBrush"      Color="#5B5D79"/>
             <SolidColorBrush x:Key="TreeViewItemForeground" Color="#A0A0C8"/>

@@ -169,6 +169,9 @@ public sealed record LocalizedStrings(
     public string Back { get; init; } = "";
     public string MarkAsFavorite { get; init; } = "";
     public string PlaybackThrough { get; init; } = "";
+    public string PlaybackThroughWithDsdConversion { get; init; } = "";
+    public string NativeDsdOutput { get; init; } = "";
+    public string DsdToPcmOutput { get; init; } = "";
     public string SearchResultSummary { get; init; } = "";
     public string RecentAlbums { get; init; } = "";
     public string Calendar { get; init; } = "";

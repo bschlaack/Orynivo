@@ -9,6 +9,7 @@ Windows audio player with:
 - MIT-licensed cwASIO bridge in `Native/CwAsioBridge/`
 - PCM playback through `ffmpeg`
 - Native DSF/DFF DSD playback through ASIO
+- Real-time DSF/DFF-to-PCM conversion through `ffmpeg` for WASAPI playback
 
 ## Build and Run
 
@@ -41,7 +42,8 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - `Orynivo/Audio/FfmpegLocator.cs`: checks `AppContext.BaseDirectory` and PATH for `ffmpeg.exe`/`ffprobe.exe` at startup; when absent, downloads the BtbN LGPL-essential Windows build from GitHub Releases, extracts the binaries next to the executable, and prepends the directory to the current-process PATH
 - `Orynivo/Audio/DsfAudioPlayer.cs`: native DSF-to-DSD path
 - `Orynivo/Audio/DffAudioPlayer.cs`: native DFF/DSDIFF-to-DSD path
-- `Orynivo/Audio/WasapiAudioPlayer.cs`: WASAPI PCM path
+- `Orynivo/Audio/WasapiAudioPlayer.cs`: exclusive-mode WASAPI PCM path; converts
+  DSD sources to PCM in real time and selects a supported output sample rate
 - `Orynivo/Audio/WasapiDeviceProvider.cs`: WASAPI devices and capability queries
 - `Native/AsioBridge/bridge.cpp`: shared Steinberg/cwASIO initialization, PCM/DSD ring buffers, and callback
 - `Native/CwAsioBridge/CwAsioBridge.vcxproj`: builds the shared bridge against vendored cwASIO
@@ -199,6 +201,11 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - Steinberg ASIO, cwASIO, and WASAPI are implemented; Kernel Streaming is not
 - WASAPI handles PCM only; native DSD remains ASIO-only
 - WASAPI runs exclusively and selects the first supported stereo format from 32-bit float, 24-bit PCM, and 16-bit PCM
+- WASAPI plays DSF/DFF by converting DSD to PCM through `ffmpeg` without a
+  temporary file. It prefers 176.4, 88.2, or 44.1 kHz and falls back to 192,
+  96, or 48 kHz according to the endpoint's exclusive-mode capabilities.
+- The transport file-information line and status bar explicitly identify
+  DSD-to-PCM conversion and show the selected PCM output sample rate.
 - WASAPI pause keeps the exclusive AudioClient running and supplies silence so drivers do not loop the final endpoint buffer; buffered audio remains available for resume
 - WASAPI playback position subtracts frames still queued in `BufferedWaveProvider`, so transport time, history, and synchronized lyrics follow audible output instead of producer progress
 - Transport uses custom vector icons for previous, play/pause, and next; unavailable queue directions are disabled
@@ -249,6 +256,9 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   surfaces, text, transport controls, navigation, separators, and scrollbars;
   transport buttons must not use fixed dark-only colors
 - Visible primary text and runtime messages use `LocalizationManager`
+- TextBox normal, pointer-over, and focused Fluent theme resources must remain
+  synchronized with `AppInputBrush`, `AppPrimaryTextBrush`, and the active
+  input-border colors so entered text keeps sufficient contrast in both themes
 - Empty artwork areas use a dedicated placeholder resource
 - Tables, lists, and trees must not expose default-white backgrounds in dark mode
 - DataGrid and ScrollViewer backgrounds are overridden via Avalonia styles in

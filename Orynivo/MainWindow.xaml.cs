@@ -5209,10 +5209,12 @@ public partial class MainWindow : Window
                                      (radioStation is null
                                          ? SelectedDriverTextBlock.Text
                                          : LocalizationManager.Current.InternetRadio);
-        FileInfoTextBlock.Text     = info.IsDsd && info.ContainerName is "dsf" or "dff"
-            ? $"{info.ContainerName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz  ·  DSD nativ"
+        var usesNativeDsd = info.IsDsd &&
+                            _settings.OutputBackend is OutputBackend.Asio or OutputBackend.CwAsio;
+        FileInfoTextBlock.Text = usesNativeDsd
+            ? $"{info.ContainerName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz  ·  {LocalizationManager.Current.NativeDsdOutput}"
             : info.IsDsd
-                ? $"DSD → PCM  ·  {info.OutputSampleRate:N0} Hz"
+                ? $"{info.ContainerName.ToUpperInvariant()}  ·  {LocalizationManager.Current.DsdToPcmOutput}  ·  {info.OutputSampleRate:N0} Hz"
                 : $"{info.CodecName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz  ·  {info.Channels} ch";
         if (radioStation is null && podcastPlayback is null)
         {
@@ -5306,7 +5308,12 @@ public partial class MainWindow : Window
         var outputName = _settings.OutputBackend is OutputBackend.Asio or OutputBackend.CwAsio
             ? _settings.SelectedDriverName
             : _settings.SelectedWasapiDeviceName;
-        StatusTextBlock.Text = string.Format(LocalizationManager.Current.PlaybackThrough, outputName);
+        StatusTextBlock.Text = info.IsDsd && !usesNativeDsd
+            ? string.Format(
+                LocalizationManager.Current.PlaybackThroughWithDsdConversion,
+                outputName,
+                info.OutputSampleRate)
+            : string.Format(LocalizationManager.Current.PlaybackThrough, outputName);
 
         try
         {

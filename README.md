@@ -13,6 +13,8 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 
 - Playback through ASIO or exclusive-mode WASAPI
 - Native stereo DSD playback for DSF and uncompressed DFF files through ASIO
+- Real-time DSF/DFF-to-PCM conversion for playback through WASAPI, with the
+  active conversion and PCM sample rate shown in the transport and status bar
 - PCM playback through `ffmpeg`
 - Seeking, volume control, pause, an automatic playback queue, and shuffle
   without repeating a track within the currently loaded queue
@@ -87,6 +89,10 @@ The user interface recognizes, among others:
 
 PCM formats are decoded by `ffmpeg`, which Orynivo downloads automatically on
 first start if not already installed. Actual codec support depends on the build.
+When WASAPI is selected, DSD audio in DSF or DFF containers is converted to PCM
+in real time without creating a temporary file. Orynivo prefers 176.4, 88.2,
+or 44.1 kHz output and falls back to 192, 96, or 48 kHz when required by the
+selected exclusive-mode endpoint.
 
 ## Requirements
 
@@ -217,7 +223,8 @@ artwork, rebasing paths, and rebuilding the search index.
 
 ## Current Limitations
 
-- Native DSD playback is available only through ASIO.
+- Native, bit-perfect DSD playback is available only through ASIO. WASAPI can
+  play DSF/DFF by converting the audio to PCM in real time.
 - Builds without the optional ASIO bridge use WASAPI for playback and do not
   offer ASIO in Settings.
 - Native DFF playback currently supports only uncompressed stereo files.
