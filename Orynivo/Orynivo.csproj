@@ -9,6 +9,11 @@
     <RootNamespace>Orynivo</RootNamespace>
     <Product>Orynivo</Product>
     <Title>Orynivo</Title>
+    <Authors>Björn Schlaack</Authors>
+    <Copyright>Copyright © 2026 Björn Schlaack</Copyright>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/bschlaack/Orynivo</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
     <ApplicationIcon>Assets\Orynivo.ico</ApplicationIcon>
   </PropertyGroup>
 
@@ -48,6 +53,39 @@
 
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\LICENSE"
+          Link="LICENSE"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\NOTICE"
+          Link="NOTICE"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\THIRD_PARTY_NOTICES.md"
+          Link="THIRD_PARTY_NOTICES.md"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\licenses\**\*"
+          Link="licenses\%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\third_party\cwasio\LICENSE"
+          Link="licenses\cwASIO-MIT.txt"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest" />
+    <None Include="$(NuGetPackageRoot)lucene.net\4.8.0-beta00017\NOTICE.txt"
+          Link="licenses\Lucene.NET-NOTICE.txt"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest"
+          Condition="Exists('$(NuGetPackageRoot)lucene.net\4.8.0-beta00017\NOTICE.txt')" />
+    <None Include="$(NuGetPackageRoot)skiasharp\2.88.9\THIRD-PARTY-NOTICES.txt"
+          Link="licenses\SkiaSharp-THIRD-PARTY-NOTICES.txt"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest"
+          Condition="Exists('$(NuGetPackageRoot)skiasharp\2.88.9\THIRD-PARTY-NOTICES.txt')" />
   </ItemGroup>
 
   <ItemGroup>

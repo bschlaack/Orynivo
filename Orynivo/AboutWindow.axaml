@@ -4,7 +4,7 @@
         Title="{DynamicResource L_About}"
         Icon="avares://Orynivo/Assets/Orynivo.ico"
         Width="560"
-        Height="540"
+        Height="620"
         MinWidth="480"
         MinHeight="440"
         Background="{DynamicResource AppContentBrush}"
@@ -16,8 +16,10 @@
             <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
     </Window.Styles>
-    <StackPanel Margin="22">
-        <Border Width="320"
+    <Grid Margin="22"
+          RowDefinitions="Auto,Auto,Auto,*">
+        <Border Grid.Row="0"
+                Width="320"
                 Padding="18,12"
                 HorizontalAlignment="Center"
                 CornerRadius="0,24,0,24">
@@ -31,24 +33,45 @@
                    Source="avares://Orynivo/Assets/Orynivo_Logo.png"
                    Stretch="Uniform"/>
         </Border>
-        <TextBlock Margin="0,18,0,4"
-                   FontWeight="SemiBold"
-                   Text="{DynamicResource L_Author}"/>
-        <TextBlock Text="Björn Schlaack"/>
 
-        <TextBlock Margin="0,22,0,10"
+        <StackPanel Grid.Row="1"
+                    Margin="0,18,0,0">
+            <TextBlock FontWeight="SemiBold"
+                       Text="{DynamicResource L_Author}"/>
+            <TextBlock Margin="0,4,0,0"
+                       Text="Björn Schlaack"/>
+            <TextBlock Margin="0,4,0,0"
+                       Text="Copyright © 2026 Björn Schlaack"/>
+        </StackPanel>
+
+        <TextBlock Grid.Row="2"
+                   Margin="0,22,0,10"
                    FontWeight="SemiBold"
                    Text="{DynamicResource L_Licenses}"/>
 
-        <StackPanel>
-            <TextBlock Classes="license" Text="ASIO is a trademark and software of Steinberg Media Technologies GmbH."/>
-            <TextBlock Classes="license" Text="cwASIO — MIT License"/>
-            <TextBlock Classes="license" Text="Avalonia — MIT License"/>
-            <TextBlock Classes="license" Text="Lucene.NET 4.8.0-beta00017 — Apache License 2.0"/>
-            <TextBlock Classes="license" Text="Microsoft.Data.Sqlite 9.0.5 — MIT License"/>
-            <TextBlock Classes="license" Text="NAudio 2.3.0 — MIT License"/>
-            <TextBlock Classes="license" Text="TagLibSharp 2.3.0 — LGPL-2.1 License"/>
-            <TextBlock Classes="license" Text="SQLitePCLRaw / e_sqlite3 — Apache License 2.0"/>
-        </StackPanel>
-    </StackPanel>
+        <ScrollViewer Grid.Row="3"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="0,0,12,0">
+                <TextBlock Classes="license"
+                           FontWeight="SemiBold"
+                           Text="Orynivo — Apache License 2.0"/>
+                <TextBlock Classes="license"
+                           Text="The Orynivo name, wordmark, logo, and application icon are not granted as trademarks by the Apache License."/>
+                <TextBlock Classes="license" Text="cwASIO — MIT License"/>
+                <TextBlock Classes="license" Text="Avalonia 11.2.0 — MIT License"/>
+                <TextBlock Classes="license" Text="SkiaSharp 2.88.9 — MIT License"/>
+                <TextBlock Classes="license" Text="Lucene.NET 4.8.0-beta00017 — Apache License 2.0"/>
+                <TextBlock Classes="license" Text="Microsoft.Data.Sqlite 9.0.5 — MIT License"/>
+                <TextBlock Classes="license" Text="NAudio 2.3.0 — MIT License"/>
+                <TextBlock Classes="license" Text="TagLibSharp 2.3.0 — LGPL-2.1-only"/>
+                <TextBlock Classes="license" Text="SQLitePCLRaw / e_sqlite3 2.1.10 — Apache License 2.0 / SQLite public domain dedication"/>
+                <TextBlock Classes="license" Text="FFmpeg — separate LGPL essentials executable; exact terms depend on the downloaded build"/>
+                <TextBlock Classes="license" Text="ASIO is a trademark and software of Steinberg Media Technologies GmbH. The optional Steinberg ASIO SDK is licensed separately and is not included in the repository."/>
+                <TextBlock Margin="0,8,0,0"
+                           Classes="license"
+                           Text="Complete notices and license texts: THIRD_PARTY_NOTICES.md and the licenses directory next to Orynivo.exe."/>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
 </Window>

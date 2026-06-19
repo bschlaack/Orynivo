@@ -71,20 +71,16 @@ public sealed class WasapiAudioPlayer : IAudioPlayer
     /// <param name="filePath">Absolute path to the audio file to play.</param>
     /// <param name="deviceId">MMDevice ID of the target render device.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <exception cref="NotSupportedException">Thrown for DSD files, which require ASIO.</exception>
+    /// <exception cref="NotSupportedException">Thrown when the device supports no suitable exclusive PCM format.</exception>
     public static async Task<(WasapiAudioPlayer AudioPlayer, AudioFileInfo Info)> CreateAsync(
         string filePath,
         string deviceId,
         CancellationToken cancellationToken = default)
     {
         var info = await ProbeAsync(filePath, cancellationToken);
-        if (info.IsDsd)
-        {
-            throw new NotSupportedException("Native DSD-Wiedergabe ist über WASAPI nicht implementiert. Bitte ASIO verwenden.");
-        }
-
         var device = WasapiDeviceProvider.GetRenderDevice(deviceId);
-        var selectedFormat = ChooseExclusiveFormat(device, info.OutputSampleRate);
+        var selectedFormat = ChooseExclusiveFormat(device, info);
+        info = info with { OutputSampleRate = selectedFormat.Format.SampleRate };
         var provider = new BufferedWaveProvider(selectedFormat.Format)
         {
             BufferDuration = TimeSpan.FromSeconds(2),
@@ -292,25 +288,34 @@ public sealed class WasapiAudioPlayer : IAudioPlayer
         }
     }
 
-    private static WasapiSelectedFormat ChooseExclusiveFormat(MMDevice device, int sampleRate)
+    private static WasapiSelectedFormat ChooseExclusiveFormat(MMDevice device, AudioFileInfo info)
     {
-        WasapiSelectedFormat[] candidates =
-        [
-            new(WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, 2), "f32le", "pcm_f32le", sizeof(float) * 2),
-            new(new WaveFormatExtensible(sampleRate, 24, 2), "s32le", "pcm_s32le", sizeof(int) * 2),
-            new(new WaveFormat(sampleRate, 16, 2), "s16le", "pcm_s16le", sizeof(short) * 2)
-        ];
+        var sampleRates = info.IsDsd
+            ? new[] { 176_400, 88_200, 44_100, 192_000, 96_000, 48_000 }
+            : new[] { info.OutputSampleRate };
 
-        foreach (var candidate in candidates)
+        foreach (var sampleRate in sampleRates)
         {
-            if (device.AudioClient.IsFormatSupported(AudioClientShareMode.Exclusive, candidate.Format))
+            WasapiSelectedFormat[] candidates =
+            [
+                new(WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, 2), "f32le", "pcm_f32le", sizeof(float) * 2),
+                new(new WaveFormatExtensible(sampleRate, 24, 2), "s32le", "pcm_s32le", sizeof(int) * 2),
+                new(new WaveFormat(sampleRate, 16, 2), "s16le", "pcm_s16le", sizeof(short) * 2)
+            ];
+
+            foreach (var candidate in candidates)
             {
-                return candidate;
+                if (device.AudioClient.IsFormatSupported(AudioClientShareMode.Exclusive, candidate.Format))
+                {
+                    return candidate;
+                }
             }
         }
 
         device.Dispose();
-        throw new NotSupportedException($"Das WASAPI-Gerät unterstützt {sampleRate:N0} Hz stereo im exklusiven Modus nicht.");
+        var requestedRates = string.Join(", ", sampleRates.Select(rate => $"{rate:N0} Hz"));
+        throw new NotSupportedException(
+            $"Das WASAPI-Gerät unterstützt keine geeignete Stereo-PCM-Ausgabe im exklusiven Modus ({requestedRates}).");
     }
 
     private static Process StartFfmpeg(string filePath, int outputSampleRate, WasapiSelectedFormat format, TimeSpan position)

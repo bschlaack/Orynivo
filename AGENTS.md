@@ -9,6 +9,7 @@ Windows audio player with:
 - MIT-licensed cwASIO bridge in `Native/CwAsioBridge/`
 - PCM playback through `ffmpeg`
 - Native DSF/DFF DSD playback through ASIO
+- Real-time DSF/DFF-to-PCM conversion through `ffmpeg` for WASAPI playback
 
 ## Build and Run
 
@@ -41,7 +42,8 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - `Orynivo/Audio/FfmpegLocator.cs`: checks `AppContext.BaseDirectory` and PATH for `ffmpeg.exe`/`ffprobe.exe` at startup; when absent, downloads the BtbN LGPL-essential Windows build from GitHub Releases, extracts the binaries next to the executable, and prepends the directory to the current-process PATH
 - `Orynivo/Audio/DsfAudioPlayer.cs`: native DSF-to-DSD path
 - `Orynivo/Audio/DffAudioPlayer.cs`: native DFF/DSDIFF-to-DSD path
-- `Orynivo/Audio/WasapiAudioPlayer.cs`: WASAPI PCM path
+- `Orynivo/Audio/WasapiAudioPlayer.cs`: exclusive-mode WASAPI PCM path; converts
+  DSD sources to PCM in real time and selects a supported output sample rate
 - `Orynivo/Audio/WasapiDeviceProvider.cs`: WASAPI devices and capability queries
 - `Native/AsioBridge/bridge.cpp`: shared Steinberg/cwASIO initialization, PCM/DSD ring buffers, and callback
 - `Native/CwAsioBridge/CwAsioBridge.vcxproj`: builds the shared bridge against vendored cwASIO
@@ -182,6 +184,14 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - Artwork is deduplicated instead of stored per track
 - `TrackSearchIndex.cs` stores a Lucene.NET index under `%LOCALAPPDATA%\Orynivo\search-index`, supports category-specific fields, partial words, and German umlaut/eszett variants, rebuilds stale indexes, updates incrementally after scans, and removes missing files below rescanned roots
 - Search-index freshness is determined by the stored schema marker; indexed `Field.Store.NO` fields must not be tested through stored-document field access
+- Track `title` and `sort_title` values are trimmed before database persistence
+  and again before Lucene indexing; future metadata/indexing changes must
+  preserve this invariant so A-Z ordering is not affected by surrounding
+  whitespace
+- Avalonia `DataGrid` vertical scrolling is handled by its own pixel-based
+  `PART_VerticalScrollbar`, not by an inner `ScrollViewer`. The main table
+  listens to `DataGrid.VerticalScroll`; scrollbar track clicks use a
+  `LargeChange` equal to the visible viewport minus one realized row
 
 ## Known Technical Details
 
@@ -199,6 +209,11 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - Steinberg ASIO, cwASIO, and WASAPI are implemented; Kernel Streaming is not
 - WASAPI handles PCM only; native DSD remains ASIO-only
 - WASAPI runs exclusively and selects the first supported stereo format from 32-bit float, 24-bit PCM, and 16-bit PCM
+- WASAPI plays DSF/DFF by converting DSD to PCM through `ffmpeg` without a
+  temporary file. It prefers 176.4, 88.2, or 44.1 kHz and falls back to 192,
+  96, or 48 kHz according to the endpoint's exclusive-mode capabilities.
+- The transport file-information line and status bar explicitly identify
+  DSD-to-PCM conversion and show the selected PCM output sample rate.
 - WASAPI pause keeps the exclusive AudioClient running and supplies silence so drivers do not loop the final endpoint buffer; buffered audio remains available for resume
 - WASAPI playback position subtracts frames still queued in `BufferedWaveProvider`, so transport time, history, and synchronized lyrics follow audible output instead of producer progress
 - Transport uses custom vector icons for previous, play/pause, and next; unavailable queue directions are disabled
@@ -249,6 +264,9 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   surfaces, text, transport controls, navigation, separators, and scrollbars;
   transport buttons must not use fixed dark-only colors
 - Visible primary text and runtime messages use `LocalizationManager`
+- TextBox normal, pointer-over, and focused Fluent theme resources must remain
+  synchronized with `AppInputBrush`, `AppPrimaryTextBrush`, and the active
+  input-border colors so entered text keeps sufficient contrast in both themes
 - Empty artwork areas use a dedicated placeholder resource
 - Tables, lists, and trees must not expose default-white backgrounds in dark mode
 - DataGrid and ScrollViewer backgrounds are overridden via Avalonia styles in
@@ -322,6 +340,9 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - Explicit sidebar navigation clears drill-down filters, including when the already selected item is clicked again
 - **Tracks**: title-sorted list with combinable Favorites, Genre, Audio Type, and Bitrate facets; counts reflect the other active filters and unavailable unselected values are hidden
 - Alphabetically sorted artist, album, and track views show an A-Z/# index immediately left of the right-aligned scrollbar; unavailable letters are disabled, dragging across letters scrolls live, and the highlighted letter follows the top visible entry
+- The A-Z/# index uses trimmed `sort_title` where available and otherwise the
+  displayed title; programmatic jumps use `DataGrid.ScrollIntoView`, while
+  manual DataGrid scrolling updates the active letter from the top visible row
 - **Search**: delayed Lucene search returns separate themed Track, Album, and Artist sections, supports partial words and German normalization variants, sorts by score then display name, and preserves the original query across drill-down Back navigation
 - **Folder structure**: configured library roots start expanded; child folders load lazily; double-clicking a track queues its direct folder sorted by disc, track number, and file name
 - **Playlists**: display position, title, artist, album, and duration; sidebar entries open their live track list

@@ -4,6 +4,39 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Licensed Orynivo's original source code and documentation under Apache
+  License 2.0, with repository and release copies of `LICENSE`, `NOTICE`,
+  third-party notices, and applicable license texts.
+- Expanded the About dialog with the Orynivo license, copyright, trademark
+  scope, FFmpeg, Steinberg ASIO, and third-party licensing information.
+- Added real-time DSF/DFF-to-PCM playback through exclusive-mode WASAPI. The
+  conversion uses FFmpeg without temporary files, prefers PCM rates in the
+  44.1 kHz family, and falls back to common 48 kHz-family rates supported by
+  the selected endpoint.
+- Added localized transport and status-bar indicators in German, English,
+  French, and Spanish when DSD is being converted to PCM, including the active
+  PCM output sample rate.
+
+### Fixed
+
+- Corrected themed scrollbar behavior so arrow buttons move one row and clicks
+  above or below the thumb move by one visible table page with one-row overlap.
+  Track-table A-Z highlighting now follows the top visible row during manual
+  scrolling, and alphabet jumps use the same trimmed sort-title ordering as the
+  database.
+- Trimmed leading and trailing whitespace from track titles and sort titles
+  during scans, database upserts, migration of existing libraries, display,
+  and Lucene indexing. The search-index schema is advanced so existing indexes
+  rebuild with normalized title values.
+- Fixed search and other text inputs switching to a white focused background
+  while retaining white text in the dark theme. Normal, hover, focused,
+  placeholder, and border colors now follow Orynivo's active light or dark
+  input palette.
+
 ## [0.5.0] - 2026-06-17
 
 ### Changed

@@ -428,10 +428,10 @@
             <Style Selector="^:pointerover">
                 <Setter Property="Foreground" Value="#6C63FF"/>
             </Style>
-            <Style Selector="^[IsDefault=true] /template/ Border#Bd">
+            <Style Selector="^.active /template/ Border#Bd">
                 <Setter Property="Background" Value="#6C63FF"/>
             </Style>
-            <Style Selector="^[IsDefault=true]">
+            <Style Selector="^.active">
                 <Setter Property="Foreground" Value="White"/>
             </Style>
             <Style Selector="^:disabled">

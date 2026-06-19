@@ -49,6 +49,18 @@
             <SolidColorBrush x:Key="AppButtonBorderBrush"        Color="#343654"/>
             <SolidColorBrush x:Key="AppInputBrush"               Color="#20213A"/>
             <SolidColorBrush x:Key="AppInputBorderBrush"         Color="#343654"/>
+            <SolidColorBrush x:Key="TextControlBackground"       Color="#20213A"/>
+            <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#20213A"/>
+            <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#20213A"/>
+            <SolidColorBrush x:Key="TextControlForeground"       Color="#F7F7FF"/>
+            <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#F7F7FF"/>
+            <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#F7F7FF"/>
+            <SolidColorBrush x:Key="TextControlBorderBrush"      Color="#343654"/>
+            <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#45486B"/>
+            <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#6C63FF"/>
+            <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#7777AA"/>
+            <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver" Color="#7777AA"/>
+            <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#7777AA"/>
             <SolidColorBrush x:Key="AppDsdSupportedBrush"        Color="#F7F7FF"/>
             <SolidColorBrush x:Key="AppDsdUnsupportedBrush"      Color="#5B5D79"/>
             <SolidColorBrush x:Key="TreeViewItemForeground" Color="#A0A0C8"/>
@@ -101,11 +113,13 @@
                 </Setter>
             </ControlTheme>
 
-            <!-- ScrollBar Thumb -->
+            <!-- ScrollBar thumb, page-track, and arrow buttons are separate themes.
+                 DataGrid discovers the named PART_* buttons and assigns small/large scrolling. -->
             <ControlTheme x:Key="AppScrollBarThumb" TargetType="Thumb">
                 <Setter Property="Template">
                     <ControlTemplate>
-                        <Border Name="ThumbBd" Margin="2"
+                        <Border Name="ThumbBd"
+                                Margin="2"
                                 Background="{DynamicResource AppScrollbarThumbBrush}"
                                 CornerRadius="5"/>
                     </ControlTemplate>
@@ -115,46 +129,88 @@
                 </Style>
             </ControlTheme>
 
-            <!-- ScrollBar -->
-            <ControlTheme x:Key="{x:Type ScrollBar}" TargetType="ScrollBar">
-                <Setter Property="Width"      Value="16"/>
-                <Setter Property="MinWidth"   Value="16"/>
-                <Setter Property="Background" Value="{DynamicResource AppScrollbarTrackBrush}"/>
+            <ControlTheme x:Key="AppScrollBarPageButton" TargetType="RepeatButton">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Focusable" Value="False"/>
+                <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                <Setter Property="VerticalAlignment" Value="Stretch"/>
                 <Setter Property="Template">
                     <ControlTemplate>
-                        <Grid Background="{TemplateBinding Background}">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="18"/>
-                                <RowDefinition Height="*"/>
-                                <RowDefinition Height="18"/>
-                            </Grid.RowDefinitions>
-                            <RepeatButton Grid.Row="0" Background="Transparent"
-                                          BorderThickness="0" Focusable="False">
-                                <Path Width="7" Height="4" Data="M 0 4 L 3.5 0 L 7 4"
-                                      Stroke="{DynamicResource AppScrollbarThumbBrush}"
-                                      StrokeThickness="1.5"/>
-                            </RepeatButton>
-                            <Track Name="PART_Track" Grid.Row="1" IsDirectionReversed="True">
-                                <Track.DecreaseButton>
-                                    <RepeatButton Opacity="0" Focusable="False"/>
-                                </Track.DecreaseButton>
-                                <Track.Thumb>
-                                    <Thumb MinHeight="42"
-                                           Theme="{StaticResource AppScrollBarThumb}"/>
-                                </Track.Thumb>
-                                <Track.IncreaseButton>
-                                    <RepeatButton Opacity="0" Focusable="False"/>
-                                </Track.IncreaseButton>
-                            </Track>
-                            <RepeatButton Grid.Row="2" Background="Transparent"
-                                          BorderThickness="0" Focusable="False">
-                                <Path Width="7" Height="4" Data="M 0 0 L 3.5 4 L 7 0"
-                                      Stroke="{DynamicResource AppScrollbarThumbBrush}"
-                                      StrokeThickness="1.5"/>
-                            </RepeatButton>
-                        </Grid>
+                        <Border Background="Transparent"/>
                     </ControlTemplate>
                 </Setter>
+            </ControlTheme>
+
+            <ControlTheme x:Key="AppScrollBarLineButton" TargetType="RepeatButton">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Focusable" Value="False"/>
+                <Setter Property="Template">
+                    <ControlTemplate>
+                        <Border Background="Transparent">
+                            <ContentPresenter Content="{TemplateBinding Content}"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter>
+            </ControlTheme>
+
+            <ControlTheme x:Key="{x:Type ScrollBar}" TargetType="ScrollBar">
+                <Setter Property="Width" Value="16"/>
+                <Setter Property="MinWidth" Value="16"/>
+                <Setter Property="Background" Value="{DynamicResource AppScrollbarTrackBrush}"/>
+                <Style Selector="^:vertical">
+                    <Setter Property="Template">
+                        <ControlTemplate>
+                            <Grid RowDefinitions="18,*,18"
+                                  Background="{TemplateBinding Background}">
+                                <RepeatButton Name="PART_LineUpButton"
+                                              Grid.Row="0"
+                                              Theme="{StaticResource AppScrollBarLineButton}">
+                                    <Path Width="7"
+                                          Height="4"
+                                          Data="M 0 4 L 3.5 0 L 7 4"
+                                          Stroke="{DynamicResource AppScrollbarThumbBrush}"
+                                          StrokeThickness="1.5"/>
+                                </RepeatButton>
+                                <Track Grid.Row="1"
+                                       Minimum="{TemplateBinding Minimum}"
+                                       Maximum="{TemplateBinding Maximum}"
+                                       Value="{TemplateBinding Value, Mode=TwoWay}"
+                                       DeferThumbDrag="{TemplateBinding ScrollViewer.IsDeferredScrollingEnabled}"
+                                       ViewportSize="{TemplateBinding ViewportSize}"
+                                       Orientation="{TemplateBinding Orientation}"
+                                       IsDirectionReversed="True">
+                                    <Track.DecreaseButton>
+                                        <RepeatButton Name="PART_PageUpButton"
+                                                      Classes="largeIncrease"
+                                                      Theme="{StaticResource AppScrollBarPageButton}"/>
+                                    </Track.DecreaseButton>
+                                    <Track.Thumb>
+                                        <Thumb MinHeight="42"
+                                               Theme="{StaticResource AppScrollBarThumb}"/>
+                                    </Track.Thumb>
+                                    <Track.IncreaseButton>
+                                        <RepeatButton Name="PART_PageDownButton"
+                                                      Classes="largeIncrease"
+                                                      Theme="{StaticResource AppScrollBarPageButton}"/>
+                                    </Track.IncreaseButton>
+                                </Track>
+                                <RepeatButton Name="PART_LineDownButton"
+                                              Grid.Row="2"
+                                              Theme="{StaticResource AppScrollBarLineButton}">
+                                    <Path Width="7"
+                                          Height="4"
+                                          Data="M 0 0 L 3.5 4 L 7 0"
+                                          Stroke="{DynamicResource AppScrollbarThumbBrush}"
+                                          StrokeThickness="1.5"/>
+                                </RepeatButton>
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter>
+                </Style>
             </ControlTheme>
 
             <!-- ── Localisation string resources (initial German; overwritten by LocalizationManager) ── -->

@@ -1,5 +1,7 @@
 # Orynivo
 
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
 A native Windows audio player with an Avalonia UI interface, local music
 library, and ASIO and WASAPI playback.
 
@@ -13,6 +15,8 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 
 - Playback through ASIO or exclusive-mode WASAPI
 - Native stereo DSD playback for DSF and uncompressed DFF files through ASIO
+- Real-time DSF/DFF-to-PCM conversion for playback through WASAPI, with the
+  active conversion and PCM sample rate shown in the transport and status bar
 - PCM playback through `ffmpeg`
 - Seeking, volume control, pause, an automatic playback queue, and shuffle
   without repeating a track within the currently loaded queue
@@ -87,6 +91,10 @@ The user interface recognizes, among others:
 
 PCM formats are decoded by `ffmpeg`, which Orynivo downloads automatically on
 first start if not already installed. Actual codec support depends on the build.
+When WASAPI is selected, DSD audio in DSF or DFF containers is converted to PCM
+in real time without creating a temporary file. Orynivo prefers 176.4, 88.2,
+or 44.1 kHz output and falls back to 192, 96, or 48 kHz when required by the
+selected exclusive-mode endpoint.
 
 ## Requirements
 
@@ -217,7 +225,8 @@ artwork, rebasing paths, and rebuilding the search index.
 
 ## Current Limitations
 
-- Native DSD playback is available only through ASIO.
+- Native, bit-perfect DSD playback is available only through ASIO. WASAPI can
+  play DSF/DFF by converting the audio to PCM in real time.
 - Builds without the optional ASIO bridge use WASAPI for playback and do not
   offer ASIO in Settings.
 - Native DFF playback currently supports only uncompressed stereo files.
@@ -251,20 +260,33 @@ include the output backend, device, file format, and sample rate.
 
 ## Dependencies and Notices
 
-- Avalonia 11.2.0, MIT License
-- Avalonia.Controls.DataGrid 11.2.0, MIT License
-- SkiaSharp 2.88.9, MIT License
-- Lucene.NET 4.8.0-beta00017, Apache License 2.0
-- Microsoft.Data.Sqlite 9.0.5, MIT License
-- NAudio 2.3.0, MIT License
-- TagLibSharp 2.3.0, LGPL-2.1
-- SQLitePCLRaw / e_sqlite3, Apache License 2.0
+Orynivo uses components under MIT, Apache-2.0, LGPL-2.1-only, and other
+compatible terms. This includes Avalonia, SkiaSharp, Lucene.NET,
+Microsoft.Data.Sqlite, NAudio, TagLibSharp, SQLitePCLRaw, cwASIO, and their
+transitive dependencies.
 
-ASIO is a trademark and software of Steinberg Media Technologies GmbH.
+The complete attribution and redistribution information is maintained in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Applicable license texts are
+provided in [`licenses/`](licenses/) and are copied into build and publish
+outputs.
+
+FFmpeg is run as a separate executable. If it is not installed, Orynivo
+downloads the BtbN LGPL essentials build. FFmpeg remains subject to its own
+license and is not covered by the Orynivo license.
+
+ASIO is a trademark and software of Steinberg Media Technologies GmbH. The
+optional Steinberg ASIO SDK is not included in this repository and must be
+obtained and licensed separately. The vendored cwASIO implementation is an
+independent MIT-licensed implementation.
 
 ## License
 
-No license file currently covers the original source code in this repository.
-Until a license is added, no additional rights to use, modify, or distribute
-that source code are granted. The dependencies listed above remain subject to
-their respective licenses.
+Copyright 2026 Björn Schlaack.
+
+Orynivo's original source code and documentation are licensed under the
+[Apache License 2.0](LICENSE). The license does not grant trademark rights in
+the Orynivo name, wordmark, logo, or application icon.
+
+Third-party components and the optional Steinberg ASIO SDK are excluded from
+that grant and remain subject to their respective terms. See [NOTICE](NOTICE)
+and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
