@@ -94,6 +94,7 @@ public partial class MainWindow : Window
     private bool _isDraggingAlphabetIndex;
     private bool _alphabetScrollUpdatePending;
     private bool _isAlphabetProgrammaticScroll;
+    private ScrollBar? _contentDataGridVerticalScrollBar;
     private readonly RadioBrowserService _radioBrowserService = new();
     private readonly RadioStreamMetadataService _radioMetadataService = new();
     private readonly PodcastService _podcastService = new();
@@ -240,6 +241,7 @@ public partial class MainWindow : Window
         public long? ArtistId       { get; set; }
         public long? AlbumId        { get; set; }
         public string? Title       { get; init; }
+        public string? AlphabetIndexText { get; init; }
         public string? Artist      { get; init; }
         public string? Album       { get; init; }
         public string? AlbumArtist { get; init; }
@@ -358,12 +360,14 @@ public partial class MainWindow : Window
     private void OnWindowOpened(object? sender, EventArgs e)
     {
         WindowChrome.ApplyTheme(this);
-        ContentDataGrid.AddHandler(
-            ScrollViewer.ScrollChangedEvent, new EventHandler<ScrollChangedEventArgs>(AlphabetTarget_OnScrollChanged));
         AlbumArtworkListBox.AddHandler(
-            ScrollViewer.ScrollChangedEvent, new EventHandler<ScrollChangedEventArgs>(AlphabetTarget_OnScrollChanged));
+            ScrollViewer.ScrollChangedEvent,
+            new EventHandler<ScrollChangedEventArgs>(AlphabetTarget_OnScrollChanged),
+            handledEventsToo: true);
         ArtistArtworkListBox.AddHandler(
-            ScrollViewer.ScrollChangedEvent, new EventHandler<ScrollChangedEventArgs>(AlphabetTarget_OnScrollChanged));
+            ScrollViewer.ScrollChangedEvent,
+            new EventHandler<ScrollChangedEventArgs>(AlphabetTarget_OnScrollChanged),
+            handledEventsToo: true);
         NavListBox.AddHandler(
             PointerPressedEvent,
             new EventHandler<PointerPressedEventArgs>(NavListBox_OnPreviewMouseLeftButtonDown),
@@ -373,10 +377,15 @@ public partial class MainWindow : Window
             handledEventsToo: true);
         QueueHydrateVisibleArtworkRows(AlbumArtworkListBox);
         QueueHydrateVisibleArtworkRows(ArtistArtworkListBox);
+        // Avalonia DataGrid owns a dedicated pixel-based vertical ScrollBar instead of
+        // exposing its vertical movement through a ScrollViewer.
+        ContentDataGrid.VerticalScroll += ContentDataGrid_OnVerticalScroll;
+        Dispatcher.UIThread.Post(AttachContentDataGridVerticalScrollBar, DispatcherPriority.Loaded);
     }
 
     protected override void OnClosed(EventArgs e)
     {
+        ContentDataGrid.VerticalScroll -= ContentDataGrid_OnVerticalScroll;
         PersistViewState();
         CancelAndDispose(ref _radioSearchCts);
         CancelAndDispose(ref _podcastSearchCts);
@@ -1055,7 +1064,7 @@ public partial class MainWindow : Window
     {
         var rows = source?.ToList() ?? [];
         var firstRows = rows
-            .GroupBy(row => GetAlphabetIndexKey(row.Title))
+            .GroupBy(GetAlphabetIndexKey)
             .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
 
         AlphabetIndexPanel.Children.Clear();
@@ -1345,6 +1354,9 @@ public partial class MainWindow : Window
         return treeItem;
     }
 
+    private static string GetAlphabetIndexKey(ContentRow row) =>
+        GetAlphabetIndexKey(row.AlphabetIndexText ?? row.Title);
+
     private static string GetAlphabetIndexKey(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -1387,18 +1399,14 @@ public partial class MainWindow : Window
 
     private void ScrollToAlphabetRow(ContentRow row)
     {
-        var targetKey = GetAlphabetIndexKey(row.Title);
+        var targetKey = GetAlphabetIndexKey(row);
         _isAlphabetProgrammaticScroll = true;
         SetActiveAlphabetButton(targetKey);
 
         if (ContentDataGrid.IsVisible)
         {
-            var index = ((ContentDataGrid.ItemsSource as System.Collections.IList)?.IndexOf(row) ?? -1);
-            var scrollViewer = FindVisualChild<ScrollViewer>(ContentDataGrid);
-            if (index >= 0 && scrollViewer is not null)
-                scrollViewer.SetCurrentValue(Avalonia.Controls.ScrollViewer.OffsetProperty, new Avalonia.Vector(0, index));
-            else
-                ContentDataGrid.ScrollIntoView(row, null);
+            // Let DataGrid translate the logical item into its internal pixel offset.
+            ContentDataGrid.ScrollIntoView(row, null);
         }
         else
         {
@@ -1413,9 +1421,8 @@ public partial class MainWindow : Window
 
         Dispatcher.UIThread.Post(() =>
         {
-            SetActiveAlphabetButton(targetKey);
             _isAlphabetProgrammaticScroll = false;
-        }, DispatcherPriority.Background);
+        }, DispatcherPriority.Loaded);
     }
 
     private void AlphabetTarget_OnScrollChanged(object? sender, ScrollChangedEventArgs e)
@@ -1427,9 +1434,22 @@ public partial class MainWindow : Window
         }
 
         if (!AlphabetIndexBorder.IsVisible ||
-            e.OffsetDelta.Y == 0 ||
             _isAlphabetProgrammaticScroll ||
             _alphabetScrollUpdatePending)
+            return;
+
+        _alphabetScrollUpdatePending = true;
+        Dispatcher.UIThread.Post(() =>
+        {
+            _alphabetScrollUpdatePending = false;
+            UpdateActiveAlphabetButton();
+        }, DispatcherPriority.Background);
+    }
+
+    private void ContentDataGrid_OnVerticalScroll(object? sender, Avalonia.Controls.Primitives.ScrollEventArgs e)
+    {
+        UpdateContentDataGridPageSize();
+        if (!AlphabetIndexBorder.IsVisible || _isAlphabetProgrammaticScroll || _alphabetScrollUpdatePending)
             return;
 
         _alphabetScrollUpdatePending = true;
@@ -1446,14 +1466,51 @@ public partial class MainWindow : Window
             return;
 
         var row = GetTopVisibleAlphabetRow();
-        var activeKey = row is null ? null : GetAlphabetIndexKey(row.Title);
+        var activeKey = row is null ? null : GetAlphabetIndexKey(row);
         SetActiveAlphabetButton(activeKey);
     }
 
     private void SetActiveAlphabetButton(string? activeKey)
     {
         foreach (var button in AlphabetIndexPanel.Children.OfType<Button>())
-            button.IsDefault = string.Equals(button.Content as string, activeKey, StringComparison.Ordinal);
+        {
+            var isActive = string.Equals(button.Content as string, activeKey, StringComparison.Ordinal);
+            button.Classes.Set("active", isActive);
+        }
+    }
+
+    private void AttachContentDataGridVerticalScrollBar()
+    {
+        // PART_VerticalScrollbar is created by the DataGrid template after layout.
+        _contentDataGridVerticalScrollBar = ContentDataGrid
+            .GetVisualDescendants()
+            .OfType<ScrollBar>()
+            .FirstOrDefault(scrollBar =>
+                scrollBar.Orientation == Orientation.Vertical &&
+                string.Equals(scrollBar.Name, "PART_VerticalScrollbar", StringComparison.Ordinal));
+        if (_contentDataGridVerticalScrollBar is not null)
+        {
+            UpdateContentDataGridPageSize();
+            UpdateActiveAlphabetButton();
+        }
+    }
+
+    private void UpdateContentDataGridPageSize()
+    {
+        if (_contentDataGridVerticalScrollBar is null)
+            return;
+
+        // DataGrid scroll values are pixels. One page intentionally overlaps by one
+        // row so users retain visual context after clicking the scrollbar track.
+        var visibleRows = FindVisualChildren<DataGridRow>(ContentDataGrid)
+            .Where(row => row.IsVisible && row.Bounds.Height > 0)
+            .ToList();
+        var rowHeight = visibleRows.Count > 0
+            ? visibleRows.Average(row => row.Bounds.Height)
+            : 0;
+        var pageSize = _contentDataGridVerticalScrollBar.ViewportSize - rowHeight;
+        if (pageSize > 0 && double.IsFinite(pageSize))
+            _contentDataGridVerticalScrollBar.LargeChange = pageSize;
     }
 
     private ContentRow? GetTopVisibleAlphabetRow()
@@ -1481,14 +1538,14 @@ public partial class MainWindow : Window
             : FindVisualChildren<ListBoxItem>(targetControl).Cast<Control>();
         foreach (var container in candidates)
         {
-            if (container.DataContext is not ContentRow)
+            if (!container.IsVisible || container.DataContext is not ContentRow)
                 continue;
 
             var topLeft = container.TranslatePoint(new Point(0, 0), targetControl) ?? new Point(0, 0);
             var bounds = new Rect(topLeft.X, topLeft.Y, container.Bounds.Width, container.Bounds.Height);
             if (bounds.Bottom <= visibleTop || bounds.Top >= targetControl.Bounds.Height)
                 continue;
-            if (bounds.Top + 0.5 >= visibleTop && bounds.Top < bestTop)
+            if (bounds.Top < bestTop)
             {
                 bestTop = bounds.Top;
                 bestContainer = container;
@@ -1745,7 +1802,8 @@ public partial class MainWindow : Window
 
     private static ContentRow ToTrackContentRow(TrackListInfo t) => new()
     {
-        Title = t.Title ?? t.FileName,
+        Title = t.Title?.Trim() ?? t.FileName.Trim(),
+        AlphabetIndexText = t.SortTitle?.Trim() ?? t.Title?.Trim() ?? t.FileName.Trim(),
         Id = t.Id,
         Artist = t.Artist,
         Album = t.Album,

@@ -271,8 +271,10 @@ public static class LibraryScanner
     }
 
     private static string? NullIfEmpty(string? s)
-        => string.IsNullOrWhiteSpace(s) ? null : s;
+        => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
 
     private static string? JoinArray(string[]? arr)
-        => arr is { Length: > 0 } ? NullIfEmpty(string.Join("; ", arr)) : null;
+        => arr is { Length: > 0 }
+            ? NullIfEmpty(string.Join("; ", arr.Select(value => value.Trim()).Where(value => value.Length > 0)))
+            : null;
 }

@@ -184,6 +184,14 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - Artwork is deduplicated instead of stored per track
 - `TrackSearchIndex.cs` stores a Lucene.NET index under `%LOCALAPPDATA%\Orynivo\search-index`, supports category-specific fields, partial words, and German umlaut/eszett variants, rebuilds stale indexes, updates incrementally after scans, and removes missing files below rescanned roots
 - Search-index freshness is determined by the stored schema marker; indexed `Field.Store.NO` fields must not be tested through stored-document field access
+- Track `title` and `sort_title` values are trimmed before database persistence
+  and again before Lucene indexing; future metadata/indexing changes must
+  preserve this invariant so A-Z ordering is not affected by surrounding
+  whitespace
+- Avalonia `DataGrid` vertical scrolling is handled by its own pixel-based
+  `PART_VerticalScrollbar`, not by an inner `ScrollViewer`. The main table
+  listens to `DataGrid.VerticalScroll`; scrollbar track clicks use a
+  `LargeChange` equal to the visible viewport minus one realized row
 
 ## Known Technical Details
 
@@ -332,6 +340,9 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - Explicit sidebar navigation clears drill-down filters, including when the already selected item is clicked again
 - **Tracks**: title-sorted list with combinable Favorites, Genre, Audio Type, and Bitrate facets; counts reflect the other active filters and unavailable unselected values are hidden
 - Alphabetically sorted artist, album, and track views show an A-Z/# index immediately left of the right-aligned scrollbar; unavailable letters are disabled, dragging across letters scrolls live, and the highlighted letter follows the top visible entry
+- The A-Z/# index uses trimmed `sort_title` where available and otherwise the
+  displayed title; programmatic jumps use `DataGrid.ScrollIntoView`, while
+  manual DataGrid scrolling updates the active letter from the top visible row
 - **Search**: delayed Lucene search returns separate themed Track, Album, and Artist sections, supports partial words and German normalization variants, sorts by score then display name, and preserves the original query across drill-down Back navigation
 - **Folder structure**: configured library roots start expanded; child folders load lazily; double-clicking a track queues its direct folder sorted by disc, track number, and file name
 - **Playlists**: display position, title, artist, album, and duration; sidebar entries open their live track list

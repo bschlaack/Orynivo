@@ -30,7 +30,7 @@ public sealed record SearchHitIds(List<long> Ids, IReadOnlyDictionary<long, floa
 public static class TrackSearchIndex
 {
     private const LuceneVersion Version = LuceneVersion.LUCENE_48;
-    private const string SchemaVersion = "search-fields-v4";
+    private const string SchemaVersion = "search-fields-v5-trimmed-titles";
 
     private static string Root => AppPaths.GetDataPath("search-index");
 
@@ -301,20 +301,16 @@ public static class TrackSearchIndex
     }
 
     private static string BuildTitleText(TrackRecord t)
-        => ExpandGermanUmlautVariants(string.Join(' ', new object?[] { t.Title, t.SortTitle }
-            .Where(v => v is not null)));
+        => ExpandGermanUmlautVariants(JoinTrimmed(t.Title, t.SortTitle));
 
     private static string BuildAlbumText(TrackRecord t)
-        => ExpandGermanUmlautVariants(string.Join(' ', new object?[] { t.Album, t.SortAlbum }
-            .Where(v => v is not null)));
+        => ExpandGermanUmlautVariants(JoinTrimmed(t.Album, t.SortAlbum));
 
     private static string BuildArtistText(TrackRecord t)
-        => ExpandGermanUmlautVariants(string.Join(' ', new object?[] { t.Artist, t.SortArtist }
-            .Where(v => v is not null)));
+        => ExpandGermanUmlautVariants(JoinTrimmed(t.Artist, t.SortArtist));
 
     private static string BuildAlbumArtistText(TrackRecord t)
-        => ExpandGermanUmlautVariants(string.Join(' ', new object?[] { t.AlbumArtist, t.SortAlbumArtist }
-            .Where(v => v is not null)));
+        => ExpandGermanUmlautVariants(JoinTrimmed(t.AlbumArtist, t.SortAlbumArtist));
 
     private static string BuildAllText(TrackRecord t)
     {
@@ -330,6 +326,13 @@ public static class TrackSearchIndex
             t.ReplayGainTrack, t.ReplayGainAlbum, t.MusicBrainzTrackId, t.MusicBrainzReleaseId,
             t.MusicBrainzArtistId, t.AcoustIdFingerprint, t.HasCover, t.CoverMimeType
         };
-        return ExpandGermanUmlautVariants(string.Join(' ', values.Where(v => v is not null)));
+        return ExpandGermanUmlautVariants(JoinTrimmed(values));
     }
+
+    private static string JoinTrimmed(params object?[] values)
+        => string.Join(
+            ' ',
+            values
+                .Select(value => value?.ToString()?.Trim())
+                .Where(value => !string.IsNullOrEmpty(value)));
 }

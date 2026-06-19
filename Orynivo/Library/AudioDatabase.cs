@@ -173,6 +173,8 @@ public sealed class AudioDatabase : IDisposable
     /// <param name="track">The track record to upsert.</param>
     public void Upsert(TrackRecord track)
     {
+        track.Title = TrimToNull(track.Title);
+        track.SortTitle = TrimToNull(track.SortTitle);
         track.Artist = ArtistNameNormalizer.NormalizeDisplayName(track.Artist);
         track.AlbumArtist = ArtistNameNormalizer.NormalizeDisplayName(track.AlbumArtist ?? track.Artist);
         using var tx = _conn.BeginTransaction();
@@ -1131,7 +1133,11 @@ public sealed class AudioDatabase : IDisposable
     }
 
     public List<TrackListInfo> GetTrackListFiltered(IEnumerable<long> ids)
-        => GetTrackListByIds(ids);
+        => GetTrackListByIds(ids)
+            .OrderBy(
+                track => track.SortTitle ?? track.Title ?? track.FileName,
+                StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
 
     public List<AlbumInfo> GetAlbumsByTrackIds(IEnumerable<long> ids)
     {
@@ -1602,6 +1608,11 @@ public sealed class AudioDatabase : IDisposable
         {
             MigrateArtworkFiles();
             SetMeta("artwork_files_v1", "done");
+        }
+        if (!string.Equals(GetMeta("trim_track_titles_v1"), "done", StringComparison.Ordinal))
+        {
+            TrimExistingTrackTitles();
+            SetMeta("trim_track_titles_v1", "done");
         }
 
         Execute("""
@@ -2238,6 +2249,52 @@ public sealed class AudioDatabase : IDisposable
                 return;
         Execute($"ALTER TABLE {table} ADD COLUMN {column} {definition};");
     }
+
+    private void TrimExistingTrackTitles()
+    {
+        var titles = new List<(long Id, string? Title, string? SortTitle)>();
+        using (var select = _conn.CreateCommand())
+        {
+            select.CommandText = "SELECT id, title, sort_title FROM tracks;";
+            using var reader = select.ExecuteReader();
+            while (reader.Read())
+            {
+                titles.Add((
+                    reader.GetInt64(0),
+                    reader.IsDBNull(1) ? null : reader.GetString(1),
+                    reader.IsDBNull(2) ? null : reader.GetString(2)));
+            }
+        }
+
+        using var tx = _conn.BeginTransaction();
+        foreach (var track in titles)
+        {
+            var title = TrimToNull(track.Title);
+            var sortTitle = TrimToNull(track.SortTitle);
+            if (string.Equals(title, track.Title, StringComparison.Ordinal) &&
+                string.Equals(sortTitle, track.SortTitle, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            using var update = _conn.CreateCommand();
+            update.Transaction = tx;
+            update.CommandText = """
+                UPDATE tracks
+                SET title = $title,
+                    sort_title = $sort_title
+                WHERE id = $id;
+                """;
+            Add(update, "$title", (object?)title ?? DBNull.Value);
+            Add(update, "$sort_title", (object?)sortTitle ?? DBNull.Value);
+            Add(update, "$id", track.Id);
+            update.ExecuteNonQuery();
+        }
+        tx.Commit();
+    }
+
+    private static string? TrimToNull(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private void MigrateNormalizedLibrary()
     {
