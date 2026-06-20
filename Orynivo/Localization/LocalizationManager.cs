@@ -125,6 +125,13 @@ public static class LocalizationManager
         resources["L_AsioOutputDevice"] = Current.AsioOutputDevice;
         resources["L_CwAsioOutputDevice"] = Current.CwAsioOutputDevice;
         resources["L_DeviceInfo"] = Current.DeviceInfo;
+        resources["L_ReplayGain"] = Current.ReplayGain;
+        resources["L_ReplayGainHint"] = Current.ReplayGainHint;
+        resources["L_SelectColumns"] = Current.SelectColumns;
+        resources["L_Codec"] = Current.Codec;
+        resources["L_Tags"] = Current.Tags;
+        resources["L_Homepage"] = Current.Homepage;
+        resources["L_FeedUrl"] = Current.FeedUrl;
         resources["L_DatabaseOptimizeHint"] = Current.DatabaseOptimizeHint;
         resources["L_NormalizeArtists"] = Current.NormalizeArtists;
         resources["L_NormalizeArtistsHint"] = Current.NormalizeArtistsHint;
@@ -297,6 +304,18 @@ public static class LocalizationManager
         PlaybackThroughWithDsdConversion = "Wiedergabe über {0} · DSD wird in PCM ({1:N0} Hz) konvertiert",
         NativeDsdOutput = "DSD nativ",
         DsdToPcmOutput = "DSD → PCM",
+        ReplayGain = "ReplayGain-Lautstärkeanpassung",
+        ReplayGainHint = "Gilt für PCM-Wiedergabe. Im Track-Modus wird bevorzugt der Track-Wert verwendet, im Album-Modus der Album-Wert. Native DSD-Ausgabe bleibt bitgenau.",
+        ReplayGainOff = "Aus",
+        ReplayGainTrack = "Track",
+        ReplayGainAlbum = "Album",
+        SelectColumns = "Spalten auswählen",
+        FileName = "Dateiname", FileSize = "Dateigröße", AddedAt = "Hinzugefügt",
+        SampleRate = "Samplerate", BitDepth = "Bittiefe", Channels = "Kanäle",
+        TrackNumber = "Tracknummer", DiscNumber = "Discnummer", Composer = "Komponist",
+        Bpm = "BPM", ReplayGainTrackColumn = "ReplayGain Track",
+        ReplayGainAlbumColumn = "ReplayGain Album", Codec = "Codec", Tags = "Tags",
+        Homepage = "Homepage", FeedUrl = "Feed-Adresse",
         SearchResultSummary = "{0:N0} Titel · {1:N0} Alben · {2:N0} Künstler",
         RecentAlbums = "Zuletzt hinzugefügte Alben",
         Calendar = "Kalender – {0}",
@@ -531,6 +550,16 @@ public static class LocalizationManager
         PlaybackThrough = "Playback through {0}",
         PlaybackThroughWithDsdConversion = "Playback through {0} · DSD is converted to PCM ({1:N0} Hz)",
         NativeDsdOutput = "Native DSD", DsdToPcmOutput = "DSD → PCM",
+        ReplayGain = "ReplayGain volume adjustment",
+        ReplayGainHint = "Applies to PCM playback. Track mode prefers track gain; album mode prefers album gain. Native DSD output remains bit-perfect.",
+        ReplayGainOff = "Off", ReplayGainTrack = "Track", ReplayGainAlbum = "Album",
+        SelectColumns = "Select columns",
+        FileName = "File name", FileSize = "File size", AddedAt = "Added",
+        SampleRate = "Sample rate", BitDepth = "Bit depth", Channels = "Channels",
+        TrackNumber = "Track number", DiscNumber = "Disc number", Composer = "Composer",
+        Bpm = "BPM", ReplayGainTrackColumn = "ReplayGain track",
+        ReplayGainAlbumColumn = "ReplayGain album", Codec = "Codec", Tags = "Tags",
+        Homepage = "Homepage", FeedUrl = "Feed address",
         SearchResultSummary = "{0:N0} tracks · {1:N0} albums · {2:N0} artists",
         RecentAlbums = "Recently added albums", Calendar = "Calendar – {0}", TopGenres = "Top 10 genres by play time",
         NoData = "No data available.", DevicePcmSampleRates = "Supported PCM sample rates", DeviceDsdRates = "DSD rates",
@@ -763,6 +792,16 @@ public static class LocalizationManager
         PlaybackThrough = "Lecture via {0}",
         PlaybackThroughWithDsdConversion = "Lecture via {0} · Le DSD est converti en PCM ({1:N0} Hz)",
         NativeDsdOutput = "DSD natif", DsdToPcmOutput = "DSD → PCM",
+        ReplayGain = "Ajustement du volume ReplayGain",
+        ReplayGainHint = "S’applique à la lecture PCM. Le mode piste privilégie le gain de piste, le mode album le gain d’album. La sortie DSD native reste bit-perfect.",
+        ReplayGainOff = "Désactivé", ReplayGainTrack = "Piste", ReplayGainAlbum = "Album",
+        SelectColumns = "Sélectionner les colonnes",
+        FileName = "Nom du fichier", FileSize = "Taille du fichier", AddedAt = "Ajouté",
+        SampleRate = "Fréquence d’échantillonnage", BitDepth = "Profondeur de bits", Channels = "Canaux",
+        TrackNumber = "Numéro de piste", DiscNumber = "Numéro de disque", Composer = "Compositeur",
+        Bpm = "BPM", ReplayGainTrackColumn = "ReplayGain piste",
+        ReplayGainAlbumColumn = "ReplayGain album", Codec = "Codec", Tags = "Tags",
+        Homepage = "Page d’accueil", FeedUrl = "Adresse du flux",
         SearchResultSummary = "{0:N0} titres · {1:N0} albums · {2:N0} artistes",
         RecentAlbums = "Albums ajoutés récemment", Calendar = "Calendrier – {0}", TopGenres = "Top 10 des genres par durée d’écoute",
         NoData = "Aucune donnée disponible.", DevicePcmSampleRates = "Fréquences PCM prises en charge", DeviceDsdRates = "Niveaux DSD",
@@ -992,6 +1031,16 @@ public static class LocalizationManager
         PlaybackThrough = "Reproducción mediante {0}",
         PlaybackThroughWithDsdConversion = "Reproducción mediante {0} · DSD se convierte a PCM ({1:N0} Hz)",
         NativeDsdOutput = "DSD nativo", DsdToPcmOutput = "DSD → PCM",
+        ReplayGain = "Ajuste de volumen ReplayGain",
+        ReplayGainHint = "Se aplica a la reproducción PCM. El modo pista prioriza la ganancia de pista y el modo álbum la ganancia de álbum. La salida DSD nativa sigue siendo bit-perfect.",
+        ReplayGainOff = "Desactivado", ReplayGainTrack = "Pista", ReplayGainAlbum = "Álbum",
+        SelectColumns = "Seleccionar columnas",
+        FileName = "Nombre de archivo", FileSize = "Tamaño de archivo", AddedAt = "Añadido",
+        SampleRate = "Frecuencia de muestreo", BitDepth = "Profundidad de bits", Channels = "Canales",
+        TrackNumber = "Número de pista", DiscNumber = "Número de disco", Composer = "Compositor",
+        Bpm = "BPM", ReplayGainTrackColumn = "ReplayGain pista",
+        ReplayGainAlbumColumn = "ReplayGain álbum", Codec = "Códec", Tags = "Etiquetas",
+        Homepage = "Página principal", FeedUrl = "Dirección del feed",
         SearchResultSummary = "{0:N0} pistas · {1:N0} álbumes · {2:N0} artistas",
         RecentAlbums = "Álbumes añadidos recientemente", Calendar = "Calendario – {0}", TopGenres = "10 géneros principales por tiempo de reproducción",
         NoData = "No hay datos disponibles.", DevicePcmSampleRates = "Frecuencias PCM compatibles", DeviceDsdRates = "Niveles DSD",

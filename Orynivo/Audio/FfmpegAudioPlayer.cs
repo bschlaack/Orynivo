@@ -42,6 +42,8 @@ public sealed class FfmpegAudioPlayer : IAudioPlayer
     public bool CanSeek => Duration > TimeSpan.Zero;
     /// <inheritdoc/>
     public float Volume { get; set; } = 1.0f;
+    /// <inheritdoc/>
+    public float ReplayGainFactor { get; set; } = 1.0f;
 
     /// <summary>
     /// Probes the file with ffprobe, opens an ASIO stream, launches the ffmpeg decode pipeline,
@@ -179,8 +181,10 @@ public sealed class FfmpegAudioPlayer : IAudioPlayer
     }
     private void ApplyVolume(Span<float> samples)
     {
-        if (Math.Abs(Volume - 1.0f) < 0.0001f) return;
-        for (var index = 0; index < samples.Length; index++) samples[index] *= Volume;
+        var factor = Volume * ReplayGainFactor;
+        if (Math.Abs(factor - 1.0f) < 0.0001f) return;
+        for (var index = 0; index < samples.Length; index++)
+            samples[index] = Math.Clamp(samples[index] * factor, -1.0f, 1.0f);
     }
     private static Process StartFfmpeg(string path, int rate, TimeSpan pos) =>
         Process.Start(new ProcessStartInfo

@@ -134,6 +134,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource _backgroundArtistLoadCts = new();
     private int _activeLyricIndex = -1;
     private bool _updatingViewMode;
+    private string? _contentColumnWidthKey;
 
     private int _dashboardYear;
     private int _dashboardMonth;
@@ -195,6 +196,7 @@ public partial class MainWindow : Window
         public string FormatSummary => Bitrate > 0
             ? $"{Codec ?? "Audio"} · {Bitrate} kbps"
             : Codec ?? "Audio";
+        public string BitrateSummary => Bitrate > 0 ? $"{Bitrate:N0} kbps" : string.Empty;
         public string GenreSummary => string.Join(", ", Genres.Take(3));
 
         public RadioBrowserStation ToBrowserStation() =>
@@ -236,7 +238,7 @@ public partial class MainWindow : Window
 
     private sealed class ContentRow : INotifyPropertyChanged
     {
-        public string? Nr          { get; init; }
+        public string? Nr          { get; set; }
         public long? Id            { get; init; }
         public long? ArtistId       { get; set; }
         public long? AlbumId        { get; set; }
@@ -246,7 +248,20 @@ public partial class MainWindow : Window
         public string? Album       { get; init; }
         public string? AlbumArtist { get; init; }
         public string? Year        { get; init; }
+        public string? TrackNumber { get; init; }
+        public string? DiscNumber  { get; init; }
         public string? Genre       { get; init; }
+        public string? Bitrate     { get; init; }
+        public string? SampleRate  { get; init; }
+        public string? BitDepth    { get; init; }
+        public string? Channels    { get; init; }
+        public string? Composer    { get; init; }
+        public string? Bpm         { get; init; }
+        public string? FileName    { get; init; }
+        public string? FileSize    { get; init; }
+        public string? AddedAt     { get; init; }
+        public string? ReplayGainTrack { get; init; }
+        public string? ReplayGainAlbum { get; init; }
         public string? Folder      { get; init; }
         public string? ArtworkPath { get; set; }
         public string? ThumbnailPath { get; set; }
@@ -288,7 +303,7 @@ public partial class MainWindow : Window
         public string  Duration    { get; init; } = "";
         public string? Format      { get; init; }
         public string  FilePath    { get; init; } = "";
-        public long?   PlaylistEntryId { get; init; }
+        public long?   PlaylistEntryId { get; set; }
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -346,6 +361,8 @@ public partial class MainWindow : Window
             await ShowSearchResultsAsync(SearchTextBox.Text ?? string.Empty);
         };
         LoadSettings();
+        RestoreFixedDataGridColumnWidths();
+        AttachDataGridColumnChoosers();
         LoadCatalogFilterCache();
         LoadNavPlaylists();
         _showAlbumArtworkView = _settings.AlbumArtworkView;
@@ -386,6 +403,7 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         ContentDataGrid.VerticalScroll -= ContentDataGrid_OnVerticalScroll;
+        CaptureAllDataGridColumnWidths();
         PersistViewState();
         CancelAndDispose(ref _radioSearchCts);
         CancelAndDispose(ref _podcastSearchCts);
@@ -420,9 +438,56 @@ public partial class MainWindow : Window
         _settingsStore.Save(_settings);
     }
 
+    private void RestoreFixedDataGridColumnWidths()
+    {
+        RestoreColumnWidths("RadioStations", RadioStationsDataGrid);
+        RestoreColumnWidths("Podcasts", PodcastsDataGrid);
+        RestoreColumnWidths("PodcastEpisodes", PodcastEpisodesDataGrid);
+    }
+
+    private void AttachDataGridColumnChoosers()
+    {
+        DataGridColumnChooser.Attach(
+            ContentDataGrid,
+            () => _contentColumnWidthKey ?? "Content.Tracks",
+            _settings);
+        DataGridColumnChooser.Attach(SearchTracksDataGrid, "SearchTracks", _settings);
+        DataGridColumnChooser.Attach(SearchAlbumsDataGrid, "SearchAlbums", _settings);
+        DataGridColumnChooser.Attach(SearchArtistsDataGrid, "SearchArtists", _settings);
+        DataGridColumnChooser.Attach(RadioStationsDataGrid, "RadioStations", _settings);
+        DataGridColumnChooser.Attach(PodcastsDataGrid, "Podcasts", _settings);
+        DataGridColumnChooser.Attach(PodcastEpisodesDataGrid, "PodcastEpisodes", _settings);
+    }
+
+    private void CaptureAllDataGridColumnWidths()
+    {
+        CaptureContentDataGridColumnWidths();
+        CaptureColumnWidths("RadioStations", RadioStationsDataGrid);
+        CaptureColumnWidths("Podcasts", PodcastsDataGrid);
+        CaptureColumnWidths("PodcastEpisodes", PodcastEpisodesDataGrid);
+        CaptureColumnWidths("SearchTracks", SearchTracksDataGrid);
+        CaptureColumnWidths("SearchAlbums", SearchAlbumsDataGrid);
+        CaptureColumnWidths("SearchArtists", SearchArtistsDataGrid);
+    }
+
+    private void CaptureContentDataGridColumnWidths()
+    {
+        if (!string.IsNullOrWhiteSpace(_contentColumnWidthKey))
+            CaptureColumnWidths(_contentColumnWidthKey, ContentDataGrid);
+    }
+
+    private void CaptureColumnWidths(string key, DataGrid grid) =>
+        DataGridColumnWidthStore.Capture(_settings.DataGridColumnWidths, key, grid);
+
+    private void RestoreColumnWidths(string key, DataGrid grid) =>
+        DataGridColumnWidthStore.Restore(_settings.DataGridColumnWidths, key, grid);
+
     private void LoadSettings()
     {
         _settings = _settingsStore.Load();
+        _settings.DataGridColumnWidths ??= new Dictionary<string, List<double>>(StringComparer.Ordinal);
+        _settings.VisibleDataGridColumns ??= new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        _settings.DataGridColumnOrders ??= new Dictionary<string, List<string>>(StringComparer.Ordinal);
         if (_settings.OutputBackend == OutputBackend.Asio && !SteinbergAsioStream.IsAvailable)
         {
             _settings.OutputBackend = SteinbergAsioStream.IsCwAsioAvailable
@@ -1713,17 +1778,22 @@ public partial class MainWindow : Window
                 return ptracks.Select((pt, i) =>
                 {
                     var t = db.GetByPath(pt.Path);
-                    return new ContentRow
+                    if (t is null)
                     {
-                        Nr              = (i + 1).ToString(),
-                        PlaylistEntryId = pt.Id,
-                        Title    = t?.Title ?? Path.GetFileName(pt.Path),
-                        Artist   = t?.Artist,
-                        Album    = t?.Album,
-                        Duration = t is not null ? FormatSeconds(t.Duration) : "",
-                        Format   = t?.Format?.ToUpperInvariant(),
-                        FilePath = pt.Path
-                    };
+                        return new ContentRow
+                        {
+                            Nr = (i + 1).ToString(),
+                            PlaylistEntryId = pt.Id,
+                            Title = Path.GetFileName(pt.Path),
+                            FileName = Path.GetFileName(pt.Path),
+                            FilePath = pt.Path
+                        };
+                    }
+
+                    var row = ToTrackContentRow(ToTrackListInfo(t));
+                    row.Nr = (i + 1).ToString();
+                    row.PlaylistEntryId = pt.Id;
+                    return row;
                 }).ToList();
             }
 
@@ -1807,12 +1877,57 @@ public partial class MainWindow : Window
         Id = t.Id,
         Artist = t.Artist,
         Album = t.Album,
+        AlbumArtist = t.AlbumArtist,
+        Year = t.Year?.ToString(CultureInfo.CurrentCulture),
+        TrackNumber = FormatPartNumber(t.TrackNumber, t.TrackTotal),
+        DiscNumber = FormatPartNumber(t.DiscNumber, t.DiscTotal),
         Duration = FormatSeconds(t.Duration),
         Genre = t.Genre,
         Format = t.Format?.ToUpperInvariant(),
+        Bitrate = t.Bitrate is > 0 ? $"{t.Bitrate:N0} kbps" : null,
+        SampleRate = t.SampleRate is > 0 ? $"{t.SampleRate:N0} Hz" : null,
+        BitDepth = t.BitDepth is > 0 ? $"{t.BitDepth:N0} Bit" : null,
+        Channels = t.Channels?.ToString(CultureInfo.CurrentCulture),
+        Composer = t.Composer,
+        Bpm = t.Bpm?.ToString(CultureInfo.CurrentCulture),
+        FileName = t.FileName,
+        FileSize = FormatFileSize(t.FileSize),
+        AddedAt = DateTimeOffset.FromUnixTimeSeconds(t.AddedAt)
+            .ToLocalTime()
+            .ToString("d", CultureInfo.CurrentCulture),
+        ReplayGainTrack = FormatReplayGainDisplay(t.ReplayGainTrack),
+        ReplayGainAlbum = FormatReplayGainDisplay(t.ReplayGainAlbum),
         FilePath = t.Path,
         IsFavorite = t.IsFavorite
     };
+
+    private static TrackListInfo ToTrackListInfo(TrackRecord track) => new(
+        track.Path, track.FileName, track.Title, track.Artist, track.Album, track.AlbumArtist,
+        track.Genre, track.Format, track.Bitrate, track.Duration, track.SortTitle, track.Id,
+        false, track.Year, track.TrackNumber, track.TrackTotal, track.DiscNumber,
+        track.DiscTotal, track.SampleRate, track.BitDepth, track.Channels, track.Composer,
+        track.Bpm, track.FileSize, track.AddedAt, track.ReplayGainTrack, track.ReplayGainAlbum);
+
+    private static string? FormatPartNumber(int? number, int? total) =>
+        number is null ? null : total is > 0 ? $"{number}/{total}" : number.Value.ToString(CultureInfo.CurrentCulture);
+
+    private static string? FormatReplayGainDisplay(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : $"{value} dB";
+
+    private static string? FormatFileSize(long? bytes)
+    {
+        if (bytes is null || bytes < 0)
+            return null;
+        string[] units = ["B", "KB", "MB", "GB", "TB"];
+        var value = (double)bytes.Value;
+        var unit = 0;
+        while (value >= 1024 && unit < units.Length - 1)
+        {
+            value /= 1024;
+            unit++;
+        }
+        return $"{value:0.##} {units[unit]}";
+    }
 
     private async void TrackFilterButton_OnClick(object? sender, RoutedEventArgs e)
     {
@@ -2269,21 +2384,38 @@ public partial class MainWindow : Window
     private void ApplySearchColumns()
     {
         ConfigureSearchGrid(SearchTracksDataGrid,
-            (LocalizationManager.Current.Title, nameof(ContentRow.Title), 240),
-            (LocalizationManager.Current.Artist, nameof(ContentRow.Artist), 180),
-            (LocalizationManager.Current.Album, nameof(ContentRow.Album), 220),
-            (LocalizationManager.Current.Duration, nameof(ContentRow.Duration), 90),
-            (LocalizationManager.Current.Format, nameof(ContentRow.Format), 80));
+            (LocalizationManager.Current.Title, nameof(ContentRow.Title), 240, "title", true),
+            (LocalizationManager.Current.Artist, nameof(ContentRow.Artist), 180, "artist", true),
+            (LocalizationManager.Current.Album, nameof(ContentRow.Album), 220, "album", true),
+            (LocalizationManager.Current.Duration, nameof(ContentRow.Duration), 90, "duration", true),
+            (LocalizationManager.Current.Format, nameof(ContentRow.Format), 80, "format", true),
+            (LocalizationManager.Current.AlbumArtist, nameof(ContentRow.AlbumArtist), 180, "albumArtist", false),
+            (LocalizationManager.Current.Year, nameof(ContentRow.Year), 80, "year", false),
+            (LocalizationManager.Current.Genre, nameof(ContentRow.Genre), 150, "genre", false),
+            (LocalizationManager.Current.Bitrate, nameof(ContentRow.Bitrate), 100, "bitrate", false),
+            (LocalizationManager.Current.SampleRate, nameof(ContentRow.SampleRate), 110, "sampleRate", false),
+            (LocalizationManager.Current.BitDepth, nameof(ContentRow.BitDepth), 90, "bitDepth", false),
+            (LocalizationManager.Current.Composer, nameof(ContentRow.Composer), 180, "composer", false),
+            (LocalizationManager.Current.FileName, nameof(ContentRow.FileName), 220, "fileName", false));
         ConfigureSearchGrid(SearchAlbumsDataGrid,
-            (LocalizationManager.Current.Album, nameof(ContentRow.Title), 260),
-            (LocalizationManager.Current.AlbumArtist, nameof(ContentRow.Artist), 220),
-            (LocalizationManager.Current.Year, nameof(ContentRow.Year), 90));
+            (LocalizationManager.Current.Album, nameof(ContentRow.Title), 260, "album", true),
+            (LocalizationManager.Current.AlbumArtist, nameof(ContentRow.Artist), 220, "artist", true),
+            (LocalizationManager.Current.Year, nameof(ContentRow.Year), 90, "year", true));
         ConfigureSearchGrid(SearchArtistsDataGrid,
-            (LocalizationManager.Current.Artist, nameof(ContentRow.Title), 320));
+            (LocalizationManager.Current.Artist, nameof(ContentRow.Title), 320, "artist", true));
     }
 
-    private void ConfigureSearchGrid(DataGrid grid, params (string Header, string Binding, double Width)[] columns)
+    private void ConfigureSearchGrid(
+        DataGrid grid,
+        params (string Header, string Binding, double Width, string Key, bool DefaultVisible)[] columns)
     {
+        var widthKey = grid.Name switch
+        {
+            nameof(SearchTracksDataGrid) => "SearchTracks",
+            nameof(SearchAlbumsDataGrid) => "SearchAlbums",
+            _ => "SearchArtists"
+        };
+        CaptureColumnWidths(widthKey, grid);
         grid.Columns.Clear();
         foreach (var column in columns)
         {
@@ -2296,15 +2428,22 @@ public partial class MainWindow : Window
                         : column.Binding == nameof(ContentRow.Album)
                             ? "Album"
                             : null;
-            grid.Columns.Add(entityType is null
+            DataGridColumn dataGridColumn = entityType is null
                 ? new DataGridTextColumn
                 {
                     Header = column.Header,
                     Binding = new Binding(column.Binding),
-                    Width = new DataGridLength(column.Width)
+                    Width = new DataGridLength(column.Width),
+                    Tag = column.Key,
+                    IsVisible = column.DefaultVisible
                 }
-                : CreateEntityLinkColumn(column.Header, column.Binding, column.Width, false, entityType));
+                : CreateEntityLinkColumn(column.Header, column.Binding, column.Width, false, entityType);
+            dataGridColumn.Tag = column.Key;
+            dataGridColumn.IsVisible = column.DefaultVisible;
+            grid.Columns.Add(dataGridColumn);
         }
+        DataGridColumnChooser.Apply(grid, widthKey, _settings);
+        RestoreColumnWidths(widthKey, grid);
     }
 
     private DataGridTemplateColumn CreateEntityLinkColumn(
@@ -2576,64 +2715,81 @@ public partial class MainWindow : Window
 
     private void ApplyColumns(string view)
     {
+        CaptureContentDataGridColumnWidths();
+        _contentColumnWidthKey = GetContentColumnWidthKey(view);
         ContentDataGrid.Columns.Clear();
         switch (view)
         {
             case "PlexArtists":
-                Add(LocalizationManager.Current.Artist, nameof(ContentRow.Title), 0, star: true);
+                Add(LocalizationManager.Current.Artist, nameof(ContentRow.Title), 0, "artist", star: true);
                 break;
             case "PlexAlbums":
-                Add(LocalizationManager.Current.Album, nameof(ContentRow.Title), 0, star: true);
-                Add(LocalizationManager.Current.AlbumArtist, nameof(ContentRow.Artist), 220);
-                Add(LocalizationManager.Current.Year, nameof(ContentRow.Year), 70, right: true);
+                Add(LocalizationManager.Current.Album, nameof(ContentRow.Title), 0, "album", star: true);
+                Add(LocalizationManager.Current.AlbumArtist, nameof(ContentRow.Artist), 220, "artist");
+                Add(LocalizationManager.Current.Year, nameof(ContentRow.Year), 70, "year", right: true);
                 break;
             case "PlexTracks":
-                Add(LocalizationManager.Current.Title, nameof(ContentRow.Title), 0, star: true);
-                Add(LocalizationManager.Current.Artist, nameof(ContentRow.Artist), 180);
-                Add(LocalizationManager.Current.Album, nameof(ContentRow.Album), 180);
-                Add(LocalizationManager.Current.Duration, nameof(ContentRow.Duration), 70, right: true);
-                Add(LocalizationManager.Current.Format, nameof(ContentRow.Format), 80);
+                Add(LocalizationManager.Current.Title, nameof(ContentRow.Title), 0, "title", star: true);
+                Add(LocalizationManager.Current.Artist, nameof(ContentRow.Artist), 180, "artist");
+                Add(LocalizationManager.Current.Album, nameof(ContentRow.Album), 180, "album");
+                Add(LocalizationManager.Current.Duration, nameof(ContentRow.Duration), 70, "duration", right: true);
+                Add(LocalizationManager.Current.Format, nameof(ContentRow.Format), 80, "format");
                 break;
             case "Artists":
                 AddFavorite();
                 AddThumbnail();
                 AddArtistInfo();
-                AddEntityLink(LocalizationManager.Current.Artist, nameof(ContentRow.Title), 0, true, "Artist");
+                AddEntityLink(LocalizationManager.Current.Artist, nameof(ContentRow.Title), 0, "artist", true, "Artist");
                 break;
             case "Albums":
                 AddFavorite();
                 AddThumbnail();
-                AddEntityLink(LocalizationManager.Current.Album, nameof(ContentRow.Title), 0, true, "Album");
-                AddEntityLink(LocalizationManager.Current.AlbumArtist, nameof(ContentRow.Artist), 220, false, "Artist");
-                Add(LocalizationManager.Current.Year,        nameof(ContentRow.Year),   60,  right: true);
+                AddEntityLink(LocalizationManager.Current.Album, nameof(ContentRow.Title), 0, "album", true, "Album");
+                AddEntityLink(LocalizationManager.Current.AlbumArtist, nameof(ContentRow.Artist), 220, "artist", false, "Artist");
+                Add(LocalizationManager.Current.Year, nameof(ContentRow.Year), 60, "year", right: true);
                 break;
             case string s when s.StartsWith("Playlist:"):
-                Add("#",        nameof(ContentRow.Nr),     38,  right: true);
-                Add(LocalizationManager.Current.Title,    nameof(ContentRow.Title),  0,   star: true, starWeight: 2.2);
-                AddEntityLink(LocalizationManager.Current.Artist, nameof(ContentRow.Artist), 0, true, "Artist", 1.05);
-                AddEntityLink(LocalizationManager.Current.Album, nameof(ContentRow.Album), 0, true, "Album", 1.05);
-                Add(LocalizationManager.Current.Duration, nameof(ContentRow.Duration), 70, right: true);
-                Add(LocalizationManager.Current.Format, nameof(ContentRow.Format), 70);
+                Add("#", nameof(ContentRow.Nr), 38, "position", right: true);
+                AddTrackColumns(includeFavorite: false, includeGenreByDefault: false);
                 break;
             default: // Tracks
-                AddFavorite();
-                Add(LocalizationManager.Current.Title,    nameof(ContentRow.Title),  0,   star: true, starWeight: 2.3);
-                AddEntityLink(LocalizationManager.Current.Artist, nameof(ContentRow.Artist), 0, true, "Artist", 1.05);
-                AddEntityLink(LocalizationManager.Current.Album, nameof(ContentRow.Album), 0, true, "Album", 1.05);
-                Add(LocalizationManager.Current.Genre,    nameof(ContentRow.Genre),  110);
-                Add(LocalizationManager.Current.Duration, nameof(ContentRow.Duration), 70, right: true);
-                Add(LocalizationManager.Current.Format,   nameof(ContentRow.Format), 76);
+                AddTrackColumns(includeFavorite: true, includeGenreByDefault: true);
                 break;
         }
 
-        void AddEntityLink(string header, string prop, double width, bool star, string entityType, double starWeight = 1)
-            => ContentDataGrid.Columns.Add(CreateEntityLinkColumn(header, prop, width, star, entityType, starWeight));
+        DataGridColumnChooser.Apply(ContentDataGrid, _contentColumnWidthKey, _settings);
+        RestoreColumnWidths(_contentColumnWidthKey, ContentDataGrid);
 
-        void Add(string header, string prop, double width, bool star = false, bool right = false, double starWeight = 1)
+        void AddEntityLink(
+            string header,
+            string prop,
+            double width,
+            string key,
+            bool star,
+            string entityType,
+            double starWeight = 1,
+            bool defaultVisible = true)
         {
+            var column = CreateEntityLinkColumn(header, prop, width, star, entityType, starWeight);
+            column.Tag = key;
+            column.IsVisible = defaultVisible;
+            ContentDataGrid.Columns.Add(column);
+        }
+
+        void Add(
+            string header,
+            string prop,
+            double width,
+            string key,
+            bool star = false,
+            bool right = false,
+            double starWeight = 1,
+            bool defaultVisible = true)
+        {
+            DataGridColumn column;
             if (right)
             {
-                ContentDataGrid.Columns.Add(new DataGridTemplateColumn
+                column = new DataGridTemplateColumn
                 {
                     Header = header,
                     Width = star ? new DataGridLength(starWeight, DataGridLengthUnitType.Star) : new DataGridLength(width),
@@ -2648,17 +2804,47 @@ public partial class MainWindow : Window
                         tb.Bind(TextBlock.TextProperty, new Binding(prop));
                         return tb;
                     })
-                });
+                };
             }
             else
             {
-                ContentDataGrid.Columns.Add(new DataGridTextColumn
+                column = new DataGridTextColumn
                 {
                     Header = header,
                     Binding = new Binding(prop),
                     Width = star ? new DataGridLength(starWeight, DataGridLengthUnitType.Star) : new DataGridLength(width)
-                });
+                };
             }
+            column.Tag = key;
+            column.IsVisible = defaultVisible;
+            ContentDataGrid.Columns.Add(column);
+        }
+
+        void AddTrackColumns(bool includeFavorite, bool includeGenreByDefault)
+        {
+            if (includeFavorite)
+                AddFavorite();
+            Add(LocalizationManager.Current.Title, nameof(ContentRow.Title), 0, "title", star: true, starWeight: 2.3);
+            AddEntityLink(LocalizationManager.Current.Artist, nameof(ContentRow.Artist), 0, "artist", true, "Artist", 1.05);
+            AddEntityLink(LocalizationManager.Current.Album, nameof(ContentRow.Album), 0, "album", true, "Album", 1.05);
+            Add(LocalizationManager.Current.Genre, nameof(ContentRow.Genre), 120, "genre", defaultVisible: includeGenreByDefault);
+            Add(LocalizationManager.Current.Duration, nameof(ContentRow.Duration), 80, "duration", right: true);
+            Add(LocalizationManager.Current.Format, nameof(ContentRow.Format), 80, "format");
+            Add(LocalizationManager.Current.AlbumArtist, nameof(ContentRow.AlbumArtist), 180, "albumArtist", defaultVisible: false);
+            Add(LocalizationManager.Current.Year, nameof(ContentRow.Year), 80, "year", right: true, defaultVisible: false);
+            Add(LocalizationManager.Current.TrackNumber, nameof(ContentRow.TrackNumber), 90, "trackNumber", right: true, defaultVisible: false);
+            Add(LocalizationManager.Current.DiscNumber, nameof(ContentRow.DiscNumber), 90, "discNumber", right: true, defaultVisible: false);
+            Add(LocalizationManager.Current.Bitrate, nameof(ContentRow.Bitrate), 100, "bitrate", right: true, defaultVisible: false);
+            Add(LocalizationManager.Current.SampleRate, nameof(ContentRow.SampleRate), 110, "sampleRate", right: true, defaultVisible: false);
+            Add(LocalizationManager.Current.BitDepth, nameof(ContentRow.BitDepth), 90, "bitDepth", right: true, defaultVisible: false);
+            Add(LocalizationManager.Current.Channels, nameof(ContentRow.Channels), 80, "channels", right: true, defaultVisible: false);
+            Add(LocalizationManager.Current.Composer, nameof(ContentRow.Composer), 180, "composer", defaultVisible: false);
+            Add(LocalizationManager.Current.Bpm, nameof(ContentRow.Bpm), 70, "bpm", right: true, defaultVisible: false);
+            Add(LocalizationManager.Current.FileName, nameof(ContentRow.FileName), 220, "fileName", defaultVisible: false);
+            Add(LocalizationManager.Current.FileSize, nameof(ContentRow.FileSize), 100, "fileSize", right: true, defaultVisible: false);
+            Add(LocalizationManager.Current.AddedAt, nameof(ContentRow.AddedAt), 110, "addedAt", defaultVisible: false);
+            Add(LocalizationManager.Current.ReplayGainTrackColumn, nameof(ContentRow.ReplayGainTrack), 120, "replayGainTrack", right: true, defaultVisible: false);
+            Add(LocalizationManager.Current.ReplayGainAlbumColumn, nameof(ContentRow.ReplayGainAlbum), 120, "replayGainAlbum", right: true, defaultVisible: false);
         }
 
         void AddFavorite()
@@ -5228,6 +5414,7 @@ public partial class MainWindow : Window
 
         _player        = player;
         _player.Volume = (float)VolumeSlider.Value;
+        _player.ReplayGainFactor = GetReplayGainFactor(filePath);
         if (podcastPlayback is not null &&
             podcastPlayback.Podcast.Id > 0 &&
             player.CanSeek)
@@ -6440,6 +6627,34 @@ public partial class MainWindow : Window
         _settings.Volume = VolumeSlider.Value;
     }
 
+    private float GetReplayGainFactor(string filePath)
+    {
+        if (_settings.ReplayGainMode == ReplayGainMode.Off ||
+            _player is DsfAudioPlayer or DffAudioPlayer)
+            return 1.0f;
+
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            var track = db.GetByPath(filePath);
+            return track is null
+                ? 1.0f
+                : ReplayGain.GetLinearFactor(
+                    _settings.ReplayGainMode,
+                    track.ReplayGainTrack,
+                    track.ReplayGainAlbum);
+        }
+        catch
+        {
+            return 1.0f;
+        }
+    }
+
+    private static string GetContentColumnWidthKey(string view) =>
+        view.StartsWith("Playlist:", StringComparison.Ordinal)
+            ? "Content.Playlist"
+            : $"Content.{view}";
+
     private static string FormatTime(TimeSpan value) =>
         value.TotalHours >= 1 ? value.ToString(@"h\:mm\:ss") : value.ToString(@"m\:ss");
 
@@ -6462,6 +6677,7 @@ public partial class MainWindow : Window
             _settings.SelectedDriverName     = window.SelectedDriverName;
             _settings.SelectedWasapiDeviceId = window.SelectedWasapiDeviceId;
             _settings.SelectedWasapiDeviceName = window.SelectedWasapiDeviceName;
+            _settings.ReplayGainMode        = window.SelectedReplayGainMode;
             _settings.LibraryPaths           = window.SelectedLibraryPaths.ToList();
             _settings.Theme                  = window.SelectedTheme;
             _settings.Language               = window.SelectedLanguage;
@@ -6486,6 +6702,8 @@ public partial class MainWindow : Window
             RefreshSelectedDriverText();
             LoadNavPlaylists();
             ApplySidebarNavigationSettings();
+            if (_player is not null)
+                _player.ReplayGainFactor = GetReplayGainFactor(_currentFilePath);
 
             StatusTextBlock.Text = _settings.OutputBackend switch
             {
@@ -7064,7 +7282,7 @@ public partial class MainWindow : Window
             return db.GetHistoryForDay(date);
         });
 
-        var dialog = new DailyHistoryDialog(date, entries);
+        var dialog = new DailyHistoryDialog(date, entries, _settings);
         if (await dialog.ShowDialog<bool>(this) == false || dialog.SelectedEntry is not { } entry)
             return;
 

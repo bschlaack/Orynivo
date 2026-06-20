@@ -45,12 +45,22 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - `Orynivo/Audio/WasapiAudioPlayer.cs`: exclusive-mode WASAPI PCM path; converts
   DSD sources to PCM in real time and selects a supported output sample rate
 - `Orynivo/Audio/WasapiDeviceProvider.cs`: WASAPI devices and capability queries
+- `Orynivo/Audio/ReplayGain.cs` and `ReplayGainMode.cs`: parse persisted
+  track/album gain values, select the configured fallback mode, and calculate
+  the linear PCM gain factor
 - `Native/AsioBridge/bridge.cpp`: shared Steinberg/cwASIO initialization, PCM/DSD ring buffers, and callback
 - `Native/CwAsioBridge/CwAsioBridge.vcxproj`: builds the shared bridge against vendored cwASIO
 - `third_party/cwasio/`: pinned MIT-licensed cwASIO host and compatibility sources
 - `Orynivo/SettingsWindow.*`: two-column settings window with navigation on the
   left and the selected section on the right
 - `Orynivo/ThemeManager.cs`: sets global Avalonia resources for light and dark themes
+- `Orynivo/Controls/DataGridColumnWidthStore.cs`: validates, captures, and
+  restores per-table pixel widths
+- `Orynivo/Controls/DataGridColumnOrderStore.cs`: captures and restores
+  identified data-column display order while retaining fixed-column slots
+- `Orynivo/Controls/DataGridColumnChooser.cs`: opens the themed, light-dismiss
+  header popup for column visibility; it intentionally uses `Popup` instead of
+  dynamically attached Avalonia `ContextMenu` instances
 - `Orynivo/Localization/*`: language model and localized German, English, French, and Spanish strings
 - `Orynivo/StartupWindow.*`: lightweight splash screen shown during initial database preparation and migration
 - `Orynivo/Assets/Orynivo_Logo.png`: embedded full logo used by the splash screen and main sidebar
@@ -70,6 +80,10 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   `AppSettings.ArtistArtworkView` preserve the selected main view and entity
   artwork/table modes
 - `AppSettings.Volume` and `AppSettings.LastTrackPath` preserve volume and the last selected or played track; restoration requires both the file and database entry to exist
+- `AppSettings.ReplayGainMode` selects disabled, track, or album ReplayGain for PCM playback; native ASIO DSD remains bit-perfect
+- `AppSettings.DataGridColumnWidths` persists user-adjusted pixel widths per stable table/view key; dynamic main-content views capture their current widths before replacing columns
+- `AppSettings.VisibleDataGridColumns` persists selectable column IDs per table/view key; right-clicking any table header opens the context-appropriate column chooser popup
+- `AppSettings.DataGridColumnOrders` persists drag-and-drop display order per stable table/view key; fixed artwork and action columns keep their structural positions
 - `AppSettings.Theme` stores the `Light` or `Dark` theme
 - `AppSettings.Language` stores `German`, `English`, `French`, or `Spanish`
 - `Orynivo/Library/TrackRecord.cs`: database track model containing tags and technical metadata
@@ -116,6 +130,7 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - Directories can be added or removed; active scans are canceled when a directory is removed or the window closes
 - Scans skip unchanged files and do not overwrite `added_at`
 - Metadata extraction supports ID3v1/v2, Vorbis Comments, APE tags, and embedded artwork
+- Metadata extraction stores track and album ReplayGain values. The first scan of each configured root after ReplayGain support was added refreshes unchanged tracks once so existing libraries receive those values.
 - Opening the database runs a legacy-data migration that normalizes artists, albums, and artwork and removes old per-track artwork BLOBs
 - `album_artist_rebuild_v1` rebuilds album assignments strictly from `album_artist` so compilations are not split by track artist
 - `album_title_uniqueness_v1` consolidates albums by unique title and uses the first album artist when multiple artists exist
@@ -174,7 +189,8 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - `GetTracksLite()` loads only path, file name, title, disc number, and track number for the folder tree
 - `GetArtistsLite()` loads artist IDs, names, favorite state, and cached profile data without loading tracks
 - `GetAlbumsLite(includeArtwork)` loads only album, display artist, and year unless artwork is requested
-- `GetTrackList()` loads only visible track-list columns
+- `GetTrackList()` and related list queries load compact scalar metadata used by
+  selectable track columns, but continue to omit artwork BLOBs and lyrics text
 - `GetTrackListByIds(ids)` batches large ID sets to stay below SQLite variable limits
 - `GetTracksByDirectory(dirPath)` uses an SQL prefix query plus a direct-child filter
 - `GetTrackPathsUnderDirectory(rootPath)` returns all recursive track paths below a root
@@ -225,6 +241,7 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - Shuffle keeps a per-loaded-queue set of played file paths, so duplicate entries and already played tracks are not selected again; loading any queue again resets that set while the shuffle toggle may remain enabled
 - The playlist table is height-limited and scrollable
 - Volume affects PCM paths; native DSD remains bit-perfect
+- ReplayGain can be disabled or use track/album gain with fallback to the other available value. It is combined with the user volume for PCM output and uses saturating sample conversion to prevent integer overflow; native DSD ignores it.
 - In ASIO DSD mode, `preferredBufferSize` counts samples rather than bytes; `ASIOSTDSDInt8*` writes `preferredBufferSize / 8` bytes per channel
 - ASIO capability queries may fail while another application owns the device
 
@@ -272,6 +289,26 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - DataGrid and ScrollViewer backgrounds are overridden via Avalonia styles in
   `MainWindow.axaml`
 - DataGrid row headers remain disabled through `HeadersVisibility="Column"`
+- DataGrid columns are user-resizable. Main library, search, radio, podcast,
+  podcast-episode, Plex, playlist, and daily-history widths are restored from
+  `settings.json`; invalid or structurally outdated width sets are ignored.
+- Right-clicking a DataGrid column header opens a localized, themed,
+  light-dismiss `Popup` column chooser. Do not replace this with a dynamically
+  attached and programmatically opened Avalonia `ContextMenu`; Avalonia 11.2
+  retains internal ownership in that sequence and can throw during placement.
+  Track contexts additionally expose file name, album artist, year, track/disc
+  numbers, genre, bitrate, sample rate, bit depth, channels, composer, BPM,
+  file size, added date, and ReplayGain values. Radio and podcast tables expose
+  only metadata appropriate to those catalogs. Artwork and action columns stay
+  fixed, and at least one selectable data column remains visible.
+- Identified data columns can be reordered by dragging their headers. The order
+  is restored independently for each table/view; fixed artwork and action
+  columns cannot be dragged.
+- Every selectable or reorderable data column must have a stable,
+  language-independent string in `DataGridColumn.Tag`. These IDs are persisted
+  in `VisibleDataGridColumns` and `DataGridColumnOrders`; changing an ID is a
+  settings-compatibility change. Fixed artwork/action columns intentionally
+  have no persisted ID.
 
 ## Dashboard
 

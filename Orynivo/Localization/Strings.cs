@@ -172,6 +172,50 @@ public sealed record LocalizedStrings(
     public string PlaybackThroughWithDsdConversion { get; init; } = "";
     public string NativeDsdOutput { get; init; } = "";
     public string DsdToPcmOutput { get; init; } = "";
+    /// <summary>Gets the ReplayGain settings label.</summary>
+    public string ReplayGain { get; init; } = "";
+    /// <summary>Gets the explanatory ReplayGain settings text.</summary>
+    public string ReplayGainHint { get; init; } = "";
+    /// <summary>Gets the disabled ReplayGain mode label.</summary>
+    public string ReplayGainOff { get; init; } = "";
+    /// <summary>Gets the track ReplayGain mode label.</summary>
+    public string ReplayGainTrack { get; init; } = "";
+    /// <summary>Gets the album ReplayGain mode label.</summary>
+    public string ReplayGainAlbum { get; init; } = "";
+    /// <summary>Gets the column-selection menu heading.</summary>
+    public string SelectColumns { get; init; } = "";
+    /// <summary>Gets the file-name column label.</summary>
+    public string FileName { get; init; } = "";
+    /// <summary>Gets the file-size column label.</summary>
+    public string FileSize { get; init; } = "";
+    /// <summary>Gets the added-date column label.</summary>
+    public string AddedAt { get; init; } = "";
+    /// <summary>Gets the sample-rate column label.</summary>
+    public string SampleRate { get; init; } = "";
+    /// <summary>Gets the bit-depth column label.</summary>
+    public string BitDepth { get; init; } = "";
+    /// <summary>Gets the channel-count column label.</summary>
+    public string Channels { get; init; } = "";
+    /// <summary>Gets the track-number column label.</summary>
+    public string TrackNumber { get; init; } = "";
+    /// <summary>Gets the disc-number column label.</summary>
+    public string DiscNumber { get; init; } = "";
+    /// <summary>Gets the composer column label.</summary>
+    public string Composer { get; init; } = "";
+    /// <summary>Gets the beats-per-minute column label.</summary>
+    public string Bpm { get; init; } = "";
+    /// <summary>Gets the track ReplayGain column label.</summary>
+    public string ReplayGainTrackColumn { get; init; } = "";
+    /// <summary>Gets the album ReplayGain column label.</summary>
+    public string ReplayGainAlbumColumn { get; init; } = "";
+    /// <summary>Gets the codec column label.</summary>
+    public string Codec { get; init; } = "";
+    /// <summary>Gets the tags column label.</summary>
+    public string Tags { get; init; } = "";
+    /// <summary>Gets the homepage column label.</summary>
+    public string Homepage { get; init; } = "";
+    /// <summary>Gets the feed-address column label.</summary>
+    public string FeedUrl { get; init; } = "";
     public string SearchResultSummary { get; init; } = "";
     public string RecentAlbums { get; init; } = "";
     public string Calendar { get; init; } = "";

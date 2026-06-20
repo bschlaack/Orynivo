@@ -63,6 +63,8 @@ public sealed class WasapiAudioPlayer : IAudioPlayer
     public bool IsPaused => _playbackProvider.IsPaused;
     public bool CanSeek => Duration > TimeSpan.Zero;
     public float Volume { get; set; } = 1.0f;
+    /// <inheritdoc/>
+    public float ReplayGainFactor { get; set; } = 1.0f;
 
     /// <summary>
     /// Probes the file, selects an exclusive-mode format, initialises the WASAPI device, starts the
@@ -266,7 +268,8 @@ public sealed class WasapiAudioPlayer : IAudioPlayer
 
     private void ApplyVolumeIfNeeded(Span<byte> bytes)
     {
-        if (Math.Abs(Volume - 1.0f) < 0.0001f)
+        var factor = Volume * ReplayGainFactor;
+        if (Math.Abs(factor - 1.0f) < 0.0001f)
         {
             return;
         }
@@ -274,17 +277,20 @@ public sealed class WasapiAudioPlayer : IAudioPlayer
         if (_selectedFormat.FfmpegSampleFormat == "f32le")
         {
             var samples = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, float>(bytes);
-            for (var index = 0; index < samples.Length; index++) samples[index] *= Volume;
+            for (var index = 0; index < samples.Length; index++)
+                samples[index] = Math.Clamp(samples[index] * factor, -1.0f, 1.0f);
         }
         else if (_selectedFormat.FfmpegSampleFormat == "s16le")
         {
             var samples = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, short>(bytes);
-            for (var index = 0; index < samples.Length; index++) samples[index] = (short)(samples[index] * Volume);
+            for (var index = 0; index < samples.Length; index++)
+                samples[index] = (short)Math.Clamp(samples[index] * factor, short.MinValue, short.MaxValue);
         }
         else
         {
             var samples = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, int>(bytes);
-            for (var index = 0; index < samples.Length; index++) samples[index] = (int)(samples[index] * Volume);
+            for (var index = 0; index < samples.Length; index++)
+                samples[index] = (int)Math.Clamp(samples[index] * (double)factor, int.MinValue, int.MaxValue);
         }
     }
 

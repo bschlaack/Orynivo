@@ -8,6 +8,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Added drag-and-drop reordering for data columns. Column order is persisted
+  independently per table and dynamic main-content view, while fixed artwork
+  and action columns retain their structural positions.
+- Added a localized, context-sensitive column chooser opened by right-clicking
+  table headers. Local track tables can show additional tag, file, technical,
+  date, and ReplayGain metadata; radio and podcast tables expose only relevant
+  catalog fields. Selections persist per table/view, while artwork/action
+  columns remain fixed and at least one data column stays visible. Active
+  columns have an explicit check mark and selected-row background in the menu.
+- Added user-resizable columns to all application tables. Widths are persisted
+  per table and main-content view in `settings.json`, captured before dynamic
+  column sets are replaced, and restored on the next application start.
+- Added optional ReplayGain volume adjustment for PCM playback with disabled,
+  track, and album modes. The preferred value falls back to the other available
+  ReplayGain tag, gain is combined with the user volume using saturating sample
+  conversion, and native ASIO DSD output remains bit-perfect.
+- Library scans now import track and album ReplayGain metadata. Each configured
+  library root receives a one-time refresh of unchanged tracks on its first
+  scan after this update.
+
+## [0.6.0] - 2026-06-19
+
+### Added
+
 - Licensed Orynivo's original source code and documentation under Apache
   License 2.0, with repository and release copies of `LICENSE`, `NOTICE`,
   third-party notices, and applicable license texts.
@@ -23,6 +47,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Fixed the table-header column chooser not opening on right-click and then
+  crashing because Avalonia 11.2 retained internal ownership for dynamically
+  attached `ContextMenu` instances. The chooser now uses a themed,
+  light-dismiss `Popup` anchored to the clicked header and no longer calls the
+  `ContextMenu` API.
 - Corrected themed scrollbar behavior so arrow buttons move one row and clicks
   above or below the thumb move by one visible table page with one-row overlap.
   Track-table A-Z highlighting now follows the top visible row during manual

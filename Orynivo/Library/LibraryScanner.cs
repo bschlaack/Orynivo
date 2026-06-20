@@ -122,6 +122,7 @@ public static class LibraryScanner
 
         using var db = AudioDatabase.OpenDefault();
         var timestamps = db.GetPathTimestamps();
+        var refreshReplayGainMetadata = db.NeedsReplayGainMetadataScan(rootPath);
         long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
         for (int i = 0; i < files.Count; i++)
@@ -135,7 +136,9 @@ public static class LibraryScanner
                 var fi = new FileInfo(filePath);
                 long modifiedAt = new DateTimeOffset(fi.LastWriteTimeUtc).ToUnixTimeSeconds();
 
-                if (timestamps.TryGetValue(filePath, out long knownModified) && knownModified == modifiedAt)
+                if (!refreshReplayGainMetadata &&
+                    timestamps.TryGetValue(filePath, out long knownModified) &&
+                    knownModified == modifiedAt)
                     continue;
 
                 bool isNew = !timestamps.ContainsKey(filePath);
@@ -154,6 +157,8 @@ public static class LibraryScanner
         if (changedTracks.Count > 0)
             TrackSearchIndex.UpdateMany(changedTracks);
         TrackSearchIndex.RemoveMissingUnderRoot(rootPath, files);
+        if (refreshReplayGainMetadata)
+            db.MarkReplayGainMetadataScanned(rootPath);
 
         return new ScanResult(total, added, updated, failed);
     }
@@ -219,6 +224,8 @@ public static class LibraryScanner
             record.MusicBrainzTrackId   = NullIfEmpty(tag.MusicBrainzTrackId);
             record.MusicBrainzReleaseId = NullIfEmpty(tag.MusicBrainzReleaseId);
             record.MusicBrainzArtistId  = NullIfEmpty(tag.MusicBrainzArtistId);
+            record.ReplayGainTrack      = FormatReplayGain(tag.ReplayGainTrackGain);
+            record.ReplayGainAlbum      = FormatReplayGain(tag.ReplayGainAlbumGain);
 
             var pic = tag.Pictures?.FirstOrDefault(p => p.Type == PictureType.FrontCover)
                    ?? tag.Pictures?.FirstOrDefault();
@@ -277,4 +284,9 @@ public static class LibraryScanner
         => arr is { Length: > 0 }
             ? NullIfEmpty(string.Join("; ", arr.Select(value => value.Trim()).Where(value => value.Length > 0)))
             : null;
+
+    private static string? FormatReplayGain(double gain) =>
+        double.IsNaN(gain) || double.IsInfinity(gain)
+            ? null
+            : gain.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
 }

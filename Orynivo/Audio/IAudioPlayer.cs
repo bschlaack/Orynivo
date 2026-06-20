@@ -20,6 +20,11 @@ public interface IAudioPlayer : IDisposable
     /// <summary>Playback volume in the range 0.0 (muted) to 1.0 (full volume).</summary>
     float Volume { get; set; }
 
+    /// <summary>
+    /// Additional linear PCM gain factor. Native bit-perfect output implementations ignore this value.
+    /// </summary>
+    float ReplayGainFactor { get; set; }
+
     /// <summary>Pauses playback.</summary>
     void Pause();
 

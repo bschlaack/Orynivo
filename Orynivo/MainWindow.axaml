@@ -1278,6 +1278,7 @@
                               GridLinesVisibility="Horizontal"
                               HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
                               AutoGenerateColumns="False"
+                              CanUserResizeColumns="True"
                               IsReadOnly="True"
                               SelectionMode="Single"
                               DoubleTapped="RadioStationsDataGrid_OnMouseDoubleClick">
@@ -1303,16 +1304,40 @@
                             </DataGridTemplateColumn>
                             <DataGridTextColumn Header="{DynamicResource L_RadioStation}"
                                                 Binding="{Binding Name}"
+                                                Tag="name"
                                                 Width="*"/>
                             <DataGridTextColumn Header="{DynamicResource L_Country}"
                                                 Binding="{Binding CountryCode}"
+                                                Tag="country"
                                                 Width="90"/>
                             <DataGridTextColumn Header="{DynamicResource L_Genre}"
                                                 Binding="{Binding GenreSummary}"
+                                                Tag="genre"
                                                 Width="180"/>
                             <DataGridTextColumn Header="{DynamicResource L_Format}"
                                                 Binding="{Binding FormatSummary}"
+                                                Tag="format"
                                                 Width="120"/>
+                            <DataGridTextColumn Header="{DynamicResource L_Codec}"
+                                                Binding="{Binding Codec}"
+                                                Tag="codec"
+                                                IsVisible="False"
+                                                Width="100"/>
+                            <DataGridTextColumn Header="{DynamicResource L_Bitrate}"
+                                                Binding="{Binding BitrateSummary}"
+                                                Tag="bitrate"
+                                                IsVisible="False"
+                                                Width="90"/>
+                            <DataGridTextColumn Header="{DynamicResource L_Tags}"
+                                                Binding="{Binding Tags}"
+                                                Tag="tags"
+                                                IsVisible="False"
+                                                Width="220"/>
+                            <DataGridTextColumn Header="{DynamicResource L_Homepage}"
+                                                Binding="{Binding Homepage}"
+                                                Tag="homepage"
+                                                IsVisible="False"
+                                                Width="220"/>
                             <DataGridTemplateColumn Width="120">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
@@ -1514,6 +1539,7 @@
                               GridLinesVisibility="Horizontal"
                               HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
                               AutoGenerateColumns="False"
+                              CanUserResizeColumns="True"
                               IsReadOnly="True"
                               SelectionMode="Single"
                               DoubleTapped="PodcastsDataGrid_OnMouseDoubleClick">
@@ -1539,16 +1565,25 @@
                             </DataGridTemplateColumn>
                             <DataGridTextColumn Header="{DynamicResource L_Podcast}"
                                                 Binding="{Binding Name}"
+                                                Tag="podcast"
                                                 Width="*"/>
                             <DataGridTextColumn Header="{DynamicResource L_PodcastAuthor}"
                                                 Binding="{Binding Author}"
+                                                Tag="author"
                                                 Width="220"/>
                             <DataGridTextColumn Header="{DynamicResource L_Genre}"
                                                 Binding="{Binding Genre}"
+                                                Tag="genre"
                                                 Width="150"/>
                             <DataGridTextColumn Header="{DynamicResource L_PodcastLanguage}"
                                                 Binding="{Binding LanguageDisplay}"
+                                                Tag="language"
                                                 Width="110"/>
+                            <DataGridTextColumn Header="{DynamicResource L_FeedUrl}"
+                                                Binding="{Binding FeedUrl}"
+                                                Tag="feed"
+                                                IsVisible="False"
+                                                Width="280"/>
                             <DataGridTemplateColumn Width="160">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
@@ -1660,25 +1695,31 @@
                                   RowHeight="54"
                                   GridLinesVisibility="Horizontal"
                                   HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
-                                  AutoGenerateColumns="False"
+                            AutoGenerateColumns="False"
+                            CanUserResizeColumns="True"
                                   IsReadOnly="True"
                                   SelectionMode="Single"
                                   DoubleTapped="PodcastEpisodesDataGrid_OnMouseDoubleClick">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="{DynamicResource L_PodcastStatus}"
                                                     Binding="{Binding Status}"
+                                                    Tag="status"
                                                     Width="90"/>
                                 <DataGridTextColumn Header="{DynamicResource L_Title}"
                                                     Binding="{Binding Title}"
+                                                    Tag="title"
                                                     Width="*"/>
                                 <DataGridTextColumn Header="{DynamicResource L_Published}"
                                                     Binding="{Binding Published}"
+                                                    Tag="published"
                                                     Width="120"/>
                                 <DataGridTextColumn Header="{DynamicResource L_Duration}"
                                                     Binding="{Binding Duration}"
+                                                    Tag="duration"
                                                     Width="90"/>
                                 <DataGridTextColumn Header="{DynamicResource L_Progress}"
                                                     Binding="{Binding Progress}"
+                                                    Tag="progress"
                                                     Width="130"/>
                             </DataGrid.Columns>
                         </DataGrid>
@@ -1800,6 +1841,7 @@
                           GridLinesVisibility="Horizontal"
                           HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
                           AutoGenerateColumns="False"
+                          CanUserResizeColumns="True"
                           IsReadOnly="True"
                           SelectionMode="Single"
                           FontSize="12"
@@ -1830,6 +1872,7 @@
                                       Background="{DynamicResource AppSurfaceBrush}"
                                       BorderThickness="0"
                                       AutoGenerateColumns="False"
+                                      CanUserResizeColumns="True"
                                       IsReadOnly="True"
                                       HeadersVisibility="Column"
                                       GridLinesVisibility="Horizontal"
@@ -1859,6 +1902,7 @@
                                       Background="{DynamicResource AppSurfaceBrush}"
                                       BorderThickness="0"
                                       AutoGenerateColumns="False"
+                                      CanUserResizeColumns="True"
                                       IsReadOnly="True"
                                       HeadersVisibility="Column"
                                       GridLinesVisibility="Horizontal"
@@ -1887,6 +1931,7 @@
                                       Background="{DynamicResource AppSurfaceBrush}"
                                       BorderThickness="0"
                                       AutoGenerateColumns="False"
+                                      CanUserResizeColumns="True"
                                       IsReadOnly="True"
                                       HeadersVisibility="Column"
                                       GridLinesVisibility="Horizontal"

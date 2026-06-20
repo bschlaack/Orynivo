@@ -20,9 +20,19 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 - PCM playback through `ffmpeg`
 - Seeking, volume control, pause, an automatic playback queue, and shuffle
   without repeating a track within the currently loaded queue
+- Optional ReplayGain volume adjustment for PCM playback, using track or album
+  gain metadata with fallback to the other available value; native DSD output
+  remains bit-perfect
 - SQLite music library with multiple monitored directories
 - Metadata and embedded artwork extraction through TagLibSharp
 - Artist, album, track, and folder views
+- Resizable table columns whose widths are preserved separately for each
+  library, search, playlist, Plex, radio, podcast, and history table
+- Context-sensitive column selection by right-clicking a table header, including
+  optional technical and tag metadata for local tracks and appropriate catalog
+  fields for radio and podcasts
+- Drag-and-drop table-column ordering persisted independently for each table
+  and main-content view
 - Space-saving accordion sections in the main sidebar, with configurable
   visibility and persisted independent expansion for library, personal radio,
   podcast, and playlist sections
@@ -160,7 +170,9 @@ the repository. Release artifacts therefore include `CwAsioBridge.dll`.
 ```
 
 Library directories and the desired output device can then be selected in the
-settings window.
+settings window. ReplayGain can be disabled or switched to track/album mode
+under the output-device settings. The first subsequent scan of each configured
+library root refreshes unchanged files once to import existing ReplayGain tags.
 
 ## Project Structure
 
