@@ -7204,7 +7204,12 @@ public partial class MainWindow : Window
         {
             var activeLine = _lyricLines[_activeLyricIndex];
             activeLine.IsActive = true;
+            LyricsListBox.SelectedItem = activeLine;
             LyricsListBox.ScrollIntoView(activeLine);
+        }
+        else
+        {
+            LyricsListBox.SelectedItem = null;
         }
     }
 
@@ -7216,6 +7221,7 @@ public partial class MainWindow : Window
 
     private void ClearLyrics()
     {
+        LyricsListBox.SelectedItem = null;
         _lyricLines.Clear();
         _activeLyricIndex = -1;
     }

@@ -181,7 +181,24 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - `AudioDatabase.Optimize()` runs `wal_checkpoint(TRUNCATE)`, `VACUUM`, and `ANALYZE`
 - Settings library backup creates a consistent SQLite snapshot, includes album artwork, artist images, and library paths, reports percentage and current-file progress for both export and import, writes to `.tmp` before publishing the completed `.zip`, validates imports in staging, rebases cached image paths, rolls back partial replacements, and reports Lucene index rebuild progress
 - Downloaded lyrics are cached in `tracks.downloaded_lyrics` / `tracks.synced_lyrics`; the transport note button replaces the current main content with a large lyrics view over a dimmed cover background, highlights timestamped LRC lines through the transport timer, and falls back to embedded unsynchronized lyrics
+- The synchronized lyrics view keeps its active line both in
+  `LyricLineViewModel.IsActive` and as the programmatically selected,
+  non-interactive `LyricsListBox` item. Its isolated item theme must preserve
+  active color, size, weight, and opacity through direct properties in the
+  `^:selected` item selector; the lyric `TextBlock` binds those properties from
+  its ancestor item. Never put child or descendant selectors such as
+  `^:selected TextBlock` inside a `ControlTheme`: Avalonia accepts them at
+  compile time but throws `InvalidOperationException` while loading the window.
 - The lyrics view can manually search LRCLIB with overridden title and artist text. Selecting a result replaces only the database-cached downloaded/synchronized lyrics and leaves audio-file tags unchanged.
+- `LyricsSearchWindow` uses its own plain `LyricsResultItemTheme`. Search
+  results must not use the asymmetric intro/header card shape; selected and
+  hover states use application surface brushes, while primary result text
+  explicitly inherits the themed item foreground to avoid black text in dark
+  mode.
+- Custom `ListBoxItem` templates in `LyricsSearchWindow` must forward both
+  `Content` and `ContentTemplate` to their `ContentPresenter`. Omitting
+  `ContentTemplate` bypasses the result `DataTemplate` and renders the record's
+  complete `ToString()` value, including full lyrics, in the result list.
 - Artist views support table and image-card modes; visible artists lazily download localized biographies and images from the configured source (Wikipedia or Last.fm). The transport info button replaces the current main content with the current artist image, biography, and source link. The source label ("Quelle: Wikipedia" / "Quelle: Last.fm") is set dynamically from the stored `SourceUrl`.
 - The artist information view can search Wikimedia Commons using editable text and assign the selected image without replacing the cached biography or its source URL.
 - Artist images remain visible even when no biography is available.
@@ -373,6 +390,14 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - Light and dark themes switch global dynamic resources for tables, artwork,
   surfaces, text, transport controls, navigation, separators, and scrollbars;
   transport buttons must not use fixed dark-only colors
+- All Avalonia windows receive `AppPrimaryTextBrush` as a global fallback
+  foreground. Do not add empty `ListBoxItem` styles or rely on Fluent's
+  selected-item foreground in themed dialogs; it can become black on dark
+  surfaces.
+- Search result lists for artist images, album covers, and lyrics use the
+  shared `AppSearchResultItemTheme`. Its custom presenter must forward
+  `Content`, `ContentTemplate`, `DataContext`, and `TextBlock.Foreground`;
+  selected items retain `AppPrimaryTextBrush` in both themes.
 - Visible primary text and runtime messages use `LocalizationManager`
 - TextBox normal, pointer-over, and focused Fluent theme resources must remain
   synchronized with `AppInputBrush`, `AppPrimaryTextBrush`, and the active

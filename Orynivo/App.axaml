@@ -4,6 +4,15 @@
     <Application.Styles>
         <FluentTheme />
         <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
+        <Style Selector="Window">
+            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+        </Style>
+        <Style Selector="Window ListBoxItem">
+            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+        </Style>
+        <Style Selector="Window ListBoxItem:selected">
+            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+        </Style>
     </Application.Styles>
     <Application.Resources>
         <ResourceDictionary>
@@ -157,6 +166,42 @@
                 </Style>
                 <Style Selector="^:disabled">
                     <Setter Property="Foreground" Value="{DynamicResource AppMutedTextBrush}"/>
+                </Style>
+            </ControlTheme>
+
+            <ControlTheme x:Key="AppSearchResultItemTheme" TargetType="ListBoxItem">
+                <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}"/>
+                <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+                <Setter Property="BorderBrush" Value="Transparent"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="CornerRadius" Value="8"/>
+                <Setter Property="Padding" Value="10"/>
+                <Setter Property="Margin" Value="0,0,0,8"/>
+                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="Template">
+                    <ControlTemplate>
+                        <Border x:Name="ResultBorder"
+                                Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}">
+                            <ContentPresenter Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              DataContext="{TemplateBinding DataContext}"
+                                              TextBlock.Foreground="{TemplateBinding Foreground}"
+                                              HorizontalAlignment="Stretch"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter>
+                <Style Selector="^:pointerover">
+                    <Setter Property="Background" Value="{DynamicResource AppSurfaceHoverBrush}"/>
+                </Style>
+                <Style Selector="^:selected">
+                    <Setter Property="Background" Value="{DynamicResource AppSurfaceSelectedBrush}"/>
+                    <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+                    <Setter Property="BorderBrush" Value="#6C63FF"/>
                 </Style>
             </ControlTheme>
 

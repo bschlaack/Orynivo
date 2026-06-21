@@ -4,6 +4,31 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.7.2] - 2026-06-21
+
+### Fixed
+
+- Fixed the application failing during startup because the lyrics
+  `ControlTheme` contained a descendant selector that Avalonia rejects only at
+  runtime. Active-line typography now binds to direct selected-item properties.
+- Fixed synchronized-lyrics highlighting being lost again after the shared
+  dialog list-theme changes. Active-line typography is now driven directly by
+  the programmatically selected lyrics item instead of a nested bound class in
+  the data template.
+- Restored synchronized-lyrics highlighting by keeping the active LRC line
+  selected in the non-interactive lyrics list in addition to its active data
+  state. The manual LRCLIB result list now has a dedicated plain theme instead
+  of header-card styling, with explicit readable selected text colors in light
+  and dark themes.
+- Fixed the custom LRCLIB result-item template bypassing its `DataTemplate` and
+  displaying the complete lyrics record in the left result list. The template
+  now forwards the configured content template so entries again show title,
+  artist, duration, album, and synchronization status.
+- Removed black selected text from the artist-image search and audited all
+  Avalonia views for the same fallback-color issue. Artist-image, cover, and
+  lyrics result lists now share a theme-aware item container, while every
+  window receives the primary theme text color as a global fallback.
+
 ## [0.7.1] - 2026-06-21
 
 ### Fixed
