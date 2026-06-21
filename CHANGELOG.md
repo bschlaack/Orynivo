@@ -4,7 +4,7 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.7.0] - 2026-06-21
 
 ### Added
 
@@ -52,9 +52,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   session. Transport metadata, ReplayGain, and playback history follow the
   audible buffered-frame boundary. Shuffle and native ASIO DSD retain
   title-by-title playback.
+- Added a themed favorite button to the album detail header shown above an
+  album's track list. Its heart state updates immediately and persists the
+  album favorite without leaving the detail view.
+- Matched the album detail header to the shared radio, podcast, and library
+  card design with the accent-colored border and asymmetric rounded corners.
 
 ### Fixed
 
+- Added a theme-aware background highlight for the currently audible item in
+  track, search, radio, and podcast-episode tables. The highlight follows
+  gapless transitions, clears when playback stops, survives navigation back to
+  a list, and does not override the stronger selected-row background.
 - Restored seek-slider dragging and track-position clicks during multi-track
   gapless PCM playback. Seeking now clears buffered output, restarts the
   current decoder at the selected position, and prepares the following track
@@ -65,6 +74,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   slider and percentage. The custom position-slider thumb also uses an
   explicit two-way value binding and handled pointer-release routing, restoring
   dragging as well as direct track clicks.
+- Fixed the position slider jumping backwards after seeking when the current
+  track reached its buffered end during gapless playback. Seek offsets are now
+  tracked independently per queued title and remain active until that title is
+  no longer audible.
 - Restored sidebar context menus for personal radio stations, pinned podcasts,
   regular playlists, and smart playlists. Dynamic entries now use Avalonia
   `MenuFlyout` instances opened at the pointer position. Right-button presses

@@ -81,6 +81,10 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 - Gapless sequential PCM playback through ASIO, cwASIO, and exclusive WASAPI:
   the next FFmpeg decoder is prefetched and handed to the existing output
   session without reopening the audio device
+- Theme-aware table highlighting follows the currently audible track across
+  library, search, playlist, radio, podcast, and Plex views
+- Album track details provide an in-place favorite button alongside the album
+  metadata
 - Playback history for local tracks, podcast episodes, and internet-radio
   sessions, including position and completion state
 - Artwork downloads through the Cover Art Archive and manual MusicBrainz search

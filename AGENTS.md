@@ -167,6 +167,13 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - Missing covers show a placeholder and manual MusicBrainz search by editable album title
 - The manual cover-search dialog uses the themed native title bar, shows search activity and explicit empty results, and can be run repeatedly
 - Album artwork has a context menu for deletion or reassignment through manual MusicBrainz search
+- The album track detail header includes a themed heart button bound to the
+  album's favorite state. Toggling it updates `albums.is_favorite` in place
+  without leaving the detail view, including when opened from a favorites-only
+  album list.
+- The album track detail header uses the same accent border and asymmetric
+  `CornerRadius="0,24,0,24"` card shape as the radio, podcast, and shared
+  library intro cards.
 - The main window starts maximized
 - `artwork_files_v1` exports legacy artwork BLOBs into the file cache; `artworks.data` remains for compatibility with old `NOT NULL` schemas
 - Thumbnail generation is intentionally fault tolerant; invalid embedded artwork must not prevent startup
@@ -292,6 +299,10 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - Seeking remains available inside multi-track gapless PCM sessions. A seek
   clears buffered output, restarts the current FFmpeg decoder at the selected
   position, and rebuilds preparation of the following track.
+- Gapless PCM position offsets are stored per queued track. Preparing or
+  writing the next decoder must not reset the seek offset of the track that is
+  still audible; the transport changes offsets only with the rendered track
+  boundary.
 - PCM user volume is applied at the active output stage rather than baked into
   prefetched samples: WASAPI follows the selected Windows endpoint's master
   volume bidirectionally and the native ASIO bridge applies an atomic volume
@@ -355,6 +366,11 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - DataGrid and ScrollViewer backgrounds are overridden via Avalonia styles in
   `MainWindow.axaml`
 - DataGrid row headers remain disabled through `HeadersVisibility="Column"`
+- Visible rows whose playback path matches the currently audible local, Plex,
+  radio, or podcast item receive the `nowPlaying` class. Its background uses
+  the theme-specific `AppNowPlayingRowBrush`; selected rows retain the stronger
+  selection background. Loading-row handlers must also clear the class on
+  recycled virtualized rows.
 - DataGrid columns are user-resizable. Main library, search, radio, podcast,
   podcast-episode, Plex, playlist, and daily-history widths are restored from
   `settings.json`; invalid or structurally outdated width sets are ignored.

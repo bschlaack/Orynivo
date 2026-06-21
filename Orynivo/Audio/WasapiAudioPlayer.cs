@@ -16,6 +16,7 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
     private readonly IReadOnlyList<GaplessPlaybackItem> _items;
     private readonly AudioFileInfo?[] _infos;
     private readonly long[] _trackStartFrames;
+    private readonly long[] _trackPositionOffsetFrames;
     private readonly WasapiOut _output;
     private readonly BufferedWaveProvider _bufferedProvider;
     private readonly PausableWaveProvider _playbackProvider;
@@ -29,7 +30,6 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
     private int _audibleTrackIndex;
     private int _writeTrackIndex;
     private FfmpegPcmDecoder? _activeDecoder;
-    private long _positionOffsetFrames;
     private int _restartPreparedFromIndex = -1;
     private int _decoderGeneration;
     private float _volume = 1.0f;
@@ -49,6 +49,7 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
         _infos = new AudioFileInfo?[items.Count];
         _infos[0] = firstInfo;
         _trackStartFrames = new long[items.Count];
+        _trackPositionOffsetFrames = new long[items.Count];
         _output = output;
         _bufferedProvider = bufferedProvider;
         _playbackProvider = playbackProvider;
@@ -79,7 +80,7 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
             var positionFrames = Math.Max(0, playedFrames - Volatile.Read(ref _trackStartFrames[index]));
             return TimeSpan.FromSeconds(
                 Math.Min(
-                    (positionFrames + Interlocked.Read(ref _positionOffsetFrames)) /
+                    (positionFrames + Volatile.Read(ref _trackPositionOffsetFrames[index])) /
                     (double)CurrentInfo.OutputSampleRate,
                     Duration.TotalSeconds));
         }
@@ -182,8 +183,8 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
             Volatile.Write(ref _restartPreparedFromIndex, audibleIndex);
             _bufferedProvider.ClearBuffer();
             Interlocked.Exchange(ref _totalFramesWritten, 0);
-            Interlocked.Exchange(
-                ref _positionOffsetFrames,
+            Volatile.Write(
+                ref _trackPositionOffsetFrames[audibleIndex],
                 (long)(position.TotalSeconds * CurrentInfo.OutputSampleRate));
         }
         finally
@@ -259,7 +260,6 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
                     Volatile.Write(ref _trackStartFrames[nextIndex], Interlocked.Read(ref _totalFramesWritten));
                     _infos[nextIndex] = prepared.Info;
                     _activeDecoder = prepared.Decoder;
-                    Interlocked.Exchange(ref _positionOffsetFrames, 0);
                     preparedNext = PrepareTrackAsync(nextIndex + 1);
                     continue;
                 }

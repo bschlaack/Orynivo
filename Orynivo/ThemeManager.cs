@@ -22,6 +22,7 @@ public static class ThemeManager
         resources["AppSurfaceBrush"]             = Brush(dark ? "#20213A" : "#F8F8FD");
         resources["AppSurfaceHoverBrush"]        = Brush(dark ? "#292B47" : "#EAEAFF");
         resources["AppSurfaceSelectedBrush"]     = Brush(dark ? "#343654" : "#DDDDF5");
+        resources["AppNowPlayingRowBrush"]       = Brush(dark ? "#302B5A" : "#E4E1FF");
         resources["AppNavHoverBrush"]            = Brush(dark ? "#1F2038" : "#E7E7F3");
         resources["AppNavSelectedBrush"]         = Brush(dark ? "#252640" : "#DDDDF5");
         resources["AppNavTextBrush"]             = Brush(dark ? "#9999BB" : "#5C5C7A");

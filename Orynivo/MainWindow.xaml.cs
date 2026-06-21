@@ -2841,11 +2841,39 @@ public partial class MainWindow : Window
 
     private void ContentDataGrid_OnLoadingRow(object? sender, DataGridRowEventArgs e)
     {
+        ApplyNowPlayingClass(e.Row);
         if (e.Row.DataContext is not ContentRow row)
             return;
         EnsureThumbnailHydrated(row);
         if (row.EntityType == "Artist")
             _ = EnsureArtistProfileAsync(row);
+    }
+
+    private void TrackDataGrid_OnLoadingRow(object? sender, DataGridRowEventArgs e) =>
+        ApplyNowPlayingClass(e.Row);
+
+    private void ApplyNowPlayingClass(DataGridRow row)
+    {
+        var rowPath = GetPlaybackPath(row.DataContext);
+        row.Classes.Set(
+            "nowPlaying",
+            _player is not null &&
+            !string.IsNullOrWhiteSpace(rowPath) &&
+            string.Equals(rowPath, _currentFilePath, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string? GetPlaybackPath(object? row) => row switch
+    {
+        ContentRow content => content.FilePath,
+        RadioStationViewModel radio => radio.StreamUrl,
+        PodcastEpisodeViewModel podcast => podcast.Episode.AudioUrl,
+        _ => null
+    };
+
+    private void UpdateNowPlayingRowHighlights()
+    {
+        foreach (var row in this.GetVisualDescendants().OfType<DataGridRow>())
+            ApplyNowPlayingClass(row);
     }
 
     private void ApplyColumns(string view)
@@ -3546,6 +3574,17 @@ public partial class MainWindow : Window
             return db.GetAlbumById(albumId);
         });
         ApplyAlbumDetailHeader(album);
+    }
+
+    private void AlbumDetailFavoriteButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: ContentRow { Id: long albumId } row })
+            return;
+
+        row.IsFavorite = !row.IsFavorite;
+        using var db = AudioDatabase.OpenDefault();
+        db.SetAlbumFavorite(albumId, row.IsFavorite);
+        e.Handled = true;
     }
 
     private async Task ShowArtistAlbumsAsync(long artistId, string artistName)
@@ -5676,6 +5715,7 @@ public partial class MainWindow : Window
         _player        = player;
         if (player is IGaplessAudioPlayer gaplessPlayer)
             gaplessPlayer.TrackChanged += GaplessPlayer_OnTrackChanged;
+        UpdateNowPlayingRowHighlights();
         _player.Volume = _settings.OutputBackend == OutputBackend.Wasapi &&
                          _endpointVolumeSynchronizer is not null
             ? 1.0f
@@ -5930,6 +5970,7 @@ public partial class MainWindow : Window
             _currentFilePath = e.FilePath;
             _currentPlaybackDuration = e.Info.Duration;
             _playedQueuePaths.Add(e.FilePath);
+            UpdateNowPlayingRowHighlights();
 
             if (_queueIndex + 1 < _queue.Count &&
                 string.Equals(
@@ -6084,6 +6125,7 @@ public partial class MainWindow : Window
         _player?.Dispose();
         _player = null;
         _currentPlaybackDuration = TimeSpan.Zero;
+        UpdateNowPlayingRowHighlights();
 
         PlayButton.IsEnabled   = true;
         SetPlayPauseIcon(isPlaying: false);

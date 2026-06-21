@@ -15,6 +15,7 @@
             <SolidColorBrush x:Key="AppSurfaceBrush"             Color="#20213A"/>
             <SolidColorBrush x:Key="AppSurfaceHoverBrush"        Color="#292B47"/>
             <SolidColorBrush x:Key="AppSurfaceSelectedBrush"     Color="#343654"/>
+            <SolidColorBrush x:Key="AppNowPlayingRowBrush"       Color="#302B5A"/>
             <SolidColorBrush x:Key="AppNavHoverBrush"            Color="#1F2038"/>
             <SolidColorBrush x:Key="AppNavSelectedBrush"         Color="#252640"/>
             <SolidColorBrush x:Key="AppNavTextBrush"             Color="#9999BB"/>
