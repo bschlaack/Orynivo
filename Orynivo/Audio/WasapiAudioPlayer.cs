@@ -111,7 +111,9 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
         if (items.Count == 0)
             throw new ArgumentException("At least one playback item is required.", nameof(items));
 
-        var info = await ProbeAsync(items[0].FilePath, cancellationToken);
+        var info = await ProbeAsync(items[0].PlaybackPath, cancellationToken);
+        if (items[0].SegmentDuration is { } firstDuration)
+            info = info with { Duration = firstDuration };
         var device = WasapiDeviceProvider.GetRenderDevice(deviceId);
         try
         {
@@ -126,11 +128,13 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
             var output = new WasapiOut(device, AudioClientShareMode.Exclusive, useEventSync: true, latency: 100);
             output.Init(playbackProvider);
             var decoder = await FfmpegPcmDecoder.CreateAsync(
-                items[0].FilePath,
+                items[0].PlaybackPath,
                 info.OutputSampleRate,
                 selectedFormat.FfmpegSampleFormat,
                 selectedFormat.FfmpegCodec,
                 TimeSpan.Zero,
+                items[0].SegmentStart,
+                items[0].SegmentEnd,
                 cancellationToken);
             output.Play();
             return (new WasapiAudioPlayer(
@@ -165,11 +169,13 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
             ? TimeSpan.Zero
             : position > Duration ? Duration : position;
         var replacement = await FfmpegPcmDecoder.CreateAsync(
-            CurrentFilePath,
+            _items[Volatile.Read(ref _audibleTrackIndex)].PlaybackPath,
             CurrentInfo.OutputSampleRate,
             _selectedFormat.FfmpegSampleFormat,
             _selectedFormat.FfmpegCodec,
             position,
+            _items[Volatile.Read(ref _audibleTrackIndex)].SegmentStart,
+            _items[Volatile.Read(ref _audibleTrackIndex)].SegmentEnd,
             _cts.Token).ConfigureAwait(false);
         await _decoderGate.WaitAsync(_cts.Token).ConfigureAwait(false);
         try
@@ -325,13 +331,17 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
 
     private async Task<(FfmpegPcmDecoder Decoder, AudioFileInfo Info)> PrepareAsync(int index)
     {
-        var info = await ProbeAsync(_items[index].FilePath, _cts.Token).ConfigureAwait(false);
+        var info = await ProbeAsync(_items[index].PlaybackPath, _cts.Token).ConfigureAwait(false);
+        if (_items[index].SegmentDuration is { } segmentDuration)
+            info = info with { Duration = segmentDuration };
         var decoder = await FfmpegPcmDecoder.CreateAsync(
-            _items[index].FilePath,
+            _items[index].PlaybackPath,
             _selectedFormat.Format.SampleRate,
             _selectedFormat.FfmpegSampleFormat,
             _selectedFormat.FfmpegCodec,
             TimeSpan.Zero,
+            _items[index].SegmentStart,
+            _items[index].SegmentEnd,
             _cts.Token).ConfigureAwait(false);
         return (decoder, info with { OutputSampleRate = _selectedFormat.Format.SampleRate });
     }

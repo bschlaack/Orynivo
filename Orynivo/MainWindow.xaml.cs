@@ -468,7 +468,7 @@ public partial class MainWindow : Window
         _settings.AlbumArtworkView = _showAlbumArtworkView;
         _settings.ArtistArtworkView = _showArtistArtworkView;
         _settings.Volume = VolumeSlider.Value;
-        _settings.LastTrackPath = File.Exists(_currentFilePath) ? _currentFilePath : null;
+        _settings.LastTrackPath = IsAvailableLocalTrack(_currentFilePath) ? _currentFilePath : null;
         CapturePlaybackQueueState();
         _settingsStore.Save(_settings);
     }
@@ -587,7 +587,7 @@ public partial class MainWindow : Window
     private void RestoreLastTrackState()
     {
         var path = _settings.LastTrackPath;
-        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        if (string.IsNullOrWhiteSpace(path) || !IsAvailableLocalTrack(path))
             return;
 
         try
@@ -841,8 +841,10 @@ public partial class MainWindow : Window
         _queue.Clear();
         foreach (var path in _settings.PlaybackQueuePaths.Where(CanPersistQueuePath))
         {
-            if (Uri.TryCreate(path, UriKind.Absolute, out var uri) && !uri.IsFile ||
-                File.Exists(path))
+            var isRemoteUrl = Uri.TryCreate(path, UriKind.Absolute, out var uri) &&
+                              !uri.IsFile &&
+                              !uri.Scheme.Equals("cue", StringComparison.OrdinalIgnoreCase);
+            if (isRemoteUrl || IsAvailableLocalTrack(path))
             {
                 _queue.Add(new PlaylistItem(path));
             }
@@ -879,11 +881,33 @@ public partial class MainWindow : Window
     {
         if (!Uri.TryCreate(path, UriKind.Absolute, out var uri) || uri.IsFile)
             return true;
+        if (uri.Scheme.Equals("cue", StringComparison.OrdinalIgnoreCase))
+            return true;
         if (uri.Scheme is not ("http" or "https") || !string.IsNullOrEmpty(uri.UserInfo))
             return false;
 
         return !uri.Query.Contains("X-Plex-Token", StringComparison.OrdinalIgnoreCase) &&
                !uri.Query.Contains("token=", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsAvailableLocalTrack(string path)
+    {
+        if (File.Exists(path))
+            return true;
+        if (!CueSheetParser.IsVirtualPath(path))
+            return false;
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            var track = db.GetByPath(path);
+            return track is not null &&
+                   File.Exists(track.SourcePath) &&
+                   (track.CuePath is null || File.Exists(track.CuePath));
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private void PersistPlaybackQueue()
@@ -3459,7 +3483,7 @@ public partial class MainWindow : Window
         public FolderTree(List<TrackLite> tracks)
         {
             _filesPerDir = tracks
-                .GroupBy(t => Path.GetDirectoryName(t.Path) ?? string.Empty,
+                .GroupBy(t => Path.GetDirectoryName(t.SourcePath) ?? string.Empty,
                          StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(
                     g => g.Key,
@@ -6382,7 +6406,8 @@ public partial class MainWindow : Window
             _playedQueuePaths.Add(filePath);
         _playbackCts     = new CancellationTokenSource();
 
-        var ext = Path.GetExtension(filePath);
+        var playbackTrack = ResolveGaplessPlaybackItem(filePath);
+        var ext = Path.GetExtension(playbackTrack.PlaybackPath);
         IAudioPlayer player;
         AudioFileInfo info;
         var gaplessItems = BuildGaplessPlaybackItems(
@@ -6668,7 +6693,7 @@ public partial class MainWindow : Window
                 currentFilePath,
                 StringComparison.OrdinalIgnoreCase))
         {
-            return [new GaplessPlaybackItem(currentFilePath, GetReplayGainFactor(currentFilePath))];
+            return [ResolveGaplessPlaybackItem(currentFilePath)];
         }
 
         var items = new List<GaplessPlaybackItem>();
@@ -6683,12 +6708,38 @@ public partial class MainWindow : Window
                 break;
             }
 
-            items.Add(new GaplessPlaybackItem(path, GetReplayGainFactor(path)));
+            items.Add(ResolveGaplessPlaybackItem(path));
         }
 
         return items.Count == 0
-            ? [new GaplessPlaybackItem(currentFilePath, GetReplayGainFactor(currentFilePath))]
+            ? [ResolveGaplessPlaybackItem(currentFilePath)]
             : items;
+    }
+
+    private GaplessPlaybackItem ResolveGaplessPlaybackItem(string path)
+    {
+        if (!CueSheetParser.IsVirtualPath(path))
+            return new GaplessPlaybackItem(path, GetReplayGainFactor(path));
+
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            var track = db.GetByPath(path);
+            if (track is not null)
+            {
+                return new GaplessPlaybackItem(
+                    path,
+                    GetReplayGainFactor(path),
+                    track.SourcePath,
+                    track.SegmentStart is double start ? TimeSpan.FromSeconds(start) : null,
+                    track.SegmentEnd is double end ? TimeSpan.FromSeconds(end) : null);
+            }
+        }
+        catch
+        {
+        }
+
+        return new GaplessPlaybackItem(path, GetReplayGainFactor(path));
     }
 
     private void GaplessPlayer_OnTrackChanged(object? sender, GaplessTrackChangedEventArgs e)
@@ -8716,7 +8767,7 @@ public partial class MainWindow : Window
 
     private async Task OpenHistoryTrackAsync(DailyHistoryEntry entry)
     {
-        if (entry.TrackId is null || !File.Exists(entry.Path))
+        if (entry.TrackId is null || !IsAvailableLocalTrack(entry.Path))
             return;
 
         _trackFavoritesOnly = false;

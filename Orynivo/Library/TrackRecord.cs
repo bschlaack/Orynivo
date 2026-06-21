@@ -12,6 +12,21 @@ public sealed class TrackRecord
     /// <summary>Absolute file path.</summary>
     public string Path             { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Physical audio source. For ordinary tracks this equals <see cref="Path"/>;
+    /// CUE tracks use a stable virtual <see cref="Path"/> and share this source file.
+    /// </summary>
+    public string SourcePath       { get; set; } = string.Empty;
+
+    /// <summary>Optional CUE sheet that defines this virtual track.</summary>
+    public string? CuePath         { get; set; }
+
+    /// <summary>Zero-based segment start in the physical source, in seconds.</summary>
+    public double? SegmentStart    { get; set; }
+
+    /// <summary>Exclusive segment end in the physical source, in seconds.</summary>
+    public double? SegmentEnd      { get; set; }
+
     /// <summary>File name including extension.</summary>
     public string FileName         { get; set; } = string.Empty;
 

@@ -27,12 +27,21 @@ internal sealed class FfmpegPcmDecoder : IDisposable
         string sampleFormat,
         string codec,
         TimeSpan position,
+        TimeSpan? segmentStart,
+        TimeSpan? segmentEnd,
         CancellationToken cancellationToken)
     {
+        var absolutePosition = (segmentStart ?? TimeSpan.Zero) + position;
+        var duration = segmentEnd is { } end
+            ? end - absolutePosition
+            : (TimeSpan?)null;
+        var durationArgument = duration is { } remaining && remaining > TimeSpan.Zero
+            ? $"-t {remaining.TotalSeconds.ToString(CultureInfo.InvariantCulture)} "
+            : string.Empty;
         var process = Process.Start(new ProcessStartInfo
         {
             FileName = "ffmpeg",
-            Arguments = $"-v error -ss {position.TotalSeconds.ToString(CultureInfo.InvariantCulture)} -i \"{filePath}\" -vn -f {sampleFormat} -acodec {codec} -ac 2 -ar {outputSampleRate} pipe:1",
+            Arguments = $"-v error -ss {absolutePosition.TotalSeconds.ToString(CultureInfo.InvariantCulture)} -i \"{filePath}\" {durationArgument}-vn -f {sampleFormat} -acodec {codec} -ac 2 -ar {outputSampleRate} pipe:1",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
