@@ -41,6 +41,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Library scans now import track and album ReplayGain metadata. Each configured
   library root receives a one-time refresh of unchanged tracks on its first
   scan after this update.
+- Added UTF-8 M3U8 import and export for regular playlists. Relative paths are
+  resolved against the playlist file and written relatively where possible;
+  missing local files and HTTP/HTTPS entries are retained, while URLs carrying
+  user-info credentials or Plex tokens are skipped. Smart playlists remain
+  live and are not exported as static M3U8 files.
 
 ### Fixed
 

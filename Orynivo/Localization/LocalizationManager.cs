@@ -529,6 +529,13 @@ public static class LocalizationManager
         , InvalidSmartPlaylistCriteria = "Bitte gültige Zahlen und widerspruchsfreie Mindest-/Maximalwerte eingeben. „Noch nie gespielt“ kann nicht mit einer kürzlichen Wiedergabe oder einer Mindestanzahl kombiniert werden."
         , EditSmartPlaylist = "Smart-Playlist bearbeiten"
         , SmartPlaylistUpdated = "Smart-Playlist »{0}« aktualisiert."
+        , ImportM3u8Playlist = "M3U8-Playlist importieren"
+        , ExportM3u8Playlist = "Als M3U8 exportieren"
+        , M3u8ImportCompleted = "Playlist »{0}« importiert: {1} Einträge · {2} lokale Dateien fehlen · {3} HTTP-Einträge · {4} übersprungen."
+        , M3u8ImportNoEntries = "Die M3U8-Datei enthält keine importierbaren Einträge."
+        , M3u8ImportFailed = "M3U8-Import fehlgeschlagen: {0}"
+        , M3u8ExportCompleted = "Playlist »{0}« als M3U8 exportiert: {1} Einträge · {2} übersprungen."
+        , M3u8ExportFailed = "M3U8-Export fehlgeschlagen: {0}"
     };
 
     private static readonly LocalizedStrings English = new(
@@ -798,6 +805,13 @@ public static class LocalizationManager
         , InvalidSmartPlaylistCriteria = "Enter valid numbers and consistent minimum/maximum values. “Never played” cannot be combined with recent playback or a positive minimum play count."
         , EditSmartPlaylist = "Edit smart playlist"
         , SmartPlaylistUpdated = "Smart playlist '{0}' updated."
+        , ImportM3u8Playlist = "Import M3U8 playlist"
+        , ExportM3u8Playlist = "Export as M3U8"
+        , M3u8ImportCompleted = "Playlist '{0}' imported: {1} entries · {2} local files missing · {3} HTTP entries · {4} skipped."
+        , M3u8ImportNoEntries = "The M3U8 file contains no importable entries."
+        , M3u8ImportFailed = "M3U8 import failed: {0}"
+        , M3u8ExportCompleted = "Playlist '{0}' exported as M3U8: {1} entries · {2} skipped."
+        , M3u8ExportFailed = "M3U8 export failed: {0}"
     };
 
     private static readonly LocalizedStrings French = new(
@@ -1070,6 +1084,13 @@ public static class LocalizationManager
         , InvalidSmartPlaylistCriteria = "Saisissez des nombres valides et des valeurs minimum/maximum cohérentes. « Jamais lu » ne peut pas être combiné avec une lecture récente ou un minimum de lectures positif."
         , EditSmartPlaylist = "Modifier la playlist intelligente"
         , SmartPlaylistUpdated = "Playlist intelligente « {0} » mise à jour."
+        , ImportM3u8Playlist = "Importer une playlist M3U8"
+        , ExportM3u8Playlist = "Exporter au format M3U8"
+        , M3u8ImportCompleted = "Playlist « {0} » importée : {1} entrées · {2} fichiers locaux manquants · {3} entrées HTTP · {4} ignorées."
+        , M3u8ImportNoEntries = "Le fichier M3U8 ne contient aucune entrée importable."
+        , M3u8ImportFailed = "Échec de l’importation M3U8 : {0}"
+        , M3u8ExportCompleted = "Playlist « {0} » exportée au format M3U8 : {1} entrées · {2} ignorées."
+        , M3u8ExportFailed = "Échec de l’exportation M3U8 : {0}"
     };
 
     private static readonly LocalizedStrings Spanish = new(
@@ -1339,6 +1360,13 @@ public static class LocalizationManager
         , InvalidSmartPlaylistCriteria = "Introduce números válidos y valores mínimos/máximos coherentes. «Nunca reproducido» no puede combinarse con reproducción reciente ni con un mínimo positivo de reproducciones."
         , EditSmartPlaylist = "Editar lista inteligente"
         , SmartPlaylistUpdated = "Lista inteligente '{0}' actualizada."
+        , ImportM3u8Playlist = "Importar lista M3U8"
+        , ExportM3u8Playlist = "Exportar como M3U8"
+        , M3u8ImportCompleted = "Lista '{0}' importada: {1} entradas · faltan {2} archivos locales · {3} entradas HTTP · {4} omitidas."
+        , M3u8ImportNoEntries = "El archivo M3U8 no contiene entradas importables."
+        , M3u8ImportFailed = "Error al importar M3U8: {0}"
+        , M3u8ExportCompleted = "Lista '{0}' exportada como M3U8: {1} entradas · {2} omitidas."
+        , M3u8ExportFailed = "Error al exportar M3U8: {0}"
     };
 
     /// <summary>Gets the currently active <see cref="LocalizedStrings"/> instance.</summary>

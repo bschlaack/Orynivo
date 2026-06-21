@@ -437,4 +437,18 @@ public sealed record LocalizedStrings(
     public string EditSmartPlaylist { get; init; } = "";
     /// <summary>Gets the status message shown after a smart playlist was updated.</summary>
     public string SmartPlaylistUpdated { get; init; } = "";
+    /// <summary>Gets the command label for importing an M3U8 playlist.</summary>
+    public string ImportM3u8Playlist { get; init; } = "";
+    /// <summary>Gets the command label for exporting an M3U8 playlist.</summary>
+    public string ExportM3u8Playlist { get; init; } = "";
+    /// <summary>Gets the successful M3U8 import status message.</summary>
+    public string M3u8ImportCompleted { get; init; } = "";
+    /// <summary>Gets the empty M3U8 import status message.</summary>
+    public string M3u8ImportNoEntries { get; init; } = "";
+    /// <summary>Gets the failed M3U8 import status message.</summary>
+    public string M3u8ImportFailed { get; init; } = "";
+    /// <summary>Gets the successful M3U8 export status message.</summary>
+    public string M3u8ExportCompleted { get; init; } = "";
+    /// <summary>Gets the failed M3U8 export status message.</summary>
+    public string M3u8ExportFailed { get; init; } = "";
 }

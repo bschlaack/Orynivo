@@ -94,6 +94,9 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - `Orynivo/SmartPlaylistDialog.*`: localized editor for the name and advanced
   criteria of an existing smart playlist
 - `Orynivo/Library/PlaylistTrackRecord.cs`: playlist entry model with position, optional TrackId reference, and required path
+- `Orynivo/Library/M3u8PlaylistService.cs`: UTF-8 M3U8 import/export with
+  relative local-path resolution, relative export paths, missing-file
+  preservation, HTTP/HTTPS entries, and rejection of credential-bearing URLs
 - `Orynivo/Library/AudioDatabase.cs`: SQLite database layer through `Microsoft.Data.Sqlite`; database at `%LOCALAPPDATA%\Orynivo\library.db`
 - `Orynivo/Library/LibraryScanner.cs`: directory scanner using TagLibSharp; writes through `AudioDatabase.Upsert()`, reports progress, and supports cancellation
 - `Orynivo/Library/LibraryWatcherService.cs`: owns one recursive
@@ -213,6 +216,8 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - Nullable `track_id` keeps playlist entries after a library track is removed; `path` is always present
 - `EnsureColumn` upgrades existing databases when new columns are introduced
 - Available methods include `CreatePlaylist`, `CreateSmartPlaylist`, `UpdatePlaylist`, `DeletePlaylist`, `GetAllPlaylists`, `GetPlaylistById`, `GetPlaylistTracks`, `AddTrackToPlaylist`, `RemoveTrackFromPlaylist`, and transactional `MovePlaylistTrack`
+- `CreatePlaylist(name, paths)` imports playlist entries transactionally and
+  links matching local paths to existing library tracks
 
 ## Performance Measures
 
@@ -432,6 +437,15 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - Right-clicking a smart playlist in the sidebar exposes **Edit smart
   playlist**, which opens `SmartPlaylistDialog` with the stored name and full
   criteria. Saving updates `filter_criteria` without replacing playlist rows.
+- Right-clicking the Playlists accordion header exposes **Import M3U8
+  playlist**. Imports are UTF-8, resolve relative local paths against the M3U8
+  directory, preserve missing local paths, and retain HTTP/HTTPS entries.
+  URLs containing user-info credentials or `X-Plex-Token` are skipped and
+  never persisted.
+- Right-clicking a regular playlist exposes **Export as M3U8**. Export writes
+  UTF-8 without BOM, uses relative forward-slash local paths where possible,
+  keeps HTTP/HTTPS entries, and skips credential-bearing URLs. Smart playlists
+  are intentionally not exported as static M3U8 files.
 - Tracks, albums, search results, and folder-tree nodes support playlist context menus
 
 ## XML Documentation Comments

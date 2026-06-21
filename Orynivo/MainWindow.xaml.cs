@@ -19,6 +19,7 @@ using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Avalonia.Controls.Primitives;
@@ -631,6 +632,7 @@ public partial class MainWindow : Window
 
     private void LoadNavPlaylists()
     {
+        PlaylistsHeaderItem.ContextFlyout = BuildPlaylistsHeaderContextFlyout();
         foreach (var dynamicItem in NavListBox.Items
                      .OfType<ListBoxItem>()
                      .Where(item => item.Tag is string tag &&
@@ -4159,6 +4161,13 @@ public partial class MainWindow : Window
             editItem.Click += EditSmartPlaylistMenuItem_OnClick;
             menu.Items.Add(editItem);
         }
+        else
+        {
+            var exportItem = CreateFlyoutMenuItem(LocalizationManager.Current.ExportM3u8Playlist);
+            exportItem.Tag = playlist.Id;
+            exportItem.Click += ExportM3u8PlaylistMenuItem_OnClick;
+            menu.Items.Add(exportItem);
+        }
 
         var deleteItem = CreateFlyoutMenuItem(
             LocalizationManager.Current.DeletePlaylist,
@@ -4167,6 +4176,15 @@ public partial class MainWindow : Window
         deleteItem.Click += DeletePlaylistMenuItem_OnClick;
         menu.Items.Add(deleteItem);
 
+        return menu;
+    }
+
+    private MenuFlyout BuildPlaylistsHeaderContextFlyout()
+    {
+        var menu = CreateSidebarMenuFlyout();
+        var importItem = CreateFlyoutMenuItem(LocalizationManager.Current.ImportM3u8Playlist);
+        importItem.Click += ImportM3u8PlaylistMenuItem_OnClick;
+        menu.Items.Add(importItem);
         return menu;
     }
 
@@ -4190,6 +4208,106 @@ public partial class MainWindow : Window
             Theme = FindResource<ControlTheme>("AppMenuFlyoutItemTheme"),
             Foreground = foreground
         };
+    }
+
+    private async void ImportM3u8PlaylistMenuItem_OnClick(object? sender, RoutedEventArgs e)
+    {
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = LocalizationManager.Current.ImportM3u8Playlist,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("M3U8") { Patterns = ["*.m3u8", "*.m3u"] }
+            ],
+            AllowMultiple = false
+        });
+        if (files.Count == 0 || files[0].TryGetLocalPath() is not { Length: > 0 } filePath)
+            return;
+
+        try
+        {
+            var result = await M3u8PlaylistService.ImportAsync(filePath);
+            if (result.Entries.Count == 0)
+            {
+                StatusTextBlock.Text = LocalizationManager.Current.M3u8ImportNoEntries;
+                return;
+            }
+
+            var name = Path.GetFileNameWithoutExtension(filePath).Trim();
+            if (name.Length == 0)
+                name = LocalizationManager.Current.NewPlaylist;
+            using var db = AudioDatabase.OpenDefault();
+            db.CreatePlaylist(name, result.Entries);
+            LoadNavPlaylists();
+            StatusTextBlock.Text = string.Format(
+                LocalizationManager.Current.M3u8ImportCompleted,
+                name,
+                result.Entries.Count,
+                result.MissingLocalFiles,
+                result.RemoteEntries,
+                result.SkippedCredentialUrls + result.SkippedInvalidEntries);
+        }
+        catch (Exception ex)
+        {
+            StatusTextBlock.Text = string.Format(
+                LocalizationManager.Current.M3u8ImportFailed,
+                ex.Message);
+        }
+    }
+
+    private async void ExportM3u8PlaylistMenuItem_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: long playlistId })
+            return;
+
+        PlaylistRecord? playlist;
+        List<string> entries;
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            playlist = db.GetPlaylistById(playlistId);
+            if (playlist is null || playlist.IsSmartPlaylist)
+                return;
+            entries = db.GetPlaylistTracks(playlistId).Select(item => item.Path).ToList();
+        }
+        catch
+        {
+            return;
+        }
+
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = LocalizationManager.Current.ExportM3u8Playlist,
+            FileTypeChoices = [new FilePickerFileType("M3U8") { Patterns = ["*.m3u8"] }],
+            DefaultExtension = "m3u8",
+            SuggestedFileName = SanitizeFileName(playlist.Name) + ".m3u8"
+        });
+        if (file?.TryGetLocalPath() is not { Length: > 0 } filePath)
+            return;
+
+        try
+        {
+            var result = await M3u8PlaylistService.ExportAsync(filePath, entries);
+            StatusTextBlock.Text = string.Format(
+                LocalizationManager.Current.M3u8ExportCompleted,
+                playlist.Name,
+                result.ExportedEntries,
+                result.SkippedCredentialUrls + result.SkippedInvalidEntries);
+        }
+        catch (Exception ex)
+        {
+            StatusTextBlock.Text = string.Format(
+                LocalizationManager.Current.M3u8ExportFailed,
+                ex.Message);
+        }
+    }
+
+    private static string SanitizeFileName(string value)
+    {
+        var invalid = Path.GetInvalidFileNameChars().ToHashSet();
+        var sanitized = new string(value.Select(character =>
+            invalid.Contains(character) ? '_' : character).ToArray()).Trim();
+        return sanitized.Length == 0 ? "playlist" : sanitized;
     }
 
     private async void EditSmartPlaylistMenuItem_OnClick(object? sender, RoutedEventArgs e)

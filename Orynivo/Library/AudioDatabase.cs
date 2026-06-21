@@ -2120,6 +2120,55 @@ public sealed class AudioDatabase : IDisposable
         return (long)cmd.ExecuteScalar()!;
     }
 
+    /// <summary>Creates a regular playlist and inserts all supplied paths transactionally.</summary>
+    /// <param name="name">Playlist display name.</param>
+    /// <param name="paths">Local paths or remote stream URLs in playlist order.</param>
+    /// <returns>The new playlist identifier.</returns>
+    public long CreatePlaylist(string name, IReadOnlyList<string> paths)
+    {
+        long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        using var transaction = _conn.BeginTransaction();
+        using var playlistCommand = _conn.CreateCommand();
+        playlistCommand.Transaction = transaction;
+        playlistCommand.CommandText = """
+            INSERT INTO playlists (name, created_at, modified_at)
+            VALUES ($name, $now, $now)
+            RETURNING id;
+            """;
+        playlistCommand.Parameters.AddWithValue("$name", name);
+        playlistCommand.Parameters.AddWithValue("$now", now);
+        var playlistId = (long)playlistCommand.ExecuteScalar()!;
+
+        using var itemCommand = _conn.CreateCommand();
+        itemCommand.Transaction = transaction;
+        itemCommand.CommandText = """
+            INSERT INTO playlist_tracks (
+                playlist_id, track_id, path, position, added_at)
+            VALUES (
+                $playlistId,
+                (SELECT id FROM tracks WHERE path = $path LIMIT 1),
+                $path,
+                $position,
+                $now);
+            """;
+        var playlistParameter = itemCommand.Parameters.Add("$playlistId", Microsoft.Data.Sqlite.SqliteType.Integer);
+        var pathParameter = itemCommand.Parameters.Add("$path", Microsoft.Data.Sqlite.SqliteType.Text);
+        var positionParameter = itemCommand.Parameters.Add("$position", Microsoft.Data.Sqlite.SqliteType.Integer);
+        var nowParameter = itemCommand.Parameters.Add("$now", Microsoft.Data.Sqlite.SqliteType.Integer);
+        playlistParameter.Value = playlistId;
+        nowParameter.Value = now;
+
+        for (var index = 0; index < paths.Count; index++)
+        {
+            pathParameter.Value = paths[index];
+            positionParameter.Value = index + 1;
+            itemCommand.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+        return playlistId;
+    }
+
     public void UpdatePlaylist(long id, string name, string? description = null)
     {
         long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();

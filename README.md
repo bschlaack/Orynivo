@@ -75,6 +75,9 @@ plus a multi-resolution Windows application icon based on the standalone logo.
   playback-history, ordering, and result-limit criteria
 - Smart playlists are created directly from active track filters and can be
   refined later through their sidebar context menu
+- UTF-8 M3U8 import and export for regular playlists, including relative local
+  paths, retained missing-file entries, and HTTP/HTTPS streams; credentialed
+  Plex URLs are excluded
 - Playback history for local tracks, podcast episodes, and internet-radio
   sessions, including position and completion state
 - Artwork downloads through the Cover Art Archive and manual MusicBrainz search
