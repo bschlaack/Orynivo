@@ -8,6 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Added Windows System Media Transport Controls integration. Global media keys
+  now control Orynivo's existing transport and queue, while Windows receives
+  playback state, seekable timeline data, title, artist, album, and artwork for
+  the media overlay and lock screen. Metadata follows gapless transitions,
+  podcasts, Plex tracks, and live internet-radio title changes.
 - Added a themed **Save as playlist** action to the album-detail header. It can
   append every currently displayed album track to an existing playlist or
   create a new playlist, respecting the current album-track scope. The album
@@ -16,6 +21,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Restored the theme-aware currently-playing highlight for track nodes in the
+  local folder view. Tree highlighting now resolves local `FolderTag` paths as
+  well as Plex folder-track paths, and remains visible when the playing node is
+  also the currently selected tree item. Local track nodes are indexed by
+  absolute path so previous/next and gapless transitions update the exact
+  following entry independently of TreeView realization. Local file entries
+  now use a dedicated visible header surface because Avalonia's Fluent tree
+  template did not consistently render their container background.
 - Restored the playlist context actions for track tables, search results,
   album rows, and folder-tree entries. Dynamically generated actions now open
   as themed pointer-positioned flyouts, including existing playlists, new

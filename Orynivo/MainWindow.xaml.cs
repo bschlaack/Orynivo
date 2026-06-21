@@ -29,6 +29,7 @@ using Orynivo.Controls;
 using Orynivo.Library;
 using Orynivo.Localization;
 using Orynivo.Streaming;
+using Windows.Media;
 
 namespace Orynivo;
 
@@ -48,6 +49,10 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _plexViewCts;
     private readonly Dictionary<string, ContentRow> _plexTracksByUrl =
         new(StringComparer.Ordinal);
+    private readonly Dictionary<string, TreeViewItem> _localFolderTrackItems =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Border> _localFolderTrackHeaders =
+        new(StringComparer.OrdinalIgnoreCase);
     private readonly Stack<PlexNavigationState> _plexNavigationStack = [];
     private const int ArtworkPageSize = 120;
     private List<ContentRow> _albumArtworkRows = [];
@@ -137,6 +142,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _lyricsCts;
     private CancellationTokenSource? _artistProfileCts;
     private WindowsEndpointVolumeSynchronizer? _endpointVolumeSynchronizer;
+    private WindowsMediaTransportService? _windowsMediaTransport;
     private bool _updatingVolumeFromSystem;
     private CancellationTokenSource _backgroundArtistLoadCts = new();
     private int _activeLyricIndex = -1;
@@ -410,6 +416,7 @@ public partial class MainWindow : Window
             new EventHandler<PointerReleasedEventArgs>(PositionSlider_OnPreviewMouseLeftButtonUp),
             handledEventsToo: true);
         ConfigureEndpointVolumeSynchronization();
+        ConfigureWindowsMediaTransport();
         QueueHydrateVisibleArtworkRows(AlbumArtworkListBox);
         QueueHydrateVisibleArtworkRows(ArtistArtworkListBox);
         // Avalonia DataGrid owns a dedicated pixel-based vertical ScrollBar instead of
@@ -431,6 +438,8 @@ public partial class MainWindow : Window
         CancelAndDispose(ref _podcastFeedCts);
         CancelAndDispose(ref _plexViewCts);
         StopPlayback();
+        _windowsMediaTransport?.Dispose();
+        _windowsMediaTransport = null;
         base.OnClosed(e);
     }
 
@@ -1487,6 +1496,8 @@ public partial class MainWindow : Window
         string sectionKey,
         CancellationToken cancellationToken)
     {
+        _localFolderTrackItems.Clear();
+        _localFolderTrackHeaders.Clear();
         FolderTreeView.Items.Clear();
         var page = await _plexClient.GetFoldersAsync(
             server,
@@ -2999,14 +3010,31 @@ public partial class MainWindow : Window
 
     private void ApplyNowPlayingClass(TreeViewItem item)
     {
-        var itemPath = item.Tag is PlexFolderTag { IsTrack: true, Track: not null } tag
-            ? tag.Track.FilePath
-            : null;
-        item.Classes.Set(
-            "nowPlaying",
+        var audiblePath = (_player as IGaplessAudioPlayer)?.CurrentFilePath ??
+                          _currentFilePath;
+        var itemPath = item.Tag switch
+        {
+            FolderTag { IsFile: true } folder => folder.FilePath,
+            PlexFolderTag { IsTrack: true, Track: not null } plex => plex.Track.FilePath,
+            _ => null
+        };
+        var isNowPlaying =
             _player is not null &&
             !string.IsNullOrWhiteSpace(itemPath) &&
-            string.Equals(itemPath, _currentFilePath, StringComparison.OrdinalIgnoreCase));
+            string.Equals(itemPath, audiblePath, StringComparison.OrdinalIgnoreCase);
+        item.Classes.Set("nowPlaying", isNowPlaying);
+
+        if (item.Tag is FolderTag { IsFile: true })
+        {
+            item.ClearValue(TemplatedControl.BackgroundProperty);
+            if (itemPath is not null &&
+                _localFolderTrackHeaders.TryGetValue(itemPath, out var header))
+            {
+                header.Background = isNowPlaying
+                    ? FindResource<IBrush>("AppNowPlayingRowBrush")
+                    : Brushes.Transparent;
+            }
+        }
     }
 
     private static string? GetPlaybackPath(object? row) => row switch
@@ -3021,6 +3049,8 @@ public partial class MainWindow : Window
     {
         foreach (var row in this.GetVisualDescendants().OfType<DataGridRow>())
             ApplyNowPlayingClass(row);
+        foreach (var item in _localFolderTrackItems.Values)
+            ApplyNowPlayingClass(item);
         foreach (var item in FolderTreeView.Items.OfType<TreeViewItem>())
             UpdateNowPlayingTreeHighlights(item);
     }
@@ -3321,6 +3351,8 @@ public partial class MainWindow : Window
 
     private void BuildFolderTree(List<TrackLite> tracks)
     {
+        _localFolderTrackItems.Clear();
+        _localFolderTrackHeaders.Clear();
         FolderTreeView.Items.Clear();
         if (tracks.Count == 0) return;
 
@@ -3347,6 +3379,7 @@ public partial class MainWindow : Window
             Tag = new FolderTag(false, dirPath, dirPath),
             ContextFlyout = CreateSidebarMenuFlyout()
         };
+        ApplyNowPlayingClass(item);
         AttachFolderPlaylistContextHandler(item);
 
         if (!tree.HasChildren(dirPath))
@@ -3366,12 +3399,33 @@ public partial class MainWindow : Window
             parent.Items.Add(CreateDirItemLazy(sub, tree, isRoot: false));
         foreach (var track in tree.Files(dirPath))
         {
+            var title = new TextBlock
+            {
+                Text = track.DisplayName,
+                Foreground = FindResource<IBrush>("AppPrimaryTextBrush"),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var header = new Border
+            {
+                Background = Brushes.Transparent,
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(6, 4),
+                Child = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Spacing = 7,
+                    Children = { title }
+                }
+            };
             var item = new TreeViewItem
             {
-                Header = track.DisplayName,
+                Header = header,
                 Tag = new FolderTag(true, track.Path, dirPath),
                 ContextFlyout = CreateSidebarMenuFlyout()
             };
+            _localFolderTrackItems[track.Path] = item;
+            _localFolderTrackHeaders[track.Path] = header;
+            ApplyNowPlayingClass(item);
             AttachFolderPlaylistContextHandler(item);
             parent.Items.Add(item);
         }
@@ -5041,6 +5095,7 @@ public partial class MainWindow : Window
             station,
             null,
             metadata);
+        RefreshWindowsMediaMetadata();
     }
 
     private static string BuildRadioDescription(
@@ -5770,7 +5825,31 @@ public partial class MainWindow : Window
     // Wiedergabe
     // ------------------------------------------------------------------
 
-    private async void PlayButton_OnClick(object? sender, RoutedEventArgs e)
+    private void ConfigureWindowsMediaTransport()
+    {
+        _windowsMediaTransport = WindowsMediaTransportService.TryCreate();
+        if (_windowsMediaTransport is null)
+            return;
+
+        _windowsMediaTransport.PlayRequested += () =>
+            Dispatcher.UIThread.Post(async () => await ResumeOrStartPlaybackAsync());
+        _windowsMediaTransport.PauseRequested += () =>
+            Dispatcher.UIThread.Post(PausePlayback);
+        _windowsMediaTransport.PreviousRequested += () =>
+            Dispatcher.UIThread.Post(async () => await PlayPreviousAsync());
+        _windowsMediaTransport.NextRequested += () =>
+            Dispatcher.UIThread.Post(async () => await PlayNextAsync());
+        _windowsMediaTransport.StopRequested += () =>
+            Dispatcher.UIThread.Post(StopPlayback);
+        _windowsMediaTransport.PositionChangeRequested += position =>
+            Dispatcher.UIThread.Post(async () => await SeekFromSystemAsync(position));
+        RefreshQueueNavigationButtons();
+    }
+
+    private async void PlayButton_OnClick(object? sender, RoutedEventArgs e) =>
+        await TogglePlaybackAsync();
+
+    private async Task TogglePlaybackAsync()
     {
         if (_player is not null)
         {
@@ -5778,11 +5857,29 @@ public partial class MainWindow : Window
             {
                 _player.Resume();
                 SetPlayPauseIcon(isPlaying: true);
+                _windowsMediaTransport?.SetPlaybackStatus(MediaPlaybackStatus.Playing);
             }
             else
             {
                 _player.Pause();
                 SetPlayPauseIcon(isPlaying: false);
+                _windowsMediaTransport?.SetPlaybackStatus(MediaPlaybackStatus.Paused);
+            }
+            return;
+        }
+
+        await ResumeOrStartPlaybackAsync();
+    }
+
+    private async Task ResumeOrStartPlaybackAsync()
+    {
+        if (_player is not null)
+        {
+            if (_player.IsPaused)
+            {
+                _player.Resume();
+                SetPlayPauseIcon(isPlaying: true);
+                _windowsMediaTransport?.SetPlaybackStatus(MediaPlaybackStatus.Playing);
             }
             return;
         }
@@ -5795,6 +5892,34 @@ public partial class MainWindow : Window
         try { await StartPlaybackAsync(_currentFilePath, _currentRadioStation, _currentPodcastPlayback); }
         catch (OperationCanceledException) { StatusTextBlock.Text = LocalizationManager.Current.PlaybackStopped; }
         catch (Exception ex) { StopPlayback(); StatusTextBlock.Text = ex.Message; }
+    }
+
+    private void PausePlayback()
+    {
+        if (_player is null || _player.IsPaused)
+            return;
+        _player.Pause();
+        SetPlayPauseIcon(isPlaying: false);
+        _windowsMediaTransport?.SetPlaybackStatus(MediaPlaybackStatus.Paused);
+    }
+
+    private async Task SeekFromSystemAsync(TimeSpan position)
+    {
+        if (_player?.CanSeek != true)
+            return;
+        try
+        {
+            await _player.SeekAsync(position);
+            RefreshTransport();
+            _windowsMediaTransport?.UpdateTimeline(
+                _player.Position,
+                _player.Duration,
+                force: true);
+        }
+        catch
+        {
+            // A rejected system seek request must not interrupt playback.
+        }
     }
 
     private async Task StartPlaybackAsync(
@@ -6010,6 +6135,12 @@ public partial class MainWindow : Window
             StartRadioMetadataMonitor(radioStation);
         }
         UpdateNowPlayingFavoriteButton();
+        RefreshWindowsMediaMetadata();
+        _windowsMediaTransport?.SetPlaybackStatus(MediaPlaybackStatus.Playing);
+        _windowsMediaTransport?.UpdateTimeline(
+            player.Position,
+            player.Duration,
+            force: true);
 
         var outputName = _settings.OutputBackend is OutputBackend.Asio or OutputBackend.CwAsio
             ? _settings.SelectedDriverName
@@ -6222,6 +6353,73 @@ public partial class MainWindow : Window
         }
 
         UpdateNowPlayingFavoriteButton();
+        RefreshWindowsMediaMetadata();
+        _windowsMediaTransport?.SetPlaybackStatus(MediaPlaybackStatus.Playing);
+        if (_player is not null)
+        {
+            _windowsMediaTransport?.UpdateTimeline(
+                _player.Position,
+                _player.Duration,
+                force: true);
+        }
+    }
+
+    private void RefreshWindowsMediaMetadata()
+    {
+        if (_windowsMediaTransport is null)
+            return;
+
+        var title = NowPlayingTitleBlock.Text ?? string.Empty;
+        var artist = NowPlayingArtistBlock.Text ?? string.Empty;
+        var album = string.Empty;
+        string? artworkPath = null;
+        Uri? artworkUri = null;
+
+        if (_currentPodcastPlayback is { } podcastPlayback)
+        {
+            album = podcastPlayback.Podcast.Name;
+            if (Uri.TryCreate(
+                    podcastPlayback.Podcast.ArtworkUrl,
+                    UriKind.Absolute,
+                    out var podcastArtworkUri))
+            {
+                artworkUri = podcastArtworkUri;
+            }
+        }
+        else if (_currentRadioStation is { } radioStation)
+        {
+            album = radioStation.Name;
+            if (Uri.TryCreate(radioStation.Favicon, UriKind.Absolute, out var radioArtworkUri))
+                artworkUri = radioArtworkUri;
+        }
+        else if (_plexTracksByUrl.TryGetValue(_currentFilePath, out var plexTrack))
+        {
+            album = plexTrack.Album ?? string.Empty;
+        }
+        else
+        {
+            try
+            {
+                using var db = AudioDatabase.OpenDefault();
+                var track = db.GetByPath(_currentFilePath);
+                var artwork = db.GetArtworkPathsByTrackPath(_currentFilePath);
+                album = track?.Album ?? string.Empty;
+                artworkPath = artwork?.OriginalPath ??
+                              artwork?.Thumb320Path ??
+                              artwork?.Thumb96Path;
+            }
+            catch
+            {
+                // Metadata is optional and must never affect audio playback.
+            }
+        }
+
+        _ = _windowsMediaTransport.UpdateMetadataAsync(new WindowsMediaMetadata(
+            title,
+            artist,
+            album,
+            artworkPath,
+            artworkUri));
     }
 
     private void StartLocalPlaybackHistory(string filePath)
@@ -6244,7 +6442,10 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void PreviousButton_OnClick(object? sender, RoutedEventArgs e)
+    private async void PreviousButton_OnClick(object? sender, RoutedEventArgs e) =>
+        await PlayPreviousAsync();
+
+    private async Task PlayPreviousAsync()
     {
         if (!TryMoveToPreviousQueueIndex())
             return;
@@ -6256,7 +6457,10 @@ public partial class MainWindow : Window
         catch (Exception ex) { StopPlayback(); StatusTextBlock.Text = ex.Message; }
     }
 
-    private async void NextButton_OnClick(object? sender, RoutedEventArgs e)
+    private async void NextButton_OnClick(object? sender, RoutedEventArgs e) =>
+        await PlayNextAsync();
+
+    private async Task PlayNextAsync()
     {
         if (!TryMoveToNextQueueIndex())
             return;
@@ -6301,6 +6505,7 @@ public partial class MainWindow : Window
         _currentTrackIsFavorite = false;
         _currentRadioStation = null;
         _currentPodcastPlayback = null;
+        _windowsMediaTransport?.Clear();
         LyricsButton.IsEnabled = false;
         ArtistInfoButton.IsEnabled = false;
         ToolTip.SetTip(ArtistInfoButton, LocalizationManager.Current.ShowArtistInfo);
@@ -6449,11 +6654,17 @@ public partial class MainWindow : Window
             NextButton.IsEnabled =
                 _shuffleHistoryPosition + 1 < _shuffleHistory.Count ||
                 HasUnplayedShuffleCandidate();
+            _windowsMediaTransport?.SetNavigationCapabilities(
+                PreviousButton.IsEnabled,
+                NextButton.IsEnabled);
             return;
         }
 
         PreviousButton.IsEnabled = _queueIndex > 0 && _queueIndex < _queue.Count;
         NextButton.IsEnabled = _queueIndex >= 0 && _queueIndex + 1 < _queue.Count;
+        _windowsMediaTransport?.SetNavigationCapabilities(
+            PreviousButton.IsEnabled,
+            NextButton.IsEnabled);
     }
 
     private void ShuffleButton_OnClick(object? sender, RoutedEventArgs e)
@@ -6592,6 +6803,13 @@ public partial class MainWindow : Window
         {
             _isSeekingWithSlider = false;
             RefreshTransport();
+            if (_player is not null)
+            {
+                _windowsMediaTransport?.UpdateTimeline(
+                    _player.Position,
+                    _player.Duration,
+                    force: true);
+            }
         }
     }
 
@@ -6623,6 +6841,7 @@ public partial class MainWindow : Window
         PositionSlider.Maximum    = Math.Max(1, _player.Duration.TotalSeconds);
         if (!_isSeekingWithSlider)
             PositionSlider.Value = Math.Min(PositionSlider.Maximum, _player.Position.TotalSeconds);
+        _windowsMediaTransport?.UpdateTimeline(_player.Position, _player.Duration);
         if (_currentPodcastPlayback is not null &&
             DateTimeOffset.UtcNow - _lastPodcastProgressSave >= TimeSpan.FromSeconds(5))
         {
@@ -7407,6 +7626,7 @@ public partial class MainWindow : Window
             _settingsStore.Save(_settings);
             ThemeManager.Apply(_settings.Theme);
             LocalizationManager.Apply(_settings.Language);
+            UpdateNowPlayingRowHighlights();
             ApplyArtistInfoSettings();
             RefreshSelectedDriverText();
             ConfigureEndpointVolumeSynchronization();

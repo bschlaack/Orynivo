@@ -608,10 +608,10 @@
         <Style Selector="TreeViewItem:pointerover">
             <Setter Property="Background" Value="{DynamicResource AppSurfaceHoverBrush}"/>
         </Style>
-        <Style Selector="TreeViewItem.nowPlaying:not(:selected)">
+        <Style Selector="TreeViewItem.nowPlaying">
             <Setter Property="Background" Value="{DynamicResource AppNowPlayingRowBrush}"/>
         </Style>
-        <Style Selector="TreeViewItem.nowPlaying:pointerover:not(:selected)">
+        <Style Selector="TreeViewItem.nowPlaying:pointerover">
             <Setter Property="Background" Value="{DynamicResource AppNowPlayingRowBrush}"/>
         </Style>
         <!-- NavItemText helper -->

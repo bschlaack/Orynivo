@@ -20,6 +20,9 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 - PCM playback through `ffmpeg`
 - Seeking, volume control, pause, an automatic playback queue, and shuffle
   without repeating a track within the currently loaded queue
+- Windows System Media Transport Controls integration with global media keys,
+  play/pause/previous/next/stop and seek requests, system-overlay and lock-screen
+  metadata, album art, playback state, and timeline synchronization
 - Optional ReplayGain volume adjustment for PCM playback, using track or album
   gain metadata with fallback to the other available value; native DSD output
   remains bit-perfect
@@ -181,7 +184,7 @@ the repository. Release artifacts therefore include `CwAsioBridge.dll`.
 ## Run
 
 ```powershell
-.\Orynivo\bin\Debug\net8.0-windows\Orynivo.exe
+.\Orynivo\bin\Debug\net8.0-windows10.0.19041.0\Orynivo.exe
 ```
 
 Library directories and the desired output device can then be selected in the

@@ -15,7 +15,7 @@ Windows audio player with:
 
 ```powershell
 .\build.ps1
-.\Orynivo\bin\Debug\net8.0-windows\Orynivo.exe
+.\Orynivo\bin\Debug\net8.0-windows10.0.19041.0\Orynivo.exe
 ```
 
 `build.ps1` always builds the vendored MIT-licensed `CwAsioBridge.dll`, then
@@ -47,6 +47,10 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - `Orynivo/Audio/WasapiAudioPlayer.cs`: exclusive-mode WASAPI PCM path; converts
   DSD sources to PCM in real time and selects a supported output sample rate
 - `Orynivo/Audio/WasapiDeviceProvider.cs`: WASAPI devices and capability queries
+- `Orynivo/WindowsMediaTransportService.cs`: optional Windows System Media
+  Transport Controls host for global media buttons, lock-screen/system-overlay
+  metadata, artwork, playback status, and timeline updates; its `MediaPlayer`
+  instance is control-only and never outputs Orynivo audio
 - `Orynivo/Audio/WindowsEndpointVolumeSynchronizer.cs`: bidirectional
   synchronization between the transport volume slider and the selected
   Windows render endpoint's master volume
@@ -296,7 +300,16 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 
 ## Known Technical Details
 
-- Target platform: `net8.0-windows`, x64
+- Target platform: `net8.0-windows10.0.19041.0`, x64
+- Windows SMTC integration is created opportunistically at main-window startup.
+  API or metadata failures must remain silent and must never prevent playback.
+  Global commands dispatch onto Avalonia's UI thread and reuse Orynivo's normal
+  play, pause, previous, next, stop, and seek paths.
+- SMTC metadata follows local tracks, gapless transitions, podcasts, Plex
+  tracks, and changing internet-radio ICY metadata. Local artwork uses the
+  managed artwork cache; podcast/radio artwork uses its public catalog URL.
+- The SMTC timeline is refreshed at most every five seconds during playback and
+  immediately after track changes or seeks.
 - `SteinbergAsioStream.IsBackendAvailable()` validates each native bridge and
   loads its shared export API dynamically. Settings shows **Steinberg ASIO**
   only when `AsioBridge.dll` exists and **cwASIO** only when
@@ -431,10 +444,23 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   the theme-specific `AppNowPlayingRowBrush`; selected rows retain the stronger
   selection background. Loading-row handlers must also clear the class on
   recycled virtualized rows.
-- Plex track nodes in the folder tree use the same `nowPlaying` class and
-  theme brush. Playback transitions must update the complete materialized
-  `TreeViewItem` hierarchy recursively, including collapsed branches, while
-  newly lazy-loaded nodes apply the class when they are created.
+- Local and Plex track nodes in the folder tree use the same `nowPlaying` class
+  and theme brush. `ApplyNowPlayingClass(TreeViewItem)` must resolve local
+  `FolderTag` file paths as well as Plex `PlexFolderTag` track paths. Playback
+  transitions update the complete materialized `TreeViewItem` hierarchy
+  recursively, including collapsed branches, while newly created or lazy-loaded
+  nodes apply the class immediately. Unlike table rows, a selected folder-tree
+  track must retain the `AppNowPlayingRowBrush`; otherwise the selection
+  background hides the playing indicator immediately after double-clicking it.
+  Local file nodes are additionally indexed by case-insensitive absolute path
+  in `_localFolderTrackItems`; previous/next and gapless queue advances update
+  those exact node references instead of relying only on TreeView traversal.
+  Avalonia's Fluent local-tree template does not reliably paint the nested
+  local node container background, so every local file node uses a dedicated
+  header `Border` indexed in `_localFolderTrackHeaders`. The audible path sets
+  `AppNowPlayingRowBrush` directly on that visible header and clears the prior
+  header on playback start, previous/next, or gapless transition. Theme changes
+  must refresh the complete highlight.
 - DataGrid columns are user-resizable. Main library, search, radio, podcast,
   podcast-episode, Plex, playlist, and daily-history widths are restored from
   `settings.json`; invalid or structurally outdated width sets are ignored.
