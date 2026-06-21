@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Added a localized, editable **Up next** view backed by the active playback
+  queue. Tracks, albums, folders, search results, playlist entries, and Plex
+  tracks can be played next or appended through themed context flyouts. Queue
+  entries can be removed or moved up/down, the full queue can be saved as a
+  regular playlist, and safe queue entries plus the current index persist
+  across restarts. Credential-bearing Plex URLs are never stored.
 - Added Windows System Media Transport Controls integration. Global media keys
   now control Orynivo's existing transport and queue, while Windows receives
   playback state, seekable timeline data, title, artist, album, and artwork for
@@ -21,6 +27,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Preserved manual artist renames across watcher updates and later library
+  scans. The original tag name is stored as exactly one alias entry in
+  `artist_aliases`, and rescanned tracks continue using the canonical database
+  display name instead of recreating the old artist. Merges also record the
+  pre-merge names of both artists as aliases without adding a redundant entry
+  for the new canonical name.
+- Fixed A-Z navigation in virtualized artist and album artwork views after
+  reopening or rebinding the view. Alphabet jumps now load through the target,
+  wait for wrap-panel layout, and then scroll reliably; stale offsets are reset.
+- Fixed artist rename and merge from the artist-information view by separating
+  modal dialogs from database connection lifetime and running the final
+  transaction without holding a UI-thread connection open.
+- Fixed the **Rename** button in the artist-name dialog not confirming pointer
+  clicks. Enter and the primary button now use the same confirmation path.
+  Both dialog buttons use centered text and explicit theme-aware hover and
+  pressed colors instead of the default black Fluent hover surface.
+- Artist renames now update the information-screen title and active artist
+  state immediately after the SQLite transaction. The potentially lengthy
+  full Lucene rebuild runs afterward in the background instead of making the
+  rename appear to have no effect.
+- Moved artist-name collision lookup off the UI thread and combined it with a
+  collision-free rename in one database session. Large libraries no longer
+  stall between closing the dialog and starting the transaction, and the
+  committed name is verified before refreshing the artist view.
+- Moved the verified SQLite rename/merge operation into the artist-name
+  dialog's confirmation lifecycle. **Rename** and Enter now keep the dialog
+  open while committing on a background thread, close only after success, and
+  display a localized error in place when persistence fails. Merge failures
+  are now caught and displayed instead of propagating as unhandled exceptions.
 - Restored the theme-aware currently-playing highlight for track nodes in the
   local folder view. Tree highlighting now resolves local `FolderTag` paths as
   well as Plex folder-track paths, and remains visible when the playing node is

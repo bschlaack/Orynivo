@@ -443,6 +443,24 @@ public sealed record LocalizedStrings(
     public string ExportM3u8Playlist { get; init; } = "";
     /// <summary>Gets the album-detail action label for saving the visible tracks to a playlist.</summary>
     public string SaveAlbumAsPlaylist { get; init; } = "";
+    /// <summary>Gets the title of the editable playback queue view.</summary>
+    public string UpNext { get; init; } = "";
+    /// <summary>Gets the action label for inserting tracks after the current queue item.</summary>
+    public string PlayNext { get; init; } = "";
+    /// <summary>Gets the action label for appending tracks to the playback queue.</summary>
+    public string AppendToQueue { get; init; } = "";
+    /// <summary>Gets the action label for removing an item from the playback queue.</summary>
+    public string RemoveFromQueue { get; init; } = "";
+    /// <summary>Gets the action label for moving a queue item upwards.</summary>
+    public string MoveUp { get; init; } = "";
+    /// <summary>Gets the action label for moving a queue item downwards.</summary>
+    public string MoveDown { get; init; } = "";
+    /// <summary>Gets the action label for saving the playback queue as a playlist.</summary>
+    public string SaveQueueAsPlaylist { get; init; } = "";
+    /// <summary>Gets the status message shown after tracks were inserted into the queue.</summary>
+    public string TracksQueuedNext { get; init; } = "";
+    /// <summary>Gets the status message shown after tracks were appended to the queue.</summary>
+    public string TracksAppendedToQueue { get; init; } = "";
     /// <summary>Gets the successful M3U8 import status message.</summary>
     public string M3u8ImportCompleted { get; init; } = "";
     /// <summary>Gets the empty M3U8 import status message.</summary>

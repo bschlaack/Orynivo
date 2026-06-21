@@ -697,6 +697,13 @@
                     </StackPanel>
                 </ListBoxItem>
 
+                <ListBoxItem Tag="Queue" Theme="{StaticResource NavItemTheme}">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="≡" Width="18" FontSize="15" VerticalAlignment="Center"/>
+                        <TextBlock Text="{DynamicResource L_UpNext}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </ListBoxItem>
+
                 <ListBoxItem x:Name="LocalLibraryHeaderItem"
                              Tag="Section:LocalLibrary"
                              FontSize="10"
@@ -958,6 +965,15 @@
                                 <TextBlock Text="{DynamicResource L_SaveSmartPlaylist}" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
+                        <Button x:Name="SaveQueueAsPlaylistButton"
+                                Grid.Column="5"
+                                Margin="8,0,0,0"
+                                Padding="12,5"
+                                VerticalAlignment="Center"
+                                IsVisible="False"
+                                Theme="{StaticResource HeaderFilterButtonTheme}"
+                                Content="{DynamicResource L_SaveQueueAsPlaylist}"
+                                Click="SaveQueueAsPlaylistButton_OnClick"/>
                         <TextBox x:Name="SearchTextBox"
                                 Grid.Column="6"
                                  Width="240"

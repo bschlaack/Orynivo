@@ -89,6 +89,9 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   `AppSettings.ArtistArtworkView` preserve the selected main view and entity
   artwork/table modes
 - `AppSettings.Volume` and `AppSettings.LastTrackPath` preserve volume and the last selected or played track; restoration requires both the file and database entry to exist
+- `AppSettings.PlaybackQueuePaths` and `PlaybackQueueIndex` preserve the editable
+  **Up next** queue across restarts. Local paths and non-credential HTTP/HTTPS
+  URLs may be stored; Plex-token and user-info URLs must never be persisted.
 - `AppSettings.ReplayGainMode` selects disabled, track, or album ReplayGain for PCM playback; native ASIO DSD remains bit-perfect
 - `AppSettings.DataGridColumnWidths` persists user-adjusted pixel widths per stable table/view key; dynamic main-content views capture their current widths before replacing columns
 - `AppSettings.VisibleDataGridColumns` persists selectable column IDs per table/view key; right-clicking any table header opens the context-appropriate column chooser flyout
@@ -204,15 +207,47 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   `ContentTemplate` bypasses the result `DataTemplate` and renders the record's
   complete `ToString()` value, including full lyrics, in the result list.
 - Artist views support table and image-card modes; visible artists lazily download localized biographies and images from the configured source (Wikipedia or Last.fm). The transport info button replaces the current main content with the current artist image, biography, and source link. The source label ("Quelle: Wikipedia" / "Quelle: Last.fm") is set dynamically from the stored `SourceUrl`.
+- Artwork A-Z navigation indexes the complete lightweight artist/album result,
+  but binds rows to the virtualized wrap panels in pages. A jump must append
+  through the target row and defer `ScrollIntoView` until layout has processed
+  the collection changes; rebinding an artwork view resets its old offset.
 - The artist information view can search Wikimedia Commons using editable text and assign the selected image without replacing the cached biography or its source URL.
 - Artist images remain visible even when no biography is available.
 - The artist information view can rename artists. A matching normalized name opens a merge dialog that asks which artist record and profile data survive; the transaction consolidates duplicate albums, reassigns tracks, preserves favorites and available album artwork, updates denormalized artist names, and rebuilds the Lucene index. Audio-file tags are not changed.
+- Artist rename/merge dialogs must not be awaited while an `AudioDatabase`
+  connection remains open. Resolve a possible collision first, dispose the
+  connection, show the modal choice, then run the rename transaction.
+- Manual artist renames persist exactly one `artist_aliases` comparison-key
+  mapping from the original tag name to the surviving artist ID. The new
+  canonical name must never be written as an alias because it is already the
+  stored `artists.name` and is loaded directly by `EnsureArtistComparisonCache`.
+  Scanner and watcher upserts must resolve this alias and keep the canonical
+  database display name in denormalized track fields; unchanged audio tags must
+  never recreate or restore the pre-rename artist name.
+- After the rename transaction, update `ArtistInfoTitleButton` and related
+  current/filter artist state immediately. The potentially expensive complete
+  Lucene rebuild runs afterward in the background and must not delay visible
+  confirmation of the new name.
+- On large libraries, do not open `AudioDatabase` for collision lookup on the
+  UI thread after the rename dialog. Collision lookup and a collision-free
+  rename share one background connection; only an actual collision returns to
+  the UI for the merge-choice dialog. Verify the committed artist name before
+  refreshing lists.
+- `EditArtistNameDialog` owns the complete confirmation lifecycle through
+  `CommitAsync`: clicking **Rename** or pressing Enter disables its inputs,
+  awaits the verified SQLite rename/merge operation, and closes only after
+  success. Failures keep the dialog open with a localized status message.
+  Its local button themes explicitly define centered content and theme-aware
+  hover/pressed surfaces.
 - Artist names are normalized when scanned: only the primary performer is retained, `feat.`/`ft.` suffixes are removed, and Unicode, whitespace, case, diacritic, and punctuation variants share one normalized artist identity
 - Settings includes **Normalize artist names**, which transactionally merges existing variants, preserves favorites and cached profile data, updates visible track and album-artist names without modifying audio files, and rebuilds the Lucene index
 
 ## Playlist Context Menus
 
-- Right-clicking a track, search result, album, or folder node offers existing playlists and **New playlist...**
+- Right-clicking a track, search result, album, or folder node first offers
+  **Play next** and **Append to queue**, followed by existing playlists and
+  **New playlist...**. Plex tracks expose only the in-memory queue actions so
+  authenticated URLs cannot be written to playlist or settings storage.
 - Selecting a playlist immediately adds the track or all album tracks and updates the status bar
 - The album-detail header includes **Save as playlist**. It reads the current
   `ContentDataGrid.ItemsSource`, so it saves exactly the album tracks currently
@@ -258,6 +293,21 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - `ContentRow.PlaylistEntryId` contains `playlist_tracks.id` only in regular playlist views
 - Playlist localization keys must exist in German, English, French, and Spanish
 
+## Editable Playback Queue
+
+- The static sidebar item `Queue` opens the localized **Up next** view backed
+  directly by `MainWindow._queue`; do not create a second playback-order model.
+- Queue rows retain their `PlaylistItem` reference so duplicate paths can be
+  removed and moved independently. Moving the active item must recalculate
+  `_queueIndex` by reference, not by path equality.
+- Queue rows can move up/down or be removed, and the complete queue can be
+  saved as a regular playlist through `NewPlaylistDialog`.
+- Queue mutations update navigation buttons, the visible queue table, shuffle
+  history, and persisted settings together.
+- The gapless PCM players receive an immutable item list at startup. Mutating
+  an active gapless queue therefore restarts the current stream and seeks back
+  to its audible position so the revised order takes effect immediately.
+
 ## Playlist Database Structure
 
 - `playlists`: id, name, description, created_at, modified_at, `is_smart`, `filter_criteria`
@@ -276,6 +326,8 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - `GetTrackList()` and related list queries load compact scalar metadata used by
   selectable track columns, but continue to omit artwork BLOBs and lyrics text
 - `GetTrackListByIds(ids)` batches large ID sets to stay below SQLite variable limits
+- `GetTrackListByPaths(paths)` batches queue metadata lookup and deduplicates
+  query paths while the queue view restores the original order and duplicates.
 - `GetTracksByDirectory(dirPath)` uses an SQL prefix query plus a direct-child filter
 - `GetTrackPathsUnderDirectory(rootPath)` returns all recursive track paths below a root
 - Folder-tree lazy loading uses an in-memory parent-to-children map and creates
@@ -389,6 +441,9 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   content width. Its favorite button appears immediately before the album title;
   cover search and **Save as playlist** remain adjacent themed actions.
 - The bottom transport bar shows artwork and track information, favorite state, playback controls, position, and volume
+- **Up next** is a top-level sidebar view using the shared track table styling.
+  It displays queue order, title, artist, album, duration, and themed
+  move/remove actions, plus a header action to save the queue as a playlist.
 - Settings uses a two-column layout with navigation on the left and content on the right
 - Settings navigation reuses the main sidebar theme resources
 - All Settings buttons use the shared themed button style, including dynamic scan and remove buttons

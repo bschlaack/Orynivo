@@ -8,8 +8,53 @@
         CanResize="False"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource AppSurfaceBrush}">
+    <Window.Resources>
+        <ControlTheme x:Key="DialogButtonTheme" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource AppButtonBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppButtonTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppButtonBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border x:Name="ButtonBorder"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="5">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          TextBlock.Foreground="{TemplateBinding Foreground}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+            <Style Selector="^:pointerover /template/ Border#ButtonBorder">
+                <Setter Property="Background" Value="{DynamicResource AppButtonHoverBrush}"/>
+            </Style>
+            <Style Selector="^:pressed /template/ Border#ButtonBorder">
+                <Setter Property="Background" Value="{DynamicResource AppButtonPressedBrush}"/>
+            </Style>
+        </ControlTheme>
+        <ControlTheme x:Key="DialogPrimaryButtonTheme"
+                      TargetType="Button"
+                      BasedOn="{StaticResource DialogButtonTheme}">
+            <Setter Property="Background" Value="{DynamicResource AppTransportPlayBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Style Selector="^:pointerover /template/ Border#ButtonBorder">
+                <Setter Property="Background" Value="{DynamicResource AppTransportPlayHoverBrush}"/>
+            </Style>
+            <Style Selector="^:pressed /template/ Border#ButtonBorder">
+                <Setter Property="Background" Value="{DynamicResource AppTransportPlayBrush}"/>
+            </Style>
+        </ControlTheme>
+    </Window.Resources>
     <Grid Margin="24,20,24,24">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -32,22 +77,25 @@
         <StackPanel Grid.Row="2"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right">
-            <Button Content="{DynamicResource L_Cancel}"
+            <Button x:Name="CancelButton"
+                    Content="{DynamicResource L_Cancel}"
                     Width="100"
                     Height="34"
                     Margin="0,0,8,0"
-                    Background="{DynamicResource AppButtonBrush}"
-                    Foreground="{DynamicResource AppButtonTextBrush}"
-                    BorderBrush="{DynamicResource AppButtonBorderBrush}"
+                    Theme="{StaticResource DialogButtonTheme}"
                     Click="CancelButton_OnClick"/>
             <Button x:Name="RenameButton"
                     Content="{DynamicResource L_RenameArtist}"
                     Width="120"
                     Height="34"
-                    Background="#6C63FF"
-                    Foreground="White"
-                    BorderThickness="0"
+                    Theme="{StaticResource DialogPrimaryButtonTheme}"
                     Click="RenameButton_OnClick"/>
         </StackPanel>
+        <TextBlock x:Name="StatusTextBlock"
+                   Grid.Row="3"
+                   Margin="0,12,0,0"
+                   Foreground="{DynamicResource AppMutedTextBrush}"
+                   TextWrapping="Wrap"
+                   IsVisible="False"/>
     </Grid>
 </Window>

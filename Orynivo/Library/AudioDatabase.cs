@@ -176,6 +176,7 @@ public sealed class AudioDatabase : IDisposable
 {
     private readonly SqliteConnection _conn;
     private Dictionary<string, (long Id, string Name)>? _artistsByComparisonKey;
+    private Dictionary<long, string>? _artistNamesById;
 
     /// <summary>
     /// Opens (or creates) the SQLite database at <paramref name="dbPath"/>,
@@ -258,6 +259,9 @@ public sealed class AudioDatabase : IDisposable
         try
         {
             var artistId  = EnsureArtist(track.Artist, tx);
+            track.Artist = GetCanonicalArtistName(artistId, track.Artist);
+            var albumArtistId = EnsureArtist(GetFirstArtist(track.AlbumArtist ?? track.Artist), tx);
+            track.AlbumArtist = GetCanonicalArtistName(albumArtistId, track.AlbumArtist ?? track.Artist);
             var artworkId = EnsureArtwork(track.CoverData, track.CoverMimeType, tx);
             var albumId   = EnsureAlbum(track.Album, track.AlbumArtist ?? track.Artist, track.Year, artistId, artworkId, tx);
 
@@ -360,7 +364,7 @@ public sealed class AudioDatabase : IDisposable
         }
         catch
         {
-            _artistsByComparisonKey = null;
+            ClearArtistIdentityCache();
             throw;
         }
     }
@@ -562,12 +566,17 @@ public sealed class AudioDatabase : IDisposable
             throw new InvalidOperationException("An artist with this name already exists.");
 
         using var tx = _conn.BeginTransaction();
-        ExecuteInTransaction(tx,
+        var previousName = GetArtistName(tx, artistId)
+            ?? throw new InvalidOperationException("The artist no longer exists.");
+        UpsertArtistAlias(tx, ArtistNameNormalizer.CreateComparisonKey(previousName), artistId);
+        var renamedRows = ExecuteInTransaction(tx,
             "UPDATE artists SET name = $name WHERE id = $id;",
             ("$name", normalizedName), ("$id", artistId));
+        if (renamedRows != 1)
+            throw new InvalidOperationException("The artist could not be renamed.");
         UpdateDenormalizedArtistNames(tx, artistId, normalizedName);
         tx.Commit();
-        _artistsByComparisonKey = null;
+        ClearArtistIdentityCache();
         return new ArtistRenameResult(artistId, normalizedName, false);
     }
 
@@ -590,6 +599,13 @@ public sealed class AudioDatabase : IDisposable
         var duplicateId = preferredArtistId == currentArtistId ? matchingArtistId : currentArtistId;
 
         using var tx = _conn.BeginTransaction();
+        var currentName = GetArtistName(tx, currentArtistId);
+        var matchingName = GetArtistName(tx, matchingArtistId);
+        ExecuteInTransaction(tx,
+            "UPDATE artist_aliases SET artist_id = $survivor WHERE artist_id = $duplicate;",
+            ("$survivor", survivorId), ("$duplicate", duplicateId));
+        UpsertArtistAlias(tx, ArtistNameNormalizer.CreateComparisonKey(currentName), survivorId);
+        UpsertArtistAlias(tx, ArtistNameNormalizer.CreateComparisonKey(matchingName), survivorId);
         MergeArtistAlbums(tx, survivorId, duplicateId);
         ExecuteInTransaction(tx,
             "UPDATE tracks SET artist_id = $survivor WHERE artist_id = $duplicate;",
@@ -608,8 +624,30 @@ public sealed class AudioDatabase : IDisposable
             ("$name", normalizedName), ("$survivor", survivorId));
         UpdateDenormalizedArtistNames(tx, survivorId, normalizedName);
         tx.Commit();
-        _artistsByComparisonKey = null;
+        ClearArtistIdentityCache();
         return new ArtistRenameResult(survivorId, normalizedName, true);
+    }
+
+    private string? GetArtistName(SqliteTransaction tx, long artistId)
+    {
+        using var command = _conn.CreateCommand();
+        command.Transaction = tx;
+        command.CommandText = "SELECT name FROM artists WHERE id = $id LIMIT 1;";
+        Add(command, "$id", artistId);
+        return command.ExecuteScalar() as string;
+    }
+
+    private void UpsertArtistAlias(SqliteTransaction tx, string aliasKey, long artistId)
+    {
+        if (aliasKey.Length == 0)
+            return;
+
+        ExecuteInTransaction(tx, """
+            INSERT INTO artist_aliases (alias_key, artist_id)
+            VALUES ($alias_key, $artist_id)
+            ON CONFLICT(alias_key) DO UPDATE SET artist_id = excluded.artist_id;
+            """,
+            ("$alias_key", aliasKey), ("$artist_id", artistId));
     }
 
     private void MergeArtistAlbums(SqliteTransaction tx, long survivorId, long duplicateId)
@@ -1056,6 +1094,13 @@ public sealed class AudioDatabase : IDisposable
 
             foreach (var duplicate in group.Where(artist => artist.Id != survivor.Id))
             {
+                ExecuteInTransaction(tx,
+                    "UPDATE artist_aliases SET artist_id = $survivor WHERE artist_id = $duplicate;",
+                    ("$survivor", survivor.Id), ("$duplicate", duplicate.Id));
+                UpsertArtistAlias(
+                    tx,
+                    ArtistNameNormalizer.CreateComparisonKey(duplicate.Name),
+                    survivor.Id);
                 MergeArtistAlbums(tx, survivor.Id, duplicate.Id);
                 ExecuteInTransaction(tx,
                     "UPDATE tracks SET artist_id = $survivor WHERE artist_id = $duplicate;",
@@ -1084,6 +1129,7 @@ public sealed class AudioDatabase : IDisposable
             ExecuteInTransaction(tx,
                 "UPDATE artists SET name = $name WHERE id = $id;",
                 ("$name", canonicalName), ("$id", survivor.Id));
+            UpsertArtistAlias(tx, group.Key, survivor.Id);
         }
 
         ExecuteInTransaction(tx, """
@@ -1105,7 +1151,7 @@ public sealed class AudioDatabase : IDisposable
             tx,
             "SELECT COUNT(*) FROM tracks WHERE artist_id IS NOT NULL;"));
         tx.Commit();
-        _artistsByComparisonKey = null;
+        ClearArtistIdentityCache();
         return new ArtistNormalizationResult(mergedArtists, updatedTracks);
     }
 
@@ -1188,6 +1234,46 @@ public sealed class AudioDatabase : IDisposable
 
         var order = idList.Select((id, index) => (id, index)).ToDictionary(x => x.id, x => x.index);
         return result.OrderBy(t => order[t.Id]).ToList();
+    }
+
+    /// <summary>Loads compact track metadata for the specified local file paths.</summary>
+    /// <param name="paths">Absolute paths to resolve; duplicates are queried once.</param>
+    /// <returns>Matching tracks in unspecified order.</returns>
+    public List<TrackListInfo> GetTrackListByPaths(IEnumerable<string> paths)
+    {
+        const int batchSize = 400;
+        var pathList = paths
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (pathList.Count == 0)
+            return [];
+
+        var result = new List<TrackListInfo>(pathList.Count);
+        foreach (var batch in pathList.Chunk(batchSize))
+        {
+            using var cmd = _conn.CreateCommand();
+            var parameters = batch.Select((path, index) =>
+            {
+                var name = $"$path{index}";
+                Add(cmd, name, path);
+                return name;
+            }).ToList();
+            cmd.CommandText = $"""
+                SELECT
+                    path, file_name, title, artist, album, album_artist, genre, format, bitrate,
+                    duration, sort_title, id, is_favorite, year, track_number, track_total,
+                    disc_number, disc_total, sample_rate, bit_depth, channels, composer, bpm,
+                    file_size, added_at, replay_gain_track, replay_gain_album
+                FROM tracks
+                WHERE path IN ({string.Join(", ", parameters)});
+                """;
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+                result.Add(MapTrackListInfo(reader));
+        }
+
+        return result;
     }
 
     /// <summary>Loads the lightweight classification fields used by the interactive track filters.</summary>
@@ -1680,6 +1766,11 @@ public sealed class AudioDatabase : IDisposable
                 profile_fetched_at INTEGER
             );
 
+            CREATE TABLE IF NOT EXISTS artist_aliases (
+                alias_key TEXT PRIMARY KEY,
+                artist_id INTEGER NOT NULL REFERENCES artists(id) ON DELETE CASCADE
+            );
+
             CREATE TABLE IF NOT EXISTS artworks (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
                 content_hash TEXT NOT NULL UNIQUE,
@@ -1724,6 +1815,7 @@ public sealed class AudioDatabase : IDisposable
             );
 
             CREATE INDEX IF NOT EXISTS idx_albums_artist        ON albums (artist_id);
+            CREATE INDEX IF NOT EXISTS idx_artist_aliases_artist ON artist_aliases (artist_id);
             CREATE INDEX IF NOT EXISTS idx_tracks_artist_id     ON tracks (artist_id);
             CREATE INDEX IF NOT EXISTS idx_tracks_album_id      ON tracks (album_id);
             CREATE INDEX IF NOT EXISTS idx_play_history_track   ON play_history (track_id, started_at DESC);
@@ -2361,7 +2453,7 @@ public sealed class AudioDatabase : IDisposable
         cmd.ExecuteNonQuery();
     }
 
-    private void ExecuteInTransaction(
+    private int ExecuteInTransaction(
         SqliteTransaction tx,
         string sql,
         params (string Name, object? Value)[] parameters)
@@ -2371,7 +2463,7 @@ public sealed class AudioDatabase : IDisposable
         cmd.CommandText = sql;
         foreach (var parameter in parameters)
             Add(cmd, parameter.Name, parameter.Value);
-        cmd.ExecuteNonQuery();
+        return cmd.ExecuteNonQuery();
     }
 
     private object? ExecuteScalarInTransaction(
@@ -2594,7 +2686,20 @@ public sealed class AudioDatabase : IDisposable
         Add(cmd, "$name", normalized);
         var id = Convert.ToInt64(cmd.ExecuteScalar());
         _artistsByComparisonKey[key] = (id, normalized);
+        _artistNamesById![id] = normalized;
         return id;
+    }
+
+    private string GetCanonicalArtistName(long? artistId, string? fallback)
+    {
+        if (artistId is long id &&
+            _artistNamesById is not null &&
+            _artistNamesById.TryGetValue(id, out var name))
+        {
+            return name;
+        }
+
+        return ArtistNameNormalizer.NormalizeDisplayName(fallback);
     }
 
     private void EnsureArtistComparisonCache(SqliteTransaction tx)
@@ -2603,6 +2708,7 @@ public sealed class AudioDatabase : IDisposable
             return;
 
         _artistsByComparisonKey = new Dictionary<string, (long Id, string Name)>(StringComparer.Ordinal);
+        _artistNamesById = new Dictionary<long, string>();
         using var cmd = _conn.CreateCommand();
         cmd.Transaction = tx;
         cmd.CommandText = "SELECT id, name FROM artists ORDER BY id;";
@@ -2611,10 +2717,32 @@ public sealed class AudioDatabase : IDisposable
         {
             var id = reader.GetInt64(0);
             var name = reader.GetString(1);
+            _artistNamesById[id] = name;
             _artistsByComparisonKey.TryAdd(
                 ArtistNameNormalizer.CreateComparisonKey(name),
                 (id, name));
         }
+        reader.Close();
+
+        cmd.CommandText = """
+            SELECT aa.alias_key, ar.id, ar.name
+            FROM artist_aliases aa
+            JOIN artists ar ON ar.id = aa.artist_id;
+            """;
+        using var aliasReader = cmd.ExecuteReader();
+        while (aliasReader.Read())
+        {
+            var key = aliasReader.GetString(0);
+            var id = aliasReader.GetInt64(1);
+            var name = aliasReader.GetString(2);
+            _artistsByComparisonKey[key] = (id, name);
+        }
+    }
+
+    private void ClearArtistIdentityCache()
+    {
+        _artistsByComparisonKey = null;
+        _artistNamesById = null;
     }
 
     private long? EnsureArtwork(byte[]? data, string? mimeType, SqliteTransaction tx)
