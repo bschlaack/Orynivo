@@ -36,7 +36,12 @@ public static class WasapiDeviceProvider
         using var device = GetRenderDevice(id);
         var audioClient = device.AudioClient;
         var mixFormat = audioClient.MixFormat;
-        var sampleRates = new[] { 44_100, 48_000, 88_200, 96_000, 176_400, 192_000, 352_800, 384_000 };
+        var sampleRates = new[]
+        {
+            8_000, 11_025, 12_000, 16_000, 22_050, 24_000, 32_000,
+            44_100, 48_000, 88_200, 96_000, 176_400, 192_000,
+            352_800, 384_000, 705_600, 768_000
+        };
         var formats = new[]
         {
             (Name: "16-Bit PCM", Factory: (Func<int, WaveFormat>)(rate => new WaveFormat(rate, 16, 2))),

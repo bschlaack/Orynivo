@@ -45,7 +45,8 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - `Orynivo/Audio/DsfAudioPlayer.cs`: native DSF-to-DSD path
 - `Orynivo/Audio/DffAudioPlayer.cs`: native DFF/DSDIFF-to-DSD path
 - `Orynivo/Audio/WasapiAudioPlayer.cs`: exclusive-mode WASAPI PCM path; converts
-  DSD sources to PCM in real time and selects a supported output sample rate
+  DSD sources to PCM in real time and selects the highest supported output
+  sample rate up to the source rate plus the highest supported output precision
 - `Orynivo/Audio/WasapiDeviceProvider.cs`: WASAPI devices and capability queries
 - `Orynivo/WindowsMediaTransportService.cs`: optional Windows System Media
   Transport Controls host for global media buttons, lock-screen/system-overlay
@@ -384,10 +385,17 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - Output types represented by settings: Steinberg `ASIO`, `CwAsio`, `WASAPI`, `KernelStreaming`
 - Steinberg ASIO, cwASIO, and WASAPI are implemented; Kernel Streaming is not
 - WASAPI handles PCM only; native DSD remains ASIO-only
-- WASAPI runs exclusively and selects the first supported stereo format from 32-bit float, 24-bit PCM, and 16-bit PCM
+- WASAPI runs exclusively and selects the highest supported sample rate up to
+  the source rate, then the first supported stereo format from 32-bit float,
+  packed 24-bit PCM, and 16-bit PCM. Sources above the endpoint maximum are
+  converted by FFmpeg; when only higher rates are available, the lowest one is
+  used.
 - WASAPI plays DSF/DFF by converting DSD to PCM through `ffmpeg` without a
-  temporary file. It prefers 176.4, 88.2, or 44.1 kHz and falls back to 192,
-  96, or 48 kHz according to the endpoint's exclusive-mode capabilities.
+  temporary file using the same endpoint-aware sample-rate and precision
+  selection as other PCM playback.
+- ASIO/cwASIO PCM playback queries the driver's reported sample rates before
+  opening the stream and converts sources above or between supported rates to
+  the highest available rate that does not exceed the source.
 - The transport file-information line and status bar explicitly identify
   DSD-to-PCM conversion and show the selected PCM output sample rate.
 - WASAPI pause keeps the exclusive AudioClient running and supplies silence so drivers do not loop the final endpoint buffer; buffered audio remains available for resume

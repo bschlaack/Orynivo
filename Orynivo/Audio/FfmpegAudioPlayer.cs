@@ -111,6 +111,20 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer
         var info = await ProbeAsync(items[0].PlaybackPath, cancellationToken);
         if (items[0].SegmentDuration is { } firstDuration)
             info = info with { Duration = firstDuration };
+        var supportedSampleRates = SteinbergAsioStream
+            .GetDeviceInfo(backend, driverName)
+            .SupportedPcmSampleRates
+            .Where(static rate => rate > 0)
+            .Distinct()
+            .ToArray();
+        if (supportedSampleRates.Length > 0)
+        {
+            var outputSampleRate = supportedSampleRates
+                .Where(rate => rate <= info.OutputSampleRate)
+                .DefaultIfEmpty(supportedSampleRates.Min())
+                .Max();
+            info = info with { OutputSampleRate = outputSampleRate };
+        }
         var stream = new SteinbergAsioStream(backend, driverName, info.OutputSampleRate, 2);
         try
         {

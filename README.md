@@ -14,6 +14,9 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 ## Features
 
 - Playback through ASIO or exclusive-mode WASAPI
+- Automatic PCM down-conversion through `ffmpeg` when the source sample rate
+  exceeds the selected ASIO or WASAPI device's capabilities; WASAPI uses the
+  highest supported 32-bit float, 24-bit PCM, or 16-bit PCM output format
 - Native stereo DSD playback for DSF and uncompressed DFF files through ASIO
 - Real-time DSF/DFF-to-PCM conversion for playback through WASAPI, with the
   active conversion and PCM sample rate shown in the transport and status bar
@@ -126,9 +129,11 @@ first start if not already installed. Actual codec support depends on the build.
 For CUE sheets, Orynivo uses `INDEX 01` boundaries to seek and stop FFmpeg
 within the referenced source file; no temporary split files are created.
 When WASAPI is selected, DSD audio in DSF or DFF containers is converted to PCM
-in real time without creating a temporary file. Orynivo prefers 176.4, 88.2,
-or 44.1 kHz output and falls back to 192, 96, or 48 kHz when required by the
-selected exclusive-mode endpoint.
+in real time without creating a temporary file. PCM and converted DSD are
+output at the highest supported endpoint sample rate that does not exceed the
+source rate; if the endpoint exposes only higher rates, its lowest supported
+rate is used. Unsupported sample rates and bit depths are converted by
+`ffmpeg`.
 
 ## Requirements
 

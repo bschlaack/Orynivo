@@ -384,6 +384,21 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
             for (var index = 0; index < samples.Length; index++)
                 samples[index] = (short)Math.Clamp(samples[index] * factor, short.MinValue, short.MaxValue);
         }
+        else if (_selectedFormat.FfmpegSampleFormat == "s24le")
+        {
+            for (var offset = 0; offset + 2 < bytes.Length; offset += 3)
+            {
+                var sample = bytes[offset] |
+                             (bytes[offset + 1] << 8) |
+                             (bytes[offset + 2] << 16);
+                if ((sample & 0x0080_0000) != 0)
+                    sample |= unchecked((int)0xFF00_0000);
+                sample = (int)Math.Clamp(sample * (double)factor, -8_388_608, 8_388_607);
+                bytes[offset] = (byte)sample;
+                bytes[offset + 1] = (byte)(sample >> 8);
+                bytes[offset + 2] = (byte)(sample >> 16);
+            }
+        }
         else
         {
             var samples = MemoryMarshal.Cast<byte, int>(bytes);
@@ -452,16 +467,28 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
 
     private static WasapiSelectedFormat ChooseExclusiveFormat(MMDevice device, AudioFileInfo info)
     {
-        var sampleRates = info.IsDsd
-            ? new[] { 176_400, 88_200, 44_100, 192_000, 96_000, 48_000 }
-            : new[] { info.OutputSampleRate };
+        int[] standardSampleRates =
+        [
+            8_000, 11_025, 12_000, 16_000, 22_050, 24_000, 32_000,
+            44_100, 48_000, 88_200, 96_000, 176_400, 192_000,
+            352_800, 384_000, 705_600, 768_000
+        ];
+        var sourceSampleRate = Math.Max(info.SourceSampleRate, info.OutputSampleRate);
+        var sampleRates = standardSampleRates
+            .Append(info.OutputSampleRate)
+            .Where(static rate => rate > 0)
+            .Distinct()
+            .OrderBy(rate => rate <= sourceSampleRate ? 0 : 1)
+            .ThenByDescending(rate => rate <= sourceSampleRate ? rate : 0)
+            .ThenBy(rate => rate > sourceSampleRate ? rate : int.MaxValue);
+
         foreach (var sampleRate in sampleRates)
         {
             WasapiSelectedFormat[] candidates =
             [
-                new(WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, 2), "f32le", "pcm_f32le", sizeof(float) * 2),
-                new(new WaveFormatExtensible(sampleRate, 24, 2), "s32le", "pcm_s32le", sizeof(int) * 2),
-                new(new WaveFormat(sampleRate, 16, 2), "s16le", "pcm_s16le", sizeof(short) * 2)
+                new(WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, 2), "f32le", "pcm_f32le"),
+                new(new WaveFormatExtensible(sampleRate, 24, 2), "s24le", "pcm_s24le"),
+                new(new WaveFormat(sampleRate, 16, 2), "s16le", "pcm_s16le")
             ];
             foreach (var candidate in candidates)
                 if (device.AudioClient.IsFormatSupported(AudioClientShareMode.Exclusive, candidate.Format))
@@ -474,8 +501,10 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
     private sealed record WasapiSelectedFormat(
         WaveFormat Format,
         string FfmpegSampleFormat,
-        string FfmpegCodec,
-        int BytesPerFrame);
+        string FfmpegCodec)
+    {
+        public int BytesPerFrame => Format.BlockAlign;
+    }
 
     private sealed class PausableWaveProvider(IWaveProvider source) : IWaveProvider
     {

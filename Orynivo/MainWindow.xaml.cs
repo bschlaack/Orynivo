@@ -6518,7 +6518,9 @@ public partial class MainWindow : Window
             ? $"{info.ContainerName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz  ·  {LocalizationManager.Current.NativeDsdOutput}"
             : info.IsDsd
                 ? $"{info.ContainerName.ToUpperInvariant()}  ·  {LocalizationManager.Current.DsdToPcmOutput}  ·  {info.OutputSampleRate:N0} Hz"
-                : $"{info.CodecName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz  ·  {info.Channels} ch";
+                : info.SourceSampleRate != info.OutputSampleRate
+                    ? $"{info.CodecName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz → {info.OutputSampleRate:N0} Hz  ·  {info.Channels} ch"
+                    : $"{info.CodecName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz  ·  {info.Channels} ch";
         if (radioStation is null && podcastPlayback is null)
         {
             var isPlexTrack = _plexTracksByUrl.TryGetValue(filePath, out var plexTrack);
@@ -6793,7 +6795,9 @@ public partial class MainWindow : Window
         NowPlayingArtistBlock.Text = SelectedDriverTextBlock.Text;
         FileInfoTextBlock.Text = info.IsDsd
             ? $"{info.ContainerName.ToUpperInvariant()}  ·  {LocalizationManager.Current.DsdToPcmOutput}  ·  {info.OutputSampleRate:N0} Hz"
-            : $"{info.CodecName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz  ·  {info.Channels} ch";
+            : info.SourceSampleRate != info.OutputSampleRate
+                ? $"{info.CodecName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz → {info.OutputSampleRate:N0} Hz  ·  {info.Channels} ch"
+                : $"{info.CodecName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz  ·  {info.Channels} ch";
 
         var isPlexTrack = _plexTracksByUrl.TryGetValue(filePath, out var plexTrack);
         try

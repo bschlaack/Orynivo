@@ -8,6 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+### Fixed
+
+- High-resolution PCM and WASAPI-converted DSD now fall back to the highest
+  sample rate and output precision supported by the selected device instead of
+  failing when the source rate or bit depth exceeds the endpoint capability.
+  The transport shows both source and converted PCM rates when they differ.
+
+## [0.9.0] - 2026-06-21
+
+### Added
+
 - Added CUE-sheet support for large FLAC/WAV images. Library scans expose CUE
   entries as independently searchable virtual tracks with their own metadata,
   queue identity, playback-history records, and persisted queue positions.
