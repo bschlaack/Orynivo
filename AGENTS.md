@@ -15,7 +15,7 @@ Windows audio player with:
 
 ```powershell
 .\build.ps1
-.\Orynivo\bin\Debug\net8.0-windows\Orynivo.exe
+.\Orynivo\bin\Debug\net8.0-windows10.0.19041.0\Orynivo.exe
 ```
 
 `build.ps1` always builds the vendored MIT-licensed `CwAsioBridge.dll`, then
@@ -47,6 +47,10 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - `Orynivo/Audio/WasapiAudioPlayer.cs`: exclusive-mode WASAPI PCM path; converts
   DSD sources to PCM in real time and selects a supported output sample rate
 - `Orynivo/Audio/WasapiDeviceProvider.cs`: WASAPI devices and capability queries
+- `Orynivo/WindowsMediaTransportService.cs`: optional Windows System Media
+  Transport Controls host for global media buttons, lock-screen/system-overlay
+  metadata, artwork, playback status, and timeline updates; its `MediaPlayer`
+  instance is control-only and never outputs Orynivo audio
 - `Orynivo/Audio/WindowsEndpointVolumeSynchronizer.cs`: bidirectional
   synchronization between the transport volume slider and the selected
   Windows render endpoint's master volume
@@ -85,6 +89,9 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   `AppSettings.ArtistArtworkView` preserve the selected main view and entity
   artwork/table modes
 - `AppSettings.Volume` and `AppSettings.LastTrackPath` preserve volume and the last selected or played track; restoration requires both the file and database entry to exist
+- `AppSettings.PlaybackQueuePaths` and `PlaybackQueueIndex` preserve the editable
+  **Up next** queue across restarts. Local paths and non-credential HTTP/HTTPS
+  URLs may be stored; Plex-token and user-info URLs must never be persisted.
 - `AppSettings.ReplayGainMode` selects disabled, track, or album ReplayGain for PCM playback; native ASIO DSD remains bit-perfect
 - `AppSettings.DataGridColumnWidths` persists user-adjusted pixel widths per stable table/view key; dynamic main-content views capture their current widths before replacing columns
 - `AppSettings.VisibleDataGridColumns` persists selectable column IDs per table/view key; right-clicking any table header opens the context-appropriate column chooser flyout
@@ -200,16 +207,52 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   `ContentTemplate` bypasses the result `DataTemplate` and renders the record's
   complete `ToString()` value, including full lyrics, in the result list.
 - Artist views support table and image-card modes; visible artists lazily download localized biographies and images from the configured source (Wikipedia or Last.fm). The transport info button replaces the current main content with the current artist image, biography, and source link. The source label ("Quelle: Wikipedia" / "Quelle: Last.fm") is set dynamically from the stored `SourceUrl`.
+- Artwork A-Z navigation indexes the complete lightweight artist/album result,
+  but binds rows to the virtualized wrap panels in pages. A jump must append
+  through the target row and defer `ScrollIntoView` until layout has processed
+  the collection changes; rebinding an artwork view resets its old offset.
 - The artist information view can search Wikimedia Commons using editable text and assign the selected image without replacing the cached biography or its source URL.
 - Artist images remain visible even when no biography is available.
 - The artist information view can rename artists. A matching normalized name opens a merge dialog that asks which artist record and profile data survive; the transaction consolidates duplicate albums, reassigns tracks, preserves favorites and available album artwork, updates denormalized artist names, and rebuilds the Lucene index. Audio-file tags are not changed.
+- Artist rename/merge dialogs must not be awaited while an `AudioDatabase`
+  connection remains open. Resolve a possible collision first, dispose the
+  connection, show the modal choice, then run the rename transaction.
+- Manual artist renames persist exactly one `artist_aliases` comparison-key
+  mapping from the original tag name to the surviving artist ID. The new
+  canonical name must never be written as an alias because it is already the
+  stored `artists.name` and is loaded directly by `EnsureArtistComparisonCache`.
+  Scanner and watcher upserts must resolve this alias and keep the canonical
+  database display name in denormalized track fields; unchanged audio tags must
+  never recreate or restore the pre-rename artist name.
+- After the rename transaction, update `ArtistInfoTitleButton` and related
+  current/filter artist state immediately. The potentially expensive complete
+  Lucene rebuild runs afterward in the background and must not delay visible
+  confirmation of the new name.
+- On large libraries, do not open `AudioDatabase` for collision lookup on the
+  UI thread after the rename dialog. Collision lookup and a collision-free
+  rename share one background connection; only an actual collision returns to
+  the UI for the merge-choice dialog. Verify the committed artist name before
+  refreshing lists.
+- `EditArtistNameDialog` owns the complete confirmation lifecycle through
+  `CommitAsync`: clicking **Rename** or pressing Enter disables its inputs,
+  awaits the verified SQLite rename/merge operation, and closes only after
+  success. Failures keep the dialog open with a localized status message.
+  Its local button themes explicitly define centered content and theme-aware
+  hover/pressed surfaces.
 - Artist names are normalized when scanned: only the primary performer is retained, `feat.`/`ft.` suffixes are removed, and Unicode, whitespace, case, diacritic, and punctuation variants share one normalized artist identity
 - Settings includes **Normalize artist names**, which transactionally merges existing variants, preserves favorites and cached profile data, updates visible track and album-artist names without modifying audio files, and rebuilds the Lucene index
 
 ## Playlist Context Menus
 
-- Right-clicking a track, search result, album, or folder node offers existing playlists and **New playlist...**
+- Right-clicking a track, search result, album, or folder node first offers
+  **Play next** and **Append to queue**, followed by existing playlists and
+  **New playlist...**. Plex tracks expose only the in-memory queue actions so
+  authenticated URLs cannot be written to playlist or settings storage.
 - Selecting a playlist immediately adds the track or all album tracks and updates the status bar
+- The album-detail header includes **Save as playlist**. It reads the current
+  `ContentDataGrid.ItemsSource`, so it saves exactly the album tracks currently
+  displayed after the artist-scope checkbox is applied, and opens the shared
+  themed playlist `MenuFlyout` for an existing or new regular playlist.
 - **New playlist...** opens `NewPlaylistDialog`; a name is required and Enter confirms
 - `Orynivo/NewPlaylistDialog.axaml/.cs` is themed with dynamic brushes and a
   DWM-colored native title bar
@@ -221,6 +264,18 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - Main-window context menus use application theme resources and a custom border template without the default white icon strip
 - Dynamically created menu objects receive their styles through Avalonia
   `ControlTheme` resources looked up via `TryGetResource`
+- Track, search-result, album-row, and folder-tree playlist actions follow the
+  same proven pattern as sidebar radio/podcast/playlist actions: assign a
+  themed `MenuFlyout` to the item's `ContextFlyout` property before opening,
+  then register the tunnel-phase `PointerPressed` handler directly on that
+  `DataGridRow` or `TreeViewItem` with `handledEventsToo: true`. The item marks
+  the right-button event handled and calls
+  `ContextFlyout.ShowAt(item, showAtPointer: true)` itself; do not resolve the
+  item indirectly from a parent grid/tree event. Data-grid flyouts are assigned
+  during `LoadingRow`; folder nodes receive a placeholder flyout when created
+  and replace it with the path-specific playlist flyout immediately before
+  opening. Do not use dynamically assigned `ContextMenu` instances or per-row
+  `ContextRequested` handlers for these actions.
 - **Delete playlist** appears in the sidebar playlist context menu, removes the database record, refreshes the sidebar, and returns to Tracks if needed
 - Dynamic radio, podcast, and playlist `ListBoxItem` instances receive a
   `MenuFlyout` through `ContextFlyout` when they are created. A tunnel-phase
@@ -237,6 +292,21 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - `_activePlaylistId` is set by `ShowTopLevelViewAsync` only for playlist views
 - `ContentRow.PlaylistEntryId` contains `playlist_tracks.id` only in regular playlist views
 - Playlist localization keys must exist in German, English, French, and Spanish
+
+## Editable Playback Queue
+
+- The static sidebar item `Queue` opens the localized **Up next** view backed
+  directly by `MainWindow._queue`; do not create a second playback-order model.
+- Queue rows retain their `PlaylistItem` reference so duplicate paths can be
+  removed and moved independently. Moving the active item must recalculate
+  `_queueIndex` by reference, not by path equality.
+- Queue rows can move up/down or be removed, and the complete queue can be
+  saved as a regular playlist through `NewPlaylistDialog`.
+- Queue mutations update navigation buttons, the visible queue table, shuffle
+  history, and persisted settings together.
+- The gapless PCM players receive an immutable item list at startup. Mutating
+  an active gapless queue therefore restarts the current stream and seeks back
+  to its audible position so the revised order takes effect immediately.
 
 ## Playlist Database Structure
 
@@ -256,6 +326,8 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - `GetTrackList()` and related list queries load compact scalar metadata used by
   selectable track columns, but continue to omit artwork BLOBs and lyrics text
 - `GetTrackListByIds(ids)` batches large ID sets to stay below SQLite variable limits
+- `GetTrackListByPaths(paths)` batches queue metadata lookup and deduplicates
+  query paths while the queue view restores the original order and duplicates.
 - `GetTracksByDirectory(dirPath)` uses an SQL prefix query plus a direct-child filter
 - `GetTrackPathsUnderDirectory(rootPath)` returns all recursive track paths below a root
 - Folder-tree lazy loading uses an in-memory parent-to-children map and creates
@@ -280,7 +352,16 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 
 ## Known Technical Details
 
-- Target platform: `net8.0-windows`, x64
+- Target platform: `net8.0-windows10.0.19041.0`, x64
+- Windows SMTC integration is created opportunistically at main-window startup.
+  API or metadata failures must remain silent and must never prevent playback.
+  Global commands dispatch onto Avalonia's UI thread and reuse Orynivo's normal
+  play, pause, previous, next, stop, and seek paths.
+- SMTC metadata follows local tracks, gapless transitions, podcasts, Plex
+  tracks, and changing internet-radio ICY metadata. Local artwork uses the
+  managed artwork cache; podcast/radio artwork uses its public catalog URL.
+- The SMTC timeline is refreshed at most every five seconds during playback and
+  immediately after track changes or seeks.
 - `SteinbergAsioStream.IsBackendAvailable()` validates each native bridge and
   loads its shared export API dynamically. Settings shows **Steinberg ASIO**
   only when `AsioBridge.dll` exists and **cwASIO** only when
@@ -356,7 +437,13 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   with a short view-specific headline and explanatory text. Search and filter
   controls stay outside and above that card in the plain header layout; A-Z
   indexes stay aligned with the content/table area, not the intro card.
+- The album-detail card above its track table stretches across the available
+  content width. Its favorite button appears immediately before the album title;
+  cover search and **Save as playlist** remain adjacent themed actions.
 - The bottom transport bar shows artwork and track information, favorite state, playback controls, position, and volume
+- **Up next** is a top-level sidebar view using the shared track table styling.
+  It displays queue order, title, artist, album, duration, and themed
+  move/remove actions, plus a header action to save the queue as a playlist.
 - Settings uses a two-column layout with navigation on the left and content on the right
 - Settings navigation reuses the main sidebar theme resources
 - All Settings buttons use the shared themed button style, including dynamic scan and remove buttons
@@ -412,10 +499,23 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   the theme-specific `AppNowPlayingRowBrush`; selected rows retain the stronger
   selection background. Loading-row handlers must also clear the class on
   recycled virtualized rows.
-- Plex track nodes in the folder tree use the same `nowPlaying` class and
-  theme brush. Playback transitions must update the complete materialized
-  `TreeViewItem` hierarchy recursively, including collapsed branches, while
-  newly lazy-loaded nodes apply the class when they are created.
+- Local and Plex track nodes in the folder tree use the same `nowPlaying` class
+  and theme brush. `ApplyNowPlayingClass(TreeViewItem)` must resolve local
+  `FolderTag` file paths as well as Plex `PlexFolderTag` track paths. Playback
+  transitions update the complete materialized `TreeViewItem` hierarchy
+  recursively, including collapsed branches, while newly created or lazy-loaded
+  nodes apply the class immediately. Unlike table rows, a selected folder-tree
+  track must retain the `AppNowPlayingRowBrush`; otherwise the selection
+  background hides the playing indicator immediately after double-clicking it.
+  Local file nodes are additionally indexed by case-insensitive absolute path
+  in `_localFolderTrackItems`; previous/next and gapless queue advances update
+  those exact node references instead of relying only on TreeView traversal.
+  Avalonia's Fluent local-tree template does not reliably paint the nested
+  local node container background, so every local file node uses a dedicated
+  header `Border` indexed in `_localFolderTrackHeaders`. The audible path sets
+  `AppNowPlayingRowBrush` directly on that visible header and clears the prior
+  header on playback start, previous/next, or gapless transition. Theme changes
+  must refresh the complete highlight.
 - DataGrid columns are user-resizable. Main library, search, radio, podcast,
   podcast-episode, Plex, playlist, and daily-history widths are restored from
   `settings.json`; invalid or structurally outdated width sets are ignored.

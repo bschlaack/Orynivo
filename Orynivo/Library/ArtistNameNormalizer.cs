@@ -65,7 +65,7 @@ internal static partial class ArtistNameNormalizer
     private static partial Regex MultipleWhitespaceRegex();
 
     [GeneratedRegex(
-        @"\s*[\(\[]?\s*(?:feat(?:uring)?|ft)\.?\s*[,.:;\-]?\s+.*$",
+        @"\s*[\(\[]?\s*\b(?:feat(?:uring)?|ft)\.?\s*[,.:;\-]?\s+.*$",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex FeaturedArtistRegex();
 

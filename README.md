@@ -18,8 +18,12 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 - Real-time DSF/DFF-to-PCM conversion for playback through WASAPI, with the
   active conversion and PCM sample rate shown in the transport and status bar
 - PCM playback through `ffmpeg`
-- Seeking, volume control, pause, an automatic playback queue, and shuffle
-  without repeating a track within the currently loaded queue
+- Seeking, volume control, pause, and an editable persistent **Up next** queue
+  with play-next/append actions, removal, reordering, playlist saving, and
+  shuffle without repeating a track within the currently loaded queue
+- Windows System Media Transport Controls integration with global media keys,
+  play/pause/previous/next/stop and seek requests, system-overlay and lock-screen
+  metadata, album art, playback state, and timeline synchronization
 - Optional ReplayGain volume adjustment for PCM playback, using track or album
   gain metadata with fallback to the other available value; native DSD output
   remains bit-perfect
@@ -181,7 +185,7 @@ the repository. Release artifacts therefore include `CwAsioBridge.dll`.
 ## Run
 
 ```powershell
-.\Orynivo\bin\Debug\net8.0-windows\Orynivo.exe
+.\Orynivo\bin\Debug\net8.0-windows10.0.19041.0\Orynivo.exe
 ```
 
 Library directories and the desired output device can then be selected in the

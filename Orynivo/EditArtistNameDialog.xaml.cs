@@ -1,25 +1,49 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Orynivo.Library;
 
 namespace Orynivo;
 
+/// <summary>
+/// Modal dialog for renaming an artist. Owns the complete confirmation lifecycle:
+/// the rename transaction runs on a background thread, and the dialog closes only
+/// after the SQLite operation succeeds.
+/// </summary>
 public partial class EditArtistNameDialog : Window
 {
-    public string ArtistName => NameTextBox.Text?.Trim() ?? string.Empty;
+    private readonly long _artistId;
+    private string _artistName = string.Empty;
+
+    /// <summary>Gets the trimmed artist name captured when the dialog was confirmed.</summary>
+    public string ArtistName => _artistName;
+
+    /// <summary>Gets the committed rename result, or <see langword="null"/> when a name collision was detected.</summary>
+    public ArtistRenameResult? Result { get; private set; }
+
+    /// <summary>Gets the colliding artist when the entered name is already taken, or <see langword="null"/> when no collision exists.</summary>
+    public ArtistInfo? MatchingArtist { get; private set; }
 
     /// <summary>
     /// Initializes a runtime-loader instance with an empty artist name.
     /// </summary>
     public EditArtistNameDialog()
-        : this(string.Empty)
+        : this(0, string.Empty)
     {
     }
 
-    public EditArtistNameDialog(string artistName)
+    /// <summary>
+    /// Initializes the dialog for the given artist.
+    /// </summary>
+    /// <param name="artistId">Database ID of the artist to rename.</param>
+    /// <param name="artistName">Current display name shown in the text field.</param>
+    public EditArtistNameDialog(long artistId, string artistName)
     {
+        _artistId = artistId;
         InitializeComponent();
         NameTextBox.Text = artistName;
+        _artistName = artistName.Trim();
+        RenameButton.IsEnabled = _artistName.Length > 0;
         Opened += (_, _) =>
         {
             WindowChrome.ApplyTheme(this);
@@ -28,7 +52,7 @@ public partial class EditArtistNameDialog : Window
         };
         KeyDown += (_, e) =>
         {
-            if (e.Key == Key.Escape) Close(false);
+            if (e.Key == Key.Escape) Close();
         };
     }
 
@@ -38,9 +62,51 @@ public partial class EditArtistNameDialog : Window
     private void NameTextBox_OnKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter && RenameButton.IsEnabled)
-            Close(true);
+        {
+            e.Handled = true;
+            CommitAsync();
+        }
     }
 
-    private void RenameButton_OnClick(object? sender, RoutedEventArgs e) => Close(true);
+    private void RenameButton_OnClick(object? sender, RoutedEventArgs e) => CommitAsync();
+
+    private async void CommitAsync()
+    {
+        var name = NameTextBox.Text?.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+            return;
+
+        RenameButton.IsEnabled = false;
+        CancelButton.IsEnabled = false;
+        NameTextBox.IsEnabled = false;
+        StatusTextBlock.Text = Localization.LocalizationManager.Current.ArtistInfoLoading;
+        StatusTextBlock.IsVisible = true;
+        try
+        {
+            var (result, matching) = await Task.Run(() =>
+            {
+                using var db = AudioDatabase.OpenDefault();
+                var match = db.FindArtistByName(name, _artistId);
+                if (match is not null)
+                    return ((ArtistRenameResult?)null, match);
+                return (db.RenameArtist(_artistId, name), (ArtistInfo?)null);
+            });
+            Result = result;
+            MatchingArtist = matching;
+            _artistName = name;
+            Close(true);
+        }
+        catch (Exception ex)
+        {
+            CrashLogger.Log(ex, "Artist rename");
+            StatusTextBlock.Text = Localization.LocalizationManager.Current.ArtistRenameFailed;
+            StatusTextBlock.IsVisible = true;
+            RenameButton.IsEnabled = true;
+            CancelButton.IsEnabled = true;
+            NameTextBox.IsEnabled = true;
+            NameTextBox.Focus();
+        }
+    }
+
     private void CancelButton_OnClick(object? sender, RoutedEventArgs e) => Close(false);
 }
