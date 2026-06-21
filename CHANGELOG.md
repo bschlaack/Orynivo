@@ -8,6 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Expanded smart playlists with a dedicated localized editor for year, artist,
+  album, duration, recently added or played windows, never-played tracks,
+  minimum/maximum play counts, random or playback-recency ordering, and result
+  limits. Creating a smart playlist remains the compact active-filter workflow;
+  the advanced editor is available by right-clicking an existing smart
+  playlist in the sidebar. Existing smart-playlist JSON stays compatible.
+- Added automatic recursive library monitoring with one `FileSystemWatcher`
+  per available configured root. Create, change, rename, and delete events are
+  debounced before updating SQLite and Lucene, while a full reconciliation runs
+  after 10 minutes and every 30 minutes as protection against missed or
+  overflowed watcher events.
+- Manual scans, watcher batches, and periodic reconciliation now share a single
+  scanner gate. Full scans also remove missing tracks from SQLite, not only
+  Lucene, and scan results report the removed-file count.
 - Added drag-and-drop reordering for data columns. Column order is persisted
   independently per table and dynamic main-content view, while fixed artwork
   and action columns retain their structural positions.
@@ -27,6 +41,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Library scans now import track and album ReplayGain metadata. Each configured
   library root receives a one-time refresh of unchanged tracks on its first
   scan after this update.
+
+### Fixed
+
+- Restored sidebar context menus for personal radio stations, pinned podcasts,
+  regular playlists, and smart playlists. Dynamic entries now use Avalonia
+  `MenuFlyout` instances opened at the pointer position. Right-button presses
+  are intercepted before the `ListBox` selection logic, while accordion and
+  repeated-item navigation handlers explicitly ignore non-left mouse buttons.
+  Flyout surfaces, borders, text, hover, pressed, and separator colors follow
+  the active Orynivo theme.
+- Unified the table-header column chooser with the same themed `MenuFlyout`
+  presentation. It remains open while multiple columns are toggled and still
+  prevents hiding the final selectable column. Explicit menu entries now share
+  the same theme-aware text colors in sidebar and table-header flyouts.
 
 ## [0.6.0] - 2026-06-19
 
@@ -49,8 +77,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Fixed the table-header column chooser not opening on right-click and then
   crashing because Avalonia 11.2 retained internal ownership for dynamically
-  attached `ContextMenu` instances. The chooser now uses a themed,
-  light-dismiss `Popup` anchored to the clicked header and no longer calls the
+  attached `ContextMenu` instances. The chooser no longer calls the
   `ContextMenu` API.
 - Corrected themed scrollbar behavior so arrow buttons move one row and clicks
   above or below the thumb move by one visible table page with one-row overlap.

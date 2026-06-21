@@ -113,6 +113,52 @@
                 </Setter>
             </ControlTheme>
 
+            <ControlTheme x:Key="AppMenuFlyoutPresenterTheme"
+                          TargetType="MenuFlyoutPresenter"
+                          BasedOn="{StaticResource {x:Type MenuFlyoutPresenter}}">
+                <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}"/>
+                <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource AppInputBorderBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="CornerRadius" Value="8"/>
+                <Setter Property="Padding" Value="0,4"/>
+            </ControlTheme>
+
+            <ControlTheme x:Key="AppMenuFlyoutItemTheme" TargetType="MenuItem">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="BorderBrush" Value="Transparent"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="CornerRadius" Value="5"/>
+                <Setter Property="Padding" Value="14,7"/>
+                <Setter Property="Template">
+                    <ControlTemplate>
+                        <Border x:Name="PART_LayoutRoot"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter x:Name="PART_HeaderPresenter"
+                                              Content="{TemplateBinding Header}"
+                                              Foreground="{TemplateBinding Foreground}"
+                                              TextBlock.Foreground="{TemplateBinding Foreground}"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter>
+                <Style Selector="^:selected /template/ Border#PART_LayoutRoot">
+                    <Setter Property="Background" Value="{DynamicResource AppSurfaceHoverBrush}"/>
+                </Style>
+                <Style Selector="^:pressed /template/ Border#PART_LayoutRoot">
+                    <Setter Property="Background" Value="{DynamicResource AppButtonPressedBrush}"/>
+                </Style>
+                <Style Selector="^:disabled">
+                    <Setter Property="Foreground" Value="{DynamicResource AppMutedTextBrush}"/>
+                </Style>
+            </ControlTheme>
+
             <!-- ScrollBar thumb, page-track, and arrow buttons are separate themes.
                  DataGrid discovers the named PART_* buttons and assigns small/large scrolling. -->
             <ControlTheme x:Key="AppScrollBarThumb" TargetType="Thumb">

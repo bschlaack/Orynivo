@@ -377,4 +377,64 @@ public sealed record LocalizedStrings(
     public string LoadMore { get; init; } = "";
     public string FfmpegDownloading { get; init; } = "";
     public string FfmpegDownloadFailed { get; init; } = "";
+    /// <summary>Gets the smart-playlist editor window title.</summary>
+    public string SmartPlaylistDialogTitle { get; init; } = "";
+    /// <summary>Gets the smart-playlist name label.</summary>
+    public string SmartPlaylistName { get; init; } = "";
+    /// <summary>Gets the basic smart-playlist filters section title.</summary>
+    public string SmartPlaylistBasicFilters { get; init; } = "";
+    /// <summary>Gets the comma-separated genre filter label.</summary>
+    public string SmartPlaylistGenres { get; init; } = "";
+    /// <summary>Gets the comma-separated format filter label.</summary>
+    public string SmartPlaylistFormats { get; init; } = "";
+    /// <summary>Gets the comma-separated bitrate filter label.</summary>
+    public string SmartPlaylistBitrates { get; init; } = "";
+    /// <summary>Gets the metadata filter section title.</summary>
+    public string SmartPlaylistMetadata { get; init; } = "";
+    /// <summary>Gets the minimum release-year label.</summary>
+    public string SmartPlaylistMinimumYear { get; init; } = "";
+    /// <summary>Gets the maximum release-year label.</summary>
+    public string SmartPlaylistMaximumYear { get; init; } = "";
+    /// <summary>Gets the artist text-filter label.</summary>
+    public string SmartPlaylistArtistContains { get; init; } = "";
+    /// <summary>Gets the album text-filter label.</summary>
+    public string SmartPlaylistAlbumContains { get; init; } = "";
+    /// <summary>Gets the minimum duration label.</summary>
+    public string SmartPlaylistMinimumDuration { get; init; } = "";
+    /// <summary>Gets the maximum duration label.</summary>
+    public string SmartPlaylistMaximumDuration { get; init; } = "";
+    /// <summary>Gets the playback-history filter section title.</summary>
+    public string SmartPlaylistHistory { get; init; } = "";
+    /// <summary>Gets the recently-added day-count label.</summary>
+    public string SmartPlaylistAddedWithinDays { get; init; } = "";
+    /// <summary>Gets the recently-played day-count label.</summary>
+    public string SmartPlaylistPlayedWithinDays { get; init; } = "";
+    /// <summary>Gets the never-played filter label.</summary>
+    public string SmartPlaylistNeverPlayed { get; init; } = "";
+    /// <summary>Gets the minimum playback-count label.</summary>
+    public string SmartPlaylistMinimumPlayCount { get; init; } = "";
+    /// <summary>Gets the maximum playback-count label.</summary>
+    public string SmartPlaylistMaximumPlayCount { get; init; } = "";
+    /// <summary>Gets the smart-playlist result section title.</summary>
+    public string SmartPlaylistResult { get; init; } = "";
+    /// <summary>Gets the smart-playlist ordering label.</summary>
+    public string SmartPlaylistSortOrder { get; init; } = "";
+    /// <summary>Gets the alphabetical ordering label.</summary>
+    public string SmartPlaylistSortTitle { get; init; } = "";
+    /// <summary>Gets the random ordering label.</summary>
+    public string SmartPlaylistSortRandom { get; init; } = "";
+    /// <summary>Gets the most-recently-played ordering label.</summary>
+    public string SmartPlaylistSortLastPlayed { get; init; } = "";
+    /// <summary>Gets the least-recently-played ordering label.</summary>
+    public string SmartPlaylistSortLeastRecentlyPlayed { get; init; } = "";
+    /// <summary>Gets the smart-playlist result-limit label.</summary>
+    public string SmartPlaylistResultLimit { get; init; } = "";
+    /// <summary>Gets the smart-playlist creation button label.</summary>
+    public string CreateSmartPlaylist { get; init; } = "";
+    /// <summary>Gets the validation error shown for contradictory or malformed criteria.</summary>
+    public string InvalidSmartPlaylistCriteria { get; init; } = "";
+    /// <summary>Gets the sidebar action label for editing a smart playlist.</summary>
+    public string EditSmartPlaylist { get; init; } = "";
+    /// <summary>Gets the status message shown after a smart playlist was updated.</summary>
+    public string SmartPlaylistUpdated { get; init; } = "";
 }

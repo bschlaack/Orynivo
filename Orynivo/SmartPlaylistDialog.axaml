@@ -1,0 +1,301 @@
+<Window x:Class="Orynivo.SmartPlaylistDialog"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{DynamicResource L_SmartPlaylistDialogTitle}"
+        Icon="avares://Orynivo/Assets/Orynivo.ico"
+        Width="700"
+        Height="760"
+        MinWidth="620"
+        MinHeight="620"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppSurfaceBrush}">
+    <Window.Resources>
+        <ControlTheme x:Key="SmartPlaylistButtonTheme" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource AppButtonBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppButtonTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppButtonBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="6"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+            <Style Selector="^:pointerover /template/ Border#Bd">
+                <Setter Property="Background" Value="{DynamicResource AppButtonHoverBrush}"/>
+            </Style>
+            <Style Selector="^:pressed /template/ Border#Bd">
+                <Setter Property="Background" Value="{DynamicResource AppButtonPressedBrush}"/>
+            </Style>
+            <Style Selector="^:disabled">
+                <Setter Property="Opacity" Value="0.55"/>
+            </Style>
+        </ControlTheme>
+        <ControlTheme x:Key="SmartPlaylistCheckBoxTheme" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="8"
+                                VerticalAlignment="Center">
+                        <Border x:Name="Box"
+                                Width="16"
+                                Height="16"
+                                Background="{DynamicResource AppInputBrush}"
+                                BorderBrush="{DynamicResource AppInputBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="4">
+                            <Path x:Name="CheckMark"
+                                  Data="M 3 8 L 6.3 11.2 L 13 4.5"
+                                  Stroke="White"
+                                  StrokeThickness="1.9"
+                                  StrokeLineCap="Round"
+                                  StrokeJoin="Round"
+                                  IsVisible="False"/>
+                        </Border>
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          VerticalAlignment="Center"/>
+                    </StackPanel>
+                </ControlTemplate>
+            </Setter>
+            <Style Selector="^:pointerover /template/ Border#Box">
+                <Setter Property="Background" Value="{DynamicResource AppButtonHoverBrush}"/>
+            </Style>
+            <Style Selector="^:checked /template/ Border#Box">
+                <Setter Property="Background" Value="#6C63FF"/>
+                <Setter Property="BorderBrush" Value="#8FA7FF"/>
+            </Style>
+            <Style Selector="^:checked /template/ Path#CheckMark">
+                <Setter Property="IsVisible" Value="True"/>
+            </Style>
+        </ControlTheme>
+    </Window.Resources>
+    <Grid RowDefinitions="*,Auto" Margin="24,20,24,24">
+        <ScrollViewer Grid.Row="0"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Spacing="8">
+                <TextBlock Text="{DynamicResource L_SmartPlaylistName}"
+                           FontSize="12"
+                           Foreground="{DynamicResource AppMutedTextBrush}"/>
+                <TextBox x:Name="NameTextBox"
+                         Height="34"
+                         Padding="10,0"
+                         VerticalContentAlignment="Center"
+                         Background="{DynamicResource AppInputBrush}"
+                         Foreground="{DynamicResource AppPrimaryTextBrush}"
+                         BorderBrush="{DynamicResource AppInputBorderBrush}"
+                         TextChanged="NameTextBox_OnTextChanged"/>
+
+                <TextBlock Text="{DynamicResource L_SmartPlaylistBasicFilters}"
+                           FontSize="15"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource AppPrimaryTextBrush}"
+                           Margin="0,14,0,2"/>
+                <CheckBox x:Name="FavoritesOnlyCheckBox"
+                          Content="{DynamicResource L_Favorites}"
+                          Theme="{StaticResource SmartPlaylistCheckBoxTheme}"/>
+                <TextBlock Text="{DynamicResource L_SmartPlaylistGenres}"
+                           FontSize="12"
+                           Foreground="{DynamicResource AppMutedTextBrush}"/>
+                <TextBox x:Name="GenresTextBox"
+                         Background="{DynamicResource AppInputBrush}"
+                         Foreground="{DynamicResource AppPrimaryTextBrush}"
+                         BorderBrush="{DynamicResource AppInputBorderBrush}"/>
+                <TextBlock Text="{DynamicResource L_SmartPlaylistFormats}"
+                           FontSize="12"
+                           Foreground="{DynamicResource AppMutedTextBrush}"/>
+                <TextBox x:Name="FormatsTextBox"
+                         Background="{DynamicResource AppInputBrush}"
+                         Foreground="{DynamicResource AppPrimaryTextBrush}"
+                         BorderBrush="{DynamicResource AppInputBorderBrush}"/>
+                <TextBlock Text="{DynamicResource L_SmartPlaylistBitrates}"
+                           FontSize="12"
+                           Foreground="{DynamicResource AppMutedTextBrush}"/>
+                <TextBox x:Name="BitratesTextBox"
+                         Background="{DynamicResource AppInputBrush}"
+                         Foreground="{DynamicResource AppPrimaryTextBrush}"
+                         BorderBrush="{DynamicResource AppInputBorderBrush}"/>
+
+                <TextBlock Text="{DynamicResource L_SmartPlaylistMetadata}"
+                           FontSize="15"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource AppPrimaryTextBrush}"
+                           Margin="0,14,0,2"/>
+                <Grid ColumnDefinitions="*,*">
+                    <StackPanel Grid.Column="0" Spacing="6">
+                        <TextBlock Text="{DynamicResource L_SmartPlaylistMinimumYear}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource AppMutedTextBrush}"/>
+                        <TextBox x:Name="MinimumYearTextBox"
+                                 Background="{DynamicResource AppInputBrush}"
+                                 Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                 BorderBrush="{DynamicResource AppInputBorderBrush}"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="6" Margin="12,0,0,0">
+                        <TextBlock Text="{DynamicResource L_SmartPlaylistMaximumYear}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource AppMutedTextBrush}"/>
+                        <TextBox x:Name="MaximumYearTextBox"
+                                 Background="{DynamicResource AppInputBrush}"
+                                 Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                 BorderBrush="{DynamicResource AppInputBorderBrush}"/>
+                    </StackPanel>
+                </Grid>
+                <Grid ColumnDefinitions="*,*">
+                    <StackPanel Grid.Column="0" Spacing="6">
+                        <TextBlock Text="{DynamicResource L_SmartPlaylistArtistContains}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource AppMutedTextBrush}"/>
+                        <TextBox x:Name="ArtistTextBox"
+                                 Background="{DynamicResource AppInputBrush}"
+                                 Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                 BorderBrush="{DynamicResource AppInputBorderBrush}"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="6" Margin="12,0,0,0">
+                        <TextBlock Text="{DynamicResource L_SmartPlaylistAlbumContains}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource AppMutedTextBrush}"/>
+                        <TextBox x:Name="AlbumTextBox"
+                                 Background="{DynamicResource AppInputBrush}"
+                                 Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                 BorderBrush="{DynamicResource AppInputBorderBrush}"/>
+                    </StackPanel>
+                </Grid>
+                <Grid ColumnDefinitions="*,*">
+                    <StackPanel Grid.Column="0" Spacing="6">
+                        <TextBlock Text="{DynamicResource L_SmartPlaylistMinimumDuration}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource AppMutedTextBrush}"/>
+                        <TextBox x:Name="MinimumDurationTextBox"
+                                 Background="{DynamicResource AppInputBrush}"
+                                 Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                 BorderBrush="{DynamicResource AppInputBorderBrush}"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="6" Margin="12,0,0,0">
+                        <TextBlock Text="{DynamicResource L_SmartPlaylistMaximumDuration}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource AppMutedTextBrush}"/>
+                        <TextBox x:Name="MaximumDurationTextBox"
+                                 Background="{DynamicResource AppInputBrush}"
+                                 Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                 BorderBrush="{DynamicResource AppInputBorderBrush}"/>
+                    </StackPanel>
+                </Grid>
+
+                <TextBlock Text="{DynamicResource L_SmartPlaylistHistory}"
+                           FontSize="15"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource AppPrimaryTextBrush}"
+                           Margin="0,14,0,2"/>
+                <Grid ColumnDefinitions="*,*">
+                    <StackPanel Grid.Column="0" Spacing="6">
+                        <TextBlock Text="{DynamicResource L_SmartPlaylistAddedWithinDays}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource AppMutedTextBrush}"/>
+                        <TextBox x:Name="AddedWithinDaysTextBox"
+                                 Background="{DynamicResource AppInputBrush}"
+                                 Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                 BorderBrush="{DynamicResource AppInputBorderBrush}"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="6" Margin="12,0,0,0">
+                        <TextBlock Text="{DynamicResource L_SmartPlaylistPlayedWithinDays}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource AppMutedTextBrush}"/>
+                        <TextBox x:Name="PlayedWithinDaysTextBox"
+                                 Background="{DynamicResource AppInputBrush}"
+                                 Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                 BorderBrush="{DynamicResource AppInputBorderBrush}"/>
+                    </StackPanel>
+                </Grid>
+                <CheckBox x:Name="NeverPlayedCheckBox"
+                          Content="{DynamicResource L_SmartPlaylistNeverPlayed}"
+                          Theme="{StaticResource SmartPlaylistCheckBoxTheme}"/>
+                <Grid ColumnDefinitions="*,*">
+                    <StackPanel Grid.Column="0" Spacing="6">
+                        <TextBlock Text="{DynamicResource L_SmartPlaylistMinimumPlayCount}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource AppMutedTextBrush}"/>
+                        <TextBox x:Name="MinimumPlayCountTextBox"
+                                 Background="{DynamicResource AppInputBrush}"
+                                 Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                 BorderBrush="{DynamicResource AppInputBorderBrush}"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="6" Margin="12,0,0,0">
+                        <TextBlock Text="{DynamicResource L_SmartPlaylistMaximumPlayCount}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource AppMutedTextBrush}"/>
+                        <TextBox x:Name="MaximumPlayCountTextBox"
+                                 Background="{DynamicResource AppInputBrush}"
+                                 Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                 BorderBrush="{DynamicResource AppInputBorderBrush}"/>
+                    </StackPanel>
+                </Grid>
+
+                <TextBlock Text="{DynamicResource L_SmartPlaylistResult}"
+                           FontSize="15"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource AppPrimaryTextBrush}"
+                           Margin="0,14,0,2"/>
+                <Grid ColumnDefinitions="*,*">
+                    <StackPanel Grid.Column="0" Spacing="6">
+                        <TextBlock Text="{DynamicResource L_SmartPlaylistSortOrder}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource AppMutedTextBrush}"/>
+                        <ComboBox x:Name="SortOrderComboBox"
+                                  HorizontalAlignment="Stretch"
+                                  Background="{DynamicResource AppInputBrush}"
+                                  Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                  BorderBrush="{DynamicResource AppInputBorderBrush}"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="6" Margin="12,0,0,0">
+                        <TextBlock Text="{DynamicResource L_SmartPlaylistResultLimit}"
+                                   FontSize="12"
+                                   Foreground="{DynamicResource AppMutedTextBrush}"/>
+                        <TextBox x:Name="ResultLimitTextBox"
+                                 Background="{DynamicResource AppInputBrush}"
+                                 Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                 BorderBrush="{DynamicResource AppInputBorderBrush}"/>
+                    </StackPanel>
+                </Grid>
+
+                <TextBlock x:Name="ValidationTextBlock"
+                           IsVisible="False"
+                           Foreground="#E05B62"
+                           TextWrapping="Wrap"
+                           Margin="0,8,0,0"/>
+            </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="1"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,20,0,0">
+            <Button Content="{DynamicResource L_Cancel}"
+                    Width="104"
+                    Height="34"
+                    Margin="0,0,8,0"
+                    Theme="{StaticResource SmartPlaylistButtonTheme}"
+                    Click="CancelButton_OnClick"/>
+            <Button x:Name="CreateButton"
+                    Content="{DynamicResource L_Save}"
+                    Width="164"
+                    Height="34"
+                    IsEnabled="False"
+                    Theme="{StaticResource SmartPlaylistButtonTheme}"
+                    Click="CreateButton_OnClick"/>
+        </StackPanel>
+    </Grid>
+</Window>

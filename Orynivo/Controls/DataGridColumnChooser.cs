@@ -12,7 +12,7 @@ using Orynivo.Localization;
 namespace Orynivo.Controls;
 
 /// <summary>
-/// Adds a right-click column chooser popup to selectable <see cref="DataGrid"/> columns.
+/// Adds a right-click column chooser flyout to selectable <see cref="DataGrid"/> columns.
 /// Selectable columns use a stable string in <see cref="DataGridColumn.Tag"/>.
 /// </summary>
 internal static class DataGridColumnChooser
@@ -96,26 +96,33 @@ internal static class DataGridColumnChooser
             return;
 
         args.Handled = true;
-        var popup = BuildPopup(grid, tableKey, settings, header, selectable);
-        popup.IsOpen = true;
+        BuildFlyout(grid, tableKey, settings, selectable)
+            .ShowAt(header, showAtPointer: true);
     }
 
-    private static Popup BuildPopup(
+    private static MenuFlyout BuildFlyout(
         DataGrid grid,
         string tableKey,
         AppSettings settings,
-        DataGridColumnHeader header,
         IReadOnlyList<DataGridColumn> selectable)
     {
-        var panel = new StackPanel { Spacing = 2 };
-        var entries = new List<(DataGridColumn Column, Button Button, TextBlock CheckMark)>();
-        panel.Children.Add(new TextBlock
+        var flyout = new MenuFlyout
         {
-            Text = LocalizationManager.Current.SelectColumns,
+            FlyoutPresenterTheme = FindTheme("AppMenuFlyoutPresenterTheme"),
+            ItemContainerTheme = FindTheme("AppMenuFlyoutItemTheme")
+        };
+        var itemTheme = FindTheme("AppMenuFlyoutItemTheme");
+        var entries = new List<(DataGridColumn Column, MenuItem Item, TextBlock CheckMark)>();
+        flyout.Items.Add(new MenuItem
+        {
+            Header = LocalizationManager.Current.SelectColumns,
+            Theme = itemTheme,
             FontWeight = FontWeight.SemiBold,
-            Margin = new Thickness(8, 5, 8, 7),
-            Foreground = FindBrush("AppPrimaryTextBrush")
+            Foreground = FindBrush("AppPrimaryTextBrush"),
+            IsHitTestVisible = false,
+            Focusable = false
         });
+        flyout.Items.Add(new Separator());
 
         foreach (var column in selectable)
         {
@@ -123,6 +130,7 @@ internal static class DataGridColumnChooser
             {
                 Text = "✓",
                 Width = 22,
+                FontSize = 13,
                 FontWeight = FontWeight.Bold,
                 Foreground = new SolidColorBrush(Color.Parse("#6C63FF")),
                 VerticalAlignment = VerticalAlignment.Center
@@ -130,6 +138,7 @@ internal static class DataGridColumnChooser
             var label = new TextBlock
             {
                 Text = FormatHeader(column),
+                FontSize = 13,
                 Foreground = FindBrush("AppPrimaryTextBrush"),
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -138,16 +147,15 @@ internal static class DataGridColumnChooser
                 Orientation = Orientation.Horizontal,
                 Children = { checkMark, label }
             };
-            var button = new Button
+            var item = new MenuItem
             {
-                Content = content,
-                HorizontalContentAlignment = HorizontalAlignment.Stretch,
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                Padding = new Thickness(8, 6),
-                BorderThickness = new Thickness(0)
+                Header = content,
+                Theme = itemTheme,
+                Foreground = FindBrush("AppPrimaryTextBrush"),
+                StaysOpenOnClick = true
             };
-            entries.Add((column, button, checkMark));
-            button.Click += (_, _) =>
+            entries.Add((column, item, checkMark));
+            item.Click += (_, _) =>
             {
                 if (column.IsVisible && selectable.Count(candidate => candidate.IsVisible) <= 1)
                     return;
@@ -161,31 +169,10 @@ internal static class DataGridColumnChooser
 
                 UpdateEntries();
             };
-            panel.Children.Add(button);
+            flyout.Items.Add(item);
         }
         UpdateEntries();
-
-        return new Popup
-        {
-            PlacementTarget = header,
-            Placement = PlacementMode.BottomEdgeAlignedLeft,
-            IsLightDismissEnabled = true,
-            Child = new Border
-            {
-                MinWidth = 220,
-                MaxHeight = 520,
-                Padding = new Thickness(7),
-                CornerRadius = new CornerRadius(8),
-                Background = FindBrush("AppSurfaceBrush"),
-                BorderBrush = FindBrush("AppInputBorderBrush"),
-                BorderThickness = new Thickness(1),
-                Child = new ScrollViewer
-                {
-                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                    Content = panel
-                }
-            }
-        };
+        return flyout;
 
         void UpdateEntries()
         {
@@ -193,10 +180,10 @@ internal static class DataGridColumnChooser
             foreach (var entry in entries)
             {
                 entry.CheckMark.IsVisible = entry.Column.IsVisible;
-                entry.Button.Background = entry.Column.IsVisible
+                entry.Item.Background = entry.Column.IsVisible
                     ? FindBrush("AppSurfaceSelectedBrush")
                     : Brushes.Transparent;
-                entry.Button.IsEnabled = !entry.Column.IsVisible || visibleCount > 1;
+                entry.Item.IsEnabled = !entry.Column.IsVisible || visibleCount > 1;
             }
         }
     }
@@ -206,6 +193,14 @@ internal static class DataGridColumnChooser
         if (Application.Current?.TryGetResource(key, ThemeVariant.Default, out var value) == true &&
             value is IBrush brush)
             return brush;
+        return null;
+    }
+
+    private static ControlTheme? FindTheme(string key)
+    {
+        if (Application.Current?.TryGetResource(key, ThemeVariant.Default, out var value) == true &&
+            value is ControlTheme theme)
+            return theme;
         return null;
     }
 

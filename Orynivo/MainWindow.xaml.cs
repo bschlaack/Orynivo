@@ -61,6 +61,8 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _playbackCts;
     private readonly SettingsStore _settingsStore = new();
     private AppSettings _settings = new();
+    private LibraryWatcherService? _libraryWatcher;
+    private int _libraryWatcherRefreshPending;
     private readonly DispatcherTimer _transportTimer;
     private bool _isSeekingWithSlider;
     private bool _showAlbumArtworkView;
@@ -361,6 +363,8 @@ public partial class MainWindow : Window
             await ShowSearchResultsAsync(SearchTextBox.Text ?? string.Empty);
         };
         LoadSettings();
+        _libraryWatcher = new LibraryWatcherService(OnWatchedLibraryChanged);
+        _libraryWatcher.UpdatePaths(_settings.LibraryPaths);
         RestoreFixedDataGridColumnWidths();
         AttachDataGridColumnChoosers();
         LoadCatalogFilterCache();
@@ -387,6 +391,11 @@ public partial class MainWindow : Window
             handledEventsToo: true);
         NavListBox.AddHandler(
             PointerPressedEvent,
+            new EventHandler<PointerPressedEventArgs>(NavListBox_OnPreviewMouseRightButtonDown),
+            RoutingStrategies.Tunnel,
+            handledEventsToo: true);
+        NavListBox.AddHandler(
+            PointerPressedEvent,
             new EventHandler<PointerPressedEventArgs>(NavListBox_OnPreviewMouseLeftButtonDown),
             handledEventsToo: true);
         PositionSlider.AddHandler(Slider.PointerPressedEvent,
@@ -403,6 +412,8 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         ContentDataGrid.VerticalScroll -= ContentDataGrid_OnVerticalScroll;
+        _libraryWatcher?.Dispose();
+        _libraryWatcher = null;
         CaptureAllDataGridColumnWidths();
         PersistViewState();
         CancelAndDispose(ref _radioSearchCts);
@@ -514,6 +525,40 @@ public partial class MainWindow : Window
         ArtistProfileService.LastFmApiKey = _settings.LastFmApiKey;
     }
 
+    private void OnWatchedLibraryChanged()
+    {
+        if (Interlocked.Increment(ref _libraryWatcherRefreshPending) != 1)
+            return;
+
+        Dispatcher.UIThread.Post(async () =>
+        {
+            while (true)
+            {
+                Interlocked.Exchange(ref _libraryWatcherRefreshPending, 1);
+                try
+                {
+                    LoadNavPlaylists();
+                    if (SearchResultsScrollViewer.IsVisible &&
+                        !string.IsNullOrWhiteSpace(SearchTextBox.Text))
+                    {
+                        await ShowSearchResultsAsync(SearchTextBox.Text);
+                    }
+                    else if (_currentTopLevelTag is "Dashboard" or "Artists" or "Albums" or "Tracks" or "Folders" ||
+                             _currentTopLevelTag?.StartsWith("Playlist:", StringComparison.Ordinal) == true)
+                    {
+                        await ShowTopLevelViewAsync(_currentTopLevelTag);
+                    }
+                }
+                catch
+                {
+                    // Background library refreshes must not affect playback or input handling.
+                }
+                if (Interlocked.CompareExchange(ref _libraryWatcherRefreshPending, 0, 1) == 1)
+                    break;
+            }
+        }, DispatcherPriority.Background);
+    }
+
     private void RestoreLastTrackState()
     {
         var path = _settings.LastTrackPath;
@@ -614,7 +659,8 @@ public partial class MainWindow : Window
                 {
                     Content = content,
                     Tag = $"Radio:{radio.Id}",
-                    Theme = FindResource<ControlTheme>("NavItemTheme")
+                    Theme = FindResource<ControlTheme>("NavItemTheme"),
+                    ContextFlyout = BuildDeleteRadioContextFlyout(radio)
                 });
             }
 
@@ -633,7 +679,8 @@ public partial class MainWindow : Window
                 {
                     Content = content,
                     Tag = $"Podcast:{podcast.Id}",
-                    Theme = FindResource<ControlTheme>("NavItemTheme")
+                    Theme = FindResource<ControlTheme>("NavItemTheme"),
+                    ContextFlyout = BuildDeletePodcastContextFlyout(podcast)
                 });
             }
 
@@ -663,7 +710,8 @@ public partial class MainWindow : Window
                 {
                     Content = content,
                     Tag     = $"Playlist:{pl.Id}",
-                    Theme = FindResource<ControlTheme>("NavItemTheme")
+                    Theme = FindResource<ControlTheme>("NavItemTheme"),
+                    ContextFlyout = BuildPlaylistSidebarContextFlyout(pl)
                 });
             }
         }
@@ -747,6 +795,8 @@ public partial class MainWindow : Window
 
     private void NavListBox_OnPreviewMouseLeftButtonDown(object? sender, PointerPressedEventArgs e)
     {
+        if (!e.GetCurrentPoint(NavListBox).Properties.IsLeftButtonPressed)
+            return;
         if (FindAncestor<ListBoxItem>(e.Source as Visual) is not
             { Tag: string tag } ||
             !tag.StartsWith("Section:", StringComparison.Ordinal))
@@ -758,6 +808,20 @@ public partial class MainWindow : Window
         SetSidebarSectionExpanded(section, !IsSidebarSectionExpanded(section));
         ApplySidebarNavigationSettings();
         e.Handled = true;
+    }
+
+    private void NavListBox_OnPreviewMouseRightButtonDown(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(NavListBox).Properties.IsRightButtonPressed)
+            return;
+        if (FindAncestor<ListBoxItem>(e.Source as Visual) is not
+            { ContextFlyout: PopupFlyoutBase flyout } item)
+            return;
+
+        // Prevent SelectingItemsControl from treating a context click as a
+        // primary selection click, then show the flyout at the pointer location.
+        e.Handled = true;
+        flyout.ShowAt(item, showAtPointer: true);
     }
 
     private void ApplySidebarNavigationSettings()
@@ -876,6 +940,8 @@ public partial class MainWindow : Window
 
     private async void NavListBox_OnPreviewMouseLeftButtonUp(object? sender, PointerReleasedEventArgs e)
     {
+        if (e.InitialPressMouseButton != MouseButton.Left)
+            return;
         if (FindAncestor<ListBoxItem>(e.Source as Visual) is not { Tag: string tag, IsSelected: true })
             return;
         if (tag.StartsWith("Section:", StringComparison.Ordinal))
@@ -1756,8 +1822,13 @@ public partial class MainWindow : Window
                     try { criteria = JsonSerializer.Deserialize<SmartPlaylistCriteria>(playlist.FilterCriteria)!; }
                     catch { return []; }
 
-                    var facets = db.GetTrackFacets();
-                    var ids = facets.Where(f => MatchesCriteria(f, criteria)).Select(f => f.Id).ToList();
+                    var facets = db.GetSmartPlaylistTracks();
+                    var ids = OrderSmartPlaylistTracks(
+                            facets.Where(f => MatchesCriteria(f, criteria)),
+                            criteria.SortOrder)
+                        .Take(criteria.ResultLimit is > 0 ? criteria.ResultLimit.Value : int.MaxValue)
+                        .Select(f => f.Id)
+                        .ToList();
                     return db.GetTrackListFiltered(ids)
                         .Select((t, i) => new ContentRow
                         {
@@ -2035,7 +2106,8 @@ public partial class MainWindow : Window
             Margin = new Thickness(0, 6, 0, 6),
             Foreground = FindResource<IBrush>("AppPrimaryTextBrush"),
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
-            HorizontalAlignment = HorizontalAlignment.Stretch
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Theme = FindResource<ControlTheme>("HeaderCheckBoxTheme")
         };
         checkBox.IsCheckedChanged += async (_, _) => await OnTrackFilterChangedAsync(update, checkBox.IsChecked == true);
         section.Children.Add(checkBox);
@@ -2076,11 +2148,11 @@ public partial class MainWindow : Window
         return true;
     }
 
-    private static bool MatchesCriteria(TrackFacetInfo facet, SmartPlaylistCriteria criteria)
+    private static bool MatchesCriteria(SmartPlaylistTrackInfo facet, SmartPlaylistCriteria criteria)
     {
         if (criteria.FavoritesOnly && !facet.IsFavorite)
             return false;
-        if (criteria.Genres.Count > 0)
+        if (criteria.Genres is { Count: > 0 })
         {
             var trackGenres = string.IsNullOrWhiteSpace(facet.Genre)
                 ? Array.Empty<string>()
@@ -2088,15 +2160,67 @@ public partial class MainWindow : Window
             if (!trackGenres.Any(g => criteria.Genres.Contains(g, StringComparer.OrdinalIgnoreCase)))
                 return false;
         }
-        if (criteria.Formats.Count > 0 &&
+        if (criteria.Formats is { Count: > 0 } &&
             (string.IsNullOrWhiteSpace(facet.Format) ||
              !criteria.Formats.Contains(facet.Format, StringComparer.OrdinalIgnoreCase)))
             return false;
-        if (criteria.Bitrates.Count > 0 &&
+        if (criteria.Bitrates is { Count: > 0 } &&
             (!facet.Bitrate.HasValue || !criteria.Bitrates.Contains(facet.Bitrate.Value)))
+            return false;
+        if (criteria.MinimumYear is int minimumYear &&
+            (!facet.Year.HasValue || facet.Year.Value < minimumYear))
+            return false;
+        if (criteria.MaximumYear is int maximumYear &&
+            (!facet.Year.HasValue || facet.Year.Value > maximumYear))
+            return false;
+        if (!string.IsNullOrWhiteSpace(criteria.ArtistContains) &&
+            (string.IsNullOrWhiteSpace(facet.Artist) ||
+             !facet.Artist.Contains(criteria.ArtistContains.Trim(), StringComparison.CurrentCultureIgnoreCase)))
+            return false;
+        if (!string.IsNullOrWhiteSpace(criteria.AlbumContains) &&
+            (string.IsNullOrWhiteSpace(facet.Album) ||
+             !facet.Album.Contains(criteria.AlbumContains.Trim(), StringComparison.CurrentCultureIgnoreCase)))
+            return false;
+        if (criteria.MinimumDurationSeconds is double minimumDuration &&
+            (!facet.Duration.HasValue || facet.Duration.Value < minimumDuration))
+            return false;
+        if (criteria.MaximumDurationSeconds is double maximumDuration &&
+            (!facet.Duration.HasValue || facet.Duration.Value > maximumDuration))
+            return false;
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        if (criteria.AddedWithinDays is > 0 &&
+            facet.AddedAt < now - (long)criteria.AddedWithinDays.Value * 24 * 60 * 60)
+            return false;
+        if (criteria.PlayedWithinDays is > 0 &&
+            (!facet.LastPlayedAt.HasValue ||
+             facet.LastPlayedAt.Value < now - (long)criteria.PlayedWithinDays.Value * 24 * 60 * 60))
+            return false;
+        if (criteria.NeverPlayed && facet.PlayCount > 0)
+            return false;
+        if (criteria.MinimumPlayCount is int minimumPlayCount && facet.PlayCount < minimumPlayCount)
+            return false;
+        if (criteria.MaximumPlayCount is int maximumPlayCount && facet.PlayCount > maximumPlayCount)
             return false;
         return true;
     }
+
+    private static IEnumerable<SmartPlaylistTrackInfo> OrderSmartPlaylistTracks(
+        IEnumerable<SmartPlaylistTrackInfo> tracks,
+        SmartPlaylistSortOrder sortOrder) =>
+        sortOrder switch
+        {
+            SmartPlaylistSortOrder.Random => tracks.OrderBy(_ => Random.Shared.Next()),
+            SmartPlaylistSortOrder.LastPlayedNewest => tracks
+                .OrderByDescending(track => track.LastPlayedAt.HasValue)
+                .ThenByDescending(track => track.LastPlayedAt),
+            SmartPlaylistSortOrder.LeastRecentlyPlayed => tracks
+                .OrderBy(track => track.LastPlayedAt.HasValue)
+                .ThenBy(track => track.LastPlayedAt),
+            _ => tracks.OrderBy(
+                track => track.SortTitle,
+                StringComparer.CurrentCultureIgnoreCase)
+        };
 
     private bool HasActiveFilters =>
         _trackFavoritesOnly || _selectedTrackGenres.Count > 0 ||
@@ -2113,12 +2237,13 @@ public partial class MainWindow : Window
         if (await dialog.ShowDialog<bool>(this) == false || string.IsNullOrWhiteSpace(dialog.PlaylistName))
             return;
 
-        var criteria = new SmartPlaylistCriteria(
-            FavoritesOnly: _trackFavoritesOnly,
-            Genres:   [.. _selectedTrackGenres.OrderBy(g => g)],
-            Formats:  [.. _selectedTrackFormats.OrderBy(f => f)],
-            Bitrates: [.. _selectedTrackBitrates.OrderBy(b => b)]);
-
+        var criteria = new SmartPlaylistCriteria
+        {
+            FavoritesOnly = _trackFavoritesOnly,
+            Genres = [.. _selectedTrackGenres.OrderBy(g => g)],
+            Formats = [.. _selectedTrackFormats.OrderBy(f => f)],
+            Bitrates = [.. _selectedTrackBitrates.OrderBy(b => b)]
+        };
         var json = JsonSerializer.Serialize(criteria);
         var name = dialog.PlaylistName.Trim();
 
@@ -3925,87 +4050,24 @@ public partial class MainWindow : Window
     // Playlist – Löschen aus Sidebar / Entfernen aus Playlist-Ansicht
     // ------------------------------------------------------------------
 
-    private void NavListBox_OnPreviewMouseRightButtonDown(object? sender, PointerPressedEventArgs e)
+    private MenuFlyout BuildDeleteRadioContextFlyout(RadioStationRecord radio)
     {
-        if (!e.GetCurrentPoint(null).Properties.IsRightButtonPressed) return;
-        var item = FindAncestor<ListBoxItem>(e.Source as Visual);
-        if (item?.Tag is not string tag)
-        {
-            NavListBox.ContextMenu = null;
-            return;
-        }
-
-        if (tag.StartsWith("Radio:", StringComparison.Ordinal) &&
-            long.TryParse(tag.AsSpan("Radio:".Length), out var radioId))
-        {
-            RadioStationRecord? radio;
-            try
-            {
-                using var db = AudioDatabase.OpenDefault();
-                radio = db.GetRadioStation(radioId);
-            }
-            catch
-            {
-                radio = null;
-            }
-            NavListBox.ContextMenu = radio is null ? null : BuildDeleteRadioContextMenu(radio);
-            return;
-        }
-
-        if (tag.StartsWith("Podcast:", StringComparison.Ordinal) &&
-            long.TryParse(tag.AsSpan("Podcast:".Length), out var podcastId))
-        {
-            PodcastRecord? podcast;
-            try
-            {
-                using var db = AudioDatabase.OpenDefault();
-                podcast = db.GetPodcast(podcastId);
-            }
-            catch
-            {
-                podcast = null;
-            }
-            NavListBox.ContextMenu = podcast is null ? null : BuildDeletePodcastContextMenu(podcast);
-            return;
-        }
-
-        item.IsSelected = true;
-        if (!tag.StartsWith("Playlist:", StringComparison.Ordinal) ||
-            !long.TryParse(tag.AsSpan("Playlist:".Length), out long playlistId))
-        {
-            NavListBox.ContextMenu = null;
-            return;
-        }
-
-        string name;
-        try { using var db = AudioDatabase.OpenDefault(); name = db.GetPlaylistById(playlistId)?.Name ?? string.Empty; }
-        catch { name = string.Empty; }
-        NavListBox.ContextMenu = BuildDeletePlaylistContextMenu(playlistId, name);
-    }
-
-    private ContextMenu BuildDeleteRadioContextMenu(RadioStationRecord radio)
-    {
-        var menu = new ContextMenu();
-        var header = new MenuItem
-        {
-            Header = radio.Name,
-            IsHitTestVisible = false,
-            Focusable = false,
-            FontSize = 11,
-            FontWeight = FontWeight.SemiBold,
-            Foreground = new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF))
-        };
+        var menu = CreateSidebarMenuFlyout();
+        var header = CreateFlyoutMenuItem(
+            radio.Name,
+            new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF)));
+        header.IsHitTestVisible = false;
+        header.Focusable = false;
+        header.FontWeight = FontWeight.SemiBold;
         menu.Items.Add(header);
 
         var separator = new Separator();
         menu.Items.Add(separator);
 
-        var deleteItem = new MenuItem
-        {
-            Header = LocalizationManager.Current.DeleteRadio,
-            Tag = radio,
-            Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x6B, 0x6B))
-        };
+        var deleteItem = CreateFlyoutMenuItem(
+            LocalizationManager.Current.DeleteRadio,
+            new SolidColorBrush(Color.FromRgb(0xFF, 0x6B, 0x6B)));
+        deleteItem.Tag = radio;
         deleteItem.Click += DeleteRadioMenuItem_OnClick;
         menu.Items.Add(deleteItem);
         return menu;
@@ -4032,29 +4094,24 @@ public partial class MainWindow : Window
         StatusTextBlock.Text = string.Format(LocalizationManager.Current.RadioDeleted, radio.Name);
     }
 
-    private ContextMenu BuildDeletePodcastContextMenu(PodcastRecord podcast)
+    private MenuFlyout BuildDeletePodcastContextFlyout(PodcastRecord podcast)
     {
-        var menu = new ContextMenu();
-        var header = new MenuItem
-        {
-            Header = podcast.Name,
-            IsHitTestVisible = false,
-            Focusable = false,
-            FontSize = 11,
-            FontWeight = FontWeight.SemiBold,
-            Foreground = new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF))
-        };
+        var menu = CreateSidebarMenuFlyout();
+        var header = CreateFlyoutMenuItem(
+            podcast.Name,
+            new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF)));
+        header.IsHitTestVisible = false;
+        header.Focusable = false;
+        header.FontWeight = FontWeight.SemiBold;
         menu.Items.Add(header);
 
         var separator = new Separator();
         menu.Items.Add(separator);
 
-        var deleteItem = new MenuItem
-        {
-            Header = LocalizationManager.Current.DeletePodcast,
-            Tag = podcast,
-            Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x6B, 0x6B))
-        };
+        var deleteItem = CreateFlyoutMenuItem(
+            LocalizationManager.Current.DeletePodcast,
+            new SolidColorBrush(Color.FromRgb(0xFF, 0x6B, 0x6B)));
+        deleteItem.Tag = podcast;
         deleteItem.Click += DeletePodcastMenuItem_OnClick;
         menu.Items.Add(deleteItem);
         return menu;
@@ -4081,35 +4138,107 @@ public partial class MainWindow : Window
         StatusTextBlock.Text = string.Format(LocalizationManager.Current.PodcastDeleted, podcast.Name);
     }
 
-    private ContextMenu BuildDeletePlaylistContextMenu(long playlistId, string playlistName)
+    private MenuFlyout BuildPlaylistSidebarContextFlyout(PlaylistRecord playlist)
     {
-        var menu = new ContextMenu();
-        var header = new MenuItem
-        {
-            Header           = playlistName,
-            IsHitTestVisible = false,
-            Focusable        = false,
-            FontSize         = 11,
-            FontWeight       = FontWeight.SemiBold,
-            Foreground       = new SolidColorBrush(
-                                   Color.FromRgb(0x6C, 0x63, 0xFF))
-        };
+        var menu = CreateSidebarMenuFlyout();
+        var header = CreateFlyoutMenuItem(
+            playlist.Name,
+            new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF)));
+        header.IsHitTestVisible = false;
+        header.Focusable = false;
+        header.FontWeight = FontWeight.SemiBold;
         menu.Items.Add(header);
 
         var sep = new Separator();
         menu.Items.Add(sep);
 
-        var deleteItem = new MenuItem
+        if (playlist.IsSmartPlaylist)
         {
-            Header     = LocalizationManager.Current.DeletePlaylist,
-            Tag        = playlistId,
-            Foreground = new SolidColorBrush(
-                             Color.FromRgb(0xFF, 0x6B, 0x6B))
-        };
+            var editItem = CreateFlyoutMenuItem(LocalizationManager.Current.EditSmartPlaylist);
+            editItem.Tag = playlist.Id;
+            editItem.Click += EditSmartPlaylistMenuItem_OnClick;
+            menu.Items.Add(editItem);
+        }
+
+        var deleteItem = CreateFlyoutMenuItem(
+            LocalizationManager.Current.DeletePlaylist,
+            new SolidColorBrush(Color.FromRgb(0xFF, 0x6B, 0x6B)));
+        deleteItem.Tag = playlist.Id;
         deleteItem.Click += DeletePlaylistMenuItem_OnClick;
         menu.Items.Add(deleteItem);
 
         return menu;
+    }
+
+    private MenuFlyout CreateSidebarMenuFlyout() => new()
+    {
+        FlyoutPresenterTheme = FindResource<ControlTheme>("AppMenuFlyoutPresenterTheme"),
+        ItemContainerTheme = FindResource<ControlTheme>("AppMenuFlyoutItemTheme")
+    };
+
+    private MenuItem CreateFlyoutMenuItem(string header, IBrush? foreground = null)
+    {
+        foreground ??= FindResource<IBrush>("AppPrimaryTextBrush");
+        return new MenuItem
+        {
+            Header = new TextBlock
+            {
+                Text = header,
+                Foreground = foreground,
+                VerticalAlignment = VerticalAlignment.Center
+            },
+            Theme = FindResource<ControlTheme>("AppMenuFlyoutItemTheme"),
+            Foreground = foreground
+        };
+    }
+
+    private async void EditSmartPlaylistMenuItem_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: long playlistId })
+            return;
+
+        PlaylistRecord? playlist;
+        SmartPlaylistCriteria criteria;
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            playlist = db.GetPlaylistById(playlistId);
+            if (playlist is not { IsSmartPlaylist: true } ||
+                string.IsNullOrWhiteSpace(playlist.FilterCriteria))
+                return;
+            criteria = JsonSerializer.Deserialize<SmartPlaylistCriteria>(playlist.FilterCriteria)
+                       ?? new SmartPlaylistCriteria();
+        }
+        catch
+        {
+            return;
+        }
+
+        var dialog = new SmartPlaylistDialog(criteria, playlist.Name);
+        if (await dialog.ShowDialog<bool>(this) == false ||
+            string.IsNullOrWhiteSpace(dialog.PlaylistName) ||
+            dialog.Criteria is null)
+            return;
+
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            db.UpdateSmartPlaylist(
+                playlistId,
+                dialog.PlaylistName.Trim(),
+                JsonSerializer.Serialize(dialog.Criteria));
+        }
+        catch
+        {
+            return;
+        }
+
+        LoadNavPlaylists();
+        if (_activePlaylistId == playlistId)
+            await ShowTopLevelViewAsync($"Playlist:{playlistId}");
+        StatusTextBlock.Text = string.Format(
+            LocalizationManager.Current.SmartPlaylistUpdated,
+            dialog.PlaylistName.Trim());
     }
 
     private void DeletePlaylistMenuItem_OnClick(object? sender, RoutedEventArgs e)
@@ -6668,6 +6797,7 @@ public partial class MainWindow : Window
         {
             _settings.LibraryPaths = paths;
             _settingsStore.Save(_settings);
+            _libraryWatcher?.UpdatePaths(paths);
         })
         ;
 
@@ -6679,6 +6809,7 @@ public partial class MainWindow : Window
             _settings.SelectedWasapiDeviceName = window.SelectedWasapiDeviceName;
             _settings.ReplayGainMode        = window.SelectedReplayGainMode;
             _settings.LibraryPaths           = window.SelectedLibraryPaths.ToList();
+            _libraryWatcher?.UpdatePaths(_settings.LibraryPaths);
             _settings.Theme                  = window.SelectedTheme;
             _settings.Language               = window.SelectedLanguage;
             _settings.ArtistInfoSource       = window.SelectedArtistInfoSource;
@@ -6721,6 +6852,8 @@ public partial class MainWindow : Window
     internal void PrepareForLibraryImport()
     {
         _searchTimer.Stop();
+        _libraryWatcher?.Dispose();
+        _libraryWatcher = null;
         StopPlayback();
     }
 

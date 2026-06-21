@@ -493,7 +493,7 @@ public partial class SettingsWindow : Window
                     : string.Empty;
                 statusBlock.Text = string.Format(
                     LocalizationManager.Current.ScanCompleted,
-                    result.Total, result.Added, result.Updated, failed);
+                    result.Total, result.Added, result.Updated, result.Removed, failed);
             }
             catch (OperationCanceledException)
             {

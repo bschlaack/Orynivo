@@ -58,9 +58,9 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   restores per-table pixel widths
 - `Orynivo/Controls/DataGridColumnOrderStore.cs`: captures and restores
   identified data-column display order while retaining fixed-column slots
-- `Orynivo/Controls/DataGridColumnChooser.cs`: opens the themed, light-dismiss
-  header popup for column visibility; it intentionally uses `Popup` instead of
-  dynamically attached Avalonia `ContextMenu` instances
+- `Orynivo/Controls/DataGridColumnChooser.cs`: opens the themed `MenuFlyout`
+  for column visibility at the clicked header; entries remain open while
+  toggling multiple columns
 - `Orynivo/Localization/*`: language model and localized German, English, French, and Spanish strings
 - `Orynivo/StartupWindow.*`: lightweight splash screen shown during initial database preparation and migration
 - `Orynivo/Assets/Orynivo_Logo.png`: embedded full logo used by the splash screen and main sidebar
@@ -82,16 +82,24 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - `AppSettings.Volume` and `AppSettings.LastTrackPath` preserve volume and the last selected or played track; restoration requires both the file and database entry to exist
 - `AppSettings.ReplayGainMode` selects disabled, track, or album ReplayGain for PCM playback; native ASIO DSD remains bit-perfect
 - `AppSettings.DataGridColumnWidths` persists user-adjusted pixel widths per stable table/view key; dynamic main-content views capture their current widths before replacing columns
-- `AppSettings.VisibleDataGridColumns` persists selectable column IDs per table/view key; right-clicking any table header opens the context-appropriate column chooser popup
+- `AppSettings.VisibleDataGridColumns` persists selectable column IDs per table/view key; right-clicking any table header opens the context-appropriate column chooser flyout
 - `AppSettings.DataGridColumnOrders` persists drag-and-drop display order per stable table/view key; fixed artwork and action columns keep their structural positions
 - `AppSettings.Theme` stores the `Light` or `Dark` theme
 - `AppSettings.Language` stores `German`, `English`, `French`, or `Spanish`
 - `Orynivo/Library/TrackRecord.cs`: database track model containing tags and technical metadata
 - `Orynivo/Library/PlaylistRecord.cs`: playlist model including denormalized `TrackCount`, `IsSmartPlaylist`, and `FilterCriteria`
-- `Orynivo/Library/SmartPlaylistCriteria.cs`: serialized smart-playlist criteria (`FavoritesOnly`, `Genres`, `Formats`, `Bitrates`)
+- `Orynivo/Library/SmartPlaylistCriteria.cs`: backward-compatible serialized
+  smart-playlist criteria covering favourites, genres, formats, bitrates,
+  metadata ranges, library/play-history rules, ordering, and result limits
+- `Orynivo/SmartPlaylistDialog.*`: localized editor for the name and advanced
+  criteria of an existing smart playlist
 - `Orynivo/Library/PlaylistTrackRecord.cs`: playlist entry model with position, optional TrackId reference, and required path
 - `Orynivo/Library/AudioDatabase.cs`: SQLite database layer through `Microsoft.Data.Sqlite`; database at `%LOCALAPPDATA%\Orynivo\library.db`
 - `Orynivo/Library/LibraryScanner.cs`: directory scanner using TagLibSharp; writes through `AudioDatabase.Upsert()`, reports progress, and supports cancellation
+- `Orynivo/Library/LibraryWatcherService.cs`: owns one recursive
+  `FileSystemWatcher` per available configured library root, debounces paths for
+  900 ms, applies incremental create/change/rename/delete updates, and runs a
+  full reconciliation after 10 minutes and every 30 minutes thereafter
 - `Orynivo/Library/LibraryBackupService.cs`: versioned ZIP export/import for the SQLite library, artwork cache, and configured library directories; audio files are not included
 - `Orynivo/Library/LyricsService.cs`: LRCLIB client and LRC parser for downloaded plain or synchronized lyrics
 - `Orynivo/Library/RadioBrowserService.cs`: Radio Browser client with mirror discovery, station search, and click registration
@@ -126,9 +134,20 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - `GetPathTimestamps()` returns paths and modification timestamps for efficient rescans
 - WAL journal mode is enabled
 - Multiple library directories are stored in `AppSettings.LibraryPaths`
+- Configured, currently available library directories are watched recursively.
+  Watchers are replaced immediately when Settings adds, removes, or imports
+  paths; unavailable roots are retried by periodic reconciliation.
 - Each directory in Settings has its own Scan button, which becomes Cancel while scanning, with progress shown below the entry
 - Directories can be added or removed; active scans are canceled when a directory is removed or the window closes
 - Scans skip unchanged files and do not overwrite `added_at`
+- Manual scans, watcher batches, and periodic reconciliations share one scanner
+  gate so SQLite and Lucene updates cannot run concurrently.
+- Watcher create/change/rename/delete events update SQLite and Lucene together.
+  Renames enqueue both old and new paths; changed files are retried briefly
+  while another process still holds them.
+- Full scans are the authoritative fallback: they upsert new/changed files and
+  remove missing paths from both SQLite and Lucene, covering lost or overflowed
+  file-system events.
 - Metadata extraction supports ID3v1/v2, Vorbis Comments, APE tags, and embedded artwork
 - Metadata extraction stores track and album ReplayGain values. The first scan of each configured root after ReplayGain support was added refreshes unchanged tracks once so existing libraries receive those values.
 - Opening the database runs a legacy-data migration that normalizes artists, albums, and artwork and removes old per-track artwork BLOBs
@@ -171,6 +190,17 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - Dynamically created menu objects receive their styles through Avalonia
   `ControlTheme` resources looked up via `TryGetResource`
 - **Delete playlist** appears in the sidebar playlist context menu, removes the database record, refreshes the sidebar, and returns to Tracks if needed
+- Dynamic radio, podcast, and playlist `ListBoxItem` instances receive a
+  `MenuFlyout` through `ContextFlyout` when they are created. A tunnel-phase
+  right-button handler marks the initial press handled before
+  `SelectingItemsControl` can change selection and opens the flyout with
+  `ShowAt(item, showAtPointer: true)`. The flyouts use dedicated presenter and
+  item themes based on the Fluent defaults with Orynivo's dynamic surface,
+  border, text, hover, pressed, and separator resources. Sidebar accordion and
+  repeated-selection handlers must explicitly accept only the left mouse
+  button. Explicitly created `MenuItem` objects must also receive the shared
+  item theme directly; `ItemContainerTheme` alone does not reliably restyle
+  preconstructed controls.
 - **Remove from playlist** appears only for regular playlist entries with a `PlaylistEntryId`
 - `_activePlaylistId` is set by `ShowTopLevelViewAsync` only for playlist views
 - `ContentRow.PlaylistEntryId` contains `playlist_tracks.id` only in regular playlist views
@@ -197,9 +227,14 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - Folder-tree lazy loading uses an in-memory parent-to-children map and creates
   items only when expanded
 - `TrackLite`, `TrackListInfo`, `ArtistInfo`, and `AlbumInfo` remain intentionally small; `TrackRecord` is reserved for complete metadata operations
+- `GetTrackFacets()` remains a lightweight interactive-filter query;
+  `GetSmartPlaylistTracks()` separately aggregates playback counts and the last
+  playback timestamp only while resolving a smart playlist
 - Artwork is deduplicated instead of stored per track
 - `TrackSearchIndex.cs` stores a Lucene.NET index under `%LOCALAPPDATA%\Orynivo\search-index`, supports category-specific fields, partial words, and German umlaut/eszett variants, rebuilds stale indexes, updates incrementally after scans, and removes missing files below rescanned roots
 - Search-index freshness is determined by the stored schema marker; indexed `Field.Store.NO` fields must not be tested through stored-document field access
+- `TrackSearchIndex.RemovePaths(paths)` removes explicit watcher/full-scan
+  deletions without rebuilding the complete index.
 - Track `title` and `sort_title` values are trimmed before database persistence
   and again before Lucene indexing; future metadata/indexing changes must
   preserve this invariant so A-Z ordering is not affected by surrounding
@@ -292,10 +327,12 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - DataGrid columns are user-resizable. Main library, search, radio, podcast,
   podcast-episode, Plex, playlist, and daily-history widths are restored from
   `settings.json`; invalid or structurally outdated width sets are ignored.
-- Right-clicking a DataGrid column header opens a localized, themed,
-  light-dismiss `Popup` column chooser. Do not replace this with a dynamically
-  attached and programmatically opened Avalonia `ContextMenu`; Avalonia 11.2
-  retains internal ownership in that sequence and can throw during placement.
+- Right-clicking a DataGrid column header opens a localized, themed
+  `MenuFlyout` column chooser at the pointer position. It uses
+  `StaysOpenOnClick` so several columns can be changed in one session. Do not
+  replace this with a dynamically attached and programmatically opened
+  Avalonia `ContextMenu`; Avalonia 11.2 retains internal ownership in that
+  sequence and can throw during placement.
   Track contexts additionally expose file name, album artist, year, track/disc
   numbers, genre, bitrate, sample rate, bit depth, channels, composer, BPM,
   file size, added date, and ReplayGain values. Radio and podcast tables expose
@@ -383,8 +420,18 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - **Search**: delayed Lucene search returns separate themed Track, Album, and Artist sections, supports partial words and German normalization variants, sorts by score then display name, and preserves the original query across drill-down Back navigation
 - **Folder structure**: configured library roots start expanded; child folders load lazily; double-clicking a track queues its direct folder sorted by disc, track number, and file name
 - **Playlists**: display position, title, artist, album, and duration; sidebar entries open their live track list
-- **Smart playlists**: store JSON criteria instead of track rows, show a gold lightning icon, resolve live when opened, and do not permit manual entry removal
-- **Save smart playlist**: available in Tracks only when filters are active; opens `NewPlaylistDialog`, serializes criteria, and calls `CreateSmartPlaylist`
+- **Smart playlists**: store JSON criteria instead of track rows, show a gold
+  lightning icon, resolve live when opened, and do not permit manual entry
+  removal. Criteria can include favourites, genre, format, bitrate, year,
+  artist, album, duration, recently added/played windows, never played,
+  playback-count ranges, alphabetical/random/recent/least-recent ordering, and
+  a result limit.
+- **Save smart playlist**: available in Tracks only when filters are active;
+  opens the compact `NewPlaylistDialog`, serializes the active favourite,
+  genre, format, and bitrate facets, and calls `CreateSmartPlaylist`.
+- Right-clicking a smart playlist in the sidebar exposes **Edit smart
+  playlist**, which opens `SmartPlaylistDialog` with the stored name and full
+  criteria. Saving updates `filter_criteria` without replacing playlist rows.
 - Tracks, albums, search results, and folder-tree nodes support playlist context menus
 
 ## XML Documentation Comments
