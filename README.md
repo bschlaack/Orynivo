@@ -78,6 +78,9 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 - UTF-8 M3U8 import and export for regular playlists, including relative local
   paths, retained missing-file entries, and HTTP/HTTPS streams; credentialed
   Plex URLs are excluded
+- Gapless sequential PCM playback through ASIO, cwASIO, and exclusive WASAPI:
+  the next FFmpeg decoder is prefetched and handed to the existing output
+  session without reopening the audio device
 - Playback history for local tracks, podcast episodes, and internet-radio
   sessions, including position and completion state
 - Artwork downloads through the Cover Art Archive and manual MusicBrainz search

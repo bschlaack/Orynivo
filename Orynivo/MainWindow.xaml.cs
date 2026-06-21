@@ -132,8 +132,11 @@ public partial class MainWindow : Window
     private PodcastPlayback? _currentPodcastPlayback;
     private PodcastRecord? _activePodcast;
     private DateTimeOffset _lastPodcastProgressSave = DateTimeOffset.MinValue;
+    private TimeSpan _currentPlaybackDuration;
     private CancellationTokenSource? _lyricsCts;
     private CancellationTokenSource? _artistProfileCts;
+    private WindowsEndpointVolumeSynchronizer? _endpointVolumeSynchronizer;
+    private bool _updatingVolumeFromSystem;
     private CancellationTokenSource _backgroundArtistLoadCts = new();
     private int _activeLyricIndex = -1;
     private bool _updatingViewMode;
@@ -402,6 +405,10 @@ public partial class MainWindow : Window
         PositionSlider.AddHandler(Slider.PointerPressedEvent,
             new EventHandler<PointerPressedEventArgs>(PositionSlider_OnPreviewMouseLeftButtonDown),
             handledEventsToo: true);
+        PositionSlider.AddHandler(Slider.PointerReleasedEvent,
+            new EventHandler<PointerReleasedEventArgs>(PositionSlider_OnPreviewMouseLeftButtonUp),
+            handledEventsToo: true);
+        ConfigureEndpointVolumeSynchronization();
         QueueHydrateVisibleArtworkRows(AlbumArtworkListBox);
         QueueHydrateVisibleArtworkRows(ArtistArtworkListBox);
         // Avalonia DataGrid owns a dedicated pixel-based vertical ScrollBar instead of
@@ -415,6 +422,7 @@ public partial class MainWindow : Window
         ContentDataGrid.VerticalScroll -= ContentDataGrid_OnVerticalScroll;
         _libraryWatcher?.Dispose();
         _libraryWatcher = null;
+        DisposeEndpointVolumeSynchronization();
         CaptureAllDataGridColumnWidths();
         PersistViewState();
         CancelAndDispose(ref _radioSearchCts);
@@ -5612,6 +5620,9 @@ public partial class MainWindow : Window
         var ext = Path.GetExtension(filePath);
         IAudioPlayer player;
         AudioFileInfo info;
+        var gaplessItems = BuildGaplessPlaybackItems(
+            filePath,
+            radioStation is null && podcastPlayback is null);
 
         if (_settings.OutputBackend is OutputBackend.Asio or OutputBackend.CwAsio)
         {
@@ -5639,7 +5650,7 @@ public partial class MainWindow : Window
                     _playbackCts.Token);
             else
                 (player, info) = await FfmpegAudioPlayer.CreateAsync(
-                    filePath,
+                    gaplessItems,
                     _settings.OutputBackend,
                     _settings.SelectedDriverName,
                     _playbackCts.Token);
@@ -5651,7 +5662,10 @@ public partial class MainWindow : Window
                 StatusTextBlock.Text = LocalizationManager.Current.SelectWasapiDevice;
                 return;
             }
-            (player, info) = await WasapiAudioPlayer.CreateAsync(filePath, _settings.SelectedWasapiDeviceId, _playbackCts.Token);
+            (player, info) = await WasapiAudioPlayer.CreateAsync(
+                gaplessItems,
+                _settings.SelectedWasapiDeviceId,
+                _playbackCts.Token);
         }
         else
         {
@@ -5660,8 +5674,14 @@ public partial class MainWindow : Window
         }
 
         _player        = player;
-        _player.Volume = (float)VolumeSlider.Value;
+        if (player is IGaplessAudioPlayer gaplessPlayer)
+            gaplessPlayer.TrackChanged += GaplessPlayer_OnTrackChanged;
+        _player.Volume = _settings.OutputBackend == OutputBackend.Wasapi &&
+                         _endpointVolumeSynchronizer is not null
+            ? 1.0f
+            : (float)VolumeSlider.Value;
         _player.ReplayGainFactor = GetReplayGainFactor(filePath);
+        _currentPlaybackDuration = player.Duration;
         if (podcastPlayback is not null &&
             podcastPlayback.Podcast.Id > 0 &&
             player.CanSeek)
@@ -5863,6 +5883,172 @@ public partial class MainWindow : Window
         }
     }
 
+    private IReadOnlyList<GaplessPlaybackItem> BuildGaplessPlaybackItems(
+        string currentFilePath,
+        bool allowQueuedTracks)
+    {
+        if (!allowQueuedTracks ||
+            _shuffleEnabled ||
+            _queueIndex < 0 ||
+            _queueIndex >= _queue.Count ||
+            !string.Equals(
+                _queue[_queueIndex].FilePath,
+                currentFilePath,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return [new GaplessPlaybackItem(currentFilePath, GetReplayGainFactor(currentFilePath))];
+        }
+
+        var items = new List<GaplessPlaybackItem>();
+        for (var index = _queueIndex; index < _queue.Count; index++)
+        {
+            var path = _queue[index].FilePath;
+            if (_settings.OutputBackend is OutputBackend.Asio or OutputBackend.CwAsio &&
+                Path.GetExtension(path) is string extension &&
+                (extension.Equals(".dsf", StringComparison.OrdinalIgnoreCase) ||
+                 extension.Equals(".dff", StringComparison.OrdinalIgnoreCase)))
+            {
+                break;
+            }
+
+            items.Add(new GaplessPlaybackItem(path, GetReplayGainFactor(path)));
+        }
+
+        return items.Count == 0
+            ? [new GaplessPlaybackItem(currentFilePath, GetReplayGainFactor(currentFilePath))]
+            : items;
+    }
+
+    private void GaplessPlayer_OnTrackChanged(object? sender, GaplessTrackChangedEventArgs e)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!ReferenceEquals(sender, _player))
+                return;
+
+            RecordPlaybackEnd(completed: true, _currentPlaybackDuration.TotalSeconds);
+            _currentFilePath = e.FilePath;
+            _currentPlaybackDuration = e.Info.Duration;
+            _playedQueuePaths.Add(e.FilePath);
+
+            if (_queueIndex + 1 < _queue.Count &&
+                string.Equals(
+                    _queue[_queueIndex + 1].FilePath,
+                    e.FilePath,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                _queueIndex++;
+            }
+            else
+            {
+                var matchingIndex = Enumerable.Range(0, _queue.Count)
+                    .Where(index => string.Equals(
+                        _queue[index].FilePath,
+                        e.FilePath,
+                        StringComparison.OrdinalIgnoreCase))
+                    .DefaultIfEmpty(-1)
+                    .First();
+                if (matchingIndex >= 0)
+                    _queueIndex = matchingIndex;
+            }
+
+            RefreshQueueNavigationButtons();
+            PositionSlider.IsEnabled = _player?.CanSeek == true;
+            DurationTextBlock.Text = FormatTime(e.Info.Duration);
+            UpdateGaplessNowPlaying(e.FilePath, e.Info);
+            StartLocalPlaybackHistory(e.FilePath);
+        });
+    }
+
+    private void UpdateGaplessNowPlaying(string filePath, AudioFileInfo info)
+    {
+        var filename = Path.GetFileNameWithoutExtension(filePath);
+        NowPlayingTitleBlock.Text = filename;
+        NowPlayingArtistBlock.Text = SelectedDriverTextBlock.Text;
+        FileInfoTextBlock.Text = info.IsDsd
+            ? $"{info.ContainerName.ToUpperInvariant()}  ·  {LocalizationManager.Current.DsdToPcmOutput}  ·  {info.OutputSampleRate:N0} Hz"
+            : $"{info.CodecName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz  ·  {info.Channels} ch";
+
+        var isPlexTrack = _plexTracksByUrl.TryGetValue(filePath, out var plexTrack);
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            var artworkPaths = db.GetArtworkPathsByTrackPath(filePath);
+            var track = db.GetByPath(filePath);
+            var artist = db.GetArtistByTrackPath(filePath);
+            NowPlayingArtworkImage.Source = CreateArtworkImage(artworkPaths?.Thumb96Path, 96);
+            LyricsBackgroundImage.Source = CreateArtworkImage(
+                artworkPaths?.Thumb320Path ?? artworkPaths?.OriginalPath,
+                900);
+            var trackInfo = db.GetTrackIdAndFavorite(filePath);
+            _currentTrackId = trackInfo?.Id;
+            _currentTrackIsFavorite = trackInfo?.IsFavorite ?? false;
+            _currentArtistId = artist?.Id;
+            _currentArtistName = artist?.Artist;
+            NowPlayingArtistButton.IsEnabled = artist is not null;
+            LyricsButton.IsEnabled = track is not null;
+            ArtistInfoButton.IsEnabled = artist is not null;
+            if (track is not null)
+            {
+                NowPlayingTitleBlock.Text = track.Title ?? filename;
+                NowPlayingArtistBlock.Text = track.Artist ?? string.Empty;
+            }
+        }
+        catch
+        {
+            NowPlayingArtworkImage.Source = null;
+            LyricsBackgroundImage.Source = null;
+            _currentTrackId = null;
+            _currentArtistId = null;
+            _currentArtistName = null;
+            _currentTrackIsFavorite = false;
+            NowPlayingArtistButton.IsEnabled = false;
+            LyricsButton.IsEnabled = false;
+            ArtistInfoButton.IsEnabled = false;
+        }
+
+        if (isPlexTrack && plexTrack is not null)
+        {
+            NowPlayingTitleBlock.Text = plexTrack.Title ?? filename;
+            NowPlayingArtistBlock.Text = plexTrack.Artist ?? string.Empty;
+            NowPlayingArtworkImage.Source = null;
+            LyricsBackgroundImage.Source = null;
+            _currentTrackId = null;
+            _currentArtistId = null;
+            _currentArtistName = plexTrack.Artist;
+            _currentTrackIsFavorite = false;
+            NowPlayingArtistButton.IsEnabled = false;
+            LyricsButton.IsEnabled = false;
+            ArtistInfoButton.IsEnabled = false;
+        }
+        else
+        {
+            _ = LoadLyricsForTrackAsync(filePath, forceRefresh: false);
+        }
+
+        UpdateNowPlayingFavoriteButton();
+    }
+
+    private void StartLocalPlaybackHistory(string filePath)
+    {
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            _currentPlayHistoryId = db.RecordPlaybackStart(
+                filePath,
+                db.GetTrackIdByPath(filePath),
+                _currentPlaybackDuration.TotalSeconds > 0
+                    ? _currentPlaybackDuration.TotalSeconds
+                    : null,
+                title: NowPlayingTitleBlock.Text,
+                subtitle: NowPlayingArtistBlock.Text);
+        }
+        catch
+        {
+            _currentPlayHistoryId = null;
+        }
+    }
+
     private async void PreviousButton_OnClick(object? sender, RoutedEventArgs e)
     {
         if (!TryMoveToPreviousQueueIndex())
@@ -5897,6 +6083,7 @@ public partial class MainWindow : Window
         _playbackCts = null;
         _player?.Dispose();
         _player = null;
+        _currentPlaybackDuration = TimeSpan.Zero;
 
         PlayButton.IsEnabled   = true;
         SetPlayPauseIcon(isPlaying: false);
@@ -5942,14 +6129,17 @@ public partial class MainWindow : Window
         current.Dispose();
     }
 
-    private void RecordPlaybackEnd(bool completed)
+    private void RecordPlaybackEnd(bool completed, double? positionSeconds = null)
     {
         if (_currentPlayHistoryId is not long historyId)
             return;
         try
         {
             using var db = AudioDatabase.OpenDefault();
-            db.RecordPlaybackEnd(historyId, _player?.Position.TotalSeconds ?? 0, completed);
+            db.RecordPlaybackEnd(
+                historyId,
+                positionSeconds ?? _player?.Position.TotalSeconds ?? 0,
+                completed);
         }
         catch { }
         finally
@@ -6195,10 +6385,18 @@ public partial class MainWindow : Window
 
     private async void PositionSlider_OnPreviewMouseLeftButtonUp(object? sender, PointerReleasedEventArgs e)
     {
-        if (_player is null || !_player.CanSeek) return;
-        await _player.SeekAsync(TimeSpan.FromSeconds(PositionSlider.Value));
-        _isSeekingWithSlider = false;
-        RefreshTransport();
+        if (!_isSeekingWithSlider)
+            return;
+        try
+        {
+            if (_player is not null && _player.CanSeek)
+                await _player.SeekAsync(TimeSpan.FromSeconds(PositionSlider.Value));
+        }
+        finally
+        {
+            _isSeekingWithSlider = false;
+            RefreshTransport();
+        }
     }
 
     private void PositionSlider_OnPreviewMouseLeftButtonDown(object? sender, PointerPressedEventArgs e)
@@ -6870,8 +7068,68 @@ public partial class MainWindow : Window
     {
         if (VolumeValueTextBlock is null) return;
         VolumeValueTextBlock.Text = $"{Math.Round(VolumeSlider.Value * 100):N0} %";
-        if (_player is not null) _player.Volume = (float)VolumeSlider.Value;
+        if (_settings.OutputBackend == OutputBackend.Wasapi &&
+            _endpointVolumeSynchronizer is not null)
+        {
+            if (!_updatingVolumeFromSystem)
+                _endpointVolumeSynchronizer.SetVolume((float)VolumeSlider.Value);
+            if (_player is not null)
+                _player.Volume = 1.0f;
+        }
+        else if (_player is not null)
+        {
+            _player.Volume = (float)VolumeSlider.Value;
+        }
         _settings.Volume = VolumeSlider.Value;
+    }
+
+    private void ConfigureEndpointVolumeSynchronization()
+    {
+        DisposeEndpointVolumeSynchronization();
+        if (_settings.OutputBackend != OutputBackend.Wasapi ||
+            string.IsNullOrWhiteSpace(_settings.SelectedWasapiDeviceId))
+        {
+            return;
+        }
+
+        try
+        {
+            _endpointVolumeSynchronizer =
+                new WindowsEndpointVolumeSynchronizer(_settings.SelectedWasapiDeviceId);
+            _endpointVolumeSynchronizer.VolumeChanged += EndpointVolumeSynchronizer_OnVolumeChanged;
+            ApplySystemVolume(_endpointVolumeSynchronizer.Volume);
+        }
+        catch
+        {
+            DisposeEndpointVolumeSynchronization();
+        }
+    }
+
+    private void DisposeEndpointVolumeSynchronization()
+    {
+        if (_endpointVolumeSynchronizer is null)
+            return;
+        _endpointVolumeSynchronizer.VolumeChanged -= EndpointVolumeSynchronizer_OnVolumeChanged;
+        _endpointVolumeSynchronizer.Dispose();
+        _endpointVolumeSynchronizer = null;
+    }
+
+    private void EndpointVolumeSynchronizer_OnVolumeChanged(object? sender, float volume) =>
+        Dispatcher.UIThread.Post(() => ApplySystemVolume(volume));
+
+    private void ApplySystemVolume(float volume)
+    {
+        _updatingVolumeFromSystem = true;
+        try
+        {
+            VolumeSlider.Value = Math.Clamp(volume, 0.0f, 1.0f);
+            VolumeValueTextBlock.Text = $"{Math.Round(VolumeSlider.Value * 100):N0} %";
+            _settings.Volume = VolumeSlider.Value;
+        }
+        finally
+        {
+            _updatingVolumeFromSystem = false;
+        }
     }
 
     private float GetReplayGainFactor(string filePath)
@@ -6949,6 +7207,7 @@ public partial class MainWindow : Window
             LocalizationManager.Apply(_settings.Language);
             ApplyArtistInfoSettings();
             RefreshSelectedDriverText();
+            ConfigureEndpointVolumeSynchronization();
             LoadNavPlaylists();
             ApplySidebarNavigationSettings();
             if (_player is not null)

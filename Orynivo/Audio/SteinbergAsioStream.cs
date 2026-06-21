@@ -59,6 +59,23 @@ public sealed class SteinbergAsioStream : IDisposable
     public bool IsDsd { get; }
     /// <summary>Gets the driver's preferred buffer size in samples.</summary>
     public int PreferredBufferSize => _native.GetPreferredBufferSize();
+    /// <summary>Gets the number of complete frames currently queued in the bridge ring buffer.</summary>
+    public int BufferedFrames => _native.GetBufferedFrames();
+
+    /// <summary>Discards all frames currently queued in the bridge ring buffer.</summary>
+    public void ClearBuffer()
+    {
+        ThrowIfDisposed();
+        _native.ClearBuffer();
+    }
+
+    /// <summary>Sets the PCM volume in the native output callback.</summary>
+    /// <param name="volume">Linear volume from 0.0 to 1.0.</param>
+    public void SetVolume(float volume)
+    {
+        ThrowIfDisposed();
+        _native.SetVolume(Math.Clamp(volume, 0.0f, 1.0f));
+    }
 
     /// <summary>
     /// Returns <see langword="true"/> when the native bridge DLL for <paramref name="backend"/> is present and can be loaded.
@@ -222,6 +239,9 @@ public sealed class SteinbergAsioStream : IDisposable
         private readonly SimpleDelegate _stop;
         private readonly CloseDelegate _close;
         private readonly SimpleDelegate _getPreferredBufferSize;
+        private readonly SimpleDelegate _getBufferedFrames;
+        private readonly CloseDelegate _clearBuffer;
+        private readonly SetVolumeDelegate _setVolume;
         private readonly GetDeviceInfoDelegate _getDeviceInfo;
 
         private NativeApi(string path)
@@ -236,6 +256,9 @@ public sealed class SteinbergAsioStream : IDisposable
             _stop = GetDelegate<SimpleDelegate>("asio_stop");
             _close = GetDelegate<CloseDelegate>("asio_close");
             _getPreferredBufferSize = GetDelegate<SimpleDelegate>("asio_get_preferred_buffer_size");
+            _getBufferedFrames = GetDelegate<SimpleDelegate>("asio_get_buffered_frames");
+            _clearBuffer = GetDelegate<CloseDelegate>("asio_clear_buffer");
+            _setVolume = GetDelegate<SetVolumeDelegate>("asio_set_volume");
             _getDeviceInfo = GetDelegate<GetDeviceInfoDelegate>("asio_get_device_info");
         }
 
@@ -264,6 +287,9 @@ public sealed class SteinbergAsioStream : IDisposable
         public int Stop() => _stop();
         public void Close() => _close();
         public int GetPreferredBufferSize() => _getPreferredBufferSize();
+        public int GetBufferedFrames() => _getBufferedFrames();
+        public void ClearBuffer() => _clearBuffer();
+        public void SetVolume(float volume) => _setVolume(volume);
         public int GetDeviceInfo(string name, StringBuilder buffer, int length) =>
             _getDeviceInfo(name, buffer, length);
         public void Dispose() => NativeLibrary.Free(_handle);
@@ -285,6 +311,8 @@ public sealed class SteinbergAsioStream : IDisposable
         private delegate int WriteByteDelegate(byte[] bytes, int byteCount);
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate void CloseDelegate();
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate void SetVolumeDelegate(float volume);
         [UnmanagedFunctionPointer(CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
         private delegate int GetDeviceInfoDelegate(string driverName, StringBuilder buffer, int bufferLength);
     }

@@ -357,7 +357,7 @@
                         <Track Name="PART_Track"
                                Minimum="{TemplateBinding Minimum}"
                                Maximum="{TemplateBinding Maximum}"
-                               Value="{TemplateBinding Value}"
+                               Value="{Binding Value, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
                                Orientation="{TemplateBinding Orientation}"
                                VerticalAlignment="Center">
                             <Track.DecreaseButton>
@@ -2657,8 +2657,6 @@
                                 Theme="{StaticResource DarkSliderTheme}"
                                 Height="30"
                                 Minimum="0" Maximum="1" IsEnabled="False"
-                                PointerPressed="PositionSlider_OnPreviewMouseLeftButtonDown"
-                                PointerReleased="PositionSlider_OnPreviewMouseLeftButtonUp"
                                 ValueChanged="PositionSlider_OnValueChanged"/>
                         <TextBlock x:Name="DurationTextBlock"
                                    Grid.Column="2"

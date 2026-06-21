@@ -39,12 +39,17 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 
 - `Orynivo/Audio/SteinbergAsioStream.cs`: runtime-selecting C# wrapper for `AsioBridge.dll` and `CwAsioBridge.dll`
 - `Orynivo/Audio/FfmpegAudioPlayer.cs`: PCM path
+- `Orynivo/Audio/FfmpegPcmDecoder.cs`: FFmpeg PCM decoder process with an
+  initial prefetched block used for gapless transitions
 - `Orynivo/Audio/FfmpegLocator.cs`: checks `AppContext.BaseDirectory` and PATH for `ffmpeg.exe`/`ffprobe.exe` at startup; when absent, downloads the BtbN LGPL-essential Windows build from GitHub Releases, extracts the binaries next to the executable, and prepends the directory to the current-process PATH
 - `Orynivo/Audio/DsfAudioPlayer.cs`: native DSF-to-DSD path
 - `Orynivo/Audio/DffAudioPlayer.cs`: native DFF/DSDIFF-to-DSD path
 - `Orynivo/Audio/WasapiAudioPlayer.cs`: exclusive-mode WASAPI PCM path; converts
   DSD sources to PCM in real time and selects a supported output sample rate
 - `Orynivo/Audio/WasapiDeviceProvider.cs`: WASAPI devices and capability queries
+- `Orynivo/Audio/WindowsEndpointVolumeSynchronizer.cs`: bidirectional
+  synchronization between the transport volume slider and the selected
+  Windows render endpoint's master volume
 - `Orynivo/Audio/ReplayGain.cs` and `ReplayGainMode.cs`: parse persisted
   track/album gain values, select the configured fallback mode, and calculate
   the linear PCM gain factor
@@ -275,9 +280,30 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - Transport uses custom vector icons for previous, play/pause, and next; unavailable queue directions are disabled
 - Seeking is implemented for ASIO PCM, WASAPI PCM, DSF, and DFF
 - Loading a file or folder builds a playback queue; completion advances automatically
+- Sequential PCM queues use one persistent ASIO/cwASIO or exclusive WASAPI
+  output session. The next FFmpeg decoder is started and prefetched while the
+  current track plays, then its samples are appended without reopening the
+  device. Audible track changes are derived from rendered/buffered frame
+  counts so transport metadata and playback history change at the actual
+  boundary.
+- Gapless playback is disabled for shuffle queues and native ASIO DSD
+  (DSF/DFF). Those paths retain title-by-title device handling; DSD converted
+  to PCM through WASAPI participates in the PCM gapless pipeline.
+- Seeking remains available inside multi-track gapless PCM sessions. A seek
+  clears buffered output, restarts the current FFmpeg decoder at the selected
+  position, and rebuilds preparation of the following track.
+- PCM user volume is applied at the active output stage rather than baked into
+  prefetched samples: WASAPI follows the selected Windows endpoint's master
+  volume bidirectionally and the native ASIO bridge applies an atomic volume
+  factor in its callback. Per-track ReplayGain remains part of PCM sample
+  preparation.
 - The transport action buttons for artist information, lyrics, favorite, and shuffle are left-aligned above the position slider; previous/play/next remain independently centered
 - When the transport area becomes narrow, the centered previous/play/next group shifts right only enough to keep a 12 px gap from the left action buttons
 - The position slider keeps the standard thumb size but exposes a 30 px transparent vertical hit area; clicking anywhere in that area updates the seek position while the visible track remains 3 px high
+- The position slider's custom `Track.Value` binding must remain explicitly
+  two-way. Its pointer pressed and released handlers are registered with
+  `handledEventsToo` because the Avalonia `Thumb` handles those routed events
+  while dragging.
 - Shuffle keeps a per-loaded-queue set of played file paths, so duplicate entries and already played tracks are not selected again; loading any queue again resets that set while the shuffle toggle may remain enabled
 - The playlist table is height-limited and scrollable
 - Volume affects PCM paths; native DSD remains bit-perfect

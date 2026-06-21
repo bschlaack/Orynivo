@@ -46,6 +46,7 @@ namespace
         size_t readIndex = 0;
         size_t writeIndex = 0;
         size_t availableSamples = 0;
+        std::atomic<float> volume{ 1.0f };
         std::mutex mutex;
         bool initialized = false;
         bool driverLoaded = false;
@@ -245,7 +246,7 @@ namespace
                         value = g_state.ring[sourceIndex];
                     }
 
-                    writeSample(destination, sampleType, value, frame);
+                    writeSample(destination, sampleType, value * g_state.volume.load(), frame);
                 }
             }
 
@@ -542,6 +543,31 @@ extern "C"
     __declspec(dllexport) int asio_get_preferred_buffer_size()
     {
         return static_cast<int>(g_state.preferredBufferSize);
+    }
+
+    __declspec(dllexport) int asio_get_buffered_frames()
+    {
+        if (!g_state.initialized || g_state.outputChannelsInUse <= 0)
+        {
+            return 0;
+        }
+
+        std::lock_guard<std::mutex> lock(g_state.mutex);
+        return static_cast<int>(
+            g_state.availableSamples / static_cast<size_t>(g_state.outputChannelsInUse));
+    }
+
+    __declspec(dllexport) void asio_clear_buffer()
+    {
+        std::lock_guard<std::mutex> lock(g_state.mutex);
+        g_state.readIndex = 0;
+        g_state.writeIndex = 0;
+        g_state.availableSamples = 0;
+    }
+
+    __declspec(dllexport) void asio_set_volume(float volume)
+    {
+        g_state.volume.store(std::clamp(volume, 0.0f, 1.0f));
     }
 
     __declspec(dllexport) int asio_get_device_info(const char* driverName, char* buffer, int bufferLength)

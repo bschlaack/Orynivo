@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
-using System.IO;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using NAudio.CoreAudioApi;
 using NAudio.Wave;
@@ -8,211 +8,396 @@ using NAudio.Wave;
 namespace Orynivo.Audio;
 
 /// <summary>
-/// WASAPI exclusive-mode PCM player using ffmpeg as the decoder and NAudio for device output.
-/// Tracks playback position against actually rendered samples to keep transport display accurate.
-/// Use <see cref="CreateAsync"/> to construct an instance.
+/// Plays one or more files as continuous PCM through one exclusive WASAPI
+/// session. Upcoming FFmpeg decoders are prefetched before track boundaries.
 /// </summary>
-public sealed class WasapiAudioPlayer : IAudioPlayer
+public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
 {
-    private readonly string _filePath;
+    private readonly IReadOnlyList<GaplessPlaybackItem> _items;
+    private readonly AudioFileInfo?[] _infos;
+    private readonly long[] _trackStartFrames;
     private readonly WasapiOut _output;
     private readonly BufferedWaveProvider _bufferedProvider;
     private readonly PausableWaveProvider _playbackProvider;
     private readonly MMDevice _device;
-    private readonly AudioFileInfo _info;
     private readonly WasapiSelectedFormat _selectedFormat;
     private readonly CancellationTokenSource _cts = new();
-    private readonly SemaphoreSlim _processGate = new(1, 1);
+    private readonly SemaphoreSlim _decoderGate = new(1, 1);
     private readonly Task _pumpTask;
-    private Process _process;
-    private long _framesWritten;
+    private readonly object _stateLock = new();
+    private long _totalFramesWritten;
+    private int _audibleTrackIndex;
+    private int _writeTrackIndex;
+    private FfmpegPcmDecoder? _activeDecoder;
+    private long _positionOffsetFrames;
+    private int _restartPreparedFromIndex = -1;
+    private int _decoderGeneration;
+    private float _volume = 1.0f;
     private bool _disposed;
 
     private WasapiAudioPlayer(
-        string filePath,
-        Process process,
+        IReadOnlyList<GaplessPlaybackItem> items,
+        AudioFileInfo firstInfo,
+        FfmpegPcmDecoder firstDecoder,
         WasapiOut output,
         BufferedWaveProvider bufferedProvider,
         PausableWaveProvider playbackProvider,
         MMDevice device,
-        AudioFileInfo info,
         WasapiSelectedFormat selectedFormat)
     {
-        _filePath = filePath;
-        _process = process;
+        _items = items;
+        _infos = new AudioFileInfo?[items.Count];
+        _infos[0] = firstInfo;
+        _trackStartFrames = new long[items.Count];
         _output = output;
         _bufferedProvider = bufferedProvider;
         _playbackProvider = playbackProvider;
         _device = device;
-        _info = info;
         _selectedFormat = selectedFormat;
-        _pumpTask = Task.Run(PumpAsync);
+        _activeDecoder = firstDecoder;
+        _pumpTask = Task.Run(() => PumpAsync(firstDecoder));
     }
 
-    public TimeSpan Duration => _info.Duration;
+    /// <inheritdoc/>
+    public event EventHandler<GaplessTrackChangedEventArgs>? TrackChanged;
+    /// <inheritdoc/>
+    public string CurrentFilePath => _items[Volatile.Read(ref _audibleTrackIndex)].FilePath;
+    /// <inheritdoc/>
+    public AudioFileInfo CurrentInfo =>
+        _infos[Volatile.Read(ref _audibleTrackIndex)]
+        ?? throw new InvalidOperationException("Current track information is unavailable.");
+    /// <inheritdoc/>
+    public TimeSpan Duration => CurrentInfo.Duration;
+    /// <inheritdoc/>
     public TimeSpan Position
     {
         get
         {
-            var framesWritten = Interlocked.Read(ref _framesWritten);
+            var index = Volatile.Read(ref _audibleTrackIndex);
             var bufferedFrames = _bufferedProvider.BufferedBytes / _selectedFormat.BytesPerFrame;
-            var playedFrames = Math.Max(0, framesWritten - bufferedFrames);
-            return TimeSpan.FromSeconds((double)playedFrames / _info.OutputSampleRate);
+            var playedFrames = Math.Max(0, Interlocked.Read(ref _totalFramesWritten) - bufferedFrames);
+            var positionFrames = Math.Max(0, playedFrames - Volatile.Read(ref _trackStartFrames[index]));
+            return TimeSpan.FromSeconds(
+                Math.Min(
+                    (positionFrames + Interlocked.Read(ref _positionOffsetFrames)) /
+                    (double)CurrentInfo.OutputSampleRate,
+                    Duration.TotalSeconds));
         }
     }
+    /// <inheritdoc/>
     public bool IsPaused => _playbackProvider.IsPaused;
+    /// <inheritdoc/>
     public bool CanSeek => Duration > TimeSpan.Zero;
-    public float Volume { get; set; } = 1.0f;
+    /// <inheritdoc/>
+    public float Volume
+    {
+        get => _volume;
+        set => _volume = Math.Clamp(value, 0.0f, 1.0f);
+    }
     /// <inheritdoc/>
     public float ReplayGainFactor { get; set; } = 1.0f;
 
-    /// <summary>
-    /// Probes the file, selects an exclusive-mode format, initialises the WASAPI device, starts the
-    /// ffmpeg pump, and returns the ready-to-play player together with the probed file info.
-    /// </summary>
-    /// <param name="filePath">Absolute path to the audio file to play.</param>
-    /// <param name="deviceId">MMDevice ID of the target render device.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <exception cref="NotSupportedException">Thrown when the device supports no suitable exclusive PCM format.</exception>
+    /// <summary>Creates a continuous exclusive-mode WASAPI playback session.</summary>
+    /// <param name="items">Tracks in playback order with their ReplayGain factors.</param>
+    /// <param name="deviceId">MMDevice identifier of the output device.</param>
+    /// <param name="cancellationToken">Cancellation token for initial probing and decoder startup.</param>
+    /// <returns>The player and technical information for the first track.</returns>
     public static async Task<(WasapiAudioPlayer AudioPlayer, AudioFileInfo Info)> CreateAsync(
-        string filePath,
+        IReadOnlyList<GaplessPlaybackItem> items,
         string deviceId,
         CancellationToken cancellationToken = default)
     {
-        var info = await ProbeAsync(filePath, cancellationToken);
+        if (items.Count == 0)
+            throw new ArgumentException("At least one playback item is required.", nameof(items));
+
+        var info = await ProbeAsync(items[0].FilePath, cancellationToken);
         var device = WasapiDeviceProvider.GetRenderDevice(deviceId);
-        var selectedFormat = ChooseExclusiveFormat(device, info);
-        info = info with { OutputSampleRate = selectedFormat.Format.SampleRate };
-        var provider = new BufferedWaveProvider(selectedFormat.Format)
-        {
-            BufferDuration = TimeSpan.FromSeconds(2),
-            DiscardOnBufferOverflow = false
-        };
-        var playbackProvider = new PausableWaveProvider(provider);
-
-        var output = new WasapiOut(device, AudioClientShareMode.Exclusive, useEventSync: true, latency: 100);
-        output.Init(playbackProvider);
-        output.Play();
-
-        var process = StartFfmpeg(filePath, info.OutputSampleRate, selectedFormat, TimeSpan.Zero);
-        return (new WasapiAudioPlayer(
-            filePath, process, output, provider, playbackProvider, device, info, selectedFormat), info);
-    }
-
-    public void Pause() => _playbackProvider.IsPaused = true;
-    public void Resume() => _playbackProvider.IsPaused = false;
-
-    public async Task SeekAsync(TimeSpan position)
-    {
-        if (!CanSeek)
-        {
-            return;
-        }
-
-        position = Clamp(position);
-        await _processGate.WaitAsync(_cts.Token).ConfigureAwait(false);
         try
         {
-            if (!_process.HasExited)
+            var selectedFormat = ChooseExclusiveFormat(device, info);
+            info = info with { OutputSampleRate = selectedFormat.Format.SampleRate };
+            var provider = new BufferedWaveProvider(selectedFormat.Format)
             {
-                _process.Kill(entireProcessTree: true);
-            }
+                BufferDuration = TimeSpan.FromSeconds(2),
+                DiscardOnBufferOverflow = false
+            };
+            var playbackProvider = new PausableWaveProvider(provider);
+            var output = new WasapiOut(device, AudioClientShareMode.Exclusive, useEventSync: true, latency: 100);
+            output.Init(playbackProvider);
+            var decoder = await FfmpegPcmDecoder.CreateAsync(
+                items[0].FilePath,
+                info.OutputSampleRate,
+                selectedFormat.FfmpegSampleFormat,
+                selectedFormat.FfmpegCodec,
+                TimeSpan.Zero,
+                cancellationToken);
+            output.Play();
+            return (new WasapiAudioPlayer(
+                items, info, decoder, output, provider, playbackProvider, device, selectedFormat), info);
+        }
+        catch
+        {
+            device.Dispose();
+            throw;
+        }
+    }
 
-            _process.Dispose();
+    /// <summary>Creates a single-track exclusive-mode WASAPI playback session.</summary>
+    /// <param name="filePath">Local path or supported stream URL.</param>
+    /// <param name="deviceId">MMDevice identifier of the output device.</param>
+    /// <param name="cancellationToken">Cancellation token for initial probing and decoder startup.</param>
+    /// <returns>The player and technical information for the track.</returns>
+    public static Task<(WasapiAudioPlayer AudioPlayer, AudioFileInfo Info)> CreateAsync(
+        string filePath,
+        string deviceId,
+        CancellationToken cancellationToken = default) =>
+        CreateAsync([new GaplessPlaybackItem(filePath, 1.0f)], deviceId, cancellationToken);
+
+    /// <inheritdoc/>
+    public void Pause() => _playbackProvider.IsPaused = true;
+    /// <inheritdoc/>
+    public void Resume() => _playbackProvider.IsPaused = false;
+    /// <inheritdoc/>
+    public async Task SeekAsync(TimeSpan position)
+    {
+        position = position < TimeSpan.Zero
+            ? TimeSpan.Zero
+            : position > Duration ? Duration : position;
+        var replacement = await FfmpegPcmDecoder.CreateAsync(
+            CurrentFilePath,
+            CurrentInfo.OutputSampleRate,
+            _selectedFormat.FfmpegSampleFormat,
+            _selectedFormat.FfmpegCodec,
+            position,
+            _cts.Token).ConfigureAwait(false);
+        await _decoderGate.WaitAsync(_cts.Token).ConfigureAwait(false);
+        try
+        {
+            _activeDecoder?.Dispose();
+            _activeDecoder = replacement;
+            Interlocked.Increment(ref _decoderGeneration);
+            var audibleIndex = Volatile.Read(ref _audibleTrackIndex);
+            _writeTrackIndex = audibleIndex;
+            Volatile.Write(ref _trackStartFrames[audibleIndex], 0);
+            Volatile.Write(ref _restartPreparedFromIndex, audibleIndex);
             _bufferedProvider.ClearBuffer();
-            _process = StartFfmpeg(_filePath, _info.OutputSampleRate, _selectedFormat, position);
-            Interlocked.Exchange(ref _framesWritten, (long)(position.TotalSeconds * _info.OutputSampleRate));
+            Interlocked.Exchange(ref _totalFramesWritten, 0);
+            Interlocked.Exchange(
+                ref _positionOffsetFrames,
+                (long)(position.TotalSeconds * CurrentInfo.OutputSampleRate));
         }
         finally
         {
-            _processGate.Release();
+            _decoderGate.Release();
         }
     }
-
+    /// <inheritdoc/>
     public async Task WaitForCompletionAsync() => await _pumpTask.ConfigureAwait(false);
 
+    /// <inheritdoc/>
     public void Dispose()
     {
         if (_disposed)
-        {
             return;
-        }
-
         _cts.Cancel();
-        if (!_process.HasExited)
-        {
-            _process.Kill(entireProcessTree: true);
-        }
-
-        try
-        {
-            _pumpTask.Wait(TimeSpan.FromSeconds(1));
-        }
-        catch (AggregateException)
-        {
-        }
-
+        try { _pumpTask.Wait(TimeSpan.FromSeconds(1)); } catch (AggregateException) { }
         _output.Stop();
         _output.Dispose();
-        _process.Dispose();
         _device.Dispose();
         _cts.Dispose();
-        _processGate.Dispose();
+        _decoderGate.Dispose();
         _disposed = true;
     }
 
-    private async Task PumpAsync()
+    private async Task PumpAsync(FfmpegPcmDecoder firstDecoder)
     {
         var buffer = new byte[64 * 1024];
-        while (!_cts.IsCancellationRequested)
+        var remainderBytes = 0;
+        Task<(FfmpegPcmDecoder Decoder, AudioFileInfo Info)>? preparedNext = PrepareTrackAsync(1);
+
+        try
         {
-            await _processGate.WaitAsync(_cts.Token).ConfigureAwait(false);
-            try
+            while (!_cts.IsCancellationRequested)
             {
-                var bytesRead = await _process.StandardOutput.BaseStream.ReadAsync(buffer, _cts.Token).ConfigureAwait(false);
+                var restartIndex = Interlocked.Exchange(ref _restartPreparedFromIndex, -1);
+                if (restartIndex >= 0)
+                {
+                    if (preparedNext is not null)
+                        _ = DisposePreparedAsync(preparedNext);
+                    preparedNext = PrepareTrackAsync(restartIndex + 1);
+                    remainderBytes = 0;
+                }
+
+                await _decoderGate.WaitAsync(_cts.Token).ConfigureAwait(false);
+                int bytesRead;
+                var decoderGeneration = Volatile.Read(ref _decoderGeneration);
+                try
+                {
+                    bytesRead = await _activeDecoder!.ReadAsync(
+                        buffer.AsMemory(remainderBytes),
+                        _cts.Token).ConfigureAwait(false);
+                }
+                finally
+                {
+                    _decoderGate.Release();
+                }
+                if (decoderGeneration != Volatile.Read(ref _decoderGeneration))
+                {
+                    remainderBytes = 0;
+                    continue;
+                }
                 if (bytesRead == 0)
                 {
-                    if (_process.HasExited)
-                    {
+                    remainderBytes = 0;
+                    _activeDecoder?.Dispose();
+                    var nextIndex = _writeTrackIndex + 1;
+                    if (nextIndex >= _items.Count || preparedNext is null)
                         break;
-                    }
 
+                    var prepared = await preparedNext.ConfigureAwait(false);
+                    _writeTrackIndex = nextIndex;
+                    Volatile.Write(ref _trackStartFrames[nextIndex], Interlocked.Read(ref _totalFramesWritten));
+                    _infos[nextIndex] = prepared.Info;
+                    _activeDecoder = prepared.Decoder;
+                    Interlocked.Exchange(ref _positionOffsetFrames, 0);
+                    preparedNext = PrepareTrackAsync(nextIndex + 1);
                     continue;
                 }
 
+                var totalBytes = remainderBytes + bytesRead;
+                bytesRead = totalBytes - (totalBytes % _selectedFormat.BytesPerFrame);
+                remainderBytes = totalBytes - bytesRead;
+                ApplyReplayGain(buffer.AsSpan(0, bytesRead), _items[_writeTrackIndex].ReplayGainFactor);
                 var offset = 0;
-                ApplyVolumeIfNeeded(buffer.AsSpan(0, bytesRead));
                 while (offset < bytesRead && !_cts.IsCancellationRequested)
                 {
                     var writable = _bufferedProvider.BufferLength - _bufferedProvider.BufferedBytes;
                     if (writable <= 0)
                     {
+                        UpdateAudibleTrack();
                         await Task.Delay(2, _cts.Token).ConfigureAwait(false);
                         continue;
                     }
 
                     var toWrite = Math.Min(writable, bytesRead - offset);
+                    toWrite -= toWrite % _selectedFormat.BytesPerFrame;
+                    if (toWrite == 0)
+                        continue;
                     _bufferedProvider.AddSamples(buffer, offset, toWrite);
                     offset += toWrite;
                 }
 
-                Interlocked.Add(ref _framesWritten, bytesRead / _selectedFormat.BytesPerFrame);
+                Interlocked.Add(ref _totalFramesWritten, bytesRead / _selectedFormat.BytesPerFrame);
+                if (remainderBytes > 0)
+                    buffer.AsSpan(bytesRead, remainderBytes).CopyTo(buffer);
+                UpdateAudibleTrack();
             }
-            finally
+
+            while (_bufferedProvider.BufferedBytes > 0 && !_cts.IsCancellationRequested)
             {
-                _processGate.Release();
+                UpdateAudibleTrack();
+                await Task.Delay(5, _cts.Token).ConfigureAwait(false);
+            }
+            UpdateAudibleTrack();
+        }
+        finally
+        {
+            _activeDecoder?.Dispose();
+            if (preparedNext is not null)
+            {
+                try
+                {
+                    var prepared = await preparedNext.ConfigureAwait(false);
+                    prepared.Decoder.Dispose();
+                }
+                catch (OperationCanceledException)
+                {
+                }
+                catch
+                {
+                }
             }
         }
+    }
 
-        while (_bufferedProvider.BufferedBytes > 0 && !_cts.IsCancellationRequested)
+    private Task<(FfmpegPcmDecoder Decoder, AudioFileInfo Info)>? PrepareTrackAsync(int index) =>
+        index >= _items.Count ? null : PrepareAsync(index);
+
+    private async Task<(FfmpegPcmDecoder Decoder, AudioFileInfo Info)> PrepareAsync(int index)
+    {
+        var info = await ProbeAsync(_items[index].FilePath, _cts.Token).ConfigureAwait(false);
+        var decoder = await FfmpegPcmDecoder.CreateAsync(
+            _items[index].FilePath,
+            _selectedFormat.Format.SampleRate,
+            _selectedFormat.FfmpegSampleFormat,
+            _selectedFormat.FfmpegCodec,
+            TimeSpan.Zero,
+            _cts.Token).ConfigureAwait(false);
+        return (decoder, info with { OutputSampleRate = _selectedFormat.Format.SampleRate });
+    }
+
+    private void UpdateAudibleTrack()
+    {
+        lock (_stateLock)
         {
-            await Task.Delay(10, _cts.Token).ConfigureAwait(false);
+            var bufferedFrames = _bufferedProvider.BufferedBytes / _selectedFormat.BytesPerFrame;
+            var playedFrames = Math.Max(0, Interlocked.Read(ref _totalFramesWritten) - bufferedFrames);
+            while (_audibleTrackIndex < _writeTrackIndex &&
+                   playedFrames >= Volatile.Read(ref _trackStartFrames[_audibleTrackIndex + 1]))
+            {
+                _audibleTrackIndex++;
+                ReplayGainFactor = _items[_audibleTrackIndex].ReplayGainFactor;
+                TrackChanged?.Invoke(
+                    this,
+                    new GaplessTrackChangedEventArgs(
+                        _items[_audibleTrackIndex].FilePath,
+                        _infos[_audibleTrackIndex]!));
+            }
+        }
+    }
+
+    private void ApplyReplayGain(Span<byte> bytes, float trackReplayGain)
+    {
+        var factor = trackReplayGain;
+        if (Math.Abs(factor - 1.0f) < 0.0001f)
+            return;
+
+        if (_selectedFormat.FfmpegSampleFormat == "f32le")
+        {
+            var samples = MemoryMarshal.Cast<byte, float>(bytes);
+            for (var index = 0; index < samples.Length; index++)
+                samples[index] = Math.Clamp(samples[index] * factor, -1.0f, 1.0f);
+        }
+        else if (_selectedFormat.FfmpegSampleFormat == "s16le")
+        {
+            var samples = MemoryMarshal.Cast<byte, short>(bytes);
+            for (var index = 0; index < samples.Length; index++)
+                samples[index] = (short)Math.Clamp(samples[index] * factor, short.MinValue, short.MaxValue);
+        }
+        else
+        {
+            var samples = MemoryMarshal.Cast<byte, int>(bytes);
+            for (var index = 0; index < samples.Length; index++)
+                samples[index] = (int)Math.Clamp(samples[index] * (double)factor, int.MinValue, int.MaxValue);
+        }
+    }
+
+    private static async Task DisposePreparedAsync(
+        Task<(FfmpegPcmDecoder Decoder, AudioFileInfo Info)> preparedTask)
+    {
+        try
+        {
+            var prepared = await preparedTask.ConfigureAwait(false);
+            prepared.Decoder.Dispose();
+        }
+        catch
+        {
         }
     }
 
     private static async Task<AudioFileInfo> ProbeAsync(string filePath, CancellationToken cancellationToken)
     {
-        var startInfo = new ProcessStartInfo
+        using var process = Process.Start(new ProcessStartInfo
         {
             FileName = "ffprobe",
             Arguments = $"-v error -select_streams a:0 -show_entries stream=codec_name,sample_rate,channels,duration -of json \"{filePath}\"",
@@ -220,34 +405,23 @@ public sealed class WasapiAudioPlayer : IAudioPlayer
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true
-        };
-
-        using var process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException("ffprobe konnte nicht gestartet werden.");
-
+        }) ?? throw new InvalidOperationException("ffprobe konnte nicht gestartet werden.");
         var json = await process.StandardOutput.ReadToEndAsync(cancellationToken);
         await process.WaitForExitAsync(cancellationToken);
-        if (process.ExitCode != 0)
-        {
-            var error = await process.StandardError.ReadToEndAsync(cancellationToken);
-            throw new InvalidOperationException($"Datei konnte nicht analysiert werden: {error}");
-        }
-
         using var document = JsonDocument.Parse(json);
         var stream = document.RootElement.GetProperty("streams")[0];
-        var codecName = stream.GetProperty("codec_name").GetString() ?? "unknown";
-        var sampleRate = int.Parse(stream.GetProperty("sample_rate").GetString() ?? "0", CultureInfo.InvariantCulture);
+        var codec = stream.GetProperty("codec_name").GetString() ?? "unknown";
+        var rate = int.Parse(stream.GetProperty("sample_rate").GetString() ?? "0", CultureInfo.InvariantCulture);
         var channels = stream.GetProperty("channels").GetInt32();
-        var isDsd = codecName.Contains("dsd", StringComparison.OrdinalIgnoreCase);
+        var isDsd = codec.Contains("dsd", StringComparison.OrdinalIgnoreCase);
         var duration = stream.TryGetProperty("duration", out var durationJson)
             ? ParseDuration(durationJson)
             : 0;
-
         return new AudioFileInfo(
-            codecName,
-            sampleRate,
+            codec,
+            rate,
             channels,
-            NormalizePcmRate(sampleRate),
+            NormalizePcmRate(rate),
             isDsd,
             Path.GetExtension(filePath).TrimStart('.').ToLowerInvariant(),
             TimeSpan.FromSeconds(duration));
@@ -266,40 +440,11 @@ public sealed class WasapiAudioPlayer : IAudioPlayer
             : 0;
     }
 
-    private void ApplyVolumeIfNeeded(Span<byte> bytes)
-    {
-        var factor = Volume * ReplayGainFactor;
-        if (Math.Abs(factor - 1.0f) < 0.0001f)
-        {
-            return;
-        }
-
-        if (_selectedFormat.FfmpegSampleFormat == "f32le")
-        {
-            var samples = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, float>(bytes);
-            for (var index = 0; index < samples.Length; index++)
-                samples[index] = Math.Clamp(samples[index] * factor, -1.0f, 1.0f);
-        }
-        else if (_selectedFormat.FfmpegSampleFormat == "s16le")
-        {
-            var samples = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, short>(bytes);
-            for (var index = 0; index < samples.Length; index++)
-                samples[index] = (short)Math.Clamp(samples[index] * factor, short.MinValue, short.MaxValue);
-        }
-        else
-        {
-            var samples = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, int>(bytes);
-            for (var index = 0; index < samples.Length; index++)
-                samples[index] = (int)Math.Clamp(samples[index] * (double)factor, int.MinValue, int.MaxValue);
-        }
-    }
-
     private static WasapiSelectedFormat ChooseExclusiveFormat(MMDevice device, AudioFileInfo info)
     {
         var sampleRates = info.IsDsd
             ? new[] { 176_400, 88_200, 44_100, 192_000, 96_000, 48_000 }
             : new[] { info.OutputSampleRate };
-
         foreach (var sampleRate in sampleRates)
         {
             WasapiSelectedFormat[] candidates =
@@ -308,41 +453,13 @@ public sealed class WasapiAudioPlayer : IAudioPlayer
                 new(new WaveFormatExtensible(sampleRate, 24, 2), "s32le", "pcm_s32le", sizeof(int) * 2),
                 new(new WaveFormat(sampleRate, 16, 2), "s16le", "pcm_s16le", sizeof(short) * 2)
             ];
-
             foreach (var candidate in candidates)
-            {
                 if (device.AudioClient.IsFormatSupported(AudioClientShareMode.Exclusive, candidate.Format))
-                {
                     return candidate;
-                }
-            }
         }
 
-        device.Dispose();
-        var requestedRates = string.Join(", ", sampleRates.Select(rate => $"{rate:N0} Hz"));
-        throw new NotSupportedException(
-            $"Das WASAPI-Gerät unterstützt keine geeignete Stereo-PCM-Ausgabe im exklusiven Modus ({requestedRates}).");
+        throw new NotSupportedException("Das WASAPI-Gerät unterstützt keine geeignete Stereo-PCM-Ausgabe im exklusiven Modus.");
     }
-
-    private static Process StartFfmpeg(string filePath, int outputSampleRate, WasapiSelectedFormat format, TimeSpan position)
-    {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = "ffmpeg",
-            Arguments = $"-v error -ss {position.TotalSeconds.ToString(CultureInfo.InvariantCulture)} -i \"{filePath}\" -vn -f {format.FfmpegSampleFormat} -acodec {format.FfmpegCodec} -ac 2 -ar {outputSampleRate} pipe:1",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-
-        return Process.Start(startInfo)
-            ?? throw new InvalidOperationException("ffmpeg konnte nicht gestartet werden.");
-    }
-
-    private TimeSpan Clamp(TimeSpan value) =>
-        value < TimeSpan.Zero ? TimeSpan.Zero :
-        value > Duration ? Duration : value;
 
     private sealed record WasapiSelectedFormat(
         WaveFormat Format,
@@ -353,22 +470,12 @@ public sealed class WasapiAudioPlayer : IAudioPlayer
     private sealed class PausableWaveProvider(IWaveProvider source) : IWaveProvider
     {
         private volatile bool _isPaused;
-
         public WaveFormat WaveFormat => source.WaveFormat;
-
-        public bool IsPaused
-        {
-            get => _isPaused;
-            set => _isPaused = value;
-        }
-
+        public bool IsPaused { get => _isPaused; set => _isPaused = value; }
         public int Read(byte[] buffer, int offset, int count)
         {
             if (!_isPaused)
-            {
                 return source.Read(buffer, offset, count);
-            }
-
             Array.Clear(buffer, offset, count);
             return count;
         }

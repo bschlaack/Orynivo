@@ -46,9 +46,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   missing local files and HTTP/HTTPS entries are retained, while URLs carrying
   user-info credentials or Plex tokens are skipped. Smart playlists remain
   live and are not exported as static M3U8 files.
+- Added gapless playback for sequential PCM queues through ASIO, cwASIO, and
+  exclusive WASAPI. The next FFmpeg decoder is started and prefetched while
+  the current track is playing, then continues through the existing device
+  session. Transport metadata, ReplayGain, and playback history follow the
+  audible buffered-frame boundary. Shuffle and native ASIO DSD retain
+  title-by-title playback.
 
 ### Fixed
 
+- Restored seek-slider dragging and track-position clicks during multi-track
+  gapless PCM playback. Seeking now clears buffered output, restarts the
+  current decoder at the selected position, and prepares the following track
+  again. User-volume changes are applied at the live ASIO/WASAPI output stage
+  instead of being delayed by already prefetched PCM samples.
+- Synchronized the WASAPI transport volume bidirectionally with the selected
+  Windows output device. Changes made through Windows now update the displayed
+  slider and percentage. The custom position-slider thumb also uses an
+  explicit two-way value binding and handled pointer-release routing, restoring
+  dragging as well as direct track clicks.
 - Restored sidebar context menus for personal radio stations, pinned podcasts,
   regular playlists, and smart playlists. Dynamic entries now use Avalonia
   `MenuFlyout` instances opened at the pointer position. Right-button presses
