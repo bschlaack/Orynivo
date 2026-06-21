@@ -132,6 +132,7 @@ public sealed record ArtworkPaths(string? OriginalPath, string? Thumb96Path, str
 /// <summary>Minimal track row for list-based views that do not need cover art or lyrics text.</summary>
 public sealed record TrackLite(
     string  Path,
+    string  SourcePath,
     string  FileName,
     string? Title,
     int?    DiscNumber,
@@ -269,7 +270,8 @@ public sealed class AudioDatabase : IDisposable
             cmd.Transaction = tx;
             cmd.CommandText = """
             INSERT INTO tracks (
-                path, file_name, file_size, modified_at, added_at,
+                path, source_path, cue_path, segment_start, segment_end,
+                file_name, file_size, modified_at, added_at,
                 format, duration, sample_rate, bit_depth, channels,
                 bitrate, is_lossless, is_dsd, dsd_rate,
                 title, sort_title, artist, sort_artist,
@@ -285,7 +287,8 @@ public sealed class AudioDatabase : IDisposable
                 has_cover, cover_mime_type, cover_data,
                 artist_id, album_id
             ) VALUES (
-                $path, $file_name, $file_size, $modified_at, $added_at,
+                $path, $source_path, $cue_path, $segment_start, $segment_end,
+                $file_name, $file_size, $modified_at, $added_at,
                 $format, $duration, $sample_rate, $bit_depth, $channels,
                 $bitrate, $is_lossless, $is_dsd, $dsd_rate,
                 $title, $sort_title, $artist, $sort_artist,
@@ -302,6 +305,10 @@ public sealed class AudioDatabase : IDisposable
                 $artist_id, $album_id
             )
             ON CONFLICT(path) DO UPDATE SET
+                source_path         = excluded.source_path,
+                cue_path            = excluded.cue_path,
+                segment_start       = excluded.segment_start,
+                segment_end         = excluded.segment_end,
                 file_name           = excluded.file_name,
                 file_size           = excluded.file_size,
                 modified_at         = excluded.modified_at,
@@ -1552,16 +1559,17 @@ public sealed class AudioDatabase : IDisposable
     {
         using var cmd = _conn.CreateCommand();
         cmd.CommandText =
-            "SELECT path, file_name, title, disc_number, track_number FROM tracks ORDER BY path;";
+            "SELECT path, COALESCE(source_path, path), file_name, title, disc_number, track_number FROM tracks ORDER BY COALESCE(source_path, path), track_number;";
         using var reader = cmd.ExecuteReader();
         var result = new List<TrackLite>();
         while (reader.Read())
             result.Add(new TrackLite(
                 reader.GetString(0),
                 reader.GetString(1),
-                reader.IsDBNull(2) ? null : reader.GetString(2),
-                reader.IsDBNull(3) ? null : (int?)reader.GetInt64(3),
-                reader.IsDBNull(4) ? null : (int?)reader.GetInt64(4)));
+                reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetString(3),
+                reader.IsDBNull(4) ? null : (int?)reader.GetInt64(4),
+                reader.IsDBNull(5) ? null : (int?)reader.GetInt64(5)));
         return result;
     }
 
@@ -1573,8 +1581,8 @@ public sealed class AudioDatabase : IDisposable
             System.IO.Path.AltDirectorySeparatorChar) + System.IO.Path.DirectorySeparatorChar;
         using var cmd = _conn.CreateCommand();
         cmd.CommandText =
-            "SELECT path, file_name, title, disc_number, track_number " +
-            "FROM tracks WHERE path LIKE $prefix || '%' " +
+            "SELECT path, COALESCE(source_path, path), file_name, title, disc_number, track_number " +
+            "FROM tracks WHERE COALESCE(source_path, path) LIKE $prefix || '%' " +
             "ORDER BY disc_number, track_number, file_name;";
         cmd.Parameters.AddWithValue("$prefix", prefix);
         using var reader = cmd.ExecuteReader();
@@ -1582,15 +1590,17 @@ public sealed class AudioDatabase : IDisposable
         while (reader.Read())
         {
             var path = reader.GetString(0);
-            if (!string.Equals(System.IO.Path.GetDirectoryName(path), dirPath,
+            var sourcePath = reader.GetString(1);
+            if (!string.Equals(System.IO.Path.GetDirectoryName(sourcePath), dirPath,
                                StringComparison.OrdinalIgnoreCase))
                 continue;
             result.Add(new TrackLite(
                 path,
-                reader.GetString(1),
-                reader.IsDBNull(2) ? null : reader.GetString(2),
-                reader.IsDBNull(3) ? null : (int?)reader.GetInt64(3),
-                reader.IsDBNull(4) ? null : (int?)reader.GetInt64(4)));
+                sourcePath,
+                reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetString(3),
+                reader.IsDBNull(4) ? null : (int?)reader.GetInt64(4),
+                reader.IsDBNull(5) ? null : (int?)reader.GetInt64(5)));
         }
         return result;
     }
@@ -1602,7 +1612,7 @@ public sealed class AudioDatabase : IDisposable
             System.IO.Path.DirectorySeparatorChar,
             System.IO.Path.AltDirectorySeparatorChar) + System.IO.Path.DirectorySeparatorChar;
         using var cmd = _conn.CreateCommand();
-        cmd.CommandText = "SELECT path FROM tracks WHERE path LIKE $prefix || '%' ORDER BY path;";
+        cmd.CommandText = "SELECT path FROM tracks WHERE COALESCE(source_path, path) LIKE $prefix || '%' ORDER BY path;";
         cmd.Parameters.AddWithValue("$prefix", prefix);
         using var reader = cmd.ExecuteReader();
         var result = new List<string>();
@@ -1617,7 +1627,7 @@ public sealed class AudioDatabase : IDisposable
     public Dictionary<string, long> GetPathTimestamps()
     {
         using var cmd = _conn.CreateCommand();
-        cmd.CommandText = "SELECT path, modified_at FROM tracks;";
+        cmd.CommandText = "SELECT path, modified_at FROM tracks WHERE cue_path IS NULL;";
         using var reader = cmd.ExecuteReader();
         var result = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
         while (reader.Read())
@@ -1630,7 +1640,7 @@ public sealed class AudioDatabase : IDisposable
         var prefix = rootPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
                      + Path.DirectorySeparatorChar;
         using var cmd = _conn.CreateCommand();
-        cmd.CommandText = "SELECT COUNT(*) FROM tracks WHERE path LIKE $prefix || '%';";
+        cmd.CommandText = "SELECT COUNT(*) FROM tracks WHERE COALESCE(source_path, path) LIKE $prefix || '%';";
         cmd.Parameters.AddWithValue("$prefix", prefix);
         return Convert.ToInt32(cmd.ExecuteScalar());
     }
@@ -1644,6 +1654,61 @@ public sealed class AudioDatabase : IDisposable
         cmd.CommandText = "DELETE FROM tracks WHERE path = $path;";
         cmd.Parameters.AddWithValue("$path", path);
         return cmd.ExecuteNonQuery() > 0;
+    }
+
+    public int DeleteCueTracks(string cuePath, IReadOnlyCollection<string>? exceptPaths = null)
+    {
+        using var cmd = _conn.CreateCommand();
+        var exclusion = string.Empty;
+        if (exceptPaths is { Count: > 0 })
+        {
+            var parameters = exceptPaths.Select((path, index) =>
+            {
+                var name = $"$keep{index}";
+                Add(cmd, name, path);
+                return name;
+            }).ToList();
+            exclusion = $" AND path NOT IN ({string.Join(", ", parameters)})";
+        }
+        cmd.CommandText = $"DELETE FROM tracks WHERE cue_path = $cue_path{exclusion};";
+        Add(cmd, "$cue_path", cuePath);
+        return cmd.ExecuteNonQuery();
+    }
+
+    public List<string> GetTrackPathsByCue(string cuePath)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = "SELECT path FROM tracks WHERE cue_path = $cue_path;";
+        Add(cmd, "$cue_path", cuePath);
+        using var reader = cmd.ExecuteReader();
+        var result = new List<string>();
+        while (reader.Read())
+            result.Add(reader.GetString(0));
+        return result;
+    }
+
+    public string? GetSourcePath(string path)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = "SELECT COALESCE(source_path, path) FROM tracks WHERE path = $path LIMIT 1;";
+        Add(cmd, "$path", path);
+        return cmd.ExecuteScalar() as string;
+    }
+
+    public List<string> GetCuePathsForSource(string sourcePath)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT DISTINCT cue_path
+            FROM tracks
+            WHERE source_path = $source_path AND cue_path IS NOT NULL;
+            """;
+        Add(cmd, "$source_path", sourcePath);
+        using var reader = cmd.ExecuteReader();
+        var result = new List<string>();
+        while (reader.Read())
+            result.Add(reader.GetString(0));
+        return result;
     }
 
     // ------------------------------------------------------------------
@@ -1748,6 +1813,13 @@ public sealed class AudioDatabase : IDisposable
         EnsureColumn("tracks", "artist_id", "INTEGER REFERENCES artists(id)");
         EnsureColumn("tracks", "album_id", "INTEGER REFERENCES albums(id)");
         EnsureColumn("tracks", "is_favorite", "INTEGER NOT NULL DEFAULT 0");
+        EnsureColumn("tracks", "source_path", "TEXT");
+        EnsureColumn("tracks", "cue_path", "TEXT");
+        EnsureColumn("tracks", "segment_start", "REAL");
+        EnsureColumn("tracks", "segment_end", "REAL");
+        Execute("UPDATE tracks SET source_path = path WHERE source_path IS NULL OR source_path = '';");
+        Execute("CREATE INDEX IF NOT EXISTS idx_tracks_source_path ON tracks (source_path);");
+        Execute("CREATE INDEX IF NOT EXISTS idx_tracks_cue_path ON tracks (cue_path);");
         EnsureColumn("tracks", "downloaded_lyrics", "TEXT");
         EnsureColumn("tracks", "synced_lyrics", "TEXT");
         EnsureColumn("tracks", "lyrics_source", "TEXT");
@@ -2822,6 +2894,10 @@ public sealed class AudioDatabase : IDisposable
     private static void BindTrack(SqliteCommand cmd, TrackRecord t)
     {
         Add(cmd, "$path",                   t.Path);
+        Add(cmd, "$source_path",            string.IsNullOrWhiteSpace(t.SourcePath) ? t.Path : t.SourcePath);
+        Add(cmd, "$cue_path",               (object?)t.CuePath ?? DBNull.Value);
+        Add(cmd, "$segment_start",          (object?)t.SegmentStart ?? DBNull.Value);
+        Add(cmd, "$segment_end",            (object?)t.SegmentEnd ?? DBNull.Value);
         Add(cmd, "$file_name",              t.FileName);
         Add(cmd, "$file_size",              (object?)t.FileSize ?? DBNull.Value);
         Add(cmd, "$modified_at",            t.ModifiedAt);
@@ -2882,6 +2958,10 @@ public sealed class AudioDatabase : IDisposable
         {
             Id                    = r.GetInt64(r.GetOrdinal("id")),
             Path                  = r.GetString(r.GetOrdinal("path")),
+            SourcePath            = NullableString(r, "source_path") ?? r.GetString(r.GetOrdinal("path")),
+            CuePath               = NullableString(r, "cue_path"),
+            SegmentStart          = NullableDouble(r, "segment_start"),
+            SegmentEnd            = NullableDouble(r, "segment_end"),
             FileName              = r.GetString(r.GetOrdinal("file_name")),
             FileSize              = NullableLong(r, "file_size"),
             ModifiedAt            = r.GetInt64(r.GetOrdinal("modified_at")),

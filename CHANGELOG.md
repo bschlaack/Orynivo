@@ -4,6 +4,18 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Added CUE-sheet support for large FLAC/WAV images. Library scans expose CUE
+  entries as independently searchable virtual tracks with their own metadata,
+  queue identity, playback-history records, and persisted queue positions.
+  ASIO PCM and exclusive WASAPI playback seek into the shared source file and
+  stop at each track's CUE boundary without creating split files.
+
+### Fixed
+
 ## [0.8.0] - 2026-06-21
 
 ### Added

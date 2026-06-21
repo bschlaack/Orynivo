@@ -111,6 +111,7 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   preservation, HTTP/HTTPS entries, and rejection of credential-bearing URLs
 - `Orynivo/Library/AudioDatabase.cs`: SQLite database layer through `Microsoft.Data.Sqlite`; database at `%LOCALAPPDATA%\Orynivo\library.db`
 - `Orynivo/Library/LibraryScanner.cs`: directory scanner using TagLibSharp; writes through `AudioDatabase.Upsert()`, reports progress, and supports cancellation
+- `Orynivo/Library/CueSheetParser.cs`: parses UTF-8 or legacy-encoded CUE sheets and creates stable virtual track paths with physical source paths and segment boundaries
 - `Orynivo/Library/LibraryWatcherService.cs`: owns one recursive
   `FileSystemWatcher` per available configured library root, debounces paths for
   900 ms, applies incremental create/change/rename/delete updates, and runs a
@@ -132,6 +133,10 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 
 - SQLite through `Microsoft.Data.Sqlite`; no server process is required
 - `tracks` stores file paths, tags, technical metadata, and references to normalized `artists` and `albums`
+- CUE-defined tracks use a stable `cue://` path while `source_path`, `cue_path`,
+  `segment_start`, and `segment_end` identify the shared FLAC/WAV source and
+  playback range. The referenced source file is not also exposed as a duplicate
+  whole-file track.
 - `artists` contains stable artist IDs plus cached profile biography, image path, source URL, language, and fetch timestamp
 - `artists`, `albums`, and `tracks` each have a direct `is_favorite` flag
 - `albums` contains stable album IDs (`id`, `title`, `artist_id`, `year`, `artwork_id`, `is_favorite`)
@@ -164,6 +169,11 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   remove missing paths from both SQLite and Lucene, covering lost or overflowed
   file-system events.
 - Metadata extraction supports ID3v1/v2, Vorbis Comments, APE tags, and embedded artwork
+- Library scans include `.cue` files. CUE `FILE`, `TRACK`, `INDEX 01`, `TITLE`,
+  `PERFORMER`, `REM GENRE`, and `REM DATE` metadata produces independently
+  searchable and queueable virtual tracks. PCM playback seeks and stops FFmpeg
+  at the stored segment boundaries; queue persistence and playback history keep
+  the virtual path so tracks sharing one source remain distinct.
 - Metadata extraction stores track and album ReplayGain values. The first scan of each configured root after ReplayGain support was added refreshes unchanged tracks once so existing libraries receive those values.
 - Opening the database runs a legacy-data migration that normalizes artists, albums, and artwork and removes old per-track artwork BLOBs
 - `album_artist_rebuild_v1` rebuilds album assignments strictly from `album_artist` so compilations are not split by track artist

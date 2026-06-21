@@ -29,7 +29,7 @@ public static class LibraryScanner
     private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".dsf", ".dff", ".flac", ".mp3", ".wav", ".aiff", ".aif",
-        ".m4a", ".aac", ".ogg", ".opus", ".wma"
+        ".m4a", ".aac", ".ogg", ".opus", ".wma", ".cue"
     };
 
     /// <summary>
@@ -153,12 +153,31 @@ public static class LibraryScanner
         IProgress<ScanProgress>? progress,
         CancellationToken ct)
     {
-        var files = Directory
+        var discoveredFiles = Directory
             .EnumerateFiles(rootPath, "*.*", SearchOption.AllDirectories)
             .Where(f => SupportedExtensions.Contains(Path.GetExtension(f)))
+            .Select(Path.GetFullPath)
+            .ToList();
+        var cueFiles = discoveredFiles
+            .Where(path => Path.GetExtension(path).Equals(".cue", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        var cueDefinitions = cueFiles
+            .SelectMany(path =>
+            {
+                try { return CueSheetParser.Parse(path); }
+                catch { return []; }
+            })
+            .Where(definition => System.IO.File.Exists(definition.SourcePath))
+            .ToList();
+        var cueSources = cueDefinitions
+            .Select(definition => definition.SourcePath)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var files = discoveredFiles
+            .Where(path => !Path.GetExtension(path).Equals(".cue", StringComparison.OrdinalIgnoreCase))
+            .Where(path => !cueSources.Contains(path))
             .ToList();
 
-        int total = files.Count;
+        int total = files.Count + cueFiles.Count;
         int added = 0;
         int updated = 0;
         int failed = 0;
@@ -198,9 +217,38 @@ public static class LibraryScanner
             }
         }
 
+        foreach (var cueGroup in cueDefinitions.GroupBy(definition => definition.CuePath, StringComparer.OrdinalIgnoreCase))
+        {
+            ct.ThrowIfCancellationRequested();
+            progress?.Report(new ScanProgress(files.Count + 1, total, cueGroup.Key));
+            try
+            {
+                var records = BuildCueRecords(cueGroup.Key, cueGroup.ToList(), now);
+                foreach (var record in records)
+                {
+                    var isNew = db.GetByPath(record.Path) is null;
+                    db.Upsert(record);
+                    changedTracks.Add(db.GetByPath(record.Path) ?? record);
+                    if (isNew) added++; else updated++;
+                }
+                var staleCuePaths = db.GetTrackPathsByCue(cueGroup.Key)
+                    .Except(records.Select(record => record.Path), StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                db.DeleteCueTracks(cueGroup.Key, records.Select(record => record.Path).ToList());
+                if (staleCuePaths.Count > 0)
+                    TrackSearchIndex.RemovePaths(staleCuePaths);
+            }
+            catch
+            {
+                failed++;
+            }
+        }
+
         if (changedTracks.Count > 0)
             TrackSearchIndex.UpdateMany(changedTracks);
-        var existing = new HashSet<string>(files, StringComparer.OrdinalIgnoreCase);
+        var existing = new HashSet<string>(
+            files.Concat(cueDefinitions.Select(definition => definition.VirtualPath)),
+            StringComparer.OrdinalIgnoreCase);
         var missingPaths = db.GetTrackPathsUnderDirectory(rootPath)
             .Where(path => !existing.Contains(path))
             .ToList();
@@ -208,7 +256,7 @@ public static class LibraryScanner
             db.Delete(missingPath);
         if (missingPaths.Count > 0)
             TrackSearchIndex.RemovePaths(missingPaths);
-        TrackSearchIndex.RemoveMissingUnderRoot(rootPath, files);
+        TrackSearchIndex.RemoveMissingUnderRoot(rootPath, existing);
         if (refreshReplayGainMetadata)
             db.MarkReplayGainMetadataScanned(rootPath);
 
@@ -227,6 +275,58 @@ public static class LibraryScanner
         foreach (var path in paths)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (Path.GetExtension(path).Equals(".cue", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!System.IO.File.Exists(path))
+                {
+                    var removedCuePaths = db.GetTrackPathsByCue(path);
+                    db.DeleteCueTracks(path);
+                    removedPaths.AddRange(removedCuePaths);
+                    continue;
+                }
+
+                var definitions = CueSheetParser.Parse(path)
+                    .Where(definition => System.IO.File.Exists(definition.SourcePath))
+                    .ToList();
+                var records = BuildCueRecords(path, definitions, now);
+                foreach (var cueRecord in records)
+                {
+                    db.Upsert(cueRecord);
+                    updatedTracks.Add(db.GetByPath(cueRecord.Path) ?? cueRecord);
+                }
+                var staleCuePaths = db.GetTrackPathsByCue(path)
+                    .Except(records.Select(record => record.Path), StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                db.DeleteCueTracks(path, records.Select(record => record.Path).ToList());
+                removedPaths.AddRange(staleCuePaths);
+                continue;
+            }
+
+            var relatedCuePaths = db.GetCuePathsForSource(path);
+            if (relatedCuePaths.Count > 0)
+            {
+                foreach (var cuePath in relatedCuePaths)
+                {
+                    var definitions = System.IO.File.Exists(cuePath)
+                        ? CueSheetParser.Parse(cuePath)
+                            .Where(definition => System.IO.File.Exists(definition.SourcePath))
+                            .ToList()
+                        : [];
+                    var records = BuildCueRecords(cuePath, definitions, now);
+                    foreach (var cueRecord in records)
+                    {
+                        db.Upsert(cueRecord);
+                        updatedTracks.Add(db.GetByPath(cueRecord.Path) ?? cueRecord);
+                    }
+                    var staleCuePaths = db.GetTrackPathsByCue(cuePath)
+                        .Except(records.Select(record => record.Path), StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                    db.DeleteCueTracks(cuePath, records.Select(record => record.Path).ToList());
+                    removedPaths.AddRange(staleCuePaths);
+                }
+                continue;
+            }
+
             if (!System.IO.File.Exists(path))
             {
                 if (db.Delete(path))
@@ -297,6 +397,7 @@ public static class LibraryScanner
         var record = new TrackRecord
         {
             Path       = filePath,
+            SourcePath = filePath,
             FileName   = fi.Name,
             FileSize   = fi.Length,
             ModifiedAt = modifiedAt,
@@ -370,6 +471,45 @@ public static class LibraryScanner
         }
 
         return record;
+    }
+
+    private static List<TrackRecord> BuildCueRecords(
+        string cuePath,
+        IReadOnlyList<CueTrackDefinition> definitions,
+        long addedAt)
+    {
+        var cueModified = new DateTimeOffset(System.IO.File.GetLastWriteTimeUtc(cuePath)).ToUnixTimeSeconds();
+        var result = new List<TrackRecord>(definitions.Count);
+        foreach (var definition in definitions)
+        {
+            var sourceFile = new FileInfo(definition.SourcePath);
+            var sourceModified = new DateTimeOffset(sourceFile.LastWriteTimeUtc).ToUnixTimeSeconds();
+            var record = BuildRecord(
+                definition.SourcePath,
+                sourceFile,
+                Math.Max(cueModified, sourceModified),
+                addedAt,
+                out _);
+            record.Path = definition.VirtualPath;
+            record.SourcePath = definition.SourcePath;
+            record.CuePath = definition.CuePath;
+            record.SegmentStart = definition.StartSeconds;
+            record.SegmentEnd = definition.EndSeconds ?? record.Duration;
+            record.Duration = record.SegmentEnd is double end
+                ? Math.Max(0, end - definition.StartSeconds)
+                : null;
+            record.FileName = $"{Path.GetFileNameWithoutExtension(definition.SourcePath)} #{definition.Number:D2}";
+            record.Title = definition.Title ?? record.Title ?? record.FileName;
+            record.Artist = definition.Artist ?? record.Artist;
+            record.Album = definition.Album ?? record.Album;
+            record.AlbumArtist = definition.AlbumArtist ?? record.AlbumArtist ?? record.Artist;
+            record.Genre = definition.Genre ?? record.Genre;
+            record.Year = definition.Year ?? record.Year;
+            record.TrackNumber = definition.Number;
+            record.TrackTotal = definitions.Count;
+            result.Add(record);
+        }
+        return result;
     }
 
     private static int RepairMissingAlbumArtwork(IProgress<ScanProgress>? progress, CancellationToken ct)

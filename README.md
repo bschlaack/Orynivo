@@ -28,6 +28,9 @@ plus a multi-resolution Windows application icon based on the standalone logo.
   gain metadata with fallback to the other available value; native DSD output
   remains bit-perfect
 - SQLite music library with multiple monitored directories
+- CUE-sheet support for large FLAC/WAV images: indexed CUE entries appear as
+  independent virtual tracks in library, folder, search, queue, playlist, and
+  playback-history workflows while retaining the shared physical audio file
 - Automatic recursive library monitoring with debounced create, update, rename,
   and delete handling, plus periodic full reconciliation as a safety net
 - Metadata and embedded artwork extraction through TagLibSharp
@@ -115,11 +118,13 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 
 The user interface recognizes, among others:
 
-`DSF`, `DFF`, `FLAC`, `MP3`, `WAV`, `AIFF`, `M4A`, `AAC`, `OGG`, `Opus`, and
-`WMA`.
+`DSF`, `DFF`, `FLAC`, `MP3`, `WAV`, `AIFF`, `M4A`, `AAC`, `OGG`, `Opus`,
+`WMA`, and CUE sheets referencing PCM source files such as FLAC or WAV.
 
 PCM formats are decoded by `ffmpeg`, which Orynivo downloads automatically on
 first start if not already installed. Actual codec support depends on the build.
+For CUE sheets, Orynivo uses `INDEX 01` boundaries to seek and stop FFmpeg
+within the referenced source file; no temporary split files are created.
 When WASAPI is selected, DSD audio in DSF or DFF containers is converted to PCM
 in real time without creating a temporary file. Orynivo prefers 176.4, 88.2,
 or 44.1 kHz output and falls back to 192, 96, or 48 kHz when required by the

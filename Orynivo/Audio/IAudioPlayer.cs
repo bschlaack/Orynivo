@@ -58,9 +58,27 @@ public interface IGaplessAudioPlayer : IAudioPlayer
 /// <summary>
 /// Describes one PCM track in a continuous playback session.
 /// </summary>
-/// <param name="FilePath">Local file path or supported stream URL.</param>
+/// <param name="FilePath">Stable track path or supported stream URL.</param>
 /// <param name="ReplayGainFactor">Linear ReplayGain factor for this track.</param>
-public sealed record GaplessPlaybackItem(string FilePath, float ReplayGainFactor);
+/// <param name="SourcePath">Physical media path. Defaults to <paramref name="FilePath"/>.</param>
+/// <param name="SegmentStart">Optional start offset within the physical source.</param>
+/// <param name="SegmentEnd">Optional exclusive end offset within the physical source.</param>
+public sealed record GaplessPlaybackItem(
+    string FilePath,
+    float ReplayGainFactor,
+    string? SourcePath = null,
+    TimeSpan? SegmentStart = null,
+    TimeSpan? SegmentEnd = null)
+{
+    /// <summary>Physical path passed to FFmpeg.</summary>
+    public string PlaybackPath => SourcePath ?? FilePath;
+
+    /// <summary>Length of the virtual segment when bounded.</summary>
+    public TimeSpan? SegmentDuration =>
+        SegmentStart is { } start && SegmentEnd is { } end && end > start
+            ? end - start
+            : null;
+}
 
 /// <summary>
 /// Provides information about a newly audible track in a gapless session.

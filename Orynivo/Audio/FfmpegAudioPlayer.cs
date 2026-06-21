@@ -108,16 +108,20 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer
         if (items.Count == 0)
             throw new ArgumentException("At least one playback item is required.", nameof(items));
 
-        var info = await ProbeAsync(items[0].FilePath, cancellationToken);
+        var info = await ProbeAsync(items[0].PlaybackPath, cancellationToken);
+        if (items[0].SegmentDuration is { } firstDuration)
+            info = info with { Duration = firstDuration };
         var stream = new SteinbergAsioStream(backend, driverName, info.OutputSampleRate, 2);
         try
         {
             var decoder = await FfmpegPcmDecoder.CreateAsync(
-                items[0].FilePath,
+                items[0].PlaybackPath,
                 info.OutputSampleRate,
                 "f32le",
                 "pcm_f32le",
                 TimeSpan.Zero,
+                items[0].SegmentStart,
+                items[0].SegmentEnd,
                 cancellationToken);
             stream.Start();
             return (new FfmpegAudioPlayer(stream, items, info, decoder), info);
@@ -154,11 +158,13 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer
             ? TimeSpan.Zero
             : position > Duration ? Duration : position;
         var replacement = await FfmpegPcmDecoder.CreateAsync(
-            CurrentFilePath,
+            _items[Volatile.Read(ref _audibleTrackIndex)].PlaybackPath,
             CurrentInfo.OutputSampleRate,
             "f32le",
             "pcm_f32le",
             position,
+            _items[Volatile.Read(ref _audibleTrackIndex)].SegmentStart,
+            _items[Volatile.Read(ref _audibleTrackIndex)].SegmentEnd,
             _cts.Token).ConfigureAwait(false);
         await _decoderGate.WaitAsync(_cts.Token).ConfigureAwait(false);
         try
@@ -319,13 +325,17 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer
 
     private async Task<(FfmpegPcmDecoder Decoder, AudioFileInfo Info)> PrepareAsync(int index)
     {
-        var info = await ProbeAsync(_items[index].FilePath, _cts.Token).ConfigureAwait(false);
+        var info = await ProbeAsync(_items[index].PlaybackPath, _cts.Token).ConfigureAwait(false);
+        if (_items[index].SegmentDuration is { } segmentDuration)
+            info = info with { Duration = segmentDuration };
         var decoder = await FfmpegPcmDecoder.CreateAsync(
-            _items[index].FilePath,
+            _items[index].PlaybackPath,
             _infos[0]!.OutputSampleRate,
             "f32le",
             "pcm_f32le",
             TimeSpan.Zero,
+            _items[index].SegmentStart,
+            _items[index].SegmentEnd,
             _cts.Token).ConfigureAwait(false);
         return (decoder, info with { OutputSampleRate = _infos[0]!.OutputSampleRate });
     }

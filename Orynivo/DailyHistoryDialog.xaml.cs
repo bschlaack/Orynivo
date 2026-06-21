@@ -31,7 +31,10 @@ public partial class DailyHistoryDialog : Window
         public required string Album { get; init; }
         public required string ListenedDuration { get; init; }
         public required string TotalDuration { get; init; }
-        public bool CanOpenTrack => Entry.TrackId.HasValue && File.Exists(Entry.Path);
+        public bool CanOpenTrack =>
+            Entry.TrackId.HasValue &&
+            (File.Exists(Entry.Path) ||
+             Entry.Path.StartsWith("cue://", StringComparison.OrdinalIgnoreCase));
         public bool CanOpenArtist => Entry.ArtistId.HasValue;
         public bool CanOpenAlbum => Entry.AlbumId.HasValue;
         public bool IsPlainTitle => !CanOpenTrack;
