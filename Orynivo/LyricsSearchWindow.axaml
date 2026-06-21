@@ -16,8 +16,6 @@
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
         </Style>
-        <Style Selector="ListBoxItem">
-        </Style>
     </Window.Styles>
     <Grid Margin="18">
         <Grid.RowDefinitions>
@@ -72,15 +70,13 @@
             <ListBox x:Name="ResultsListBox"
                      Background="Transparent"
                      BorderThickness="0"
+                     ItemContainerTheme="{StaticResource AppSearchResultItemTheme}"
                      SelectionChanged="ResultsListBox_OnSelectionChanged">
                 <ListBox.ItemTemplate>
                     <DataTemplate>
-                        <Border Margin="0,0,0,8"
-                                Padding="10"
-                                Background="{DynamicResource AppSurfaceBrush}"
-                                CornerRadius="0,14,0,14">
-                            <StackPanel>
+                        <StackPanel>
                                 <TextBlock Text="{Binding TrackName}"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
                                            FontWeight="SemiBold"
                                            TextWrapping="Wrap"/>
                                 <TextBlock Text="{Binding ArtistName}"
@@ -91,8 +87,7 @@
                                            FontSize="11"
                                            Foreground="{DynamicResource AppMutedTextBrush}"
                                            TextWrapping="Wrap"/>
-                            </StackPanel>
-                        </Border>
+                        </StackPanel>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>

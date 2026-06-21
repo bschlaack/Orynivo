@@ -614,13 +614,6 @@
         <Style Selector="TreeViewItem.nowPlaying:pointerover:not(:selected)">
             <Setter Property="Background" Value="{DynamicResource AppNowPlayingRowBrush}"/>
         </Style>
-        <!-- Active lyrics line -->
-        <Style Selector="TextBlock.active">
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="FontSize" Value="30"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Opacity" Value="1"/>
-        </Style>
         <!-- NavItemText helper -->
         <Style Selector="TextBlock.navItemText">
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
@@ -2270,8 +2263,18 @@
                                     <Setter Property="Focusable" Value="False"/>
                                     <Setter Property="IsHitTestVisible" Value="False"/>
                                     <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="Foreground" Value="#B8B8D0"/>
+                                    <Setter Property="FontSize" Value="24"/>
+                                    <Setter Property="FontWeight" Value="Medium"/>
+                                    <Setter Property="Opacity" Value="0.78"/>
                                     <Setter Property="Padding" Value="0"/>
                                     <Setter Property="Margin" Value="0,5"/>
+                                    <Style Selector="^:selected">
+                                        <Setter Property="Foreground" Value="White"/>
+                                        <Setter Property="FontSize" Value="30"/>
+                                        <Setter Property="FontWeight" Value="Bold"/>
+                                        <Setter Property="Opacity" Value="1"/>
+                                    </Style>
                                 </ControlTheme>
                             </ListBox.ItemContainerTheme>
                             <ListBox.ItemTemplate>
@@ -2280,11 +2283,10 @@
                                                Padding="16,10"
                                                TextWrapping="Wrap"
                                                TextAlignment="Center"
-                                               Foreground="#B8B8D0"
-                                               Opacity="0.78"
-                                               FontSize="24"
-                                               FontWeight="Medium"
-                                               Classes.active="{Binding IsActive}"/>
+                                               Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                               Opacity="{Binding Opacity, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                               FontSize="{Binding FontSize, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                               FontWeight="{Binding FontWeight, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>

@@ -16,8 +16,6 @@
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
         </Style>
-        <Style Selector="ListBoxItem">
-        </Style>
     </Window.Styles>
     <Grid Margin="18">
         <Grid.RowDefinitions>
@@ -58,14 +56,11 @@
                  Grid.Row="2"
                  Background="Transparent"
                  BorderThickness="0"
+                 ItemContainerTheme="{StaticResource AppSearchResultItemTheme}"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled">
             <ListBox.ItemTemplate>
                 <DataTemplate>
-                    <Border Margin="0,0,0,8"
-                            Padding="10"
-                            Background="{DynamicResource AppSurfaceBrush}"
-                            CornerRadius="0,14,0,14">
-                        <Grid>
+                    <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="112"/>
                                 <ColumnDefinition Width="*"/>
@@ -81,6 +76,7 @@
                                         Margin="12,0,0,0"
                                         VerticalAlignment="Center">
                                 <TextBlock Text="{Binding Title}"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
                                            FontWeight="SemiBold"
                                            TextWrapping="Wrap"/>
                                 <TextBlock Text="{Binding Attribution}"
@@ -92,8 +88,7 @@
                                            FontSize="11"
                                            Foreground="{DynamicResource AppMutedTextBrush}"/>
                             </StackPanel>
-                        </Grid>
-                    </Border>
+                    </Grid>
                 </DataTemplate>
             </ListBox.ItemTemplate>
         </ListBox>
