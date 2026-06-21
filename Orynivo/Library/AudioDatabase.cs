@@ -1,5 +1,6 @@
 using System.IO;
 using System.Security.Cryptography;
+using System.Text;
 using Microsoft.Data.Sqlite;
 
 namespace Orynivo.Library;
@@ -26,28 +27,104 @@ public sealed record AlbumInfo(
     string? ThumbnailPath,
     bool IsFavorite);
 
-/// <summary>Lightweight track row for the main track list; omits cover data and lyrics.</summary>
+/// <summary>Lightweight track row for list and search tables; omits artwork and lyrics payloads.</summary>
+/// <param name="Path">Absolute audio-file path.</param>
+/// <param name="FileName">File name including extension.</param>
+/// <param name="Title">Track title.</param>
+/// <param name="Artist">Primary artist.</param>
+/// <param name="Album">Album title.</param>
+/// <param name="AlbumArtist">Album artist.</param>
+/// <param name="Genre">Genre text.</param>
+/// <param name="Format">Container format.</param>
+/// <param name="Bitrate">Encoded bitrate in kbps.</param>
+/// <param name="Duration">Duration in seconds.</param>
+/// <param name="SortTitle">Title used for sorting.</param>
+/// <param name="Id">Database track identifier.</param>
+/// <param name="IsFavorite">Whether the track is marked as a favorite.</param>
+/// <param name="Year">Release year.</param>
+/// <param name="TrackNumber">Track number.</param>
+/// <param name="TrackTotal">Total number of tracks.</param>
+/// <param name="DiscNumber">Disc number.</param>
+/// <param name="DiscTotal">Total number of discs.</param>
+/// <param name="SampleRate">Source sample rate in Hz.</param>
+/// <param name="BitDepth">Source bit depth.</param>
+/// <param name="Channels">Source channel count.</param>
+/// <param name="Composer">Composer text.</param>
+/// <param name="Bpm">Beats per minute.</param>
+/// <param name="FileSize">File size in bytes.</param>
+/// <param name="AddedAt">Library-added timestamp in Unix seconds.</param>
+/// <param name="ReplayGainTrack">Track ReplayGain value.</param>
+/// <param name="ReplayGainAlbum">Album ReplayGain value.</param>
 public sealed record TrackListInfo(
     string Path,
     string FileName,
     string? Title,
     string? Artist,
     string? Album,
+    string? AlbumArtist,
     string? Genre,
     string? Format,
     int? Bitrate,
     double? Duration,
     string? SortTitle,
     long Id,
-    bool IsFavorite);
+    bool IsFavorite,
+    int? Year,
+    int? TrackNumber,
+    int? TrackTotal,
+    int? DiscNumber,
+    int? DiscTotal,
+    int? SampleRate,
+    int? BitDepth,
+    int? Channels,
+    string? Composer,
+    int? Bpm,
+    long? FileSize,
+    long AddedAt,
+    string? ReplayGainTrack,
+    string? ReplayGainAlbum);
 
 /// <summary>Minimal track row for filter/facet building; carries only classification fields.</summary>
+/// <param name="Id">Track database identifier.</param>
+/// <param name="IsFavorite">Whether the track is marked as a favourite.</param>
+/// <param name="Genre">Stored genre text.</param>
+/// <param name="Format">Lowercase container format.</param>
+/// <param name="Bitrate">Encoded bitrate in kbps.</param>
 public sealed record TrackFacetInfo(
     long Id,
     bool IsFavorite,
     string? Genre,
     string? Format,
     int? Bitrate);
+
+/// <summary>Compact metadata and playback-history values used to resolve smart playlists.</summary>
+/// <param name="Id">Track database identifier.</param>
+/// <param name="IsFavorite">Whether the track is marked as a favourite.</param>
+/// <param name="Genre">Stored genre text.</param>
+/// <param name="Format">Lowercase container format.</param>
+/// <param name="Bitrate">Encoded bitrate in kbps.</param>
+/// <param name="Year">Release year.</param>
+/// <param name="Artist">Primary artist name.</param>
+/// <param name="Album">Album title.</param>
+/// <param name="Duration">Track duration in seconds.</param>
+/// <param name="AddedAt">Library-add timestamp in Unix seconds.</param>
+/// <param name="PlayCount">Number of recorded local-track playback sessions.</param>
+/// <param name="LastPlayedAt">Most recent playback timestamp in Unix seconds.</param>
+/// <param name="SortTitle">Resolved title used for alphabetical ordering.</param>
+public sealed record SmartPlaylistTrackInfo(
+    long Id,
+    bool IsFavorite,
+    string? Genre,
+    string? Format,
+    int? Bitrate,
+    int? Year,
+    string? Artist,
+    string? Album,
+    double? Duration,
+    long AddedAt,
+    int PlayCount,
+    long? LastPlayedAt,
+    string SortTitle);
 
 /// <summary>File-system paths for the three artwork variants stored per album (original, 96-px thumb, 320-px thumb).</summary>
 public sealed record ArtworkPaths(string? OriginalPath, string? Thumb96Path, string? Thumb320Path);
@@ -299,6 +376,30 @@ public sealed class AudioDatabase : IDisposable
         cmd.Parameters.AddWithValue("$path", path);
         using var reader = cmd.ExecuteReader();
         return reader.Read() ? MapRow(reader) : null;
+    }
+
+    /// <summary>
+    /// Determines whether tracks below a library root need a one-time metadata refresh for ReplayGain tags.
+    /// </summary>
+    /// <param name="rootPath">Configured library root path.</param>
+    /// <returns><see langword="true"/> when the root has not yet completed the ReplayGain metadata refresh.</returns>
+    public bool NeedsReplayGainMetadataScan(string rootPath) =>
+        !string.Equals(GetMeta(GetReplayGainScanKey(rootPath)), "done", StringComparison.Ordinal);
+
+    /// <summary>
+    /// Marks the one-time ReplayGain metadata refresh as complete for a library root.
+    /// </summary>
+    /// <param name="rootPath">Configured library root path.</param>
+    public void MarkReplayGainMetadataScanned(string rootPath) =>
+        SetMeta(GetReplayGainScanKey(rootPath), "done");
+
+    private static string GetReplayGainScanKey(string rootPath)
+    {
+        var normalizedPath = Path.GetFullPath(rootPath)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            .ToUpperInvariant();
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalizedPath)));
+        return $"replay_gain_metadata_v1_{hash}";
     }
 
     public void UpdateDownloadedLyrics(
@@ -1014,26 +1115,17 @@ public sealed class AudioDatabase : IDisposable
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = """
             SELECT
-                path, file_name, title, artist, album, genre, format, bitrate, duration, sort_title, id, is_favorite
+                path, file_name, title, artist, album, album_artist, genre, format, bitrate,
+                duration, sort_title, id, is_favorite, year, track_number, track_total,
+                disc_number, disc_total, sample_rate, bit_depth, channels, composer, bpm,
+                file_size, added_at, replay_gain_track, replay_gain_album
             FROM tracks
             ORDER BY COALESCE(sort_title, title, file_name) COLLATE NOCASE;
             """;
         using var reader = cmd.ExecuteReader();
         var result = new List<TrackListInfo>();
         while (reader.Read())
-            result.Add(new TrackListInfo(
-                reader.GetString(0),
-                reader.GetString(1),
-                reader.IsDBNull(2) ? null : reader.GetString(2),
-                reader.IsDBNull(3) ? null : reader.GetString(3),
-                reader.IsDBNull(4) ? null : reader.GetString(4),
-                reader.IsDBNull(5) ? null : reader.GetString(5),
-                reader.IsDBNull(6) ? null : reader.GetString(6),
-                reader.IsDBNull(7) ? null : reader.GetInt32(7),
-                reader.IsDBNull(8) ? null : reader.GetDouble(8),
-                reader.IsDBNull(9) ? null : reader.GetString(9),
-                reader.GetInt64(10),
-                reader.GetInt32(11) != 0));
+            result.Add(MapTrackListInfo(reader));
         return result;
     }
 
@@ -1042,7 +1134,10 @@ public sealed class AudioDatabase : IDisposable
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = """
             SELECT
-                path, file_name, title, artist, album, genre, format, bitrate, duration, sort_title, id, is_favorite
+                path, file_name, title, artist, album, album_artist, genre, format, bitrate,
+                duration, sort_title, id, is_favorite, year, track_number, track_total,
+                disc_number, disc_total, sample_rate, bit_depth, channels, composer, bpm,
+                file_size, added_at, replay_gain_track, replay_gain_album
             FROM tracks
             WHERE album_id = $album_id
               AND ($artist_id IS NULL OR artist_id = $artist_id)
@@ -1056,19 +1151,7 @@ public sealed class AudioDatabase : IDisposable
         using var reader = cmd.ExecuteReader();
         var result = new List<TrackListInfo>();
         while (reader.Read())
-            result.Add(new TrackListInfo(
-                reader.GetString(0),
-                reader.GetString(1),
-                reader.IsDBNull(2) ? null : reader.GetString(2),
-                reader.IsDBNull(3) ? null : reader.GetString(3),
-                reader.IsDBNull(4) ? null : reader.GetString(4),
-                reader.IsDBNull(5) ? null : reader.GetString(5),
-                reader.IsDBNull(6) ? null : reader.GetString(6),
-                reader.IsDBNull(7) ? null : reader.GetInt32(7),
-                reader.IsDBNull(8) ? null : reader.GetDouble(8),
-                reader.IsDBNull(9) ? null : reader.GetString(9),
-                reader.GetInt64(10),
-                reader.GetInt32(11) != 0));
+            result.Add(MapTrackListInfo(reader));
         return result;
     }
 
@@ -1091,31 +1174,24 @@ public sealed class AudioDatabase : IDisposable
             }).ToList();
             cmd.CommandText = $"""
                 SELECT
-                    path, file_name, title, artist, album, genre, format, bitrate, duration, sort_title, id, is_favorite
+                    path, file_name, title, artist, album, album_artist, genre, format, bitrate,
+                    duration, sort_title, id, is_favorite, year, track_number, track_total,
+                    disc_number, disc_total, sample_rate, bit_depth, channels, composer, bpm,
+                    file_size, added_at, replay_gain_track, replay_gain_album
                 FROM tracks
                 WHERE id IN ({string.Join(", ", parameters)});
                 """;
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
-                result.Add(new TrackListInfo(
-                    reader.GetString(0),
-                    reader.GetString(1),
-                    reader.IsDBNull(2) ? null : reader.GetString(2),
-                    reader.IsDBNull(3) ? null : reader.GetString(3),
-                    reader.IsDBNull(4) ? null : reader.GetString(4),
-                    reader.IsDBNull(5) ? null : reader.GetString(5),
-                    reader.IsDBNull(6) ? null : reader.GetString(6),
-                    reader.IsDBNull(7) ? null : reader.GetInt32(7),
-                    reader.IsDBNull(8) ? null : reader.GetDouble(8),
-                    reader.IsDBNull(9) ? null : reader.GetString(9),
-                    reader.GetInt64(10),
-                    reader.GetInt32(11) != 0));
+                result.Add(MapTrackListInfo(reader));
         }
 
         var order = idList.Select((id, index) => (id, index)).ToDictionary(x => x.id, x => x.index);
         return result.OrderBy(t => order[t.Id]).ToList();
     }
 
+    /// <summary>Loads the lightweight classification fields used by the interactive track filters.</summary>
+    /// <returns>All local tracks with favourite, genre, format, and bitrate values.</returns>
     public List<TrackFacetInfo> GetTrackFacets()
     {
         using var cmd = _conn.CreateCommand();
@@ -1132,12 +1208,95 @@ public sealed class AudioDatabase : IDisposable
         return result;
     }
 
+    /// <summary>
+    /// Loads compact metadata and aggregated playback history used to resolve smart playlists.
+    /// </summary>
+    /// <returns>All local tracks with their smart-playlist and playback-history values.</returns>
+    public List<SmartPlaylistTrackInfo> GetSmartPlaylistTracks()
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT
+                t.id,
+                t.is_favorite,
+                t.genre,
+                t.format,
+                t.bitrate,
+                t.year,
+                t.artist,
+                t.album,
+                t.duration,
+                t.added_at,
+                COALESCE(ph.play_count, 0) AS play_count,
+                ph.last_played_at,
+                COALESCE(t.sort_title, t.title, t.file_name) AS display_sort_title
+            FROM tracks t
+            LEFT JOIN (
+                SELECT
+                    track_id,
+                    COUNT(*) AS play_count,
+                    MAX(started_at) AS last_played_at
+                FROM play_history
+                WHERE media_type = 'track'
+                  AND track_id IS NOT NULL
+                GROUP BY track_id
+            ) ph ON ph.track_id = t.id;
+            """;
+        using var reader = cmd.ExecuteReader();
+        var result = new List<SmartPlaylistTrackInfo>();
+        while (reader.Read())
+            result.Add(new SmartPlaylistTrackInfo(
+                reader.GetInt64(0),
+                reader.GetInt32(1) != 0,
+                reader.IsDBNull(2) ? null : reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetString(3),
+                reader.IsDBNull(4) ? null : reader.GetInt32(4),
+                reader.IsDBNull(5) ? null : reader.GetInt32(5),
+                reader.IsDBNull(6) ? null : reader.GetString(6),
+                reader.IsDBNull(7) ? null : reader.GetString(7),
+                reader.IsDBNull(8) ? null : reader.GetDouble(8),
+                reader.GetInt64(9),
+                reader.GetInt32(10),
+                reader.IsDBNull(11) ? null : reader.GetInt64(11),
+                reader.GetString(12)));
+        return result;
+    }
+
     public List<TrackListInfo> GetTrackListFiltered(IEnumerable<long> ids)
         => GetTrackListByIds(ids)
             .OrderBy(
                 track => track.SortTitle ?? track.Title ?? track.FileName,
                 StringComparer.CurrentCultureIgnoreCase)
             .ToList();
+
+    private static TrackListInfo MapTrackListInfo(SqliteDataReader reader) => new(
+        reader.GetString(0),
+        reader.GetString(1),
+        reader.IsDBNull(2) ? null : reader.GetString(2),
+        reader.IsDBNull(3) ? null : reader.GetString(3),
+        reader.IsDBNull(4) ? null : reader.GetString(4),
+        reader.IsDBNull(5) ? null : reader.GetString(5),
+        reader.IsDBNull(6) ? null : reader.GetString(6),
+        reader.IsDBNull(7) ? null : reader.GetString(7),
+        reader.IsDBNull(8) ? null : reader.GetInt32(8),
+        reader.IsDBNull(9) ? null : reader.GetDouble(9),
+        reader.IsDBNull(10) ? null : reader.GetString(10),
+        reader.GetInt64(11),
+        reader.GetInt32(12) != 0,
+        reader.IsDBNull(13) ? null : reader.GetInt32(13),
+        reader.IsDBNull(14) ? null : reader.GetInt32(14),
+        reader.IsDBNull(15) ? null : reader.GetInt32(15),
+        reader.IsDBNull(16) ? null : reader.GetInt32(16),
+        reader.IsDBNull(17) ? null : reader.GetInt32(17),
+        reader.IsDBNull(18) ? null : reader.GetInt32(18),
+        reader.IsDBNull(19) ? null : reader.GetInt32(19),
+        reader.IsDBNull(20) ? null : reader.GetInt32(20),
+        reader.IsDBNull(21) ? null : reader.GetString(21),
+        reader.IsDBNull(22) ? null : reader.GetInt32(22),
+        reader.IsDBNull(23) ? null : reader.GetInt64(23),
+        reader.GetInt64(24),
+        reader.IsDBNull(25) ? null : reader.GetString(25),
+        reader.IsDBNull(26) ? null : reader.GetString(26));
 
     public List<AlbumInfo> GetAlbumsByTrackIds(IEnumerable<long> ids)
     {
@@ -1390,12 +1549,15 @@ public sealed class AudioDatabase : IDisposable
         return Convert.ToInt32(cmd.ExecuteScalar());
     }
 
-    public void Delete(string path)
+    /// <summary>Deletes a track by absolute path.</summary>
+    /// <param name="path">Absolute audio-file path.</param>
+    /// <returns><see langword="true"/> when a database row was removed.</returns>
+    public bool Delete(string path)
     {
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = "DELETE FROM tracks WHERE path = $path;";
         cmd.Parameters.AddWithValue("$path", path);
-        cmd.ExecuteNonQuery();
+        return cmd.ExecuteNonQuery() > 0;
     }
 
     // ------------------------------------------------------------------
@@ -1958,6 +2120,55 @@ public sealed class AudioDatabase : IDisposable
         return (long)cmd.ExecuteScalar()!;
     }
 
+    /// <summary>Creates a regular playlist and inserts all supplied paths transactionally.</summary>
+    /// <param name="name">Playlist display name.</param>
+    /// <param name="paths">Local paths or remote stream URLs in playlist order.</param>
+    /// <returns>The new playlist identifier.</returns>
+    public long CreatePlaylist(string name, IReadOnlyList<string> paths)
+    {
+        long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        using var transaction = _conn.BeginTransaction();
+        using var playlistCommand = _conn.CreateCommand();
+        playlistCommand.Transaction = transaction;
+        playlistCommand.CommandText = """
+            INSERT INTO playlists (name, created_at, modified_at)
+            VALUES ($name, $now, $now)
+            RETURNING id;
+            """;
+        playlistCommand.Parameters.AddWithValue("$name", name);
+        playlistCommand.Parameters.AddWithValue("$now", now);
+        var playlistId = (long)playlistCommand.ExecuteScalar()!;
+
+        using var itemCommand = _conn.CreateCommand();
+        itemCommand.Transaction = transaction;
+        itemCommand.CommandText = """
+            INSERT INTO playlist_tracks (
+                playlist_id, track_id, path, position, added_at)
+            VALUES (
+                $playlistId,
+                (SELECT id FROM tracks WHERE path = $path LIMIT 1),
+                $path,
+                $position,
+                $now);
+            """;
+        var playlistParameter = itemCommand.Parameters.Add("$playlistId", Microsoft.Data.Sqlite.SqliteType.Integer);
+        var pathParameter = itemCommand.Parameters.Add("$path", Microsoft.Data.Sqlite.SqliteType.Text);
+        var positionParameter = itemCommand.Parameters.Add("$position", Microsoft.Data.Sqlite.SqliteType.Integer);
+        var nowParameter = itemCommand.Parameters.Add("$now", Microsoft.Data.Sqlite.SqliteType.Integer);
+        playlistParameter.Value = playlistId;
+        nowParameter.Value = now;
+
+        for (var index = 0; index < paths.Count; index++)
+        {
+            pathParameter.Value = paths[index];
+            positionParameter.Value = index + 1;
+            itemCommand.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+        return playlistId;
+    }
+
     public void UpdatePlaylist(long id, string name, string? description = null)
     {
         long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
@@ -1969,6 +2180,29 @@ public sealed class AudioDatabase : IDisposable
             """;
         cmd.Parameters.AddWithValue("$name", name);
         cmd.Parameters.AddWithValue("$desc", (object?)description ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$now", now);
+        cmd.Parameters.AddWithValue("$id", id);
+        cmd.ExecuteNonQuery();
+    }
+
+    /// <summary>Updates the name and serialized criteria of an existing smart playlist.</summary>
+    /// <param name="id">Smart-playlist database identifier.</param>
+    /// <param name="name">Updated display name.</param>
+    /// <param name="filterCriteria">Updated JSON-serialized smart-playlist criteria.</param>
+    public void UpdateSmartPlaylist(long id, string name, string filterCriteria)
+    {
+        long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            UPDATE playlists
+            SET name = $name,
+                filter_criteria = $filter,
+                modified_at = $now
+            WHERE id = $id
+              AND is_smart = 1;
+            """;
+        cmd.Parameters.AddWithValue("$name", name);
+        cmd.Parameters.AddWithValue("$filter", filterCriteria);
         cmd.Parameters.AddWithValue("$now", now);
         cmd.Parameters.AddWithValue("$id", id);
         cmd.ExecuteNonQuery();

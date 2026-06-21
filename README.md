@@ -20,9 +20,21 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 - PCM playback through `ffmpeg`
 - Seeking, volume control, pause, an automatic playback queue, and shuffle
   without repeating a track within the currently loaded queue
+- Optional ReplayGain volume adjustment for PCM playback, using track or album
+  gain metadata with fallback to the other available value; native DSD output
+  remains bit-perfect
 - SQLite music library with multiple monitored directories
+- Automatic recursive library monitoring with debounced create, update, rename,
+  and delete handling, plus periodic full reconciliation as a safety net
 - Metadata and embedded artwork extraction through TagLibSharp
 - Artist, album, track, and folder views
+- Resizable table columns whose widths are preserved separately for each
+  library, search, playlist, Plex, radio, podcast, and history table
+- Context-sensitive column selection by right-clicking a table header, including
+  optional technical and tag metadata for local tracks and appropriate catalog
+  fields for radio and podcasts
+- Drag-and-drop table-column ordering persisted independently for each table
+  and main-content view
 - Space-saving accordion sections in the main sidebar, with configurable
   visibility and persisted independent expansion for library, personal radio,
   podcast, and playlist sections
@@ -59,7 +71,20 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 - Podcast category and language filters can be used without entering a title
 - Lucene.NET full-text search with partial-word and German umlaut variants
 - Favorites for tracks, albums, and artists
-- Regular and filter-based smart playlists
+- Regular playlists and live smart playlists with metadata, library-age,
+  playback-history, ordering, and result-limit criteria
+- Smart playlists are created directly from active track filters and can be
+  refined later through their sidebar context menu
+- UTF-8 M3U8 import and export for regular playlists, including relative local
+  paths, retained missing-file entries, and HTTP/HTTPS streams; credentialed
+  Plex URLs are excluded
+- Gapless sequential PCM playback through ASIO, cwASIO, and exclusive WASAPI:
+  the next FFmpeg decoder is prefetched and handed to the existing output
+  session without reopening the audio device
+- Theme-aware table highlighting follows the currently audible track across
+  library, search, playlist, radio, podcast, and Plex views
+- Album track details provide an in-place favorite button alongside the album
+  metadata
 - Playback history for local tracks, podcast episodes, and internet-radio
   sessions, including position and completion state
 - Artwork downloads through the Cover Art Archive and manual MusicBrainz search
@@ -160,7 +185,12 @@ the repository. Release artifacts therefore include `CwAsioBridge.dll`.
 ```
 
 Library directories and the desired output device can then be selected in the
-settings window.
+settings window. ReplayGain can be disabled or switched to track/album mode
+under the output-device settings. The first subsequent scan of each configured
+library root refreshes unchanged files once to import existing ReplayGain tags.
+Available library roots are monitored automatically after configuration.
+File-system events are debounced before updating the database and search index;
+periodic full scans reconcile changes that a watcher may have missed.
 
 ## Project Structure
 

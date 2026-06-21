@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Orynivo.Library;
 using Orynivo.Localization;
+using Orynivo.Controls;
 
 namespace Orynivo;
 
@@ -19,6 +20,7 @@ public enum DailyHistoryAction
 
 public partial class DailyHistoryDialog : Window
 {
+    private readonly AppSettings _settings;
     public sealed class HistoryRow
     {
         public required DailyHistoryEntry Entry { get; init; }
@@ -48,23 +50,48 @@ public partial class DailyHistoryDialog : Window
     /// Initializes a runtime-loader instance for an empty history day.
     /// </summary>
     public DailyHistoryDialog()
-        : this(DateTime.Today, Array.Empty<DailyHistoryEntry>())
+        : this(DateTime.Today, Array.Empty<DailyHistoryEntry>(), new AppSettings())
     {
     }
 
-    public DailyHistoryDialog(DateTime date, IReadOnlyList<DailyHistoryEntry> entries)
+    /// <summary>
+    /// Initializes the playback-history dialog for a calendar day.
+    /// </summary>
+    /// <param name="date">Calendar date represented by the dialog.</param>
+    /// <param name="entries">Playback-history entries to display.</param>
+    /// <param name="settings">Shared application settings used for persisted column widths.</param>
+    public DailyHistoryDialog(
+        DateTime date,
+        IReadOnlyList<DailyHistoryEntry> entries,
+        AppSettings settings)
     {
+        _settings = settings;
         DialogTitle = string.Format(
             LocalizationManager.Current.DailyHistoryTitle,
             date.ToString("D", CultureInfo.CurrentCulture));
         Rows = new ObservableCollection<HistoryRow>(entries.Select(CreateRow));
         InitializeComponent();
         DataContext = this;
+        DataGridColumnWidthStore.Restore(
+            _settings.DataGridColumnWidths,
+            "DailyHistory",
+            HistoryDataGrid);
+        DataGridColumnChooser.Attach(HistoryDataGrid, "DailyHistory", _settings);
         Opened += (_, _) => WindowChrome.ApplyTheme(this);
         KeyDown += (_, e) =>
         {
             if (e.Key == Key.Escape) Close(false);
         };
+    }
+
+    /// <inheritdoc/>
+    protected override void OnClosed(EventArgs e)
+    {
+        DataGridColumnWidthStore.Capture(
+            _settings.DataGridColumnWidths,
+            "DailyHistory",
+            HistoryDataGrid);
+        base.OnClosed(e);
     }
 
     private static HistoryRow CreateRow(DailyHistoryEntry entry) => new()

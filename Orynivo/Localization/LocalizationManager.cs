@@ -103,6 +103,29 @@ public static class LocalizationManager
         resources["L_CreatePlaylist"] = Current.CreatePlaylist;
         resources["L_SaveSmartPlaylistDisabledTooltip"] = Current.SaveSmartPlaylistDisabledTooltip;
         resources["L_SaveSmartPlaylist"] = Current.SaveSmartPlaylist;
+        resources["L_SmartPlaylistDialogTitle"] = Current.SmartPlaylistDialogTitle;
+        resources["L_SmartPlaylistName"] = Current.SmartPlaylistName;
+        resources["L_SmartPlaylistBasicFilters"] = Current.SmartPlaylistBasicFilters;
+        resources["L_SmartPlaylistGenres"] = Current.SmartPlaylistGenres;
+        resources["L_SmartPlaylistFormats"] = Current.SmartPlaylistFormats;
+        resources["L_SmartPlaylistBitrates"] = Current.SmartPlaylistBitrates;
+        resources["L_SmartPlaylistMetadata"] = Current.SmartPlaylistMetadata;
+        resources["L_SmartPlaylistMinimumYear"] = Current.SmartPlaylistMinimumYear;
+        resources["L_SmartPlaylistMaximumYear"] = Current.SmartPlaylistMaximumYear;
+        resources["L_SmartPlaylistArtistContains"] = Current.SmartPlaylistArtistContains;
+        resources["L_SmartPlaylistAlbumContains"] = Current.SmartPlaylistAlbumContains;
+        resources["L_SmartPlaylistMinimumDuration"] = Current.SmartPlaylistMinimumDuration;
+        resources["L_SmartPlaylistMaximumDuration"] = Current.SmartPlaylistMaximumDuration;
+        resources["L_SmartPlaylistHistory"] = Current.SmartPlaylistHistory;
+        resources["L_SmartPlaylistAddedWithinDays"] = Current.SmartPlaylistAddedWithinDays;
+        resources["L_SmartPlaylistPlayedWithinDays"] = Current.SmartPlaylistPlayedWithinDays;
+        resources["L_SmartPlaylistNeverPlayed"] = Current.SmartPlaylistNeverPlayed;
+        resources["L_SmartPlaylistMinimumPlayCount"] = Current.SmartPlaylistMinimumPlayCount;
+        resources["L_SmartPlaylistMaximumPlayCount"] = Current.SmartPlaylistMaximumPlayCount;
+        resources["L_SmartPlaylistResult"] = Current.SmartPlaylistResult;
+        resources["L_SmartPlaylistSortOrder"] = Current.SmartPlaylistSortOrder;
+        resources["L_SmartPlaylistResultLimit"] = Current.SmartPlaylistResultLimit;
+        resources["L_CreateSmartPlaylist"] = Current.CreateSmartPlaylist;
         resources["L_LibraryBackup"] = Current.LibraryBackup;
         resources["L_LibraryBackupHint"] = Current.LibraryBackupHint;
         resources["L_ExportLibrary"] = Current.ExportLibrary;
@@ -125,6 +148,13 @@ public static class LocalizationManager
         resources["L_AsioOutputDevice"] = Current.AsioOutputDevice;
         resources["L_CwAsioOutputDevice"] = Current.CwAsioOutputDevice;
         resources["L_DeviceInfo"] = Current.DeviceInfo;
+        resources["L_ReplayGain"] = Current.ReplayGain;
+        resources["L_ReplayGainHint"] = Current.ReplayGainHint;
+        resources["L_SelectColumns"] = Current.SelectColumns;
+        resources["L_Codec"] = Current.Codec;
+        resources["L_Tags"] = Current.Tags;
+        resources["L_Homepage"] = Current.Homepage;
+        resources["L_FeedUrl"] = Current.FeedUrl;
         resources["L_DatabaseOptimizeHint"] = Current.DatabaseOptimizeHint;
         resources["L_NormalizeArtists"] = Current.NormalizeArtists;
         resources["L_NormalizeArtistsHint"] = Current.NormalizeArtistsHint;
@@ -288,7 +318,7 @@ public static class LocalizationManager
         TrackCountTooltip = "Anzahl Titel in der Datenbank",
         Scan = "Scannen",
         RemoveDirectory = "Verzeichnis entfernen",
-        ScanCompleted = "Fertig: {0} Dateien · {1} neu · {2} aktualisiert{3}",
+        ScanCompleted = "Fertig: {0} Dateien · {1} neu · {2} aktualisiert · {3} entfernt{4}",
         ScanFailed = "Fehler: {0}",
         StartupPreparingLibrary = "Bibliothek wird vorbereitet …",
         Back = "Zurück",
@@ -297,6 +327,18 @@ public static class LocalizationManager
         PlaybackThroughWithDsdConversion = "Wiedergabe über {0} · DSD wird in PCM ({1:N0} Hz) konvertiert",
         NativeDsdOutput = "DSD nativ",
         DsdToPcmOutput = "DSD → PCM",
+        ReplayGain = "ReplayGain-Lautstärkeanpassung",
+        ReplayGainHint = "Gilt für PCM-Wiedergabe. Im Track-Modus wird bevorzugt der Track-Wert verwendet, im Album-Modus der Album-Wert. Native DSD-Ausgabe bleibt bitgenau.",
+        ReplayGainOff = "Aus",
+        ReplayGainTrack = "Track",
+        ReplayGainAlbum = "Album",
+        SelectColumns = "Spalten auswählen",
+        FileName = "Dateiname", FileSize = "Dateigröße", AddedAt = "Hinzugefügt",
+        SampleRate = "Samplerate", BitDepth = "Bittiefe", Channels = "Kanäle",
+        TrackNumber = "Tracknummer", DiscNumber = "Discnummer", Composer = "Komponist",
+        Bpm = "BPM", ReplayGainTrackColumn = "ReplayGain Track",
+        ReplayGainAlbumColumn = "ReplayGain Album", Codec = "Codec", Tags = "Tags",
+        Homepage = "Homepage", FeedUrl = "Feed-Adresse",
         SearchResultSummary = "{0:N0} Titel · {1:N0} Alben · {2:N0} Künstler",
         RecentAlbums = "Zuletzt hinzugefügte Alben",
         Calendar = "Kalender – {0}",
@@ -457,6 +499,43 @@ public static class LocalizationManager
         , LoadMore = "Mehr laden"
         , FfmpegDownloading = "FFmpeg wird heruntergeladen …"
         , FfmpegDownloadFailed = "FFmpeg konnte nicht heruntergeladen werden. Bitte manuell installieren: ffmpeg.org"
+        , SmartPlaylistDialogTitle = "Smart-Playlist bearbeiten"
+        , SmartPlaylistName = "Name"
+        , SmartPlaylistBasicFilters = "Grundfilter"
+        , SmartPlaylistGenres = "Genres (durch Komma getrennt)"
+        , SmartPlaylistFormats = "Formate (z. B. FLAC, MP3; durch Komma getrennt)"
+        , SmartPlaylistBitrates = "Bitraten in kbps (durch Komma getrennt)"
+        , SmartPlaylistMetadata = "Metadaten"
+        , SmartPlaylistMinimumYear = "Jahr von"
+        , SmartPlaylistMaximumYear = "Jahr bis"
+        , SmartPlaylistArtistContains = "Künstler enthält"
+        , SmartPlaylistAlbumContains = "Album enthält"
+        , SmartPlaylistMinimumDuration = "Mindestdauer in Minuten"
+        , SmartPlaylistMaximumDuration = "Maximaldauer in Minuten"
+        , SmartPlaylistHistory = "Bibliothek und Wiedergabeverlauf"
+        , SmartPlaylistAddedWithinDays = "Hinzugefügt innerhalb der letzten X Tage"
+        , SmartPlaylistPlayedWithinDays = "Gespielt innerhalb der letzten X Tage"
+        , SmartPlaylistNeverPlayed = "Noch nie gespielt"
+        , SmartPlaylistMinimumPlayCount = "Mindestens so oft gespielt"
+        , SmartPlaylistMaximumPlayCount = "Höchstens so oft gespielt"
+        , SmartPlaylistResult = "Ergebnis"
+        , SmartPlaylistSortOrder = "Sortierung"
+        , SmartPlaylistSortTitle = "Titel A–Z"
+        , SmartPlaylistSortRandom = "Zufällig"
+        , SmartPlaylistSortLastPlayed = "Zuletzt gespielt zuerst"
+        , SmartPlaylistSortLeastRecentlyPlayed = "Lange nicht gehört zuerst"
+        , SmartPlaylistResultLimit = "Maximale Titelanzahl (leer = unbegrenzt)"
+        , CreateSmartPlaylist = "Smart-Playlist erstellen"
+        , InvalidSmartPlaylistCriteria = "Bitte gültige Zahlen und widerspruchsfreie Mindest-/Maximalwerte eingeben. „Noch nie gespielt“ kann nicht mit einer kürzlichen Wiedergabe oder einer Mindestanzahl kombiniert werden."
+        , EditSmartPlaylist = "Smart-Playlist bearbeiten"
+        , SmartPlaylistUpdated = "Smart-Playlist »{0}« aktualisiert."
+        , ImportM3u8Playlist = "M3U8-Playlist importieren"
+        , ExportM3u8Playlist = "Als M3U8 exportieren"
+        , M3u8ImportCompleted = "Playlist »{0}« importiert: {1} Einträge · {2} lokale Dateien fehlen · {3} HTTP-Einträge · {4} übersprungen."
+        , M3u8ImportNoEntries = "Die M3U8-Datei enthält keine importierbaren Einträge."
+        , M3u8ImportFailed = "M3U8-Import fehlgeschlagen: {0}"
+        , M3u8ExportCompleted = "Playlist »{0}« als M3U8 exportiert: {1} Einträge · {2} übersprungen."
+        , M3u8ExportFailed = "M3U8-Export fehlgeschlagen: {0}"
     };
 
     private static readonly LocalizedStrings English = new(
@@ -526,11 +605,21 @@ public static class LocalizationManager
         KernelStreamingUnavailable = "Kernel Streaming can be selected but is not implemented as a playback backend yet.",
         AddMusicDirectory = "Add music directory", TrackCountTooltip = "Number of tracks in the database",
         Scan = "Scan", RemoveDirectory = "Remove directory",
-        ScanCompleted = "Finished: {0} files · {1} new · {2} updated{3}", ScanFailed = "Error: {0}",
+        ScanCompleted = "Finished: {0} files · {1} new · {2} updated · {3} removed{4}", ScanFailed = "Error: {0}",
         StartupPreparingLibrary = "Preparing library …", Back = "Back", MarkAsFavorite = "Mark as favorite",
         PlaybackThrough = "Playback through {0}",
         PlaybackThroughWithDsdConversion = "Playback through {0} · DSD is converted to PCM ({1:N0} Hz)",
         NativeDsdOutput = "Native DSD", DsdToPcmOutput = "DSD → PCM",
+        ReplayGain = "ReplayGain volume adjustment",
+        ReplayGainHint = "Applies to PCM playback. Track mode prefers track gain; album mode prefers album gain. Native DSD output remains bit-perfect.",
+        ReplayGainOff = "Off", ReplayGainTrack = "Track", ReplayGainAlbum = "Album",
+        SelectColumns = "Select columns",
+        FileName = "File name", FileSize = "File size", AddedAt = "Added",
+        SampleRate = "Sample rate", BitDepth = "Bit depth", Channels = "Channels",
+        TrackNumber = "Track number", DiscNumber = "Disc number", Composer = "Composer",
+        Bpm = "BPM", ReplayGainTrackColumn = "ReplayGain track",
+        ReplayGainAlbumColumn = "ReplayGain album", Codec = "Codec", Tags = "Tags",
+        Homepage = "Homepage", FeedUrl = "Feed address",
         SearchResultSummary = "{0:N0} tracks · {1:N0} albums · {2:N0} artists",
         RecentAlbums = "Recently added albums", Calendar = "Calendar – {0}", TopGenres = "Top 10 genres by play time",
         NoData = "No data available.", DevicePcmSampleRates = "Supported PCM sample rates", DeviceDsdRates = "DSD rates",
@@ -686,6 +775,43 @@ public static class LocalizationManager
         , LoadMore = "Load more"
         , FfmpegDownloading = "Downloading FFmpeg …"
         , FfmpegDownloadFailed = "FFmpeg could not be downloaded. Please install it manually: ffmpeg.org"
+        , SmartPlaylistDialogTitle = "Edit smart playlist"
+        , SmartPlaylistName = "Name"
+        , SmartPlaylistBasicFilters = "Basic filters"
+        , SmartPlaylistGenres = "Genres (comma-separated)"
+        , SmartPlaylistFormats = "Formats (for example FLAC, MP3; comma-separated)"
+        , SmartPlaylistBitrates = "Bitrates in kbps (comma-separated)"
+        , SmartPlaylistMetadata = "Metadata"
+        , SmartPlaylistMinimumYear = "Year from"
+        , SmartPlaylistMaximumYear = "Year to"
+        , SmartPlaylistArtistContains = "Artist contains"
+        , SmartPlaylistAlbumContains = "Album contains"
+        , SmartPlaylistMinimumDuration = "Minimum duration in minutes"
+        , SmartPlaylistMaximumDuration = "Maximum duration in minutes"
+        , SmartPlaylistHistory = "Library and playback history"
+        , SmartPlaylistAddedWithinDays = "Added within the last X days"
+        , SmartPlaylistPlayedWithinDays = "Played within the last X days"
+        , SmartPlaylistNeverPlayed = "Never played"
+        , SmartPlaylistMinimumPlayCount = "Minimum play count"
+        , SmartPlaylistMaximumPlayCount = "Maximum play count"
+        , SmartPlaylistResult = "Result"
+        , SmartPlaylistSortOrder = "Order"
+        , SmartPlaylistSortTitle = "Title A–Z"
+        , SmartPlaylistSortRandom = "Random"
+        , SmartPlaylistSortLastPlayed = "Most recently played first"
+        , SmartPlaylistSortLeastRecentlyPlayed = "Least recently played first"
+        , SmartPlaylistResultLimit = "Maximum number of tracks (blank = unlimited)"
+        , CreateSmartPlaylist = "Create smart playlist"
+        , InvalidSmartPlaylistCriteria = "Enter valid numbers and consistent minimum/maximum values. “Never played” cannot be combined with recent playback or a positive minimum play count."
+        , EditSmartPlaylist = "Edit smart playlist"
+        , SmartPlaylistUpdated = "Smart playlist '{0}' updated."
+        , ImportM3u8Playlist = "Import M3U8 playlist"
+        , ExportM3u8Playlist = "Export as M3U8"
+        , M3u8ImportCompleted = "Playlist '{0}' imported: {1} entries · {2} local files missing · {3} HTTP entries · {4} skipped."
+        , M3u8ImportNoEntries = "The M3U8 file contains no importable entries."
+        , M3u8ImportFailed = "M3U8 import failed: {0}"
+        , M3u8ExportCompleted = "Playlist '{0}' exported as M3U8: {1} entries · {2} skipped."
+        , M3u8ExportFailed = "M3U8 export failed: {0}"
     };
 
     private static readonly LocalizedStrings French = new(
@@ -758,11 +884,21 @@ public static class LocalizationManager
         KernelStreamingUnavailable = "Kernel Streaming peut être sélectionné, mais ce mode de lecture n’est pas encore implémenté.",
         AddMusicDirectory = "Ajouter un dossier musical", TrackCountTooltip = "Nombre de titres dans la base",
         Scan = "Analyser", RemoveDirectory = "Supprimer le dossier",
-        ScanCompleted = "Terminé : {0} fichiers · {1} nouveaux · {2} actualisés{3}", ScanFailed = "Erreur : {0}",
+        ScanCompleted = "Terminé : {0} fichiers · {1} nouveaux · {2} actualisés · {3} supprimés{4}", ScanFailed = "Erreur : {0}",
         StartupPreparingLibrary = "Préparation de la bibliothèque …", Back = "Retour", MarkAsFavorite = "Ajouter aux favoris",
         PlaybackThrough = "Lecture via {0}",
         PlaybackThroughWithDsdConversion = "Lecture via {0} · Le DSD est converti en PCM ({1:N0} Hz)",
         NativeDsdOutput = "DSD natif", DsdToPcmOutput = "DSD → PCM",
+        ReplayGain = "Ajustement du volume ReplayGain",
+        ReplayGainHint = "S’applique à la lecture PCM. Le mode piste privilégie le gain de piste, le mode album le gain d’album. La sortie DSD native reste bit-perfect.",
+        ReplayGainOff = "Désactivé", ReplayGainTrack = "Piste", ReplayGainAlbum = "Album",
+        SelectColumns = "Sélectionner les colonnes",
+        FileName = "Nom du fichier", FileSize = "Taille du fichier", AddedAt = "Ajouté",
+        SampleRate = "Fréquence d’échantillonnage", BitDepth = "Profondeur de bits", Channels = "Canaux",
+        TrackNumber = "Numéro de piste", DiscNumber = "Numéro de disque", Composer = "Compositeur",
+        Bpm = "BPM", ReplayGainTrackColumn = "ReplayGain piste",
+        ReplayGainAlbumColumn = "ReplayGain album", Codec = "Codec", Tags = "Tags",
+        Homepage = "Page d’accueil", FeedUrl = "Adresse du flux",
         SearchResultSummary = "{0:N0} titres · {1:N0} albums · {2:N0} artistes",
         RecentAlbums = "Albums ajoutés récemment", Calendar = "Calendrier – {0}", TopGenres = "Top 10 des genres par durée d’écoute",
         NoData = "Aucune donnée disponible.", DevicePcmSampleRates = "Fréquences PCM prises en charge", DeviceDsdRates = "Niveaux DSD",
@@ -918,6 +1054,43 @@ public static class LocalizationManager
         , LoadMore = "Charger plus"
         , FfmpegDownloading = "Téléchargement de FFmpeg …"
         , FfmpegDownloadFailed = "FFmpeg n'a pas pu être téléchargé. Veuillez l'installer manuellement : ffmpeg.org"
+        , SmartPlaylistDialogTitle = "Modifier la playlist intelligente"
+        , SmartPlaylistName = "Nom"
+        , SmartPlaylistBasicFilters = "Filtres de base"
+        , SmartPlaylistGenres = "Genres (séparés par des virgules)"
+        , SmartPlaylistFormats = "Formats (par ex. FLAC, MP3 ; séparés par des virgules)"
+        , SmartPlaylistBitrates = "Débits en kbps (séparés par des virgules)"
+        , SmartPlaylistMetadata = "Métadonnées"
+        , SmartPlaylistMinimumYear = "Année de début"
+        , SmartPlaylistMaximumYear = "Année de fin"
+        , SmartPlaylistArtistContains = "L’artiste contient"
+        , SmartPlaylistAlbumContains = "L’album contient"
+        , SmartPlaylistMinimumDuration = "Durée minimale en minutes"
+        , SmartPlaylistMaximumDuration = "Durée maximale en minutes"
+        , SmartPlaylistHistory = "Bibliothèque et historique de lecture"
+        , SmartPlaylistAddedWithinDays = "Ajouté au cours des X derniers jours"
+        , SmartPlaylistPlayedWithinDays = "Lu au cours des X derniers jours"
+        , SmartPlaylistNeverPlayed = "Jamais lu"
+        , SmartPlaylistMinimumPlayCount = "Nombre minimal de lectures"
+        , SmartPlaylistMaximumPlayCount = "Nombre maximal de lectures"
+        , SmartPlaylistResult = "Résultat"
+        , SmartPlaylistSortOrder = "Tri"
+        , SmartPlaylistSortTitle = "Titre A–Z"
+        , SmartPlaylistSortRandom = "Aléatoire"
+        , SmartPlaylistSortLastPlayed = "Écoutés récemment en premier"
+        , SmartPlaylistSortLeastRecentlyPlayed = "Écoutés il y a longtemps en premier"
+        , SmartPlaylistResultLimit = "Nombre maximal de titres (vide = illimité)"
+        , CreateSmartPlaylist = "Créer la playlist intelligente"
+        , InvalidSmartPlaylistCriteria = "Saisissez des nombres valides et des valeurs minimum/maximum cohérentes. « Jamais lu » ne peut pas être combiné avec une lecture récente ou un minimum de lectures positif."
+        , EditSmartPlaylist = "Modifier la playlist intelligente"
+        , SmartPlaylistUpdated = "Playlist intelligente « {0} » mise à jour."
+        , ImportM3u8Playlist = "Importer une playlist M3U8"
+        , ExportM3u8Playlist = "Exporter au format M3U8"
+        , M3u8ImportCompleted = "Playlist « {0} » importée : {1} entrées · {2} fichiers locaux manquants · {3} entrées HTTP · {4} ignorées."
+        , M3u8ImportNoEntries = "Le fichier M3U8 ne contient aucune entrée importable."
+        , M3u8ImportFailed = "Échec de l’importation M3U8 : {0}"
+        , M3u8ExportCompleted = "Playlist « {0} » exportée au format M3U8 : {1} entrées · {2} ignorées."
+        , M3u8ExportFailed = "Échec de l’exportation M3U8 : {0}"
     };
 
     private static readonly LocalizedStrings Spanish = new(
@@ -987,11 +1160,21 @@ public static class LocalizationManager
         KernelStreamingUnavailable = "Kernel Streaming se puede seleccionar, pero todavía no está implementado como backend de reproducción.",
         AddMusicDirectory = "Agregar directorio de música", TrackCountTooltip = "Número de pistas en la base de datos",
         Scan = "Analizar", RemoveDirectory = "Eliminar directorio",
-        ScanCompleted = "Finalizado: {0} archivos · {1} nuevos · {2} actualizados{3}", ScanFailed = "Error: {0}",
+        ScanCompleted = "Finalizado: {0} archivos · {1} nuevos · {2} actualizados · {3} eliminados{4}", ScanFailed = "Error: {0}",
         StartupPreparingLibrary = "Preparando biblioteca …", Back = "Atrás", MarkAsFavorite = "Marcar como favorita",
         PlaybackThrough = "Reproducción mediante {0}",
         PlaybackThroughWithDsdConversion = "Reproducción mediante {0} · DSD se convierte a PCM ({1:N0} Hz)",
         NativeDsdOutput = "DSD nativo", DsdToPcmOutput = "DSD → PCM",
+        ReplayGain = "Ajuste de volumen ReplayGain",
+        ReplayGainHint = "Se aplica a la reproducción PCM. El modo pista prioriza la ganancia de pista y el modo álbum la ganancia de álbum. La salida DSD nativa sigue siendo bit-perfect.",
+        ReplayGainOff = "Desactivado", ReplayGainTrack = "Pista", ReplayGainAlbum = "Álbum",
+        SelectColumns = "Seleccionar columnas",
+        FileName = "Nombre de archivo", FileSize = "Tamaño de archivo", AddedAt = "Añadido",
+        SampleRate = "Frecuencia de muestreo", BitDepth = "Profundidad de bits", Channels = "Canales",
+        TrackNumber = "Número de pista", DiscNumber = "Número de disco", Composer = "Compositor",
+        Bpm = "BPM", ReplayGainTrackColumn = "ReplayGain pista",
+        ReplayGainAlbumColumn = "ReplayGain álbum", Codec = "Códec", Tags = "Etiquetas",
+        Homepage = "Página principal", FeedUrl = "Dirección del feed",
         SearchResultSummary = "{0:N0} pistas · {1:N0} álbumes · {2:N0} artistas",
         RecentAlbums = "Álbumes añadidos recientemente", Calendar = "Calendario – {0}", TopGenres = "10 géneros principales por tiempo de reproducción",
         NoData = "No hay datos disponibles.", DevicePcmSampleRates = "Frecuencias PCM compatibles", DeviceDsdRates = "Niveles DSD",
@@ -1147,6 +1330,43 @@ public static class LocalizationManager
         , LoadMore = "Cargar más"
         , FfmpegDownloading = "Descargando FFmpeg …"
         , FfmpegDownloadFailed = "No se pudo descargar FFmpeg. Instálelo manualmente: ffmpeg.org"
+        , SmartPlaylistDialogTitle = "Editar lista inteligente"
+        , SmartPlaylistName = "Nombre"
+        , SmartPlaylistBasicFilters = "Filtros básicos"
+        , SmartPlaylistGenres = "Géneros (separados por comas)"
+        , SmartPlaylistFormats = "Formatos (por ejemplo FLAC, MP3; separados por comas)"
+        , SmartPlaylistBitrates = "Bitrates en kbps (separados por comas)"
+        , SmartPlaylistMetadata = "Metadatos"
+        , SmartPlaylistMinimumYear = "Año desde"
+        , SmartPlaylistMaximumYear = "Año hasta"
+        , SmartPlaylistArtistContains = "El artista contiene"
+        , SmartPlaylistAlbumContains = "El álbum contiene"
+        , SmartPlaylistMinimumDuration = "Duración mínima en minutos"
+        , SmartPlaylistMaximumDuration = "Duración máxima en minutos"
+        , SmartPlaylistHistory = "Biblioteca e historial de reproducción"
+        , SmartPlaylistAddedWithinDays = "Añadido en los últimos X días"
+        , SmartPlaylistPlayedWithinDays = "Reproducido en los últimos X días"
+        , SmartPlaylistNeverPlayed = "Nunca reproducido"
+        , SmartPlaylistMinimumPlayCount = "Número mínimo de reproducciones"
+        , SmartPlaylistMaximumPlayCount = "Número máximo de reproducciones"
+        , SmartPlaylistResult = "Resultado"
+        , SmartPlaylistSortOrder = "Orden"
+        , SmartPlaylistSortTitle = "Título A–Z"
+        , SmartPlaylistSortRandom = "Aleatorio"
+        , SmartPlaylistSortLastPlayed = "Reproducidos recientemente primero"
+        , SmartPlaylistSortLeastRecentlyPlayed = "Menos recientes primero"
+        , SmartPlaylistResultLimit = "Número máximo de pistas (vacío = sin límite)"
+        , CreateSmartPlaylist = "Crear lista inteligente"
+        , InvalidSmartPlaylistCriteria = "Introduce números válidos y valores mínimos/máximos coherentes. «Nunca reproducido» no puede combinarse con reproducción reciente ni con un mínimo positivo de reproducciones."
+        , EditSmartPlaylist = "Editar lista inteligente"
+        , SmartPlaylistUpdated = "Lista inteligente '{0}' actualizada."
+        , ImportM3u8Playlist = "Importar lista M3U8"
+        , ExportM3u8Playlist = "Exportar como M3U8"
+        , M3u8ImportCompleted = "Lista '{0}' importada: {1} entradas · faltan {2} archivos locales · {3} entradas HTTP · {4} omitidas."
+        , M3u8ImportNoEntries = "El archivo M3U8 no contiene entradas importables."
+        , M3u8ImportFailed = "Error al importar M3U8: {0}"
+        , M3u8ExportCompleted = "Lista '{0}' exportada como M3U8: {1} entradas · {2} omitidas."
+        , M3u8ExportFailed = "Error al exportar M3U8: {0}"
     };
 
     /// <summary>Gets the currently active <see cref="LocalizedStrings"/> instance.</summary>

@@ -132,22 +132,26 @@
                        HorizontalAlignment="Center"
                        VerticalAlignment="Center"/>
 
-            <DataGrid ItemsSource="{Binding Rows}"
+            <DataGrid x:Name="HistoryDataGrid"
+                      ItemsSource="{Binding Rows}"
                       IsVisible="{Binding ShowGrid}"
                       AutoGenerateColumns="False"
                       IsReadOnly="True"
-                      CanUserReorderColumns="False"
+                      CanUserReorderColumns="True"
+                      CanUserResizeColumns="True"
                       SelectionMode="Single"
                       HeadersVisibility="Column"
                       GridLinesVisibility="Horizontal">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="{DynamicResource L_PlayedAt}"
                                         Binding="{Binding PlayedAt}"
+                                        Tag="playedAt"
                                         Width="90"/>
                     <DataGridTextColumn Header="{DynamicResource L_MediaType}"
                                         Binding="{Binding MediaType}"
+                                        Tag="mediaType"
                                         Width="90"/>
-                    <DataGridTemplateColumn Header="{DynamicResource L_Title}" Width="2*">
+                    <DataGridTemplateColumn Header="{DynamicResource L_Title}" Tag="title" Width="2*">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <Grid>
@@ -166,7 +170,7 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Header="{DynamicResource L_Artist}" Width="*">
+                    <DataGridTemplateColumn Header="{DynamicResource L_Artist}" Tag="artist" Width="*">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <Grid>
@@ -185,7 +189,7 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Header="{DynamicResource L_Album}" Width="*">
+                    <DataGridTemplateColumn Header="{DynamicResource L_Album}" Tag="album" Width="*">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <Grid>
@@ -206,9 +210,11 @@
                     </DataGridTemplateColumn>
                     <DataGridTextColumn Header="{DynamicResource L_ListenedDuration}"
                                         Binding="{Binding ListenedDuration}"
+                                        Tag="listened"
                                         Width="100"/>
                     <DataGridTextColumn Header="{DynamicResource L_Duration}"
                                         Binding="{Binding TotalDuration}"
+                                        Tag="duration"
                                         Width="100"/>
                 </DataGrid.Columns>
             </DataGrid>

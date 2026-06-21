@@ -15,8 +15,9 @@ public readonly record struct ScanProgress(int Current, int Total, string Curren
 /// <param name="Total">Total files discovered.</param>
 /// <param name="Added">New files added to the library.</param>
 /// <param name="Updated">Existing files whose metadata was updated.</param>
+/// <param name="Removed">Missing files removed from the library.</param>
 /// <param name="Failed">Files that could not be processed.</param>
-public readonly record struct ScanResult(int Total, int Added, int Updated, int Failed);
+public readonly record struct ScanResult(int Total, int Added, int Updated, int Removed, int Failed);
 
 /// <summary>
 /// Scans library directories with TagLibSharp, upserts track metadata into the database,
@@ -24,6 +25,7 @@ public readonly record struct ScanResult(int Total, int Added, int Updated, int 
 /// </summary>
 public static class LibraryScanner
 {
+    private static readonly SemaphoreSlim ScanGate = new(1, 1);
     private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".dsf", ".dff", ".flac", ".mp3", ".wav", ".aiff", ".aif",
@@ -37,11 +39,53 @@ public static class LibraryScanner
     /// <param name="rootPath">Root directory to scan recursively.</param>
     /// <param name="progress">Optional progress callback.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    public static Task<ScanResult> ScanAsync(
+    public static async Task<ScanResult> ScanAsync(
         string rootPath,
         IProgress<ScanProgress>? progress = null,
         CancellationToken cancellationToken = default)
-        => Task.Run(() => Scan(rootPath, progress, cancellationToken), cancellationToken);
+    {
+        await ScanGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await Task.Run(
+                () => Scan(rootPath, progress, cancellationToken),
+                cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            ScanGate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Applies a debounced set of changed, created, renamed, or deleted paths to the library.
+    /// </summary>
+    /// <param name="paths">Absolute paths reported by file-system watchers.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when database or search-index content changed.</returns>
+    public static async Task<bool> ApplyFileChangesAsync(
+        IEnumerable<string> paths,
+        CancellationToken cancellationToken = default)
+    {
+        var pathList = paths
+            .Where(IsSupportedPath)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (pathList.Count == 0)
+            return false;
+
+        await ScanGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await Task.Run(
+                () => ApplyFileChanges(pathList, cancellationToken),
+                cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            ScanGate.Release();
+        }
+    }
 
     /// <summary>
     /// Re-reads embedded artwork from a sample file for each album that is missing artwork in the database.
@@ -122,6 +166,7 @@ public static class LibraryScanner
 
         using var db = AudioDatabase.OpenDefault();
         var timestamps = db.GetPathTimestamps();
+        var refreshReplayGainMetadata = db.NeedsReplayGainMetadataScan(rootPath);
         long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
         for (int i = 0; i < files.Count; i++)
@@ -135,11 +180,13 @@ public static class LibraryScanner
                 var fi = new FileInfo(filePath);
                 long modifiedAt = new DateTimeOffset(fi.LastWriteTimeUtc).ToUnixTimeSeconds();
 
-                if (timestamps.TryGetValue(filePath, out long knownModified) && knownModified == modifiedAt)
+                if (!refreshReplayGainMetadata &&
+                    timestamps.TryGetValue(filePath, out long knownModified) &&
+                    knownModified == modifiedAt)
                     continue;
 
                 bool isNew = !timestamps.ContainsKey(filePath);
-                var record = BuildRecord(filePath, fi, modifiedAt, now);
+                var record = BuildRecord(filePath, fi, modifiedAt, now, out _);
                 db.Upsert(record);
                 changedTracks.Add(db.GetByPath(filePath) ?? record);
 
@@ -153,13 +200,98 @@ public static class LibraryScanner
 
         if (changedTracks.Count > 0)
             TrackSearchIndex.UpdateMany(changedTracks);
+        var existing = new HashSet<string>(files, StringComparer.OrdinalIgnoreCase);
+        var missingPaths = db.GetTrackPathsUnderDirectory(rootPath)
+            .Where(path => !existing.Contains(path))
+            .ToList();
+        foreach (var missingPath in missingPaths)
+            db.Delete(missingPath);
+        if (missingPaths.Count > 0)
+            TrackSearchIndex.RemovePaths(missingPaths);
         TrackSearchIndex.RemoveMissingUnderRoot(rootPath, files);
+        if (refreshReplayGainMetadata)
+            db.MarkReplayGainMetadataScanned(rootPath);
 
-        return new ScanResult(total, added, updated, failed);
+        return new ScanResult(total, added, updated, missingPaths.Count, failed);
     }
 
-    private static TrackRecord BuildRecord(string filePath, FileInfo fi, long modifiedAt, long addedAt)
+    private static bool ApplyFileChanges(
+        IReadOnlyList<string> paths,
+        CancellationToken cancellationToken)
     {
+        var updatedTracks = new List<TrackRecord>();
+        var removedPaths = new List<string>();
+        using var db = AudioDatabase.OpenDefault();
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
+        foreach (var path in paths)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!System.IO.File.Exists(path))
+            {
+                if (db.Delete(path))
+                    removedPaths.Add(path);
+                continue;
+            }
+
+            TrackRecord? record = null;
+            for (var attempt = 0; attempt < 4 && record is null; attempt++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    var file = new FileInfo(path);
+                    if (!file.Exists)
+                        break;
+                    var modifiedAt = new DateTimeOffset(file.LastWriteTimeUtc).ToUnixTimeSeconds();
+                    var candidate = BuildRecord(path, file, modifiedAt, now, out var metadataRead);
+                    if (!metadataRead)
+                    {
+                        if (attempt < 3)
+                        {
+                            Thread.Sleep(250 * (attempt + 1));
+                            continue;
+                        }
+                        break;
+                    }
+                    record = candidate;
+                }
+                catch (IOException) when (attempt < 3)
+                {
+                    Thread.Sleep(250 * (attempt + 1));
+                }
+                catch (UnauthorizedAccessException) when (attempt < 3)
+                {
+                    Thread.Sleep(250 * (attempt + 1));
+                }
+            }
+
+            if (record is null)
+                continue;
+
+            db.Upsert(record);
+            updatedTracks.Add(db.GetByPath(path) ?? record);
+        }
+
+        if (updatedTracks.Count > 0)
+            TrackSearchIndex.UpdateMany(updatedTracks);
+        if (removedPaths.Count > 0)
+            TrackSearchIndex.RemovePaths(removedPaths);
+        return updatedTracks.Count > 0 || removedPaths.Count > 0;
+    }
+
+    private static bool IsSupportedPath(string path) =>
+        !string.IsNullOrWhiteSpace(path) &&
+        SupportedExtensions.Contains(Path.GetExtension(path));
+
+    private static TrackRecord BuildRecord(
+        string filePath,
+        FileInfo fi,
+        long modifiedAt,
+        long addedAt,
+        out bool metadataRead)
+    {
+        metadataRead = false;
         var ext = Path.GetExtension(filePath).ToLowerInvariant();
 
         var record = new TrackRecord
@@ -219,6 +351,9 @@ public static class LibraryScanner
             record.MusicBrainzTrackId   = NullIfEmpty(tag.MusicBrainzTrackId);
             record.MusicBrainzReleaseId = NullIfEmpty(tag.MusicBrainzReleaseId);
             record.MusicBrainzArtistId  = NullIfEmpty(tag.MusicBrainzArtistId);
+            record.ReplayGainTrack      = FormatReplayGain(tag.ReplayGainTrackGain);
+            record.ReplayGainAlbum      = FormatReplayGain(tag.ReplayGainAlbumGain);
+            metadataRead = true;
 
             var pic = tag.Pictures?.FirstOrDefault(p => p.Type == PictureType.FrontCover)
                    ?? tag.Pictures?.FirstOrDefault();
@@ -277,4 +412,9 @@ public static class LibraryScanner
         => arr is { Length: > 0 }
             ? NullIfEmpty(string.Join("; ", arr.Select(value => value.Trim()).Where(value => value.Length > 0)))
             : null;
+
+    private static string? FormatReplayGain(double gain) =>
+        double.IsNaN(gain) || double.IsInfinity(gain)
+            ? null
+            : gain.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
 }

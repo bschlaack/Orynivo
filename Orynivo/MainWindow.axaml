@@ -357,7 +357,7 @@
                         <Track Name="PART_Track"
                                Minimum="{TemplateBinding Minimum}"
                                Maximum="{TemplateBinding Maximum}"
-                               Value="{TemplateBinding Value}"
+                               Value="{Binding Value, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
                                Orientation="{TemplateBinding Orientation}"
                                VerticalAlignment="Center">
                             <Track.DecreaseButton>
@@ -534,6 +534,12 @@
         </Style>
         <Style Selector="DataGridRow:selected">
             <Setter Property="Background" Value="{DynamicResource AppSurfaceSelectedBrush}"/>
+        </Style>
+        <Style Selector="DataGridRow.nowPlaying:not(:selected)">
+            <Setter Property="Background" Value="{DynamicResource AppNowPlayingRowBrush}"/>
+        </Style>
+        <Style Selector="DataGridRow.nowPlaying:pointerover:not(:selected)">
+            <Setter Property="Background" Value="{DynamicResource AppNowPlayingRowBrush}"/>
         </Style>
         <Style Selector="DataGridCell">
             <Setter Property="BorderThickness" Value="0"/>
@@ -1278,8 +1284,10 @@
                               GridLinesVisibility="Horizontal"
                               HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
                               AutoGenerateColumns="False"
+                              CanUserResizeColumns="True"
                               IsReadOnly="True"
                               SelectionMode="Single"
+                              LoadingRow="TrackDataGrid_OnLoadingRow"
                               DoubleTapped="RadioStationsDataGrid_OnMouseDoubleClick">
                         <DataGrid.Columns>
                             <DataGridTemplateColumn Width="70">
@@ -1303,16 +1311,40 @@
                             </DataGridTemplateColumn>
                             <DataGridTextColumn Header="{DynamicResource L_RadioStation}"
                                                 Binding="{Binding Name}"
+                                                Tag="name"
                                                 Width="*"/>
                             <DataGridTextColumn Header="{DynamicResource L_Country}"
                                                 Binding="{Binding CountryCode}"
+                                                Tag="country"
                                                 Width="90"/>
                             <DataGridTextColumn Header="{DynamicResource L_Genre}"
                                                 Binding="{Binding GenreSummary}"
+                                                Tag="genre"
                                                 Width="180"/>
                             <DataGridTextColumn Header="{DynamicResource L_Format}"
                                                 Binding="{Binding FormatSummary}"
+                                                Tag="format"
                                                 Width="120"/>
+                            <DataGridTextColumn Header="{DynamicResource L_Codec}"
+                                                Binding="{Binding Codec}"
+                                                Tag="codec"
+                                                IsVisible="False"
+                                                Width="100"/>
+                            <DataGridTextColumn Header="{DynamicResource L_Bitrate}"
+                                                Binding="{Binding BitrateSummary}"
+                                                Tag="bitrate"
+                                                IsVisible="False"
+                                                Width="90"/>
+                            <DataGridTextColumn Header="{DynamicResource L_Tags}"
+                                                Binding="{Binding Tags}"
+                                                Tag="tags"
+                                                IsVisible="False"
+                                                Width="220"/>
+                            <DataGridTextColumn Header="{DynamicResource L_Homepage}"
+                                                Binding="{Binding Homepage}"
+                                                Tag="homepage"
+                                                IsVisible="False"
+                                                Width="220"/>
                             <DataGridTemplateColumn Width="120">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
@@ -1514,6 +1546,7 @@
                               GridLinesVisibility="Horizontal"
                               HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
                               AutoGenerateColumns="False"
+                              CanUserResizeColumns="True"
                               IsReadOnly="True"
                               SelectionMode="Single"
                               DoubleTapped="PodcastsDataGrid_OnMouseDoubleClick">
@@ -1539,16 +1572,25 @@
                             </DataGridTemplateColumn>
                             <DataGridTextColumn Header="{DynamicResource L_Podcast}"
                                                 Binding="{Binding Name}"
+                                                Tag="podcast"
                                                 Width="*"/>
                             <DataGridTextColumn Header="{DynamicResource L_PodcastAuthor}"
                                                 Binding="{Binding Author}"
+                                                Tag="author"
                                                 Width="220"/>
                             <DataGridTextColumn Header="{DynamicResource L_Genre}"
                                                 Binding="{Binding Genre}"
+                                                Tag="genre"
                                                 Width="150"/>
                             <DataGridTextColumn Header="{DynamicResource L_PodcastLanguage}"
                                                 Binding="{Binding LanguageDisplay}"
+                                                Tag="language"
                                                 Width="110"/>
+                            <DataGridTextColumn Header="{DynamicResource L_FeedUrl}"
+                                                Binding="{Binding FeedUrl}"
+                                                Tag="feed"
+                                                IsVisible="False"
+                                                Width="280"/>
                             <DataGridTemplateColumn Width="160">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
@@ -1660,25 +1702,32 @@
                                   RowHeight="54"
                                   GridLinesVisibility="Horizontal"
                                   HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
-                                  AutoGenerateColumns="False"
+                            AutoGenerateColumns="False"
+                            CanUserResizeColumns="True"
                                   IsReadOnly="True"
                                   SelectionMode="Single"
+                                  LoadingRow="TrackDataGrid_OnLoadingRow"
                                   DoubleTapped="PodcastEpisodesDataGrid_OnMouseDoubleClick">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="{DynamicResource L_PodcastStatus}"
                                                     Binding="{Binding Status}"
+                                                    Tag="status"
                                                     Width="90"/>
                                 <DataGridTextColumn Header="{DynamicResource L_Title}"
                                                     Binding="{Binding Title}"
+                                                    Tag="title"
                                                     Width="*"/>
                                 <DataGridTextColumn Header="{DynamicResource L_Published}"
                                                     Binding="{Binding Published}"
+                                                    Tag="published"
                                                     Width="120"/>
                                 <DataGridTextColumn Header="{DynamicResource L_Duration}"
                                                     Binding="{Binding Duration}"
+                                                    Tag="duration"
                                                     Width="90"/>
                                 <DataGridTextColumn Header="{DynamicResource L_Progress}"
                                                     Binding="{Binding Progress}"
+                                                    Tag="progress"
                                                     Width="130"/>
                             </DataGrid.Columns>
                         </DataGrid>
@@ -1707,9 +1756,9 @@
                         HorizontalAlignment="Center"
                         MaxWidth="920"
                         Background="{DynamicResource AppSurfaceBrush}"
-                        BorderBrush="{DynamicResource AppGridLineBrush}"
+                        BorderBrush="#6C63FF"
                         BorderThickness="1"
-                        CornerRadius="12">
+                        CornerRadius="0,24,0,24">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="240"/>
@@ -1772,9 +1821,22 @@
                                        Margin="0,8,0,0"
                                        FontSize="14"
                                        Foreground="{DynamicResource AppMutedTextBrush}"/>
+                            <Button Content="{Binding FavoriteGlyph}"
+                                    Tag="{Binding}"
+                                    Margin="0,18,0,0"
+                                    Width="40"
+                                    Height="36"
+                                    Padding="0"
+                                    HorizontalAlignment="Left"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"
+                                    FontSize="20"
+                                    ToolTip.Tip="{DynamicResource L_MarkAsFavorite}"
+                                    Theme="{StaticResource HeaderFilterButtonTheme}"
+                                    Click="AlbumDetailFavoriteButton_OnClick"/>
                             <Button Content="{DynamicResource L_SearchCover}"
                                     Tag="{Binding}"
-                                    Margin="0,22,0,0"
+                                    Margin="0,12,0,0"
                                     Padding="14,7"
                                     HorizontalAlignment="Left"
                                     Theme="{StaticResource HeaderFilterButtonTheme}"
@@ -1800,6 +1862,7 @@
                           GridLinesVisibility="Horizontal"
                           HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
                           AutoGenerateColumns="False"
+                          CanUserResizeColumns="True"
                           IsReadOnly="True"
                           SelectionMode="Single"
                           FontSize="12"
@@ -1830,10 +1893,12 @@
                                       Background="{DynamicResource AppSurfaceBrush}"
                                       BorderThickness="0"
                                       AutoGenerateColumns="False"
+                                      CanUserResizeColumns="True"
                                       IsReadOnly="True"
                                       HeadersVisibility="Column"
                                       GridLinesVisibility="Horizontal"
                                       HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
+                                      LoadingRow="TrackDataGrid_OnLoadingRow"
                                       DoubleTapped="SearchTracksDataGrid_OnMouseDoubleClick"
                                       PointerPressed="SearchTracksDataGrid_OnPreviewMouseRightButtonDown"/>
                             <TextBlock x:Name="SearchTracksEmptyTextBlock"
@@ -1859,6 +1924,7 @@
                                       Background="{DynamicResource AppSurfaceBrush}"
                                       BorderThickness="0"
                                       AutoGenerateColumns="False"
+                                      CanUserResizeColumns="True"
                                       IsReadOnly="True"
                                       HeadersVisibility="Column"
                                       GridLinesVisibility="Horizontal"
@@ -1887,6 +1953,7 @@
                                       Background="{DynamicResource AppSurfaceBrush}"
                                       BorderThickness="0"
                                       AutoGenerateColumns="False"
+                                      CanUserResizeColumns="True"
                                       IsReadOnly="True"
                                       HeadersVisibility="Column"
                                       GridLinesVisibility="Horizontal"
@@ -2612,8 +2679,6 @@
                                 Theme="{StaticResource DarkSliderTheme}"
                                 Height="30"
                                 Minimum="0" Maximum="1" IsEnabled="False"
-                                PointerPressed="PositionSlider_OnPreviewMouseLeftButtonDown"
-                                PointerReleased="PositionSlider_OnPreviewMouseLeftButtonUp"
                                 ValueChanged="PositionSlider_OnValueChanged"/>
                         <TextBlock x:Name="DurationTextBlock"
                                    Grid.Column="2"

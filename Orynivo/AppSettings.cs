@@ -26,6 +26,17 @@ public sealed class AppSettings
     public bool ArtistArtworkView { get; set; }
     /// <summary>Gets or sets the master playback volume (0.0 – 1.0).</summary>
     public double Volume { get; set; } = 1.0;
+    /// <summary>Gets or sets the ReplayGain mode used for PCM playback.</summary>
+    public ReplayGainMode ReplayGainMode { get; set; } = ReplayGainMode.Off;
+    /// <summary>Gets or sets user-adjusted table column widths grouped by stable table key.</summary>
+    public Dictionary<string, List<double>> DataGridColumnWidths { get; set; } =
+        new(StringComparer.Ordinal);
+    /// <summary>Gets or sets visible selectable column identifiers grouped by stable table key.</summary>
+    public Dictionary<string, List<string>> VisibleDataGridColumns { get; set; } =
+        new(StringComparer.Ordinal);
+    /// <summary>Gets or sets user-defined column orders grouped by stable table key.</summary>
+    public Dictionary<string, List<string>> DataGridColumnOrders { get; set; } =
+        new(StringComparer.Ordinal);
     /// <summary>Gets or sets the file path of the last played track, used to restore the queue on restart.</summary>
     public string? LastTrackPath { get; set; }
     /// <summary>Gets or sets the application colour theme.</summary>

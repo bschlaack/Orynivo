@@ -287,6 +287,22 @@
                                Margin="0,12,0,0"
                                TextWrapping="Wrap"
                                Foreground="{DynamicResource AppMutedTextBrush}"/>
+
+                    <Separator Margin="0,18,0,14"/>
+
+                    <TextBlock Text="{DynamicResource L_ReplayGain}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+                    <ComboBox x:Name="ReplayGainModeComboBox"
+                              Height="30"
+                              MinWidth="360"
+                              HorizontalAlignment="Stretch"
+                              Margin="0,0,0,8"/>
+                    <TextBlock Text="{DynamicResource L_ReplayGainHint}"
+                               FontSize="11"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"/>
                 </StackPanel>
 
                 <StackPanel x:Name="LibraryPanel"

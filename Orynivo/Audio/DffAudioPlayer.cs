@@ -90,6 +90,12 @@ public sealed class DffAudioPlayer : IAudioPlayer
     /// <inheritdoc/>
     public float Volume { get; set; } = 1.0f;
     /// <inheritdoc/>
+    public float ReplayGainFactor
+    {
+        get => 1.0f;
+        set { }
+    }
+    /// <inheritdoc/>
     public void Pause() => _paused = true;
     /// <inheritdoc/>
     public void Resume() => _paused = false;

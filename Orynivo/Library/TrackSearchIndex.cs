@@ -110,6 +110,26 @@ public static class TrackSearchIndex
         writer.Commit();
     }
 
+    /// <summary>Removes index documents for the specified absolute file paths.</summary>
+    /// <param name="paths">File paths whose documents should be deleted.</param>
+    public static void RemovePaths(IEnumerable<string> paths)
+    {
+        var pathList = paths
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (pathList.Count == 0 || !Exists())
+            return;
+
+        using var directory = FSDirectory.Open(Root);
+        using var analyzer = CreateAnalyzer();
+        var config = new IndexWriterConfig(Version, analyzer);
+        using var writer = new IndexWriter(directory, config);
+        foreach (var path in pathList)
+            writer.DeleteDocuments(new Term("path", path));
+        writer.Commit();
+    }
+
     /// <summary>
     /// Removes index documents for paths under <paramref name="rootPath"/> that are not in
     /// <paramref name="existingPaths"/>, keeping the index consistent after a rescan.
@@ -133,7 +153,10 @@ public static class TrackSearchIndex
             var path = doc.Get("path");
             if (string.IsNullOrWhiteSpace(path))
                 continue;
-            if (!path.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))
+            var relative = IOPath.GetRelativePath(rootPath, path);
+            if (relative == ".." ||
+                relative.StartsWith($"..{IOPath.DirectorySeparatorChar}", StringComparison.Ordinal) ||
+                IOPath.IsPathRooted(relative))
                 continue;
             if (existing.Contains(path))
                 continue;

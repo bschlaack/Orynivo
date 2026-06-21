@@ -75,6 +75,16 @@ public partial class SettingsWindow : Window
         };
         LanguageComboBox.ItemsSource = languageChoices;
         LanguageComboBox.SelectedItem = languageChoices.First(choice => choice.Value == settings.Language);
+        var replayGainChoices = new[]
+        {
+            new SettingChoice<ReplayGainMode>(ReplayGainMode.Off, LocalizationManager.Current.ReplayGainOff),
+            new SettingChoice<ReplayGainMode>(ReplayGainMode.Track, LocalizationManager.Current.ReplayGainTrack),
+            new SettingChoice<ReplayGainMode>(ReplayGainMode.Album, LocalizationManager.Current.ReplayGainAlbum)
+        };
+        ReplayGainModeComboBox.ItemsSource = replayGainChoices;
+        ReplayGainModeComboBox.SelectedItem =
+            replayGainChoices.FirstOrDefault(choice => choice.Value == settings.ReplayGainMode)
+            ?? replayGainChoices[0];
         ShowLocalLibrarySectionCheckBox.IsChecked = settings.ShowLocalLibrarySection;
         ShowOwnRadiosSectionCheckBox.IsChecked = settings.ShowOwnRadiosSection;
         ShowMyPodcastsSectionCheckBox.IsChecked = settings.ShowMyPodcastsSection;
@@ -109,6 +119,11 @@ public partial class SettingsWindow : Window
         OutputBackendComboBox.SelectedItem is SettingChoice<OutputBackend> choice
             ? choice.Value
             : OutputBackend.Wasapi;
+    /// <summary>Gets the ReplayGain mode selected in the settings window.</summary>
+    public ReplayGainMode SelectedReplayGainMode =>
+        ReplayGainModeComboBox.SelectedItem is SettingChoice<ReplayGainMode> choice
+            ? choice.Value
+            : ReplayGainMode.Off;
     public IReadOnlyList<string> SelectedLibraryPaths => _libraryPaths.AsReadOnly();
     public AppTheme SelectedTheme =>
         ThemeComboBox.SelectedItem is SettingChoice<AppTheme> theme ? theme.Value : AppTheme.Dark;
@@ -478,7 +493,7 @@ public partial class SettingsWindow : Window
                     : string.Empty;
                 statusBlock.Text = string.Format(
                     LocalizationManager.Current.ScanCompleted,
-                    result.Total, result.Added, result.Updated, failed);
+                    result.Total, result.Added, result.Updated, result.Removed, failed);
             }
             catch (OperationCanceledException)
             {

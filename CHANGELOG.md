@@ -4,7 +4,93 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.7.0] - 2026-06-21
+
+### Added
+
+- Expanded smart playlists with a dedicated localized editor for year, artist,
+  album, duration, recently added or played windows, never-played tracks,
+  minimum/maximum play counts, random or playback-recency ordering, and result
+  limits. Creating a smart playlist remains the compact active-filter workflow;
+  the advanced editor is available by right-clicking an existing smart
+  playlist in the sidebar. Existing smart-playlist JSON stays compatible.
+- Added automatic recursive library monitoring with one `FileSystemWatcher`
+  per available configured root. Create, change, rename, and delete events are
+  debounced before updating SQLite and Lucene, while a full reconciliation runs
+  after 10 minutes and every 30 minutes as protection against missed or
+  overflowed watcher events.
+- Manual scans, watcher batches, and periodic reconciliation now share a single
+  scanner gate. Full scans also remove missing tracks from SQLite, not only
+  Lucene, and scan results report the removed-file count.
+- Added drag-and-drop reordering for data columns. Column order is persisted
+  independently per table and dynamic main-content view, while fixed artwork
+  and action columns retain their structural positions.
+- Added a localized, context-sensitive column chooser opened by right-clicking
+  table headers. Local track tables can show additional tag, file, technical,
+  date, and ReplayGain metadata; radio and podcast tables expose only relevant
+  catalog fields. Selections persist per table/view, while artwork/action
+  columns remain fixed and at least one data column stays visible. Active
+  columns have an explicit check mark and selected-row background in the menu.
+- Added user-resizable columns to all application tables. Widths are persisted
+  per table and main-content view in `settings.json`, captured before dynamic
+  column sets are replaced, and restored on the next application start.
+- Added optional ReplayGain volume adjustment for PCM playback with disabled,
+  track, and album modes. The preferred value falls back to the other available
+  ReplayGain tag, gain is combined with the user volume using saturating sample
+  conversion, and native ASIO DSD output remains bit-perfect.
+- Library scans now import track and album ReplayGain metadata. Each configured
+  library root receives a one-time refresh of unchanged tracks on its first
+  scan after this update.
+- Added UTF-8 M3U8 import and export for regular playlists. Relative paths are
+  resolved against the playlist file and written relatively where possible;
+  missing local files and HTTP/HTTPS entries are retained, while URLs carrying
+  user-info credentials or Plex tokens are skipped. Smart playlists remain
+  live and are not exported as static M3U8 files.
+- Added gapless playback for sequential PCM queues through ASIO, cwASIO, and
+  exclusive WASAPI. The next FFmpeg decoder is started and prefetched while
+  the current track is playing, then continues through the existing device
+  session. Transport metadata, ReplayGain, and playback history follow the
+  audible buffered-frame boundary. Shuffle and native ASIO DSD retain
+  title-by-title playback.
+- Added a themed favorite button to the album detail header shown above an
+  album's track list. Its heart state updates immediately and persists the
+  album favorite without leaving the detail view.
+- Matched the album detail header to the shared radio, podcast, and library
+  card design with the accent-colored border and asymmetric rounded corners.
+
+### Fixed
+
+- Added a theme-aware background highlight for the currently audible item in
+  track, search, radio, and podcast-episode tables. The highlight follows
+  gapless transitions, clears when playback stops, survives navigation back to
+  a list, and does not override the stronger selected-row background.
+- Restored seek-slider dragging and track-position clicks during multi-track
+  gapless PCM playback. Seeking now clears buffered output, restarts the
+  current decoder at the selected position, and prepares the following track
+  again. User-volume changes are applied at the live ASIO/WASAPI output stage
+  instead of being delayed by already prefetched PCM samples.
+- Synchronized the WASAPI transport volume bidirectionally with the selected
+  Windows output device. Changes made through Windows now update the displayed
+  slider and percentage. The custom position-slider thumb also uses an
+  explicit two-way value binding and handled pointer-release routing, restoring
+  dragging as well as direct track clicks.
+- Fixed the position slider jumping backwards after seeking when the current
+  track reached its buffered end during gapless playback. Seek offsets are now
+  tracked independently per queued title and remain active until that title is
+  no longer audible.
+- Restored sidebar context menus for personal radio stations, pinned podcasts,
+  regular playlists, and smart playlists. Dynamic entries now use Avalonia
+  `MenuFlyout` instances opened at the pointer position. Right-button presses
+  are intercepted before the `ListBox` selection logic, while accordion and
+  repeated-item navigation handlers explicitly ignore non-left mouse buttons.
+  Flyout surfaces, borders, text, hover, pressed, and separator colors follow
+  the active Orynivo theme.
+- Unified the table-header column chooser with the same themed `MenuFlyout`
+  presentation. It remains open while multiple columns are toggled and still
+  prevents hiding the final selectable column. Explicit menu entries now share
+  the same theme-aware text colors in sidebar and table-header flyouts.
+
+## [0.6.0] - 2026-06-19
 
 ### Added
 
@@ -23,6 +109,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Fixed the table-header column chooser not opening on right-click and then
+  crashing because Avalonia 11.2 retained internal ownership for dynamically
+  attached `ContextMenu` instances. The chooser no longer calls the
+  `ContextMenu` API.
 - Corrected themed scrollbar behavior so arrow buttons move one row and clicks
   above or below the thumb move by one visible table page with one-row overlap.
   Track-table A-Z highlighting now follows the top visible row during manual

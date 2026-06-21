@@ -39,18 +39,33 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 
 - `Orynivo/Audio/SteinbergAsioStream.cs`: runtime-selecting C# wrapper for `AsioBridge.dll` and `CwAsioBridge.dll`
 - `Orynivo/Audio/FfmpegAudioPlayer.cs`: PCM path
+- `Orynivo/Audio/FfmpegPcmDecoder.cs`: FFmpeg PCM decoder process with an
+  initial prefetched block used for gapless transitions
 - `Orynivo/Audio/FfmpegLocator.cs`: checks `AppContext.BaseDirectory` and PATH for `ffmpeg.exe`/`ffprobe.exe` at startup; when absent, downloads the BtbN LGPL-essential Windows build from GitHub Releases, extracts the binaries next to the executable, and prepends the directory to the current-process PATH
 - `Orynivo/Audio/DsfAudioPlayer.cs`: native DSF-to-DSD path
 - `Orynivo/Audio/DffAudioPlayer.cs`: native DFF/DSDIFF-to-DSD path
 - `Orynivo/Audio/WasapiAudioPlayer.cs`: exclusive-mode WASAPI PCM path; converts
   DSD sources to PCM in real time and selects a supported output sample rate
 - `Orynivo/Audio/WasapiDeviceProvider.cs`: WASAPI devices and capability queries
+- `Orynivo/Audio/WindowsEndpointVolumeSynchronizer.cs`: bidirectional
+  synchronization between the transport volume slider and the selected
+  Windows render endpoint's master volume
+- `Orynivo/Audio/ReplayGain.cs` and `ReplayGainMode.cs`: parse persisted
+  track/album gain values, select the configured fallback mode, and calculate
+  the linear PCM gain factor
 - `Native/AsioBridge/bridge.cpp`: shared Steinberg/cwASIO initialization, PCM/DSD ring buffers, and callback
 - `Native/CwAsioBridge/CwAsioBridge.vcxproj`: builds the shared bridge against vendored cwASIO
 - `third_party/cwasio/`: pinned MIT-licensed cwASIO host and compatibility sources
 - `Orynivo/SettingsWindow.*`: two-column settings window with navigation on the
   left and the selected section on the right
 - `Orynivo/ThemeManager.cs`: sets global Avalonia resources for light and dark themes
+- `Orynivo/Controls/DataGridColumnWidthStore.cs`: validates, captures, and
+  restores per-table pixel widths
+- `Orynivo/Controls/DataGridColumnOrderStore.cs`: captures and restores
+  identified data-column display order while retaining fixed-column slots
+- `Orynivo/Controls/DataGridColumnChooser.cs`: opens the themed `MenuFlyout`
+  for column visibility at the clicked header; entries remain open while
+  toggling multiple columns
 - `Orynivo/Localization/*`: language model and localized German, English, French, and Spanish strings
 - `Orynivo/StartupWindow.*`: lightweight splash screen shown during initial database preparation and migration
 - `Orynivo/Assets/Orynivo_Logo.png`: embedded full logo used by the splash screen and main sidebar
@@ -70,14 +85,29 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   `AppSettings.ArtistArtworkView` preserve the selected main view and entity
   artwork/table modes
 - `AppSettings.Volume` and `AppSettings.LastTrackPath` preserve volume and the last selected or played track; restoration requires both the file and database entry to exist
+- `AppSettings.ReplayGainMode` selects disabled, track, or album ReplayGain for PCM playback; native ASIO DSD remains bit-perfect
+- `AppSettings.DataGridColumnWidths` persists user-adjusted pixel widths per stable table/view key; dynamic main-content views capture their current widths before replacing columns
+- `AppSettings.VisibleDataGridColumns` persists selectable column IDs per table/view key; right-clicking any table header opens the context-appropriate column chooser flyout
+- `AppSettings.DataGridColumnOrders` persists drag-and-drop display order per stable table/view key; fixed artwork and action columns keep their structural positions
 - `AppSettings.Theme` stores the `Light` or `Dark` theme
 - `AppSettings.Language` stores `German`, `English`, `French`, or `Spanish`
 - `Orynivo/Library/TrackRecord.cs`: database track model containing tags and technical metadata
 - `Orynivo/Library/PlaylistRecord.cs`: playlist model including denormalized `TrackCount`, `IsSmartPlaylist`, and `FilterCriteria`
-- `Orynivo/Library/SmartPlaylistCriteria.cs`: serialized smart-playlist criteria (`FavoritesOnly`, `Genres`, `Formats`, `Bitrates`)
+- `Orynivo/Library/SmartPlaylistCriteria.cs`: backward-compatible serialized
+  smart-playlist criteria covering favourites, genres, formats, bitrates,
+  metadata ranges, library/play-history rules, ordering, and result limits
+- `Orynivo/SmartPlaylistDialog.*`: localized editor for the name and advanced
+  criteria of an existing smart playlist
 - `Orynivo/Library/PlaylistTrackRecord.cs`: playlist entry model with position, optional TrackId reference, and required path
+- `Orynivo/Library/M3u8PlaylistService.cs`: UTF-8 M3U8 import/export with
+  relative local-path resolution, relative export paths, missing-file
+  preservation, HTTP/HTTPS entries, and rejection of credential-bearing URLs
 - `Orynivo/Library/AudioDatabase.cs`: SQLite database layer through `Microsoft.Data.Sqlite`; database at `%LOCALAPPDATA%\Orynivo\library.db`
 - `Orynivo/Library/LibraryScanner.cs`: directory scanner using TagLibSharp; writes through `AudioDatabase.Upsert()`, reports progress, and supports cancellation
+- `Orynivo/Library/LibraryWatcherService.cs`: owns one recursive
+  `FileSystemWatcher` per available configured library root, debounces paths for
+  900 ms, applies incremental create/change/rename/delete updates, and runs a
+  full reconciliation after 10 minutes and every 30 minutes thereafter
 - `Orynivo/Library/LibraryBackupService.cs`: versioned ZIP export/import for the SQLite library, artwork cache, and configured library directories; audio files are not included
 - `Orynivo/Library/LyricsService.cs`: LRCLIB client and LRC parser for downloaded plain or synchronized lyrics
 - `Orynivo/Library/RadioBrowserService.cs`: Radio Browser client with mirror discovery, station search, and click registration
@@ -112,10 +142,22 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - `GetPathTimestamps()` returns paths and modification timestamps for efficient rescans
 - WAL journal mode is enabled
 - Multiple library directories are stored in `AppSettings.LibraryPaths`
+- Configured, currently available library directories are watched recursively.
+  Watchers are replaced immediately when Settings adds, removes, or imports
+  paths; unavailable roots are retried by periodic reconciliation.
 - Each directory in Settings has its own Scan button, which becomes Cancel while scanning, with progress shown below the entry
 - Directories can be added or removed; active scans are canceled when a directory is removed or the window closes
 - Scans skip unchanged files and do not overwrite `added_at`
+- Manual scans, watcher batches, and periodic reconciliations share one scanner
+  gate so SQLite and Lucene updates cannot run concurrently.
+- Watcher create/change/rename/delete events update SQLite and Lucene together.
+  Renames enqueue both old and new paths; changed files are retried briefly
+  while another process still holds them.
+- Full scans are the authoritative fallback: they upsert new/changed files and
+  remove missing paths from both SQLite and Lucene, covering lost or overflowed
+  file-system events.
 - Metadata extraction supports ID3v1/v2, Vorbis Comments, APE tags, and embedded artwork
+- Metadata extraction stores track and album ReplayGain values. The first scan of each configured root after ReplayGain support was added refreshes unchanged tracks once so existing libraries receive those values.
 - Opening the database runs a legacy-data migration that normalizes artists, albums, and artwork and removes old per-track artwork BLOBs
 - `album_artist_rebuild_v1` rebuilds album assignments strictly from `album_artist` so compilations are not split by track artist
 - `album_title_uniqueness_v1` consolidates albums by unique title and uses the first album artist when multiple artists exist
@@ -125,6 +167,13 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - Missing covers show a placeholder and manual MusicBrainz search by editable album title
 - The manual cover-search dialog uses the themed native title bar, shows search activity and explicit empty results, and can be run repeatedly
 - Album artwork has a context menu for deletion or reassignment through manual MusicBrainz search
+- The album track detail header includes a themed heart button bound to the
+  album's favorite state. Toggling it updates `albums.is_favorite` in place
+  without leaving the detail view, including when opened from a favorites-only
+  album list.
+- The album track detail header uses the same accent border and asymmetric
+  `CornerRadius="0,24,0,24"` card shape as the radio, podcast, and shared
+  library intro cards.
 - The main window starts maximized
 - `artwork_files_v1` exports legacy artwork BLOBs into the file cache; `artworks.data` remains for compatibility with old `NOT NULL` schemas
 - Thumbnail generation is intentionally fault tolerant; invalid embedded artwork must not prevent startup
@@ -156,6 +205,17 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - Dynamically created menu objects receive their styles through Avalonia
   `ControlTheme` resources looked up via `TryGetResource`
 - **Delete playlist** appears in the sidebar playlist context menu, removes the database record, refreshes the sidebar, and returns to Tracks if needed
+- Dynamic radio, podcast, and playlist `ListBoxItem` instances receive a
+  `MenuFlyout` through `ContextFlyout` when they are created. A tunnel-phase
+  right-button handler marks the initial press handled before
+  `SelectingItemsControl` can change selection and opens the flyout with
+  `ShowAt(item, showAtPointer: true)`. The flyouts use dedicated presenter and
+  item themes based on the Fluent defaults with Orynivo's dynamic surface,
+  border, text, hover, pressed, and separator resources. Sidebar accordion and
+  repeated-selection handlers must explicitly accept only the left mouse
+  button. Explicitly created `MenuItem` objects must also receive the shared
+  item theme directly; `ItemContainerTheme` alone does not reliably restyle
+  preconstructed controls.
 - **Remove from playlist** appears only for regular playlist entries with a `PlaylistEntryId`
 - `_activePlaylistId` is set by `ShowTopLevelViewAsync` only for playlist views
 - `ContentRow.PlaylistEntryId` contains `playlist_tracks.id` only in regular playlist views
@@ -168,22 +228,30 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - Nullable `track_id` keeps playlist entries after a library track is removed; `path` is always present
 - `EnsureColumn` upgrades existing databases when new columns are introduced
 - Available methods include `CreatePlaylist`, `CreateSmartPlaylist`, `UpdatePlaylist`, `DeletePlaylist`, `GetAllPlaylists`, `GetPlaylistById`, `GetPlaylistTracks`, `AddTrackToPlaylist`, `RemoveTrackFromPlaylist`, and transactional `MovePlaylistTrack`
+- `CreatePlaylist(name, paths)` imports playlist entries transactionally and
+  links matching local paths to existing library tracks
 
 ## Performance Measures
 
 - `GetTracksLite()` loads only path, file name, title, disc number, and track number for the folder tree
 - `GetArtistsLite()` loads artist IDs, names, favorite state, and cached profile data without loading tracks
 - `GetAlbumsLite(includeArtwork)` loads only album, display artist, and year unless artwork is requested
-- `GetTrackList()` loads only visible track-list columns
+- `GetTrackList()` and related list queries load compact scalar metadata used by
+  selectable track columns, but continue to omit artwork BLOBs and lyrics text
 - `GetTrackListByIds(ids)` batches large ID sets to stay below SQLite variable limits
 - `GetTracksByDirectory(dirPath)` uses an SQL prefix query plus a direct-child filter
 - `GetTrackPathsUnderDirectory(rootPath)` returns all recursive track paths below a root
 - Folder-tree lazy loading uses an in-memory parent-to-children map and creates
   items only when expanded
 - `TrackLite`, `TrackListInfo`, `ArtistInfo`, and `AlbumInfo` remain intentionally small; `TrackRecord` is reserved for complete metadata operations
+- `GetTrackFacets()` remains a lightweight interactive-filter query;
+  `GetSmartPlaylistTracks()` separately aggregates playback counts and the last
+  playback timestamp only while resolving a smart playlist
 - Artwork is deduplicated instead of stored per track
 - `TrackSearchIndex.cs` stores a Lucene.NET index under `%LOCALAPPDATA%\Orynivo\search-index`, supports category-specific fields, partial words, and German umlaut/eszett variants, rebuilds stale indexes, updates incrementally after scans, and removes missing files below rescanned roots
 - Search-index freshness is determined by the stored schema marker; indexed `Field.Store.NO` fields must not be tested through stored-document field access
+- `TrackSearchIndex.RemovePaths(paths)` removes explicit watcher/full-scan
+  deletions without rebuilding the complete index.
 - Track `title` and `sort_title` values are trimmed before database persistence
   and again before Lucene indexing; future metadata/indexing changes must
   preserve this invariant so A-Z ordering is not affected by surrounding
@@ -219,12 +287,38 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - Transport uses custom vector icons for previous, play/pause, and next; unavailable queue directions are disabled
 - Seeking is implemented for ASIO PCM, WASAPI PCM, DSF, and DFF
 - Loading a file or folder builds a playback queue; completion advances automatically
+- Sequential PCM queues use one persistent ASIO/cwASIO or exclusive WASAPI
+  output session. The next FFmpeg decoder is started and prefetched while the
+  current track plays, then its samples are appended without reopening the
+  device. Audible track changes are derived from rendered/buffered frame
+  counts so transport metadata and playback history change at the actual
+  boundary.
+- Gapless playback is disabled for shuffle queues and native ASIO DSD
+  (DSF/DFF). Those paths retain title-by-title device handling; DSD converted
+  to PCM through WASAPI participates in the PCM gapless pipeline.
+- Seeking remains available inside multi-track gapless PCM sessions. A seek
+  clears buffered output, restarts the current FFmpeg decoder at the selected
+  position, and rebuilds preparation of the following track.
+- Gapless PCM position offsets are stored per queued track. Preparing or
+  writing the next decoder must not reset the seek offset of the track that is
+  still audible; the transport changes offsets only with the rendered track
+  boundary.
+- PCM user volume is applied at the active output stage rather than baked into
+  prefetched samples: WASAPI follows the selected Windows endpoint's master
+  volume bidirectionally and the native ASIO bridge applies an atomic volume
+  factor in its callback. Per-track ReplayGain remains part of PCM sample
+  preparation.
 - The transport action buttons for artist information, lyrics, favorite, and shuffle are left-aligned above the position slider; previous/play/next remain independently centered
 - When the transport area becomes narrow, the centered previous/play/next group shifts right only enough to keep a 12 px gap from the left action buttons
 - The position slider keeps the standard thumb size but exposes a 30 px transparent vertical hit area; clicking anywhere in that area updates the seek position while the visible track remains 3 px high
+- The position slider's custom `Track.Value` binding must remain explicitly
+  two-way. Its pointer pressed and released handlers are registered with
+  `handledEventsToo` because the Avalonia `Thumb` handles those routed events
+  while dragging.
 - Shuffle keeps a per-loaded-queue set of played file paths, so duplicate entries and already played tracks are not selected again; loading any queue again resets that set while the shuffle toggle may remain enabled
 - The playlist table is height-limited and scrollable
 - Volume affects PCM paths; native DSD remains bit-perfect
+- ReplayGain can be disabled or use track/album gain with fallback to the other available value. It is combined with the user volume for PCM output and uses saturating sample conversion to prevent integer overflow; native DSD ignores it.
 - In ASIO DSD mode, `preferredBufferSize` counts samples rather than bytes; `ASIOSTDSDInt8*` writes `preferredBufferSize / 8` bytes per channel
 - ASIO capability queries may fail while another application owns the device
 
@@ -272,6 +366,33 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - DataGrid and ScrollViewer backgrounds are overridden via Avalonia styles in
   `MainWindow.axaml`
 - DataGrid row headers remain disabled through `HeadersVisibility="Column"`
+- Visible rows whose playback path matches the currently audible local, Plex,
+  radio, or podcast item receive the `nowPlaying` class. Its background uses
+  the theme-specific `AppNowPlayingRowBrush`; selected rows retain the stronger
+  selection background. Loading-row handlers must also clear the class on
+  recycled virtualized rows.
+- DataGrid columns are user-resizable. Main library, search, radio, podcast,
+  podcast-episode, Plex, playlist, and daily-history widths are restored from
+  `settings.json`; invalid or structurally outdated width sets are ignored.
+- Right-clicking a DataGrid column header opens a localized, themed
+  `MenuFlyout` column chooser at the pointer position. It uses
+  `StaysOpenOnClick` so several columns can be changed in one session. Do not
+  replace this with a dynamically attached and programmatically opened
+  Avalonia `ContextMenu`; Avalonia 11.2 retains internal ownership in that
+  sequence and can throw during placement.
+  Track contexts additionally expose file name, album artist, year, track/disc
+  numbers, genre, bitrate, sample rate, bit depth, channels, composer, BPM,
+  file size, added date, and ReplayGain values. Radio and podcast tables expose
+  only metadata appropriate to those catalogs. Artwork and action columns stay
+  fixed, and at least one selectable data column remains visible.
+- Identified data columns can be reordered by dragging their headers. The order
+  is restored independently for each table/view; fixed artwork and action
+  columns cannot be dragged.
+- Every selectable or reorderable data column must have a stable,
+  language-independent string in `DataGridColumn.Tag`. These IDs are persisted
+  in `VisibleDataGridColumns` and `DataGridColumnOrders`; changing an ID is a
+  settings-compatibility change. Fixed artwork/action columns intentionally
+  have no persisted ID.
 
 ## Dashboard
 
@@ -346,8 +467,27 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - **Search**: delayed Lucene search returns separate themed Track, Album, and Artist sections, supports partial words and German normalization variants, sorts by score then display name, and preserves the original query across drill-down Back navigation
 - **Folder structure**: configured library roots start expanded; child folders load lazily; double-clicking a track queues its direct folder sorted by disc, track number, and file name
 - **Playlists**: display position, title, artist, album, and duration; sidebar entries open their live track list
-- **Smart playlists**: store JSON criteria instead of track rows, show a gold lightning icon, resolve live when opened, and do not permit manual entry removal
-- **Save smart playlist**: available in Tracks only when filters are active; opens `NewPlaylistDialog`, serializes criteria, and calls `CreateSmartPlaylist`
+- **Smart playlists**: store JSON criteria instead of track rows, show a gold
+  lightning icon, resolve live when opened, and do not permit manual entry
+  removal. Criteria can include favourites, genre, format, bitrate, year,
+  artist, album, duration, recently added/played windows, never played,
+  playback-count ranges, alphabetical/random/recent/least-recent ordering, and
+  a result limit.
+- **Save smart playlist**: available in Tracks only when filters are active;
+  opens the compact `NewPlaylistDialog`, serializes the active favourite,
+  genre, format, and bitrate facets, and calls `CreateSmartPlaylist`.
+- Right-clicking a smart playlist in the sidebar exposes **Edit smart
+  playlist**, which opens `SmartPlaylistDialog` with the stored name and full
+  criteria. Saving updates `filter_criteria` without replacing playlist rows.
+- Right-clicking the Playlists accordion header exposes **Import M3U8
+  playlist**. Imports are UTF-8, resolve relative local paths against the M3U8
+  directory, preserve missing local paths, and retain HTTP/HTTPS entries.
+  URLs containing user-info credentials or `X-Plex-Token` are skipped and
+  never persisted.
+- Right-clicking a regular playlist exposes **Export as M3U8**. Export writes
+  UTF-8 without BOM, uses relative forward-slash local paths where possible,
+  keeps HTTP/HTTPS entries, and skips credential-bearing URLs. Smart playlists
+  are intentionally not exported as static M3U8 files.
 - Tracks, albums, search results, and folder-tree nodes support playlist context menus
 
 ## XML Documentation Comments
