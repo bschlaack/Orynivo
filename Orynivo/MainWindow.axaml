@@ -608,6 +608,12 @@
         <Style Selector="TreeViewItem:pointerover">
             <Setter Property="Background" Value="{DynamicResource AppSurfaceHoverBrush}"/>
         </Style>
+        <Style Selector="TreeViewItem.nowPlaying:not(:selected)">
+            <Setter Property="Background" Value="{DynamicResource AppNowPlayingRowBrush}"/>
+        </Style>
+        <Style Selector="TreeViewItem.nowPlaying:pointerover:not(:selected)">
+            <Setter Property="Background" Value="{DynamicResource AppNowPlayingRowBrush}"/>
+        </Style>
         <!-- Active lyrics line -->
         <Style Selector="TextBlock.active">
             <Setter Property="Foreground" Value="White"/>

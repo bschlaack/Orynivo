@@ -348,8 +348,24 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   title-bar color
 - The Plex server editor uses themed inputs and buttons plus a DWM-colored native title bar; Plex credential persistence must not synchronously wait on asynchronous file I/O from the UI thread
 - Selecting a Plex audio library exposes Artists, Albums, Tracks, and Folders modes; lists load in pages of 500, artist/album rows drill down to children, and folder nodes query Plex only when expanded
+- Plex mode `RadioButton.IsCheckedChanged` handlers must react only to
+  `IsChecked == true`; Avalonia also raises the event for the button being
+  unchecked. Each asynchronous mode load snapshots its server, token, section,
+  and view and validates a load version before applying rows so stale responses
+  cannot replace another mode's content or columns.
 - Plex track rows reuse the main track table and playback path; Plex access tokens remain memory-only in generated stream URLs and must never be written to settings, documentation, logs, or source
 - Starting a Plex track from the folder tree queues only direct track siblings from that same tree level; subfolder tracks are excluded and the existing shuffle state applies to that sibling queue
+- Plex folder nodes use real `TreeViewItem` children in `Items`, matching the
+  local folder tree. Do not bind an `ObservableCollection<TreeViewItem>` to
+  `ItemsSource`: Avalonia can wrap those controls in additional item
+  containers, producing expanded nodes with large blank child rows. The
+  expand-toggle pointer event must be intercepted while a lazy node is
+  unloaded; fetch and insert real child controls first, then set
+  `IsExpanded=true`. Keep the `Expanded` event only as a keyboard-accessibility
+  fallback that immediately collapses until loading completes. Suppress
+  concurrent requests, classify nodes through `PlexMediaItem.IsFolder` rather
+  than `PartKey`, and retain the placeholder after failure so loading can be
+  retried.
 - DSD capability states use explicit supported and unsupported theme colors
 - A splash screen is shown while initial database preparation runs
 - Device information displays channels, buffer sizes, PCM rates, DSD levels, and readable raw formats
@@ -371,6 +387,10 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   the theme-specific `AppNowPlayingRowBrush`; selected rows retain the stronger
   selection background. Loading-row handlers must also clear the class on
   recycled virtualized rows.
+- Plex track nodes in the folder tree use the same `nowPlaying` class and
+  theme brush. Playback transitions must update the complete materialized
+  `TreeViewItem` hierarchy recursively, including collapsed branches, while
+  newly lazy-loaded nodes apply the class when they are created.
 - DataGrid columns are user-resizable. Main library, search, radio, podcast,
   podcast-episode, Plex, playlist, and daily-history widths are restored from
   `settings.json`; invalid or structurally outdated width sets are ignored.

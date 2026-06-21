@@ -4,6 +4,25 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.7.1] - 2026-06-21
+
+### Fixed
+
+- Added the theme-aware now-playing highlight to tracks in the Plex folder
+  tree. It follows normal and gapless playback transitions, clears on stop,
+  and remains correct for collapsed or newly lazy-loaded branches.
+- Fixed Plex Artists, Albums, Tracks, and Folders mode buttons starting loads
+  for both checked and unchecked radio-button events. Mode requests now use
+  stable server, library, token, and view snapshots and discard stale
+  asynchronous responses before they can display another mode's rows or
+  columns.
+- Fixed Plex folder nodes expanding into blank rows. Using `TreeViewItem`
+  controls through `ItemsSource` caused Avalonia to create incorrect nested
+  containers, while expanding before asynchronous loading exposed the empty
+  placeholder. The expand action now waits until real children exist, folder
+  classification uses Plex's folder marker, keyboard expansion follows the
+  same guarded path, and failures remain retryable.
+
 ## [0.7.0] - 2026-06-21
 
 ### Added

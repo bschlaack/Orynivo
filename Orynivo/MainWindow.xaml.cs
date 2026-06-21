@@ -35,6 +35,7 @@ namespace Orynivo;
 public partial class MainWindow : Window
 {
     private int _plexNavigationLoadVersion;
+    private int _plexViewLoadVersion;
     private const int PlexPageSize = 500;
     private readonly PlexServerClient _plexClient = new();
     private PlexServerSettings? _activePlexServer;
@@ -1294,13 +1295,16 @@ public partial class MainWindow : Window
     private async void PlexViewModeRadioButton_OnChecked(object? sender, RoutedEventArgs e)
     {
         if (!IsVisible || _updatingViewMode ||
-            sender is not RadioButton { Tag: string view } ||
+            sender is not RadioButton { IsChecked: true, Tag: string view } ||
             _activePlexServer is null)
         {
             return;
         }
 
+        _plexNavigationStack.Clear();
         _activePlexView = view;
+        ContentTitleTextBlock.Text = _activePlexSectionTitle;
+        BackButton.IsVisible = _navigationStack.Count > 0;
         await LoadPlexViewAsync(reset: true);
     }
 
@@ -1315,14 +1319,19 @@ public partial class MainWindow : Window
         CancelAndDispose(ref _plexViewCts);
         _plexViewCts = new CancellationTokenSource();
         var cancellationToken = _plexViewCts.Token;
+        var loadVersion = ++_plexViewLoadVersion;
+        var server = _activePlexServer;
+        var token = _activePlexToken;
+        var sectionKey = _activePlexSectionKey;
+        var view = _activePlexView;
         if (reset)
         {
             _plexLoadedCount = 0;
             _plexTotalCount = 0;
         }
 
-        ContentDataGrid.IsVisible = !(_activePlexView == "Folders");
-        FolderTreeView.IsVisible = _activePlexView == "Folders";
+        ContentDataGrid.IsVisible = view != "Folders";
+        FolderTreeView.IsVisible = view == "Folders";
         AlbumArtworkListBox.IsVisible = false;
         ArtistArtworkListBox.IsVisible = false;
         SearchResultsScrollViewer.IsVisible = false;
@@ -1331,29 +1340,46 @@ public partial class MainWindow : Window
 
         try
         {
-            if (_activePlexView == "Folders")
+            if (view == "Folders")
             {
-                await BuildPlexFolderTreeAsync(cancellationToken);
+                await BuildPlexFolderTreeAsync(
+                    server,
+                    token,
+                    sectionKey,
+                    cancellationToken);
+                if (loadVersion != _plexViewLoadVersion ||
+                    !string.Equals(view, _activePlexView, StringComparison.Ordinal))
+                {
+                    return;
+                }
                 ContentCountTextBlock.Text = string.Empty;
                 StatusTextBlock.Text = string.Empty;
                 return;
             }
 
-            var mediaType = _activePlexView switch
+            var mediaType = view switch
             {
                 "Artists" => 8,
                 "Albums" => 9,
                 _ => 10
             };
             var page = await _plexClient.GetLibraryItemsAsync(
-                _activePlexServer,
-                _activePlexToken,
-                _activePlexSectionKey,
+                server,
+                token,
+                sectionKey,
                 mediaType,
                 _plexLoadedCount,
                 PlexPageSize,
                 cancellationToken);
-            var newRows = page.Items.Select(ToPlexContentRow).ToList();
+            if (loadVersion != _plexViewLoadVersion ||
+                !string.Equals(view, _activePlexView, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            var newRows = page.Items
+                .Select(item => ToPlexContentRow(item, view, server, token))
+                .ToList();
             var rows = reset
                 ? newRows
                 : ((ContentDataGrid.ItemsSource as IEnumerable<ContentRow>) ?? [])
@@ -1361,9 +1387,9 @@ public partial class MainWindow : Window
                     .ToList();
             _plexLoadedCount = rows.Count;
             _plexTotalCount = page.TotalSize;
-            ApplyColumns("Plex" + _activePlexView);
+            ApplyColumns("Plex" + view);
             ContentDataGrid.ItemsSource = rows;
-            UpdateAlphabetIndex(rows, _activePlexView is "Artists" or "Albums" or "Tracks");
+            UpdateAlphabetIndex(rows, view is "Artists" or "Albums" or "Tracks");
             ContentCountTextBlock.Text = $"{_plexLoadedCount:N0} / {_plexTotalCount:N0}";
             PlexLoadMoreButton.IsVisible = _plexLoadedCount < _plexTotalCount;
             StatusTextBlock.Text = string.Empty;
@@ -1379,9 +1405,13 @@ public partial class MainWindow : Window
         }
     }
 
-    private ContentRow ToPlexContentRow(PlexMediaItem item)
+    private ContentRow ToPlexContentRow(
+        PlexMediaItem item,
+        string view,
+        PlexServerSettings server,
+        string? token)
     {
-        var entityType = _activePlexView switch
+        var entityType = view switch
         {
             "Artists" => "PlexArtist",
             "Albums" => "PlexAlbum",
@@ -1398,12 +1428,11 @@ public partial class MainWindow : Window
                 ? FormatSeconds(duration / 1000d)
                 : string.Empty,
             Format = item.Format?.ToUpperInvariant(),
-            FilePath = item.PartKey is not null &&
-                       _activePlexServer is not null
+            FilePath = item.PartKey is not null
                 ? PlexServerClient.CreateStreamUrl(
-                    _activePlexServer,
+                    server,
                     item.PartKey,
-                    _activePlexToken)
+                    token)
                 : string.Empty,
             EntityType = entityType
         };
@@ -1430,7 +1459,13 @@ public partial class MainWindow : Window
                 (ContentDataGrid.ItemsSource as IEnumerable<ContentRow>)?.ToList() ?? []));
             BackButton.IsVisible = true;
             _activePlexView = parent.EntityType == "PlexArtist" ? "Albums" : "Tracks";
-            var rows = page.Items.Select(ToPlexContentRow).ToList();
+            var rows = page.Items
+                .Select(item => ToPlexContentRow(
+                    item,
+                    _activePlexView,
+                    _activePlexServer,
+                    _activePlexToken))
+                .ToList();
             ApplyColumns("Plex" + _activePlexView);
             ContentDataGrid.ItemsSource = rows;
             ContentTitleTextBlock.Text = parent.Title ?? _activePlexSectionTitle;
@@ -1446,51 +1481,114 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task BuildPlexFolderTreeAsync(CancellationToken cancellationToken)
+    private async Task BuildPlexFolderTreeAsync(
+        PlexServerSettings server,
+        string? token,
+        string sectionKey,
+        CancellationToken cancellationToken)
     {
         FolderTreeView.Items.Clear();
         var page = await _plexClient.GetFoldersAsync(
-            _activePlexServer!,
-            _activePlexToken,
-            _activePlexSectionKey!,
+            server,
+            token,
+            sectionKey,
             null,
             cancellationToken);
         foreach (var folder in page.Items)
-            FolderTreeView.Items.Add(CreatePlexFolderItem(folder));
+            FolderTreeView.Items.Add(CreatePlexFolderItem(folder, server, token, sectionKey));
     }
 
-    private TreeViewItem CreatePlexFolderItem(PlexMediaItem item)
+    private TreeViewItem CreatePlexFolderItem(
+        PlexMediaItem item,
+        PlexServerSettings server,
+        string? token,
+        string sectionKey)
     {
-        var row = item.PartKey is null ? null : ToPlexContentRow(item);
+        var row = item.IsFolder || item.PartKey is null
+            ? null
+            : ToPlexContentRow(item, "Tracks", server, token);
         var treeItem = new TreeViewItem
         {
             Header = item.Title,
             Tag = new PlexFolderTag(item.Key, row is not null, row)
         };
+        ApplyNowPlayingClass(treeItem);
         if (row is not null)
             return treeItem;
 
         var placeholder = new TreeViewItem();
         treeItem.Items.Add(placeholder);
+        var isLoaded = false;
+        Task? loadingTask = null;
+
+        async Task LoadChildrenAsync()
+        {
+            if (isLoaded)
+                return;
+            if (loadingTask is not null)
+            {
+                await loadingTask;
+                return;
+            }
+
+            loadingTask = LoadCoreAsync();
+            await loadingTask;
+            loadingTask = null;
+
+            async Task LoadCoreAsync()
+            {
+                try
+                {
+                    var page = await _plexClient.GetFoldersAsync(
+                        server,
+                        token,
+                        sectionKey,
+                        item.Key);
+                    treeItem.Items.Clear();
+                    foreach (var child in page.Items)
+                        treeItem.Items.Add(CreatePlexFolderItem(child, server, token, sectionKey));
+                    isLoaded = true;
+                    treeItem.InvalidateMeasure();
+                }
+                catch (Exception ex)
+                {
+                    treeItem.Items.Clear();
+                    treeItem.Items.Add(placeholder);
+                    StatusTextBlock.Text = string.Format(
+                        LocalizationManager.Current.PlexConnectionFailed,
+                        ex.Message);
+                }
+            }
+        }
+
+        treeItem.AddHandler(
+            PointerPressedEvent,
+            new EventHandler<PointerPressedEventArgs>(async (_, e) =>
+            {
+                if (isLoaded ||
+                    !e.GetCurrentPoint(treeItem).Properties.IsLeftButtonPressed ||
+                    FindAncestor<ToggleButton>(e.Source as Visual) is null)
+                {
+                    return;
+                }
+
+                e.Handled = true;
+                await LoadChildrenAsync();
+                if (isLoaded)
+                    treeItem.IsExpanded = true;
+            }),
+            RoutingStrategies.Tunnel,
+            handledEventsToo: true);
+
         treeItem.Expanded += async (_, _) =>
         {
-            if (treeItem.Items.Count != 1 || treeItem.Items[0] != placeholder)
+            if (isLoaded)
                 return;
-            try
-            {
-                var page = await _plexClient.GetFoldersAsync(
-                    _activePlexServer!,
-                    _activePlexToken,
-                    _activePlexSectionKey!,
-                    item.Key);
-                treeItem.Items.Clear();
-                foreach (var child in page.Items)
-                    treeItem.Items.Add(CreatePlexFolderItem(child));
-            }
-            catch
-            {
-                treeItem.Items.Clear();
-            }
+
+            treeItem.IsExpanded = false;
+            await LoadChildrenAsync();
+            if (isLoaded)
+                treeItem.IsExpanded = true;
         };
         return treeItem;
     }
@@ -2862,6 +2960,18 @@ public partial class MainWindow : Window
             string.Equals(rowPath, _currentFilePath, StringComparison.OrdinalIgnoreCase));
     }
 
+    private void ApplyNowPlayingClass(TreeViewItem item)
+    {
+        var itemPath = item.Tag is PlexFolderTag { IsTrack: true, Track: not null } tag
+            ? tag.Track.FilePath
+            : null;
+        item.Classes.Set(
+            "nowPlaying",
+            _player is not null &&
+            !string.IsNullOrWhiteSpace(itemPath) &&
+            string.Equals(itemPath, _currentFilePath, StringComparison.OrdinalIgnoreCase));
+    }
+
     private static string? GetPlaybackPath(object? row) => row switch
     {
         ContentRow content => content.FilePath,
@@ -2874,6 +2984,15 @@ public partial class MainWindow : Window
     {
         foreach (var row in this.GetVisualDescendants().OfType<DataGridRow>())
             ApplyNowPlayingClass(row);
+        foreach (var item in FolderTreeView.Items.OfType<TreeViewItem>())
+            UpdateNowPlayingTreeHighlights(item);
+    }
+
+    private void UpdateNowPlayingTreeHighlights(TreeViewItem item)
+    {
+        ApplyNowPlayingClass(item);
+        foreach (var child in item.Items.OfType<TreeViewItem>())
+            UpdateNowPlayingTreeHighlights(child);
     }
 
     private void ApplyColumns(string view)
