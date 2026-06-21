@@ -97,6 +97,7 @@ public static class LocalizationManager
         resources["L_Save"] = Current.Save;
         resources["L_Cancel"] = Current.Cancel;
         resources["L_AddToPlaylist"] = Current.AddToPlaylist;
+        resources["L_SaveAlbumAsPlaylist"] = Current.SaveAlbumAsPlaylist;
         resources["L_NewPlaylist"] = Current.NewPlaylist;
         resources["L_NewPlaylistDialogTitle"] = Current.NewPlaylistDialogTitle;
         resources["L_NewPlaylistNameLabel"] = Current.NewPlaylistNameLabel;
@@ -531,6 +532,7 @@ public static class LocalizationManager
         , SmartPlaylistUpdated = "Smart-Playlist »{0}« aktualisiert."
         , ImportM3u8Playlist = "M3U8-Playlist importieren"
         , ExportM3u8Playlist = "Als M3U8 exportieren"
+        , SaveAlbumAsPlaylist = "Als Playlist speichern"
         , M3u8ImportCompleted = "Playlist »{0}« importiert: {1} Einträge · {2} lokale Dateien fehlen · {3} HTTP-Einträge · {4} übersprungen."
         , M3u8ImportNoEntries = "Die M3U8-Datei enthält keine importierbaren Einträge."
         , M3u8ImportFailed = "M3U8-Import fehlgeschlagen: {0}"
@@ -807,6 +809,7 @@ public static class LocalizationManager
         , SmartPlaylistUpdated = "Smart playlist '{0}' updated."
         , ImportM3u8Playlist = "Import M3U8 playlist"
         , ExportM3u8Playlist = "Export as M3U8"
+        , SaveAlbumAsPlaylist = "Save as playlist"
         , M3u8ImportCompleted = "Playlist '{0}' imported: {1} entries · {2} local files missing · {3} HTTP entries · {4} skipped."
         , M3u8ImportNoEntries = "The M3U8 file contains no importable entries."
         , M3u8ImportFailed = "M3U8 import failed: {0}"
@@ -1086,6 +1089,7 @@ public static class LocalizationManager
         , SmartPlaylistUpdated = "Playlist intelligente « {0} » mise à jour."
         , ImportM3u8Playlist = "Importer une playlist M3U8"
         , ExportM3u8Playlist = "Exporter au format M3U8"
+        , SaveAlbumAsPlaylist = "Enregistrer comme playlist"
         , M3u8ImportCompleted = "Playlist « {0} » importée : {1} entrées · {2} fichiers locaux manquants · {3} entrées HTTP · {4} ignorées."
         , M3u8ImportNoEntries = "Le fichier M3U8 ne contient aucune entrée importable."
         , M3u8ImportFailed = "Échec de l’importation M3U8 : {0}"
@@ -1362,6 +1366,7 @@ public static class LocalizationManager
         , SmartPlaylistUpdated = "Lista inteligente '{0}' actualizada."
         , ImportM3u8Playlist = "Importar lista M3U8"
         , ExportM3u8Playlist = "Exportar como M3U8"
+        , SaveAlbumAsPlaylist = "Guardar como lista"
         , M3u8ImportCompleted = "Lista '{0}' importada: {1} entradas · faltan {2} archivos locales · {3} entradas HTTP · {4} omitidas."
         , M3u8ImportNoEntries = "El archivo M3U8 no contiene entradas importables."
         , M3u8ImportFailed = "Error al importar M3U8: {0}"

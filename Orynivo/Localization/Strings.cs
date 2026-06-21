@@ -441,6 +441,8 @@ public sealed record LocalizedStrings(
     public string ImportM3u8Playlist { get; init; } = "";
     /// <summary>Gets the command label for exporting an M3U8 playlist.</summary>
     public string ExportM3u8Playlist { get; init; } = "";
+    /// <summary>Gets the album-detail action label for saving the visible tracks to a playlist.</summary>
+    public string SaveAlbumAsPlaylist { get; init; } = "";
     /// <summary>Gets the successful M3U8 import status message.</summary>
     public string M3u8ImportCompleted { get; init; } = "";
     /// <summary>Gets the empty M3U8 import status message.</summary>

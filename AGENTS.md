@@ -210,6 +210,10 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 
 - Right-clicking a track, search result, album, or folder node offers existing playlists and **New playlist...**
 - Selecting a playlist immediately adds the track or all album tracks and updates the status bar
+- The album-detail header includes **Save as playlist**. It reads the current
+  `ContentDataGrid.ItemsSource`, so it saves exactly the album tracks currently
+  displayed after the artist-scope checkbox is applied, and opens the shared
+  themed playlist `MenuFlyout` for an existing or new regular playlist.
 - **New playlist...** opens `NewPlaylistDialog`; a name is required and Enter confirms
 - `Orynivo/NewPlaylistDialog.axaml/.cs` is themed with dynamic brushes and a
   DWM-colored native title bar
@@ -221,6 +225,18 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - Main-window context menus use application theme resources and a custom border template without the default white icon strip
 - Dynamically created menu objects receive their styles through Avalonia
   `ControlTheme` resources looked up via `TryGetResource`
+- Track, search-result, album-row, and folder-tree playlist actions follow the
+  same proven pattern as sidebar radio/podcast/playlist actions: assign a
+  themed `MenuFlyout` to the item's `ContextFlyout` property before opening,
+  then register the tunnel-phase `PointerPressed` handler directly on that
+  `DataGridRow` or `TreeViewItem` with `handledEventsToo: true`. The item marks
+  the right-button event handled and calls
+  `ContextFlyout.ShowAt(item, showAtPointer: true)` itself; do not resolve the
+  item indirectly from a parent grid/tree event. Data-grid flyouts are assigned
+  during `LoadingRow`; folder nodes receive a placeholder flyout when created
+  and replace it with the path-specific playlist flyout immediately before
+  opening. Do not use dynamically assigned `ContextMenu` instances or per-row
+  `ContextRequested` handlers for these actions.
 - **Delete playlist** appears in the sidebar playlist context menu, removes the database record, refreshes the sidebar, and returns to Tracks if needed
 - Dynamic radio, podcast, and playlist `ListBoxItem` instances receive a
   `MenuFlyout` through `ContextFlyout` when they are created. A tunnel-phase
@@ -356,6 +372,9 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   with a short view-specific headline and explanatory text. Search and filter
   controls stay outside and above that card in the plain header layout; A-Z
   indexes stay aligned with the content/table area, not the intro card.
+- The album-detail card above its track table stretches across the available
+  content width. Its favorite button appears immediately before the album title;
+  cover search and **Save as playlist** remain adjacent themed actions.
 - The bottom transport bar shows artwork and track information, favorite state, playback controls, position, and volume
 - Settings uses a two-column layout with navigation on the left and content on the right
 - Settings navigation reuses the main sidebar theme resources

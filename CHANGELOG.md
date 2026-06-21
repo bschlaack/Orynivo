@@ -4,6 +4,25 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Added a themed **Save as playlist** action to the album-detail header. It can
+  append every currently displayed album track to an existing playlist or
+  create a new playlist, respecting the current album-track scope. The album
+  card now spans the available content width, with the favorite action directly
+  before the album title and the cover/playlist actions aligned side by side.
+
+### Fixed
+
+- Restored the playlist context actions for track tables, search results,
+  album rows, and folder-tree entries. Dynamically generated actions now open
+  as themed pointer-positioned flyouts, including existing playlists, new
+  playlist creation, and removal from the active regular playlist. Rows and
+  folder nodes now carry and directly open their own `ContextFlyout` instances
+  using the same tunnel-phase pattern as the working sidebar actions.
+
 ## [0.7.2] - 2026-06-21
 
 ### Fixed

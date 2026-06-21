@@ -2940,6 +2940,7 @@ public partial class MainWindow : Window
     private void ContentDataGrid_OnLoadingRow(object? sender, DataGridRowEventArgs e)
     {
         ApplyNowPlayingClass(e.Row);
+        SetPlaylistContextFlyout(e.Row);
         if (e.Row.DataContext is not ContentRow row)
             return;
         EnsureThumbnailHydrated(row);
@@ -2947,8 +2948,44 @@ public partial class MainWindow : Window
             _ = EnsureArtistProfileAsync(row);
     }
 
-    private void TrackDataGrid_OnLoadingRow(object? sender, DataGridRowEventArgs e) =>
+    private void TrackDataGrid_OnLoadingRow(object? sender, DataGridRowEventArgs e)
+    {
         ApplyNowPlayingClass(e.Row);
+        if (ReferenceEquals(sender, SearchTracksDataGrid))
+            SetPlaylistContextFlyout(e.Row);
+    }
+
+    private void PlaylistDataGrid_OnLoadingRow(object? sender, DataGridRowEventArgs e) =>
+        SetPlaylistContextFlyout(e.Row);
+
+    private void SetPlaylistContextFlyout(DataGridRow row)
+    {
+        row.RemoveHandler(
+            PointerPressedEvent,
+            PlaylistContextItem_OnPreviewMouseRightButtonDown);
+        row.ContextFlyout = null;
+        if (row.DataContext is not ContentRow contentRow ||
+            contentRow.EntityType.StartsWith("Plex", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var isTrack = !string.IsNullOrEmpty(contentRow.FilePath);
+        var isAlbum = contentRow.EntityType == "Album";
+        if (!isTrack && !isAlbum)
+            return;
+
+        row.ContextFlyout = _activePlaylistId.HasValue &&
+                            isTrack &&
+                            contentRow.PlaylistEntryId.HasValue
+            ? BuildRemoveFromPlaylistContextFlyout(contentRow.PlaylistEntryId.Value)
+            : BuildPlaylistContextFlyout(GetPathsForRow(contentRow));
+        row.AddHandler(
+            PointerPressedEvent,
+            PlaylistContextItem_OnPreviewMouseRightButtonDown,
+            RoutingStrategies.Tunnel,
+            handledEventsToo: true);
+    }
 
     private void ApplyNowPlayingClass(DataGridRow row)
     {
@@ -3301,14 +3338,16 @@ public partial class MainWindow : Window
         }
     }
 
-    private static TreeViewItem CreateDirItemLazy(string dirPath, FolderTree tree, bool isRoot)
+    private TreeViewItem CreateDirItemLazy(string dirPath, FolderTree tree, bool isRoot)
     {
         var name = Path.GetFileName(dirPath);
         var item = new TreeViewItem
         {
             Header = isRoot ? dirPath : (string.IsNullOrEmpty(name) ? dirPath : name),
-            Tag    = new FolderTag(false, dirPath, dirPath)
+            Tag = new FolderTag(false, dirPath, dirPath),
+            ContextFlyout = CreateSidebarMenuFlyout()
         };
+        AttachFolderPlaylistContextHandler(item);
 
         if (!tree.HasChildren(dirPath))
             return item;
@@ -3320,17 +3359,31 @@ public partial class MainWindow : Window
         return item;
     }
 
-    private static void PopulateDirNode(TreeViewItem parent, string dirPath, FolderTree tree)
+    private void PopulateDirNode(TreeViewItem parent, string dirPath, FolderTree tree)
     {
         parent.Items.Clear();
         foreach (var sub in tree.SubDirs(dirPath))
             parent.Items.Add(CreateDirItemLazy(sub, tree, isRoot: false));
         foreach (var track in tree.Files(dirPath))
-            parent.Items.Add(new TreeViewItem
+        {
+            var item = new TreeViewItem
             {
                 Header = track.DisplayName,
-                Tag    = new FolderTag(true, track.Path, dirPath)
-            });
+                Tag = new FolderTag(true, track.Path, dirPath),
+                ContextFlyout = CreateSidebarMenuFlyout()
+            };
+            AttachFolderPlaylistContextHandler(item);
+            parent.Items.Add(item);
+        }
+    }
+
+    private void AttachFolderPlaylistContextHandler(TreeViewItem item)
+    {
+        item.AddHandler(
+            PointerPressedEvent,
+            PlaylistContextItem_OnPreviewMouseRightButtonDown,
+            RoutingStrategies.Tunnel,
+            handledEventsToo: true);
     }
 
     private async void FolderTreeView_OnMouseDoubleClick(object? sender, Avalonia.Input.TappedEventArgs e)
@@ -3390,40 +3443,23 @@ public partial class MainWindow : Window
         catch (Exception ex) { StopPlayback(); StatusTextBlock.Text = ex.Message; }
     }
 
-    private void FolderTreeView_OnPreviewMouseRightButtonDown(object? sender, PointerPressedEventArgs e)
+    private IReadOnlyList<string> GetPathsForFolderItem(TreeViewItem treeItem)
     {
-        if (!e.GetCurrentPoint(null).Properties.IsRightButtonPressed) return;
-        var treeItem = FindAncestor<TreeViewItem>(e.Source as Visual);
-        if (treeItem?.Tag is not FolderTag tag)
-        {
-            FolderTreeView.ContextMenu = null;
-            return;
-        }
+        if (treeItem.Tag is not FolderTag tag)
+            return [];
 
-        treeItem.IsSelected = true;
-
-        List<string> paths;
         if (tag.IsFile)
-        {
-            paths = [tag.FilePath];
-        }
-        else
-        {
-            try
-            {
-                using var db = AudioDatabase.OpenDefault();
-                paths = db.GetTrackPathsUnderDirectory(tag.FilePath);
-            }
-            catch { paths = []; }
-        }
+            return [tag.FilePath];
 
-        if (paths.Count == 0)
+        try
         {
-            FolderTreeView.ContextMenu = null;
-            return;
+            using var db = AudioDatabase.OpenDefault();
+            return db.GetTrackPathsUnderDirectory(tag.FilePath);
         }
-
-        FolderTreeView.ContextMenu = BuildPlaylistContextMenu(paths);
+        catch
+        {
+            return [];
+        }
     }
 
     // ------------------------------------------------------------------
@@ -3704,6 +3740,23 @@ public partial class MainWindow : Window
         using var db = AudioDatabase.OpenDefault();
         db.SetAlbumFavorite(albumId, row.IsFavorite);
         e.Handled = true;
+    }
+
+    private void AlbumSaveAsPlaylistButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button)
+            return;
+
+        var paths = (ContentDataGrid.ItemsSource as IEnumerable<ContentRow>)
+            ?.Where(row => !string.IsNullOrWhiteSpace(row.FilePath))
+            .Select(row => row.FilePath)
+            .ToList() ?? [];
+        if (paths.Count == 0)
+            return;
+
+        button.ContextFlyout = BuildPlaylistContextFlyout(paths);
+        e.Handled = true;
+        button.ContextFlyout.ShowAt(button);
     }
 
     private async Task ShowArtistAlbumsAsync(long artistId, string artistName)
@@ -4023,65 +4076,40 @@ public partial class MainWindow : Window
     // Playlist-Kontextmenü
     // ------------------------------------------------------------------
 
-    private void ContentDataGrid_OnPreviewMouseRightButtonDown(object? sender, PointerPressedEventArgs e)
+    private void PlaylistContextItem_OnPreviewMouseRightButtonDown(
+        object? sender,
+        PointerPressedEventArgs e)
     {
-        if (!e.GetCurrentPoint(null).Properties.IsRightButtonPressed) return;
-        var dataRow = FindAncestor<DataGridRow>(e.Source as Visual);
-        if (dataRow?.DataContext is not ContentRow contentRow)
+        if (sender is not Control target ||
+            !e.GetCurrentPoint(target).Properties.IsRightButtonPressed)
         {
-            ContentDataGrid.ContextMenu = null;
             return;
         }
 
-        ContentDataGrid.SelectedItem = contentRow;
-        if (contentRow.EntityType.StartsWith("Plex", StringComparison.Ordinal))
+        if (target is DataGridRow dataRow)
         {
-            ContentDataGrid.ContextMenu = null;
+            if (dataRow.ContextFlyout is not PopupFlyoutBase)
+                return;
+            if (FindAncestor<DataGrid>(dataRow) is { } dataGrid)
+                dataGrid.SelectedItem = dataRow.DataContext;
+        }
+        else if (target is TreeViewItem treeItem)
+        {
+            var paths = GetPathsForFolderItem(treeItem);
+            if (paths.Count == 0)
+                return;
+            treeItem.IsSelected = true;
+            treeItem.ContextFlyout = BuildPlaylistContextFlyout(paths);
+        }
+        else
+        {
             return;
         }
 
-        bool isTrack = !string.IsNullOrEmpty(contentRow.FilePath);
-        bool isAlbum = contentRow.EntityType == "Album";
-
-        if (!isTrack && !isAlbum)
-        {
-            ContentDataGrid.ContextMenu = null;
+        if (target.ContextFlyout is not PopupFlyoutBase flyout)
             return;
-        }
-
-        if (_activePlaylistId.HasValue && isTrack && contentRow.PlaylistEntryId.HasValue)
-        {
-            ContentDataGrid.ContextMenu = BuildRemoveFromPlaylistContextMenu(contentRow.PlaylistEntryId.Value);
-            return;
-        }
-
-        ContentDataGrid.ContextMenu = BuildPlaylistContextMenu(GetPathsForRow(contentRow));
-    }
-
-    private void SearchTracksDataGrid_OnPreviewMouseRightButtonDown(object? sender, PointerPressedEventArgs e)
-    {
-        if (!e.GetCurrentPoint(null).Properties.IsRightButtonPressed) return;
-        var dataRow = FindAncestor<DataGridRow>(e.Source as Visual);
-        if (dataRow?.DataContext is not ContentRow contentRow || string.IsNullOrEmpty(contentRow.FilePath))
-        {
-            SearchTracksDataGrid.ContextMenu = null;
-            return;
-        }
-        SearchTracksDataGrid.SelectedItem = contentRow;
-        SearchTracksDataGrid.ContextMenu = BuildPlaylistContextMenu(GetPathsForRow(contentRow));
-    }
-
-    private void SearchAlbumsDataGrid_OnPreviewMouseRightButtonDown(object? sender, PointerPressedEventArgs e)
-    {
-        if (!e.GetCurrentPoint(null).Properties.IsRightButtonPressed) return;
-        var dataRow = FindAncestor<DataGridRow>(e.Source as Visual);
-        if (dataRow?.DataContext is not ContentRow contentRow || contentRow.Id is null)
-        {
-            SearchAlbumsDataGrid.ContextMenu = null;
-            return;
-        }
-        SearchAlbumsDataGrid.SelectedItem = contentRow;
-        SearchAlbumsDataGrid.ContextMenu = BuildPlaylistContextMenu(GetPathsForRow(contentRow));
+        e.Handled = true;
+        flyout.ShowAt(target, showAtPointer: true);
     }
 
     private void AlbumArtworkContextMenu_OnOpened(object? sender, System.ComponentModel.CancelEventArgs e)
@@ -4098,29 +4126,39 @@ public partial class MainWindow : Window
         AppendPlaylistItems(menu, GetPathsForRow(row));
     }
 
-    private ContextMenu BuildPlaylistContextMenu(IReadOnlyList<string> paths)
+    private MenuFlyout BuildPlaylistContextFlyout(IReadOnlyList<string> paths)
     {
-        var menu = new ContextMenu();
-                AppendPlaylistItems(menu, paths);
+        var menu = CreateSidebarMenuFlyout();
+        AppendPlaylistItems(menu, paths);
         return menu;
+    }
+
+    private void AppendPlaylistItems(MenuFlyout menu, IReadOnlyList<string> paths)
+    {
+        foreach (var item in CreatePlaylistMenuItems(paths))
+            menu.Items.Add(item);
     }
 
     private void AppendPlaylistItems(ItemsControl menu, IReadOnlyList<string> paths)
     {
-        var header = new MenuItem
-        {
-            Header           = LocalizationManager.Current.AddToPlaylist,
-            IsHitTestVisible = false,
-            Focusable        = false,
-            FontSize         = 11,
-            FontWeight       = FontWeight.SemiBold,
-            Foreground       = new SolidColorBrush(
-                                   Color.FromRgb(0x6C, 0x63, 0xFF))
-        };
-        menu.Items.Add(header);
+        foreach (var item in CreatePlaylistMenuItems(paths))
+            menu.Items.Add(item);
+    }
+
+    private IReadOnlyList<Control> CreatePlaylistMenuItems(IReadOnlyList<string> paths)
+    {
+        var items = new List<Control>();
+        var header = CreateFlyoutMenuItem(
+            LocalizationManager.Current.AddToPlaylist,
+            new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF)));
+        header.IsHitTestVisible = false;
+        header.Focusable = false;
+        header.FontSize = 11;
+        header.FontWeight = FontWeight.SemiBold;
+        items.Add(header);
 
         var sep0 = new Separator();
-        menu.Items.Add(sep0);
+        items.Add(sep0);
 
         List<PlaylistRecord> playlists;
         try
@@ -4132,20 +4170,23 @@ public partial class MainWindow : Window
 
         foreach (var pl in playlists)
         {
-            var item = new MenuItem { Header = pl.Name, Tag = new PlaylistMenuTag(pl.Id, paths) };
+            var item = CreateFlyoutMenuItem(pl.Name);
+            item.Tag = new PlaylistMenuTag(pl.Id, paths);
             item.Click += PlaylistMenuItem_OnClick;
-            menu.Items.Add(item);
+            items.Add(item);
         }
 
         if (playlists.Count > 0)
         {
             var sep1 = new Separator();
-            menu.Items.Add(sep1);
+            items.Add(sep1);
         }
 
-        var newItem = new MenuItem { Header = LocalizationManager.Current.NewPlaylist, Tag = paths };
+        var newItem = CreateFlyoutMenuItem(LocalizationManager.Current.NewPlaylist);
+        newItem.Tag = paths;
         newItem.Click += NewPlaylistMenuItem_OnClick;
-        menu.Items.Add(newItem);
+        items.Add(newItem);
+        return items;
     }
 
     private void PlaylistMenuItem_OnClick(object? sender, RoutedEventArgs e)
@@ -4556,29 +4597,23 @@ public partial class MainWindow : Window
         StatusTextBlock.Text = string.Format(LocalizationManager.Current.PlaylistDeleted, name);
     }
 
-    private ContextMenu BuildRemoveFromPlaylistContextMenu(long playlistEntryId)
+    private MenuFlyout BuildRemoveFromPlaylistContextFlyout(long playlistEntryId)
     {
-        var menu = new ContextMenu();
-        var header = new MenuItem
-        {
-            Header           = LocalizationManager.Current.RemoveFromPlaylist,
-            IsHitTestVisible = false,
-            Focusable        = false,
-            FontSize         = 11,
-            FontWeight       = FontWeight.SemiBold,
-            Foreground       = new SolidColorBrush(
-                                   Color.FromRgb(0x6C, 0x63, 0xFF))
-        };
+        var menu = CreateSidebarMenuFlyout();
+        var header = CreateFlyoutMenuItem(
+            LocalizationManager.Current.RemoveFromPlaylist,
+            new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF)));
+        header.IsHitTestVisible = false;
+        header.Focusable = false;
+        header.FontSize = 11;
+        header.FontWeight = FontWeight.SemiBold;
         menu.Items.Add(header);
 
         var sep = new Separator();
         menu.Items.Add(sep);
 
-        var removeItem = new MenuItem
-        {
-            Header = LocalizationManager.Current.RemoveFromPlaylist,
-            Tag    = new RemovePlaylistEntryTag(playlistEntryId)
-        };
+        var removeItem = CreateFlyoutMenuItem(LocalizationManager.Current.RemoveFromPlaylist);
+        removeItem.Tag = new RemovePlaylistEntryTag(playlistEntryId);
         removeItem.Click += RemoveFromPlaylistMenuItem_OnClick;
         menu.Items.Add(removeItem);
 

@@ -1752,8 +1752,7 @@
                         IsVisible="False"
                         Margin="24,22,24,18"
                         Padding="22"
-                        HorizontalAlignment="Center"
-                        MaxWidth="920"
+                        HorizontalAlignment="Stretch"
                         Background="{DynamicResource AppSurfaceBrush}"
                         BorderBrush="#6C63FF"
                         BorderThickness="1"
@@ -1762,7 +1761,7 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="240"/>
                             <ColumnDefinition Width="44"/>
-                            <ColumnDefinition Width="360"/>
+                            <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
 
                         <Border Grid.Column="0"
@@ -1803,12 +1802,27 @@
                         </Border>
 
                         <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                            <Button Content="{Binding Title}"
-                                    Tag="{Binding}"
-                                    FontSize="28"
-                                    FontWeight="SemiBold"
-                                    Theme="{StaticResource EntityLinkButtonTheme}"
-                                    Click="AlbumLinkButton_OnClick"/>
+                            <StackPanel Orientation="Horizontal"
+                                        VerticalAlignment="Center"
+                                        Spacing="8">
+                                <Button Content="{Binding FavoriteGlyph}"
+                                        Tag="{Binding}"
+                                        Width="40"
+                                        Height="36"
+                                        Padding="0"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
+                                        FontSize="20"
+                                        ToolTip.Tip="{DynamicResource L_MarkAsFavorite}"
+                                        Theme="{StaticResource HeaderFilterButtonTheme}"
+                                        Click="AlbumDetailFavoriteButton_OnClick"/>
+                                <Button Content="{Binding Title}"
+                                        Tag="{Binding}"
+                                        FontSize="28"
+                                        FontWeight="SemiBold"
+                                        Theme="{StaticResource EntityLinkButtonTheme}"
+                                        Click="AlbumLinkButton_OnClick"/>
+                            </StackPanel>
                             <Button Content="{Binding Artist}"
                                     Tag="{Binding}"
                                     Margin="0,10,0,0"
@@ -1820,30 +1834,24 @@
                                        Margin="0,8,0,0"
                                        FontSize="14"
                                        Foreground="{DynamicResource AppMutedTextBrush}"/>
-                            <Button Content="{Binding FavoriteGlyph}"
-                                    Tag="{Binding}"
-                                    Margin="0,18,0,0"
-                                    Width="40"
-                                    Height="36"
-                                    Padding="0"
-                                    HorizontalAlignment="Left"
-                                    HorizontalContentAlignment="Center"
-                                    VerticalContentAlignment="Center"
-                                    FontSize="20"
-                                    ToolTip.Tip="{DynamicResource L_MarkAsFavorite}"
-                                    Theme="{StaticResource HeaderFilterButtonTheme}"
-                                    Click="AlbumDetailFavoriteButton_OnClick"/>
-                            <Button Content="{DynamicResource L_SearchCover}"
-                                    Tag="{Binding}"
-                                    Margin="0,12,0,0"
-                                    Padding="14,7"
-                                    HorizontalAlignment="Left"
-                                    Theme="{StaticResource HeaderFilterButtonTheme}"
-                                    Click="SearchCoverButton_OnClick"/>
+                            <StackPanel Margin="0,12,0,0"
+                                        Orientation="Horizontal"
+                                        HorizontalAlignment="Left"
+                                        Spacing="8">
+                                <Button Content="{DynamicResource L_SearchCover}"
+                                        Tag="{Binding}"
+                                        Padding="14,7"
+                                        Theme="{StaticResource HeaderFilterButtonTheme}"
+                                        Click="SearchCoverButton_OnClick"/>
+                                <Button Content="{DynamicResource L_SaveAlbumAsPlaylist}"
+                                        Padding="14,7"
+                                        Theme="{StaticResource HeaderFilterButtonTheme}"
+                                        Click="AlbumSaveAsPlaylistButton_OnClick"/>
+                            </StackPanel>
                             <CheckBox x:Name="ShowAllAlbumTracksCheckBox"
                                       Margin="0,18,0,0"
                                       HorizontalAlignment="Left"
-                                      Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                      Theme="{StaticResource HeaderCheckBoxTheme}"
                                       Content="{DynamicResource L_ShowAllAlbumTracks}"
                                       IsVisible="False"
                                       IsCheckedChanged="ShowAllAlbumTracksCheckBox_OnChanged"/>
@@ -1866,8 +1874,7 @@
                           SelectionMode="Single"
                           FontSize="12"
                           LoadingRow="ContentDataGrid_OnLoadingRow"
-                          DoubleTapped="ContentDataGrid_OnMouseDoubleClick"
-                          PointerPressed="ContentDataGrid_OnPreviewMouseRightButtonDown"/>
+                          DoubleTapped="ContentDataGrid_OnMouseDoubleClick"/>
             </Grid>
 
             <ScrollViewer x:Name="SearchResultsScrollViewer"
@@ -1898,8 +1905,7 @@
                                       GridLinesVisibility="Horizontal"
                                       HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
                                       LoadingRow="TrackDataGrid_OnLoadingRow"
-                                      DoubleTapped="SearchTracksDataGrid_OnMouseDoubleClick"
-                                      PointerPressed="SearchTracksDataGrid_OnPreviewMouseRightButtonDown"/>
+                                      DoubleTapped="SearchTracksDataGrid_OnMouseDoubleClick"/>
                             <TextBlock x:Name="SearchTracksEmptyTextBlock"
                                        IsVisible="False"
                                        Foreground="{DynamicResource AppSecondaryTextBrush}"
@@ -1928,8 +1934,8 @@
                                       HeadersVisibility="Column"
                                       GridLinesVisibility="Horizontal"
                                       HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
-                                      DoubleTapped="SearchAlbumsDataGrid_OnMouseDoubleClick"
-                                      PointerPressed="SearchAlbumsDataGrid_OnPreviewMouseRightButtonDown"/>
+                                      LoadingRow="PlaylistDataGrid_OnLoadingRow"
+                                      DoubleTapped="SearchAlbumsDataGrid_OnMouseDoubleClick"/>
                             <TextBlock x:Name="SearchAlbumsEmptyTextBlock"
                                        IsVisible="False"
                                        Foreground="{DynamicResource AppSecondaryTextBrush}"
@@ -1975,8 +1981,7 @@
                       BorderThickness="0"
                       FontSize="13"
                       IsVisible="False"
-                      DoubleTapped="FolderTreeView_OnMouseDoubleClick"
-                      PointerPressed="FolderTreeView_OnPreviewMouseRightButtonDown"/>
+                      DoubleTapped="FolderTreeView_OnMouseDoubleClick"/>
 
             <!-- Album artwork view -->
             <ListBox x:Name="AlbumArtworkListBox"
