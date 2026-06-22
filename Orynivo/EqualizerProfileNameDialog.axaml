@@ -1,0 +1,103 @@
+<Window x:Class="Orynivo.EqualizerProfileNameDialog"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{DynamicResource L_EqualizerCreateTitle}"
+        Icon="avares://Orynivo/Assets/Orynivo.ico"
+        Width="420"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppSurfaceBrush}"
+        Foreground="{DynamicResource AppPrimaryTextBrush}">
+    <Window.Resources>
+        <ControlTheme x:Key="DialogButtonTheme" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource AppButtonBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppButtonTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppButtonBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border x:Name="ButtonBorder"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="5">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          TextBlock.Foreground="{TemplateBinding Foreground}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+            <Style Selector="^:pointerover /template/ Border#ButtonBorder">
+                <Setter Property="Background" Value="{DynamicResource AppButtonHoverBrush}"/>
+            </Style>
+            <Style Selector="^:pressed /template/ Border#ButtonBorder">
+                <Setter Property="Background" Value="{DynamicResource AppButtonPressedBrush}"/>
+            </Style>
+            <Style Selector="^:disabled">
+                <Setter Property="Opacity" Value="0.55"/>
+            </Style>
+        </ControlTheme>
+        <ControlTheme x:Key="DialogPrimaryButtonTheme"
+                      TargetType="Button"
+                      BasedOn="{StaticResource DialogButtonTheme}">
+            <Setter Property="Background" Value="{DynamicResource AppTransportPlayBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Style Selector="^:pointerover /template/ Border#ButtonBorder">
+                <Setter Property="Background" Value="{DynamicResource AppTransportPlayHoverBrush}"/>
+            </Style>
+        </ControlTheme>
+    </Window.Resources>
+
+    <Grid Margin="24,20,24,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Text="{DynamicResource L_EqualizerName}"
+                   FontSize="12"
+                   Foreground="{DynamicResource AppMutedTextBrush}"
+                   Margin="0,0,0,6"/>
+        <TextBox x:Name="NameTextBox"
+                 Grid.Row="1"
+                 Height="34"
+                 Padding="10,0"
+                 VerticalContentAlignment="Center"
+                 Background="{DynamicResource AppInputBrush}"
+                 Foreground="{DynamicResource AppPrimaryTextBrush}"
+                 BorderBrush="{DynamicResource AppInputBorderBrush}"
+                 TextChanged="NameTextBox_OnTextChanged"
+                 KeyDown="NameTextBox_OnKeyDown"/>
+        <TextBlock x:Name="ValidationTextBlock"
+                   Grid.Row="2"
+                   MinHeight="18"
+                   Margin="0,5,0,12"
+                   FontSize="11"
+                   Foreground="{DynamicResource AppMutedTextBrush}"
+                   TextWrapping="Wrap"/>
+        <StackPanel Grid.Row="3"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right">
+            <Button Width="96"
+                    Height="34"
+                    Margin="0,0,8,0"
+                    Theme="{StaticResource DialogButtonTheme}"
+                    Content="{DynamicResource L_Cancel}"
+                    Click="CancelButton_OnClick"/>
+            <Button x:Name="CreateButton"
+                    Width="110"
+                    Height="34"
+                    IsEnabled="False"
+                    Theme="{StaticResource DialogPrimaryButtonTheme}"
+                    Content="{DynamicResource L_EqualizerCreate}"
+                    Click="CreateButton_OnClick"/>
+        </StackPanel>
+    </Grid>
+</Window>

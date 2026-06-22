@@ -182,6 +182,72 @@ public sealed record LocalizedStrings(
     public string ReplayGainTrack { get; init; } = "";
     /// <summary>Gets the album ReplayGain mode label.</summary>
     public string ReplayGainAlbum { get; init; } = "";
+    /// <summary>Gets the DSD playback settings heading.</summary>
+    public string DsdPlayback { get; init; } = "";
+    /// <summary>Gets the option label for forcing DSD sources through PCM conversion.</summary>
+    public string AlwaysConvertDsdToPcm { get; init; } = "";
+    /// <summary>Gets the explanatory text for forced DSD-to-PCM conversion.</summary>
+    public string AlwaysConvertDsdToPcmHint { get; init; } = "";
+    /// <summary>Gets the output-device loading status message.</summary>
+    public string OutputDevicesLoading { get; init; } = "";
+    /// <summary>Gets the parametric equalizer settings label.</summary>
+    public string Equalizer { get; init; } = "";
+    /// <summary>Gets the explanatory equalizer settings text.</summary>
+    public string EqualizerHint { get; init; } = "";
+    /// <summary>Gets the equalizer enable checkbox label.</summary>
+    public string EqualizerEnabled { get; init; } = "";
+    /// <summary>Gets the Equalizer APO or AutoEQ import button label.</summary>
+    public string EqualizerImport { get; init; } = "";
+    /// <summary>Gets the equalizer import activity message.</summary>
+    public string EqualizerImporting { get; init; } = "";
+    /// <summary>Gets the equalizer profile file-picker title.</summary>
+    public string EqualizerImportTitle { get; init; } = "";
+    /// <summary>Gets the text displayed when no equalizer profile is loaded.</summary>
+    public string EqualizerNoProfile { get; init; } = "";
+    /// <summary>Gets the imported equalizer profile summary format.</summary>
+    public string EqualizerProfileSummary { get; init; } = "";
+    /// <summary>Gets the equalizer import failure format.</summary>
+    public string EqualizerImportFailed { get; init; } = "";
+    /// <summary>Gets the Equalizer APO or AutoEQ profile file-type label.</summary>
+    public string EqualizerProfileFileType { get; init; } = "";
+    /// <summary>Gets the equalizer preamplification label.</summary>
+    public string EqualizerPreamp { get; init; } = "";
+    /// <summary>Gets the equalizer filter-type label.</summary>
+    public string EqualizerFilterType { get; init; } = "";
+    /// <summary>Gets the equalizer frequency label.</summary>
+    public string EqualizerFrequency { get; init; } = "";
+    /// <summary>Gets the equalizer gain label.</summary>
+    public string EqualizerGain { get; init; } = "";
+    /// <summary>Gets the equalizer quality-factor label.</summary>
+    public string EqualizerQ { get; init; } = "";
+    /// <summary>Gets the label for adding an equalizer filter.</summary>
+    public string EqualizerAddFilter { get; init; } = "";
+    /// <summary>Gets the tooltip for removing an equalizer filter.</summary>
+    public string EqualizerRemoveFilter { get; init; } = "";
+    /// <summary>Gets the peaking equalizer filter name.</summary>
+    public string EqualizerPeak { get; init; } = "";
+    /// <summary>Gets the low-shelf equalizer filter name.</summary>
+    public string EqualizerLowShelf { get; init; } = "";
+    /// <summary>Gets the high-shelf equalizer filter name.</summary>
+    public string EqualizerHighShelf { get; init; } = "";
+    /// <summary>Gets the low-pass equalizer filter name.</summary>
+    public string EqualizerLowPass { get; init; } = "";
+    /// <summary>Gets the high-pass equalizer filter name.</summary>
+    public string EqualizerHighPass { get; init; } = "";
+    /// <summary>Gets the label for creating an equalizer profile.</summary>
+    public string EqualizerCreate { get; init; } = "";
+    /// <summary>Gets the equalizer profile creation dialog title.</summary>
+    public string EqualizerCreateTitle { get; init; } = "";
+    /// <summary>Gets the equalizer profile name label.</summary>
+    public string EqualizerName { get; init; } = "";
+    /// <summary>Gets the duplicate equalizer profile name validation message.</summary>
+    public string EqualizerNameExists { get; init; } = "";
+    /// <summary>Gets the label for deleting an equalizer profile.</summary>
+    public string EqualizerDelete { get; init; } = "";
+    /// <summary>Gets the equalizer profile deletion dialog title.</summary>
+    public string EqualizerDeleteTitle { get; init; } = "";
+    /// <summary>Gets the equalizer profile deletion confirmation format.</summary>
+    public string EqualizerDeleteConfirm { get; init; } = "";
     /// <summary>Gets the column-selection menu heading.</summary>
     public string SelectColumns { get; init; } = "";
     /// <summary>Gets the file-name column label.</summary>

@@ -11,12 +11,15 @@ namespace Orynivo.Audio;
 /// Plays one or more files as continuous PCM through one exclusive WASAPI
 /// session. Upcoming FFmpeg decoders are prefetched before track boundaries.
 /// </summary>
-public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
+public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlayer
 {
+    private const int MaximumPrematurePlexEofRetries = 3;
+    private static readonly TimeSpan PrematurePlexEofTolerance = TimeSpan.FromSeconds(5);
     private readonly IReadOnlyList<GaplessPlaybackItem> _items;
     private readonly AudioFileInfo?[] _infos;
     private readonly long[] _trackStartFrames;
     private readonly long[] _trackPositionOffsetFrames;
+    private readonly int[] _prematurePlexEofRetryCounts;
     private readonly WasapiOut _output;
     private readonly BufferedWaveProvider _bufferedProvider;
     private readonly PausableWaveProvider _playbackProvider;
@@ -26,12 +29,15 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
     private readonly SemaphoreSlim _decoderGate = new(1, 1);
     private readonly Task _pumpTask;
     private readonly object _stateLock = new();
+    private readonly ParametricEqualizer _equalizer;
     private long _totalFramesWritten;
     private int _audibleTrackIndex;
     private int _writeTrackIndex;
     private FfmpegPcmDecoder? _activeDecoder;
     private int _restartPreparedFromIndex = -1;
     private int _decoderGeneration;
+    private EqualizerUpdateRequest? _pendingEqualizerUpdate;
+    private int _equalizerResetRequested;
     private float _volume = 1.0f;
     private bool _disposed;
 
@@ -43,18 +49,25 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
         BufferedWaveProvider bufferedProvider,
         PausableWaveProvider playbackProvider,
         MMDevice device,
-        WasapiSelectedFormat selectedFormat)
+        WasapiSelectedFormat selectedFormat,
+        bool equalizerEnabled,
+        EqualizerProfile? equalizerProfile)
     {
         _items = items;
         _infos = new AudioFileInfo?[items.Count];
         _infos[0] = firstInfo;
         _trackStartFrames = new long[items.Count];
         _trackPositionOffsetFrames = new long[items.Count];
+        _prematurePlexEofRetryCounts = new int[items.Count];
         _output = output;
         _bufferedProvider = bufferedProvider;
         _playbackProvider = playbackProvider;
         _device = device;
         _selectedFormat = selectedFormat;
+        _equalizer = new ParametricEqualizer(
+            selectedFormat.Format.SampleRate,
+            equalizerEnabled,
+            equalizerProfile);
         _activeDecoder = firstDecoder;
         _pumpTask = Task.Run(() => PumpAsync(firstDecoder));
     }
@@ -101,11 +114,15 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
     /// <summary>Creates a continuous exclusive-mode WASAPI playback session.</summary>
     /// <param name="items">Tracks in playback order with their ReplayGain factors.</param>
     /// <param name="deviceId">MMDevice identifier of the output device.</param>
+    /// <param name="equalizerEnabled">Whether the supplied equalizer profile is active.</param>
+    /// <param name="equalizerProfile">Equalizer profile applied to PCM samples.</param>
     /// <param name="cancellationToken">Cancellation token for initial probing and decoder startup.</param>
     /// <returns>The player and technical information for the first track.</returns>
     public static async Task<(WasapiAudioPlayer AudioPlayer, AudioFileInfo Info)> CreateAsync(
         IReadOnlyList<GaplessPlaybackItem> items,
         string deviceId,
+        bool equalizerEnabled = false,
+        EqualizerProfile? equalizerProfile = null,
         CancellationToken cancellationToken = default)
     {
         if (items.Count == 0)
@@ -114,6 +131,8 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
         var info = await ProbeAsync(items[0].PlaybackPath, cancellationToken);
         if (items[0].SegmentDuration is { } firstDuration)
             info = info with { Duration = firstDuration };
+        else if (items[0].KnownDuration is { } knownDuration)
+            info = info with { Duration = knownDuration };
         var device = WasapiDeviceProvider.GetRenderDevice(deviceId);
         try
         {
@@ -128,7 +147,7 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
             var output = new WasapiOut(device, AudioClientShareMode.Exclusive, useEventSync: true, latency: 100);
             output.Init(playbackProvider);
             var decoder = await FfmpegPcmDecoder.CreateAsync(
-                items[0].PlaybackPath,
+                items[0].PlaybackPaths,
                 info.OutputSampleRate,
                 selectedFormat.FfmpegSampleFormat,
                 selectedFormat.FfmpegCodec,
@@ -138,7 +157,16 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
                 cancellationToken);
             output.Play();
             return (new WasapiAudioPlayer(
-                items, info, decoder, output, provider, playbackProvider, device, selectedFormat), info);
+                items,
+                info,
+                decoder,
+                output,
+                provider,
+                playbackProvider,
+                device,
+                selectedFormat,
+                equalizerEnabled,
+                equalizerProfile), info);
         }
         catch
         {
@@ -150,13 +178,28 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
     /// <summary>Creates a single-track exclusive-mode WASAPI playback session.</summary>
     /// <param name="filePath">Local path or supported stream URL.</param>
     /// <param name="deviceId">MMDevice identifier of the output device.</param>
+    /// <param name="equalizerEnabled">Whether the supplied equalizer profile is active.</param>
+    /// <param name="equalizerProfile">Equalizer profile applied to PCM samples.</param>
     /// <param name="cancellationToken">Cancellation token for initial probing and decoder startup.</param>
     /// <returns>The player and technical information for the track.</returns>
     public static Task<(WasapiAudioPlayer AudioPlayer, AudioFileInfo Info)> CreateAsync(
         string filePath,
         string deviceId,
+        bool equalizerEnabled = false,
+        EqualizerProfile? equalizerProfile = null,
         CancellationToken cancellationToken = default) =>
-        CreateAsync([new GaplessPlaybackItem(filePath, 1.0f)], deviceId, cancellationToken);
+        CreateAsync(
+            [new GaplessPlaybackItem(filePath, 1.0f)],
+            deviceId,
+            equalizerEnabled,
+            equalizerProfile,
+            cancellationToken);
+
+    /// <inheritdoc/>
+    public void UpdateEqualizer(bool enabled, EqualizerProfile? profile)
+        => Interlocked.Exchange(
+            ref _pendingEqualizerUpdate,
+            new EqualizerUpdateRequest(enabled, profile?.Clone()));
 
     /// <inheritdoc/>
     public void Pause() => _playbackProvider.IsPaused = true;
@@ -169,7 +212,7 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
             ? TimeSpan.Zero
             : position > Duration ? Duration : position;
         var replacement = await FfmpegPcmDecoder.CreateAsync(
-            _items[Volatile.Read(ref _audibleTrackIndex)].PlaybackPath,
+            _items[Volatile.Read(ref _audibleTrackIndex)].PlaybackPaths,
             CurrentInfo.OutputSampleRate,
             _selectedFormat.FfmpegSampleFormat,
             _selectedFormat.FfmpegCodec,
@@ -185,9 +228,11 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
             Interlocked.Increment(ref _decoderGeneration);
             var audibleIndex = Volatile.Read(ref _audibleTrackIndex);
             _writeTrackIndex = audibleIndex;
+            _prematurePlexEofRetryCounts[audibleIndex] = 0;
             Volatile.Write(ref _trackStartFrames[audibleIndex], 0);
             Volatile.Write(ref _restartPreparedFromIndex, audibleIndex);
             _bufferedProvider.ClearBuffer();
+            Interlocked.Exchange(ref _equalizerResetRequested, 1);
             Interlocked.Exchange(ref _totalFramesWritten, 0);
             Volatile.Write(
                 ref _trackPositionOffsetFrames[audibleIndex],
@@ -256,6 +301,9 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
                 if (bytesRead == 0)
                 {
                     remainderBytes = 0;
+                    if (await TryResumePrematurePlexEofAsync(decoderGeneration).ConfigureAwait(false))
+                        continue;
+
                     _activeDecoder?.Dispose();
                     var nextIndex = _writeTrackIndex + 1;
                     if (nextIndex >= _items.Count || preparedNext is null)
@@ -273,7 +321,7 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
                 var totalBytes = remainderBytes + bytesRead;
                 bytesRead = totalBytes - (totalBytes % _selectedFormat.BytesPerFrame);
                 remainderBytes = totalBytes - bytesRead;
-                ApplyReplayGain(buffer.AsSpan(0, bytesRead), _items[_writeTrackIndex].ReplayGainFactor);
+                ProcessPcm(buffer.AsSpan(0, bytesRead), _items[_writeTrackIndex].ReplayGainFactor);
                 var offset = 0;
                 while (offset < bytesRead && !_cts.IsCancellationRequested)
                 {
@@ -334,8 +382,10 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
         var info = await ProbeAsync(_items[index].PlaybackPath, _cts.Token).ConfigureAwait(false);
         if (_items[index].SegmentDuration is { } segmentDuration)
             info = info with { Duration = segmentDuration };
+        else if (_items[index].KnownDuration is { } knownDuration)
+            info = info with { Duration = knownDuration };
         var decoder = await FfmpegPcmDecoder.CreateAsync(
-            _items[index].PlaybackPath,
+            _items[index].PlaybackPaths,
             _selectedFormat.Format.SampleRate,
             _selectedFormat.FfmpegSampleFormat,
             _selectedFormat.FfmpegCodec,
@@ -344,6 +394,78 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
             _items[index].SegmentEnd,
             _cts.Token).ConfigureAwait(false);
         return (decoder, info with { OutputSampleRate = _selectedFormat.Format.SampleRate });
+    }
+
+    private async Task<bool> TryResumePrematurePlexEofAsync(int decoderGeneration)
+    {
+        var trackIndex = _writeTrackIndex;
+        var item = _items[trackIndex];
+        if (item.SourcePaths is not { Count: > 0 } ||
+            item.KnownDuration is not { } knownDuration ||
+            knownDuration <= TimeSpan.Zero)
+        {
+            return false;
+        }
+
+        var outputSampleRate = _selectedFormat.Format.SampleRate;
+        var writtenTrackFrames = Math.Max(
+            0,
+            Interlocked.Read(ref _totalFramesWritten) -
+            Volatile.Read(ref _trackStartFrames[trackIndex]));
+        var resumeFrames = writtenTrackFrames +
+            Volatile.Read(ref _trackPositionOffsetFrames[trackIndex]);
+        var resumePosition = TimeSpan.FromSeconds(resumeFrames / (double)outputSampleRate);
+        if (knownDuration - resumePosition <= PrematurePlexEofTolerance)
+            return false;
+
+        while (_prematurePlexEofRetryCounts[trackIndex] < MaximumPrematurePlexEofRetries)
+        {
+            var retry = ++_prematurePlexEofRetryCounts[trackIndex];
+            await Task.Delay(TimeSpan.FromMilliseconds(150 * retry), _cts.Token).ConfigureAwait(false);
+
+            FfmpegPcmDecoder replacement;
+            try
+            {
+                replacement = await FfmpegPcmDecoder.CreateAsync(
+                    item.PlaybackPaths,
+                    outputSampleRate,
+                    _selectedFormat.FfmpegSampleFormat,
+                    _selectedFormat.FfmpegCodec,
+                    resumePosition,
+                    item.SegmentStart,
+                    item.SegmentEnd,
+                    _cts.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch
+            {
+                continue;
+            }
+
+            await _decoderGate.WaitAsync(_cts.Token).ConfigureAwait(false);
+            try
+            {
+                if (decoderGeneration != Volatile.Read(ref _decoderGeneration) ||
+                    trackIndex != _writeTrackIndex)
+                {
+                    replacement.Dispose();
+                    return true;
+                }
+
+                _activeDecoder?.Dispose();
+                _activeDecoder = replacement;
+                return true;
+            }
+            finally
+            {
+                _decoderGate.Release();
+            }
+        }
+
+        return false;
     }
 
     private void UpdateAudibleTrack()
@@ -366,30 +488,90 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
         }
     }
 
-    private void ApplyReplayGain(Span<byte> bytes, float trackReplayGain)
+    private void ProcessPcm(Span<byte> bytes, float trackReplayGain)
     {
-        var factor = trackReplayGain;
-        if (Math.Abs(factor - 1.0f) < 0.0001f)
-            return;
-
+        ApplyPendingEqualizerChanges();
         if (_selectedFormat.FfmpegSampleFormat == "f32le")
         {
             var samples = MemoryMarshal.Cast<byte, float>(bytes);
-            for (var index = 0; index < samples.Length; index++)
-                samples[index] = Math.Clamp(samples[index] * factor, -1.0f, 1.0f);
+            for (var index = 0; index + 1 < samples.Length; index += 2)
+            {
+                var output = _equalizer.Process(
+                    samples[index] * trackReplayGain,
+                    samples[index + 1] * trackReplayGain);
+                samples[index] = Math.Clamp(output.Left, -1.0f, 1.0f);
+                samples[index + 1] = Math.Clamp(output.Right, -1.0f, 1.0f);
+            }
         }
         else if (_selectedFormat.FfmpegSampleFormat == "s16le")
         {
             var samples = MemoryMarshal.Cast<byte, short>(bytes);
-            for (var index = 0; index < samples.Length; index++)
-                samples[index] = (short)Math.Clamp(samples[index] * factor, short.MinValue, short.MaxValue);
+            for (var index = 0; index + 1 < samples.Length; index += 2)
+            {
+                var output = _equalizer.Process(
+                    samples[index] / 32768.0f * trackReplayGain,
+                    samples[index + 1] / 32768.0f * trackReplayGain);
+                samples[index] = FloatToInt16(output.Left);
+                samples[index + 1] = FloatToInt16(output.Right);
+            }
+        }
+        else if (_selectedFormat.FfmpegSampleFormat == "s24le")
+        {
+            for (var offset = 0; offset + 5 < bytes.Length; offset += 6)
+            {
+                var output = _equalizer.Process(
+                    ReadInt24(bytes, offset) / 8_388_608.0f * trackReplayGain,
+                    ReadInt24(bytes, offset + 3) / 8_388_608.0f * trackReplayGain);
+                WriteInt24(bytes, offset, output.Left);
+                WriteInt24(bytes, offset + 3, output.Right);
+            }
         }
         else
         {
             var samples = MemoryMarshal.Cast<byte, int>(bytes);
-            for (var index = 0; index < samples.Length; index++)
-                samples[index] = (int)Math.Clamp(samples[index] * (double)factor, int.MinValue, int.MaxValue);
+            for (var index = 0; index + 1 < samples.Length; index += 2)
+            {
+                var output = _equalizer.Process(
+                    samples[index] / 2_147_483_648.0f * trackReplayGain,
+                    samples[index + 1] / 2_147_483_648.0f * trackReplayGain);
+                samples[index] = FloatToInt32(output.Left);
+                samples[index + 1] = FloatToInt32(output.Right);
+            }
         }
+    }
+
+    private void ApplyPendingEqualizerChanges()
+    {
+        if (Interlocked.Exchange(ref _equalizerResetRequested, 0) != 0)
+            _equalizer.Reset();
+        var update = Interlocked.Exchange(ref _pendingEqualizerUpdate, null);
+        if (update is not null)
+            _equalizer.Update(update.Enabled, update.Profile);
+    }
+
+    private sealed record EqualizerUpdateRequest(bool Enabled, EqualizerProfile? Profile);
+
+    private static short FloatToInt16(float sample) =>
+        (short)Math.Round(Math.Clamp(sample, -1.0f, 1.0f) * (sample < 0 ? 32768.0f : 32767.0f));
+
+    private static int FloatToInt32(float sample) =>
+        (int)Math.Round(Math.Clamp(sample, -1.0f, 1.0f) * (sample < 0 ? 2_147_483_648.0 : 2_147_483_647.0));
+
+    private static int ReadInt24(ReadOnlySpan<byte> bytes, int offset)
+    {
+        var sample = bytes[offset] | (bytes[offset + 1] << 8) | (bytes[offset + 2] << 16);
+        return (sample & 0x0080_0000) != 0
+            ? sample | unchecked((int)0xFF00_0000)
+            : sample;
+    }
+
+    private static void WriteInt24(Span<byte> bytes, int offset, float sample)
+    {
+        var value = (int)Math.Round(
+            Math.Clamp(sample, -1.0f, 1.0f) * (sample < 0 ? 8_388_608.0 : 8_388_607.0));
+        bytes[offset] = (byte)value;
+        bytes[offset + 1] = (byte)(value >> 8);
+        bytes[offset + 2] = (byte)(value >> 16);
     }
 
     private static async Task DisposePreparedAsync(
@@ -452,16 +634,28 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
 
     private static WasapiSelectedFormat ChooseExclusiveFormat(MMDevice device, AudioFileInfo info)
     {
-        var sampleRates = info.IsDsd
-            ? new[] { 176_400, 88_200, 44_100, 192_000, 96_000, 48_000 }
-            : new[] { info.OutputSampleRate };
+        int[] standardSampleRates =
+        [
+            8_000, 11_025, 12_000, 16_000, 22_050, 24_000, 32_000,
+            44_100, 48_000, 88_200, 96_000, 176_400, 192_000,
+            352_800, 384_000, 705_600, 768_000
+        ];
+        var sourceSampleRate = Math.Max(info.SourceSampleRate, info.OutputSampleRate);
+        var sampleRates = standardSampleRates
+            .Append(info.OutputSampleRate)
+            .Where(static rate => rate > 0)
+            .Distinct()
+            .OrderBy(rate => rate <= sourceSampleRate ? 0 : 1)
+            .ThenByDescending(rate => rate <= sourceSampleRate ? rate : 0)
+            .ThenBy(rate => rate > sourceSampleRate ? rate : int.MaxValue);
+
         foreach (var sampleRate in sampleRates)
         {
             WasapiSelectedFormat[] candidates =
             [
-                new(WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, 2), "f32le", "pcm_f32le", sizeof(float) * 2),
-                new(new WaveFormatExtensible(sampleRate, 24, 2), "s32le", "pcm_s32le", sizeof(int) * 2),
-                new(new WaveFormat(sampleRate, 16, 2), "s16le", "pcm_s16le", sizeof(short) * 2)
+                new(WaveFormat.CreateIeeeFloatWaveFormat(sampleRate, 2), "f32le", "pcm_f32le"),
+                new(new WaveFormatExtensible(sampleRate, 24, 2), "s24le", "pcm_s24le"),
+                new(new WaveFormat(sampleRate, 16, 2), "s16le", "pcm_s16le")
             ];
             foreach (var candidate in candidates)
                 if (device.AudioClient.IsFormatSupported(AudioClientShareMode.Exclusive, candidate.Format))
@@ -474,8 +668,10 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
     private sealed record WasapiSelectedFormat(
         WaveFormat Format,
         string FfmpegSampleFormat,
-        string FfmpegCodec,
-        int BytesPerFrame);
+        string FfmpegCodec)
+    {
+        public int BytesPerFrame => Format.BlockAlign;
+    }
 
     private sealed class PausableWaveProvider(IWaveProvider source) : IWaveProvider
     {

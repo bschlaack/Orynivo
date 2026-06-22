@@ -14,9 +14,14 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 ## Features
 
 - Playback through ASIO or exclusive-mode WASAPI
+- Automatic PCM down-conversion through `ffmpeg` when the source sample rate
+  exceeds the selected ASIO or WASAPI device's capabilities; WASAPI uses the
+  highest supported 32-bit float, 24-bit PCM, or 16-bit PCM output format
 - Native stereo DSD playback for DSF and uncompressed DFF files through ASIO
 - Real-time DSF/DFF-to-PCM conversion for playback through WASAPI, with the
   active conversion and PCM sample rate shown in the transport and status bar
+- Optional forced DSF/DFF-to-PCM conversion with ASIO/cwASIO, allowing volume,
+  ReplayGain, and the parametric equalizer to affect DSD sources
 - PCM playback through `ffmpeg`
 - Seeking, volume control, pause, and an editable persistent **Up next** queue
   with play-next/append actions, removal, reordering, playlist saving, and
@@ -27,6 +32,12 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 - Optional ReplayGain volume adjustment for PCM playback, using track or album
   gain metadata with fallback to the other available value; native DSD output
   remains bit-perfect
+- Multiple named parametric PCM equalizers with one selected profile, a live
+  frequency-response graph, editable preamp, dynamic filter rows, persisted
+  on/off state, and Equalizer APO/AutoEQ text-profile import. Preamp, peak,
+  low/high shelf, low/high pass, and `GraphicEQ` profiles are supported;
+  changes are crossfaded during playback and native DSD output remains
+  bit-perfect
 - SQLite music library with multiple monitored directories
 - CUE-sheet support for large FLAC/WAV images: indexed CUE entries appear as
   independent virtual tracks in library, folder, search, queue, playlist, and
@@ -110,7 +121,8 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 - German, English, French, and Spanish user interfaces
 - Multiple Plex Media Server configurations with protected access tokens and
   music-library discovery, artist/album/track browsing, folder navigation, and
-  playback
+  playback, including an A–Z root-folder index and multi-part tracks decoded as
+  one logical item
 - Provider-neutral streaming interfaces with a prepared Qobuz configuration
   page for future approved partner API access
 
@@ -126,9 +138,11 @@ first start if not already installed. Actual codec support depends on the build.
 For CUE sheets, Orynivo uses `INDEX 01` boundaries to seek and stop FFmpeg
 within the referenced source file; no temporary split files are created.
 When WASAPI is selected, DSD audio in DSF or DFF containers is converted to PCM
-in real time without creating a temporary file. Orynivo prefers 176.4, 88.2,
-or 44.1 kHz output and falls back to 192, 96, or 48 kHz when required by the
-selected exclusive-mode endpoint.
+in real time without creating a temporary file. PCM and converted DSD are
+output at the highest supported endpoint sample rate that does not exceed the
+source rate; if the endpoint exposes only higher rates, its lowest supported
+rate is used. Unsupported sample rates and bit depths are converted by
+`ffmpeg`.
 
 ## Requirements
 
@@ -194,9 +208,21 @@ the repository. Release artifacts therefore include `CwAsioBridge.dll`.
 ```
 
 Library directories and the desired output device can then be selected in the
-settings window. ReplayGain can be disabled or switched to track/album mode
+settings view inside the main window. ReplayGain can be disabled or switched to track/album mode
 under the output-device settings. The first subsequent scan of each configured
 library root refreshes unchanged files once to import existing ReplayGain tags.
+Equalizer APO or AutoEQ `.txt`/`.cfg` profiles can be imported in the same
+section. `GraphicEQ` curves are translated into a log-frequency shelf cascade;
+the imported parameters are stored directly in `settings.json`, so the source
+profile file does not need to remain available. The same settings section plots
+the combined response and exposes every filter as an editable row. Rows follow
+the profile dynamically, and filters can be added or removed without
+reimporting a file. Several named equalizers can be created and retained, while
+the dropdown selects the only profile eligible for active playback. With no
+selection, the editor and import controls remain hidden. Profiles can be
+deleted after confirmation. Edits are previewed during active PCM playback.
+The DSD playback option can force DSF/DFF files through this PCM path even when
+ASIO/cwASIO native DSD is available.
 Available library roots are monitored automatically after configuration.
 File-system events are debounced before updating the database and search index;
 periodic full scans reconcile changes that a watcher may have missed.
@@ -277,8 +303,10 @@ artwork, rebasing paths, and rebuilding the search index.
   Qobuz partner API contract and official endpoint documentation are still
   required.
 - Plex browsing is paginated to keep very large libraries responsive. Playback
-  availability depends on the selected Plex part being directly accessible and
-  decodable by the installed FFmpeg build.
+  availability depends on every selected Plex media part being directly
+  accessible and decodable by the installed FFmpeg build. Unexpected HTTP
+  stream termination is retried from the last decoded position before Orynivo
+  advances to the next queue item.
 - Renaming or merging artists updates Orynivo's internal library, album
   assignments, and search index. It does not modify tags in the audio files.
 - ASIO devices may be unavailable for inspection or playback while another

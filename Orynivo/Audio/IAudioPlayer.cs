@@ -63,15 +63,23 @@ public interface IGaplessAudioPlayer : IAudioPlayer
 /// <param name="SourcePath">Physical media path. Defaults to <paramref name="FilePath"/>.</param>
 /// <param name="SegmentStart">Optional start offset within the physical source.</param>
 /// <param name="SegmentEnd">Optional exclusive end offset within the physical source.</param>
+/// <param name="SourcePaths">Ordered physical media parts forming one logical track.</param>
+/// <param name="KnownDuration">Optional authoritative duration for the logical track.</param>
 public sealed record GaplessPlaybackItem(
     string FilePath,
     float ReplayGainFactor,
     string? SourcePath = null,
     TimeSpan? SegmentStart = null,
-    TimeSpan? SegmentEnd = null)
+    TimeSpan? SegmentEnd = null,
+    IReadOnlyList<string>? SourcePaths = null,
+    TimeSpan? KnownDuration = null)
 {
     /// <summary>Physical path passed to FFmpeg.</summary>
     public string PlaybackPath => SourcePath ?? FilePath;
+
+    /// <summary>Ordered physical paths passed to FFmpeg.</summary>
+    public IReadOnlyList<string> PlaybackPaths =>
+        SourcePaths is { Count: > 0 } ? SourcePaths : [PlaybackPath];
 
     /// <summary>Length of the virtual segment when bounded.</summary>
     public TimeSpan? SegmentDuration =>

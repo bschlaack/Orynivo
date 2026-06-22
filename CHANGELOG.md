@@ -4,7 +4,91 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.10.0] - 2026-06-22
+
+### Added
+
+- Added a persisted **Always convert DSD files to PCM** option. When enabled,
+  DSF and DFF playback uses the FFmpeg PCM path with ASIO/cwASIO as well as
+  WASAPI, allowing volume, ReplayGain, and the parametric equalizer to apply.
+  When disabled, ASIO/cwASIO retains native bit-perfect DSD playback.
+- Added a persisted parametric equalizer for ASIO/cwASIO PCM, exclusive WASAPI
+  PCM, and WASAPI DSD-to-PCM playback. Settings can import Equalizer APO and
+  AutoEQ profiles containing preamp, peak, low/high shelf, low/high pass, and
+  `GraphicEQ` definitions. Profile changes crossfade without clicks, seeks
+  reset filter history, and native ASIO DSD remains bit-perfect.
+- Added a graphical parametric-EQ editor with a live combined frequency
+  response, editable preamp, and a dynamic filter list. Peak, shelf, and
+  low/high-pass entries can be added, removed, or adjusted while playback
+  previews changes through the existing debounced DSP update path.
+- Moved the complete settings experience into the main window. Output, library,
+  streaming, appearance, artist-information, and equalizer settings now share
+  the main content area instead of opening a separate window.
+- Added multiple named equalizer profiles with one selected profile at a time.
+  Settings provides an empty-capable profile dropdown, a themed name dialog,
+  per-profile import and editing, and confirmed deletion. Existing single-EQ
+  settings migrate automatically into the profile list.
+
+### Fixed
+
+- Enabled the A–Z index in the Plex folder view. Available letters now come
+  from the currently displayed top-level directories, jump directly to the
+  first matching root folder, and follow manual tree scrolling.
+- Fixed double-clicking a Plex folder name expanding only its lazy placeholder.
+  The second pointer press is now intercepted before Avalonia's internal
+  TreeView gesture can expose the placeholder; it uses the same asynchronous
+  child-loading path as the chevron and then toggles the populated folder.
+- Fixed Plex tracks composed of multiple media parts advancing to the next
+  queue item after only the first part. Orynivo now preserves all ordered Plex
+  part URLs and decodes them as one logical gapless track with the authoritative
+  Plex duration.
+- Fixed Plex playback advancing when FFmpeg reports an unexpected end of the
+  HTTP stream before the duration supplied by Plex. PCM playback now reopens
+  the same logical track at its last decoded position with bounded retries.
+- Improved the embedded equalizer editor layout with a wider preamp input,
+  consistently full-width filter-type selectors, and equally wide adjacent
+  frequency, gain, and Q fields sized to keep their numeric values readable.
+- Added numbered dashed frequency markers to the graphical equalizer response.
+  Each marker matches the corresponding dynamic filter-row number, with
+  staggered labels when nearby frequencies would otherwise overlap.
+- Added a logarithmic frequency scale below the equalizer response from 20 Hz
+  through 20 kHz.
+- Equalizer marker numbers now remain aligned along the bottom of the graph.
+  Markers at identical or nearby frequencies move sideways with a short leader
+  instead of jumping upward into the response curve.
+- Moved the numbered equalizer marker bubbles below the frequency scale. Their
+  dashed lines continue through the scale at the exact selected frequency, so
+  the relationship between each row and its frequency remains unambiguous.
+- Fixed the application becoming unresponsive after saving an imported
+  Equalizer APO/AutoEQ profile during active playback. UI updates no longer
+  wait for the audio thread's DSP work; profile changes and seek resets are
+  handed to that thread atomically. Profile file parsing also runs off the UI
+  thread with visible progress and bounded file/filter counts.
+- Equalizer enable/disable now previews immediately during playback without
+  closing Settings; cancel restores the previous profile state. Saving an EQ
+  change no longer reopens the unchanged WASAPI endpoint. Actual backend or
+  device changes stop and dispose the old player off the UI thread, while
+  endpoint synchronization and ASIO/WASAPI device enumeration also run in the
+  background to prevent driver calls from freezing the application.
+- Fixed another live-EQ AppHang caused by competing settings activity. EQ
+  preview requests are now debounced and executed entirely away from the UI
+  event handler. Initial output-device enumeration no longer starts twice, and
+  later backend enumeration requests are serialized so native driver discovery
+  cannot overlap within the settings view.
+- Fixed leaked WASAPI endpoint COM objects during device enumeration and device
+  opening. Repeatedly opening Settings no longer accumulates undisposed
+  `MMDevice` and `MMDeviceEnumerator` instances while playback is active.
+- Saving an EQ-only settings change no longer performs unrelated synchronous
+  work on the UI thread. Settings persistence and credential protection run in
+  the background, while theme, language, sidebar, artist-provider, ReplayGain,
+  Plex navigation, and output-device refreshes execute only when their
+  corresponding values actually changed.
+- High-resolution PCM and WASAPI-converted DSD now fall back to the highest
+  sample rate and output precision supported by the selected device instead of
+  failing when the source rate or bit depth exceeds the endpoint capability.
+  The transport shows both source and converted PCM rates when they differ.
+
+## [0.9.0] - 2026-06-21
 
 ### Added
 

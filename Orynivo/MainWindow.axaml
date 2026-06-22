@@ -2530,6 +2530,13 @@
                            VerticalAlignment="Center"
                            Foreground="{DynamicResource AppPrimaryTextBrush}"/>
             </Grid>
+
+            <ContentControl x:Name="SettingsViewHost"
+                            Grid.Row="0"
+                            Grid.RowSpan="3"
+                            IsVisible="False"
+                            Background="{DynamicResource AppContentBrush}"
+                            ZIndex="100"/>
         </Grid>
 
         <!-- ═══ TRANSPORT BAR ═══ -->

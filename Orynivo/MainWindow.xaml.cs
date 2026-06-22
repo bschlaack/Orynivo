@@ -144,6 +144,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _lyricsCts;
     private CancellationTokenSource? _artistProfileCts;
     private WindowsEndpointVolumeSynchronizer? _endpointVolumeSynchronizer;
+    private int _endpointVolumeSynchronizationVersion;
     private WindowsMediaTransportService? _windowsMediaTransport;
     private bool _updatingVolumeFromSystem;
     private CancellationTokenSource _backgroundArtistLoadCts = new();
@@ -182,6 +183,7 @@ public partial class MainWindow : Window
 
     private sealed record FolderTag(bool IsFile, string FilePath, string FolderPath);
     private sealed record PlexFolderTag(string Key, bool IsTrack, ContentRow? Track);
+    private sealed record AlphabetTreeTarget(string Key, TreeViewItem Item);
     private sealed record PlexNavigationState(
         string Title,
         string View,
@@ -318,6 +320,8 @@ public partial class MainWindow : Window
         public string  Duration    { get; init; } = "";
         public string? Format      { get; init; }
         public string  FilePath    { get; init; } = "";
+        public IReadOnlyList<string>? PlexPartUrls { get; init; }
+        public TimeSpan? KnownDuration { get; init; }
         public long?   PlaylistEntryId { get; set; }
         public PlaylistItem? QueueItem { get; set; }
 
@@ -404,6 +408,10 @@ public partial class MainWindow : Window
             ScrollViewer.ScrollChangedEvent,
             new EventHandler<ScrollChangedEventArgs>(AlphabetTarget_OnScrollChanged),
             handledEventsToo: true);
+        FolderTreeView.AddHandler(
+            ScrollViewer.ScrollChangedEvent,
+            new EventHandler<ScrollChangedEventArgs>(AlphabetTarget_OnScrollChanged),
+            handledEventsToo: true);
         NavListBox.AddHandler(
             PointerPressedEvent,
             new EventHandler<PointerPressedEventArgs>(NavListBox_OnPreviewMouseRightButtonDown),
@@ -419,7 +427,7 @@ public partial class MainWindow : Window
         PositionSlider.AddHandler(Slider.PointerReleasedEvent,
             new EventHandler<PointerReleasedEventArgs>(PositionSlider_OnPreviewMouseLeftButtonUp),
             handledEventsToo: true);
-        ConfigureEndpointVolumeSynchronization();
+        _ = ConfigureEndpointVolumeSynchronizationAsync();
         ConfigureWindowsMediaTransport();
         QueueHydrateVisibleArtworkRows(AlbumArtworkListBox);
         QueueHydrateVisibleArtworkRows(ArtistArtworkListBox);
@@ -431,10 +439,11 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        CloseEmbeddedSettings();
         ContentDataGrid.VerticalScroll -= ContentDataGrid_OnVerticalScroll;
         _libraryWatcher?.Dispose();
         _libraryWatcher = null;
-        DisposeEndpointVolumeSynchronization();
+        DisposeEndpointVolumeSynchronizationInBackground();
         CaptureAllDataGridColumnWidths();
         PersistViewState();
         CancelAndDispose(ref _radioSearchCts);
@@ -1037,6 +1046,7 @@ public partial class MainWindow : Window
         if (tag.StartsWith("Section:", StringComparison.Ordinal))
             return;
 
+        CloseEmbeddedSettings();
         PushCurrentNavigationState();
         ResetDrilldownState(clearNavigationHistory: false);
         if (tag is "InternetRadio" or "Podcasts" or "Queue" or "Artists" or "Albums" or "Tracks" or "Folders")
@@ -1337,6 +1347,45 @@ public partial class MainWindow : Window
         ContentDataGrid.Margin = indexMargin;
         AlbumArtworkListBox.Margin = indexMargin;
         ArtistArtworkListBox.Margin = indexMargin;
+        FolderTreeView.Margin = new Thickness(0);
+        Dispatcher.UIThread.Post(UpdateActiveAlphabetButton, DispatcherPriority.Loaded);
+    }
+
+    private void UpdatePlexFolderAlphabetIndex()
+    {
+        var roots = FolderTreeView.Items
+            .OfType<TreeViewItem>()
+            .Where(item => item.Tag is PlexFolderTag { IsTrack: false })
+            .Select(item => new AlphabetTreeTarget(
+                GetAlphabetIndexKey(GetTreeItemHeader(item)),
+                item))
+            .ToList();
+        var firstTargets = roots
+            .GroupBy(target => target.Key)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+
+        AlphabetIndexPanel.Children.Clear();
+        foreach (var label in AlphabetIndexLabels)
+        {
+            var button = new Button
+            {
+                Content = label,
+                Tag = firstTargets.GetValueOrDefault(label),
+                IsEnabled = firstTargets.ContainsKey(label),
+                Theme = FindResource<ControlTheme>("AlphabetIndexButtonTheme")
+            };
+            button.Click += AlphabetIndexButton_OnClick;
+            AlphabetIndexPanel.Children.Add(button);
+        }
+
+        var showIndex = roots.Count > 0;
+        AlphabetIndexBorder.IsVisible = showIndex;
+        FolderTreeView.Margin = showIndex
+            ? new Thickness(0, 0, 46, 0)
+            : new Thickness(0);
+        ContentDataGrid.Margin = new Thickness(0);
+        AlbumArtworkListBox.Margin = new Thickness(0);
+        ArtistArtworkListBox.Margin = new Thickness(0);
         Dispatcher.UIThread.Post(UpdateActiveAlphabetButton, DispatcherPriority.Loaded);
     }
 
@@ -1445,6 +1494,8 @@ public partial class MainWindow : Window
         SearchResultsScrollViewer.IsVisible = false;
         PlexLoadMoreButton.IsVisible = false;
         StatusTextBlock.Text = LocalizationManager.Current.PlexLoading;
+        if (view == "Folders")
+            UpdateAlphabetIndex(null, false);
 
         try
         {
@@ -1460,6 +1511,7 @@ public partial class MainWindow : Window
                 {
                     return;
                 }
+                UpdatePlexFolderAlphabetIndex();
                 ContentCountTextBlock.Text = string.Empty;
                 StatusTextBlock.Text = string.Empty;
                 return;
@@ -1536,12 +1588,18 @@ public partial class MainWindow : Window
                 ? FormatSeconds(duration / 1000d)
                 : string.Empty,
             Format = item.Format?.ToUpperInvariant(),
-            FilePath = item.PartKey is not null
+            FilePath = item.PartKeys.Count > 0
                 ? PlexServerClient.CreateStreamUrl(
                     server,
-                    item.PartKey,
+                    item.PartKeys[0],
                     token)
                 : string.Empty,
+            PlexPartUrls = item.PartKeys
+                .Select(partKey => PlexServerClient.CreateStreamUrl(server, partKey, token))
+                .ToArray(),
+            KnownDuration = item.DurationMilliseconds is long durationMilliseconds
+                ? TimeSpan.FromMilliseconds(durationMilliseconds)
+                : null,
             EntityType = entityType
         };
         if (entityType == "PlexTrack" && row.FilePath.Length > 0)
@@ -1614,7 +1672,7 @@ public partial class MainWindow : Window
         string? token,
         string sectionKey)
     {
-        var row = item.IsFolder || item.PartKey is null
+        var row = item.IsFolder || item.PartKeys.Count == 0
             ? null
             : ToPlexContentRow(item, "Tracks", server, token);
         var treeItem = new TreeViewItem
@@ -1679,17 +1737,48 @@ public partial class MainWindow : Window
             PointerPressedEvent,
             new EventHandler<PointerPressedEventArgs>(async (_, e) =>
             {
-                if (isLoaded ||
-                    !e.GetCurrentPoint(treeItem).Properties.IsLeftButtonPressed ||
-                    FindAncestor<ToggleButton>(e.Source as Visual) is null)
+                if (!e.GetCurrentPoint(treeItem).Properties.IsLeftButtonPressed ||
+                    !ReferenceEquals(FindAncestor<TreeViewItem>(e.Source as Visual), treeItem))
                 {
                     return;
                 }
 
+                var isChevronPress = FindAncestor<ToggleButton>(e.Source as Visual) is not null;
+                if (isChevronPress)
+                {
+                    if (isLoaded)
+                        return;
+                    e.Handled = true;
+                    await LoadChildrenAsync();
+                    if (isLoaded)
+                        treeItem.IsExpanded = true;
+                    return;
+                }
+
+                if (e.ClickCount < 2)
+                    return;
+
                 e.Handled = true;
+                if (treeItem.IsExpanded)
+                {
+                    treeItem.IsExpanded = false;
+                    return;
+                }
+
                 await LoadChildrenAsync();
                 if (isLoaded)
                     treeItem.IsExpanded = true;
+            }),
+            RoutingStrategies.Tunnel,
+            handledEventsToo: true);
+
+        treeItem.AddHandler(
+            InputElement.DoubleTappedEvent,
+            new EventHandler<TappedEventArgs>((_, e) =>
+            {
+                if (ReferenceEquals(FindAncestor<TreeViewItem>(e.Source as Visual), treeItem) &&
+                    FindAncestor<ToggleButton>(e.Source as Visual) is null)
+                    e.Handled = true;
             }),
             RoutingStrategies.Tunnel,
             handledEventsToo: true);
@@ -1744,10 +1833,23 @@ public partial class MainWindow : Window
 
     private void AlphabetIndexButton_OnClick(object? sender, RoutedEventArgs e)
     {
-        if (sender is not Button { Tag: ContentRow row })
+        if (sender is not Button button)
             return;
+        if (button.Tag is ContentRow row)
+            ScrollToAlphabetRow(row);
+        else if (button.Tag is AlphabetTreeTarget target)
+            ScrollToAlphabetTreeTarget(target);
+    }
 
-        ScrollToAlphabetRow(row);
+    private void ScrollToAlphabetTreeTarget(AlphabetTreeTarget target)
+    {
+        _isAlphabetProgrammaticScroll = true;
+        SetActiveAlphabetButton(target.Key);
+        FolderTreeView.ScrollIntoView(target.Item);
+        Dispatcher.UIThread.Post(() =>
+        {
+            _isAlphabetProgrammaticScroll = false;
+        }, DispatcherPriority.Loaded);
     }
 
     private void ScrollToAlphabetRow(ContentRow row)
@@ -1814,6 +1916,13 @@ public partial class MainWindow : Window
     {
         if (!AlphabetIndexBorder.IsVisible)
             return;
+
+        if (FolderTreeView.IsVisible &&
+            string.Equals(_activePlexView, "Folders", StringComparison.Ordinal))
+        {
+            SetActiveAlphabetButton(GetTopVisiblePlexFolderAlphabetKey());
+            return;
+        }
 
         var row = GetTopVisibleAlphabetRow();
         var activeKey = row is null ? null : GetAlphabetIndexKey(row);
@@ -1905,6 +2014,37 @@ public partial class MainWindow : Window
         return bestContainer?.DataContext as ContentRow;
     }
 
+    private string? GetTopVisiblePlexFolderAlphabetKey()
+    {
+        TreeViewItem? bestItem = null;
+        var bestTop = double.PositiveInfinity;
+        foreach (var item in FolderTreeView.Items.OfType<TreeViewItem>())
+        {
+            if (!item.IsVisible || item.Tag is not PlexFolderTag { IsTrack: false })
+                continue;
+            var top = item.TranslatePoint(new Point(0, 0), FolderTreeView)?.Y;
+            if (top is null || top + item.Bounds.Height <= 0 || top >= FolderTreeView.Bounds.Height)
+                continue;
+            if (top < bestTop)
+            {
+                bestTop = top.Value;
+                bestItem = item;
+            }
+        }
+
+        return bestItem is null
+            ? null
+            : GetAlphabetIndexKey(GetTreeItemHeader(bestItem));
+    }
+
+    private static string? GetTreeItemHeader(TreeViewItem item) =>
+        item.Header switch
+        {
+            string text => text,
+            TextBlock textBlock => textBlock.Text,
+            _ => item.Header?.ToString()
+        };
+
     private void AlphabetIndexBorder_OnPreviewMouseLeftButtonDown(object sender, PointerPressedEventArgs e)
     {
         _isDraggingAlphabetIndex = true;
@@ -1945,8 +2085,12 @@ public partial class MainWindow : Window
             })
             .FirstOrDefault();
 
-        if (button is { IsEnabled: true, Tag: ContentRow row })
+        if (button is not { IsEnabled: true })
+            return;
+        if (button.Tag is ContentRow row)
             ScrollToAlphabetRow(row);
+        else if (button.Tag is AlphabetTreeTarget target)
+            ScrollToAlphabetTreeTarget(target);
     }
 
     private T? FindResource<T>(string key) where T : class
@@ -6426,13 +6570,15 @@ public partial class MainWindow : Window
                 StatusTextBlock.Text = LocalizationManager.Current.SelectAsioDevice;
                 return;
             }
-            if (ext.Equals(".dsf", StringComparison.OrdinalIgnoreCase))
+            if (!_settings.AlwaysConvertDsdToPcm &&
+                ext.Equals(".dsf", StringComparison.OrdinalIgnoreCase))
                 (player, info) = await DsfAudioPlayer.CreateAsync(
                     filePath,
                     _settings.OutputBackend,
                     _settings.SelectedDriverName,
                     _playbackCts.Token);
-            else if (ext.Equals(".dff", StringComparison.OrdinalIgnoreCase))
+            else if (!_settings.AlwaysConvertDsdToPcm &&
+                     ext.Equals(".dff", StringComparison.OrdinalIgnoreCase))
                 (player, info) = await DffAudioPlayer.CreateAsync(
                     filePath,
                     _settings.OutputBackend,
@@ -6443,6 +6589,8 @@ public partial class MainWindow : Window
                     gaplessItems,
                     _settings.OutputBackend,
                     _settings.SelectedDriverName,
+                    _settings.EqualizerEnabled,
+                    _settings.EqualizerProfile,
                     _playbackCts.Token);
         }
         else if (_settings.OutputBackend == OutputBackend.Wasapi)
@@ -6455,6 +6603,8 @@ public partial class MainWindow : Window
             (player, info) = await WasapiAudioPlayer.CreateAsync(
                 gaplessItems,
                 _settings.SelectedWasapiDeviceId,
+                _settings.EqualizerEnabled,
+                _settings.EqualizerProfile,
                 _playbackCts.Token);
         }
         else
@@ -6513,12 +6663,15 @@ public partial class MainWindow : Window
                                          ? SelectedDriverTextBlock.Text
                                          : LocalizationManager.Current.InternetRadio);
         var usesNativeDsd = info.IsDsd &&
+                            !_settings.AlwaysConvertDsdToPcm &&
                             _settings.OutputBackend is OutputBackend.Asio or OutputBackend.CwAsio;
         FileInfoTextBlock.Text = usesNativeDsd
             ? $"{info.ContainerName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz  ·  {LocalizationManager.Current.NativeDsdOutput}"
             : info.IsDsd
                 ? $"{info.ContainerName.ToUpperInvariant()}  ·  {LocalizationManager.Current.DsdToPcmOutput}  ·  {info.OutputSampleRate:N0} Hz"
-                : $"{info.CodecName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz  ·  {info.Channels} ch";
+                : info.SourceSampleRate != info.OutputSampleRate
+                    ? $"{info.CodecName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz → {info.OutputSampleRate:N0} Hz  ·  {info.Channels} ch"
+                    : $"{info.CodecName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz  ·  {info.Channels} ch";
         if (radioStation is null && podcastPlayback is null)
         {
             var isPlexTrack = _plexTracksByUrl.TryGetValue(filePath, out var plexTrack);
@@ -6700,7 +6853,8 @@ public partial class MainWindow : Window
         for (var index = _queueIndex; index < _queue.Count; index++)
         {
             var path = _queue[index].FilePath;
-            if (_settings.OutputBackend is OutputBackend.Asio or OutputBackend.CwAsio &&
+            if (!_settings.AlwaysConvertDsdToPcm &&
+                _settings.OutputBackend is OutputBackend.Asio or OutputBackend.CwAsio &&
                 Path.GetExtension(path) is string extension &&
                 (extension.Equals(".dsf", StringComparison.OrdinalIgnoreCase) ||
                  extension.Equals(".dff", StringComparison.OrdinalIgnoreCase)))
@@ -6718,6 +6872,15 @@ public partial class MainWindow : Window
 
     private GaplessPlaybackItem ResolveGaplessPlaybackItem(string path)
     {
+        if (_plexTracksByUrl.TryGetValue(path, out var plexTrack))
+        {
+            return new GaplessPlaybackItem(
+                path,
+                1.0f,
+                SourcePaths: plexTrack.PlexPartUrls,
+                KnownDuration: plexTrack.KnownDuration);
+        }
+
         if (!CueSheetParser.IsVirtualPath(path))
             return new GaplessPlaybackItem(path, GetReplayGainFactor(path));
 
@@ -6793,7 +6956,9 @@ public partial class MainWindow : Window
         NowPlayingArtistBlock.Text = SelectedDriverTextBlock.Text;
         FileInfoTextBlock.Text = info.IsDsd
             ? $"{info.ContainerName.ToUpperInvariant()}  ·  {LocalizationManager.Current.DsdToPcmOutput}  ·  {info.OutputSampleRate:N0} Hz"
-            : $"{info.CodecName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz  ·  {info.Channels} ch";
+            : info.SourceSampleRate != info.OutputSampleRate
+                ? $"{info.CodecName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz → {info.OutputSampleRate:N0} Hz  ·  {info.Channels} ch"
+                : $"{info.CodecName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz  ·  {info.Channels} ch";
 
         var isPlexTrack = _plexTracksByUrl.TryGetValue(filePath, out var plexTrack);
         try
@@ -6978,13 +7143,39 @@ public partial class MainWindow : Window
 
     private void StopPlayback()
     {
+        var player = StopPlaybackCore();
+        player?.Dispose();
+    }
+
+    private async Task StopPlaybackAsync()
+    {
+        var player = StopPlaybackCore();
+        if (player is not null)
+        {
+            var disposalTask = Task.Run(() =>
+            {
+                try
+                {
+                    player.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    CrashLogger.Log(ex, "Background audio-player disposal");
+                }
+            });
+            await Task.WhenAny(disposalTask, Task.Delay(TimeSpan.FromSeconds(2)));
+        }
+    }
+
+    private IAudioPlayer? StopPlaybackCore()
+    {
         RecordPlaybackEnd(completed: false);
         SavePodcastProgress(completed: false);
         CancelAndDispose(ref _radioMetadataCts);
         _playbackCts?.Cancel();
         _playbackCts?.Dispose();
         _playbackCts = null;
-        _player?.Dispose();
+        var player = _player;
         _player = null;
         _currentPlaybackDuration = TimeSpan.Zero;
         UpdateNowPlayingRowHighlights();
@@ -7017,6 +7208,7 @@ public partial class MainWindow : Window
         ArtistInfoView.IsVisible = false;
         ClearRadioNowPlaying();
         UpdateNowPlayingFavoriteButton();
+        return player;
     }
 
     private static void CancelAndDispose(ref CancellationTokenSource? source)
@@ -8017,9 +8209,13 @@ public partial class MainWindow : Window
         _settings.Volume = VolumeSlider.Value;
     }
 
-    private void ConfigureEndpointVolumeSynchronization()
+    private async Task ConfigureEndpointVolumeSynchronizationAsync()
     {
-        DisposeEndpointVolumeSynchronization();
+        var synchronizationVersion =
+            Interlocked.Increment(ref _endpointVolumeSynchronizationVersion);
+        var previous = DetachEndpointVolumeSynchronization();
+        if (previous is not null)
+            _ = Task.Run(() => DisposeEndpointSynchronizer(previous));
         if (_settings.OutputBackend != OutputBackend.Wasapi ||
             string.IsNullOrWhiteSpace(_settings.SelectedWasapiDeviceId))
         {
@@ -8028,14 +8224,27 @@ public partial class MainWindow : Window
 
         try
         {
-            _endpointVolumeSynchronizer =
-                new WindowsEndpointVolumeSynchronizer(_settings.SelectedWasapiDeviceId);
-            _endpointVolumeSynchronizer.VolumeChanged += EndpointVolumeSynchronizer_OnVolumeChanged;
-            ApplySystemVolume(_endpointVolumeSynchronizer.Volume);
+            var deviceId = _settings.SelectedWasapiDeviceId;
+            var synchronizer = await Task.Run(() => new WindowsEndpointVolumeSynchronizer(deviceId));
+            if (synchronizationVersion !=
+                    Volatile.Read(ref _endpointVolumeSynchronizationVersion) ||
+                _settings.OutputBackend != OutputBackend.Wasapi ||
+                !string.Equals(
+                    _settings.SelectedWasapiDeviceId,
+                    deviceId,
+                    StringComparison.Ordinal))
+            {
+                _ = Task.Run(() => DisposeEndpointSynchronizer(synchronizer));
+                return;
+            }
+            synchronizer.VolumeChanged += EndpointVolumeSynchronizer_OnVolumeChanged;
+            _endpointVolumeSynchronizer = synchronizer;
+            var volume = await Task.Run(() => synchronizer.Volume);
+            ApplySystemVolume(volume);
         }
         catch
         {
-            DisposeEndpointVolumeSynchronization();
+            DisposeEndpointVolumeSynchronizationInBackground();
         }
     }
 
@@ -8055,13 +8264,33 @@ public partial class MainWindow : Window
         }
     }
 
-    private void DisposeEndpointVolumeSynchronization()
+    private WindowsEndpointVolumeSynchronizer? DetachEndpointVolumeSynchronization()
     {
-        if (_endpointVolumeSynchronizer is null)
-            return;
-        _endpointVolumeSynchronizer.VolumeChanged -= EndpointVolumeSynchronizer_OnVolumeChanged;
-        _endpointVolumeSynchronizer.Dispose();
+        var synchronizer = _endpointVolumeSynchronizer;
         _endpointVolumeSynchronizer = null;
+        if (synchronizer is not null)
+            synchronizer.VolumeChanged -= EndpointVolumeSynchronizer_OnVolumeChanged;
+        return synchronizer;
+    }
+
+    private void DisposeEndpointVolumeSynchronizationInBackground()
+    {
+        Interlocked.Increment(ref _endpointVolumeSynchronizationVersion);
+        var synchronizer = DetachEndpointVolumeSynchronization();
+        if (synchronizer is not null)
+            _ = Task.Run(() => DisposeEndpointSynchronizer(synchronizer));
+    }
+
+    private static void DisposeEndpointSynchronizer(
+        WindowsEndpointVolumeSynchronizer synchronizer)
+    {
+        try
+        {
+            synchronizer.Dispose();
+        }
+        catch
+        {
+        }
     }
 
     private void EndpointVolumeSynchronizer_OnVolumeChanged(object? sender, float volume) =>
@@ -8117,23 +8346,95 @@ public partial class MainWindow : Window
     // Einstellungen
     // ------------------------------------------------------------------
 
-    private async void SettingsButton_OnClick(object? sender, RoutedEventArgs e)
+    private void SettingsButton_OnClick(object? sender, RoutedEventArgs e)
     {
-        var window = new SettingsWindow(_settings, paths =>
+        if (SettingsViewHost.IsVisible)
+            return;
+
+        var view = new SettingsView(_settings, paths =>
         {
             _settings.LibraryPaths = paths;
             _settingsStore.Save(_settings);
             _libraryWatcher?.UpdatePaths(paths);
-        })
-        ;
-
-        if (await window.ShowDialog<bool>(this) == true)
+        }, (enabled, profile) =>
         {
+            if (_player is IEqualizerAudioPlayer equalizerPlayer)
+                equalizerPlayer.UpdateEqualizer(enabled, profile);
+        });
+        var completionHandled = false;
+        view.CompletionRequested += async (_, accepted) =>
+        {
+            if (completionHandled)
+                return;
+            completionHandled = true;
+            SettingsViewHost.IsEnabled = false;
+            try
+            {
+                if (accepted)
+                    await ApplySettingsAsync(view);
+            }
+            finally
+            {
+                CloseEmbeddedSettings();
+                SettingsViewHost.IsEnabled = true;
+            }
+        };
+        SettingsViewHost.Content = view;
+        SettingsViewHost.IsVisible = true;
+    }
+
+    private void CloseEmbeddedSettings()
+    {
+        if (SettingsViewHost.Content is SettingsView settingsView)
+            settingsView.Deactivate();
+        SettingsViewHost.Content = null;
+        SettingsViewHost.IsVisible = false;
+    }
+
+    private async Task ApplySettingsAsync(SettingsView window)
+    {
+            var themeChanged = _settings.Theme != window.SelectedTheme;
+            var languageChanged = _settings.Language != window.SelectedLanguage;
+            var replayGainChanged =
+                _settings.ReplayGainMode != window.SelectedReplayGainMode;
+            var artistInfoChanged =
+                _settings.ArtistInfoSource != window.SelectedArtistInfoSource ||
+                !string.Equals(
+                    _settings.LastFmApiKey,
+                    window.SelectedLastFmApiKey,
+                    StringComparison.Ordinal);
+            var sidebarChanged =
+                _settings.ShowLocalLibrarySection != window.ShowLocalLibrarySection ||
+                _settings.ShowOwnRadiosSection != window.ShowOwnRadiosSection ||
+                _settings.ShowMyPodcastsSection != window.ShowMyPodcastsSection ||
+                _settings.ShowPlexSection != window.ShowPlexSection ||
+                _settings.ShowPlaylistsSection != window.ShowPlaylistsSection;
+            var plexServersChanged = !PlexServerSettingsEqual(
+                _settings.PlexServers,
+                window.SelectedPlexServers);
+            var outputChanged =
+                _settings.OutputBackend != window.SelectedOutputBackend ||
+                !string.Equals(
+                    _settings.SelectedDriverName,
+                    window.SelectedDriverName,
+                    StringComparison.Ordinal) ||
+                !string.Equals(
+                    _settings.SelectedWasapiDeviceId,
+                    window.SelectedWasapiDeviceId,
+                    StringComparison.Ordinal);
+            if (outputChanged && _player is not null)
+                await StopPlaybackAsync();
+
             _settings.OutputBackend          = window.SelectedOutputBackend;
             _settings.SelectedDriverName     = window.SelectedDriverName;
             _settings.SelectedWasapiDeviceId = window.SelectedWasapiDeviceId;
             _settings.SelectedWasapiDeviceName = window.SelectedWasapiDeviceName;
             _settings.ReplayGainMode        = window.SelectedReplayGainMode;
+            _settings.AlwaysConvertDsdToPcm = window.AlwaysConvertDsdToPcm;
+            _settings.EqualizerEnabled      = window.EqualizerEnabled;
+            _settings.EqualizerProfile      = window.SelectedEqualizerProfile;
+            _settings.EqualizerProfiles     = window.SelectedEqualizerProfiles.ToList();
+            _settings.SelectedEqualizerProfileName = window.SelectedEqualizerProfileName;
             _settings.LibraryPaths           = window.SelectedLibraryPaths.ToList();
             _libraryWatcher?.UpdatePaths(_settings.LibraryPaths);
             _settings.Theme                  = window.SelectedTheme;
@@ -8147,22 +8448,55 @@ public partial class MainWindow : Window
             _settings.ShowMyPodcastsSection   = window.ShowMyPodcastsSection;
             _settings.ShowPlexSection         = window.ShowPlexSection;
             _settings.ShowPlaylistsSection    = window.ShowPlaylistsSection;
-            try
+            if (window.PlexCredentialsChanged)
             {
-                new WindowsPlexCredentialStore().SaveAll(window.SelectedPlexTokens);
+                try
+                {
+                    var plexTokens = window.SelectedPlexTokens.ToDictionary(
+                        static pair => pair.Key,
+                        static pair => pair.Value);
+                    await Task.Run(() => new WindowsPlexCredentialStore().SaveAll(plexTokens));
+                }
+                catch
+                {
+                }
             }
-            catch { }
-            _settingsStore.Save(_settings);
-            ThemeManager.Apply(_settings.Theme);
-            LocalizationManager.Apply(_settings.Language);
-            UpdateNowPlayingRowHighlights();
-            ApplyArtistInfoSettings();
-            RefreshSelectedDriverText();
-            ConfigureEndpointVolumeSynchronization();
-            LoadNavPlaylists();
-            ApplySidebarNavigationSettings();
-            if (_player is not null)
-                _player.ReplayGainFactor = GetReplayGainFactor(_currentFilePath);
+            await Task.Run(() => _settingsStore.Save(_settings));
+            if (themeChanged)
+            {
+                ThemeManager.Apply(_settings.Theme);
+                UpdateNowPlayingRowHighlights();
+            }
+            if (languageChanged)
+                LocalizationManager.Apply(_settings.Language);
+            if (artistInfoChanged)
+                ApplyArtistInfoSettings();
+            if (outputChanged)
+                RefreshSelectedDriverText();
+            if (plexServersChanged || window.PlexCredentialsChanged)
+                LoadNavPlaylists();
+            else if (sidebarChanged)
+                ApplySidebarNavigationSettings();
+            if (replayGainChanged && _player is not null)
+            {
+                var currentFilePath = _currentFilePath;
+                var replayGainFactor = await Task.Run(() =>
+                    GetReplayGainFactorFromDatabase(currentFilePath));
+                if (_player is not null &&
+                    string.Equals(
+                        _currentFilePath,
+                        currentFilePath,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    _player.ReplayGainFactor = replayGainFactor;
+                }
+            }
+            if (_player is IEqualizerAudioPlayer equalizerPlayer)
+                equalizerPlayer.UpdateEqualizer(
+                    _settings.EqualizerEnabled,
+                    _settings.EqualizerProfile);
+            if (outputChanged)
+                _ = ConfigureEndpointVolumeSynchronizationAsync();
 
             StatusTextBlock.Text = _settings.OutputBackend switch
             {
@@ -8174,7 +8508,44 @@ public partial class MainWindow : Window
                     string.Format(LocalizationManager.Current.NotImplemented, "KernelStreaming"),
                 _ => LocalizationManager.Current.SettingsSaved
             };
+    }
+
+    private float GetReplayGainFactorFromDatabase(string filePath)
+    {
+        if (_settings.ReplayGainMode == ReplayGainMode.Off ||
+            _player is DsfAudioPlayer or DffAudioPlayer)
+        {
+            return 1.0f;
         }
+
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            var track = db.GetByPath(filePath);
+            return track is null
+                ? 1.0f
+                : ReplayGain.GetLinearFactor(
+                    _settings.ReplayGainMode,
+                    track.ReplayGainTrack,
+                    track.ReplayGainAlbum);
+        }
+        catch
+        {
+            return 1.0f;
+        }
+    }
+
+    private static bool PlexServerSettingsEqual(
+        IReadOnlyList<PlexServerSettings>? left,
+        IReadOnlyList<PlexServerSettings>? right)
+    {
+        left ??= [];
+        right ??= [];
+        return left.Count == right.Count &&
+               left.Zip(right).All(pair =>
+                   string.Equals(pair.First.Id, pair.Second.Id, StringComparison.Ordinal) &&
+                   string.Equals(pair.First.Name, pair.Second.Name, StringComparison.Ordinal) &&
+                   string.Equals(pair.First.BaseUrl, pair.Second.BaseUrl, StringComparison.Ordinal));
     }
 
     internal void PrepareForLibraryImport()
@@ -8187,6 +8558,7 @@ public partial class MainWindow : Window
 
     private async void AboutButton_OnClick(object? sender, RoutedEventArgs e)
     {
+        CloseEmbeddedSettings();
         await new AboutWindow().ShowDialog<object?>(this);
     }
 
