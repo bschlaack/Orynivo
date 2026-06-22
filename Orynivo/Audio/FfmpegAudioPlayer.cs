@@ -11,11 +11,14 @@ namespace Orynivo.Audio;
 /// </summary>
 public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlayer
 {
+    private const int MaximumPrematurePlexEofRetries = 3;
+    private static readonly TimeSpan PrematurePlexEofTolerance = TimeSpan.FromSeconds(5);
     private readonly SteinbergAsioStream _stream;
     private readonly IReadOnlyList<GaplessPlaybackItem> _items;
     private readonly AudioFileInfo?[] _infos;
     private readonly long[] _trackStartFrames;
     private readonly long[] _trackPositionOffsetFrames;
+    private readonly int[] _prematurePlexEofRetryCounts;
     private readonly CancellationTokenSource _cts = new();
     private readonly SemaphoreSlim _decoderGate = new(1, 1);
     private readonly Task _pumpTask;
@@ -47,6 +50,7 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
         _infos[0] = firstInfo;
         _trackStartFrames = new long[items.Count];
         _trackPositionOffsetFrames = new long[items.Count];
+        _prematurePlexEofRetryCounts = new int[items.Count];
         _equalizer = new ParametricEqualizer(
             firstInfo.OutputSampleRate,
             equalizerEnabled,
@@ -124,6 +128,8 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
         var info = await ProbeAsync(items[0].PlaybackPath, cancellationToken);
         if (items[0].SegmentDuration is { } firstDuration)
             info = info with { Duration = firstDuration };
+        else if (items[0].KnownDuration is { } knownDuration)
+            info = info with { Duration = knownDuration };
         var supportedSampleRates = SteinbergAsioStream
             .GetDeviceInfo(backend, driverName)
             .SupportedPcmSampleRates
@@ -142,7 +148,7 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
         try
         {
             var decoder = await FfmpegPcmDecoder.CreateAsync(
-                items[0].PlaybackPath,
+                items[0].PlaybackPaths,
                 info.OutputSampleRate,
                 "f32le",
                 "pcm_f32le",
@@ -207,7 +213,7 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
             ? TimeSpan.Zero
             : position > Duration ? Duration : position;
         var replacement = await FfmpegPcmDecoder.CreateAsync(
-            _items[Volatile.Read(ref _audibleTrackIndex)].PlaybackPath,
+            _items[Volatile.Read(ref _audibleTrackIndex)].PlaybackPaths,
             CurrentInfo.OutputSampleRate,
             "f32le",
             "pcm_f32le",
@@ -223,6 +229,7 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
             Interlocked.Increment(ref _decoderGeneration);
             var audibleIndex = Volatile.Read(ref _audibleTrackIndex);
             _writeTrackIndex = audibleIndex;
+            _prematurePlexEofRetryCounts[audibleIndex] = 0;
             Volatile.Write(ref _trackStartFrames[audibleIndex], 0);
             Volatile.Write(ref _restartPreparedFromIndex, audibleIndex);
             _stream.ClearBuffer();
@@ -303,6 +310,9 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
                 if (bytesRead == 0)
                 {
                     remainderBytes = 0;
+                    if (await TryResumePrematurePlexEofAsync(decoderGeneration).ConfigureAwait(false))
+                        continue;
+
                     _activeDecoder?.Dispose();
                     var nextIndex = _writeTrackIndex + 1;
                     if (nextIndex >= _items.Count || preparedNext is null)
@@ -378,8 +388,10 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
         var info = await ProbeAsync(_items[index].PlaybackPath, _cts.Token).ConfigureAwait(false);
         if (_items[index].SegmentDuration is { } segmentDuration)
             info = info with { Duration = segmentDuration };
+        else if (_items[index].KnownDuration is { } knownDuration)
+            info = info with { Duration = knownDuration };
         var decoder = await FfmpegPcmDecoder.CreateAsync(
-            _items[index].PlaybackPath,
+            _items[index].PlaybackPaths,
             _infos[0]!.OutputSampleRate,
             "f32le",
             "pcm_f32le",
@@ -388,6 +400,78 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
             _items[index].SegmentEnd,
             _cts.Token).ConfigureAwait(false);
         return (decoder, info with { OutputSampleRate = _infos[0]!.OutputSampleRate });
+    }
+
+    private async Task<bool> TryResumePrematurePlexEofAsync(int decoderGeneration)
+    {
+        var trackIndex = _writeTrackIndex;
+        var item = _items[trackIndex];
+        if (item.SourcePaths is not { Count: > 0 } ||
+            item.KnownDuration is not { } knownDuration ||
+            knownDuration <= TimeSpan.Zero)
+        {
+            return false;
+        }
+
+        var outputSampleRate = _infos[0]!.OutputSampleRate;
+        var writtenTrackFrames = Math.Max(
+            0,
+            Interlocked.Read(ref _totalFramesWritten) -
+            Volatile.Read(ref _trackStartFrames[trackIndex]));
+        var resumeFrames = writtenTrackFrames +
+            Volatile.Read(ref _trackPositionOffsetFrames[trackIndex]);
+        var resumePosition = TimeSpan.FromSeconds(resumeFrames / (double)outputSampleRate);
+        if (knownDuration - resumePosition <= PrematurePlexEofTolerance)
+            return false;
+
+        while (_prematurePlexEofRetryCounts[trackIndex] < MaximumPrematurePlexEofRetries)
+        {
+            var retry = ++_prematurePlexEofRetryCounts[trackIndex];
+            await Task.Delay(TimeSpan.FromMilliseconds(150 * retry), _cts.Token).ConfigureAwait(false);
+
+            FfmpegPcmDecoder replacement;
+            try
+            {
+                replacement = await FfmpegPcmDecoder.CreateAsync(
+                    item.PlaybackPaths,
+                    outputSampleRate,
+                    "f32le",
+                    "pcm_f32le",
+                    resumePosition,
+                    item.SegmentStart,
+                    item.SegmentEnd,
+                    _cts.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch
+            {
+                continue;
+            }
+
+            await _decoderGate.WaitAsync(_cts.Token).ConfigureAwait(false);
+            try
+            {
+                if (decoderGeneration != Volatile.Read(ref _decoderGeneration) ||
+                    trackIndex != _writeTrackIndex)
+                {
+                    replacement.Dispose();
+                    return true;
+                }
+
+                _activeDecoder?.Dispose();
+                _activeDecoder = replacement;
+                return true;
+            }
+            finally
+            {
+                _decoderGate.Release();
+            }
+        }
+
+        return false;
     }
 
     private void UpdateAudibleTrack()

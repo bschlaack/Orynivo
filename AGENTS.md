@@ -543,6 +543,14 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   cannot replace another mode's content or columns.
 - Plex track rows reuse the main track table and playback path; Plex access tokens remain memory-only in generated stream URLs and must never be written to settings, documentation, logs, or source
 - Starting a Plex track from the folder tree queues only direct track siblings from that same tree level; subfolder tracks are excluded and the existing shuffle state applies to that sibling queue
+- Plex tracks may contain several ordered `Media.Part` entries. The client keeps
+  every part URL, and `GaplessPlaybackItem.SourcePaths` passes them to FFmpeg's
+  concat demuxer as one logical track. Never reduce such an item to its first
+  part, because playback would advance before the Plex metadata duration ends.
+- A Plex FFmpeg decoder EOF is accepted as the track boundary only when the
+  decoded position is within five seconds of Plex's authoritative duration.
+  Earlier HTTP EOFs reopen the same logical item at the decoded position with
+  at most three retries; they must not immediately advance the queue.
 - Plex folder nodes use real `TreeViewItem` children in `Items`, matching the
   local folder tree. Do not bind an `ObservableCollection<TreeViewItem>` to
   `ItemsSource`: Avalonia can wrap those controls in additional item
@@ -553,7 +561,15 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   fallback that immediately collapses until loading completes. Suppress
   concurrent requests, classify nodes through `PlexMediaItem.IsFolder` rather
   than `PartKey`, and retain the placeholder after failure so loading can be
-  retried.
+  retried. Double-clicking a folder header must intercept the second
+  `PointerPressed` (`ClickCount >= 2`) in the tunnel phase and route it through
+  the same lazy-load function before toggling expansion; handling only
+  `DoubleTapped` is too late because Avalonia may already expose the
+  placeholder row.
+- The A–Z index in Plex Folders is built only from the currently displayed
+  top-level directory nodes. A click or drag scrolls the real root
+  `TreeViewItem` into view, and manual tree scrolling updates the active letter;
+  nested lazy-loaded children do not contribute index letters.
 - DSD capability states use explicit supported and unsupported theme colors
 - A splash screen is shown while initial database preparation runs
 - Device information displays channels, buffer sizes, PCM rates, DSD levels, and readable raw formats

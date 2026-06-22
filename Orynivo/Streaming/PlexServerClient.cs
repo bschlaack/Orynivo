@@ -5,6 +5,17 @@ using System.Xml.Linq;
 namespace Orynivo.Streaming;
 
 public sealed record PlexLibrarySection(string Key, string Title);
+/// <summary>Describes one artist, album, track, or folder returned by Plex.</summary>
+/// <param name="Key">Plex navigation key.</param>
+/// <param name="RatingKey">Stable Plex metadata identifier.</param>
+/// <param name="Title">Display title.</param>
+/// <param name="Artist">Optional artist name.</param>
+/// <param name="Album">Optional album title.</param>
+/// <param name="Year">Optional release year.</param>
+/// <param name="DurationMilliseconds">Optional logical item duration in milliseconds.</param>
+/// <param name="Format">Optional media container or codec.</param>
+/// <param name="PartKeys">Ordered direct-media part keys forming the logical track.</param>
+/// <param name="IsFolder">Whether the item represents a folder.</param>
 public sealed record PlexMediaItem(
     string Key,
     string RatingKey,
@@ -14,7 +25,7 @@ public sealed record PlexMediaItem(
     int? Year,
     long? DurationMilliseconds,
     string? Format,
-    string? PartKey,
+    IReadOnlyList<string> PartKeys,
     bool IsFolder);
 
 public sealed record PlexMediaPage(IReadOnlyList<PlexMediaItem> Items, int TotalSize);
@@ -162,11 +173,15 @@ public sealed class PlexServerClient
                         mediaArray.ValueKind == JsonValueKind.Array
                 ? mediaArray.EnumerateArray().FirstOrDefault()
                 : default;
-            var part = media.ValueKind == JsonValueKind.Object &&
-                       media.TryGetProperty("Part", out var partArray) &&
-                       partArray.ValueKind == JsonValueKind.Array
-                ? partArray.EnumerateArray().FirstOrDefault()
-                : default;
+            var partKeys = media.ValueKind == JsonValueKind.Object &&
+                           media.TryGetProperty("Part", out var partArray) &&
+                           partArray.ValueKind == JsonValueKind.Array
+                ? partArray.EnumerateArray()
+                    .Select(part => GetString(part, "key"))
+                    .Where(static key => !string.IsNullOrWhiteSpace(key))
+                    .Cast<string>()
+                    .ToArray()
+                : [];
             return new PlexMediaItem(
                 GetString(item, "key") ?? string.Empty,
                 GetString(item, "ratingKey") ?? string.Empty,
@@ -176,7 +191,7 @@ public sealed class PlexServerClient
                 GetInt(item, "year") ?? GetInt(item, "parentYear"),
                 GetLong(item, "duration"),
                 GetString(media, "container") ?? GetString(media, "audioCodec"),
-                GetString(part, "key"),
+                partKeys,
                 string.IsNullOrWhiteSpace(GetString(item, "ratingKey")));
         }).Where(item => item.Title.Length > 0).ToList();
         return new PlexMediaPage(items, totalSize);

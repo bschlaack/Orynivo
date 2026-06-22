@@ -121,7 +121,8 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 - German, English, French, and Spanish user interfaces
 - Multiple Plex Media Server configurations with protected access tokens and
   music-library discovery, artist/album/track browsing, folder navigation, and
-  playback
+  playback, including an A–Z root-folder index and multi-part tracks decoded as
+  one logical item
 - Provider-neutral streaming interfaces with a prepared Qobuz configuration
   page for future approved partner API access
 
@@ -302,8 +303,10 @@ artwork, rebasing paths, and rebuilding the search index.
   Qobuz partner API contract and official endpoint documentation are still
   required.
 - Plex browsing is paginated to keep very large libraries responsive. Playback
-  availability depends on the selected Plex part being directly accessible and
-  decodable by the installed FFmpeg build.
+  availability depends on every selected Plex media part being directly
+  accessible and decodable by the installed FFmpeg build. Unexpected HTTP
+  stream termination is retried from the last decoded position before Orynivo
+  advances to the next queue item.
 - Renaming or merging artists updates Orynivo's internal library, album
   assignments, and search index. It does not modify tags in the audio files.
 - ASIO devices may be unavailable for inspection or playback while another

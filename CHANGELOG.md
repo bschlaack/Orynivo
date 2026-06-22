@@ -4,7 +4,7 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.10.0] - 2026-06-22
 
 ### Added
 
@@ -31,6 +31,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Enabled the A–Z index in the Plex folder view. Available letters now come
+  from the currently displayed top-level directories, jump directly to the
+  first matching root folder, and follow manual tree scrolling.
+- Fixed double-clicking a Plex folder name expanding only its lazy placeholder.
+  The second pointer press is now intercepted before Avalonia's internal
+  TreeView gesture can expose the placeholder; it uses the same asynchronous
+  child-loading path as the chevron and then toggles the populated folder.
+- Fixed Plex tracks composed of multiple media parts advancing to the next
+  queue item after only the first part. Orynivo now preserves all ordered Plex
+  part URLs and decodes them as one logical gapless track with the authoritative
+  Plex duration.
+- Fixed Plex playback advancing when FFmpeg reports an unexpected end of the
+  HTTP stream before the duration supplied by Plex. PCM playback now reopens
+  the same logical track at its last decoded position with bounded retries.
 - Improved the embedded equalizer editor layout with a wider preamp input,
   consistently full-width filter-type selectors, and equally wide adjacent
   frequency, gain, and Q fields sized to keep their numeric values readable.

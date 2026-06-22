@@ -183,6 +183,7 @@ public partial class MainWindow : Window
 
     private sealed record FolderTag(bool IsFile, string FilePath, string FolderPath);
     private sealed record PlexFolderTag(string Key, bool IsTrack, ContentRow? Track);
+    private sealed record AlphabetTreeTarget(string Key, TreeViewItem Item);
     private sealed record PlexNavigationState(
         string Title,
         string View,
@@ -319,6 +320,8 @@ public partial class MainWindow : Window
         public string  Duration    { get; init; } = "";
         public string? Format      { get; init; }
         public string  FilePath    { get; init; } = "";
+        public IReadOnlyList<string>? PlexPartUrls { get; init; }
+        public TimeSpan? KnownDuration { get; init; }
         public long?   PlaylistEntryId { get; set; }
         public PlaylistItem? QueueItem { get; set; }
 
@@ -402,6 +405,10 @@ public partial class MainWindow : Window
             new EventHandler<ScrollChangedEventArgs>(AlphabetTarget_OnScrollChanged),
             handledEventsToo: true);
         ArtistArtworkListBox.AddHandler(
+            ScrollViewer.ScrollChangedEvent,
+            new EventHandler<ScrollChangedEventArgs>(AlphabetTarget_OnScrollChanged),
+            handledEventsToo: true);
+        FolderTreeView.AddHandler(
             ScrollViewer.ScrollChangedEvent,
             new EventHandler<ScrollChangedEventArgs>(AlphabetTarget_OnScrollChanged),
             handledEventsToo: true);
@@ -1340,6 +1347,45 @@ public partial class MainWindow : Window
         ContentDataGrid.Margin = indexMargin;
         AlbumArtworkListBox.Margin = indexMargin;
         ArtistArtworkListBox.Margin = indexMargin;
+        FolderTreeView.Margin = new Thickness(0);
+        Dispatcher.UIThread.Post(UpdateActiveAlphabetButton, DispatcherPriority.Loaded);
+    }
+
+    private void UpdatePlexFolderAlphabetIndex()
+    {
+        var roots = FolderTreeView.Items
+            .OfType<TreeViewItem>()
+            .Where(item => item.Tag is PlexFolderTag { IsTrack: false })
+            .Select(item => new AlphabetTreeTarget(
+                GetAlphabetIndexKey(GetTreeItemHeader(item)),
+                item))
+            .ToList();
+        var firstTargets = roots
+            .GroupBy(target => target.Key)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+
+        AlphabetIndexPanel.Children.Clear();
+        foreach (var label in AlphabetIndexLabels)
+        {
+            var button = new Button
+            {
+                Content = label,
+                Tag = firstTargets.GetValueOrDefault(label),
+                IsEnabled = firstTargets.ContainsKey(label),
+                Theme = FindResource<ControlTheme>("AlphabetIndexButtonTheme")
+            };
+            button.Click += AlphabetIndexButton_OnClick;
+            AlphabetIndexPanel.Children.Add(button);
+        }
+
+        var showIndex = roots.Count > 0;
+        AlphabetIndexBorder.IsVisible = showIndex;
+        FolderTreeView.Margin = showIndex
+            ? new Thickness(0, 0, 46, 0)
+            : new Thickness(0);
+        ContentDataGrid.Margin = new Thickness(0);
+        AlbumArtworkListBox.Margin = new Thickness(0);
+        ArtistArtworkListBox.Margin = new Thickness(0);
         Dispatcher.UIThread.Post(UpdateActiveAlphabetButton, DispatcherPriority.Loaded);
     }
 
@@ -1448,6 +1494,8 @@ public partial class MainWindow : Window
         SearchResultsScrollViewer.IsVisible = false;
         PlexLoadMoreButton.IsVisible = false;
         StatusTextBlock.Text = LocalizationManager.Current.PlexLoading;
+        if (view == "Folders")
+            UpdateAlphabetIndex(null, false);
 
         try
         {
@@ -1463,6 +1511,7 @@ public partial class MainWindow : Window
                 {
                     return;
                 }
+                UpdatePlexFolderAlphabetIndex();
                 ContentCountTextBlock.Text = string.Empty;
                 StatusTextBlock.Text = string.Empty;
                 return;
@@ -1539,12 +1588,18 @@ public partial class MainWindow : Window
                 ? FormatSeconds(duration / 1000d)
                 : string.Empty,
             Format = item.Format?.ToUpperInvariant(),
-            FilePath = item.PartKey is not null
+            FilePath = item.PartKeys.Count > 0
                 ? PlexServerClient.CreateStreamUrl(
                     server,
-                    item.PartKey,
+                    item.PartKeys[0],
                     token)
                 : string.Empty,
+            PlexPartUrls = item.PartKeys
+                .Select(partKey => PlexServerClient.CreateStreamUrl(server, partKey, token))
+                .ToArray(),
+            KnownDuration = item.DurationMilliseconds is long durationMilliseconds
+                ? TimeSpan.FromMilliseconds(durationMilliseconds)
+                : null,
             EntityType = entityType
         };
         if (entityType == "PlexTrack" && row.FilePath.Length > 0)
@@ -1617,7 +1672,7 @@ public partial class MainWindow : Window
         string? token,
         string sectionKey)
     {
-        var row = item.IsFolder || item.PartKey is null
+        var row = item.IsFolder || item.PartKeys.Count == 0
             ? null
             : ToPlexContentRow(item, "Tracks", server, token);
         var treeItem = new TreeViewItem
@@ -1682,17 +1737,48 @@ public partial class MainWindow : Window
             PointerPressedEvent,
             new EventHandler<PointerPressedEventArgs>(async (_, e) =>
             {
-                if (isLoaded ||
-                    !e.GetCurrentPoint(treeItem).Properties.IsLeftButtonPressed ||
-                    FindAncestor<ToggleButton>(e.Source as Visual) is null)
+                if (!e.GetCurrentPoint(treeItem).Properties.IsLeftButtonPressed ||
+                    !ReferenceEquals(FindAncestor<TreeViewItem>(e.Source as Visual), treeItem))
                 {
                     return;
                 }
 
+                var isChevronPress = FindAncestor<ToggleButton>(e.Source as Visual) is not null;
+                if (isChevronPress)
+                {
+                    if (isLoaded)
+                        return;
+                    e.Handled = true;
+                    await LoadChildrenAsync();
+                    if (isLoaded)
+                        treeItem.IsExpanded = true;
+                    return;
+                }
+
+                if (e.ClickCount < 2)
+                    return;
+
                 e.Handled = true;
+                if (treeItem.IsExpanded)
+                {
+                    treeItem.IsExpanded = false;
+                    return;
+                }
+
                 await LoadChildrenAsync();
                 if (isLoaded)
                     treeItem.IsExpanded = true;
+            }),
+            RoutingStrategies.Tunnel,
+            handledEventsToo: true);
+
+        treeItem.AddHandler(
+            InputElement.DoubleTappedEvent,
+            new EventHandler<TappedEventArgs>((_, e) =>
+            {
+                if (ReferenceEquals(FindAncestor<TreeViewItem>(e.Source as Visual), treeItem) &&
+                    FindAncestor<ToggleButton>(e.Source as Visual) is null)
+                    e.Handled = true;
             }),
             RoutingStrategies.Tunnel,
             handledEventsToo: true);
@@ -1747,10 +1833,23 @@ public partial class MainWindow : Window
 
     private void AlphabetIndexButton_OnClick(object? sender, RoutedEventArgs e)
     {
-        if (sender is not Button { Tag: ContentRow row })
+        if (sender is not Button button)
             return;
+        if (button.Tag is ContentRow row)
+            ScrollToAlphabetRow(row);
+        else if (button.Tag is AlphabetTreeTarget target)
+            ScrollToAlphabetTreeTarget(target);
+    }
 
-        ScrollToAlphabetRow(row);
+    private void ScrollToAlphabetTreeTarget(AlphabetTreeTarget target)
+    {
+        _isAlphabetProgrammaticScroll = true;
+        SetActiveAlphabetButton(target.Key);
+        FolderTreeView.ScrollIntoView(target.Item);
+        Dispatcher.UIThread.Post(() =>
+        {
+            _isAlphabetProgrammaticScroll = false;
+        }, DispatcherPriority.Loaded);
     }
 
     private void ScrollToAlphabetRow(ContentRow row)
@@ -1817,6 +1916,13 @@ public partial class MainWindow : Window
     {
         if (!AlphabetIndexBorder.IsVisible)
             return;
+
+        if (FolderTreeView.IsVisible &&
+            string.Equals(_activePlexView, "Folders", StringComparison.Ordinal))
+        {
+            SetActiveAlphabetButton(GetTopVisiblePlexFolderAlphabetKey());
+            return;
+        }
 
         var row = GetTopVisibleAlphabetRow();
         var activeKey = row is null ? null : GetAlphabetIndexKey(row);
@@ -1908,6 +2014,37 @@ public partial class MainWindow : Window
         return bestContainer?.DataContext as ContentRow;
     }
 
+    private string? GetTopVisiblePlexFolderAlphabetKey()
+    {
+        TreeViewItem? bestItem = null;
+        var bestTop = double.PositiveInfinity;
+        foreach (var item in FolderTreeView.Items.OfType<TreeViewItem>())
+        {
+            if (!item.IsVisible || item.Tag is not PlexFolderTag { IsTrack: false })
+                continue;
+            var top = item.TranslatePoint(new Point(0, 0), FolderTreeView)?.Y;
+            if (top is null || top + item.Bounds.Height <= 0 || top >= FolderTreeView.Bounds.Height)
+                continue;
+            if (top < bestTop)
+            {
+                bestTop = top.Value;
+                bestItem = item;
+            }
+        }
+
+        return bestItem is null
+            ? null
+            : GetAlphabetIndexKey(GetTreeItemHeader(bestItem));
+    }
+
+    private static string? GetTreeItemHeader(TreeViewItem item) =>
+        item.Header switch
+        {
+            string text => text,
+            TextBlock textBlock => textBlock.Text,
+            _ => item.Header?.ToString()
+        };
+
     private void AlphabetIndexBorder_OnPreviewMouseLeftButtonDown(object sender, PointerPressedEventArgs e)
     {
         _isDraggingAlphabetIndex = true;
@@ -1948,8 +2085,12 @@ public partial class MainWindow : Window
             })
             .FirstOrDefault();
 
-        if (button is { IsEnabled: true, Tag: ContentRow row })
+        if (button is not { IsEnabled: true })
+            return;
+        if (button.Tag is ContentRow row)
             ScrollToAlphabetRow(row);
+        else if (button.Tag is AlphabetTreeTarget target)
+            ScrollToAlphabetTreeTarget(target);
     }
 
     private T? FindResource<T>(string key) where T : class
@@ -6731,6 +6872,15 @@ public partial class MainWindow : Window
 
     private GaplessPlaybackItem ResolveGaplessPlaybackItem(string path)
     {
+        if (_plexTracksByUrl.TryGetValue(path, out var plexTrack))
+        {
+            return new GaplessPlaybackItem(
+                path,
+                1.0f,
+                SourcePaths: plexTrack.PlexPartUrls,
+                KnownDuration: plexTrack.KnownDuration);
+        }
+
         if (!CueSheetParser.IsVirtualPath(path))
             return new GaplessPlaybackItem(path, GetReplayGainFactor(path));
 
