@@ -398,6 +398,10 @@
             <x:String x:Key="L_EqualizerGain">Pegel (dB)</x:String>
             <x:String x:Key="L_EqualizerQ">Q-Faktor</x:String>
             <x:String x:Key="L_EqualizerAddFilter">Filter hinzufügen</x:String>
+            <x:String x:Key="L_EqualizerCreate">Equalizer anlegen</x:String>
+            <x:String x:Key="L_EqualizerCreateTitle">Neuen Equalizer anlegen</x:String>
+            <x:String x:Key="L_EqualizerName">Name des Equalizers</x:String>
+            <x:String x:Key="L_EqualizerDelete">Equalizer löschen</x:String>
             <x:String x:Key="L_SelectColumns">Spalten auswählen</x:String>
             <x:String x:Key="L_Codec">Codec</x:String>
             <x:String x:Key="L_Tags">Tags</x:String>

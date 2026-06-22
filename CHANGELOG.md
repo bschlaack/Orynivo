@@ -24,6 +24,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Moved the complete settings experience into the main window. Output, library,
   streaming, appearance, artist-information, and equalizer settings now share
   the main content area instead of opening a separate window.
+- Added multiple named equalizer profiles with one selected profile at a time.
+  Settings provides an empty-capable profile dropdown, a themed name dialog,
+  per-profile import and editing, and confirmed deletion. Existing single-EQ
+  settings migrate automatically into the profile list.
 
 ### Fixed
 

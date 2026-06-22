@@ -32,11 +32,12 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 - Optional ReplayGain volume adjustment for PCM playback, using track or album
   gain metadata with fallback to the other available value; native DSD output
   remains bit-perfect
-- Parametric PCM equalizer with a live frequency-response graph, editable
-  preamp, dynamic filter rows, persisted on/off state, and Equalizer APO/AutoEQ
-  text-profile import. Preamp, peak, low/high shelf, low/high pass, and
-  `GraphicEQ` profiles are supported; changes are crossfaded during playback
-  and native DSD output remains bit-perfect
+- Multiple named parametric PCM equalizers with one selected profile, a live
+  frequency-response graph, editable preamp, dynamic filter rows, persisted
+  on/off state, and Equalizer APO/AutoEQ text-profile import. Preamp, peak,
+  low/high shelf, low/high pass, and `GraphicEQ` profiles are supported;
+  changes are crossfaded during playback and native DSD output remains
+  bit-perfect
 - SQLite music library with multiple monitored directories
 - CUE-sheet support for large FLAC/WAV images: indexed CUE entries appear as
   independent virtual tracks in library, folder, search, queue, playlist, and
@@ -215,8 +216,11 @@ the imported parameters are stored directly in `settings.json`, so the source
 profile file does not need to remain available. The same settings section plots
 the combined response and exposes every filter as an editable row. Rows follow
 the profile dynamically, and filters can be added or removed without
-reimporting a file. Edits are previewed during active PCM playback. The DSD
-playback option can force DSF/DFF files through this PCM path even when
+reimporting a file. Several named equalizers can be created and retained, while
+the dropdown selects the only profile eligible for active playback. With no
+selection, the editor and import controls remain hidden. Profiles can be
+deleted after confirmation. Edits are previewed during active PCM playback.
+The DSD playback option can force DSF/DFF files through this PCM path even when
 ASIO/cwASIO native DSD is available.
 Available library roots are monitored automatically after configuration.
 File-system events are debounced before updating the database and search index;

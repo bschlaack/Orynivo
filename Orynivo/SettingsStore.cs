@@ -32,8 +32,10 @@ public sealed class SettingsStore
 
         try
         {
-            return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(_filePath))
+            var settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(_filePath))
                 ?? new AppSettings();
+            NormalizeEqualizerProfiles(settings);
+            return settings;
         }
         catch
         {
@@ -45,10 +47,42 @@ public sealed class SettingsStore
     /// <param name="settings">The settings object to persist.</param>
     public void Save(AppSettings settings)
     {
+        NormalizeEqualizerProfiles(settings);
         var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions
         {
             WriteIndented = true
         });
         File.WriteAllText(_filePath, json);
+    }
+
+    /// <summary>Normalizes multi-profile equalizer settings and migrates the legacy single profile.</summary>
+    /// <param name="settings">Settings instance to normalize.</param>
+    private static void NormalizeEqualizerProfiles(AppSettings settings)
+    {
+        settings.EqualizerProfiles ??= [];
+        if (settings.EqualizerProfiles.Count == 0 && settings.EqualizerProfile is not null)
+            settings.EqualizerProfiles.Add(settings.EqualizerProfile.Clone());
+
+        if (string.IsNullOrWhiteSpace(settings.SelectedEqualizerProfileName)
+            && settings.EqualizerProfile is not null)
+        {
+            settings.SelectedEqualizerProfileName = settings.EqualizerProfile.Name;
+        }
+
+        var selected = settings.EqualizerProfiles.FirstOrDefault(profile =>
+            string.Equals(
+                profile.Name,
+                settings.SelectedEqualizerProfileName,
+                StringComparison.OrdinalIgnoreCase));
+        if (selected is null)
+        {
+            settings.SelectedEqualizerProfileName = null;
+            settings.EqualizerProfile = null;
+            settings.EqualizerEnabled = false;
+            return;
+        }
+
+        settings.SelectedEqualizerProfileName = selected.Name;
+        settings.EqualizerProfile = selected.Clone();
     }
 }

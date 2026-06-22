@@ -8283,6 +8283,8 @@ public partial class MainWindow : Window
             _settings.AlwaysConvertDsdToPcm = window.AlwaysConvertDsdToPcm;
             _settings.EqualizerEnabled      = window.EqualizerEnabled;
             _settings.EqualizerProfile      = window.SelectedEqualizerProfile;
+            _settings.EqualizerProfiles     = window.SelectedEqualizerProfiles.ToList();
+            _settings.SelectedEqualizerProfileName = window.SelectedEqualizerProfileName;
             _settings.LibraryPaths           = window.SelectedLibraryPaths.ToList();
             _libraryWatcher?.UpdatePaths(_settings.LibraryPaths);
             _settings.Theme                  = window.SelectedTheme;

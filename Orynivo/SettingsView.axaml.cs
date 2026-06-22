@@ -37,6 +37,7 @@ internal partial class SettingsView : UserControl
     private readonly Action<bool, EqualizerProfile?>? _onEqualizerPreviewChanged;
     private readonly bool _originalEqualizerEnabled;
     private readonly EqualizerProfile? _originalEqualizerProfile;
+    private readonly List<EqualizerProfile> _equalizerProfiles = [];
     private readonly SemaphoreSlim _driverLoadGate = new(1, 1);
     private EqualizerProfile? _equalizerProfile;
     private int _driverLoadVersion;
@@ -110,7 +111,19 @@ internal partial class SettingsView : UserControl
             replayGainChoices.FirstOrDefault(choice => choice.Value == settings.ReplayGainMode)
             ?? replayGainChoices[0];
         AlwaysConvertDsdToPcmCheckBox.IsChecked = settings.AlwaysConvertDsdToPcm;
-        _equalizerProfile = settings.EqualizerProfile?.Clone();
+        _equalizerProfiles.AddRange((settings.EqualizerProfiles ?? [])
+            .Select(static profile => profile.Clone()));
+        if (_equalizerProfiles.Count == 0 && settings.EqualizerProfile is not null)
+            _equalizerProfiles.Add(settings.EqualizerProfile.Clone());
+        EqualizerProfileComboBox.ItemsSource = _equalizerProfiles;
+        EqualizerProfileComboBox.DisplayMemberBinding =
+            new Avalonia.Data.Binding(nameof(EqualizerProfile.Name));
+        _equalizerProfile = _equalizerProfiles.FirstOrDefault(profile =>
+            string.Equals(
+                profile.Name,
+                settings.SelectedEqualizerProfileName ?? settings.EqualizerProfile?.Name,
+                StringComparison.OrdinalIgnoreCase));
+        EqualizerProfileComboBox.SelectedItem = _equalizerProfile;
         EqualizerEnabledCheckBox.IsChecked = settings.EqualizerEnabled;
         RefreshEqualizerProfileText();
         RebuildEqualizerEditor();
@@ -163,6 +176,11 @@ internal partial class SettingsView : UserControl
         _equalizerProfile is not null && EqualizerEnabledCheckBox.IsChecked == true;
     /// <summary>Gets an independent copy of the imported equalizer profile.</summary>
     public EqualizerProfile? SelectedEqualizerProfile => _equalizerProfile?.Clone();
+    /// <summary>Gets independent copies of all configured equalizer profiles.</summary>
+    public IReadOnlyList<EqualizerProfile> SelectedEqualizerProfiles =>
+        _equalizerProfiles.Select(static profile => profile.Clone()).ToList().AsReadOnly();
+    /// <summary>Gets the selected equalizer profile name.</summary>
+    public string? SelectedEqualizerProfileName => _equalizerProfile?.Name;
     public IReadOnlyList<string> SelectedLibraryPaths => _libraryPaths.AsReadOnly();
     public AppTheme SelectedTheme =>
         ThemeComboBox.SelectedItem is SettingChoice<AppTheme> theme ? theme.Value : AppTheme.Dark;
@@ -458,7 +476,13 @@ internal partial class SettingsView : UserControl
         EqualizerProfileTextBlock.Text = LocalizationManager.Current.EqualizerImporting;
         try
         {
-            _equalizerProfile = await Task.Run(() => EqualizerApoParser.ParseFile(path));
+            if (_equalizerProfile is null)
+                return;
+            var importedProfile = await Task.Run(() => EqualizerApoParser.ParseFile(path));
+            _equalizerProfile.PreampDb = importedProfile.PreampDb;
+            _equalizerProfile.Filters = importedProfile.Filters
+                .Select(static filter => filter.Clone())
+                .ToList();
             EqualizerEnabledCheckBox.IsChecked = true;
             RefreshEqualizerProfileText();
             RebuildEqualizerEditor();
@@ -477,14 +501,89 @@ internal partial class SettingsView : UserControl
     /// <summary>Refreshes the imported equalizer profile summary.</summary>
     private void RefreshEqualizerProfileText()
     {
-        EqualizerEnabledCheckBox.IsEnabled = _equalizerProfile is not null;
+        var hasProfile = _equalizerProfile is not null;
+        EqualizerEditorPanel.IsVisible = hasProfile;
+        DeleteEqualizerProfileButton.IsVisible = hasProfile;
+        EqualizerEnabledCheckBox.IsEnabled = hasProfile;
         EqualizerProfileTextBlock.Text = _equalizerProfile is null
-            ? LocalizationManager.Current.EqualizerNoProfile
+            ? string.Empty
             : string.Format(
                 LocalizationManager.Current.EqualizerProfileSummary,
                 _equalizerProfile.Name,
                 _equalizerProfile.PreampDb,
                 _equalizerProfile.Filters.Count);
+    }
+
+    /// <summary>Switches the editable and active equalizer profile.</summary>
+    /// <param name="sender">Control that raised the event.</param>
+    /// <param name="e">Selection-change event data.</param>
+    private void EqualizerProfileComboBox_OnSelectionChanged(
+        object? sender,
+        SelectionChangedEventArgs e)
+    {
+        _equalizerProfile = EqualizerProfileComboBox.SelectedItem as EqualizerProfile;
+        if (_initializing)
+            return;
+        if (_equalizerProfile is null)
+            EqualizerEnabledCheckBox.IsChecked = false;
+        RefreshEqualizerProfileText();
+        RebuildEqualizerEditor();
+        QueueEqualizerPreview();
+    }
+
+    /// <summary>Creates and selects a new empty equalizer profile.</summary>
+    /// <param name="sender">Control that raised the event.</param>
+    /// <param name="e">Event data.</param>
+    private async void CreateEqualizerProfileButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        var dialog = new EqualizerProfileNameDialog(
+            _equalizerProfiles.Select(static profile => profile.Name));
+        if (await dialog.ShowDialog<bool>(GetHostWindow()) != true
+            || string.IsNullOrWhiteSpace(dialog.ProfileName))
+        {
+            return;
+        }
+
+        var profile = new EqualizerProfile { Name = dialog.ProfileName };
+        _equalizerProfiles.Add(profile);
+        RefreshEqualizerProfileChoices(profile);
+        EqualizerEnabledCheckBox.IsChecked = true;
+        QueueEqualizerPreview();
+    }
+
+    /// <summary>Deletes the selected equalizer profile after confirmation.</summary>
+    /// <param name="sender">Control that raised the event.</param>
+    /// <param name="e">Event data.</param>
+    private async void DeleteEqualizerProfileButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (_equalizerProfile is null)
+            return;
+        var confirmed = await AppMessageBox.ConfirmAsync(
+            string.Format(
+                LocalizationManager.Current.EqualizerDeleteConfirm,
+                _equalizerProfile.Name),
+            LocalizationManager.Current.EqualizerDeleteTitle,
+            GetHostWindow());
+        if (!confirmed)
+            return;
+
+        _equalizerProfiles.Remove(_equalizerProfile);
+        _equalizerProfile = null;
+        EqualizerEnabledCheckBox.IsChecked = false;
+        RefreshEqualizerProfileChoices(null);
+        QueueEqualizerPreview();
+    }
+
+    /// <summary>Refreshes the profile dropdown and applies the requested selection.</summary>
+    /// <param name="selectedProfile">Profile to select, or <see langword="null"/> for no selection.</param>
+    private void RefreshEqualizerProfileChoices(EqualizerProfile? selectedProfile)
+    {
+        EqualizerProfileComboBox.ItemsSource = null;
+        EqualizerProfileComboBox.ItemsSource = _equalizerProfiles;
+        EqualizerProfileComboBox.SelectedItem = selectedProfile;
+        _equalizerProfile = selectedProfile;
+        RefreshEqualizerProfileText();
+        RebuildEqualizerEditor();
     }
 
     /// <summary>Rebuilds the dynamic equalizer filter editor from the active profile.</summary>
@@ -684,10 +783,8 @@ internal partial class SettingsView : UserControl
     /// <param name="e">Event data.</param>
     private void AddEqualizerFilterButton_OnClick(object? sender, RoutedEventArgs e)
     {
-        _equalizerProfile ??= new EqualizerProfile
-        {
-            Name = LocalizationManager.Current.Equalizer
-        };
+        if (_equalizerProfile is null)
+            return;
         if (_equalizerProfile.Filters.Count >= MaximumEqualizerFilters)
             return;
         _equalizerProfile.Filters.Add(new EqualizerFilter

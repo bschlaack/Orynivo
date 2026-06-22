@@ -69,6 +69,8 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   to dynamic editor rows. Marker bubbles sit below the scale; colliding numbers
   remain bottom-aligned and shift horizontally with a short leader instead of
   moving upward.
+- `Orynivo/EqualizerProfileNameDialog.*`: themed unique-name dialog used when
+  creating a new persisted equalizer profile
 - `Native/AsioBridge/bridge.cpp`: shared Steinberg/cwASIO initialization, PCM/DSD ring buffers, and callback
 - `Native/CwAsioBridge/CwAsioBridge.vcxproj`: builds the shared bridge against vendored cwASIO
 - `third_party/cwasio/`: pinned MIT-licensed cwASIO host and compatibility sources
@@ -109,9 +111,12 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - `AppSettings.AlwaysConvertDsdToPcm` forces DSF/DFF sources through FFmpeg and
   the PCM output path even when ASIO/cwASIO native DSD is available, allowing
   volume, ReplayGain, and equalizer processing
-- `AppSettings.EqualizerEnabled` and `EqualizerProfile` persist the active
-  imported or manually edited Equalizer APO/AutoEQ profile parameters; the
-  source file path is not required after import
+- `AppSettings.EqualizerProfiles` persists all named imported or manually
+  edited Equalizer APO/AutoEQ profiles, while
+  `SelectedEqualizerProfileName`, `EqualizerProfile`, and `EqualizerEnabled`
+  identify the only selected/active profile and retain compatibility with the
+  previous single-profile settings format. The source file path is not required
+  after import.
 - `AppSettings.DataGridColumnWidths` persists user-adjusted pixel widths per stable table/view key; dynamic main-content views capture their current widths before replacing columns
 - `AppSettings.VisibleDataGridColumns` persists selectable column IDs per table/view key; right-clicking any table header opens the context-appropriate column chooser flyout
 - `AppSettings.DataGridColumnOrders` persists drag-and-drop display order per stable table/view key; fixed artwork and action columns keep their structural positions
@@ -468,6 +473,10 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   Filter rows use fixed adjacent columns so type selectors share one width and
   frequency, gain, and Q use equally wide readable fields instead of being
   pushed to the right.
+- Settings can retain multiple uniquely named equalizer profiles but selects at
+  most one. The profile dropdown may be empty; in that state the enable option,
+  import action, graph, and parameter editor remain hidden. Creating a profile
+  selects it immediately, and deleting one requires confirmation.
 - Equalizer profile changes and seek resets must never synchronously lock the
   UI thread against the PCM pump. Players atomically queue those requests and
   apply them from the audio pump before processing the next block. Profile

@@ -4,15 +4,26 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Orynivo.Localization;
 
 namespace Orynivo;
 
 /// <summary>Avalonia-native replacement for System.Windows.MessageBox.</summary>
 internal static class AppMessageBox
 {
+    /// <summary>Shows a themed informational message dialog.</summary>
+    /// <param name="message">Message displayed by the dialog.</param>
+    /// <param name="title">Dialog title.</param>
+    /// <param name="owner">Optional owning window.</param>
+    /// <returns>A task that completes when the dialog closes.</returns>
     public static Task ShowAsync(string message, string title = "Orynivo", Window? owner = null) =>
         Dispatcher.UIThread.InvokeAsync(() => ShowInternal(message, title, owner));
 
+    /// <summary>Shows a themed confirmation dialog.</summary>
+    /// <param name="message">Confirmation question displayed by the dialog.</param>
+    /// <param name="title">Dialog title.</param>
+    /// <param name="owner">Optional owning window.</param>
+    /// <returns><see langword="true"/> when the user confirms; otherwise <see langword="false"/>.</returns>
     public static Task<bool> ConfirmAsync(string message, string title = "Orynivo", Window? owner = null) =>
         Dispatcher.UIThread.InvokeAsync(() => ConfirmInternal(message, title, owner));
 
@@ -28,7 +39,7 @@ internal static class AppMessageBox
             WindowStartupLocation = owner is null
                 ? WindowStartupLocation.CenterScreen
                 : WindowStartupLocation.CenterOwner,
-            Background = new SolidColorBrush(Color.Parse("#18192E"))
+            Background = GetBrush("AppSurfaceBrush", "#18192E")
         };
 
         var yes = new Button
@@ -36,20 +47,20 @@ internal static class AppMessageBox
             Content = "OK",
             Width = 90,
             Height = 32,
-            Background = new SolidColorBrush(Color.Parse("#6C63FF")),
-            Foreground = new SolidColorBrush(Colors.White),
-            BorderBrush = new SolidColorBrush(Color.Parse("#6C63FF")),
+            Background = GetBrush("AppTransportPlayBrush", "#6C63FF"),
+            Foreground = GetBrush("AppButtonTextBrush", "#FFFFFF"),
+            BorderBrush = GetBrush("AppTransportPlayBrush", "#6C63FF"),
             BorderThickness = new Thickness(1)
         };
         var no = new Button
         {
-            Content = "Cancel",
+            Content = LocalizationManager.Current.Cancel,
             Width = 90,
             Height = 32,
             Margin = new Thickness(0, 0, 8, 0),
-            Background = new SolidColorBrush(Color.Parse("#252640")),
-            Foreground = new SolidColorBrush(Colors.White),
-            BorderBrush = new SolidColorBrush(Color.Parse("#343654")),
+            Background = GetBrush("AppButtonBrush", "#252640"),
+            Foreground = GetBrush("AppButtonTextBrush", "#FFFFFF"),
+            BorderBrush = GetBrush("AppButtonBorderBrush", "#343654"),
             BorderThickness = new Thickness(1)
         };
         yes.Click += (_, _) => { result = true; dlg.Close(); };
@@ -64,7 +75,7 @@ internal static class AppMessageBox
                 new TextBlock
                 {
                     Text = message,
-                    Foreground = new SolidColorBrush(Color.Parse("#F7F7FF")),
+                    Foreground = GetBrush("AppPrimaryTextBrush", "#F7F7FF"),
                     TextWrapping = Avalonia.Media.TextWrapping.Wrap,
                     MaxWidth = 392
                 },
@@ -98,7 +109,7 @@ internal static class AppMessageBox
             WindowStartupLocation = owner is null
                 ? WindowStartupLocation.CenterScreen
                 : WindowStartupLocation.CenterOwner,
-            Background = new SolidColorBrush(Color.Parse("#18192E"))
+            Background = GetBrush("AppSurfaceBrush", "#18192E")
         };
 
         var ok = new Button
@@ -107,9 +118,9 @@ internal static class AppMessageBox
             Width = 90,
             Height = 32,
             HorizontalAlignment = HorizontalAlignment.Right,
-            Background = new SolidColorBrush(Color.Parse("#252640")),
-            Foreground = new SolidColorBrush(Colors.White),
-            BorderBrush = new SolidColorBrush(Color.Parse("#343654")),
+            Background = GetBrush("AppButtonBrush", "#252640"),
+            Foreground = GetBrush("AppButtonTextBrush", "#FFFFFF"),
+            BorderBrush = GetBrush("AppButtonBorderBrush", "#343654"),
             BorderThickness = new Thickness(1)
         };
         ok.Click += (_, _) => dlg.Close();
@@ -123,7 +134,7 @@ internal static class AppMessageBox
                 new TextBlock
                 {
                     Text = message,
-                    Foreground = new SolidColorBrush(Color.Parse("#F7F7FF")),
+                    Foreground = GetBrush("AppPrimaryTextBrush", "#F7F7FF"),
                     TextWrapping = Avalonia.Media.TextWrapping.Wrap,
                     MaxWidth = 392
                 },
@@ -139,4 +150,10 @@ internal static class AppMessageBox
         else
             dlg.Show();
     }
+
+    private static IBrush GetBrush(string key, string fallback) =>
+        Application.Current?.Resources.TryGetResource(key, null, out var value) == true
+            && value is IBrush brush
+            ? brush
+            : new SolidColorBrush(Color.Parse(fallback));
 }

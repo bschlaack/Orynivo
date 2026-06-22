@@ -166,6 +166,10 @@ public static class LocalizationManager
         resources["L_EqualizerGain"] = Current.EqualizerGain;
         resources["L_EqualizerQ"] = Current.EqualizerQ;
         resources["L_EqualizerAddFilter"] = Current.EqualizerAddFilter;
+        resources["L_EqualizerCreate"] = Current.EqualizerCreate;
+        resources["L_EqualizerCreateTitle"] = Current.EqualizerCreateTitle;
+        resources["L_EqualizerName"] = Current.EqualizerName;
+        resources["L_EqualizerDelete"] = Current.EqualizerDelete;
         resources["L_SelectColumns"] = Current.SelectColumns;
         resources["L_Codec"] = Current.Codec;
         resources["L_Tags"] = Current.Tags;
@@ -374,6 +378,13 @@ public static class LocalizationManager
         EqualizerHighShelf = "Höhen-Shelf",
         EqualizerLowPass = "Tiefpass",
         EqualizerHighPass = "Hochpass",
+        EqualizerCreate = "Equalizer anlegen",
+        EqualizerCreateTitle = "Neuen Equalizer anlegen",
+        EqualizerName = "Name des Equalizers",
+        EqualizerNameExists = "Ein Equalizer mit diesem Namen ist bereits vorhanden.",
+        EqualizerDelete = "Equalizer löschen",
+        EqualizerDeleteTitle = "Equalizer löschen",
+        EqualizerDeleteConfirm = "Soll der Equalizer „{0}“ wirklich gelöscht werden?",
         SelectColumns = "Spalten auswählen",
         FileName = "Dateiname", FileSize = "Dateigröße", AddedAt = "Hinzugefügt",
         SampleRate = "Samplerate", BitDepth = "Bittiefe", Channels = "Kanäle",
@@ -691,6 +702,13 @@ public static class LocalizationManager
         EqualizerHighShelf = "High shelf",
         EqualizerLowPass = "Low pass",
         EqualizerHighPass = "High pass",
+        EqualizerCreate = "Create equalizer",
+        EqualizerCreateTitle = "Create new equalizer",
+        EqualizerName = "Equalizer name",
+        EqualizerNameExists = "An equalizer with this name already exists.",
+        EqualizerDelete = "Delete equalizer",
+        EqualizerDeleteTitle = "Delete equalizer",
+        EqualizerDeleteConfirm = "Are you sure you want to delete the equalizer “{0}”?",
         SelectColumns = "Select columns",
         FileName = "File name", FileSize = "File size", AddedAt = "Added",
         SampleRate = "Sample rate", BitDepth = "Bit depth", Channels = "Channels",
@@ -1006,6 +1024,13 @@ public static class LocalizationManager
         EqualizerHighShelf = "Plateau aigu",
         EqualizerLowPass = "Passe-bas",
         EqualizerHighPass = "Passe-haut",
+        EqualizerCreate = "Créer un égaliseur",
+        EqualizerCreateTitle = "Créer un nouvel égaliseur",
+        EqualizerName = "Nom de l’égaliseur",
+        EqualizerNameExists = "Un égaliseur portant ce nom existe déjà.",
+        EqualizerDelete = "Supprimer l’égaliseur",
+        EqualizerDeleteTitle = "Supprimer l’égaliseur",
+        EqualizerDeleteConfirm = "Voulez-vous vraiment supprimer l’égaliseur « {0} » ?",
         SelectColumns = "Sélectionner les colonnes",
         FileName = "Nom du fichier", FileSize = "Taille du fichier", AddedAt = "Ajouté",
         SampleRate = "Fréquence d’échantillonnage", BitDepth = "Profondeur de bits", Channels = "Canaux",
@@ -1318,6 +1343,13 @@ public static class LocalizationManager
         EqualizerHighShelf = "Estante de agudos",
         EqualizerLowPass = "Paso bajo",
         EqualizerHighPass = "Paso alto",
+        EqualizerCreate = "Crear ecualizador",
+        EqualizerCreateTitle = "Crear nuevo ecualizador",
+        EqualizerName = "Nombre del ecualizador",
+        EqualizerNameExists = "Ya existe un ecualizador con este nombre.",
+        EqualizerDelete = "Eliminar ecualizador",
+        EqualizerDeleteTitle = "Eliminar ecualizador",
+        EqualizerDeleteConfirm = "¿Seguro que quieres eliminar el ecualizador «{0}»?",
         SelectColumns = "Seleccionar columnas",
         FileName = "Nombre de archivo", FileSize = "Tamaño de archivo", AddedAt = "Añadido",
         SampleRate = "Frecuencia de muestreo", BitDepth = "Profundidad de bits", Channels = "Canales",

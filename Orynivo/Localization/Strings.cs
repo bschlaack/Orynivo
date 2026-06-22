@@ -234,6 +234,20 @@ public sealed record LocalizedStrings(
     public string EqualizerLowPass { get; init; } = "";
     /// <summary>Gets the high-pass equalizer filter name.</summary>
     public string EqualizerHighPass { get; init; } = "";
+    /// <summary>Gets the label for creating an equalizer profile.</summary>
+    public string EqualizerCreate { get; init; } = "";
+    /// <summary>Gets the equalizer profile creation dialog title.</summary>
+    public string EqualizerCreateTitle { get; init; } = "";
+    /// <summary>Gets the equalizer profile name label.</summary>
+    public string EqualizerName { get; init; } = "";
+    /// <summary>Gets the duplicate equalizer profile name validation message.</summary>
+    public string EqualizerNameExists { get; init; } = "";
+    /// <summary>Gets the label for deleting an equalizer profile.</summary>
+    public string EqualizerDelete { get; init; } = "";
+    /// <summary>Gets the equalizer profile deletion dialog title.</summary>
+    public string EqualizerDeleteTitle { get; init; } = "";
+    /// <summary>Gets the equalizer profile deletion confirmation format.</summary>
+    public string EqualizerDeleteConfirm { get; init; } = "";
     /// <summary>Gets the column-selection menu heading.</summary>
     public string SelectColumns { get; init; } = "";
     /// <summary>Gets the file-name column label.</summary>
