@@ -20,6 +20,8 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 - Native stereo DSD playback for DSF and uncompressed DFF files through ASIO
 - Real-time DSF/DFF-to-PCM conversion for playback through WASAPI, with the
   active conversion and PCM sample rate shown in the transport and status bar
+- Optional forced DSF/DFF-to-PCM conversion with ASIO/cwASIO, allowing volume,
+  ReplayGain, and the parametric equalizer to affect DSD sources
 - PCM playback through `ffmpeg`
 - Seeking, volume control, pause, and an editable persistent **Up next** queue
   with play-next/append actions, removal, reordering, playlist saving, and
@@ -30,6 +32,10 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 - Optional ReplayGain volume adjustment for PCM playback, using track or album
   gain metadata with fallback to the other available value; native DSD output
   remains bit-perfect
+- Parametric PCM equalizer with persisted on/off state and Equalizer APO/AutoEQ
+  text-profile import. Preamp, peak, low/high shelf, low/high pass, and
+  `GraphicEQ` profiles are supported; changes are crossfaded during playback
+  and native DSD output remains bit-perfect
 - SQLite music library with multiple monitored directories
 - CUE-sheet support for large FLAC/WAV images: indexed CUE entries appear as
   independent virtual tracks in library, folder, search, queue, playlist, and
@@ -202,6 +208,12 @@ Library directories and the desired output device can then be selected in the
 settings window. ReplayGain can be disabled or switched to track/album mode
 under the output-device settings. The first subsequent scan of each configured
 library root refreshes unchanged files once to import existing ReplayGain tags.
+Equalizer APO or AutoEQ `.txt`/`.cfg` profiles can be imported in the same
+section. `GraphicEQ` curves are translated into a log-frequency shelf cascade;
+the imported parameters are stored directly in `settings.json`, so the source
+profile file does not need to remain available. The DSD playback option can
+force DSF/DFF files through this PCM path even when ASIO/cwASIO native DSD is
+available.
 Available library roots are monitored automatically after configuration.
 File-system events are debounced before updating the database and search index;
 periodic full scans reconcile changes that a watcher may have missed.

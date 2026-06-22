@@ -8,8 +8,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Added a persisted **Always convert DSD files to PCM** option. When enabled,
+  DSF and DFF playback uses the FFmpeg PCM path with ASIO/cwASIO as well as
+  WASAPI, allowing volume, ReplayGain, and the parametric equalizer to apply.
+  When disabled, ASIO/cwASIO retains native bit-perfect DSD playback.
+- Added a persisted parametric equalizer for ASIO/cwASIO PCM, exclusive WASAPI
+  PCM, and WASAPI DSD-to-PCM playback. Settings can import Equalizer APO and
+  AutoEQ profiles containing preamp, peak, low/high shelf, low/high pass, and
+  `GraphicEQ` definitions. Profile changes crossfade without clicks, seeks
+  reset filter history, and native ASIO DSD remains bit-perfect.
+
 ### Fixed
 
+- Fixed the application becoming unresponsive after saving an imported
+  Equalizer APO/AutoEQ profile during active playback. UI updates no longer
+  wait for the audio thread's DSP work; profile changes and seek resets are
+  handed to that thread atomically. Profile file parsing also runs off the UI
+  thread with visible progress and bounded file/filter counts.
+- Equalizer enable/disable now previews immediately during playback without
+  closing Settings; cancel restores the previous profile state. Saving an EQ
+  change no longer reopens the unchanged WASAPI endpoint. Actual backend or
+  device changes stop and dispose the old player off the UI thread, while
+  endpoint synchronization and ASIO/WASAPI device enumeration also run in the
+  background to prevent driver calls from freezing the application.
+- Fixed another live-EQ AppHang caused by competing settings activity. EQ
+  preview requests are now debounced and executed entirely away from the UI
+  event handler. Initial output-device enumeration no longer starts twice, and
+  later backend enumeration requests are serialized so native driver discovery
+  cannot overlap within the settings window.
+- Fixed leaked WASAPI endpoint COM objects during device enumeration and device
+  opening. Repeatedly opening Settings no longer accumulates undisposed
+  `MMDevice` and `MMDeviceEnumerator` instances while playback is active.
+- Saving an EQ-only settings change no longer performs unrelated synchronous
+  work on the UI thread. Settings persistence and credential protection run in
+  the background, while theme, language, sidebar, artist-provider, ReplayGain,
+  Plex navigation, and output-device refreshes execute only when their
+  corresponding values actually changed.
 - High-resolution PCM and WASAPI-converted DSD now fall back to the highest
   sample rate and output precision supported by the selected device instead of
   failing when the source rate or bit depth exceeds the endpoint capability.

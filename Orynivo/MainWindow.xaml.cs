@@ -144,6 +144,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _lyricsCts;
     private CancellationTokenSource? _artistProfileCts;
     private WindowsEndpointVolumeSynchronizer? _endpointVolumeSynchronizer;
+    private int _endpointVolumeSynchronizationVersion;
     private WindowsMediaTransportService? _windowsMediaTransport;
     private bool _updatingVolumeFromSystem;
     private CancellationTokenSource _backgroundArtistLoadCts = new();
@@ -419,7 +420,7 @@ public partial class MainWindow : Window
         PositionSlider.AddHandler(Slider.PointerReleasedEvent,
             new EventHandler<PointerReleasedEventArgs>(PositionSlider_OnPreviewMouseLeftButtonUp),
             handledEventsToo: true);
-        ConfigureEndpointVolumeSynchronization();
+        _ = ConfigureEndpointVolumeSynchronizationAsync();
         ConfigureWindowsMediaTransport();
         QueueHydrateVisibleArtworkRows(AlbumArtworkListBox);
         QueueHydrateVisibleArtworkRows(ArtistArtworkListBox);
@@ -434,7 +435,7 @@ public partial class MainWindow : Window
         ContentDataGrid.VerticalScroll -= ContentDataGrid_OnVerticalScroll;
         _libraryWatcher?.Dispose();
         _libraryWatcher = null;
-        DisposeEndpointVolumeSynchronization();
+        DisposeEndpointVolumeSynchronizationInBackground();
         CaptureAllDataGridColumnWidths();
         PersistViewState();
         CancelAndDispose(ref _radioSearchCts);
@@ -6426,13 +6427,15 @@ public partial class MainWindow : Window
                 StatusTextBlock.Text = LocalizationManager.Current.SelectAsioDevice;
                 return;
             }
-            if (ext.Equals(".dsf", StringComparison.OrdinalIgnoreCase))
+            if (!_settings.AlwaysConvertDsdToPcm &&
+                ext.Equals(".dsf", StringComparison.OrdinalIgnoreCase))
                 (player, info) = await DsfAudioPlayer.CreateAsync(
                     filePath,
                     _settings.OutputBackend,
                     _settings.SelectedDriverName,
                     _playbackCts.Token);
-            else if (ext.Equals(".dff", StringComparison.OrdinalIgnoreCase))
+            else if (!_settings.AlwaysConvertDsdToPcm &&
+                     ext.Equals(".dff", StringComparison.OrdinalIgnoreCase))
                 (player, info) = await DffAudioPlayer.CreateAsync(
                     filePath,
                     _settings.OutputBackend,
@@ -6443,6 +6446,8 @@ public partial class MainWindow : Window
                     gaplessItems,
                     _settings.OutputBackend,
                     _settings.SelectedDriverName,
+                    _settings.EqualizerEnabled,
+                    _settings.EqualizerProfile,
                     _playbackCts.Token);
         }
         else if (_settings.OutputBackend == OutputBackend.Wasapi)
@@ -6455,6 +6460,8 @@ public partial class MainWindow : Window
             (player, info) = await WasapiAudioPlayer.CreateAsync(
                 gaplessItems,
                 _settings.SelectedWasapiDeviceId,
+                _settings.EqualizerEnabled,
+                _settings.EqualizerProfile,
                 _playbackCts.Token);
         }
         else
@@ -6513,6 +6520,7 @@ public partial class MainWindow : Window
                                          ? SelectedDriverTextBlock.Text
                                          : LocalizationManager.Current.InternetRadio);
         var usesNativeDsd = info.IsDsd &&
+                            !_settings.AlwaysConvertDsdToPcm &&
                             _settings.OutputBackend is OutputBackend.Asio or OutputBackend.CwAsio;
         FileInfoTextBlock.Text = usesNativeDsd
             ? $"{info.ContainerName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz  ·  {LocalizationManager.Current.NativeDsdOutput}"
@@ -6702,7 +6710,8 @@ public partial class MainWindow : Window
         for (var index = _queueIndex; index < _queue.Count; index++)
         {
             var path = _queue[index].FilePath;
-            if (_settings.OutputBackend is OutputBackend.Asio or OutputBackend.CwAsio &&
+            if (!_settings.AlwaysConvertDsdToPcm &&
+                _settings.OutputBackend is OutputBackend.Asio or OutputBackend.CwAsio &&
                 Path.GetExtension(path) is string extension &&
                 (extension.Equals(".dsf", StringComparison.OrdinalIgnoreCase) ||
                  extension.Equals(".dff", StringComparison.OrdinalIgnoreCase)))
@@ -6982,13 +6991,39 @@ public partial class MainWindow : Window
 
     private void StopPlayback()
     {
+        var player = StopPlaybackCore();
+        player?.Dispose();
+    }
+
+    private async Task StopPlaybackAsync()
+    {
+        var player = StopPlaybackCore();
+        if (player is not null)
+        {
+            var disposalTask = Task.Run(() =>
+            {
+                try
+                {
+                    player.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    CrashLogger.Log(ex, "Background audio-player disposal");
+                }
+            });
+            await Task.WhenAny(disposalTask, Task.Delay(TimeSpan.FromSeconds(2)));
+        }
+    }
+
+    private IAudioPlayer? StopPlaybackCore()
+    {
         RecordPlaybackEnd(completed: false);
         SavePodcastProgress(completed: false);
         CancelAndDispose(ref _radioMetadataCts);
         _playbackCts?.Cancel();
         _playbackCts?.Dispose();
         _playbackCts = null;
-        _player?.Dispose();
+        var player = _player;
         _player = null;
         _currentPlaybackDuration = TimeSpan.Zero;
         UpdateNowPlayingRowHighlights();
@@ -7021,6 +7056,7 @@ public partial class MainWindow : Window
         ArtistInfoView.IsVisible = false;
         ClearRadioNowPlaying();
         UpdateNowPlayingFavoriteButton();
+        return player;
     }
 
     private static void CancelAndDispose(ref CancellationTokenSource? source)
@@ -8021,9 +8057,13 @@ public partial class MainWindow : Window
         _settings.Volume = VolumeSlider.Value;
     }
 
-    private void ConfigureEndpointVolumeSynchronization()
+    private async Task ConfigureEndpointVolumeSynchronizationAsync()
     {
-        DisposeEndpointVolumeSynchronization();
+        var synchronizationVersion =
+            Interlocked.Increment(ref _endpointVolumeSynchronizationVersion);
+        var previous = DetachEndpointVolumeSynchronization();
+        if (previous is not null)
+            _ = Task.Run(() => DisposeEndpointSynchronizer(previous));
         if (_settings.OutputBackend != OutputBackend.Wasapi ||
             string.IsNullOrWhiteSpace(_settings.SelectedWasapiDeviceId))
         {
@@ -8032,14 +8072,27 @@ public partial class MainWindow : Window
 
         try
         {
-            _endpointVolumeSynchronizer =
-                new WindowsEndpointVolumeSynchronizer(_settings.SelectedWasapiDeviceId);
-            _endpointVolumeSynchronizer.VolumeChanged += EndpointVolumeSynchronizer_OnVolumeChanged;
-            ApplySystemVolume(_endpointVolumeSynchronizer.Volume);
+            var deviceId = _settings.SelectedWasapiDeviceId;
+            var synchronizer = await Task.Run(() => new WindowsEndpointVolumeSynchronizer(deviceId));
+            if (synchronizationVersion !=
+                    Volatile.Read(ref _endpointVolumeSynchronizationVersion) ||
+                _settings.OutputBackend != OutputBackend.Wasapi ||
+                !string.Equals(
+                    _settings.SelectedWasapiDeviceId,
+                    deviceId,
+                    StringComparison.Ordinal))
+            {
+                _ = Task.Run(() => DisposeEndpointSynchronizer(synchronizer));
+                return;
+            }
+            synchronizer.VolumeChanged += EndpointVolumeSynchronizer_OnVolumeChanged;
+            _endpointVolumeSynchronizer = synchronizer;
+            var volume = await Task.Run(() => synchronizer.Volume);
+            ApplySystemVolume(volume);
         }
         catch
         {
-            DisposeEndpointVolumeSynchronization();
+            DisposeEndpointVolumeSynchronizationInBackground();
         }
     }
 
@@ -8059,13 +8112,33 @@ public partial class MainWindow : Window
         }
     }
 
-    private void DisposeEndpointVolumeSynchronization()
+    private WindowsEndpointVolumeSynchronizer? DetachEndpointVolumeSynchronization()
     {
-        if (_endpointVolumeSynchronizer is null)
-            return;
-        _endpointVolumeSynchronizer.VolumeChanged -= EndpointVolumeSynchronizer_OnVolumeChanged;
-        _endpointVolumeSynchronizer.Dispose();
+        var synchronizer = _endpointVolumeSynchronizer;
         _endpointVolumeSynchronizer = null;
+        if (synchronizer is not null)
+            synchronizer.VolumeChanged -= EndpointVolumeSynchronizer_OnVolumeChanged;
+        return synchronizer;
+    }
+
+    private void DisposeEndpointVolumeSynchronizationInBackground()
+    {
+        Interlocked.Increment(ref _endpointVolumeSynchronizationVersion);
+        var synchronizer = DetachEndpointVolumeSynchronization();
+        if (synchronizer is not null)
+            _ = Task.Run(() => DisposeEndpointSynchronizer(synchronizer));
+    }
+
+    private static void DisposeEndpointSynchronizer(
+        WindowsEndpointVolumeSynchronizer synchronizer)
+    {
+        try
+        {
+            synchronizer.Dispose();
+        }
+        catch
+        {
+        }
     }
 
     private void EndpointVolumeSynchronizer_OnVolumeChanged(object? sender, float volume) =>
@@ -8128,16 +8201,55 @@ public partial class MainWindow : Window
             _settings.LibraryPaths = paths;
             _settingsStore.Save(_settings);
             _libraryWatcher?.UpdatePaths(paths);
+        }, (enabled, profile) =>
+        {
+            if (_player is IEqualizerAudioPlayer equalizerPlayer)
+                equalizerPlayer.UpdateEqualizer(enabled, profile);
         })
         ;
 
         if (await window.ShowDialog<bool>(this) == true)
         {
+            var themeChanged = _settings.Theme != window.SelectedTheme;
+            var languageChanged = _settings.Language != window.SelectedLanguage;
+            var replayGainChanged =
+                _settings.ReplayGainMode != window.SelectedReplayGainMode;
+            var artistInfoChanged =
+                _settings.ArtistInfoSource != window.SelectedArtistInfoSource ||
+                !string.Equals(
+                    _settings.LastFmApiKey,
+                    window.SelectedLastFmApiKey,
+                    StringComparison.Ordinal);
+            var sidebarChanged =
+                _settings.ShowLocalLibrarySection != window.ShowLocalLibrarySection ||
+                _settings.ShowOwnRadiosSection != window.ShowOwnRadiosSection ||
+                _settings.ShowMyPodcastsSection != window.ShowMyPodcastsSection ||
+                _settings.ShowPlexSection != window.ShowPlexSection ||
+                _settings.ShowPlaylistsSection != window.ShowPlaylistsSection;
+            var plexServersChanged = !PlexServerSettingsEqual(
+                _settings.PlexServers,
+                window.SelectedPlexServers);
+            var outputChanged =
+                _settings.OutputBackend != window.SelectedOutputBackend ||
+                !string.Equals(
+                    _settings.SelectedDriverName,
+                    window.SelectedDriverName,
+                    StringComparison.Ordinal) ||
+                !string.Equals(
+                    _settings.SelectedWasapiDeviceId,
+                    window.SelectedWasapiDeviceId,
+                    StringComparison.Ordinal);
+            if (outputChanged && _player is not null)
+                await StopPlaybackAsync();
+
             _settings.OutputBackend          = window.SelectedOutputBackend;
             _settings.SelectedDriverName     = window.SelectedDriverName;
             _settings.SelectedWasapiDeviceId = window.SelectedWasapiDeviceId;
             _settings.SelectedWasapiDeviceName = window.SelectedWasapiDeviceName;
             _settings.ReplayGainMode        = window.SelectedReplayGainMode;
+            _settings.AlwaysConvertDsdToPcm = window.AlwaysConvertDsdToPcm;
+            _settings.EqualizerEnabled      = window.EqualizerEnabled;
+            _settings.EqualizerProfile      = window.SelectedEqualizerProfile;
             _settings.LibraryPaths           = window.SelectedLibraryPaths.ToList();
             _libraryWatcher?.UpdatePaths(_settings.LibraryPaths);
             _settings.Theme                  = window.SelectedTheme;
@@ -8151,22 +8263,55 @@ public partial class MainWindow : Window
             _settings.ShowMyPodcastsSection   = window.ShowMyPodcastsSection;
             _settings.ShowPlexSection         = window.ShowPlexSection;
             _settings.ShowPlaylistsSection    = window.ShowPlaylistsSection;
-            try
+            if (window.PlexCredentialsChanged)
             {
-                new WindowsPlexCredentialStore().SaveAll(window.SelectedPlexTokens);
+                try
+                {
+                    var plexTokens = window.SelectedPlexTokens.ToDictionary(
+                        static pair => pair.Key,
+                        static pair => pair.Value);
+                    await Task.Run(() => new WindowsPlexCredentialStore().SaveAll(plexTokens));
+                }
+                catch
+                {
+                }
             }
-            catch { }
-            _settingsStore.Save(_settings);
-            ThemeManager.Apply(_settings.Theme);
-            LocalizationManager.Apply(_settings.Language);
-            UpdateNowPlayingRowHighlights();
-            ApplyArtistInfoSettings();
-            RefreshSelectedDriverText();
-            ConfigureEndpointVolumeSynchronization();
-            LoadNavPlaylists();
-            ApplySidebarNavigationSettings();
-            if (_player is not null)
-                _player.ReplayGainFactor = GetReplayGainFactor(_currentFilePath);
+            await Task.Run(() => _settingsStore.Save(_settings));
+            if (themeChanged)
+            {
+                ThemeManager.Apply(_settings.Theme);
+                UpdateNowPlayingRowHighlights();
+            }
+            if (languageChanged)
+                LocalizationManager.Apply(_settings.Language);
+            if (artistInfoChanged)
+                ApplyArtistInfoSettings();
+            if (outputChanged)
+                RefreshSelectedDriverText();
+            if (plexServersChanged || window.PlexCredentialsChanged)
+                LoadNavPlaylists();
+            else if (sidebarChanged)
+                ApplySidebarNavigationSettings();
+            if (replayGainChanged && _player is not null)
+            {
+                var currentFilePath = _currentFilePath;
+                var replayGainFactor = await Task.Run(() =>
+                    GetReplayGainFactorFromDatabase(currentFilePath));
+                if (_player is not null &&
+                    string.Equals(
+                        _currentFilePath,
+                        currentFilePath,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    _player.ReplayGainFactor = replayGainFactor;
+                }
+            }
+            if (_player is IEqualizerAudioPlayer equalizerPlayer)
+                equalizerPlayer.UpdateEqualizer(
+                    _settings.EqualizerEnabled,
+                    _settings.EqualizerProfile);
+            if (outputChanged)
+                _ = ConfigureEndpointVolumeSynchronizationAsync();
 
             StatusTextBlock.Text = _settings.OutputBackend switch
             {
@@ -8179,6 +8324,44 @@ public partial class MainWindow : Window
                 _ => LocalizationManager.Current.SettingsSaved
             };
         }
+    }
+
+    private float GetReplayGainFactorFromDatabase(string filePath)
+    {
+        if (_settings.ReplayGainMode == ReplayGainMode.Off ||
+            _player is DsfAudioPlayer or DffAudioPlayer)
+        {
+            return 1.0f;
+        }
+
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            var track = db.GetByPath(filePath);
+            return track is null
+                ? 1.0f
+                : ReplayGain.GetLinearFactor(
+                    _settings.ReplayGainMode,
+                    track.ReplayGainTrack,
+                    track.ReplayGainAlbum);
+        }
+        catch
+        {
+            return 1.0f;
+        }
+    }
+
+    private static bool PlexServerSettingsEqual(
+        IReadOnlyList<PlexServerSettings>? left,
+        IReadOnlyList<PlexServerSettings>? right)
+    {
+        left ??= [];
+        right ??= [];
+        return left.Count == right.Count &&
+               left.Zip(right).All(pair =>
+                   string.Equals(pair.First.Id, pair.Second.Id, StringComparison.Ordinal) &&
+                   string.Equals(pair.First.Name, pair.Second.Name, StringComparison.Ordinal) &&
+                   string.Equals(pair.First.BaseUrl, pair.Second.BaseUrl, StringComparison.Ordinal));
     }
 
     internal void PrepareForLibraryImport()

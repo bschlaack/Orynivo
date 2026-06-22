@@ -11,7 +11,7 @@ namespace Orynivo.Audio;
 /// Plays one or more files as continuous PCM through one exclusive WASAPI
 /// session. Upcoming FFmpeg decoders are prefetched before track boundaries.
 /// </summary>
-public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
+public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlayer
 {
     private readonly IReadOnlyList<GaplessPlaybackItem> _items;
     private readonly AudioFileInfo?[] _infos;
@@ -26,12 +26,15 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
     private readonly SemaphoreSlim _decoderGate = new(1, 1);
     private readonly Task _pumpTask;
     private readonly object _stateLock = new();
+    private readonly ParametricEqualizer _equalizer;
     private long _totalFramesWritten;
     private int _audibleTrackIndex;
     private int _writeTrackIndex;
     private FfmpegPcmDecoder? _activeDecoder;
     private int _restartPreparedFromIndex = -1;
     private int _decoderGeneration;
+    private EqualizerUpdateRequest? _pendingEqualizerUpdate;
+    private int _equalizerResetRequested;
     private float _volume = 1.0f;
     private bool _disposed;
 
@@ -43,7 +46,9 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
         BufferedWaveProvider bufferedProvider,
         PausableWaveProvider playbackProvider,
         MMDevice device,
-        WasapiSelectedFormat selectedFormat)
+        WasapiSelectedFormat selectedFormat,
+        bool equalizerEnabled,
+        EqualizerProfile? equalizerProfile)
     {
         _items = items;
         _infos = new AudioFileInfo?[items.Count];
@@ -55,6 +60,10 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
         _playbackProvider = playbackProvider;
         _device = device;
         _selectedFormat = selectedFormat;
+        _equalizer = new ParametricEqualizer(
+            selectedFormat.Format.SampleRate,
+            equalizerEnabled,
+            equalizerProfile);
         _activeDecoder = firstDecoder;
         _pumpTask = Task.Run(() => PumpAsync(firstDecoder));
     }
@@ -101,11 +110,15 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
     /// <summary>Creates a continuous exclusive-mode WASAPI playback session.</summary>
     /// <param name="items">Tracks in playback order with their ReplayGain factors.</param>
     /// <param name="deviceId">MMDevice identifier of the output device.</param>
+    /// <param name="equalizerEnabled">Whether the supplied equalizer profile is active.</param>
+    /// <param name="equalizerProfile">Equalizer profile applied to PCM samples.</param>
     /// <param name="cancellationToken">Cancellation token for initial probing and decoder startup.</param>
     /// <returns>The player and technical information for the first track.</returns>
     public static async Task<(WasapiAudioPlayer AudioPlayer, AudioFileInfo Info)> CreateAsync(
         IReadOnlyList<GaplessPlaybackItem> items,
         string deviceId,
+        bool equalizerEnabled = false,
+        EqualizerProfile? equalizerProfile = null,
         CancellationToken cancellationToken = default)
     {
         if (items.Count == 0)
@@ -138,7 +151,16 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
                 cancellationToken);
             output.Play();
             return (new WasapiAudioPlayer(
-                items, info, decoder, output, provider, playbackProvider, device, selectedFormat), info);
+                items,
+                info,
+                decoder,
+                output,
+                provider,
+                playbackProvider,
+                device,
+                selectedFormat,
+                equalizerEnabled,
+                equalizerProfile), info);
         }
         catch
         {
@@ -150,13 +172,28 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
     /// <summary>Creates a single-track exclusive-mode WASAPI playback session.</summary>
     /// <param name="filePath">Local path or supported stream URL.</param>
     /// <param name="deviceId">MMDevice identifier of the output device.</param>
+    /// <param name="equalizerEnabled">Whether the supplied equalizer profile is active.</param>
+    /// <param name="equalizerProfile">Equalizer profile applied to PCM samples.</param>
     /// <param name="cancellationToken">Cancellation token for initial probing and decoder startup.</param>
     /// <returns>The player and technical information for the track.</returns>
     public static Task<(WasapiAudioPlayer AudioPlayer, AudioFileInfo Info)> CreateAsync(
         string filePath,
         string deviceId,
+        bool equalizerEnabled = false,
+        EqualizerProfile? equalizerProfile = null,
         CancellationToken cancellationToken = default) =>
-        CreateAsync([new GaplessPlaybackItem(filePath, 1.0f)], deviceId, cancellationToken);
+        CreateAsync(
+            [new GaplessPlaybackItem(filePath, 1.0f)],
+            deviceId,
+            equalizerEnabled,
+            equalizerProfile,
+            cancellationToken);
+
+    /// <inheritdoc/>
+    public void UpdateEqualizer(bool enabled, EqualizerProfile? profile)
+        => Interlocked.Exchange(
+            ref _pendingEqualizerUpdate,
+            new EqualizerUpdateRequest(enabled, profile?.Clone()));
 
     /// <inheritdoc/>
     public void Pause() => _playbackProvider.IsPaused = true;
@@ -188,6 +225,7 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
             Volatile.Write(ref _trackStartFrames[audibleIndex], 0);
             Volatile.Write(ref _restartPreparedFromIndex, audibleIndex);
             _bufferedProvider.ClearBuffer();
+            Interlocked.Exchange(ref _equalizerResetRequested, 1);
             Interlocked.Exchange(ref _totalFramesWritten, 0);
             Volatile.Write(
                 ref _trackPositionOffsetFrames[audibleIndex],
@@ -273,7 +311,7 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
                 var totalBytes = remainderBytes + bytesRead;
                 bytesRead = totalBytes - (totalBytes % _selectedFormat.BytesPerFrame);
                 remainderBytes = totalBytes - bytesRead;
-                ApplyReplayGain(buffer.AsSpan(0, bytesRead), _items[_writeTrackIndex].ReplayGainFactor);
+                ProcessPcm(buffer.AsSpan(0, bytesRead), _items[_writeTrackIndex].ReplayGainFactor);
                 var offset = 0;
                 while (offset < bytesRead && !_cts.IsCancellationRequested)
                 {
@@ -366,45 +404,90 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer
         }
     }
 
-    private void ApplyReplayGain(Span<byte> bytes, float trackReplayGain)
+    private void ProcessPcm(Span<byte> bytes, float trackReplayGain)
     {
-        var factor = trackReplayGain;
-        if (Math.Abs(factor - 1.0f) < 0.0001f)
-            return;
-
+        ApplyPendingEqualizerChanges();
         if (_selectedFormat.FfmpegSampleFormat == "f32le")
         {
             var samples = MemoryMarshal.Cast<byte, float>(bytes);
-            for (var index = 0; index < samples.Length; index++)
-                samples[index] = Math.Clamp(samples[index] * factor, -1.0f, 1.0f);
+            for (var index = 0; index + 1 < samples.Length; index += 2)
+            {
+                var output = _equalizer.Process(
+                    samples[index] * trackReplayGain,
+                    samples[index + 1] * trackReplayGain);
+                samples[index] = Math.Clamp(output.Left, -1.0f, 1.0f);
+                samples[index + 1] = Math.Clamp(output.Right, -1.0f, 1.0f);
+            }
         }
         else if (_selectedFormat.FfmpegSampleFormat == "s16le")
         {
             var samples = MemoryMarshal.Cast<byte, short>(bytes);
-            for (var index = 0; index < samples.Length; index++)
-                samples[index] = (short)Math.Clamp(samples[index] * factor, short.MinValue, short.MaxValue);
+            for (var index = 0; index + 1 < samples.Length; index += 2)
+            {
+                var output = _equalizer.Process(
+                    samples[index] / 32768.0f * trackReplayGain,
+                    samples[index + 1] / 32768.0f * trackReplayGain);
+                samples[index] = FloatToInt16(output.Left);
+                samples[index + 1] = FloatToInt16(output.Right);
+            }
         }
         else if (_selectedFormat.FfmpegSampleFormat == "s24le")
         {
-            for (var offset = 0; offset + 2 < bytes.Length; offset += 3)
+            for (var offset = 0; offset + 5 < bytes.Length; offset += 6)
             {
-                var sample = bytes[offset] |
-                             (bytes[offset + 1] << 8) |
-                             (bytes[offset + 2] << 16);
-                if ((sample & 0x0080_0000) != 0)
-                    sample |= unchecked((int)0xFF00_0000);
-                sample = (int)Math.Clamp(sample * (double)factor, -8_388_608, 8_388_607);
-                bytes[offset] = (byte)sample;
-                bytes[offset + 1] = (byte)(sample >> 8);
-                bytes[offset + 2] = (byte)(sample >> 16);
+                var output = _equalizer.Process(
+                    ReadInt24(bytes, offset) / 8_388_608.0f * trackReplayGain,
+                    ReadInt24(bytes, offset + 3) / 8_388_608.0f * trackReplayGain);
+                WriteInt24(bytes, offset, output.Left);
+                WriteInt24(bytes, offset + 3, output.Right);
             }
         }
         else
         {
             var samples = MemoryMarshal.Cast<byte, int>(bytes);
-            for (var index = 0; index < samples.Length; index++)
-                samples[index] = (int)Math.Clamp(samples[index] * (double)factor, int.MinValue, int.MaxValue);
+            for (var index = 0; index + 1 < samples.Length; index += 2)
+            {
+                var output = _equalizer.Process(
+                    samples[index] / 2_147_483_648.0f * trackReplayGain,
+                    samples[index + 1] / 2_147_483_648.0f * trackReplayGain);
+                samples[index] = FloatToInt32(output.Left);
+                samples[index + 1] = FloatToInt32(output.Right);
+            }
         }
+    }
+
+    private void ApplyPendingEqualizerChanges()
+    {
+        if (Interlocked.Exchange(ref _equalizerResetRequested, 0) != 0)
+            _equalizer.Reset();
+        var update = Interlocked.Exchange(ref _pendingEqualizerUpdate, null);
+        if (update is not null)
+            _equalizer.Update(update.Enabled, update.Profile);
+    }
+
+    private sealed record EqualizerUpdateRequest(bool Enabled, EqualizerProfile? Profile);
+
+    private static short FloatToInt16(float sample) =>
+        (short)Math.Round(Math.Clamp(sample, -1.0f, 1.0f) * (sample < 0 ? 32768.0f : 32767.0f));
+
+    private static int FloatToInt32(float sample) =>
+        (int)Math.Round(Math.Clamp(sample, -1.0f, 1.0f) * (sample < 0 ? 2_147_483_648.0 : 2_147_483_647.0));
+
+    private static int ReadInt24(ReadOnlySpan<byte> bytes, int offset)
+    {
+        var sample = bytes[offset] | (bytes[offset + 1] << 8) | (bytes[offset + 2] << 16);
+        return (sample & 0x0080_0000) != 0
+            ? sample | unchecked((int)0xFF00_0000)
+            : sample;
+    }
+
+    private static void WriteInt24(Span<byte> bytes, int offset, float sample)
+    {
+        var value = (int)Math.Round(
+            Math.Clamp(sample, -1.0f, 1.0f) * (sample < 0 ? 8_388_608.0 : 8_388_607.0));
+        bytes[offset] = (byte)value;
+        bytes[offset + 1] = (byte)(value >> 8);
+        bytes[offset + 2] = (byte)(value >> 16);
     }
 
     private static async Task DisposePreparedAsync(

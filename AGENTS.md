@@ -58,6 +58,11 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - `Orynivo/Audio/ReplayGain.cs` and `ReplayGainMode.cs`: parse persisted
   track/album gain values, select the configured fallback mode, and calculate
   the linear PCM gain factor
+- `Orynivo/Audio/EqualizerApoParser.cs`: imports Equalizer APO and AutoEQ
+  preamp, parametric filter, and `GraphicEQ` text profiles
+- `Orynivo/Audio/ParametricEqualizer.cs`: stereo biquad PCM equalizer with a
+  short crossfade when the active profile changes and filter-state reset after
+  seeks
 - `Native/AsioBridge/bridge.cpp`: shared Steinberg/cwASIO initialization, PCM/DSD ring buffers, and callback
 - `Native/CwAsioBridge/CwAsioBridge.vcxproj`: builds the shared bridge against vendored cwASIO
 - `third_party/cwasio/`: pinned MIT-licensed cwASIO host and compatibility sources
@@ -94,6 +99,12 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   **Up next** queue across restarts. Local paths and non-credential HTTP/HTTPS
   URLs may be stored; Plex-token and user-info URLs must never be persisted.
 - `AppSettings.ReplayGainMode` selects disabled, track, or album ReplayGain for PCM playback; native ASIO DSD remains bit-perfect
+- `AppSettings.AlwaysConvertDsdToPcm` forces DSF/DFF sources through FFmpeg and
+  the PCM output path even when ASIO/cwASIO native DSD is available, allowing
+  volume, ReplayGain, and equalizer processing
+- `AppSettings.EqualizerEnabled` and `EqualizerProfile` persist the active
+  imported Equalizer APO/AutoEQ profile parameters; the source file path is not
+  required after import
 - `AppSettings.DataGridColumnWidths` persists user-adjusted pixel widths per stable table/view key; dynamic main-content views capture their current widths before replacing columns
 - `AppSettings.VisibleDataGridColumns` persists selectable column IDs per table/view key; right-clicking any table header opens the context-appropriate column chooser flyout
 - `AppSettings.DataGridColumnOrders` persists drag-and-drop display order per stable table/view key; fixed artwork and action columns keep their structural positions
@@ -393,6 +404,10 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - WASAPI plays DSF/DFF by converting DSD to PCM through `ffmpeg` without a
   temporary file using the same endpoint-aware sample-rate and precision
   selection as other PCM playback.
+- Settings can force DSF/DFF through the same FFmpeg PCM path for
+  ASIO/cwASIO. Forced conversion participates in gapless PCM playback and
+  enables volume, ReplayGain, and equalizer processing; disabling the option
+  restores native bit-perfect ASIO/cwASIO DSD routing.
 - ASIO/cwASIO PCM playback queries the driver's reported sample rates before
   opening the stream and converts sources above or between supported rates to
   the highest available rate that does not exceed the source.
@@ -435,6 +450,34 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - The playlist table is height-limited and scrollable
 - Volume affects PCM paths; native DSD remains bit-perfect
 - ReplayGain can be disabled or use track/album gain with fallback to the other available value. It is combined with the user volume for PCM output and uses saturating sample conversion to prevent integer overflow; native DSD ignores it.
+- The parametric equalizer runs after ReplayGain and before ASIO/cwASIO or
+  WASAPI PCM output. It supports peak, low/high shelf, low/high pass, preamp,
+  and imported `GraphicEQ` curves. Live changes crossfade over 50 ms, gapless
+  transitions preserve filter state, seeks reset it, and native DSD ignores
+  the equalizer.
+- Equalizer profile changes and seek resets must never synchronously lock the
+  UI thread against the PCM pump. Players atomically queue those requests and
+  apply them from the audio pump before processing the next block. Profile
+  file reading/parsing runs off the UI thread and enforces bounded input size
+  and filter count.
+- Settings previews equalizer enable/disable immediately against the active PCM
+  player through a debounced background request; the checkbox event itself must
+  never call into the player. Cancel restores the original state. Saving settings must only
+  reconfigure endpoint synchronization when the backend or selected device
+  actually changed. Driver enumeration, endpoint open/close, and player
+  disposal during a device change must not run on the UI thread. Device-change
+  settings application waits at most two seconds for old-player disposal
+  before continuing; a misbehaving driver must not hold the settings workflow.
+- Settings output-device enumeration is serialized and guarded by a load
+  version. Initial ComboBox setup must not start enumeration through its
+  selection-changed event in addition to the explicit initial load.
+- `WasapiDeviceProvider` must dispose every temporary enumerated `MMDevice` and
+  its `MMDeviceEnumerator`; only the explicitly returned render device remains
+  owned by the caller.
+- Applying Settings must be change-scoped. An EQ-only save must not rebuild
+  sidebar/Plex navigation, reopen SQLite for ReplayGain, reapply theme or
+  language, refresh output labels, or recreate endpoint synchronization.
+  Settings JSON writes and DPAPI credential writes run off the UI thread.
 - In ASIO DSD mode, `preferredBufferSize` counts samples rather than bytes; `ASIOSTDSDInt8*` writes `preferredBufferSize / 8` bytes per channel
 - ASIO capability queries may fail while another application owns the device
 

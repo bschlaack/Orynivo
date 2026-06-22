@@ -9,7 +9,7 @@ namespace Orynivo.Audio;
 /// device session. The next FFmpeg decoder is started and prefetched while the
 /// current track is playing.
 /// </summary>
-public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer
+public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlayer
 {
     private readonly SteinbergAsioStream _stream;
     private readonly IReadOnlyList<GaplessPlaybackItem> _items;
@@ -20,6 +20,7 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer
     private readonly SemaphoreSlim _decoderGate = new(1, 1);
     private readonly Task _pumpTask;
     private readonly object _stateLock = new();
+    private readonly ParametricEqualizer _equalizer;
     private volatile bool _paused;
     private long _totalFramesWritten;
     private int _audibleTrackIndex;
@@ -27,6 +28,8 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer
     private FfmpegPcmDecoder? _activeDecoder;
     private int _restartPreparedFromIndex = -1;
     private int _decoderGeneration;
+    private EqualizerUpdateRequest? _pendingEqualizerUpdate;
+    private int _equalizerResetRequested;
     private float _volume = 1.0f;
     private bool _disposed;
 
@@ -34,7 +37,9 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer
         SteinbergAsioStream stream,
         IReadOnlyList<GaplessPlaybackItem> items,
         AudioFileInfo firstInfo,
-        FfmpegPcmDecoder firstDecoder)
+        FfmpegPcmDecoder firstDecoder,
+        bool equalizerEnabled,
+        EqualizerProfile? equalizerProfile)
     {
         _stream = stream;
         _items = items;
@@ -42,6 +47,10 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer
         _infos[0] = firstInfo;
         _trackStartFrames = new long[items.Count];
         _trackPositionOffsetFrames = new long[items.Count];
+        _equalizer = new ParametricEqualizer(
+            firstInfo.OutputSampleRate,
+            equalizerEnabled,
+            equalizerProfile);
         _activeDecoder = firstDecoder;
         _pumpTask = Task.Run(() => PumpAsync(firstDecoder));
     }
@@ -97,12 +106,16 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer
     /// <param name="items">Tracks in playback order with their ReplayGain factors.</param>
     /// <param name="backend">ASIO bridge backend.</param>
     /// <param name="driverName">ASIO driver name.</param>
+    /// <param name="equalizerEnabled">Whether the supplied equalizer profile is active.</param>
+    /// <param name="equalizerProfile">Equalizer profile applied to PCM samples.</param>
     /// <param name="cancellationToken">Cancellation token for initial probing and decoder startup.</param>
     /// <returns>The player and technical information for the first track.</returns>
     public static async Task<(FfmpegAudioPlayer AudioPlayer, AudioFileInfo Info)> CreateAsync(
         IReadOnlyList<GaplessPlaybackItem> items,
         OutputBackend backend,
         string driverName,
+        bool equalizerEnabled = false,
+        EqualizerProfile? equalizerProfile = null,
         CancellationToken cancellationToken = default)
     {
         if (items.Count == 0)
@@ -138,7 +151,13 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer
                 items[0].SegmentEnd,
                 cancellationToken);
             stream.Start();
-            return (new FfmpegAudioPlayer(stream, items, info, decoder), info);
+            return (new FfmpegAudioPlayer(
+                stream,
+                items,
+                info,
+                decoder,
+                equalizerEnabled,
+                equalizerProfile), info);
         }
         catch
         {
@@ -151,14 +170,30 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer
     /// <param name="filePath">Local path or supported stream URL.</param>
     /// <param name="backend">ASIO bridge backend.</param>
     /// <param name="driverName">ASIO driver name.</param>
+    /// <param name="equalizerEnabled">Whether the supplied equalizer profile is active.</param>
+    /// <param name="equalizerProfile">Equalizer profile applied to PCM samples.</param>
     /// <param name="cancellationToken">Cancellation token for initial probing and decoder startup.</param>
     /// <returns>The player and technical information for the track.</returns>
     public static Task<(FfmpegAudioPlayer AudioPlayer, AudioFileInfo Info)> CreateAsync(
         string filePath,
         OutputBackend backend,
         string driverName,
+        bool equalizerEnabled = false,
+        EqualizerProfile? equalizerProfile = null,
         CancellationToken cancellationToken = default) =>
-        CreateAsync([new GaplessPlaybackItem(filePath, 1.0f)], backend, driverName, cancellationToken);
+        CreateAsync(
+            [new GaplessPlaybackItem(filePath, 1.0f)],
+            backend,
+            driverName,
+            equalizerEnabled,
+            equalizerProfile,
+            cancellationToken);
+
+    /// <inheritdoc/>
+    public void UpdateEqualizer(bool enabled, EqualizerProfile? profile)
+        => Interlocked.Exchange(
+            ref _pendingEqualizerUpdate,
+            new EqualizerUpdateRequest(enabled, profile?.Clone()));
 
     /// <inheritdoc/>
     public void Pause() => _paused = true;
@@ -191,6 +226,7 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer
             Volatile.Write(ref _trackStartFrames[audibleIndex], 0);
             Volatile.Write(ref _restartPreparedFromIndex, audibleIndex);
             _stream.ClearBuffer();
+            Interlocked.Exchange(ref _equalizerResetRequested, 1);
             Interlocked.Exchange(ref _totalFramesWritten, 0);
             Volatile.Write(
                 ref _trackPositionOffsetFrames[audibleIndex],
@@ -286,7 +322,7 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer
                 Buffer.BlockCopy(buffer, 0, floatBuffer, 0, usableBytes);
                 remainderBytes = totalBytes - usableBytes;
                 var samples = usableBytes / sizeof(float);
-                ApplyReplayGain(
+                ProcessPcm(
                     floatBuffer.AsSpan(0, samples),
                     _items[_writeTrackIndex].ReplayGainFactor);
                 var accepted = _stream.WriteInterleaved(floatBuffer.AsSpan(0, samples));
@@ -372,14 +408,29 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer
         }
     }
 
-    private static void ApplyReplayGain(Span<float> samples, float trackReplayGain)
+    private void ProcessPcm(Span<float> samples, float trackReplayGain)
     {
-        var factor = trackReplayGain;
-        if (Math.Abs(factor - 1.0f) < 0.0001f)
-            return;
-        for (var index = 0; index < samples.Length; index++)
-            samples[index] = Math.Clamp(samples[index] * factor, -1.0f, 1.0f);
+        ApplyPendingEqualizerChanges();
+        for (var index = 0; index + 1 < samples.Length; index += 2)
+        {
+            var output = _equalizer.Process(
+                samples[index] * trackReplayGain,
+                samples[index + 1] * trackReplayGain);
+            samples[index] = Math.Clamp(output.Left, -1.0f, 1.0f);
+            samples[index + 1] = Math.Clamp(output.Right, -1.0f, 1.0f);
+        }
     }
+
+    private void ApplyPendingEqualizerChanges()
+    {
+        if (Interlocked.Exchange(ref _equalizerResetRequested, 0) != 0)
+            _equalizer.Reset();
+        var update = Interlocked.Exchange(ref _pendingEqualizerUpdate, null);
+        if (update is not null)
+            _equalizer.Update(update.Enabled, update.Profile);
+    }
+
+    private sealed record EqualizerUpdateRequest(bool Enabled, EqualizerProfile? Profile);
 
     private static async Task DisposePreparedAsync(
         Task<(FfmpegPcmDecoder Decoder, AudioFileInfo Info)> preparedTask)

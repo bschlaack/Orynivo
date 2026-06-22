@@ -12,17 +12,21 @@ public static class WasapiDeviceProvider
     public static IReadOnlyList<WasapiDeviceInfo> GetRenderDevices()
     {
         using var enumerator = new MMDeviceEnumerator();
-        return enumerator
-            .EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active)
-            .Select(device => new WasapiDeviceInfo(device.ID, device.FriendlyName))
-            .ToArray();
+        var devices = enumerator.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active);
+        var result = new List<WasapiDeviceInfo>(devices.Count);
+        foreach (var device in devices)
+        {
+            using (device)
+                result.Add(new WasapiDeviceInfo(device.ID, device.FriendlyName));
+        }
+        return result;
     }
 
     /// <summary>Opens and returns the <see cref="MMDevice"/> for the given device ID. Caller must dispose.</summary>
     /// <param name="id">MMDevice ID as returned by <see cref="GetRenderDevices"/>.</param>
     public static MMDevice GetRenderDevice(string id)
     {
-        var enumerator = new MMDeviceEnumerator();
+        using var enumerator = new MMDeviceEnumerator();
         return enumerator.GetDevice(id);
     }
 

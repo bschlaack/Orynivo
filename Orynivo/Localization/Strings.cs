@@ -182,6 +182,34 @@ public sealed record LocalizedStrings(
     public string ReplayGainTrack { get; init; } = "";
     /// <summary>Gets the album ReplayGain mode label.</summary>
     public string ReplayGainAlbum { get; init; } = "";
+    /// <summary>Gets the DSD playback settings heading.</summary>
+    public string DsdPlayback { get; init; } = "";
+    /// <summary>Gets the option label for forcing DSD sources through PCM conversion.</summary>
+    public string AlwaysConvertDsdToPcm { get; init; } = "";
+    /// <summary>Gets the explanatory text for forced DSD-to-PCM conversion.</summary>
+    public string AlwaysConvertDsdToPcmHint { get; init; } = "";
+    /// <summary>Gets the output-device loading status message.</summary>
+    public string OutputDevicesLoading { get; init; } = "";
+    /// <summary>Gets the parametric equalizer settings label.</summary>
+    public string Equalizer { get; init; } = "";
+    /// <summary>Gets the explanatory equalizer settings text.</summary>
+    public string EqualizerHint { get; init; } = "";
+    /// <summary>Gets the equalizer enable checkbox label.</summary>
+    public string EqualizerEnabled { get; init; } = "";
+    /// <summary>Gets the Equalizer APO or AutoEQ import button label.</summary>
+    public string EqualizerImport { get; init; } = "";
+    /// <summary>Gets the equalizer import activity message.</summary>
+    public string EqualizerImporting { get; init; } = "";
+    /// <summary>Gets the equalizer profile file-picker title.</summary>
+    public string EqualizerImportTitle { get; init; } = "";
+    /// <summary>Gets the text displayed when no equalizer profile is loaded.</summary>
+    public string EqualizerNoProfile { get; init; } = "";
+    /// <summary>Gets the imported equalizer profile summary format.</summary>
+    public string EqualizerProfileSummary { get; init; } = "";
+    /// <summary>Gets the equalizer import failure format.</summary>
+    public string EqualizerImportFailed { get; init; } = "";
+    /// <summary>Gets the Equalizer APO or AutoEQ profile file-type label.</summary>
+    public string EqualizerProfileFileType { get; init; } = "";
     /// <summary>Gets the column-selection menu heading.</summary>
     public string SelectColumns { get; init; } = "";
     /// <summary>Gets the file-name column label.</summary>

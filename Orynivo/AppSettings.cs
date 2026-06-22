@@ -28,6 +28,12 @@ public sealed class AppSettings
     public double Volume { get; set; } = 1.0;
     /// <summary>Gets or sets the ReplayGain mode used for PCM playback.</summary>
     public ReplayGainMode ReplayGainMode { get; set; } = ReplayGainMode.Off;
+    /// <summary>Gets or sets a value indicating whether DSF and DFF sources always use the PCM playback path.</summary>
+    public bool AlwaysConvertDsdToPcm { get; set; }
+    /// <summary>Gets or sets a value indicating whether the imported PCM equalizer profile is active.</summary>
+    public bool EqualizerEnabled { get; set; }
+    /// <summary>Gets or sets the imported Equalizer APO or AutoEQ profile.</summary>
+    public EqualizerProfile? EqualizerProfile { get; set; }
     /// <summary>Gets or sets user-adjusted table column widths grouped by stable table key.</summary>
     public Dictionary<string, List<double>> DataGridColumnWidths { get; set; } =
         new(StringComparer.Ordinal);

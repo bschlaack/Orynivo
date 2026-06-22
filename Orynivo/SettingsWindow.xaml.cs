@@ -31,6 +31,16 @@ public partial class SettingsWindow : Window
     private readonly Action<List<string>>? _onLibraryPathsChanged;
     private readonly bool _steinbergAsioAvailable = SteinbergAsioStream.IsAvailable;
     private readonly bool _cwAsioAvailable = SteinbergAsioStream.IsCwAsioAvailable;
+    private readonly Action<bool, EqualizerProfile?>? _onEqualizerPreviewChanged;
+    private readonly bool _originalEqualizerEnabled;
+    private readonly EqualizerProfile? _originalEqualizerProfile;
+    private readonly SemaphoreSlim _driverLoadGate = new(1, 1);
+    private EqualizerProfile? _equalizerProfile;
+    private int _driverLoadVersion;
+    private int _equalizerPreviewVersion;
+    private bool _initializing = true;
+    private bool _settingsAccepted;
+    private bool _plexCredentialsChanged;
 
     /// <summary>
     /// Initializes a runtime-loader instance with default settings.
@@ -40,11 +50,21 @@ public partial class SettingsWindow : Window
     {
     }
 
-    public SettingsWindow(AppSettings settings, Action<List<string>>? onLibraryPathsChanged = null)
+    /// <summary>Initializes the settings window from persisted application settings.</summary>
+    /// <param name="settings">Settings displayed and edited by the window.</param>
+    /// <param name="onLibraryPathsChanged">Optional callback for immediate library-path updates.</param>
+    /// <param name="onEqualizerPreviewChanged">Optional callback for live equalizer preview changes.</param>
+    public SettingsWindow(
+        AppSettings settings,
+        Action<List<string>>? onLibraryPathsChanged = null,
+        Action<bool, EqualizerProfile?>? onEqualizerPreviewChanged = null)
     {
         InitializeComponent();
         _settings = settings;
         _onLibraryPathsChanged = onLibraryPathsChanged;
+        _onEqualizerPreviewChanged = onEqualizerPreviewChanged;
+        _originalEqualizerEnabled = settings.EqualizerEnabled;
+        _originalEqualizerProfile = settings.EqualizerProfile?.Clone();
         var availableBackends = new[]
         {
             new SettingChoice<OutputBackend>(OutputBackend.Asio, LocalizationManager.Current.SteinbergAsio),
@@ -85,6 +105,10 @@ public partial class SettingsWindow : Window
         ReplayGainModeComboBox.SelectedItem =
             replayGainChoices.FirstOrDefault(choice => choice.Value == settings.ReplayGainMode)
             ?? replayGainChoices[0];
+        AlwaysConvertDsdToPcmCheckBox.IsChecked = settings.AlwaysConvertDsdToPcm;
+        _equalizerProfile = settings.EqualizerProfile?.Clone();
+        EqualizerEnabledCheckBox.IsChecked = settings.EqualizerEnabled;
+        RefreshEqualizerProfileText();
         ShowLocalLibrarySectionCheckBox.IsChecked = settings.ShowLocalLibrarySection;
         ShowOwnRadiosSectionCheckBox.IsChecked = settings.ShowOwnRadiosSection;
         ShowMyPodcastsSectionCheckBox.IsChecked = settings.ShowMyPodcastsSection;
@@ -105,7 +129,8 @@ public partial class SettingsWindow : Window
         catch { }
         RebuildDirectoryList();
         RebuildPlexServerList();
-        LoadDrivers();
+        _initializing = false;
+        _ = LoadDriversAsync();
         NavListBox.SelectedIndex = 1;
         Opened += (_, _) => WindowChrome.ApplyTheme(this);
     }
@@ -124,6 +149,13 @@ public partial class SettingsWindow : Window
         ReplayGainModeComboBox.SelectedItem is SettingChoice<ReplayGainMode> choice
             ? choice.Value
             : ReplayGainMode.Off;
+    /// <summary>Gets a value indicating whether DSF and DFF sources should always be converted to PCM.</summary>
+    public bool AlwaysConvertDsdToPcm => AlwaysConvertDsdToPcmCheckBox.IsChecked == true;
+    /// <summary>Gets a value indicating whether the imported equalizer profile is enabled.</summary>
+    public bool EqualizerEnabled =>
+        _equalizerProfile is not null && EqualizerEnabledCheckBox.IsChecked == true;
+    /// <summary>Gets an independent copy of the imported equalizer profile.</summary>
+    public EqualizerProfile? SelectedEqualizerProfile => _equalizerProfile?.Clone();
     public IReadOnlyList<string> SelectedLibraryPaths => _libraryPaths.AsReadOnly();
     public AppTheme SelectedTheme =>
         ThemeComboBox.SelectedItem is SettingChoice<AppTheme> theme ? theme.Value : AppTheme.Dark;
@@ -136,6 +168,8 @@ public partial class SettingsWindow : Window
     public IReadOnlyList<PlexServerSettings> SelectedPlexServers =>
         _plexServers.Select(ClonePlexServer).ToList().AsReadOnly();
     public IReadOnlyDictionary<string, string> SelectedPlexTokens => _plexTokens;
+    /// <summary>Gets a value indicating whether Plex credentials were edited in this window.</summary>
+    public bool PlexCredentialsChanged => _plexCredentialsChanged;
     public bool ShowLocalLibrarySection => ShowLocalLibrarySectionCheckBox.IsChecked == true;
     public bool ShowOwnRadiosSection => ShowOwnRadiosSectionCheckBox.IsChecked == true;
     public bool ShowMyPodcastsSection => ShowMyPodcastsSectionCheckBox.IsChecked == true;
@@ -215,6 +249,7 @@ public partial class SettingsWindow : Window
             return;
         _plexServers.Add(dialog.Server);
         _plexTokens[dialog.Server.Id] = dialog.Token;
+        _plexCredentialsChanged = true;
         RebuildPlexServerList();
     }
 
@@ -230,6 +265,7 @@ public partial class SettingsWindow : Window
             return;
         _plexServers[index] = dialog.Server;
         _plexTokens[id] = dialog.Token;
+        _plexCredentialsChanged = true;
         RebuildPlexServerList();
     }
 
@@ -239,6 +275,7 @@ public partial class SettingsWindow : Window
             return;
         _plexServers.RemoveAll(server => server.Id == id);
         _plexTokens.Remove(id);
+        _plexCredentialsChanged = true;
         RebuildPlexServerList();
     }
 
@@ -246,6 +283,15 @@ public partial class SettingsWindow : Window
     {
         foreach (var cts in _activeScans.Values)
             cts.Cancel();
+        Interlocked.Increment(ref _driverLoadVersion);
+        Interlocked.Increment(ref _equalizerPreviewVersion);
+        if (!_settingsAccepted)
+        {
+            var originalProfile = _originalEqualizerProfile?.Clone();
+            _ = Task.Run(() => _onEqualizerPreviewChanged?.Invoke(
+                _originalEqualizerEnabled,
+                originalProfile));
+        }
         base.OnClosed(e);
     }
 
@@ -273,13 +319,23 @@ public partial class SettingsWindow : Window
     // Geräte
     // ------------------------------------------------------------------
 
-    private void LoadDrivers()
+    private async Task LoadDriversAsync()
     {
+        var loadVersion = Interlocked.Increment(ref _driverLoadVersion);
+        var backend = SelectedOutputBackend;
+        DriverComboBox.IsEnabled = false;
+        DeviceInfoButton.IsEnabled = false;
+        StatusTextBlock.Text = LocalizationManager.Current.OutputDevicesLoading;
         try
         {
-            if (SelectedOutputBackend == OutputBackend.Wasapi)
+            await _driverLoadGate.WaitAsync();
+            if (loadVersion != Volatile.Read(ref _driverLoadVersion))
+                return;
+            if (backend == OutputBackend.Wasapi)
             {
-                var devices = WasapiDeviceProvider.GetRenderDevices();
+                var devices = await Task.Run(WasapiDeviceProvider.GetRenderDevices);
+                if (loadVersion != Volatile.Read(ref _driverLoadVersion))
+                    return;
                 DriverComboBox.ItemsSource = devices;
                 DriverComboBox.DisplayMemberBinding = new Avalonia.Data.Binding(nameof(WasapiDeviceInfo.Name));
                 DriverComboBox.SelectedItem = devices.FirstOrDefault(device =>
@@ -290,9 +346,11 @@ public partial class SettingsWindow : Window
                     ? LocalizationManager.Current.NoWasapiDevices
                     : LocalizationManager.Current.SelectAndSave;
             }
-            else if (SelectedOutputBackend is OutputBackend.Asio or OutputBackend.CwAsio)
+            else if (backend is OutputBackend.Asio or OutputBackend.CwAsio)
             {
-                var drivers = SteinbergAsioStream.GetDriverNames(SelectedOutputBackend);
+                var drivers = await Task.Run(() => SteinbergAsioStream.GetDriverNames(backend));
+                if (loadVersion != Volatile.Read(ref _driverLoadVersion))
+                    return;
                 DriverComboBox.ItemsSource = drivers;
                 DriverComboBox.DisplayMemberBinding = null;
                 DriverComboBox.SelectedItem = drivers.FirstOrDefault(name =>
@@ -300,7 +358,7 @@ public partial class SettingsWindow : Window
                     ?? drivers.FirstOrDefault(name =>
                         name.Contains("TOPPING", StringComparison.OrdinalIgnoreCase))
                     ?? drivers.FirstOrDefault();
-                DeviceLabelTextBlock.Text = SelectedOutputBackend == OutputBackend.CwAsio
+                DeviceLabelTextBlock.Text = backend == OutputBackend.CwAsio
                     ? LocalizationManager.Current.CwAsioOutputDevice
                     : LocalizationManager.Current.AsioOutputDevice;
                 StatusTextBlock.Text = drivers.Count == 0
@@ -317,7 +375,26 @@ public partial class SettingsWindow : Window
         }
         catch (DllNotFoundException)
         {
-            StatusTextBlock.Text = LocalizationManager.Current.AsioBridgeMissing;
+            if (loadVersion == Volatile.Read(ref _driverLoadVersion))
+                StatusTextBlock.Text = LocalizationManager.Current.AsioBridgeMissing;
+        }
+        catch
+        {
+            if (loadVersion == Volatile.Read(ref _driverLoadVersion))
+                StatusTextBlock.Text = backend == OutputBackend.Wasapi
+                    ? LocalizationManager.Current.NoWasapiDevices
+                    : LocalizationManager.Current.NoAsioDrivers;
+        }
+        finally
+        {
+            if (_driverLoadGate.CurrentCount == 0)
+                _driverLoadGate.Release();
+            if (loadVersion == Volatile.Read(ref _driverLoadVersion))
+            {
+                DriverComboBox.IsEnabled = backend != OutputBackend.KernelStreaming;
+                DeviceInfoButton.IsEnabled =
+                    DriverComboBox.SelectedItem is string or WasapiDeviceInfo;
+            }
         }
     }
 
@@ -326,20 +403,101 @@ public partial class SettingsWindow : Window
         DeviceInfoButton.IsVisible = DriverComboBox.SelectedItem is string or WasapiDeviceInfo;
     }
 
-    private void OutputBackendComboBox_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    private async void OutputBackendComboBox_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
+        if (_initializing)
+            return;
         var backend = SelectedOutputBackend;
-        DriverComboBox.IsEnabled = backend != OutputBackend.KernelStreaming;
-        DeviceInfoButton.IsEnabled =
-            backend == OutputBackend.Wasapi ||
-            (backend == OutputBackend.Asio && _steinbergAsioAvailable) ||
-            (backend == OutputBackend.CwAsio && _cwAsioAvailable);
-        LoadDrivers();
+        await LoadDriversAsync();
+        if (backend != SelectedOutputBackend)
+            return;
         if (backend == OutputBackend.KernelStreaming)
         {
             DriverComboBox.ItemsSource = null;
             StatusTextBlock.Text = LocalizationManager.Current.KernelStreamingUnavailable;
         }
+    }
+
+    /// <summary>Imports an Equalizer APO or AutoEQ text profile.</summary>
+    /// <param name="sender">Control that raised the event.</param>
+    /// <param name="e">Event data.</param>
+    private async void ImportEqualizerProfileButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = LocalizationManager.Current.EqualizerImportTitle,
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType(LocalizationManager.Current.EqualizerProfileFileType)
+                {
+                    Patterns = ["*.txt", "*.cfg"]
+                }
+            ]
+        });
+        if (files.Count == 0)
+            return;
+
+        var path = files[0].TryGetLocalPath();
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+        ImportEqualizerProfileButton.IsEnabled = false;
+        EqualizerProfileTextBlock.Text = LocalizationManager.Current.EqualizerImporting;
+        try
+        {
+            _equalizerProfile = await Task.Run(() => EqualizerApoParser.ParseFile(path));
+            EqualizerEnabledCheckBox.IsChecked = true;
+            RefreshEqualizerProfileText();
+        }
+        catch
+        {
+            EqualizerProfileTextBlock.Text = LocalizationManager.Current.EqualizerImportFailed;
+        }
+        finally
+        {
+            ImportEqualizerProfileButton.IsEnabled = true;
+        }
+    }
+
+    /// <summary>Refreshes the imported equalizer profile summary.</summary>
+    private void RefreshEqualizerProfileText()
+    {
+        EqualizerEnabledCheckBox.IsEnabled = _equalizerProfile is not null;
+        EqualizerProfileTextBlock.Text = _equalizerProfile is null
+            ? LocalizationManager.Current.EqualizerNoProfile
+            : string.Format(
+                LocalizationManager.Current.EqualizerProfileSummary,
+                _equalizerProfile.Name,
+                _equalizerProfile.PreampDb,
+                _equalizerProfile.Filters.Count);
+    }
+
+    private void EqualizerEnabledCheckBox_OnIsCheckedChanged(object? sender, RoutedEventArgs e)
+    {
+        if (_initializing)
+            return;
+        QueueEqualizerPreview();
+    }
+
+    private void QueueEqualizerPreview()
+    {
+        var previewVersion = Interlocked.Increment(ref _equalizerPreviewVersion);
+        var enabled = EqualizerEnabled;
+        var profile = _equalizerProfile?.Clone();
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(75);
+            if (previewVersion != Volatile.Read(ref _equalizerPreviewVersion))
+                return;
+            try
+            {
+                _onEqualizerPreviewChanged?.Invoke(enabled, profile);
+            }
+            catch (Exception ex)
+            {
+                CrashLogger.Log(ex, "Equalizer live preview");
+            }
+        });
     }
 
     private async void DeviceInfoButton_OnClick(object? sender, RoutedEventArgs e)
@@ -794,6 +952,11 @@ public partial class SettingsWindow : Window
     // Dialog
     // ------------------------------------------------------------------
 
-    private void SaveButton_OnClick(object? sender, RoutedEventArgs e) => Close(true);
+    private void SaveButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        Interlocked.Increment(ref _equalizerPreviewVersion);
+        _settingsAccepted = true;
+        Close(true);
+    }
     private void CancelButton_OnClick(object? sender, RoutedEventArgs e) => Close(false);
 }

@@ -290,6 +290,21 @@
 
                     <Separator Margin="0,18,0,14"/>
 
+                    <TextBlock Text="{DynamicResource L_DsdPlayback}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,8"/>
+                    <CheckBox x:Name="AlwaysConvertDsdToPcmCheckBox"
+                              Theme="{StaticResource SettingsCheckBoxTheme}"
+                              Content="{DynamicResource L_AlwaysConvertDsdToPcm}"
+                              Margin="0,0,0,6"/>
+                    <TextBlock Text="{DynamicResource L_AlwaysConvertDsdToPcmHint}"
+                               FontSize="11"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"/>
+
+                    <Separator Margin="0,18,0,14"/>
+
                     <TextBlock Text="{DynamicResource L_ReplayGain}"
                                FontSize="12"
                                FontWeight="SemiBold"
@@ -300,6 +315,35 @@
                               HorizontalAlignment="Stretch"
                               Margin="0,0,0,8"/>
                     <TextBlock Text="{DynamicResource L_ReplayGainHint}"
+                               FontSize="11"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"/>
+
+                    <Separator Margin="0,18,0,14"/>
+
+                    <TextBlock Text="{DynamicResource L_Equalizer}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,8"/>
+                    <CheckBox x:Name="EqualizerEnabledCheckBox"
+                              Theme="{StaticResource SettingsCheckBoxTheme}"
+                              Content="{DynamicResource L_EqualizerEnabled}"
+                              IsCheckedChanged="EqualizerEnabledCheckBox_OnIsCheckedChanged"
+                              Margin="0,0,0,10"/>
+                    <Button x:Name="ImportEqualizerProfileButton"
+                            Width="220"
+                            Height="28"
+                            HorizontalAlignment="Left"
+                            Theme="{StaticResource SettingsButtonTheme}"
+                            Content="{DynamicResource L_EqualizerImport}"
+                            Click="ImportEqualizerProfileButton_OnClick"/>
+                    <TextBlock x:Name="EqualizerProfileTextBlock"
+                               Margin="0,8,0,0"
+                               FontSize="11"
+                               Foreground="{DynamicResource AppSecondaryTextBrush}"
+                               TextWrapping="Wrap"/>
+                    <TextBlock Text="{DynamicResource L_EqualizerHint}"
+                               Margin="0,6,0,0"
                                FontSize="11"
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"/>
