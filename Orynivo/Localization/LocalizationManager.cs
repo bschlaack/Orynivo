@@ -160,6 +160,12 @@ public static class LocalizationManager
         resources["L_EqualizerHint"] = Current.EqualizerHint;
         resources["L_EqualizerEnabled"] = Current.EqualizerEnabled;
         resources["L_EqualizerImport"] = Current.EqualizerImport;
+        resources["L_EqualizerPreamp"] = Current.EqualizerPreamp;
+        resources["L_EqualizerFilterType"] = Current.EqualizerFilterType;
+        resources["L_EqualizerFrequency"] = Current.EqualizerFrequency;
+        resources["L_EqualizerGain"] = Current.EqualizerGain;
+        resources["L_EqualizerQ"] = Current.EqualizerQ;
+        resources["L_EqualizerAddFilter"] = Current.EqualizerAddFilter;
         resources["L_SelectColumns"] = Current.SelectColumns;
         resources["L_Codec"] = Current.Codec;
         resources["L_Tags"] = Current.Tags;
@@ -356,6 +362,18 @@ public static class LocalizationManager
         EqualizerProfileSummary = "{0} · Vorverstärkung {1:+0.##;-0.##;0} dB · {2} Filter",
         EqualizerImportFailed = "Das Profil konnte nicht importiert werden.",
         EqualizerProfileFileType = "Equalizer-APO-/AutoEQ-Profil",
+        EqualizerPreamp = "Vorverstärkung (dB)",
+        EqualizerFilterType = "Filtertyp",
+        EqualizerFrequency = "Frequenz (Hz)",
+        EqualizerGain = "Pegel (dB)",
+        EqualizerQ = "Q-Faktor",
+        EqualizerAddFilter = "Filter hinzufügen",
+        EqualizerRemoveFilter = "Filter entfernen",
+        EqualizerPeak = "Peak",
+        EqualizerLowShelf = "Tiefen-Shelf",
+        EqualizerHighShelf = "Höhen-Shelf",
+        EqualizerLowPass = "Tiefpass",
+        EqualizerHighPass = "Hochpass",
         SelectColumns = "Spalten auswählen",
         FileName = "Dateiname", FileSize = "Dateigröße", AddedAt = "Hinzugefügt",
         SampleRate = "Samplerate", BitDepth = "Bittiefe", Channels = "Kanäle",
@@ -661,6 +679,18 @@ public static class LocalizationManager
         EqualizerProfileSummary = "{0} · preamp {1:+0.##;-0.##;0} dB · {2} filters",
         EqualizerImportFailed = "The profile could not be imported.",
         EqualizerProfileFileType = "Equalizer APO / AutoEQ profile",
+        EqualizerPreamp = "Preamp (dB)",
+        EqualizerFilterType = "Filter type",
+        EqualizerFrequency = "Frequency (Hz)",
+        EqualizerGain = "Gain (dB)",
+        EqualizerQ = "Q factor",
+        EqualizerAddFilter = "Add filter",
+        EqualizerRemoveFilter = "Remove filter",
+        EqualizerPeak = "Peak",
+        EqualizerLowShelf = "Low shelf",
+        EqualizerHighShelf = "High shelf",
+        EqualizerLowPass = "Low pass",
+        EqualizerHighPass = "High pass",
         SelectColumns = "Select columns",
         FileName = "File name", FileSize = "File size", AddedAt = "Added",
         SampleRate = "Sample rate", BitDepth = "Bit depth", Channels = "Channels",
@@ -964,6 +994,18 @@ public static class LocalizationManager
         EqualizerProfileSummary = "{0} · préampli {1:+0.##;-0.##;0} dB · {2} filtres",
         EqualizerImportFailed = "Impossible d’importer le profil.",
         EqualizerProfileFileType = "Profil Equalizer APO / AutoEQ",
+        EqualizerPreamp = "Préampli (dB)",
+        EqualizerFilterType = "Type de filtre",
+        EqualizerFrequency = "Fréquence (Hz)",
+        EqualizerGain = "Gain (dB)",
+        EqualizerQ = "Facteur Q",
+        EqualizerAddFilter = "Ajouter un filtre",
+        EqualizerRemoveFilter = "Supprimer le filtre",
+        EqualizerPeak = "Crête",
+        EqualizerLowShelf = "Plateau grave",
+        EqualizerHighShelf = "Plateau aigu",
+        EqualizerLowPass = "Passe-bas",
+        EqualizerHighPass = "Passe-haut",
         SelectColumns = "Sélectionner les colonnes",
         FileName = "Nom du fichier", FileSize = "Taille du fichier", AddedAt = "Ajouté",
         SampleRate = "Fréquence d’échantillonnage", BitDepth = "Profondeur de bits", Channels = "Canaux",
@@ -1264,6 +1306,18 @@ public static class LocalizationManager
         EqualizerProfileSummary = "{0} · preamplificación {1:+0.##;-0.##;0} dB · {2} filtros",
         EqualizerImportFailed = "No se pudo importar el perfil.",
         EqualizerProfileFileType = "Perfil de Equalizer APO / AutoEQ",
+        EqualizerPreamp = "Preamplificación (dB)",
+        EqualizerFilterType = "Tipo de filtro",
+        EqualizerFrequency = "Frecuencia (Hz)",
+        EqualizerGain = "Ganancia (dB)",
+        EqualizerQ = "Factor Q",
+        EqualizerAddFilter = "Añadir filtro",
+        EqualizerRemoveFilter = "Eliminar filtro",
+        EqualizerPeak = "Pico",
+        EqualizerLowShelf = "Estante de graves",
+        EqualizerHighShelf = "Estante de agudos",
+        EqualizerLowPass = "Paso bajo",
+        EqualizerHighPass = "Paso alto",
         SelectColumns = "Seleccionar columnas",
         FileName = "Nombre de archivo", FileSize = "Tamaño de archivo", AddedAt = "Añadido",
         SampleRate = "Frecuencia de muestreo", BitDepth = "Profundidad de bits", Channels = "Canales",

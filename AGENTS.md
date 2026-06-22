@@ -63,11 +63,18 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - `Orynivo/Audio/ParametricEqualizer.cs`: stereo biquad PCM equalizer with a
   short crossfade when the active profile changes and filter-state reset after
   seeks
+- `Orynivo/Controls/EqualizerResponseControl.cs`: logarithmic frequency-response
+  graph for the editable parametric equalizer profile in Settings, including
+  a 20 Hz–20 kHz scale and numbered dashed markers that map filter frequencies
+  to dynamic editor rows. Marker bubbles sit below the scale; colliding numbers
+  remain bottom-aligned and shift horizontally with a short leader instead of
+  moving upward.
 - `Native/AsioBridge/bridge.cpp`: shared Steinberg/cwASIO initialization, PCM/DSD ring buffers, and callback
 - `Native/CwAsioBridge/CwAsioBridge.vcxproj`: builds the shared bridge against vendored cwASIO
 - `third_party/cwasio/`: pinned MIT-licensed cwASIO host and compatibility sources
-- `Orynivo/SettingsWindow.*`: two-column settings window with navigation on the
-  left and the selected section on the right
+- `Orynivo/SettingsView.*`: two-column settings view embedded in the main
+  content area, with navigation on the left and the selected section on the
+  right
 - `Orynivo/ThemeManager.cs`: sets global Avalonia resources for light and dark themes
 - `Orynivo/Controls/DataGridColumnWidthStore.cs`: validates, captures, and
   restores per-table pixel widths
@@ -103,8 +110,8 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   the PCM output path even when ASIO/cwASIO native DSD is available, allowing
   volume, ReplayGain, and equalizer processing
 - `AppSettings.EqualizerEnabled` and `EqualizerProfile` persist the active
-  imported Equalizer APO/AutoEQ profile parameters; the source file path is not
-  required after import
+  imported or manually edited Equalizer APO/AutoEQ profile parameters; the
+  source file path is not required after import
 - `AppSettings.DataGridColumnWidths` persists user-adjusted pixel widths per stable table/view key; dynamic main-content views capture their current widths before replacing columns
 - `AppSettings.VisibleDataGridColumns` persists selectable column IDs per table/view key; right-clicking any table header opens the context-appropriate column chooser flyout
 - `AppSettings.DataGridColumnOrders` persists drag-and-drop display order per stable table/view key; fixed artwork and action columns keep their structural positions
@@ -455,6 +462,12 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   and imported `GraphicEQ` curves. Live changes crossfade over 50 ms, gapless
   transitions preserve filter state, seeks reset it, and native DSD ignores
   the equalizer.
+- Settings displays the combined equalizer response and a dynamic row for every
+  filter. Preamp, type, frequency, gain, and Q can be edited; filters can be
+  added or removed up to the same 512-filter bound used by profile import.
+  Filter rows use fixed adjacent columns so type selectors share one width and
+  frequency, gain, and Q use equally wide readable fields instead of being
+  pushed to the right.
 - Equalizer profile changes and seek resets must never synchronously lock the
   UI thread against the PCM pump. Players atomically queue those requests and
   apply them from the audio pump before processing the next block. Profile
@@ -505,7 +518,8 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - **Up next** is a top-level sidebar view using the shared track table styling.
   It displays queue order, title, artist, album, duration, and themed
   move/remove actions, plus a header action to save the queue as a playlist.
-- Settings uses a two-column layout with navigation on the left and content on the right
+- Settings opens inside the main window and uses a two-column layout with
+  navigation on the left and content on the right
 - Settings navigation reuses the main sidebar theme resources
 - All Settings buttons use the shared themed button style, including dynamic scan and remove buttons
 - Settings ComboBoxes use fully themed templates, inputs should stretch to the

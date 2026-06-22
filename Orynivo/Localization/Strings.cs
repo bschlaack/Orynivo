@@ -210,6 +210,30 @@ public sealed record LocalizedStrings(
     public string EqualizerImportFailed { get; init; } = "";
     /// <summary>Gets the Equalizer APO or AutoEQ profile file-type label.</summary>
     public string EqualizerProfileFileType { get; init; } = "";
+    /// <summary>Gets the equalizer preamplification label.</summary>
+    public string EqualizerPreamp { get; init; } = "";
+    /// <summary>Gets the equalizer filter-type label.</summary>
+    public string EqualizerFilterType { get; init; } = "";
+    /// <summary>Gets the equalizer frequency label.</summary>
+    public string EqualizerFrequency { get; init; } = "";
+    /// <summary>Gets the equalizer gain label.</summary>
+    public string EqualizerGain { get; init; } = "";
+    /// <summary>Gets the equalizer quality-factor label.</summary>
+    public string EqualizerQ { get; init; } = "";
+    /// <summary>Gets the label for adding an equalizer filter.</summary>
+    public string EqualizerAddFilter { get; init; } = "";
+    /// <summary>Gets the tooltip for removing an equalizer filter.</summary>
+    public string EqualizerRemoveFilter { get; init; } = "";
+    /// <summary>Gets the peaking equalizer filter name.</summary>
+    public string EqualizerPeak { get; init; } = "";
+    /// <summary>Gets the low-shelf equalizer filter name.</summary>
+    public string EqualizerLowShelf { get; init; } = "";
+    /// <summary>Gets the high-shelf equalizer filter name.</summary>
+    public string EqualizerHighShelf { get; init; } = "";
+    /// <summary>Gets the low-pass equalizer filter name.</summary>
+    public string EqualizerLowPass { get; init; } = "";
+    /// <summary>Gets the high-pass equalizer filter name.</summary>
+    public string EqualizerHighPass { get; init; } = "";
     /// <summary>Gets the column-selection menu heading.</summary>
     public string SelectColumns { get; init; } = "";
     /// <summary>Gets the file-name column label.</summary>

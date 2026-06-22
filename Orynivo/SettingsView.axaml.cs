@@ -16,8 +16,11 @@ using UiLanguage = Orynivo.Localization.Language;
 
 namespace Orynivo;
 
-public partial class SettingsWindow : Window
+/// <summary>Provides the complete settings experience embedded in the main window.</summary>
+internal partial class SettingsView : UserControl
 {
+    private const int MaximumEqualizerFilters = 512;
+
     private sealed record SettingChoice<T>(T Value, string Label)
     {
         public override string ToString() => Label;
@@ -39,22 +42,23 @@ public partial class SettingsWindow : Window
     private int _driverLoadVersion;
     private int _equalizerPreviewVersion;
     private bool _initializing = true;
+    private bool _rebuildingEqualizerEditor;
     private bool _settingsAccepted;
     private bool _plexCredentialsChanged;
 
     /// <summary>
     /// Initializes a runtime-loader instance with default settings.
     /// </summary>
-    public SettingsWindow()
+    public SettingsView()
         : this(new AppSettings())
     {
     }
 
-    /// <summary>Initializes the settings window from persisted application settings.</summary>
+    /// <summary>Initializes the settings view from persisted application settings.</summary>
     /// <param name="settings">Settings displayed and edited by the window.</param>
     /// <param name="onLibraryPathsChanged">Optional callback for immediate library-path updates.</param>
     /// <param name="onEqualizerPreviewChanged">Optional callback for live equalizer preview changes.</param>
-    public SettingsWindow(
+    public SettingsView(
         AppSettings settings,
         Action<List<string>>? onLibraryPathsChanged = null,
         Action<bool, EqualizerProfile?>? onEqualizerPreviewChanged = null)
@@ -109,6 +113,7 @@ public partial class SettingsWindow : Window
         _equalizerProfile = settings.EqualizerProfile?.Clone();
         EqualizerEnabledCheckBox.IsChecked = settings.EqualizerEnabled;
         RefreshEqualizerProfileText();
+        RebuildEqualizerEditor();
         ShowLocalLibrarySectionCheckBox.IsChecked = settings.ShowLocalLibrarySection;
         ShowOwnRadiosSectionCheckBox.IsChecked = settings.ShowOwnRadiosSection;
         ShowMyPodcastsSectionCheckBox.IsChecked = settings.ShowMyPodcastsSection;
@@ -132,8 +137,10 @@ public partial class SettingsWindow : Window
         _initializing = false;
         _ = LoadDriversAsync();
         NavListBox.SelectedIndex = 1;
-        Opened += (_, _) => WindowChrome.ApplyTheme(this);
     }
+
+    /// <summary>Raised when the embedded settings view requests save or cancel.</summary>
+    internal event EventHandler<bool>? CompletionRequested;
 
     public string? SelectedDriverName => DriverComboBox.SelectedItem as string;
     public string? SelectedWasapiDeviceId =>
@@ -144,7 +151,7 @@ public partial class SettingsWindow : Window
         OutputBackendComboBox.SelectedItem is SettingChoice<OutputBackend> choice
             ? choice.Value
             : OutputBackend.Wasapi;
-    /// <summary>Gets the ReplayGain mode selected in the settings window.</summary>
+    /// <summary>Gets the ReplayGain mode selected in the settings view.</summary>
     public ReplayGainMode SelectedReplayGainMode =>
         ReplayGainModeComboBox.SelectedItem is SettingChoice<ReplayGainMode> choice
             ? choice.Value
@@ -245,7 +252,7 @@ public partial class SettingsWindow : Window
     private async void AddPlexServerButton_OnClick(object? sender, RoutedEventArgs e)
     {
         var dialog = new PlexServerDialog();
-        if (await dialog.ShowDialog<bool?>(this) != true)
+        if (await dialog.ShowDialog<bool?>(GetHostWindow()) != true)
             return;
         _plexServers.Add(dialog.Server);
         _plexTokens[dialog.Server.Id] = dialog.Token;
@@ -261,7 +268,7 @@ public partial class SettingsWindow : Window
         if (index < 0)
             return;
         var dialog = new PlexServerDialog(_plexServers[index], _plexTokens.GetValueOrDefault(id));
-        if (await dialog.ShowDialog<bool?>(this) != true)
+        if (await dialog.ShowDialog<bool?>(GetHostWindow()) != true)
             return;
         _plexServers[index] = dialog.Server;
         _plexTokens[id] = dialog.Token;
@@ -279,7 +286,8 @@ public partial class SettingsWindow : Window
         RebuildPlexServerList();
     }
 
-    protected override void OnClosed(EventArgs e)
+    /// <summary>Stops background work and restores the original live equalizer preview when needed.</summary>
+    internal void Deactivate()
     {
         foreach (var cts in _activeScans.Values)
             cts.Cancel();
@@ -292,8 +300,13 @@ public partial class SettingsWindow : Window
                 _originalEqualizerEnabled,
                 originalProfile));
         }
-        base.OnClosed(e);
     }
+
+    /// <summary>Returns the main window hosting this settings view.</summary>
+    /// <returns>The hosting window.</returns>
+    private Window GetHostWindow() =>
+        TopLevel.GetTopLevel(this) as Window
+        ?? throw new InvalidOperationException("The settings view is not attached to a window.");
 
     // ------------------------------------------------------------------
     // Navigation
@@ -423,7 +436,7 @@ public partial class SettingsWindow : Window
     /// <param name="e">Event data.</param>
     private async void ImportEqualizerProfileButton_OnClick(object? sender, RoutedEventArgs e)
     {
-        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        var files = await GetHostWindow().StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = LocalizationManager.Current.EqualizerImportTitle,
             AllowMultiple = false,
@@ -448,6 +461,8 @@ public partial class SettingsWindow : Window
             _equalizerProfile = await Task.Run(() => EqualizerApoParser.ParseFile(path));
             EqualizerEnabledCheckBox.IsChecked = true;
             RefreshEqualizerProfileText();
+            RebuildEqualizerEditor();
+            QueueEqualizerPreview();
         }
         catch
         {
@@ -470,6 +485,221 @@ public partial class SettingsWindow : Window
                 _equalizerProfile.Name,
                 _equalizerProfile.PreampDb,
                 _equalizerProfile.Filters.Count);
+    }
+
+    /// <summary>Rebuilds the dynamic equalizer filter editor from the active profile.</summary>
+    private void RebuildEqualizerEditor()
+    {
+        _rebuildingEqualizerEditor = true;
+        try
+        {
+            EqualizerFiltersPanel.Children.Clear();
+            EqualizerPreampNumericUpDown.Value = (decimal)(_equalizerProfile?.PreampDb ?? 0);
+            EqualizerPreampNumericUpDown.IsEnabled = _equalizerProfile is not null;
+            AddEqualizerFilterButton.IsEnabled =
+                (_equalizerProfile?.Filters.Count ?? 0) < MaximumEqualizerFilters;
+            EqualizerResponseGraph.SetProfile(_equalizerProfile);
+            if (_equalizerProfile is null)
+                return;
+
+            for (var index = 0; index < _equalizerProfile.Filters.Count; index++)
+                EqualizerFiltersPanel.Children.Add(
+                    CreateEqualizerFilterRow(_equalizerProfile.Filters[index], index));
+        }
+        finally
+        {
+            _rebuildingEqualizerEditor = false;
+        }
+    }
+
+    /// <summary>Creates one editable row for a parametric equalizer filter.</summary>
+    /// <param name="filter">Filter edited by the row.</param>
+    /// <param name="index">Zero-based filter index.</param>
+    /// <returns>The configured filter row.</returns>
+    private Control CreateEqualizerFilterRow(EqualizerFilter filter, int index)
+    {
+        var row = new Grid { Margin = new Thickness(0, 0, 0, 6) };
+        row.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(28)));
+        row.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(220)));
+        row.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(150)));
+        row.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(150)));
+        row.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(150)));
+        row.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(40)));
+        row.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+
+        var number = new TextBlock
+        {
+            Text = (index + 1).ToString(),
+            FontSize = 10,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        row.Children.Add(number);
+
+        var typeChoices = CreateEqualizerTypeChoices();
+        var typeComboBox = new ComboBox
+        {
+            ItemsSource = typeChoices,
+            SelectedItem = typeChoices.First(choice => choice.Value == filter.Type),
+            Height = 28,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Margin = new Thickness(0, 0, 6, 0)
+        };
+        Grid.SetColumn(typeComboBox, 1);
+        row.Children.Add(typeComboBox);
+
+        var frequency = CreateEqualizerNumber(filter.Frequency, 1, 100000, 10, "0");
+        Grid.SetColumn(frequency, 2);
+        row.Children.Add(frequency);
+
+        var gain = CreateEqualizerNumber(filter.GainDb, -100, 100, 0.5, "0.0");
+        gain.IsEnabled = SupportsEqualizerGain(filter.Type);
+        Grid.SetColumn(gain, 3);
+        row.Children.Add(gain);
+
+        var quality = CreateEqualizerNumber(filter.Q, 0.05, 100, 0.05, "0.00");
+        Grid.SetColumn(quality, 4);
+        row.Children.Add(quality);
+
+        var remove = CreateStyledButton("×", 28, 28);
+        remove.Margin = new Thickness(6, 0, 0, 0);
+        ToolTip.SetTip(remove, LocalizationManager.Current.EqualizerRemoveFilter);
+        Grid.SetColumn(remove, 5);
+        row.Children.Add(remove);
+
+        typeComboBox.SelectionChanged += (_, _) =>
+        {
+            if (typeComboBox.SelectedItem is not SettingChoice<EqualizerFilterType> choice)
+                return;
+            filter.Type = choice.Value;
+            gain.IsEnabled = SupportsEqualizerGain(filter.Type);
+            EqualizerEditorChanged();
+        };
+        frequency.ValueChanged += (_, args) =>
+        {
+            if (args.NewValue is decimal value)
+            {
+                filter.Frequency = (double)value;
+                EqualizerEditorChanged();
+            }
+        };
+        gain.ValueChanged += (_, args) =>
+        {
+            if (args.NewValue is decimal value)
+            {
+                filter.GainDb = (double)value;
+                EqualizerEditorChanged();
+            }
+        };
+        quality.ValueChanged += (_, args) =>
+        {
+            if (args.NewValue is decimal value)
+            {
+                filter.Q = (double)value;
+                EqualizerEditorChanged();
+            }
+        };
+        remove.Click += (_, _) =>
+        {
+            if (_equalizerProfile is null)
+                return;
+            _equalizerProfile.Filters.Remove(filter);
+            RebuildEqualizerEditor();
+            EqualizerEditorChanged();
+        };
+        return row;
+    }
+
+    /// <summary>Creates a numeric editor used by an equalizer filter row.</summary>
+    /// <param name="value">Initial value.</param>
+    /// <param name="minimum">Minimum accepted value.</param>
+    /// <param name="maximum">Maximum accepted value.</param>
+    /// <param name="increment">Spinner increment.</param>
+    /// <param name="format">Display format.</param>
+    /// <returns>The configured numeric editor.</returns>
+    private static NumericUpDown CreateEqualizerNumber(
+        double value,
+        double minimum,
+        double maximum,
+        double increment,
+        string format) =>
+        new()
+        {
+            Value = (decimal)Math.Clamp(value, minimum, maximum),
+            Minimum = (decimal)minimum,
+            Maximum = (decimal)maximum,
+            Increment = (decimal)increment,
+            FormatString = format,
+            ClipValueToMinMax = true,
+            Height = 28,
+            Margin = new Thickness(0, 0, 6, 0)
+        };
+
+    /// <summary>Creates localized choices for all supported parametric filter types.</summary>
+    /// <returns>The localized filter-type choices.</returns>
+    private static SettingChoice<EqualizerFilterType>[] CreateEqualizerTypeChoices() =>
+    [
+        new(EqualizerFilterType.Peak, LocalizationManager.Current.EqualizerPeak),
+        new(EqualizerFilterType.LowShelf, LocalizationManager.Current.EqualizerLowShelf),
+        new(EqualizerFilterType.HighShelf, LocalizationManager.Current.EqualizerHighShelf),
+        new(EqualizerFilterType.LowPass, LocalizationManager.Current.EqualizerLowPass),
+        new(EqualizerFilterType.HighPass, LocalizationManager.Current.EqualizerHighPass)
+    ];
+
+    /// <summary>Returns whether a filter type uses a gain value.</summary>
+    /// <param name="type">Filter type to inspect.</param>
+    /// <returns><see langword="true"/> for peak and shelf filters; otherwise <see langword="false"/>.</returns>
+    private static bool SupportsEqualizerGain(EqualizerFilterType type) =>
+        type is EqualizerFilterType.Peak
+            or EqualizerFilterType.LowShelf
+            or EqualizerFilterType.HighShelf;
+
+    /// <summary>Updates the graph, profile summary, and debounced live preview after an edit.</summary>
+    private void EqualizerEditorChanged()
+    {
+        if (_initializing)
+            return;
+        RefreshEqualizerProfileText();
+        EqualizerResponseGraph.SetProfile(_equalizerProfile);
+        QueueEqualizerPreview();
+    }
+
+    /// <summary>Updates the profile preamplification from the numeric editor.</summary>
+    /// <param name="sender">Control that raised the event.</param>
+    /// <param name="e">Value-change event data.</param>
+    private void EqualizerPreampNumericUpDown_OnValueChanged(
+        object? sender,
+        NumericUpDownValueChangedEventArgs e)
+    {
+        if (_initializing
+            || _rebuildingEqualizerEditor
+            || _equalizerProfile is null
+            || e.NewValue is not decimal value)
+            return;
+        _equalizerProfile.PreampDb = (double)value;
+        EqualizerEditorChanged();
+    }
+
+    /// <summary>Adds a new peaking filter to the dynamic equalizer profile.</summary>
+    /// <param name="sender">Control that raised the event.</param>
+    /// <param name="e">Event data.</param>
+    private void AddEqualizerFilterButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        _equalizerProfile ??= new EqualizerProfile
+        {
+            Name = LocalizationManager.Current.Equalizer
+        };
+        if (_equalizerProfile.Filters.Count >= MaximumEqualizerFilters)
+            return;
+        _equalizerProfile.Filters.Add(new EqualizerFilter
+        {
+            Type = EqualizerFilterType.Peak,
+            Frequency = 1000,
+            GainDb = 0,
+            Q = 0.7071067811865476
+        });
+        EqualizerEnabledCheckBox.IsChecked = true;
+        RebuildEqualizerEditor();
+        EqualizerEditorChanged();
     }
 
     private void EqualizerEnabledCheckBox_OnIsCheckedChanged(object? sender, RoutedEventArgs e)
@@ -507,12 +737,12 @@ public partial class SettingsWindow : Window
             if (DriverComboBox.SelectedItem is string driverName)
             {
                 var info = SteinbergAsioStream.GetDeviceInfo(SelectedOutputBackend, driverName);
-                await new DeviceInfoWindow(info).ShowDialog(this);
+                await new DeviceInfoWindow(info).ShowDialog(GetHostWindow());
             }
             else if (DriverComboBox.SelectedItem is WasapiDeviceInfo wasapiDevice)
             {
                 var info = WasapiDeviceProvider.GetCapabilities(wasapiDevice.Id);
-                await new DeviceInfoWindow(info).ShowDialog(this);
+                await new DeviceInfoWindow(info).ShowDialog(GetHostWindow());
             }
         }
         catch (Exception ex)
@@ -864,7 +1094,7 @@ public partial class SettingsWindow : Window
         var confirmed = await AppMessageBox.ConfirmAsync(
             LocalizationManager.Current.LibraryImportConfirm,
             LocalizationManager.Current.ImportLibrary,
-            this);
+            GetHostWindow());
         if (!confirmed)
             return;
 
@@ -881,7 +1111,7 @@ public partial class SettingsWindow : Window
         });
         try
         {
-            if (Owner is MainWindow mainWindow)
+            if (GetHostWindow() is MainWindow mainWindow)
                 mainWindow.PrepareForLibraryImport();
 
             var importedPaths = await LibraryBackupService.ImportAsync(filePath, progress);
@@ -896,7 +1126,7 @@ public partial class SettingsWindow : Window
             await AppMessageBox.ShowAsync(
                 LocalizationManager.Current.LibraryImported,
                 LocalizationManager.Current.ImportLibrary,
-                this);
+                GetHostWindow());
             (AvaloniaApp.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Shutdown();
         }
         catch (Exception ex)
@@ -956,7 +1186,9 @@ public partial class SettingsWindow : Window
     {
         Interlocked.Increment(ref _equalizerPreviewVersion);
         _settingsAccepted = true;
-        Close(true);
+        CompletionRequested?.Invoke(this, true);
     }
-    private void CancelButton_OnClick(object? sender, RoutedEventArgs e) => Close(false);
+
+    private void CancelButton_OnClick(object? sender, RoutedEventArgs e) =>
+        CompletionRequested?.Invoke(this, false);
 }

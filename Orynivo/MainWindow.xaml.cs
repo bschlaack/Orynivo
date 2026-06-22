@@ -432,6 +432,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        CloseEmbeddedSettings();
         ContentDataGrid.VerticalScroll -= ContentDataGrid_OnVerticalScroll;
         _libraryWatcher?.Dispose();
         _libraryWatcher = null;
@@ -1038,6 +1039,7 @@ public partial class MainWindow : Window
         if (tag.StartsWith("Section:", StringComparison.Ordinal))
             return;
 
+        CloseEmbeddedSettings();
         PushCurrentNavigationState();
         ResetDrilldownState(clearNavigationHistory: false);
         if (tag is "InternetRadio" or "Podcasts" or "Queue" or "Artists" or "Albums" or "Tracks" or "Folders")
@@ -8194,9 +8196,12 @@ public partial class MainWindow : Window
     // Einstellungen
     // ------------------------------------------------------------------
 
-    private async void SettingsButton_OnClick(object? sender, RoutedEventArgs e)
+    private void SettingsButton_OnClick(object? sender, RoutedEventArgs e)
     {
-        var window = new SettingsWindow(_settings, paths =>
+        if (SettingsViewHost.IsVisible)
+            return;
+
+        var view = new SettingsView(_settings, paths =>
         {
             _settings.LibraryPaths = paths;
             _settingsStore.Save(_settings);
@@ -8205,11 +8210,39 @@ public partial class MainWindow : Window
         {
             if (_player is IEqualizerAudioPlayer equalizerPlayer)
                 equalizerPlayer.UpdateEqualizer(enabled, profile);
-        })
-        ;
-
-        if (await window.ShowDialog<bool>(this) == true)
+        });
+        var completionHandled = false;
+        view.CompletionRequested += async (_, accepted) =>
         {
+            if (completionHandled)
+                return;
+            completionHandled = true;
+            SettingsViewHost.IsEnabled = false;
+            try
+            {
+                if (accepted)
+                    await ApplySettingsAsync(view);
+            }
+            finally
+            {
+                CloseEmbeddedSettings();
+                SettingsViewHost.IsEnabled = true;
+            }
+        };
+        SettingsViewHost.Content = view;
+        SettingsViewHost.IsVisible = true;
+    }
+
+    private void CloseEmbeddedSettings()
+    {
+        if (SettingsViewHost.Content is SettingsView settingsView)
+            settingsView.Deactivate();
+        SettingsViewHost.Content = null;
+        SettingsViewHost.IsVisible = false;
+    }
+
+    private async Task ApplySettingsAsync(SettingsView window)
+    {
             var themeChanged = _settings.Theme != window.SelectedTheme;
             var languageChanged = _settings.Language != window.SelectedLanguage;
             var replayGainChanged =
@@ -8323,7 +8356,6 @@ public partial class MainWindow : Window
                     string.Format(LocalizationManager.Current.NotImplemented, "KernelStreaming"),
                 _ => LocalizationManager.Current.SettingsSaved
             };
-        }
     }
 
     private float GetReplayGainFactorFromDatabase(string filePath)
@@ -8374,6 +8406,7 @@ public partial class MainWindow : Window
 
     private async void AboutButton_OnClick(object? sender, RoutedEventArgs e)
     {
+        CloseEmbeddedSettings();
         await new AboutWindow().ShowDialog<object?>(this);
     }
 

@@ -32,7 +32,8 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 - Optional ReplayGain volume adjustment for PCM playback, using track or album
   gain metadata with fallback to the other available value; native DSD output
   remains bit-perfect
-- Parametric PCM equalizer with persisted on/off state and Equalizer APO/AutoEQ
+- Parametric PCM equalizer with a live frequency-response graph, editable
+  preamp, dynamic filter rows, persisted on/off state, and Equalizer APO/AutoEQ
   text-profile import. Preamp, peak, low/high shelf, low/high pass, and
   `GraphicEQ` profiles are supported; changes are crossfaded during playback
   and native DSD output remains bit-perfect
@@ -205,15 +206,18 @@ the repository. Release artifacts therefore include `CwAsioBridge.dll`.
 ```
 
 Library directories and the desired output device can then be selected in the
-settings window. ReplayGain can be disabled or switched to track/album mode
+settings view inside the main window. ReplayGain can be disabled or switched to track/album mode
 under the output-device settings. The first subsequent scan of each configured
 library root refreshes unchanged files once to import existing ReplayGain tags.
 Equalizer APO or AutoEQ `.txt`/`.cfg` profiles can be imported in the same
 section. `GraphicEQ` curves are translated into a log-frequency shelf cascade;
 the imported parameters are stored directly in `settings.json`, so the source
-profile file does not need to remain available. The DSD playback option can
-force DSF/DFF files through this PCM path even when ASIO/cwASIO native DSD is
-available.
+profile file does not need to remain available. The same settings section plots
+the combined response and exposes every filter as an editable row. Rows follow
+the profile dynamically, and filters can be added or removed without
+reimporting a file. Edits are previewed during active PCM playback. The DSD
+playback option can force DSF/DFF files through this PCM path even when
+ASIO/cwASIO native DSD is available.
 Available library roots are monitored automatically after configuration.
 File-system events are debounced before updating the database and search index;
 periodic full scans reconcile changes that a watcher may have missed.

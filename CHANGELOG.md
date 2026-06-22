@@ -17,9 +17,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   AutoEQ profiles containing preamp, peak, low/high shelf, low/high pass, and
   `GraphicEQ` definitions. Profile changes crossfade without clicks, seeks
   reset filter history, and native ASIO DSD remains bit-perfect.
+- Added a graphical parametric-EQ editor with a live combined frequency
+  response, editable preamp, and a dynamic filter list. Peak, shelf, and
+  low/high-pass entries can be added, removed, or adjusted while playback
+  previews changes through the existing debounced DSP update path.
+- Moved the complete settings experience into the main window. Output, library,
+  streaming, appearance, artist-information, and equalizer settings now share
+  the main content area instead of opening a separate window.
 
 ### Fixed
 
+- Improved the embedded equalizer editor layout with a wider preamp input,
+  consistently full-width filter-type selectors, and equally wide adjacent
+  frequency, gain, and Q fields sized to keep their numeric values readable.
+- Added numbered dashed frequency markers to the graphical equalizer response.
+  Each marker matches the corresponding dynamic filter-row number, with
+  staggered labels when nearby frequencies would otherwise overlap.
+- Added a logarithmic frequency scale below the equalizer response from 20 Hz
+  through 20 kHz.
+- Equalizer marker numbers now remain aligned along the bottom of the graph.
+  Markers at identical or nearby frequencies move sideways with a short leader
+  instead of jumping upward into the response curve.
+- Moved the numbered equalizer marker bubbles below the frequency scale. Their
+  dashed lines continue through the scale at the exact selected frequency, so
+  the relationship between each row and its frequency remains unambiguous.
 - Fixed the application becoming unresponsive after saving an imported
   Equalizer APO/AutoEQ profile during active playback. UI updates no longer
   wait for the audio thread's DSP work; profile changes and seek resets are
@@ -35,7 +56,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   preview requests are now debounced and executed entirely away from the UI
   event handler. Initial output-device enumeration no longer starts twice, and
   later backend enumeration requests are serialized so native driver discovery
-  cannot overlap within the settings window.
+  cannot overlap within the settings view.
 - Fixed leaked WASAPI endpoint COM objects during device enumeration and device
   opening. Repeatedly opening Settings no longer accumulates undisposed
   `MMDevice` and `MMDeviceEnumerator` instances while playback is active.
