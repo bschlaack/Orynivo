@@ -247,41 +247,55 @@
                                FontWeight="SemiBold"
                                Margin="0,0,0,20"/>
 
-                    <TextBlock Text="{DynamicResource L_OutputType}"
+                    <TextBlock Text="{DynamicResource L_OutputProfile}"
                                FontSize="12"
                                FontWeight="SemiBold"
                                Margin="0,0,0,6"/>
-                    <ComboBox x:Name="OutputBackendComboBox"
-                              Height="30"
-                              MinWidth="360"
-                              HorizontalAlignment="Stretch"
-                              Margin="0,0,0,18"
-                              SelectionChanged="OutputBackendComboBox_OnSelectionChanged"/>
-
-                    <TextBlock x:Name="DeviceLabelTextBlock"
-                               Text="{DynamicResource L_AsioOutputDevice}"
-                               FontSize="12"
-                               FontWeight="SemiBold"
-                               Margin="0,0,0,6"/>
-                    <ComboBox x:Name="DriverComboBox"
-                              Height="30"
-                              MinWidth="360"
-                              HorizontalAlignment="Stretch"
-                              Margin="0,0,0,8"
-                              SelectionChanged="DriverComboBox_OnSelectionChanged"/>
-                    <Button x:Name="DeviceInfoButton"
-                            Width="130"
-                            Height="28"
-                            HorizontalAlignment="Left"
-                            Theme="{StaticResource SettingsButtonTheme}"
-                            Click="DeviceInfoButton_OnClick"
-                            Content="{DynamicResource L_DeviceInfo}"
-                            IsVisible="False"/>
-
-                    <TextBlock x:Name="StatusTextBlock"
-                               Margin="0,12,0,0"
-                               TextWrapping="Wrap"
-                               Foreground="{DynamicResource AppMutedTextBrush}"/>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ComboBox x:Name="OutputProfileComboBox"
+                                  Height="30"
+                                  HorizontalAlignment="Stretch"
+                                  SelectionChanged="OutputProfileComboBox_OnSelectionChanged"/>
+                        <Button x:Name="ConfigureOutputProfileButton"
+                                Grid.Column="1"
+                                Height="30"
+                                MinWidth="160"
+                                Margin="8,0,0,0"
+                                Padding="12,0"
+                                IsEnabled="False"
+                                Theme="{StaticResource SettingsButtonTheme}"
+                                Content="{DynamicResource L_OutputProfileConfigure}"
+                                Click="ConfigureOutputProfileButton_OnClick"/>
+                        <Button Grid.Column="2"
+                                Height="30"
+                                MinWidth="140"
+                                Margin="8,0,0,0"
+                                Padding="12,0"
+                                Theme="{StaticResource SettingsButtonTheme}"
+                                Content="{DynamicResource L_OutputProfileCreate}"
+                                Click="CreateOutputProfileButton_OnClick"/>
+                        <Button x:Name="DeleteOutputProfileButton"
+                                Grid.Column="3"
+                                Height="30"
+                                MinWidth="130"
+                                Margin="8,0,0,0"
+                                Padding="12,0"
+                                IsEnabled="False"
+                                Theme="{StaticResource SettingsButtonTheme}"
+                                Content="{DynamicResource L_OutputProfileDelete}"
+                                Click="DeleteOutputProfileButton_OnClick"/>
+                    </Grid>
+                    <TextBlock x:Name="OutputProfileSummaryTextBlock"
+                               Margin="0,6,0,0"
+                               FontSize="11"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"/>
 
                     <Separator Margin="0,18,0,14"/>
 

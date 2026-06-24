@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using Orynivo.Audio;
 
 namespace Orynivo;
 
@@ -35,6 +36,7 @@ public sealed class SettingsStore
             var settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(_filePath))
                 ?? new AppSettings();
             NormalizeEqualizerProfiles(settings);
+            NormalizeOutputProfiles(settings);
             return settings;
         }
         catch
@@ -48,11 +50,57 @@ public sealed class SettingsStore
     public void Save(AppSettings settings)
     {
         NormalizeEqualizerProfiles(settings);
+        NormalizeOutputProfiles(settings);
         var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions
         {
             WriteIndented = true
         });
         File.WriteAllText(_filePath, json);
+    }
+
+    /// <summary>
+    /// Normalizes named output profiles and migrates a previously configured single device to a profile.
+    /// Also derives the flat <see cref="AppSettings.OutputBackend"/> and device fields from the active profile.
+    /// </summary>
+    /// <param name="settings">Settings instance to normalize.</param>
+    private static void NormalizeOutputProfiles(AppSettings settings)
+    {
+        settings.OutputProfiles ??= [];
+
+        if (settings.OutputProfiles.Count == 0 &&
+            (!string.IsNullOrEmpty(settings.SelectedDriverName) ||
+             !string.IsNullOrEmpty(settings.SelectedWasapiDeviceId)))
+        {
+            var legacy = new OutputProfile
+            {
+                Name = "Standard",
+                Backend = settings.OutputBackend,
+                SelectedDriverName = settings.SelectedDriverName,
+                SelectedWasapiDeviceId = settings.SelectedWasapiDeviceId,
+                SelectedWasapiDeviceName = settings.SelectedWasapiDeviceName
+            };
+            settings.OutputProfiles.Add(legacy);
+            settings.SelectedOutputProfileName = legacy.Name;
+        }
+
+        var selected = settings.OutputProfiles.FirstOrDefault(p =>
+            string.Equals(p.Name, settings.SelectedOutputProfileName, StringComparison.OrdinalIgnoreCase));
+
+        if (selected is null)
+        {
+            settings.SelectedOutputProfileName = null;
+            settings.OutputBackend = OutputBackend.Wasapi;
+            settings.SelectedDriverName = null;
+            settings.SelectedWasapiDeviceId = null;
+            settings.SelectedWasapiDeviceName = null;
+            return;
+        }
+
+        settings.SelectedOutputProfileName = selected.Name;
+        settings.OutputBackend = selected.Backend;
+        settings.SelectedDriverName = selected.SelectedDriverName;
+        settings.SelectedWasapiDeviceId = selected.SelectedWasapiDeviceId;
+        settings.SelectedWasapiDeviceName = selected.SelectedWasapiDeviceName;
     }
 
     /// <summary>Normalizes multi-profile equalizer settings and migrates the legacy single profile.</summary>

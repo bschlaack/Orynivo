@@ -89,6 +89,7 @@ public partial class MainWindow : Window
     private string? _activeArtistFilterName;
     private bool _showAllAlbumTracks;
     private bool _updatingAlbumTrackScope;
+    private readonly List<DataGrid> _albumFolderGroupGrids = [];
     private readonly Stack<NavigationState> _navigationStack = [];
     private bool _restoringNavigationHistory;
     private readonly DispatcherTimer _searchTimer;
@@ -96,6 +97,8 @@ public partial class MainWindow : Window
     private bool _artistFavoritesOnly;
     private bool _albumFavoritesOnly;
     private bool _updatingEntityFavoritesFilter;
+    private bool _eqPickerUpdating;
+    private bool _outputPickerUpdating;
     private readonly HashSet<string> _selectedTrackGenres = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _selectedTrackFormats = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<int> _selectedTrackBitrates = [];
@@ -196,7 +199,8 @@ public partial class MainWindow : Window
         long? SelectedId,
         long? ArtistFilterId,
         string? ArtistFilterName,
-        string? SearchQuery = null);
+        string? SearchQuery = null,
+        double? VerticalOffset = null);
 
     private sealed class RadioStationViewModel
     {
@@ -919,6 +923,13 @@ public partial class MainWindow : Window
         }
     }
 
+    private sealed record AlbumTrackGroup(
+        string Directory,
+        string Album,
+        string? Artist,
+        string? Year,
+        List<ContentRow> Rows);
+
     private void PersistPlaybackQueue()
     {
         CapturePlaybackQueueState();
@@ -1108,9 +1119,10 @@ public partial class MainWindow : Window
                 GetSelectedContentRowId(),
                 null,
                 null,
-                SearchTextBox.Text ?? string.Empty);
+                SearchTextBox.Text ?? string.Empty,
+                CaptureCurrentVerticalOffset());
 
-        if (AlbumDetailHeader.IsVisible && _activeAlbumFilterId is long albumId)
+        if (_activeAlbumFilterId is long albumId)
             return new NavigationState(
                 "AlbumTracks",
                 albumId,
@@ -1126,10 +1138,11 @@ public partial class MainWindow : Window
         {
             return new NavigationState(
                 "ArtistAlbums",
+                GetSelectedContentRowId(),
                 artistId,
-                null,
-                null,
-                _activeArtistFilterName);
+                _activeArtistFilterName,
+                _activeArtistFilterName,
+                CaptureCurrentVerticalOffset());
         }
 
         if (!string.IsNullOrWhiteSpace(_currentTopLevelTag) &&
@@ -1140,10 +1153,31 @@ public partial class MainWindow : Window
                 GetSelectedContentRowId(),
                 _activeArtistFilterId,
                 _activeArtistFilterName,
-                SearchTextBox.Text ?? string.Empty);
+                SearchTextBox.Text ?? string.Empty,
+                CaptureCurrentVerticalOffset());
         }
 
         return null;
+    }
+
+    private double? CaptureCurrentVerticalOffset()
+    {
+        if (ContentDataGrid.IsVisible)
+        {
+            AttachContentDataGridVerticalScrollBar();
+            return _contentDataGridVerticalScrollBar?.Value;
+        }
+
+        var listBox = AlbumArtworkListBox.IsVisible
+            ? AlbumArtworkListBox
+            : ArtistArtworkListBox.IsVisible
+                ? ArtistArtworkListBox
+                : null;
+        return listBox?
+            .GetVisualDescendants()
+            .OfType<ScrollViewer>()
+            .FirstOrDefault()?
+            .Offset.Y;
     }
 
     private long? GetSelectedContentRowId()
@@ -3354,11 +3388,19 @@ public partial class MainWindow : Window
             UpdateNowPlayingTreeHighlights(child);
     }
 
-    private void ApplyColumns(string view)
+    private void ApplyColumns(
+        string view,
+        DataGrid? targetGrid = null,
+        bool captureCurrentWidths = true)
     {
-        CaptureContentDataGridColumnWidths();
-        _contentColumnWidthKey = GetContentColumnWidthKey(view);
-        ContentDataGrid.Columns.Clear();
+        var grid = targetGrid ?? ContentDataGrid;
+        if (captureCurrentWidths && ReferenceEquals(grid, ContentDataGrid))
+        {
+            CaptureContentDataGridColumnWidths();
+            _contentColumnWidthKey = GetContentColumnWidthKey(view);
+        }
+        var widthKey = GetContentColumnWidthKey(view);
+        grid.Columns.Clear();
         switch (view)
         {
             case "PlexArtists":
@@ -3406,8 +3448,8 @@ public partial class MainWindow : Window
                 break;
         }
 
-        DataGridColumnChooser.Apply(ContentDataGrid, _contentColumnWidthKey, _settings);
-        RestoreColumnWidths(_contentColumnWidthKey, ContentDataGrid);
+        DataGridColumnChooser.Apply(grid, widthKey, _settings);
+        RestoreColumnWidths(widthKey, grid);
 
         void AddEntityLink(
             string header,
@@ -3422,7 +3464,7 @@ public partial class MainWindow : Window
             var column = CreateEntityLinkColumn(header, prop, width, star, entityType, starWeight);
             column.Tag = key;
             column.IsVisible = defaultVisible;
-            ContentDataGrid.Columns.Add(column);
+            grid.Columns.Add(column);
         }
 
         void Add(
@@ -3466,7 +3508,7 @@ public partial class MainWindow : Window
             }
             column.Tag = key;
             column.IsVisible = defaultVisible;
-            ContentDataGrid.Columns.Add(column);
+            grid.Columns.Add(column);
         }
 
         void AddTrackColumns(bool includeFavorite, bool includeGenreByDefault)
@@ -3498,7 +3540,7 @@ public partial class MainWindow : Window
 
         void AddFavorite()
         {
-            ContentDataGrid.Columns.Add(new DataGridTemplateColumn
+            grid.Columns.Add(new DataGridTemplateColumn
             {
                 Header = "",
                 Width = new DataGridLength(42),
@@ -3532,7 +3574,7 @@ public partial class MainWindow : Window
 
         void AddThumbnail()
         {
-            ContentDataGrid.Columns.Add(new DataGridTemplateColumn
+            grid.Columns.Add(new DataGridTemplateColumn
             {
                 Header = "",
                 Width = new DataGridLength(64),
@@ -3554,7 +3596,7 @@ public partial class MainWindow : Window
 
         void AddArtistInfo()
         {
-            ContentDataGrid.Columns.Add(new DataGridTemplateColumn
+            grid.Columns.Add(new DataGridTemplateColumn
             {
                 Header = "",
                 Width = new DataGridLength(44),
@@ -3580,7 +3622,7 @@ public partial class MainWindow : Window
 
         void AddQueueActions()
         {
-            ContentDataGrid.Columns.Add(new DataGridTemplateColumn
+            grid.Columns.Add(new DataGridTemplateColumn
             {
                 Header = "",
                 Width = new DataGridLength(132),
@@ -4046,8 +4088,17 @@ public partial class MainWindow : Window
     {
         if (FindAncestor<Button>(e.Source as Visual) is not null)
             return;
-        if (ContentDataGrid.SelectedItem is not ContentRow row)
+        if (sender is not DataGrid grid ||
+            grid.SelectedItem is not ContentRow row)
             return;
+
+        if (row.EntityType == "Track" &&
+            grid.ItemsSource is IEnumerable<ContentRow> rows)
+        {
+            await PlayTrackFromRowsAsync(row, rows.ToList());
+            return;
+        }
+
         await HandleContentRowDoubleClickAsync(row);
     }
 
@@ -4253,19 +4304,67 @@ public partial class MainWindow : Window
         var result = await Task.Run(() =>
         {
             using var db = AudioDatabase.OpenDefault();
+            var tracks = db.GetTrackListByAlbum(albumId, artistId);
             return (
                 Album: db.GetAlbumById(albumId),
-                Tracks: db.GetTrackListByAlbum(albumId, artistId)
-                    .Select(ToTrackContentRow)
-                    .ToList());
+                Tracks: tracks,
+                Directories: db.GetAlbumTrackDirectories(albumId, artistId));
         });
-        var rows = result.Tracks;
+        var groupedRows = result.Tracks
+            .GroupBy(
+                track => (
+                    Directory: NormalizeAlbumGroupValue(
+                        result.Directories.TryGetValue(track.Id, out var directory)
+                            ? directory
+                            : Path.GetDirectoryName(track.Path)),
+                    Album: NormalizeAlbumGroupValue(track.Album)))
+            .Select(group =>
+            {
+                var first = group.First();
+                var albumArtists = group
+                    .Select(track => ArtistNameNormalizer.NormalizeDisplayName(
+                        track.AlbumArtist))
+                    .Where(artist => artist.Length > 0)
+                    .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                    .ToList();
+                var primaryArtists = group
+                    .Select(track => ArtistNameNormalizer.NormalizeDisplayName(track.Artist))
+                    .Where(artist => artist.Length > 0)
+                    .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                    .ToList();
+                return new AlbumTrackGroup(
+                    result.Directories.TryGetValue(first.Id, out var directory)
+                        ? directory
+                        : Path.GetDirectoryName(first.Path) ?? string.Empty,
+                    string.IsNullOrWhiteSpace(first.Album)
+                        ? LocalizationManager.Current.Unknown
+                        : first.Album.Trim(),
+                    albumArtists.Count == 1
+                        ? albumArtists[0]
+                        : albumArtists.Count == 0 && primaryArtists.Count == 1
+                            ? primaryArtists[0]
+                            : null,
+                    first.Year?.ToString(CultureInfo.CurrentCulture),
+                    group.Select(ToTrackContentRow).ToList());
+            })
+            .OrderBy(group => group.Directory, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(group => group.Album, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(group => group.Artist, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+        var rows = groupedRows.SelectMany(group => group.Rows).ToList();
+        HideAlbumFolderGroups();
+        ContentDataGrid.IsVisible = true;
         ApplyColumns("Tracks");
         ContentDataGrid.ItemsSource = rows;
         ContentCountTextBlock.Text = LocalizationManager.FormatTrackCount(rows.Count);
         UpdateAlphabetIndex(null, false);
         ApplyAlbumDetailHeader(result.Album);
+        if (result.Album is not null && groupedRows.Count > 1)
+            ShowAlbumFolderGroups(groupedRows);
     }
+
+    private static string NormalizeAlbumGroupValue(string? value) =>
+        value?.Trim().ToUpperInvariant() ?? string.Empty;
 
     private async void ShowAllAlbumTracksCheckBox_OnChanged(object? sender, RoutedEventArgs e)
     {
@@ -4284,7 +4383,14 @@ public partial class MainWindow : Window
             return;
         }
 
-        var row = new ContentRow
+        var row = CreateAlbumDetailRow(album);
+        EnsureArtworkHydrated(row);
+        AlbumDetailHeader.DataContext = row;
+        AlbumDetailHeader.IsVisible = true;
+    }
+
+    private static ContentRow CreateAlbumDetailRow(AlbumInfo album) =>
+        new()
         {
             Id = album.Id,
             AlbumId = album.Id,
@@ -4301,16 +4407,164 @@ public partial class MainWindow : Window
             EntityType = "Album",
             FilePath = ""
         };
-        EnsureArtworkHydrated(row);
-        AlbumDetailHeader.DataContext = row;
-        AlbumDetailHeader.IsVisible = true;
-    }
 
     private void HideAlbumDetailHeader()
     {
         AlbumDetailHeader.IsVisible = false;
         AlbumDetailHeader.DataContext = null;
         ShowAllAlbumTracksCheckBox.IsVisible = false;
+        HideAlbumFolderGroups();
+    }
+
+    private void ShowAlbumFolderGroups(IReadOnlyList<AlbumTrackGroup> groups)
+    {
+        AlbumFolderGroupsPanel.Children.Clear();
+
+        foreach (var group in groups)
+        {
+            var groupPanel = new StackPanel { Spacing = 10 };
+            groupPanel.Children.Add(CreateAlbumFolderGroupHeader(
+                group));
+
+            var grid = new DataGrid
+            {
+                ItemsSource = group.Rows,
+                Height = 44 + (group.Rows.Count * 40),
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Background = FindResource<IBrush>("AppContentBrush"),
+                BorderThickness = new Thickness(0),
+                RowHeight = 40,
+                ColumnHeaderHeight = 44,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+                HorizontalGridLinesBrush = FindResource<IBrush>("AppGridLineBrush"),
+                AutoGenerateColumns = false,
+                CanUserResizeColumns = true,
+                IsReadOnly = true,
+                SelectionMode = DataGridSelectionMode.Single,
+                FontSize = 12
+            };
+            ScrollViewer.SetBringIntoViewOnFocusChange(grid, false);
+            grid.LoadingRow += ContentDataGrid_OnLoadingRow;
+            grid.DoubleTapped += ContentDataGrid_OnMouseDoubleClick;
+            ApplyColumns("Tracks", grid, captureCurrentWidths: false);
+            DataGridColumnChooser.Attach(
+                grid,
+                GetContentColumnWidthKey("Tracks"),
+                _settings);
+            grid.AddHandler(
+                PointerReleasedEvent,
+                AlbumFolderDataGrid_OnPointerReleased,
+                RoutingStrategies.Tunnel,
+                handledEventsToo: true);
+            _albumFolderGroupGrids.Add(grid);
+            groupPanel.Children.Add(grid);
+            AlbumFolderGroupsPanel.Children.Add(groupPanel);
+        }
+
+        ContentDataGrid.IsVisible = false;
+        AlbumFolderGroupsScrollViewer.IsVisible = true;
+    }
+
+    private Border CreateAlbumFolderGroupHeader(AlbumTrackGroup group)
+    {
+        var representativeTrack = group.Rows[0];
+        var albumRow = new ContentRow
+        {
+            Id = representativeTrack.Id,
+            AlbumId = representativeTrack.AlbumId,
+            ArtistId = representativeTrack.ArtistId,
+            Title = group.Album,
+            Artist = group.Artist,
+            Album = group.Album,
+            Year = group.Year,
+            EntityType = "AlbumGroup",
+            FilePath = representativeTrack.FilePath
+        };
+        var titleButton = new Button
+        {
+            Content = albumRow.Title,
+            Tag = albumRow,
+            FontSize = 20,
+            FontWeight = FontWeight.SemiBold,
+            Theme = FindResource<ControlTheme>("EntityLinkButtonTheme")
+        };
+        titleButton.Click += AlbumLinkButton_OnClick;
+
+        var artistButton = new Button
+        {
+            Content = albumRow.Artist,
+            Tag = albumRow,
+            FontSize = 14,
+            Foreground = FindResource<IBrush>("AppSecondaryTextBrush"),
+            Theme = FindResource<ControlTheme>("EntityLinkButtonTheme")
+        };
+        artistButton.Click += ArtistLinkButton_OnClick;
+
+        var metadataPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 10
+        };
+        if (!string.IsNullOrWhiteSpace(group.Artist))
+            metadataPanel.Children.Add(artistButton);
+        if (!string.IsNullOrWhiteSpace(albumRow.Year))
+        {
+            metadataPanel.Children.Add(new TextBlock
+            {
+                Text = albumRow.Year,
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = FindResource<IBrush>("AppMutedTextBrush")
+            });
+        }
+        metadataPanel.Children.Add(new TextBlock
+        {
+            Text = LocalizationManager.FormatTrackCount(group.Rows.Count),
+            VerticalAlignment = VerticalAlignment.Center,
+            Foreground = FindResource<IBrush>("AppMutedTextBrush")
+        });
+
+        var content = new StackPanel { Spacing = 5 };
+        content.Children.Add(titleButton);
+        content.Children.Add(metadataPanel);
+        content.Children.Add(new TextBlock
+        {
+            Text = $"{LocalizationManager.Current.AlbumPath}: {group.Directory}",
+            FontSize = 12,
+            Foreground = FindResource<IBrush>("AppMutedTextBrush"),
+            TextWrapping = TextWrapping.Wrap
+        });
+
+        return new Border
+        {
+            Padding = new Thickness(16, 12),
+            Background = FindResource<IBrush>("AppSurfaceBrush"),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(0, 16, 0, 16),
+            Child = content
+        };
+    }
+
+    private void HideAlbumFolderGroups()
+    {
+        AlbumFolderGroupsScrollViewer.IsVisible = false;
+        AlbumFolderGroupsPanel.Children.Clear();
+        _albumFolderGroupGrids.Clear();
+    }
+
+    private void AlbumFolderDataGrid_OnPointerReleased(
+        object? sender,
+        PointerReleasedEventArgs e)
+    {
+        if (sender is not DataGrid grid)
+            return;
+
+        var widthKey = GetContentColumnWidthKey("Tracks");
+        CaptureColumnWidths(widthKey, grid);
+        foreach (var otherGrid in _albumFolderGroupGrids.Where(other => !ReferenceEquals(other, grid)))
+            RestoreColumnWidths(widthKey, otherGrid);
     }
 
     private async Task ReloadAlbumDetailHeaderAsync(long albumId)
@@ -4392,13 +4646,14 @@ public partial class MainWindow : Window
         if (sender is not MenuItem { Tag: ContentRow { Id: long albumId } })
             return;
 
+        var verticalOffset = CaptureCurrentVerticalOffset();
         using (var db = AudioDatabase.OpenDefault())
             db.ClearArtworkFromAlbum(albumId);
 
         if (_activeAlbumFilterId == albumId)
             await ReloadAlbumDetailHeaderAsync(albumId);
         else
-            await ReloadAlbumRowsAsync();
+            await ReloadAlbumRowsAsync(albumId, verticalOffset);
     }
 
     private async void ReassignCoverMenuItem_OnClick(object? sender, RoutedEventArgs e)
@@ -4414,6 +4669,7 @@ public partial class MainWindow : Window
         if (row.Id is not long albumId)
             return;
 
+        var verticalOffset = CaptureCurrentVerticalOffset();
         var dialog = new CoverSearchWindow(row.Title ?? string.Empty) ;
         if (await dialog.ShowDialog<bool>(this) == false || dialog.SelectedResult is not { } selected)
             return;
@@ -4424,17 +4680,22 @@ public partial class MainWindow : Window
         if (_activeAlbumFilterId == albumId)
             await ReloadAlbumDetailHeaderAsync(albumId);
         else
-            await ReloadAlbumRowsAsync();
+            await ReloadAlbumRowsAsync(albumId, verticalOffset);
     }
 
-    private async Task ReloadAlbumRowsAsync()
+    private async Task ReloadAlbumRowsAsync(
+        long? selectedAlbumId = null,
+        double? verticalOffset = null)
     {
+        selectedAlbumId ??= GetSelectedContentRowId();
+        verticalOffset ??= CaptureCurrentVerticalOffset();
         var rows = await Task.Run(() => QueryRows("Albums"));
         ApplyColumns("Albums");
         ContentDataGrid.ItemsSource = rows;
         BindArtworkRows("Albums", rows);
         UpdateAlphabetIndex(rows, true);
         ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(rows.Count);
+        RestoreSelection(rows, selectedAlbumId, verticalOffset);
     }
 
     private async void BackButton_OnClick(object? sender, RoutedEventArgs e)
@@ -4502,12 +4763,15 @@ public partial class MainWindow : Window
                         : state.SearchQuery);
                 return;
 
-            case "ArtistAlbums" when state.SelectedId is long artistId:
+            case "ArtistAlbums" when state.ArtistFilterId is long artistId:
                 await ShowArtistAlbumsAsync(
                     artistId,
                     string.IsNullOrWhiteSpace(state.SearchQuery)
                         ? LocalizationManager.Current.Unknown
                         : state.SearchQuery);
+                RestoreSelectionFromCurrentItems(
+                    state.SelectedId,
+                    state.VerticalOffset);
                 return;
 
             case "Search":
@@ -4530,7 +4794,7 @@ public partial class MainWindow : Window
                 BindArtworkRows("Artists", artists);
                 UpdateAlphabetIndex(artists, true);
                 ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(artists.Count);
-                RestoreSelection(artists, state.SelectedId);
+                RestoreSelection(artists, state.SelectedId, state.VerticalOffset);
                 break;
 
             case "Albums":
@@ -4550,13 +4814,15 @@ public partial class MainWindow : Window
                 ArtistArtworkListBox.IsVisible = false;
                 UpdateAlphabetIndex(albums, true);
                 ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(albums.Count);
-                RestoreSelection(albums, state.SelectedId);
+                RestoreSelection(albums, state.SelectedId, state.VerticalOffset);
                 break;
 
             default:
                 SelectNavigationItem(state.View);
                 await ShowTopLevelViewAsync(state.View);
-                RestoreSelectionFromCurrentItems(state.SelectedId);
+                RestoreSelectionFromCurrentItems(
+                    state.SelectedId,
+                    state.VerticalOffset);
                 break;
         }
     }
@@ -4580,30 +4846,121 @@ public partial class MainWindow : Window
         }
     }
 
-    private void RestoreSelectionFromCurrentItems(long? selectedId)
+    private void RestoreSelectionFromCurrentItems(
+        long? selectedId,
+        double? verticalOffset = null)
     {
         var rows = (ContentDataGrid.ItemsSource as IEnumerable<ContentRow>)?.ToList()
                    ?? (AlbumArtworkListBox.ItemsSource as IEnumerable<ContentRow>)?.ToList()
                    ?? (ArtistArtworkListBox.ItemsSource as IEnumerable<ContentRow>)?.ToList()
                    ?? [];
-        RestoreSelection(rows, selectedId);
+        RestoreSelection(rows, selectedId, verticalOffset);
     }
 
-    private void RestoreSelection(List<ContentRow> rows, long? selectedId)
+    private void RestoreSelection(
+        List<ContentRow> rows,
+        long? selectedId,
+        double? verticalOffset = null)
     {
-        if (selectedId is not long id)
+        var row = selectedId is long id
+            ? rows.FirstOrDefault(candidate => candidate.Id == id)
+            : null;
+
+        if (ContentDataGrid.IsVisible)
+        {
+            ContentDataGrid.SelectedItem = row;
+            RestoreDataGridPositionAfterLayout(row, verticalOffset);
             return;
-        var row = rows.FirstOrDefault(r => r.Id == id);
-        if (row is null)
+        }
+
+        var listBox = AlbumArtworkListBox.IsVisible
+            ? AlbumArtworkListBox
+            : ArtistArtworkListBox.IsVisible
+                ? ArtistArtworkListBox
+                : null;
+        if (listBox is null)
             return;
-        ContentDataGrid.SelectedItem = row;
-        ContentDataGrid.ScrollIntoView(row, null);
-        EnsureArtworkRowBound(AlbumArtworkListBox, row);
-        EnsureArtworkRowBound(ArtistArtworkListBox, row);
-        AlbumArtworkListBox.SelectedItem = row;
-        AlbumArtworkListBox.ScrollIntoView(row);
-        ArtistArtworkListBox.SelectedItem = row;
-        ArtistArtworkListBox.ScrollIntoView(row);
+
+        if (row is not null)
+        {
+            EnsureArtworkRowBound(listBox, row);
+            listBox.SelectedItem = row;
+        }
+        RestoreArtworkPositionAfterLayout(listBox, row, verticalOffset);
+    }
+
+    private void RestoreDataGridPositionAfterLayout(
+        ContentRow? row,
+        double? verticalOffset)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            AttachContentDataGridVerticalScrollBar();
+            if (verticalOffset is double offset &&
+                _contentDataGridVerticalScrollBar is { } scrollBar)
+            {
+                scrollBar.Value = Math.Clamp(offset, scrollBar.Minimum, scrollBar.Maximum);
+            }
+            else if (row is not null)
+            {
+                ContentDataGrid.ScrollIntoView(row, null);
+            }
+        }, DispatcherPriority.Loaded);
+    }
+
+    private void RestoreArtworkPositionAfterLayout(
+        ListBox listBox,
+        ContentRow? row,
+        double? verticalOffset)
+    {
+        var bindingVersion = _artworkBindingVersion;
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (bindingVersion != _artworkBindingVersion)
+                return;
+
+            var scrollViewer = listBox.GetVisualDescendants()
+                .OfType<ScrollViewer>()
+                .FirstOrDefault();
+            if (scrollViewer is null)
+                return;
+
+            if (verticalOffset is double offset)
+            {
+                var itemWidth = ReferenceEquals(listBox, AlbumArtworkListBox) ? 196d : 216d;
+                var itemHeight = ReferenceEquals(listBox, AlbumArtworkListBox) ? 292d : 260d;
+                var perRow = Math.Max(1, (int)Math.Floor(scrollViewer.Viewport.Width / itemWidth));
+                var requiredItems = Math.Max(
+                    ArtworkPageSize,
+                    ((int)Math.Ceiling((offset + scrollViewer.Viewport.Height) / itemHeight) + 1) * perRow);
+                var visibleRows = ReferenceEquals(listBox, AlbumArtworkListBox)
+                    ? _visibleAlbumArtworkRows
+                    : _visibleArtistArtworkRows;
+                while (visibleRows.Count < requiredItems && AppendArtworkRows(listBox))
+                {
+                }
+
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (bindingVersion != _artworkBindingVersion)
+                        return;
+                    var restoredViewer = listBox.GetVisualDescendants()
+                        .OfType<ScrollViewer>()
+                        .FirstOrDefault();
+                    if (restoredViewer is null)
+                        return;
+                    restoredViewer.Offset = new Vector(
+                        restoredViewer.Offset.X,
+                        Math.Clamp(offset, 0, Math.Max(0, restoredViewer.Extent.Height - restoredViewer.Viewport.Height)));
+                    QueueHydrateVisibleArtworkRows(listBox);
+                    UpdateActiveAlphabetButton();
+                }, DispatcherPriority.Background);
+            }
+            else if (row is not null)
+            {
+                ScrollArtworkRowIntoViewAfterLayout(listBox, row);
+            }
+        }, DispatcherPriority.Loaded);
     }
 
     private void UpdateNowPlayingFavoriteButton()
@@ -6540,7 +6897,8 @@ public partial class MainWindow : Window
     private async Task StartPlaybackAsync(
         string filePath,
         RadioStationRecord? radioStation = null,
-        PodcastPlayback? podcastPlayback = null)
+        PodcastPlayback? podcastPlayback = null,
+        TimeSpan initialPosition = default)
     {
         StopPlayback();
         _currentFilePath = filePath;
@@ -6616,6 +6974,11 @@ public partial class MainWindow : Window
         _player        = player;
         if (player is IGaplessAudioPlayer gaplessPlayer)
             gaplessPlayer.TrackChanged += GaplessPlayer_OnTrackChanged;
+        if (initialPosition > TimeSpan.Zero && player.CanSeek)
+        {
+            try { await player.SeekAsync(initialPosition); }
+            catch { /* seek failure must not prevent playback */ }
+        }
         UpdateNowPlayingRowHighlights();
         _player.Volume = _settings.OutputBackend == OutputBackend.Wasapi &&
                          _endpointVolumeSynchronizer is not null
@@ -7796,22 +8159,25 @@ public partial class MainWindow : Window
         _artistInfoDisplayedId = result.ArtistId;
         ArtistInfoTitleButton.Content = result.ArtistName;
         ArtistInfoStatusTextBlock.IsVisible = false;
-        await ReloadVisibleArtistListAsync();
+        await ReloadVisibleArtistListAsync(result.ArtistId);
         await ShowArtistInfoAsync(result.ArtistId, forceRefresh: false);
         _ = RebuildSearchIndexAfterArtistRenameAsync();
     }
 
-    private async Task ReloadVisibleArtistListAsync()
+    private async Task ReloadVisibleArtistListAsync(long? selectedArtistId = null)
     {
         if (NavListBox.SelectedItem is not ListBoxItem { Tag: "Artists" })
             return;
 
+        selectedArtistId ??= GetSelectedContentRowId();
+        var verticalOffset = CaptureCurrentVerticalOffset();
         var rows = await Task.Run(() => QueryRows("Artists"));
         ApplyColumns("Artists");
         ContentDataGrid.ItemsSource = rows;
         BindArtworkRows("Artists", rows);
         UpdateAlphabetIndex(rows, true);
         ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(rows.Count);
+        RestoreSelection(rows, selectedArtistId, verticalOffset);
     }
 
     private void ArtistInfoSourceButton_OnClick(object? sender, RoutedEventArgs e)
@@ -8391,6 +8757,141 @@ public partial class MainWindow : Window
         SettingsViewHost.IsVisible = false;
     }
 
+    private void OpenSettingsAt(string sectionTag, bool scrollToEqualizer = false)
+    {
+        if (!SettingsViewHost.IsVisible)
+            SettingsButton_OnClick(null!, null!);
+        if (SettingsViewHost.Content is SettingsView sv)
+        {
+            sv.NavigateToSection(sectionTag);
+            if (scrollToEqualizer)
+                sv.ScrollToEqualizerSection();
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // EQ + Output quick-pick popups
+    // ------------------------------------------------------------------
+
+    private void EqPickerButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        OutputPickerPopup.IsOpen = false;
+        _eqPickerUpdating = true;
+        try
+        {
+            EqPickerComboBox.ItemsSource = _settings.EqualizerProfiles;
+            EqPickerComboBox.SelectedItem = _settings.EqualizerProfiles
+                .FirstOrDefault(p => string.Equals(
+                    p.Name, _settings.SelectedEqualizerProfileName,
+                    StringComparison.OrdinalIgnoreCase));
+            EqPickerEnabledCheckBox.IsChecked = _settings.EqualizerEnabled;
+        }
+        finally
+        {
+            _eqPickerUpdating = false;
+        }
+        EqPickerPopup.IsOpen = !EqPickerPopup.IsOpen;
+    }
+
+    private void EqPickerComboBox_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_eqPickerUpdating) return;
+        if (EqPickerComboBox.SelectedItem is not EqualizerProfile profile) return;
+        _settings.SelectedEqualizerProfileName = profile.Name;
+        _settings.EqualizerProfile = profile.Clone();
+        if (_player is IEqualizerAudioPlayer eqPlayer)
+            eqPlayer.UpdateEqualizer(_settings.EqualizerEnabled, _settings.EqualizerProfile);
+        _ = Task.Run(() => _settingsStore.Save(_settings));
+    }
+
+    private void EqPickerEnabledCheckBox_OnIsCheckedChanged(object? sender, RoutedEventArgs e)
+    {
+        if (_eqPickerUpdating) return;
+        _settings.EqualizerEnabled = EqPickerEnabledCheckBox.IsChecked == true;
+        if (_player is IEqualizerAudioPlayer eqPlayer)
+            eqPlayer.UpdateEqualizer(_settings.EqualizerEnabled, _settings.EqualizerProfile);
+        _ = Task.Run(() => _settingsStore.Save(_settings));
+    }
+
+    private void EqPickerSettingsButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        EqPickerPopup.IsOpen = false;
+        OpenSettingsAt("AudioDevice", scrollToEqualizer: true);
+    }
+
+    private void OutputPickerButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        EqPickerPopup.IsOpen = false;
+        _outputPickerUpdating = true;
+        try
+        {
+            OutputPickerComboBox.ItemsSource = _settings.OutputProfiles;
+            OutputPickerComboBox.SelectedItem = _settings.OutputProfiles
+                .FirstOrDefault(p => string.Equals(
+                    p.Name, _settings.SelectedOutputProfileName,
+                    StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            _outputPickerUpdating = false;
+        }
+        OutputPickerPopup.IsOpen = !OutputPickerPopup.IsOpen;
+    }
+
+    private async void OutputPickerComboBox_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_outputPickerUpdating) return;
+        if (OutputPickerComboBox.SelectedItem is not OutputProfile profile) return;
+        if (string.Equals(profile.Name, _settings.SelectedOutputProfileName, StringComparison.Ordinal)) return;
+
+        var outputChanged =
+            _settings.OutputBackend != profile.Backend ||
+            !string.Equals(_settings.SelectedDriverName, profile.SelectedDriverName, StringComparison.Ordinal) ||
+            !string.Equals(_settings.SelectedWasapiDeviceId, profile.SelectedWasapiDeviceId, StringComparison.Ordinal);
+
+        // Snapshot playback state before StopPlaybackCore clears station/podcast fields.
+        var resumePath     = _currentFilePath;
+        var resumeStation  = _currentRadioStation;
+        var resumePodcast  = _currentPodcastPlayback;
+        var resumePosition = outputChanged && _player is not null ? _player.Position : TimeSpan.Zero;
+        var wasPaused      = outputChanged && _player?.IsPaused == true;
+        var shouldResume   = outputChanged && _player is not null && !string.IsNullOrEmpty(resumePath);
+
+        if (outputChanged && _player is not null)
+            await StopPlaybackAsync();
+
+        _settings.SelectedOutputProfileName  = profile.Name;
+        _settings.OutputBackend              = profile.Backend;
+        _settings.SelectedDriverName         = profile.SelectedDriverName;
+        _settings.SelectedWasapiDeviceId     = profile.SelectedWasapiDeviceId;
+        _settings.SelectedWasapiDeviceName   = profile.SelectedWasapiDeviceName;
+        _ = Task.Run(() => _settingsStore.Save(_settings));
+
+        if (!shouldResume)
+            return;
+        try
+        {
+            await StartPlaybackAsync(resumePath, resumeStation, resumePodcast, resumePosition);
+            if (wasPaused)
+                PausePlayback();
+        }
+        catch (OperationCanceledException)
+        {
+            StatusTextBlock.Text = LocalizationManager.Current.PlaybackStopped;
+        }
+        catch (Exception ex)
+        {
+            StopPlayback();
+            StatusTextBlock.Text = ex.Message;
+        }
+    }
+
+    private void OutputPickerSettingsButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        OutputPickerPopup.IsOpen = false;
+        OpenSettingsAt("AudioDevice");
+    }
+
     private async Task ApplySettingsAsync(SettingsView window)
     {
             var themeChanged = _settings.Theme != window.SelectedTheme;
@@ -8425,10 +8926,12 @@ public partial class MainWindow : Window
             if (outputChanged && _player is not null)
                 await StopPlaybackAsync();
 
-            _settings.OutputBackend          = window.SelectedOutputBackend;
-            _settings.SelectedDriverName     = window.SelectedDriverName;
-            _settings.SelectedWasapiDeviceId = window.SelectedWasapiDeviceId;
-            _settings.SelectedWasapiDeviceName = window.SelectedWasapiDeviceName;
+            _settings.OutputProfiles             = window.SelectedOutputProfiles.ToList();
+            _settings.SelectedOutputProfileName  = window.SelectedOutputProfileName;
+            _settings.OutputBackend              = window.SelectedOutputBackend;
+            _settings.SelectedDriverName         = window.SelectedDriverName;
+            _settings.SelectedWasapiDeviceId     = window.SelectedWasapiDeviceId;
+            _settings.SelectedWasapiDeviceName   = window.SelectedWasapiDeviceName;
             _settings.ReplayGainMode        = window.SelectedReplayGainMode;
             _settings.AlwaysConvertDsdToPcm = window.AlwaysConvertDsdToPcm;
             _settings.EqualizerEnabled      = window.EqualizerEnabled;

@@ -1,0 +1,3 @@
+# Orynivo — Projektregeln
+
+@AGENTS.md

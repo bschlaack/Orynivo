@@ -83,10 +83,11 @@
         </ListBox>
         <Button Classes="accent"
                 Grid.Row="3"
-                Width="220"
-                Height="30"
+                MinWidth="220"
+                MinHeight="34"
                 Margin="0,12,0,0"
                 HorizontalAlignment="Right"
+                Padding="16,7"
                 Content="{DynamicResource L_UseSelectedCover}"
                 Click="UseSelectedCoverButton_OnClick"/>
     </Grid>

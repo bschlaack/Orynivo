@@ -37,6 +37,12 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 
 ## Important Architecture
 
+- `Orynivo/OutputProfile.cs`: named audio output configuration (backend, device
+  IDs, display name); multiple profiles allow switching between output devices
+  without reconfiguring each time
+- `Orynivo/OutputProfileDialog.axaml/.cs`: dialog for creating or editing an
+  output profile; loads available devices asynchronously, validates unique
+  names, and exposes the confirmed result via `Result`
 - `Orynivo/Audio/SteinbergAsioStream.cs`: runtime-selecting C# wrapper for `AsioBridge.dll` and `CwAsioBridge.dll`
 - `Orynivo/Audio/FfmpegAudioPlayer.cs`: PCM path
 - `Orynivo/Audio/FfmpegPcmDecoder.cs`: FFmpeg PCM decoder process with an
@@ -76,7 +82,10 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - `third_party/cwasio/`: pinned MIT-licensed cwASIO host and compatibility sources
 - `Orynivo/SettingsView.*`: two-column settings view embedded in the main
   content area, with navigation on the left and the selected section on the
-  right
+  right; the output-profile dropdown shows a compact `Backend  ·  Device`
+  summary line (`OutputProfileSummaryTextBlock`) beneath it when a profile is
+  selected; `NavigateToSection(tag)` and `ScrollToEqualizerSection()` allow
+  the transport quick-pick buttons to jump directly into a settings section
 - `Orynivo/ThemeManager.cs`: sets global Avalonia resources for light and dark themes
 - `Orynivo/Controls/DataGridColumnWidthStore.cs`: validates, captures, and
   restores per-table pixel widths
@@ -107,6 +116,14 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - `AppSettings.PlaybackQueuePaths` and `PlaybackQueueIndex` preserve the editable
   **Up next** queue across restarts. Local paths and non-credential HTTP/HTTPS
   URLs may be stored; Plex-token and user-info URLs must never be persisted.
+- `AppSettings.OutputProfiles` persists all named output profiles;
+  `SelectedOutputProfileName` identifies the active one.
+  `SettingsStore.NormalizeOutputProfiles` migrates a previously configured
+  single device to a profile named "Standard" and derives the flat
+  `OutputBackend`, `SelectedDriverName`, `SelectedWasapiDeviceId`, and
+  `SelectedWasapiDeviceName` fields from the active profile on every load and
+  save. These flat fields remain in `AppSettings` for playback code that reads
+  them directly but must not be edited independently of their profile.
 - `AppSettings.ReplayGainMode` selects disabled, track, or album ReplayGain for PCM playback; native ASIO DSD remains bit-perfect
 - `AppSettings.AlwaysConvertDsdToPcm` forces DSF/DFF sources through FFmpeg and
   the PCM output path even when ASIO/cwASIO native DSD is available, allowing
@@ -201,13 +218,28 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - Metadata extraction stores track and album ReplayGain values. The first scan of each configured root after ReplayGain support was added refreshes unchanged tracks once so existing libraries receive those values.
 - Opening the database runs a legacy-data migration that normalizes artists, albums, and artwork and removes old per-track artwork BLOBs
 - `album_artist_rebuild_v1` rebuilds album assignments strictly from `album_artist` so compilations are not split by track artist
-- `album_title_uniqueness_v1` consolidates albums by unique title and uses the first album artist when multiple artists exist
-- `RebuildAlbumsFromAlbumArtists()` must preserve existing `artwork_id` assignments
+- `album_title_uniqueness_v1` and `album_title_artist_identity_v1` are
+  historical album migrations. `album_disc_directory_identity_v1` supersedes
+  them and rebuilds album identity from normalized album title plus the
+  physical album root (`source_path` for CUE tracks). Conventional disc
+  directories such as `CD1`, `CD 2`, `Disc 1`, and `Disk-2` resolve to their
+  common parent directory.
+- `RebuildAlbumsFromAlbumArtists()` retains its historical public name but now
+  rebuilds by title and physical album root. It keeps compilations and
+  multi-disc releases together even when their track artists or disc
+  directories differ, preserves favorites, and prefers the embedded cover
+  from each physical album.
 - Settings includes **Repair album artwork**, which re-reads a sample file per album through TagLib when historical assignments are missing
 - Settings includes **Download missing artwork**, using Cover Art Archive for albums with a `musicbrainz_release_id`
 - Missing covers show a placeholder and manual MusicBrainz search by editable album title
+- Manual MusicBrainz cover searches replace every character other than Unicode
+  letters and numbers with a separating space before submitting the album title.
 - The manual cover-search dialog uses the themed native title bar, shows search activity and explicit empty results, and can be run repeatedly
 - Album artwork has a context menu for deletion or reassignment through manual MusicBrainz search
+- Album cover assignment, reassignment, and deletion must preserve the selected
+  album plus the exact table/artwork vertical offset across the required list
+  reload. Artist-list reloads after rename follow the same rule; manual artist
+  image changes update the existing row without rebinding.
 - The album track detail header includes a themed heart button bound to the
   album's favorite state. Toggling it updates `albums.is_favorite` in place
   without leaving the detail view, including when opened from a favorites-only
@@ -451,6 +483,11 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   volume bidirectionally and the native ASIO bridge applies an atomic volume
   factor in its callback. Per-track ReplayGain remains part of PCM sample
   preparation.
+- `StartPlaybackAsync` accepts an optional `initialPosition` parameter. When
+  provided, the new player is seeked to that position immediately after
+  creation and before transport UI setup, ensuring no audio from position 0 is
+  heard. Used by the output quick-pick popup to resume at the exact track
+  position after a device switch.
 - The transport action buttons for artist information, lyrics, favorite, and shuffle are left-aligned above the position slider; previous/play/next remain independently centered
 - When the transport area becomes narrow, the centered previous/play/next group shifts right only enough to keep a 12 px gap from the left action buttons
 - The position slider keeps the standard thumb size but exposes a 30 px transparent vertical hit area; clicking anywhere in that area updates the seek position while the visible track remains 3 px high
@@ -523,7 +560,12 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - The album-detail card above its track table stretches across the available
   content width. Its favorite button appears immediately before the album title;
   cover search and **Save as playlist** remain adjacent themed actions.
-- The bottom transport bar shows artwork and track information, favorite state, playback controls, position, and volume
+- The bottom transport bar shows 58 × 58 px album artwork, track information,
+  favorite state, playback controls, position, volume, and two quick-pick
+  buttons (EQ and Output) below the volume control. The EQ popup contains a
+  profile ComboBox, a ⚙ settings button, and a themed enable/disable checkbox
+  (`PopupCheckBoxTheme`). The Output popup contains a profile ComboBox and a
+  ⚙ settings button. Both buttons use vector SVG path icons and tooltips.
 - **Up next** is a top-level sidebar view using the shared track table styling.
   It displays queue order, title, artist, album, duration, and themed
   move/remove actions, plus a header action to save the queue as a playlist.
@@ -679,10 +721,15 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 
 - **Artists**: distinct alphabetical artist list with table and artwork-card
   modes; double-click opens albums containing that artist
-- **Albums**: normalized unique-title list with favorite, 96 px thumbnail,
-  album, album artist, and year, plus a switchable artwork grid using 320 px
-  thumbnails
-- Album views show the album artist rather than combining track artists; when multiple album artists exist, the first is used
+- **Albums**: normalized title-plus-physical-album-root list with favorite,
+  96 px thumbnail, album, album artist, and year, plus a switchable artwork
+  grid using 320 px thumbnails. Equal titles in different album roots are
+  separate album records and open separate full detail headers and covers.
+  Compilation tracks and conventional `CD1`/`CD2` sibling directories remain
+  one album.
+- Album views show a common album artist when one exists. The artist is display
+  metadata and is not part of album identity; differing artists inside one
+  physical album directory therefore do not split compilations.
 - Album images are converted to `ImageSource` only when visible elements load
 - `ContentRow` implements `INotifyPropertyChanged` so asynchronously loaded artwork appears immediately
 - **Now Playing**: shows a 96 px thumbnail and track favorite button; the button is disabled when the current file has no database track
@@ -690,8 +737,25 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   fixed-size artwork cards from the top-left; sparse artist/album card result
   sets must not be vertically centered. It uses `StyledProperty` for
   `ItemWidth` and `ItemHeight`
-- **Album tracks**: `GetTrackListByAlbum(albumId)` sorts by disc, track number, and file name; playback queues all visible album tracks
+- **Album tracks**: `GetTrackListByAlbum(albumId)` sorts by disc, track number,
+  and file name. Normalized album IDs represent one title and physical album
+  root. Multi-disc releases keep one full album header while the detail view
+  renders separate track groups for their actual `CD1`/`CD2` directories and
+  queues only the selected group on double-click.
+- Nested multi-disc track grids and their outer album `ScrollViewer` disable
+  focus-triggered bring-into-view behavior. Selecting a row must not scroll the
+  complete album page or move its directory header before a double-click.
+- Each nested directory/disc `DataGrid` stretches to the available width,
+  disables both internal scrollbars through the DataGrid's direct scrollbar
+  properties, and uses its complete column-header plus row height. Only the
+  outer album `ScrollViewer` scrolls the grouped detail page.
 - When album tracks are opened from an artist drill-down, the list initially contains only tracks by that artist; a localized **Show all album tracks** switch removes the artist filter and rebuilds the visible playback queue
+- Artist-filtered compilation details always retain the full album cover
+  header, metadata, favorite/cover/playlist actions, and the **Show all album
+  tracks** switch. CD/directory group headers appear below it only when the
+  current filter produces more than one physical group. Enabling the switch
+  includes every directory assigned to the album; disabling it restores the
+  artist filter.
 - The album-track view has a centered header with a large 240 px cover, album title, album artist, and optional year; artwork can be searched, reassigned, or deleted
 - **Favorites**: artist, album, and track lists and album cards can toggle their
   direct favorite flags; Artists and Albums expose a Favorites-only header
@@ -701,7 +765,10 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   drill-downs, dashboard links, playlists, podcasts, radio, folder, and Plex
   library views. It is hidden on the initial view until a real return target
   exists. Plex child browsing may additionally use its existing intra-Plex stack
-  before returning through the global stack.
+  before returning through the global stack. Album and artist table/artwork
+  states retain both the selected entity and exact vertical offset; artwork
+  restoration appends virtualized pages through the saved viewport and applies
+  the offset only after the normal rebind reset and layout pass have completed.
 - Visible artist and album names act as links across tables, search results, artwork cards, album headers, artist profiles, dashboard cards, and Now Playing; artist links open the artist's albums and album links open the album's tracks
 - Explicit sidebar navigation clears drill-down filters, including when the already selected item is clicked again
 - **Tracks**: title-sorted list with combinable Favorites, Genre, Audio Type, and Bitrate facets; counts reflect the other active filters and unavailable unselected values are hidden

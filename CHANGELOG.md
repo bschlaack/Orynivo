@@ -4,6 +4,80 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.11.0] - 2026-06-25
+
+### Added
+
+- Added **EQ** and **Output** quick-pick buttons to the right side of the
+  transport bar (below the volume control). The EQ button opens a popup with
+  an equalizer-profile ComboBox, a ⚙ button that navigates to Settings >
+  Equalizer, and a themed enable/disable checkbox. The Output button opens a
+  popup with an output-profile ComboBox and a ⚙ button that navigates to
+  Settings > Audio Device. Both buttons use vector path icons, tooltips, and
+  respect the active light/dark theme. (`EqPickerButton`, `OutputPickerButton`,
+  `EqPickerPopup`, `OutputPickerPopup`, `PopupCheckBoxTheme`)
+- The output-profile dropdown in Settings now shows a compact summary line
+  (e.g. `WASAPI  ·  Realtek HD Audio`) beneath it when a profile is selected.
+- Increased the transport album artwork from 42 × 42 px to 58 × 58 px to
+  better fill the taller transport bar.
+- Added named **output profiles** to Settings. The output device section is
+  replaced by a dropdown listing saved profiles and three buttons: **Ausgabe
+  erstellen** opens a dialog to pick a name, backend (WASAPI, Steinberg ASIO, or
+  cwASIO), and device, then saves and immediately selects the new profile;
+  **Ausgabe konfigurieren** re-opens the dialog for the selected profile;
+  **Ausgabe löschen** removes it after confirmation. Both action buttons are
+  disabled when no profile is selected. An existing single-device configuration
+  is automatically migrated to a profile named "Standard" on first launch.
+  (`OutputProfile`, `OutputProfileDialog`, `AppSettings.OutputProfiles`,
+  `AppSettings.SelectedOutputProfileName`, `SettingsStore.NormalizeOutputProfiles`)
+
+### Fixed
+
+- Switching the output profile via the transport quick-pick popup now resumes
+  playback at the exact position the track was at before the device change.
+  `StartPlaybackAsync` accepts an `initialPosition` parameter that seeks the
+  new player immediately after creation, before any UI updates or timer ticks.
+- Sanitized manual MusicBrainz cover-search queries to contain only letters,
+  numbers, and separating spaces, preventing punctuation such as hyphens from
+  interfering with album matches.
+- Fixed artist-filtered compilation albums hiding the full album header when
+  opened from an artist drill-down. The cover, album metadata, actions, and
+  **Show all album tracks** option now remain visible above the filtered
+  tracks. CD/directory headings are shown only when the current result contains
+  multiple physical groups; enabling the option shows every assigned disc and
+  track, while disabling it returns to the artist-filtered result.
+- Fixed selecting a track in a multi-disc album scrolling the complete grouped
+  album view upward before a double-click could complete. The outer album
+  scroller and nested disc tables no longer request ancestor bring-into-view
+  movement when row focus changes.
+- Removed redundant horizontal and vertical scrollbars from each nested
+  directory/disc track table. Every table now stretches to the album viewport
+  and expands to its complete header-plus-row height, leaving scrolling solely
+  to the outer album view.
+- Fixed Back navigation from album-track and artist drill-down views returning
+  to an unrelated position. Navigation history now preserves the selected row
+  and exact vertical offset for album and artist table/artwork modes, restores
+  paged artwork rows before applying the offset, and waits until layout has
+  completed so the normal rebind reset cannot overwrite the restored position.
+- Preserved the selected album and exact table/artwork scroll position after
+  assigning, replacing, or deleting a cover. Artist-list reloads after a rename
+  use the same restoration path, while manual artist-image replacement updates
+  the visible row in place without rebinding the list.
+- Fixed the cover-search confirmation button clipping the end of its localized
+  label. The button now sizes to its complete text while retaining a consistent
+  minimum size.
+- Fixed duplicate album copies appearing as one interleaved track list. Each
+  physical album directory now resolves to its own album entry, full cover
+  header, track list, and playback queue. The detail view retains a grouped
+  fallback for inconsistent legacy assignments and derives those headings from
+  the actual track metadata.
+- Changed normalized album identity from title-only to album title plus
+  physical album root. Equal titles stored in different album folders appear
+  independently, while compilations remain together. Conventional multi-disc
+  subfolders such as `CD1`, `CD 2`, `Disc 1`, and `Disk-2` now resolve to their
+  common parent album and are shown as separate disc groups inside one full
+  album detail view. Existing libraries migrate automatically.
+
 ## [0.10.0] - 2026-06-22
 
 ### Added

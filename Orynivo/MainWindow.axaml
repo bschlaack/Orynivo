@@ -138,6 +138,52 @@
             </Style>
         </ControlTheme>
 
+        <!-- Popup checkbox - theme-aware colors matching AppInputBrush/AppPrimaryTextBrush -->
+        <ControlTheme x:Key="PopupCheckBoxTheme" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Grid Background="Transparent">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="18"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border x:Name="CheckBorder"
+                                Width="16" Height="16"
+                                HorizontalAlignment="Left" VerticalAlignment="Center"
+                                Background="{DynamicResource AppInputBrush}"
+                                BorderBrush="{DynamicResource AppInputBorderBrush}"
+                                BorderThickness="1" CornerRadius="3">
+                            <Path x:Name="CheckMark"
+                                  Width="9" Height="7"
+                                  Data="M 0 3.5 L 3 6.5 L 9 0"
+                                  Stroke="White" StrokeThickness="2"
+                                  StrokeLineCap="Round" StrokeJoin="Round"
+                                  IsVisible="False"/>
+                        </Border>
+                        <ContentPresenter Grid.Column="1"
+                                          Content="{TemplateBinding Content}"
+                                          Margin="8,0,0,0"
+                                          TextBlock.FontSize="{TemplateBinding FontSize}"
+                                          TextBlock.Foreground="{TemplateBinding Foreground}"
+                                          VerticalAlignment="Center"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter>
+            <Style Selector="^:pointerover /template/ Border#CheckBorder">
+                <Setter Property="BorderBrush" Value="#6C63FF"/>
+            </Style>
+            <Style Selector="^:checked /template/ Border#CheckBorder">
+                <Setter Property="Background" Value="#6C63FF"/>
+                <Setter Property="BorderBrush" Value="#6C63FF"/>
+            </Style>
+            <Style Selector="^:checked /template/ Path#CheckMark">
+                <Setter Property="IsVisible" Value="True"/>
+            </Style>
+        </ControlTheme>
+
         <!-- Settings button -->
         <ControlTheme x:Key="SidebarBtnTheme" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
@@ -1891,6 +1937,18 @@
                           FontSize="12"
                           LoadingRow="ContentDataGrid_OnLoadingRow"
                           DoubleTapped="ContentDataGrid_OnMouseDoubleClick"/>
+
+                <ScrollViewer x:Name="AlbumFolderGroupsScrollViewer"
+                              Grid.Row="1"
+                              IsVisible="False"
+                              Background="{DynamicResource AppContentBrush}"
+                              BringIntoViewOnFocusChange="False"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel x:Name="AlbumFolderGroupsPanel"
+                                Margin="24,22,24,24"
+                                Spacing="18"/>
+                </ScrollViewer>
             </Grid>
 
             <ScrollViewer x:Name="SearchResultsScrollViewer"
@@ -2554,10 +2612,10 @@
                 <!-- Now playing -->
                 <Grid VerticalAlignment="Center" Margin="0,0,16,0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="52"/>
+                        <ColumnDefinition Width="68"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <Border Width="42" Height="42" Background="{DynamicResource AppArtworkPlaceholderBrush}" CornerRadius="5">
+                    <Border Width="58" Height="58" Background="{DynamicResource AppArtworkPlaceholderBrush}" CornerRadius="6">
                         <Image x:Name="NowPlayingArtworkImage" Stretch="UniformToFill"/>
                     </Border>
                     <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
@@ -2724,22 +2782,134 @@
                     </Grid>
                 </Grid>
 
-                <!-- Volume -->
+                <!-- EQ Picker Popup -->
+                <Popup x:Name="EqPickerPopup"
+                       Grid.Column="2"
+                       PlacementTarget="{Binding ElementName=EqPickerButton}"
+                       Placement="Top"
+                       IsLightDismissEnabled="True">
+                    <Border Margin="0,0,0,8"
+                            Width="300"
+                            Padding="14,12"
+                            CornerRadius="10"
+                            Background="{DynamicResource AppSurfaceBrush}"
+                            BorderBrush="{DynamicResource AppInputBorderBrush}"
+                            BorderThickness="1">
+                        <StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <ComboBox x:Name="EqPickerComboBox"
+                                          Height="30"
+                                          HorizontalAlignment="Stretch"
+                                          DisplayMemberBinding="{Binding Name}"
+                                          SelectionChanged="EqPickerComboBox_OnSelectionChanged"/>
+                                <Button Grid.Column="1"
+                                        Width="34" Height="30"
+                                        Margin="8,0,0,0"
+                                        Theme="{StaticResource TransportBtnTheme}"
+                                        ToolTip.Tip="{DynamicResource L_Settings}"
+                                        Click="EqPickerSettingsButton_OnClick">
+                                    <TextBlock Text="⚙" FontSize="14"/>
+                                </Button>
+                            </Grid>
+                            <CheckBox x:Name="EqPickerEnabledCheckBox"
+                                      Margin="2,10,0,0"
+                                      Theme="{StaticResource PopupCheckBoxTheme}"
+                                      Content="{DynamicResource L_EqualizerEnabled}"
+                                      IsCheckedChanged="EqPickerEnabledCheckBox_OnIsCheckedChanged"/>
+                        </StackPanel>
+                    </Border>
+                </Popup>
+
+                <!-- Output Picker Popup -->
+                <Popup x:Name="OutputPickerPopup"
+                       Grid.Column="2"
+                       PlacementTarget="{Binding ElementName=OutputPickerButton}"
+                       Placement="Top"
+                       IsLightDismissEnabled="True">
+                    <Border Margin="0,0,0,8"
+                            Width="300"
+                            Padding="14,12"
+                            CornerRadius="10"
+                            Background="{DynamicResource AppSurfaceBrush}"
+                            BorderBrush="{DynamicResource AppInputBorderBrush}"
+                            BorderThickness="1">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <ComboBox x:Name="OutputPickerComboBox"
+                                      Height="30"
+                                      HorizontalAlignment="Stretch"
+                                      DisplayMemberBinding="{Binding Name}"
+                                      SelectionChanged="OutputPickerComboBox_OnSelectionChanged"/>
+                            <Button Grid.Column="1"
+                                    Width="34" Height="30"
+                                    Margin="8,0,0,0"
+                                    Theme="{StaticResource TransportBtnTheme}"
+                                    ToolTip.Tip="{DynamicResource L_Settings}"
+                                    Click="OutputPickerSettingsButton_OnClick">
+                                <TextBlock Text="⚙" FontSize="14"/>
+                            </Button>
+                        </Grid>
+                    </Border>
+                </Popup>
+
+                <!-- Volume + quick-pick buttons stacked vertically (right column) -->
                 <StackPanel Grid.Column="2"
-                            Orientation="Horizontal"
                             HorizontalAlignment="Right"
                             VerticalAlignment="Center">
-                    <TextBlock Text="🔊" Foreground="#6666AA" FontSize="13"
-                               VerticalAlignment="Center" Margin="0,0,10,0"/>
-                    <Slider x:Name="VolumeSlider"
-                            Theme="{StaticResource DarkSliderTheme}"
-                            Width="100" Minimum="0" Maximum="1" Value="1"
-                            VerticalAlignment="Center"
-                            ValueChanged="VolumeSlider_OnValueChanged"/>
-                    <TextBlock x:Name="VolumeValueTextBlock"
-                               Foreground="#6666AA" FontSize="11" Width="44"
-                               VerticalAlignment="Center" Margin="10,0,0,0"
-                               Text="100 %"/>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="🔊" Foreground="#6666AA" FontSize="13"
+                                   VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <Slider x:Name="VolumeSlider"
+                                Theme="{StaticResource DarkSliderTheme}"
+                                Width="100" Minimum="0" Maximum="1" Value="1"
+                                VerticalAlignment="Center"
+                                ValueChanged="VolumeSlider_OnValueChanged"/>
+                        <TextBlock x:Name="VolumeValueTextBlock"
+                                   Foreground="#6666AA" FontSize="11" Width="44"
+                                   VerticalAlignment="Center" Margin="10,0,0,0"
+                                   Text="100 %"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                Margin="0,6,0,0">
+                        <Button x:Name="EqPickerButton"
+                                Theme="{StaticResource TransportBtnTheme}"
+                                ToolTip.Tip="{DynamicResource L_Equalizer}"
+                                Click="EqPickerButton_OnClick">
+                            <Viewbox Width="17" Height="17">
+                                <Canvas Width="24" Height="24">
+                                    <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                          StrokeThickness="1.8"
+                                          StrokeLineCap="Round"
+                                          Data="M6,4 L6,20 M12,4 L12,20 M18,4 L18,20 M3,9 L9,9 M9,14 L15,14 M15,17 L21,17"/>
+                                </Canvas>
+                            </Viewbox>
+                        </Button>
+                        <Button x:Name="OutputPickerButton"
+                                Theme="{StaticResource TransportBtnTheme}"
+                                Margin="4,0,0,0"
+                                ToolTip.Tip="{DynamicResource L_OutputDevice}"
+                                Click="OutputPickerButton_OnClick">
+                            <Viewbox Width="17" Height="17">
+                                <Canvas Width="24" Height="24">
+                                    <Path Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                          Data="M4,9 L4,15 L8,15 L13,19 L13,5 L8,9 Z"/>
+                                    <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                          StrokeThickness="1.8"
+                                          StrokeLineCap="Round"
+                                          Fill="Transparent"
+                                          Data="M16,9 Q19,12 16,15 M19,6 Q23,12 19,18"/>
+                                </Canvas>
+                            </Viewbox>
+                        </Button>
+                    </StackPanel>
                 </StackPanel>
             </Grid>
         </Border>
