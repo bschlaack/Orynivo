@@ -112,6 +112,10 @@ plus a multi-resolution Windows application icon based on the standalone logo.
   `CD1`/`CD2` or `Disc 1`/`Disc 2` subfolders appear as separate groups inside
   one multi-disc album detail view. Disc tables expand fully without their own
   scrollbars, and row selection does not move the outer page.
+- Opening a compilation from an artist keeps the full album header visible,
+  initially filters its tracks to that artist, and provides a switch to show
+  every track across all assigned discs. Physical directory/disc headings are
+  shown only when the current result contains multiple groups.
 - Playback history for local tracks, podcast episodes, and internet-radio
   sessions, including position and completion state
 - Artwork downloads through the Cover Art Archive and manual MusicBrainz search

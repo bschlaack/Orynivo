@@ -10,6 +10,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Fixed artist-filtered compilation albums hiding the full album header when
+  opened from an artist drill-down. The cover, album metadata, actions, and
+  **Show all album tracks** option now remain visible above the filtered
+  tracks. CD/directory headings are shown only when the current result contains
+  multiple physical groups; enabling the option shows every assigned disc and
+  track, while disabling it returns to the artist-filtered result.
 - Fixed selecting a track in a multi-disc album scrolling the complete grouped
   album view upward before a double-click could complete. The outer album
   scroller and nested disc tables no longer request ancestor bring-into-view

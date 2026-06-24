@@ -721,6 +721,12 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   properties, and uses its complete column-header plus row height. Only the
   outer album `ScrollViewer` scrolls the grouped detail page.
 - When album tracks are opened from an artist drill-down, the list initially contains only tracks by that artist; a localized **Show all album tracks** switch removes the artist filter and rebuilds the visible playback queue
+- Artist-filtered compilation details always retain the full album cover
+  header, metadata, favorite/cover/playlist actions, and the **Show all album
+  tracks** switch. CD/directory group headers appear below it only when the
+  current filter produces more than one physical group. Enabling the switch
+  includes every directory assigned to the album; disabling it restores the
+  artist filter.
 - The album-track view has a centered header with a large 240 px cover, album title, album artist, and optional year; artwork can be searched, reassigned, or deleted
 - **Favorites**: artist, album, and track lists and album cards can toggle their
   direct favorite flags; Artists and Albums expose a Favorites-only header

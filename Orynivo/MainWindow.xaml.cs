@@ -4357,24 +4357,8 @@ public partial class MainWindow : Window
         ContentCountTextBlock.Text = LocalizationManager.FormatTrackCount(rows.Count);
         UpdateAlphabetIndex(null, false);
         ApplyAlbumDetailHeader(result.Album);
-        if (result.Album is not null)
-        {
-            var sharedHeaderConflicts = groupedRows.Any(group =>
-                !string.Equals(
-                    NormalizeAlbumGroupValue(group.Album),
-                    NormalizeAlbumGroupValue(result.Album.Album),
-                    StringComparison.Ordinal) ||
-                !string.Equals(
-                    NormalizeAlbumGroupValue(group.Artist),
-                    NormalizeAlbumGroupValue(result.Album.DisplayArtist),
-                    StringComparison.Ordinal) ||
-                !string.Equals(
-                    group.Year,
-                    result.Album.Year?.ToString(CultureInfo.CurrentCulture),
-                    StringComparison.Ordinal));
-            if (groupedRows.Count > 1 || sharedHeaderConflicts)
-                ShowAlbumFolderGroups(groupedRows, sharedHeaderConflicts);
-        }
+        if (result.Album is not null && groupedRows.Count > 1)
+            ShowAlbumFolderGroups(groupedRows);
     }
 
     private static string NormalizeAlbumGroupValue(string? value) =>
@@ -4430,21 +4414,9 @@ public partial class MainWindow : Window
         HideAlbumFolderGroups();
     }
 
-    private void ShowAlbumFolderGroups(
-        IReadOnlyList<AlbumTrackGroup> groups,
-        bool sharedHeaderConflicts)
+    private void ShowAlbumFolderGroups(IReadOnlyList<AlbumTrackGroup> groups)
     {
         AlbumFolderGroupsPanel.Children.Clear();
-        var hasDifferentMetadata = groups
-            .Select(group => (
-                Album: NormalizeAlbumGroupValue(group.Album),
-                Artist: NormalizeAlbumGroupValue(group.Artist),
-                Year: group.Year))
-            .Distinct()
-            .Skip(1)
-            .Any();
-        if (sharedHeaderConflicts || hasDifferentMetadata)
-            AlbumDetailHeader.IsVisible = false;
 
         foreach (var group in groups)
         {
