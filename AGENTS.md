@@ -201,19 +201,26 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - Metadata extraction stores track and album ReplayGain values. The first scan of each configured root after ReplayGain support was added refreshes unchanged tracks once so existing libraries receive those values.
 - Opening the database runs a legacy-data migration that normalizes artists, albums, and artwork and removes old per-track artwork BLOBs
 - `album_artist_rebuild_v1` rebuilds album assignments strictly from `album_artist` so compilations are not split by track artist
-- `album_title_uniqueness_v1` is the historical title-only consolidation
-  migration. `album_title_artist_identity_v1` supersedes it and rebuilds album
-  identity from normalized album title plus album artist, so equal titles by
-  different artists remain separate.
-- `RebuildAlbumsFromAlbumArtists()` preserves favorites and artwork only for
-  the matching title/album-artist pair. Newly separated albums recover their
-  own embedded cover from a sample source file instead of inheriting another
-  artist's artwork.
+- `album_title_uniqueness_v1` and `album_title_artist_identity_v1` are
+  historical album migrations. `album_disc_directory_identity_v1` supersedes
+  them and rebuilds album identity from normalized album title plus the
+  physical album root (`source_path` for CUE tracks). Conventional disc
+  directories such as `CD1`, `CD 2`, `Disc 1`, and `Disk-2` resolve to their
+  common parent directory.
+- `RebuildAlbumsFromAlbumArtists()` retains its historical public name but now
+  rebuilds by title and physical album root. It keeps compilations and
+  multi-disc releases together even when their track artists or disc
+  directories differ, preserves favorites, and prefers the embedded cover
+  from each physical album.
 - Settings includes **Repair album artwork**, which re-reads a sample file per album through TagLib when historical assignments are missing
 - Settings includes **Download missing artwork**, using Cover Art Archive for albums with a `musicbrainz_release_id`
 - Missing covers show a placeholder and manual MusicBrainz search by editable album title
 - The manual cover-search dialog uses the themed native title bar, shows search activity and explicit empty results, and can be run repeatedly
 - Album artwork has a context menu for deletion or reassignment through manual MusicBrainz search
+- Album cover assignment, reassignment, and deletion must preserve the selected
+  album plus the exact table/artwork vertical offset across the required list
+  reload. Artist-list reloads after rename follow the same rule; manual artist
+  image changes update the existing row without rebinding.
 - The album track detail header includes a themed heart button bound to the
   album's favorite state. Toggling it updates `albums.is_favorite` in place
   without leaving the detail view, including when opened from a favorites-only
@@ -685,13 +692,15 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 
 - **Artists**: distinct alphabetical artist list with table and artwork-card
   modes; double-click opens albums containing that artist
-- **Albums**: normalized title-plus-album-artist list with favorite, 96 px
-  thumbnail, album, album artist, and year, plus a switchable artwork grid
-  using 320 px thumbnails. Equal album titles by different artists are
+- **Albums**: normalized title-plus-physical-album-root list with favorite,
+  96 px thumbnail, album, album artist, and year, plus a switchable artwork
+  grid using 320 px thumbnails. Equal titles in different album roots are
   separate album records and open separate full detail headers and covers.
-- Album views show the album artist rather than combining track artists; when
-  several album artists are encoded in one field, the first is used for album
-  identity.
+  Compilation tracks and conventional `CD1`/`CD2` sibling directories remain
+  one album.
+- Album views show a common album artist when one exists. The artist is display
+  metadata and is not part of album identity; differing artists inside one
+  physical album directory therefore do not split compilations.
 - Album images are converted to `ImageSource` only when visible elements load
 - `ContentRow` implements `INotifyPropertyChanged` so asynchronously loaded artwork appears immediately
 - **Now Playing**: shows a 96 px thumbnail and track favorite button; the button is disabled when the current file has no database track
@@ -700,12 +709,17 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   sets must not be vertically centered. It uses `StyledProperty` for
   `ItemWidth` and `ItemHeight`
 - **Album tracks**: `GetTrackListByAlbum(albumId)` sorts by disc, track number,
-  and file name. When matching tracks come from multiple physical directories,
-  album titles, or primary track artists, the detail view renders separate
-  metadata headers and track tables from the actual track metadata. It displays
-  the physical album path (using `source_path` for CUE tracks), suppresses a
-  conflicting shared album header, and queues only the selected group on
-  double-click.
+  and file name. Normalized album IDs represent one title and physical album
+  root. Multi-disc releases keep one full album header while the detail view
+  renders separate track groups for their actual `CD1`/`CD2` directories and
+  queues only the selected group on double-click.
+- Nested multi-disc track grids and their outer album `ScrollViewer` disable
+  focus-triggered bring-into-view behavior. Selecting a row must not scroll the
+  complete album page or move its directory header before a double-click.
+- Each nested directory/disc `DataGrid` stretches to the available width,
+  disables both internal scrollbars through the DataGrid's direct scrollbar
+  properties, and uses its complete column-header plus row height. Only the
+  outer album `ScrollViewer` scrolls the grouped detail page.
 - When album tracks are opened from an artist drill-down, the list initially contains only tracks by that artist; a localized **Show all album tracks** switch removes the artist filter and rebuilds the visible playback queue
 - The album-track view has a centered header with a large 240 px cover, album title, album artist, and optional year; artwork can be searched, reassigned, or deleted
 - **Favorites**: artist, album, and track lists and album cards can toggle their
@@ -716,7 +730,10 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   drill-downs, dashboard links, playlists, podcasts, radio, folder, and Plex
   library views. It is hidden on the initial view until a real return target
   exists. Plex child browsing may additionally use its existing intra-Plex stack
-  before returning through the global stack.
+  before returning through the global stack. Album and artist table/artwork
+  states retain both the selected entity and exact vertical offset; artwork
+  restoration appends virtualized pages through the saved viewport and applies
+  the offset only after the normal rebind reset and layout pass have completed.
 - Visible artist and album names act as links across tables, search results, artwork cards, album headers, artist profiles, dashboard cards, and Now Playing; artist links open the artist's albums and album links open the album's tracks
 - Explicit sidebar navigation clears drill-down filters, including when the already selected item is clicked again
 - **Tracks**: title-sorted list with combinable Favorites, Genre, Audio Type, and Bitrate facets; counts reflect the other active filters and unavailable unselected values are hidden

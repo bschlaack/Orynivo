@@ -10,22 +10,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Fixed selecting a track in a multi-disc album scrolling the complete grouped
+  album view upward before a double-click could complete. The outer album
+  scroller and nested disc tables no longer request ancestor bring-into-view
+  movement when row focus changes.
+- Removed redundant horizontal and vertical scrollbars from each nested
+  directory/disc track table. Every table now stretches to the album viewport
+  and expands to its complete header-plus-row height, leaving scrolling solely
+  to the outer album view.
+- Fixed Back navigation from album-track and artist drill-down views returning
+  to an unrelated position. Navigation history now preserves the selected row
+  and exact vertical offset for album and artist table/artwork modes, restores
+  paged artwork rows before applying the offset, and waits until layout has
+  completed so the normal rebind reset cannot overwrite the restored position.
+- Preserved the selected album and exact table/artwork scroll position after
+  assigning, replacing, or deleting a cover. Artist-list reloads after a rename
+  use the same restoration path, while manual artist-image replacement updates
+  the visible row in place without rebinding the list.
 - Fixed the cover-search confirmation button clipping the end of its localized
   label. The button now sizes to its complete text while retaining a consistent
   minimum size.
-- Fixed duplicate album copies appearing as one interleaved track list. When an
-  album resolves to multiple physical source directories, the album detail view
-  now renders one metadata header and track table per directory, shows each
-  album path, and starts playback from the selected physical copy. Group
-  headings use the tracks' actual album, artist, and year metadata instead of
-  the shared normalized album record; differing artists or album titles create
-  separate groups and suppress the misleading shared header.
-- Changed normalized album identity from title-only to album title plus album
-  artist. Equal titles by different artists now appear as independent albums
-  with their own full cover header, favorite state, artwork, and track list.
-  Existing libraries migrate automatically; newly separated records recover
-  embedded artwork from their own source files rather than copying another
-  artist's cover.
+- Fixed duplicate album copies appearing as one interleaved track list. Each
+  physical album directory now resolves to its own album entry, full cover
+  header, track list, and playback queue. The detail view retains a grouped
+  fallback for inconsistent legacy assignments and derives those headings from
+  the actual track metadata.
+- Changed normalized album identity from title-only to album title plus
+  physical album root. Equal titles stored in different album folders appear
+  independently, while compilations remain together. Conventional multi-disc
+  subfolders such as `CD1`, `CD 2`, `Disc 1`, and `Disk-2` now resolve to their
+  common parent album and are shown as separate disc groups inside one full
+  album detail view. Existing libraries migrate automatically.
 
 ## [0.10.0] - 2026-06-22
 

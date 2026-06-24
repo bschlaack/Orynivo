@@ -197,7 +197,8 @@ public partial class MainWindow : Window
         long? SelectedId,
         long? ArtistFilterId,
         string? ArtistFilterName,
-        string? SearchQuery = null);
+        string? SearchQuery = null,
+        double? VerticalOffset = null);
 
     private sealed class RadioStationViewModel
     {
@@ -1116,9 +1117,10 @@ public partial class MainWindow : Window
                 GetSelectedContentRowId(),
                 null,
                 null,
-                SearchTextBox.Text ?? string.Empty);
+                SearchTextBox.Text ?? string.Empty,
+                CaptureCurrentVerticalOffset());
 
-        if (AlbumDetailHeader.IsVisible && _activeAlbumFilterId is long albumId)
+        if (_activeAlbumFilterId is long albumId)
             return new NavigationState(
                 "AlbumTracks",
                 albumId,
@@ -1134,10 +1136,11 @@ public partial class MainWindow : Window
         {
             return new NavigationState(
                 "ArtistAlbums",
+                GetSelectedContentRowId(),
                 artistId,
-                null,
-                null,
-                _activeArtistFilterName);
+                _activeArtistFilterName,
+                _activeArtistFilterName,
+                CaptureCurrentVerticalOffset());
         }
 
         if (!string.IsNullOrWhiteSpace(_currentTopLevelTag) &&
@@ -1148,10 +1151,31 @@ public partial class MainWindow : Window
                 GetSelectedContentRowId(),
                 _activeArtistFilterId,
                 _activeArtistFilterName,
-                SearchTextBox.Text ?? string.Empty);
+                SearchTextBox.Text ?? string.Empty,
+                CaptureCurrentVerticalOffset());
         }
 
         return null;
+    }
+
+    private double? CaptureCurrentVerticalOffset()
+    {
+        if (ContentDataGrid.IsVisible)
+        {
+            AttachContentDataGridVerticalScrollBar();
+            return _contentDataGridVerticalScrollBar?.Value;
+        }
+
+        var listBox = AlbumArtworkListBox.IsVisible
+            ? AlbumArtworkListBox
+            : ArtistArtworkListBox.IsVisible
+                ? ArtistArtworkListBox
+                : null;
+        return listBox?
+            .GetVisualDescendants()
+            .OfType<ScrollViewer>()
+            .FirstOrDefault()?
+            .Offset.Y;
     }
 
     private long? GetSelectedContentRowId()
@@ -4291,15 +4315,21 @@ public partial class MainWindow : Window
                         result.Directories.TryGetValue(track.Id, out var directory)
                             ? directory
                             : Path.GetDirectoryName(track.Path)),
-                    Album: NormalizeAlbumGroupValue(track.Album),
-                    Artist: NormalizeAlbumGroupValue(
-                        string.IsNullOrWhiteSpace(track.AlbumArtist)
-                            ? track.Artist
-                            : track.AlbumArtist),
-                    Year: track.Year))
+                    Album: NormalizeAlbumGroupValue(track.Album)))
             .Select(group =>
             {
                 var first = group.First();
+                var albumArtists = group
+                    .Select(track => ArtistNameNormalizer.NormalizeDisplayName(
+                        track.AlbumArtist))
+                    .Where(artist => artist.Length > 0)
+                    .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                    .ToList();
+                var primaryArtists = group
+                    .Select(track => ArtistNameNormalizer.NormalizeDisplayName(track.Artist))
+                    .Where(artist => artist.Length > 0)
+                    .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                    .ToList();
                 return new AlbumTrackGroup(
                     result.Directories.TryGetValue(first.Id, out var directory)
                         ? directory
@@ -4307,9 +4337,11 @@ public partial class MainWindow : Window
                     string.IsNullOrWhiteSpace(first.Album)
                         ? LocalizationManager.Current.Unknown
                         : first.Album.Trim(),
-                    string.IsNullOrWhiteSpace(first.AlbumArtist)
-                        ? first.Artist?.Trim()
-                        : first.AlbumArtist.Trim(),
+                    albumArtists.Count == 1
+                        ? albumArtists[0]
+                        : albumArtists.Count == 0 && primaryArtists.Count == 1
+                            ? primaryArtists[0]
+                            : null,
                     first.Year?.ToString(CultureInfo.CurrentCulture),
                     group.Select(ToTrackContentRow).ToList());
             })
@@ -4423,11 +4455,14 @@ public partial class MainWindow : Window
             var grid = new DataGrid
             {
                 ItemsSource = group.Rows,
-                Height = 45 + (group.Rows.Count * 40),
+                Height = 44 + (group.Rows.Count * 40),
+                HorizontalAlignment = HorizontalAlignment.Stretch,
                 Background = FindResource<IBrush>("AppContentBrush"),
                 BorderThickness = new Thickness(0),
                 RowHeight = 40,
                 ColumnHeaderHeight = 44,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
                 GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
                 HorizontalGridLinesBrush = FindResource<IBrush>("AppGridLineBrush"),
                 AutoGenerateColumns = false,
@@ -4436,9 +4471,7 @@ public partial class MainWindow : Window
                 SelectionMode = DataGridSelectionMode.Single,
                 FontSize = 12
             };
-            grid.SetValue(
-                ScrollViewer.VerticalScrollBarVisibilityProperty,
-                ScrollBarVisibility.Disabled);
+            ScrollViewer.SetBringIntoViewOnFocusChange(grid, false);
             grid.LoadingRow += ContentDataGrid_OnLoadingRow;
             grid.DoubleTapped += ContentDataGrid_OnMouseDoubleClick;
             ApplyColumns("Tracks", grid, captureCurrentWidths: false);
@@ -4639,13 +4672,14 @@ public partial class MainWindow : Window
         if (sender is not MenuItem { Tag: ContentRow { Id: long albumId } })
             return;
 
+        var verticalOffset = CaptureCurrentVerticalOffset();
         using (var db = AudioDatabase.OpenDefault())
             db.ClearArtworkFromAlbum(albumId);
 
         if (_activeAlbumFilterId == albumId)
             await ReloadAlbumDetailHeaderAsync(albumId);
         else
-            await ReloadAlbumRowsAsync();
+            await ReloadAlbumRowsAsync(albumId, verticalOffset);
     }
 
     private async void ReassignCoverMenuItem_OnClick(object? sender, RoutedEventArgs e)
@@ -4661,6 +4695,7 @@ public partial class MainWindow : Window
         if (row.Id is not long albumId)
             return;
 
+        var verticalOffset = CaptureCurrentVerticalOffset();
         var dialog = new CoverSearchWindow(row.Title ?? string.Empty) ;
         if (await dialog.ShowDialog<bool>(this) == false || dialog.SelectedResult is not { } selected)
             return;
@@ -4671,17 +4706,22 @@ public partial class MainWindow : Window
         if (_activeAlbumFilterId == albumId)
             await ReloadAlbumDetailHeaderAsync(albumId);
         else
-            await ReloadAlbumRowsAsync();
+            await ReloadAlbumRowsAsync(albumId, verticalOffset);
     }
 
-    private async Task ReloadAlbumRowsAsync()
+    private async Task ReloadAlbumRowsAsync(
+        long? selectedAlbumId = null,
+        double? verticalOffset = null)
     {
+        selectedAlbumId ??= GetSelectedContentRowId();
+        verticalOffset ??= CaptureCurrentVerticalOffset();
         var rows = await Task.Run(() => QueryRows("Albums"));
         ApplyColumns("Albums");
         ContentDataGrid.ItemsSource = rows;
         BindArtworkRows("Albums", rows);
         UpdateAlphabetIndex(rows, true);
         ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(rows.Count);
+        RestoreSelection(rows, selectedAlbumId, verticalOffset);
     }
 
     private async void BackButton_OnClick(object? sender, RoutedEventArgs e)
@@ -4749,12 +4789,15 @@ public partial class MainWindow : Window
                         : state.SearchQuery);
                 return;
 
-            case "ArtistAlbums" when state.SelectedId is long artistId:
+            case "ArtistAlbums" when state.ArtistFilterId is long artistId:
                 await ShowArtistAlbumsAsync(
                     artistId,
                     string.IsNullOrWhiteSpace(state.SearchQuery)
                         ? LocalizationManager.Current.Unknown
                         : state.SearchQuery);
+                RestoreSelectionFromCurrentItems(
+                    state.SelectedId,
+                    state.VerticalOffset);
                 return;
 
             case "Search":
@@ -4777,7 +4820,7 @@ public partial class MainWindow : Window
                 BindArtworkRows("Artists", artists);
                 UpdateAlphabetIndex(artists, true);
                 ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(artists.Count);
-                RestoreSelection(artists, state.SelectedId);
+                RestoreSelection(artists, state.SelectedId, state.VerticalOffset);
                 break;
 
             case "Albums":
@@ -4797,13 +4840,15 @@ public partial class MainWindow : Window
                 ArtistArtworkListBox.IsVisible = false;
                 UpdateAlphabetIndex(albums, true);
                 ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(albums.Count);
-                RestoreSelection(albums, state.SelectedId);
+                RestoreSelection(albums, state.SelectedId, state.VerticalOffset);
                 break;
 
             default:
                 SelectNavigationItem(state.View);
                 await ShowTopLevelViewAsync(state.View);
-                RestoreSelectionFromCurrentItems(state.SelectedId);
+                RestoreSelectionFromCurrentItems(
+                    state.SelectedId,
+                    state.VerticalOffset);
                 break;
         }
     }
@@ -4827,30 +4872,121 @@ public partial class MainWindow : Window
         }
     }
 
-    private void RestoreSelectionFromCurrentItems(long? selectedId)
+    private void RestoreSelectionFromCurrentItems(
+        long? selectedId,
+        double? verticalOffset = null)
     {
         var rows = (ContentDataGrid.ItemsSource as IEnumerable<ContentRow>)?.ToList()
                    ?? (AlbumArtworkListBox.ItemsSource as IEnumerable<ContentRow>)?.ToList()
                    ?? (ArtistArtworkListBox.ItemsSource as IEnumerable<ContentRow>)?.ToList()
                    ?? [];
-        RestoreSelection(rows, selectedId);
+        RestoreSelection(rows, selectedId, verticalOffset);
     }
 
-    private void RestoreSelection(List<ContentRow> rows, long? selectedId)
+    private void RestoreSelection(
+        List<ContentRow> rows,
+        long? selectedId,
+        double? verticalOffset = null)
     {
-        if (selectedId is not long id)
+        var row = selectedId is long id
+            ? rows.FirstOrDefault(candidate => candidate.Id == id)
+            : null;
+
+        if (ContentDataGrid.IsVisible)
+        {
+            ContentDataGrid.SelectedItem = row;
+            RestoreDataGridPositionAfterLayout(row, verticalOffset);
             return;
-        var row = rows.FirstOrDefault(r => r.Id == id);
-        if (row is null)
+        }
+
+        var listBox = AlbumArtworkListBox.IsVisible
+            ? AlbumArtworkListBox
+            : ArtistArtworkListBox.IsVisible
+                ? ArtistArtworkListBox
+                : null;
+        if (listBox is null)
             return;
-        ContentDataGrid.SelectedItem = row;
-        ContentDataGrid.ScrollIntoView(row, null);
-        EnsureArtworkRowBound(AlbumArtworkListBox, row);
-        EnsureArtworkRowBound(ArtistArtworkListBox, row);
-        AlbumArtworkListBox.SelectedItem = row;
-        AlbumArtworkListBox.ScrollIntoView(row);
-        ArtistArtworkListBox.SelectedItem = row;
-        ArtistArtworkListBox.ScrollIntoView(row);
+
+        if (row is not null)
+        {
+            EnsureArtworkRowBound(listBox, row);
+            listBox.SelectedItem = row;
+        }
+        RestoreArtworkPositionAfterLayout(listBox, row, verticalOffset);
+    }
+
+    private void RestoreDataGridPositionAfterLayout(
+        ContentRow? row,
+        double? verticalOffset)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            AttachContentDataGridVerticalScrollBar();
+            if (verticalOffset is double offset &&
+                _contentDataGridVerticalScrollBar is { } scrollBar)
+            {
+                scrollBar.Value = Math.Clamp(offset, scrollBar.Minimum, scrollBar.Maximum);
+            }
+            else if (row is not null)
+            {
+                ContentDataGrid.ScrollIntoView(row, null);
+            }
+        }, DispatcherPriority.Loaded);
+    }
+
+    private void RestoreArtworkPositionAfterLayout(
+        ListBox listBox,
+        ContentRow? row,
+        double? verticalOffset)
+    {
+        var bindingVersion = _artworkBindingVersion;
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (bindingVersion != _artworkBindingVersion)
+                return;
+
+            var scrollViewer = listBox.GetVisualDescendants()
+                .OfType<ScrollViewer>()
+                .FirstOrDefault();
+            if (scrollViewer is null)
+                return;
+
+            if (verticalOffset is double offset)
+            {
+                var itemWidth = ReferenceEquals(listBox, AlbumArtworkListBox) ? 196d : 216d;
+                var itemHeight = ReferenceEquals(listBox, AlbumArtworkListBox) ? 292d : 260d;
+                var perRow = Math.Max(1, (int)Math.Floor(scrollViewer.Viewport.Width / itemWidth));
+                var requiredItems = Math.Max(
+                    ArtworkPageSize,
+                    ((int)Math.Ceiling((offset + scrollViewer.Viewport.Height) / itemHeight) + 1) * perRow);
+                var visibleRows = ReferenceEquals(listBox, AlbumArtworkListBox)
+                    ? _visibleAlbumArtworkRows
+                    : _visibleArtistArtworkRows;
+                while (visibleRows.Count < requiredItems && AppendArtworkRows(listBox))
+                {
+                }
+
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (bindingVersion != _artworkBindingVersion)
+                        return;
+                    var restoredViewer = listBox.GetVisualDescendants()
+                        .OfType<ScrollViewer>()
+                        .FirstOrDefault();
+                    if (restoredViewer is null)
+                        return;
+                    restoredViewer.Offset = new Vector(
+                        restoredViewer.Offset.X,
+                        Math.Clamp(offset, 0, Math.Max(0, restoredViewer.Extent.Height - restoredViewer.Viewport.Height)));
+                    QueueHydrateVisibleArtworkRows(listBox);
+                    UpdateActiveAlphabetButton();
+                }, DispatcherPriority.Background);
+            }
+            else if (row is not null)
+            {
+                ScrollArtworkRowIntoViewAfterLayout(listBox, row);
+            }
+        }, DispatcherPriority.Loaded);
     }
 
     private void UpdateNowPlayingFavoriteButton()
@@ -8043,22 +8179,25 @@ public partial class MainWindow : Window
         _artistInfoDisplayedId = result.ArtistId;
         ArtistInfoTitleButton.Content = result.ArtistName;
         ArtistInfoStatusTextBlock.IsVisible = false;
-        await ReloadVisibleArtistListAsync();
+        await ReloadVisibleArtistListAsync(result.ArtistId);
         await ShowArtistInfoAsync(result.ArtistId, forceRefresh: false);
         _ = RebuildSearchIndexAfterArtistRenameAsync();
     }
 
-    private async Task ReloadVisibleArtistListAsync()
+    private async Task ReloadVisibleArtistListAsync(long? selectedArtistId = null)
     {
         if (NavListBox.SelectedItem is not ListBoxItem { Tag: "Artists" })
             return;
 
+        selectedArtistId ??= GetSelectedContentRowId();
+        var verticalOffset = CaptureCurrentVerticalOffset();
         var rows = await Task.Run(() => QueryRows("Artists"));
         ApplyColumns("Artists");
         ContentDataGrid.ItemsSource = rows;
         BindArtworkRows("Artists", rows);
         UpdateAlphabetIndex(rows, true);
         ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(rows.Count);
+        RestoreSelection(rows, selectedArtistId, verticalOffset);
     }
 
     private void ArtistInfoSourceButton_OnClick(object? sender, RoutedEventArgs e)

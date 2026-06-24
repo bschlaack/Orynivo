@@ -1896,6 +1896,7 @@
                               Grid.Row="1"
                               IsVisible="False"
                               Background="{DynamicResource AppContentBrush}"
+                              BringIntoViewOnFocusChange="False"
                               VerticalScrollBarVisibility="Auto"
                               HorizontalScrollBarVisibility="Disabled">
                     <StackPanel x:Name="AlbumFolderGroupsPanel"

@@ -1,6 +1,7 @@
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
 
 namespace Orynivo.Library;
@@ -264,7 +265,13 @@ public sealed class AudioDatabase : IDisposable
             var albumArtistId = EnsureArtist(GetFirstArtist(track.AlbumArtist ?? track.Artist), tx);
             track.AlbumArtist = GetCanonicalArtistName(albumArtistId, track.AlbumArtist ?? track.Artist);
             var artworkId = EnsureArtwork(track.CoverData, track.CoverMimeType, tx);
-            var albumId   = EnsureAlbum(track.Album, track.AlbumArtist ?? track.Artist, track.Year, artistId, artworkId, tx);
+            var albumId = EnsureAlbum(
+                track.Album,
+                track.AlbumArtist ?? track.Artist,
+                track.Year,
+                artworkId,
+                GetPhysicalAlbumDirectory(track.SourcePath ?? track.Path),
+                tx);
 
             using var cmd = _conn.CreateCommand();
             cmd.Transaction = tx;
@@ -659,12 +666,12 @@ public sealed class AudioDatabase : IDisposable
 
     private void MergeArtistAlbums(SqliteTransaction tx, long survivorId, long duplicateId)
     {
-        var duplicateAlbums = new List<(long Id, string Title, int? Year)>();
+        var duplicateAlbums = new List<(long Id, string Title, string SourceDirectory)>();
         using (var command = _conn.CreateCommand())
         {
             command.Transaction = tx;
             command.CommandText = """
-                SELECT id, title, year
+                SELECT id, title, source_directory
                 FROM albums
                 WHERE artist_id = $artist_id;
                 """;
@@ -675,7 +682,7 @@ public sealed class AudioDatabase : IDisposable
                 duplicateAlbums.Add((
                     reader.GetInt64(0),
                     reader.GetString(1),
-                    reader.IsDBNull(2) ? null : reader.GetInt32(2)));
+                    reader.GetString(2)));
             }
         }
 
@@ -686,12 +693,12 @@ public sealed class AudioDatabase : IDisposable
                 FROM albums
                 WHERE artist_id = $artist_id
                   AND title = $title COLLATE NOCASE
-                  AND year IS $year
+                  AND source_directory = $source_directory COLLATE NOCASE
                 LIMIT 1;
                 """,
                 ("$artist_id", survivorId),
                 ("$title", duplicateAlbum.Title),
-                ("$year", duplicateAlbum.Year));
+                ("$source_directory", duplicateAlbum.SourceDirectory));
 
             if (survivorAlbumId is long existingAlbumId)
             {
@@ -827,90 +834,123 @@ public sealed class AudioDatabase : IDisposable
     }
 
     /// <summary>
-    /// Rebuilds album assignments using album title and normalized album artist as
-    /// the album identity while preserving matching favorites and artwork.
+    /// Rebuilds album assignments using album title and physical source directory
+    /// as the identity while preserving matching favorites and artwork.
     /// </summary>
     public void RebuildAlbumsFromAlbumArtists()
+        => RebuildAlbumsByPhysicalDirectory();
+
+    private void RebuildAlbumsByPhysicalDirectory()
     {
         using var tx = _conn.BeginTransaction();
-        var existingStateByAlbumKey = LoadExistingAlbumStateMap(tx);
-        var existingAlbumTitles = existingStateByAlbumKey.Keys
-            .Select(key => key.Split('\u001f', 2)[0])
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
         using var select = _conn.CreateCommand();
         select.Transaction = tx;
         select.CommandText = """
             SELECT
-                COALESCE(TRIM(album), ''),
-                COALESCE(NULLIF(TRIM(album_artist), ''), NULLIF(TRIM(artist), ''), ''),
-                MIN(year),
-                MIN(artist_id),
-                MIN(path),
-                MIN(COALESCE(source_path, path))
-            FROM tracks
-            GROUP BY
-                COALESCE(TRIM(album), ''),
-                COALESCE(NULLIF(TRIM(album_artist), ''), NULLIF(TRIM(artist), ''), '');
+                t.id,
+                COALESCE(TRIM(t.album), ''),
+                NULLIF(TRIM(t.album_artist), ''),
+                NULLIF(TRIM(t.artist), ''),
+                t.year,
+                COALESCE(t.source_path, t.path),
+                al.id,
+                al.artwork_id,
+                COALESCE(al.is_favorite, 0)
+            FROM tracks t
+            LEFT JOIN albums al ON al.id = t.album_id;
             """;
         using var reader = select.ExecuteReader();
         var rows = new List<(
+            long Id,
             string Album,
-            string DisplayArtist,
+            string? AlbumArtist,
+            string? Artist,
             int? Year,
-            long? ArtistId,
-            string Path,
-            string SourcePath)>();
+            string SourcePath,
+            long? OldAlbumId,
+            long? ArtworkId,
+            bool IsFavorite)>();
         while (reader.Read())
             rows.Add((
-                reader.GetString(0),
+                reader.GetInt64(0),
                 reader.GetString(1),
-                reader.IsDBNull(2) ? null : reader.GetInt32(2),
-                reader.IsDBNull(3) ? null : reader.GetInt64(3),
-                reader.GetString(4),
-                reader.GetString(5)));
+                reader.IsDBNull(2) ? null : reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetString(3),
+                reader.IsDBNull(4) ? null : reader.GetInt32(4),
+                reader.GetString(5),
+                reader.IsDBNull(6) ? null : reader.GetInt64(6),
+                reader.IsDBNull(7) ? null : reader.GetInt64(7),
+                reader.GetInt32(8) != 0));
         reader.Close();
 
         ExecuteInTransaction(tx, "UPDATE tracks SET album_id = NULL;");
-        ExecuteInTransaction(tx, "DELETE FROM albums;");
+        ExecuteInTransaction(tx, "DROP TABLE albums;");
+        CreateAlbumsTable(tx);
         ExecuteInTransaction(tx, """
             CREATE TEMP TABLE album_rebuild_map (
                 album_title   TEXT NOT NULL,
-                album_artist  TEXT NOT NULL,
+                album_path    TEXT NOT NULL,
                 album_id      INTEGER NOT NULL,
-                PRIMARY KEY (album_title, album_artist)
+                PRIMARY KEY (album_title, album_path)
             );
             """);
 
         var albumGroups = rows
-            .GroupBy(row => MakeAlbumKey(
+            .GroupBy(row => MakeAlbumDirectoryKey(
                 row.Album,
-                GetFirstArtist(row.DisplayArtist)),
+                GetPhysicalAlbumDirectory(row.SourcePath)),
                 StringComparer.OrdinalIgnoreCase);
+        var splitOldAlbumIds = rows
+            .Where(row => row.OldAlbumId.HasValue)
+            .GroupBy(row => row.OldAlbumId!.Value)
+            .Where(group => group
+                .Select(row => MakeAlbumDirectoryKey(
+                    row.Album,
+                    GetPhysicalAlbumDirectory(row.SourcePath)))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Skip(1)
+                .Any())
+            .Select(group => group.Key)
+            .ToHashSet();
         foreach (var group in albumGroups)
         {
             var row = group.First();
-            var displayArtist = row.DisplayArtist;
-            var key = group.Key;
-            var hasExistingState = existingStateByAlbumKey.TryGetValue(key, out var state);
-            var artworkId = state.ArtworkId;
-            if (artworkId is null &&
-                !hasExistingState &&
-                existingAlbumTitles.Contains(NormalizeAlbumTitleKey(row.Album)))
+            var albumDirectory = GetPhysicalAlbumDirectory(row.SourcePath);
+            var albumArtists = group
+                .Select(item => ArtistNameNormalizer.NormalizeDisplayName(item.AlbumArtist))
+                .Where(value => value.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var primaryArtists = group
+                .Select(item => ArtistNameNormalizer.NormalizeDisplayName(item.Artist))
+                .Where(value => value.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var displayArtist = albumArtists.Count == 1
+                ? albumArtists[0]
+                : albumArtists.Count == 0 && primaryArtists.Count == 1
+                    ? primaryArtists[0]
+                    : null;
+            var oldAlbumWasSplit = group.Any(item =>
+                item.OldAlbumId is long oldAlbumId &&
+                splitOldAlbumIds.Contains(oldAlbumId));
+            var artworkId = group.Select(item => item.ArtworkId)
+                .FirstOrDefault(id => id.HasValue);
+            if (oldAlbumWasSplit)
             {
                 var artwork = TryReadEmbeddedArtwork(row.SourcePath);
                 artworkId = artwork.Data is null
-                    ? null
+                    ? artworkId
                     : EnsureArtwork(artwork.Data, artwork.MimeType, tx);
             }
             var albumId = EnsureAlbum(
                 row.Album,
                 displayArtist,
-                row.Year,
-                row.ArtistId,
+                group.Select(item => item.Year).FirstOrDefault(year => year.HasValue),
                 artworkId,
+                albumDirectory,
                 tx)!.Value;
-            if (state.IsFavorite)
+            if (group.Any(item => item.IsFavorite))
             {
                 ExecuteInTransaction(
                     tx,
@@ -918,33 +958,45 @@ public sealed class AudioDatabase : IDisposable
                     ("$album_id", albumId));
             }
 
-            foreach (var variant in group)
-            {
-                ExecuteInTransaction(tx, """
-                    INSERT OR REPLACE INTO album_rebuild_map (
-                        album_title, album_artist, album_id)
-                    VALUES ($album_title, $album_artist, $album_id);
-                    """,
-                    ("$album_title", variant.Album),
-                    ("$album_artist", variant.DisplayArtist),
-                    ("$album_id", albumId));
-            }
+            ExecuteInTransaction(tx, """
+                INSERT INTO album_rebuild_map (album_title, album_path, album_id)
+                VALUES ($album_title, $album_path, $album_id);
+                """,
+                ("$album_title", row.Album),
+                ("$album_path", albumDirectory),
+                ("$album_id", albumId));
         }
 
-        ExecuteInTransaction(tx, """
-            UPDATE tracks
-            SET album_id = (
-                SELECT map.album_id
-                FROM album_rebuild_map map
-                WHERE map.album_title = COALESCE(TRIM(tracks.album), '')
-                  AND map.album_artist = COALESCE(
-                      NULLIF(TRIM(tracks.album_artist), ''),
-                      NULLIF(TRIM(tracks.artist), ''),
-                      '')
-                LIMIT 1
-            );
-            DROP TABLE album_rebuild_map;
-            """);
+        foreach (var group in albumGroups)
+        {
+            var albumTitle = group.First().Album;
+            var albumPath = GetPhysicalAlbumDirectory(group.First().SourcePath);
+            var albumId = ExecuteScalarInTransaction(tx, """
+                SELECT album_id
+                FROM album_rebuild_map
+                WHERE album_title = $album_title
+                  AND album_path = $album_path
+                LIMIT 1;
+                """,
+                ("$album_title", albumTitle),
+                ("$album_path", albumPath));
+            foreach (var batch in group.Select(item => item.Id).Chunk(400))
+            {
+                using var update = _conn.CreateCommand();
+                update.Transaction = tx;
+                var parameters = batch.Select((id, index) =>
+                {
+                    var name = $"$id{index}";
+                    Add(update, name, id);
+                    return name;
+                }).ToList();
+                update.CommandText =
+                    $"UPDATE tracks SET album_id = $album_id WHERE id IN ({string.Join(", ", parameters)});";
+                Add(update, "$album_id", albumId);
+                update.ExecuteNonQuery();
+            }
+        }
+        ExecuteInTransaction(tx, "DROP TABLE album_rebuild_map;");
         tx.Commit();
     }
 
@@ -1983,11 +2035,11 @@ public sealed class AudioDatabase : IDisposable
             CREATE TABLE IF NOT EXISTS albums (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
                 title       TEXT NOT NULL,
+                source_directory TEXT NOT NULL DEFAULT '',
                 artist_id   INTEGER REFERENCES artists(id),
                 year        INTEGER,
                 artwork_id  INTEGER REFERENCES artworks(id),
-                is_favorite INTEGER NOT NULL DEFAULT 0,
-                UNIQUE(title, artist_id, year)
+                is_favorite INTEGER NOT NULL DEFAULT 0
             );
 
             CREATE TABLE IF NOT EXISTS favorites (
@@ -2034,6 +2086,7 @@ public sealed class AudioDatabase : IDisposable
         EnsureColumn("artists", "profile_language", "TEXT");
         EnsureColumn("artists", "profile_fetched_at", "INTEGER");
         EnsureColumn("albums", "is_favorite", "INTEGER NOT NULL DEFAULT 0");
+        EnsureColumn("albums", "source_directory", "TEXT NOT NULL DEFAULT ''");
         EnsureColumn("artworks", "original_path", "TEXT");
         EnsureColumn("artworks", "thumb_96_path", "TEXT");
         EnsureColumn("artworks", "thumb_320_path", "TEXT");
@@ -2047,24 +2100,19 @@ public sealed class AudioDatabase : IDisposable
             MigrateNormalizedLibrary();
             SetMeta("normalized_library_v1", "done");
         }
-        if (!string.Equals(GetMeta("album_artist_rebuild_v1"), "done", StringComparison.Ordinal))
+        if (!string.Equals(GetMeta("album_disc_directory_identity_v1"), "done", StringComparison.Ordinal))
         {
-            RebuildAlbumsFromAlbumArtists();
+            RebuildAlbumsByPhysicalDirectory();
             SetMeta("album_artist_rebuild_v1", "done");
-        }
-        if (!string.Equals(GetMeta("album_title_uniqueness_v1"), "done", StringComparison.Ordinal))
-        {
-            RebuildAlbumsFromAlbumArtists();
             SetMeta("album_title_uniqueness_v1", "done");
-        }
-        if (!string.Equals(GetMeta("album_title_artist_identity_v1"), "done", StringComparison.Ordinal))
-        {
-            RebuildAlbumsFromAlbumArtists();
             SetMeta("album_title_artist_identity_v1", "done");
+            SetMeta("album_title_directory_identity_v1", "done");
+            SetMeta("album_disc_directory_identity_v1", "done");
         }
         Execute("""
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_albums_title_artist_identity
-            ON albums (title COLLATE NOCASE, IFNULL(artist_id, -1));
+            DROP INDEX IF EXISTS idx_albums_title_artist_identity;
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_albums_title_directory_identity
+            ON albums (title COLLATE NOCASE, source_directory COLLATE NOCASE);
             """);
         if (!string.Equals(GetMeta("artwork_files_v1"), "done", StringComparison.Ordinal))
         {
@@ -2687,39 +2735,23 @@ public sealed class AudioDatabase : IDisposable
         return cmd.ExecuteScalar();
     }
 
-    private Dictionary<string, (long? ArtworkId, bool IsFavorite)> LoadExistingAlbumStateMap(
-        SqliteTransaction tx)
+    private void CreateAlbumsTable(SqliteTransaction tx)
     {
-        using var cmd = _conn.CreateCommand();
-        cmd.Transaction = tx;
-        cmd.CommandText = """
-            SELECT al.title, ar.name, al.artwork_id, al.is_favorite
-            FROM albums al
-            LEFT JOIN artists ar ON ar.id = al.artist_id
-            """;
-        using var reader = cmd.ExecuteReader();
-        var result = new Dictionary<string, (long? ArtworkId, bool IsFavorite)>(
-            StringComparer.OrdinalIgnoreCase);
-        while (reader.Read())
-        {
-            var key = MakeAlbumKey(
-                reader.IsDBNull(0) ? null : reader.GetString(0),
-                reader.IsDBNull(1) ? null : reader.GetString(1));
-            long? artworkId = reader.IsDBNull(2) ? null : reader.GetInt64(2);
-            var isFavorite = reader.GetInt32(3) != 0;
-            if (result.TryGetValue(key, out var existing))
-            {
-                artworkId ??= existing.ArtworkId;
-                isFavorite |= existing.IsFavorite;
-            }
-            result[key] = (artworkId, isFavorite);
-        }
-        return result;
+        ExecuteInTransaction(tx, """
+            CREATE TABLE albums (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                title            TEXT NOT NULL,
+                source_directory TEXT NOT NULL DEFAULT '',
+                artist_id        INTEGER REFERENCES artists(id),
+                year             INTEGER,
+                artwork_id       INTEGER REFERENCES artworks(id),
+                is_favorite      INTEGER NOT NULL DEFAULT 0
+            );
+            CREATE INDEX idx_albums_artist ON albums (artist_id);
+            CREATE UNIQUE INDEX idx_albums_title_directory_identity
+            ON albums (title COLLATE NOCASE, source_directory COLLATE NOCASE);
+            """);
     }
-
-    private static string MakeAlbumKey(string? title, string? artist) =>
-        $"{NormalizeAlbumTitleKey(title)}\u001f" +
-        ArtistNameNormalizer.CreateComparisonKey(artist);
 
     private static string NormalizeAlbumTitleKey(string? title) =>
         title?.Trim().ToUpperInvariant() ?? string.Empty;
@@ -2850,12 +2882,21 @@ public sealed class AudioDatabase : IDisposable
         using var cmd = _conn.CreateCommand();
         cmd.Transaction = tx;
         cmd.CommandText = """
-            SELECT id, artist, album_artist, album, year, cover_data, cover_mime_type
+            SELECT id, artist, album_artist, album, year, cover_data, cover_mime_type,
+                   COALESCE(source_path, path)
             FROM tracks
             WHERE artist_id IS NULL OR album_id IS NULL OR cover_data IS NOT NULL;
             """;
         using var reader = cmd.ExecuteReader();
-        var rows = new List<(long Id, string? Artist, string? AlbumArtist, string? Album, int? Year, byte[]? Cover, string? Mime)>();
+        var rows = new List<(
+            long Id,
+            string? Artist,
+            string? AlbumArtist,
+            string? Album,
+            int? Year,
+            byte[]? Cover,
+            string? Mime,
+            string SourcePath)>();
         while (reader.Read())
             rows.Add((
                 reader.GetInt64(0),
@@ -2864,14 +2905,21 @@ public sealed class AudioDatabase : IDisposable
                 reader.IsDBNull(3) ? null : reader.GetString(3),
                 reader.IsDBNull(4) ? null : reader.GetInt32(4),
                 reader.IsDBNull(5) ? null : (byte[])reader.GetValue(5),
-                reader.IsDBNull(6) ? null : reader.GetString(6)));
+                reader.IsDBNull(6) ? null : reader.GetString(6),
+                reader.GetString(7)));
         reader.Close();
 
         foreach (var row in rows)
         {
             var artistId  = EnsureArtist(row.Artist, tx);
             var artworkId = EnsureArtwork(row.Cover, row.Mime, tx);
-            var albumId   = EnsureAlbum(row.Album, row.AlbumArtist ?? row.Artist, row.Year, artistId, artworkId, tx);
+            var albumId = EnsureAlbum(
+                row.Album,
+                row.AlbumArtist ?? row.Artist,
+                row.Year,
+                artworkId,
+                GetPhysicalAlbumDirectory(row.SourcePath),
+                tx);
             using var update = _conn.CreateCommand();
             update.Transaction = tx;
             update.CommandText = """
@@ -2993,46 +3041,78 @@ public sealed class AudioDatabase : IDisposable
         return Convert.ToInt64(cmd.ExecuteScalar());
     }
 
-    private long? EnsureAlbum(string? title, string? displayArtist, int? year, long? fallbackArtistId, long? artworkId, SqliteTransaction tx)
+    private long? EnsureAlbum(
+        string? title,
+        string? displayArtist,
+        int? year,
+        long? artworkId,
+        string sourceDirectory,
+        SqliteTransaction tx)
     {
         var normalizedTitle = string.IsNullOrWhiteSpace(title) ? "" : title.Trim();
         var normalizedYear  = year ?? 0;
-        var albumArtistId = EnsureArtist(GetFirstArtist(displayArtist), tx) ?? fallbackArtistId;
+        var albumArtistId = EnsureArtist(GetFirstArtist(displayArtist), tx);
         using var cmd = _conn.CreateCommand();
         cmd.Transaction = tx;
         cmd.CommandText = """
             UPDATE albums
-            SET artwork_id = COALESCE(artwork_id, $artwork_id)
+            SET artwork_id = COALESCE(artwork_id, $artwork_id),
+                artist_id = CASE
+                    WHEN artist_id IS NULL OR artist_id = $artist_id THEN artist_id
+                    ELSE NULL
+                END
             WHERE id = (
                 SELECT id
                 FROM albums
                 WHERE title = $title COLLATE NOCASE
-                  AND artist_id IS $artist_id
+                  AND source_directory = $source_directory COLLATE NOCASE
                 ORDER BY id
                 LIMIT 1
             );
 
-            INSERT INTO albums (title, artist_id, year, artwork_id)
-            SELECT $title, $artist_id, $year, $artwork_id
+            INSERT INTO albums (title, source_directory, artist_id, year, artwork_id)
+            SELECT $title, $source_directory, $artist_id, $year, $artwork_id
             WHERE NOT EXISTS (
                 SELECT 1
                 FROM albums
                 WHERE title = $title COLLATE NOCASE
-                  AND artist_id IS $artist_id
+                  AND source_directory = $source_directory COLLATE NOCASE
             );
 
             SELECT id FROM albums
             WHERE title = $title COLLATE NOCASE
-              AND artist_id IS $artist_id
+              AND source_directory = $source_directory COLLATE NOCASE
             ORDER BY id
             LIMIT 1;
             """;
         Add(cmd, "$title", normalizedTitle);
+        Add(cmd, "$source_directory", sourceDirectory);
         Add(cmd, "$artist_id", albumArtistId);
         Add(cmd, "$year", normalizedYear);
         Add(cmd, "$artwork_id", artworkId);
         return Convert.ToInt64(cmd.ExecuteScalar());
     }
+
+    private static string GetPhysicalAlbumDirectory(string? sourcePath)
+    {
+        if (string.IsNullOrWhiteSpace(sourcePath))
+            return string.Empty;
+
+        var directory = Path.GetDirectoryName(sourcePath) ?? string.Empty;
+        var leaf = Path.GetFileName(Path.TrimEndingDirectorySeparator(directory));
+        if (!DiscDirectoryNameRegex.IsMatch(leaf))
+            return directory;
+
+        return Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(directory))
+               ?? directory;
+    }
+
+    private static string MakeAlbumDirectoryKey(string? title, string? sourceDirectory) =>
+        $"{NormalizeAlbumTitleKey(title)}\u001f{sourceDirectory?.Trim().ToUpperInvariant() ?? string.Empty}";
+
+    private static readonly Regex DiscDirectoryNameRegex = new(
+        @"^(?:cd|disc|disk|dvd)[\s._-]*0*[1-9]\d?$",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     private static string? GetFirstArtist(string? displayArtist)
     {

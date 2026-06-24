@@ -101,11 +101,17 @@ plus a multi-resolution Windows application icon based on the standalone logo.
   session without reopening the audio device
 - Theme-aware table highlighting follows the currently audible track across
   library, search, playlist, radio, podcast, and Plex views
+- Back navigation restores the previous selection and scroll position in album
+  and artist table or artwork views after returning from a drill-down
+- Album cover changes and artist metadata/image updates retain the current
+  selection and list position
 - Album track details provide an in-place favorite button alongside the album
-  metadata. Album identity uses album title plus album artist, so equal titles
-  by different artists have independent list entries, full cover headers,
-  favorites, and artwork. Multiple physical copies of the same artist's album
-  remain separated into directory-specific track groups.
+  metadata. Album identity uses album title plus physical album root, so equal
+  titles stored in different album folders have independent list entries,
+  covers, and favorites. Compilations remain together, and conventional
+  `CD1`/`CD2` or `Disc 1`/`Disc 2` subfolders appear as separate groups inside
+  one multi-disc album detail view. Disc tables expand fully without their own
+  scrollbars, and row selection does not move the outer page.
 - Playback history for local tracks, podcast episodes, and internet-radio
   sessions, including position and completion state
 - Artwork downloads through the Cover Art Archive and manual MusicBrainz search
