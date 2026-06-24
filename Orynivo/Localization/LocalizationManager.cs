@@ -152,6 +152,16 @@ public static class LocalizationManager
         resources["L_AsioOutputDevice"] = Current.AsioOutputDevice;
         resources["L_CwAsioOutputDevice"] = Current.CwAsioOutputDevice;
         resources["L_DeviceInfo"] = Current.DeviceInfo;
+        resources["L_OutputProfile"] = Current.OutputProfile;
+        resources["L_OutputProfileCreate"] = Current.OutputProfileCreate;
+        resources["L_OutputProfileConfigure"] = Current.OutputProfileConfigure;
+        resources["L_OutputProfileDelete"] = Current.OutputProfileDelete;
+        resources["L_OutputProfileCreateTitle"] = Current.OutputProfileCreateTitle;
+        resources["L_OutputProfileConfigureTitle"] = Current.OutputProfileConfigureTitle;
+        resources["L_OutputProfileName"] = Current.OutputProfileName;
+        resources["L_OutputProfileNameExists"] = Current.OutputProfileNameExists;
+        resources["L_OutputProfileDeleteTitle"] = Current.OutputProfileDeleteTitle;
+        resources["L_OutputProfileDeleteConfirm"] = Current.OutputProfileDeleteConfirm;
         resources["L_ReplayGain"] = Current.ReplayGain;
         resources["L_ReplayGainHint"] = Current.ReplayGainHint;
         resources["L_DsdPlayback"] = Current.DsdPlayback;
@@ -332,6 +342,16 @@ public static class LocalizationManager
         CwAsio = "cwASIO",
         WasapiOutputDevice = "WASAPI-Ausgabegerät",
         DeviceInfo = "Geräteinfo",
+        OutputProfile = "Ausgabe",
+        OutputProfileCreate = "Ausgabe erstellen",
+        OutputProfileConfigure = "Ausgabe konfigurieren",
+        OutputProfileDelete = "Ausgabe löschen",
+        OutputProfileCreateTitle = "Neue Ausgabe anlegen",
+        OutputProfileConfigureTitle = "Ausgabe konfigurieren",
+        OutputProfileName = "Name der Ausgabe",
+        OutputProfileNameExists = "Eine Ausgabe mit diesem Namen ist bereits vorhanden.",
+        OutputProfileDeleteTitle = "Ausgabe löschen",
+        OutputProfileDeleteConfirm = "Soll die Ausgabe »{0}« wirklich gelöscht werden?",
         DatabaseOptimizeHint = "Freigegebene Seiten werden entfernt; danach ist die Datei physisch kleiner.",
         AsioBridgeMissing = "Dieser Build enthält keine ASIO-Unterstützung. Bitte WASAPI verwenden.",
         KernelStreamingUnavailable = "Kernel Streaming ist auswählbar, aber noch nicht als Wiedergabe-Backend implementiert.",
@@ -665,7 +685,17 @@ public static class LocalizationManager
     {
         OutputType = "Output type", AsioOutputDevice = "ASIO output device", WasapiOutputDevice = "WASAPI output device",
         CwAsioOutputDevice = "cwASIO output device", SteinbergAsio = "Steinberg ASIO", CwAsio = "cwASIO",
-        DeviceInfo = "Device information", DatabaseOptimizeHint = "Released pages are removed so the file becomes physically smaller.",
+        DeviceInfo = "Device information",
+        OutputProfile = "Output",
+        OutputProfileCreate = "Create output",
+        OutputProfileConfigure = "Configure output",
+        OutputProfileDelete = "Delete output",
+        OutputProfileCreateTitle = "Create new output",
+        OutputProfileConfigureTitle = "Configure output",
+        OutputProfileName = "Output name",
+        OutputProfileNameExists = "An output with this name already exists.",
+        OutputProfileDeleteTitle = "Delete output",
+        OutputProfileDeleteConfirm = "Are you sure you want to delete the output “{0}”?", DatabaseOptimizeHint = "Released pages are removed so the file becomes physically smaller.",
         AsioBridgeMissing = "This build does not include ASIO support. Please use WASAPI.",
         KernelStreamingUnavailable = "Kernel Streaming can be selected but is not implemented as a playback backend yet.",
         AddMusicDirectory = "Add music directory", TrackCountTooltip = "Number of tracks in the database",
@@ -988,7 +1018,17 @@ public static class LocalizationManager
     {
         OutputType = "Type de sortie", AsioOutputDevice = "Périphérique de sortie ASIO", WasapiOutputDevice = "Périphérique de sortie WASAPI",
         CwAsioOutputDevice = "Périphérique de sortie cwASIO", SteinbergAsio = "Steinberg ASIO", CwAsio = "cwASIO",
-        DeviceInfo = "Informations sur le périphérique", DatabaseOptimizeHint = "Les pages libérées sont supprimées afin de réduire physiquement le fichier.",
+        DeviceInfo = "Informations sur le périphérique",
+        OutputProfile = "Sortie",
+        OutputProfileCreate = "Créer une sortie",
+        OutputProfileConfigure = "Configurer la sortie",
+        OutputProfileDelete = "Supprimer la sortie",
+        OutputProfileCreateTitle = "Créer une nouvelle sortie",
+        OutputProfileConfigureTitle = "Configurer la sortie",
+        OutputProfileName = "Nom de la sortie",
+        OutputProfileNameExists = "Une sortie portant ce nom existe déjà.",
+        OutputProfileDeleteTitle = "Supprimer la sortie",
+        OutputProfileDeleteConfirm = "Voulez-vous vraiment supprimer la sortie « {0} » ?", DatabaseOptimizeHint = "Les pages libérées sont supprimées afin de réduire physiquement le fichier.",
         AsioBridgeMissing = "Cette version ne comprend pas la prise en charge ASIO. Utilisez WASAPI.",
         KernelStreamingUnavailable = "Kernel Streaming peut être sélectionné, mais ce mode de lecture n’est pas encore implémenté.",
         AddMusicDirectory = "Ajouter un dossier musical", TrackCountTooltip = "Nombre de titres dans la base",
@@ -1308,7 +1348,17 @@ public static class LocalizationManager
     {
         OutputType = "Tipo de salida", AsioOutputDevice = "Dispositivo de salida ASIO", WasapiOutputDevice = "Dispositivo de salida WASAPI",
         CwAsioOutputDevice = "Dispositivo de salida cwASIO", SteinbergAsio = "Steinberg ASIO", CwAsio = "cwASIO",
-        DeviceInfo = "Información del dispositivo", DatabaseOptimizeHint = "Las páginas liberadas se eliminan para reducir físicamente el archivo.",
+        DeviceInfo = "Información del dispositivo",
+        OutputProfile = "Salida",
+        OutputProfileCreate = "Crear salida",
+        OutputProfileConfigure = "Configurar salida",
+        OutputProfileDelete = "Eliminar salida",
+        OutputProfileCreateTitle = "Crear nueva salida",
+        OutputProfileConfigureTitle = "Configurar salida",
+        OutputProfileName = "Nombre de la salida",
+        OutputProfileNameExists = "Ya existe una salida con este nombre.",
+        OutputProfileDeleteTitle = "Eliminar salida",
+        OutputProfileDeleteConfirm = "¿Seguro que quieres eliminar la salida «{0}»?", DatabaseOptimizeHint = "Las páginas liberadas se eliminan para reducir físicamente el archivo.",
         AsioBridgeMissing = "Esta compilación no incluye compatibilidad con ASIO. Utiliza WASAPI.",
         KernelStreamingUnavailable = "Kernel Streaming se puede seleccionar, pero todavía no está implementado como backend de reproducción.",
         AddMusicDirectory = "Agregar directorio de música", TrackCountTooltip = "Número de pistas en la base de datos",

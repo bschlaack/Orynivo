@@ -4,12 +4,39 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.11.0] - 2026-06-25
 
 ### Added
 
+- Added **EQ** and **Output** quick-pick buttons to the right side of the
+  transport bar (below the volume control). The EQ button opens a popup with
+  an equalizer-profile ComboBox, a ⚙ button that navigates to Settings >
+  Equalizer, and a themed enable/disable checkbox. The Output button opens a
+  popup with an output-profile ComboBox and a ⚙ button that navigates to
+  Settings > Audio Device. Both buttons use vector path icons, tooltips, and
+  respect the active light/dark theme. (`EqPickerButton`, `OutputPickerButton`,
+  `EqPickerPopup`, `OutputPickerPopup`, `PopupCheckBoxTheme`)
+- The output-profile dropdown in Settings now shows a compact summary line
+  (e.g. `WASAPI  ·  Realtek HD Audio`) beneath it when a profile is selected.
+- Increased the transport album artwork from 42 × 42 px to 58 × 58 px to
+  better fill the taller transport bar.
+- Added named **output profiles** to Settings. The output device section is
+  replaced by a dropdown listing saved profiles and three buttons: **Ausgabe
+  erstellen** opens a dialog to pick a name, backend (WASAPI, Steinberg ASIO, or
+  cwASIO), and device, then saves and immediately selects the new profile;
+  **Ausgabe konfigurieren** re-opens the dialog for the selected profile;
+  **Ausgabe löschen** removes it after confirmation. Both action buttons are
+  disabled when no profile is selected. An existing single-device configuration
+  is automatically migrated to a profile named "Standard" on first launch.
+  (`OutputProfile`, `OutputProfileDialog`, `AppSettings.OutputProfiles`,
+  `AppSettings.SelectedOutputProfileName`, `SettingsStore.NormalizeOutputProfiles`)
+
 ### Fixed
 
+- Switching the output profile via the transport quick-pick popup now resumes
+  playback at the exact position the track was at before the device change.
+  `StartPlaybackAsync` accepts an `initialPosition` parameter that seeks the
+  new player immediately after creation, before any UI updates or timer ticks.
 - Sanitized manual MusicBrainz cover-search queries to contain only letters,
   numbers, and separating spaces, preventing punctuation such as hyphens from
   interfering with album matches.

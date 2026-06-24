@@ -1,5 +1,6 @@
 using System.IO;
 using Avalonia;
+using Avalonia.Threading;
 using Avalonia.Controls;
 using Avalonia.Styling;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -32,15 +33,13 @@ internal partial class SettingsView : UserControl
     private readonly Dictionary<string, string> _plexTokens = [];
     private readonly Dictionary<string, CancellationTokenSource> _activeScans = [];
     private readonly Action<List<string>>? _onLibraryPathsChanged;
-    private readonly bool _steinbergAsioAvailable = SteinbergAsioStream.IsAvailable;
-    private readonly bool _cwAsioAvailable = SteinbergAsioStream.IsCwAsioAvailable;
     private readonly Action<bool, EqualizerProfile?>? _onEqualizerPreviewChanged;
     private readonly bool _originalEqualizerEnabled;
     private readonly EqualizerProfile? _originalEqualizerProfile;
     private readonly List<EqualizerProfile> _equalizerProfiles = [];
-    private readonly SemaphoreSlim _driverLoadGate = new(1, 1);
+    private readonly List<OutputProfile> _outputProfiles = [];
     private EqualizerProfile? _equalizerProfile;
-    private int _driverLoadVersion;
+    private OutputProfile? _outputProfile;
     private int _equalizerPreviewVersion;
     private bool _initializing = true;
     private bool _rebuildingEqualizerEditor;
@@ -70,20 +69,15 @@ internal partial class SettingsView : UserControl
         _onEqualizerPreviewChanged = onEqualizerPreviewChanged;
         _originalEqualizerEnabled = settings.EqualizerEnabled;
         _originalEqualizerProfile = settings.EqualizerProfile?.Clone();
-        var availableBackends = new[]
-        {
-            new SettingChoice<OutputBackend>(OutputBackend.Asio, LocalizationManager.Current.SteinbergAsio),
-            new SettingChoice<OutputBackend>(OutputBackend.CwAsio, LocalizationManager.Current.CwAsio),
-            new SettingChoice<OutputBackend>(OutputBackend.Wasapi, "WASAPI"),
-            new SettingChoice<OutputBackend>(OutputBackend.KernelStreaming, "Kernel Streaming")
-        }
-            .Where(choice => choice.Value != OutputBackend.Asio || _steinbergAsioAvailable)
-            .Where(choice => choice.Value != OutputBackend.CwAsio || _cwAsioAvailable)
-            .ToArray();
-        OutputBackendComboBox.ItemsSource = availableBackends;
-        OutputBackendComboBox.SelectedItem =
-            availableBackends.FirstOrDefault(choice => choice.Value == settings.OutputBackend)
-            ?? availableBackends.First(choice => choice.Value == OutputBackend.Wasapi);
+        _outputProfiles.AddRange((settings.OutputProfiles ?? []).Select(CloneOutputProfile));
+        OutputProfileComboBox.ItemsSource = _outputProfiles;
+        OutputProfileComboBox.DisplayMemberBinding = new Avalonia.Data.Binding(nameof(OutputProfile.Name));
+        _outputProfile = _outputProfiles.FirstOrDefault(profile =>
+            string.Equals(
+                profile.Name,
+                settings.SelectedOutputProfileName,
+                StringComparison.OrdinalIgnoreCase));
+        OutputProfileComboBox.SelectedItem = _outputProfile;
         var themeChoices = new[]
         {
             new SettingChoice<AppTheme>(AppTheme.Light, LocalizationManager.Current.ThemeLight),
@@ -148,22 +142,26 @@ internal partial class SettingsView : UserControl
         RebuildDirectoryList();
         RebuildPlexServerList();
         _initializing = false;
-        _ = LoadDriversAsync();
+        RefreshOutputProfileButtons();
         NavListBox.SelectedIndex = 1;
     }
 
     /// <summary>Raised when the embedded settings view requests save or cancel.</summary>
     internal event EventHandler<bool>? CompletionRequested;
 
-    public string? SelectedDriverName => DriverComboBox.SelectedItem as string;
-    public string? SelectedWasapiDeviceId =>
-        DriverComboBox.SelectedItem is WasapiDeviceInfo device ? device.Id : null;
-    public string? SelectedWasapiDeviceName =>
-        DriverComboBox.SelectedItem is WasapiDeviceInfo device ? device.Name : null;
-    public OutputBackend SelectedOutputBackend =>
-        OutputBackendComboBox.SelectedItem is SettingChoice<OutputBackend> choice
-            ? choice.Value
-            : OutputBackend.Wasapi;
+    /// <summary>Gets the driver name of the selected output profile.</summary>
+    public string? SelectedDriverName => _outputProfile?.SelectedDriverName;
+    /// <summary>Gets the WASAPI device ID of the selected output profile.</summary>
+    public string? SelectedWasapiDeviceId => _outputProfile?.SelectedWasapiDeviceId;
+    /// <summary>Gets the WASAPI device display name of the selected output profile.</summary>
+    public string? SelectedWasapiDeviceName => _outputProfile?.SelectedWasapiDeviceName;
+    /// <summary>Gets the output backend of the selected output profile.</summary>
+    public OutputBackend SelectedOutputBackend => _outputProfile?.Backend ?? OutputBackend.Wasapi;
+    /// <summary>Gets independent copies of all configured output profiles.</summary>
+    public IReadOnlyList<OutputProfile> SelectedOutputProfiles =>
+        _outputProfiles.Select(CloneOutputProfile).ToList().AsReadOnly();
+    /// <summary>Gets the name of the currently selected output profile.</summary>
+    public string? SelectedOutputProfileName => _outputProfile?.Name;
     /// <summary>Gets the ReplayGain mode selected in the settings view.</summary>
     public ReplayGainMode SelectedReplayGainMode =>
         ReplayGainModeComboBox.SelectedItem is SettingChoice<ReplayGainMode> choice
@@ -206,6 +204,15 @@ internal partial class SettingsView : UserControl
         Id = server.Id,
         Name = server.Name,
         BaseUrl = server.BaseUrl
+    };
+
+    private static OutputProfile CloneOutputProfile(OutputProfile profile) => new()
+    {
+        Name = profile.Name,
+        Backend = profile.Backend,
+        SelectedDriverName = profile.SelectedDriverName,
+        SelectedWasapiDeviceId = profile.SelectedWasapiDeviceId,
+        SelectedWasapiDeviceName = profile.SelectedWasapiDeviceName
     };
 
     private Button CreateStyledButton(string content, double width, double height, Thickness margin = default)
@@ -309,7 +316,6 @@ internal partial class SettingsView : UserControl
     {
         foreach (var cts in _activeScans.Values)
             cts.Cancel();
-        Interlocked.Increment(ref _driverLoadVersion);
         Interlocked.Increment(ref _equalizerPreviewVersion);
         if (!_settingsAccepted)
         {
@@ -347,106 +353,120 @@ internal partial class SettingsView : UserControl
     }
 
     // ------------------------------------------------------------------
-    // Geräte
+    // Ausgabeprofile
     // ------------------------------------------------------------------
 
-    private async Task LoadDriversAsync()
+    private void OutputProfileComboBox_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
-        var loadVersion = Interlocked.Increment(ref _driverLoadVersion);
-        var backend = SelectedOutputBackend;
-        DriverComboBox.IsEnabled = false;
-        DeviceInfoButton.IsEnabled = false;
-        StatusTextBlock.Text = LocalizationManager.Current.OutputDevicesLoading;
-        try
-        {
-            await _driverLoadGate.WaitAsync();
-            if (loadVersion != Volatile.Read(ref _driverLoadVersion))
-                return;
-            if (backend == OutputBackend.Wasapi)
-            {
-                var devices = await Task.Run(WasapiDeviceProvider.GetRenderDevices);
-                if (loadVersion != Volatile.Read(ref _driverLoadVersion))
-                    return;
-                DriverComboBox.ItemsSource = devices;
-                DriverComboBox.DisplayMemberBinding = new Avalonia.Data.Binding(nameof(WasapiDeviceInfo.Name));
-                DriverComboBox.SelectedItem = devices.FirstOrDefault(device =>
-                    string.Equals(device.Id, _settings.SelectedWasapiDeviceId, StringComparison.Ordinal))
-                    ?? devices.FirstOrDefault();
-                DeviceLabelTextBlock.Text = LocalizationManager.Current.WasapiOutputDevice;
-                StatusTextBlock.Text = devices.Count == 0
-                    ? LocalizationManager.Current.NoWasapiDevices
-                    : LocalizationManager.Current.SelectAndSave;
-            }
-            else if (backend is OutputBackend.Asio or OutputBackend.CwAsio)
-            {
-                var drivers = await Task.Run(() => SteinbergAsioStream.GetDriverNames(backend));
-                if (loadVersion != Volatile.Read(ref _driverLoadVersion))
-                    return;
-                DriverComboBox.ItemsSource = drivers;
-                DriverComboBox.DisplayMemberBinding = null;
-                DriverComboBox.SelectedItem = drivers.FirstOrDefault(name =>
-                    string.Equals(name, _settings.SelectedDriverName, StringComparison.Ordinal))
-                    ?? drivers.FirstOrDefault(name =>
-                        name.Contains("TOPPING", StringComparison.OrdinalIgnoreCase))
-                    ?? drivers.FirstOrDefault();
-                DeviceLabelTextBlock.Text = backend == OutputBackend.CwAsio
-                    ? LocalizationManager.Current.CwAsioOutputDevice
-                    : LocalizationManager.Current.AsioOutputDevice;
-                StatusTextBlock.Text = drivers.Count == 0
-                    ? LocalizationManager.Current.NoAsioDrivers
-                    : LocalizationManager.Current.SelectAndSave;
-            }
-            else
-            {
-                DriverComboBox.ItemsSource = null;
-                DriverComboBox.DisplayMemberBinding = null;
-                DeviceLabelTextBlock.Text = LocalizationManager.Current.OutputDevice;
-                StatusTextBlock.Text = LocalizationManager.Current.KernelStreamingUnavailable;
-            }
-        }
-        catch (DllNotFoundException)
-        {
-            if (loadVersion == Volatile.Read(ref _driverLoadVersion))
-                StatusTextBlock.Text = LocalizationManager.Current.AsioBridgeMissing;
-        }
-        catch
-        {
-            if (loadVersion == Volatile.Read(ref _driverLoadVersion))
-                StatusTextBlock.Text = backend == OutputBackend.Wasapi
-                    ? LocalizationManager.Current.NoWasapiDevices
-                    : LocalizationManager.Current.NoAsioDrivers;
-        }
-        finally
-        {
-            if (_driverLoadGate.CurrentCount == 0)
-                _driverLoadGate.Release();
-            if (loadVersion == Volatile.Read(ref _driverLoadVersion))
-            {
-                DriverComboBox.IsEnabled = backend != OutputBackend.KernelStreaming;
-                DeviceInfoButton.IsEnabled =
-                    DriverComboBox.SelectedItem is string or WasapiDeviceInfo;
-            }
-        }
+        _outputProfile = OutputProfileComboBox.SelectedItem as OutputProfile;
+        RefreshOutputProfileButtons();
     }
 
-    private void DriverComboBox_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    /// <summary>Creates a new output profile via dialog and selects it immediately.</summary>
+    /// <param name="sender">Control that raised the event.</param>
+    /// <param name="e">Event data.</param>
+    private async void CreateOutputProfileButton_OnClick(object? sender, RoutedEventArgs e)
     {
-        DeviceInfoButton.IsVisible = DriverComboBox.SelectedItem is string or WasapiDeviceInfo;
+        var dialog = new OutputProfileDialog(
+            _outputProfiles.Select(static p => p.Name));
+        if (await dialog.ShowDialog<bool>(GetHostWindow()) != true || dialog.Result is null)
+            return;
+        _outputProfiles.Add(dialog.Result);
+        RefreshOutputProfileChoices(dialog.Result);
     }
 
-    private async void OutputBackendComboBox_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    /// <summary>Opens the selected output profile for editing.</summary>
+    /// <param name="sender">Control that raised the event.</param>
+    /// <param name="e">Event data.</param>
+    private async void ConfigureOutputProfileButton_OnClick(object? sender, RoutedEventArgs e)
     {
-        if (_initializing)
+        if (_outputProfile is null)
             return;
-        var backend = SelectedOutputBackend;
-        await LoadDriversAsync();
-        if (backend != SelectedOutputBackend)
+        var dialog = new OutputProfileDialog(
+            _outputProfiles
+                .Where(p => p != _outputProfile)
+                .Select(static p => p.Name),
+            _outputProfile);
+        if (await dialog.ShowDialog<bool>(GetHostWindow()) != true || dialog.Result is null)
             return;
-        if (backend == OutputBackend.KernelStreaming)
+        var index = _outputProfiles.IndexOf(_outputProfile);
+        if (index >= 0)
+            _outputProfiles[index] = dialog.Result;
+        RefreshOutputProfileChoices(dialog.Result);
+    }
+
+    /// <summary>Deletes the selected output profile after confirmation.</summary>
+    /// <param name="sender">Control that raised the event.</param>
+    /// <param name="e">Event data.</param>
+    private async void DeleteOutputProfileButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (_outputProfile is null)
+            return;
+        var confirmed = await AppMessageBox.ConfirmAsync(
+            string.Format(
+                LocalizationManager.Current.OutputProfileDeleteConfirm,
+                _outputProfile.Name),
+            LocalizationManager.Current.OutputProfileDeleteTitle,
+            GetHostWindow());
+        if (!confirmed)
+            return;
+        _outputProfiles.Remove(_outputProfile);
+        _outputProfile = null;
+        RefreshOutputProfileChoices(null);
+    }
+
+    /// <summary>Refreshes the profile dropdown and applies the requested selection.</summary>
+    /// <param name="selectedProfile">Profile to select, or <see langword="null"/> for no selection.</param>
+    private void RefreshOutputProfileChoices(OutputProfile? selectedProfile)
+    {
+        OutputProfileComboBox.ItemsSource = null;
+        OutputProfileComboBox.ItemsSource = _outputProfiles;
+        OutputProfileComboBox.SelectedItem = selectedProfile;
+        _outputProfile = selectedProfile;
+        RefreshOutputProfileButtons();
+    }
+
+    /// <summary>Updates the enabled state of the configure and delete buttons and the summary label.</summary>
+    private void RefreshOutputProfileButtons()
+    {
+        var hasSelection = _outputProfile is not null;
+        ConfigureOutputProfileButton.IsEnabled = hasSelection;
+        DeleteOutputProfileButton.IsEnabled    = hasSelection;
+        OutputProfileSummaryTextBlock.Text     = _outputProfile is null
+            ? string.Empty
+            : BuildOutputSummary(_outputProfile);
+    }
+
+    private static string BuildOutputSummary(OutputProfile profile)
+    {
+        var backend = profile.Backend switch
         {
-            DriverComboBox.ItemsSource = null;
-            StatusTextBlock.Text = LocalizationManager.Current.KernelStreamingUnavailable;
-        }
+            OutputBackend.Asio   => LocalizationManager.Current.SteinbergAsio,
+            OutputBackend.CwAsio => LocalizationManager.Current.CwAsio,
+            _                    => "WASAPI"
+        };
+        var device = profile.Backend is OutputBackend.Asio or OutputBackend.CwAsio
+            ? profile.SelectedDriverName
+            : profile.SelectedWasapiDeviceName;
+        return string.IsNullOrEmpty(device) ? backend : $"{backend}  ·  {device}";
+    }
+
+    /// <summary>Programmatically navigates to the settings section identified by <paramref name="tag"/>.</summary>
+    internal void NavigateToSection(string tag)
+    {
+        var item = NavListBox.Items
+            .OfType<ListBoxItem>()
+            .FirstOrDefault(i => string.Equals(i.Tag as string, tag, StringComparison.Ordinal));
+        if (item is not null)
+            NavListBox.SelectedItem = item;
+    }
+
+    /// <summary>Scrolls the content area to make the equalizer profile selector visible.</summary>
+    internal void ScrollToEqualizerSection()
+    {
+        Dispatcher.UIThread.Post(
+            () => EqualizerProfileComboBox.BringIntoView(),
+            DispatcherPriority.Loaded);
     }
 
     /// <summary>Imports an Equalizer APO or AutoEQ text profile.</summary>
@@ -827,26 +847,6 @@ internal partial class SettingsView : UserControl
         });
     }
 
-    private async void DeviceInfoButton_OnClick(object? sender, RoutedEventArgs e)
-    {
-        try
-        {
-            if (DriverComboBox.SelectedItem is string driverName)
-            {
-                var info = SteinbergAsioStream.GetDeviceInfo(SelectedOutputBackend, driverName);
-                await new DeviceInfoWindow(info).ShowDialog(GetHostWindow());
-            }
-            else if (DriverComboBox.SelectedItem is WasapiDeviceInfo wasapiDevice)
-            {
-                var info = WasapiDeviceProvider.GetCapabilities(wasapiDevice.Id);
-                await new DeviceInfoWindow(info).ShowDialog(GetHostWindow());
-            }
-        }
-        catch (Exception ex)
-        {
-            StatusTextBlock.Text = string.Format(LocalizationManager.Current.DeviceInfoFailed, ex.Message);
-        }
-    }
 
     // ------------------------------------------------------------------
     // Bibliothek

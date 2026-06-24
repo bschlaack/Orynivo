@@ -8,13 +8,17 @@ namespace Orynivo;
 /// </summary>
 public sealed class AppSettings
 {
-    /// <summary>Gets or sets the audio output backend.</summary>
+    /// <summary>Gets or sets all named audio output profiles.</summary>
+    public List<OutputProfile> OutputProfiles { get; set; } = [];
+    /// <summary>Gets or sets the name of the currently selected output profile.</summary>
+    public string? SelectedOutputProfileName { get; set; }
+    /// <summary>Gets or sets the audio output backend (derived from the selected profile on load).</summary>
     public OutputBackend OutputBackend { get; set; } = OutputBackend.Wasapi;
-    /// <summary>Gets or sets the selected ASIO/cwASIO driver name.</summary>
+    /// <summary>Gets or sets the selected ASIO/cwASIO driver name (derived from the selected profile on load).</summary>
     public string? SelectedDriverName { get; set; }
-    /// <summary>Gets or sets the MMDevice ID of the selected WASAPI render device.</summary>
+    /// <summary>Gets or sets the MMDevice ID of the selected WASAPI render device (derived from the selected profile on load).</summary>
     public string? SelectedWasapiDeviceId { get; set; }
-    /// <summary>Gets or sets the display name of the selected WASAPI render device.</summary>
+    /// <summary>Gets or sets the display name of the selected WASAPI render device (derived from the selected profile on load).</summary>
     public string? SelectedWasapiDeviceName { get; set; }
     /// <summary>Gets or sets the list of root directories scanned for audio files.</summary>
     public List<string> LibraryPaths { get; set; } = [];

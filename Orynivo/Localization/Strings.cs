@@ -242,6 +242,26 @@ public sealed record LocalizedStrings(
     public string EqualizerName { get; init; } = "";
     /// <summary>Gets the duplicate equalizer profile name validation message.</summary>
     public string EqualizerNameExists { get; init; } = "";
+    /// <summary>Gets the output profiles section label.</summary>
+    public string OutputProfile { get; init; } = "";
+    /// <summary>Gets the label for creating a new output profile.</summary>
+    public string OutputProfileCreate { get; init; } = "";
+    /// <summary>Gets the label for opening an output profile for editing.</summary>
+    public string OutputProfileConfigure { get; init; } = "";
+    /// <summary>Gets the label for deleting the selected output profile.</summary>
+    public string OutputProfileDelete { get; init; } = "";
+    /// <summary>Gets the dialog title for creating a new output profile.</summary>
+    public string OutputProfileCreateTitle { get; init; } = "";
+    /// <summary>Gets the dialog title for configuring an existing output profile.</summary>
+    public string OutputProfileConfigureTitle { get; init; } = "";
+    /// <summary>Gets the name-field label in the output profile dialog.</summary>
+    public string OutputProfileName { get; init; } = "";
+    /// <summary>Gets the duplicate-name validation message in the output profile dialog.</summary>
+    public string OutputProfileNameExists { get; init; } = "";
+    /// <summary>Gets the output profile deletion confirmation dialog title.</summary>
+    public string OutputProfileDeleteTitle { get; init; } = "";
+    /// <summary>Gets the output profile deletion confirmation format string (parameter: profile name).</summary>
+    public string OutputProfileDeleteConfirm { get; init; } = "";
     /// <summary>Gets the label for deleting an equalizer profile.</summary>
     public string EqualizerDelete { get; init; } = "";
     /// <summary>Gets the equalizer profile deletion dialog title.</summary>

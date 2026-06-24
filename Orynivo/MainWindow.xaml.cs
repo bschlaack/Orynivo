@@ -97,6 +97,8 @@ public partial class MainWindow : Window
     private bool _artistFavoritesOnly;
     private bool _albumFavoritesOnly;
     private bool _updatingEntityFavoritesFilter;
+    private bool _eqPickerUpdating;
+    private bool _outputPickerUpdating;
     private readonly HashSet<string> _selectedTrackGenres = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _selectedTrackFormats = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<int> _selectedTrackBitrates = [];
@@ -6895,7 +6897,8 @@ public partial class MainWindow : Window
     private async Task StartPlaybackAsync(
         string filePath,
         RadioStationRecord? radioStation = null,
-        PodcastPlayback? podcastPlayback = null)
+        PodcastPlayback? podcastPlayback = null,
+        TimeSpan initialPosition = default)
     {
         StopPlayback();
         _currentFilePath = filePath;
@@ -6971,6 +6974,11 @@ public partial class MainWindow : Window
         _player        = player;
         if (player is IGaplessAudioPlayer gaplessPlayer)
             gaplessPlayer.TrackChanged += GaplessPlayer_OnTrackChanged;
+        if (initialPosition > TimeSpan.Zero && player.CanSeek)
+        {
+            try { await player.SeekAsync(initialPosition); }
+            catch { /* seek failure must not prevent playback */ }
+        }
         UpdateNowPlayingRowHighlights();
         _player.Volume = _settings.OutputBackend == OutputBackend.Wasapi &&
                          _endpointVolumeSynchronizer is not null
@@ -8749,6 +8757,141 @@ public partial class MainWindow : Window
         SettingsViewHost.IsVisible = false;
     }
 
+    private void OpenSettingsAt(string sectionTag, bool scrollToEqualizer = false)
+    {
+        if (!SettingsViewHost.IsVisible)
+            SettingsButton_OnClick(null!, null!);
+        if (SettingsViewHost.Content is SettingsView sv)
+        {
+            sv.NavigateToSection(sectionTag);
+            if (scrollToEqualizer)
+                sv.ScrollToEqualizerSection();
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // EQ + Output quick-pick popups
+    // ------------------------------------------------------------------
+
+    private void EqPickerButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        OutputPickerPopup.IsOpen = false;
+        _eqPickerUpdating = true;
+        try
+        {
+            EqPickerComboBox.ItemsSource = _settings.EqualizerProfiles;
+            EqPickerComboBox.SelectedItem = _settings.EqualizerProfiles
+                .FirstOrDefault(p => string.Equals(
+                    p.Name, _settings.SelectedEqualizerProfileName,
+                    StringComparison.OrdinalIgnoreCase));
+            EqPickerEnabledCheckBox.IsChecked = _settings.EqualizerEnabled;
+        }
+        finally
+        {
+            _eqPickerUpdating = false;
+        }
+        EqPickerPopup.IsOpen = !EqPickerPopup.IsOpen;
+    }
+
+    private void EqPickerComboBox_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_eqPickerUpdating) return;
+        if (EqPickerComboBox.SelectedItem is not EqualizerProfile profile) return;
+        _settings.SelectedEqualizerProfileName = profile.Name;
+        _settings.EqualizerProfile = profile.Clone();
+        if (_player is IEqualizerAudioPlayer eqPlayer)
+            eqPlayer.UpdateEqualizer(_settings.EqualizerEnabled, _settings.EqualizerProfile);
+        _ = Task.Run(() => _settingsStore.Save(_settings));
+    }
+
+    private void EqPickerEnabledCheckBox_OnIsCheckedChanged(object? sender, RoutedEventArgs e)
+    {
+        if (_eqPickerUpdating) return;
+        _settings.EqualizerEnabled = EqPickerEnabledCheckBox.IsChecked == true;
+        if (_player is IEqualizerAudioPlayer eqPlayer)
+            eqPlayer.UpdateEqualizer(_settings.EqualizerEnabled, _settings.EqualizerProfile);
+        _ = Task.Run(() => _settingsStore.Save(_settings));
+    }
+
+    private void EqPickerSettingsButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        EqPickerPopup.IsOpen = false;
+        OpenSettingsAt("AudioDevice", scrollToEqualizer: true);
+    }
+
+    private void OutputPickerButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        EqPickerPopup.IsOpen = false;
+        _outputPickerUpdating = true;
+        try
+        {
+            OutputPickerComboBox.ItemsSource = _settings.OutputProfiles;
+            OutputPickerComboBox.SelectedItem = _settings.OutputProfiles
+                .FirstOrDefault(p => string.Equals(
+                    p.Name, _settings.SelectedOutputProfileName,
+                    StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            _outputPickerUpdating = false;
+        }
+        OutputPickerPopup.IsOpen = !OutputPickerPopup.IsOpen;
+    }
+
+    private async void OutputPickerComboBox_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_outputPickerUpdating) return;
+        if (OutputPickerComboBox.SelectedItem is not OutputProfile profile) return;
+        if (string.Equals(profile.Name, _settings.SelectedOutputProfileName, StringComparison.Ordinal)) return;
+
+        var outputChanged =
+            _settings.OutputBackend != profile.Backend ||
+            !string.Equals(_settings.SelectedDriverName, profile.SelectedDriverName, StringComparison.Ordinal) ||
+            !string.Equals(_settings.SelectedWasapiDeviceId, profile.SelectedWasapiDeviceId, StringComparison.Ordinal);
+
+        // Snapshot playback state before StopPlaybackCore clears station/podcast fields.
+        var resumePath     = _currentFilePath;
+        var resumeStation  = _currentRadioStation;
+        var resumePodcast  = _currentPodcastPlayback;
+        var resumePosition = outputChanged && _player is not null ? _player.Position : TimeSpan.Zero;
+        var wasPaused      = outputChanged && _player?.IsPaused == true;
+        var shouldResume   = outputChanged && _player is not null && !string.IsNullOrEmpty(resumePath);
+
+        if (outputChanged && _player is not null)
+            await StopPlaybackAsync();
+
+        _settings.SelectedOutputProfileName  = profile.Name;
+        _settings.OutputBackend              = profile.Backend;
+        _settings.SelectedDriverName         = profile.SelectedDriverName;
+        _settings.SelectedWasapiDeviceId     = profile.SelectedWasapiDeviceId;
+        _settings.SelectedWasapiDeviceName   = profile.SelectedWasapiDeviceName;
+        _ = Task.Run(() => _settingsStore.Save(_settings));
+
+        if (!shouldResume)
+            return;
+        try
+        {
+            await StartPlaybackAsync(resumePath, resumeStation, resumePodcast, resumePosition);
+            if (wasPaused)
+                PausePlayback();
+        }
+        catch (OperationCanceledException)
+        {
+            StatusTextBlock.Text = LocalizationManager.Current.PlaybackStopped;
+        }
+        catch (Exception ex)
+        {
+            StopPlayback();
+            StatusTextBlock.Text = ex.Message;
+        }
+    }
+
+    private void OutputPickerSettingsButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        OutputPickerPopup.IsOpen = false;
+        OpenSettingsAt("AudioDevice");
+    }
+
     private async Task ApplySettingsAsync(SettingsView window)
     {
             var themeChanged = _settings.Theme != window.SelectedTheme;
@@ -8783,10 +8926,12 @@ public partial class MainWindow : Window
             if (outputChanged && _player is not null)
                 await StopPlaybackAsync();
 
-            _settings.OutputBackend          = window.SelectedOutputBackend;
-            _settings.SelectedDriverName     = window.SelectedDriverName;
-            _settings.SelectedWasapiDeviceId = window.SelectedWasapiDeviceId;
-            _settings.SelectedWasapiDeviceName = window.SelectedWasapiDeviceName;
+            _settings.OutputProfiles             = window.SelectedOutputProfiles.ToList();
+            _settings.SelectedOutputProfileName  = window.SelectedOutputProfileName;
+            _settings.OutputBackend              = window.SelectedOutputBackend;
+            _settings.SelectedDriverName         = window.SelectedDriverName;
+            _settings.SelectedWasapiDeviceId     = window.SelectedWasapiDeviceId;
+            _settings.SelectedWasapiDeviceName   = window.SelectedWasapiDeviceName;
             _settings.ReplayGainMode        = window.SelectedReplayGainMode;
             _settings.AlwaysConvertDsdToPcm = window.AlwaysConvertDsdToPcm;
             _settings.EqualizerEnabled      = window.EqualizerEnabled;

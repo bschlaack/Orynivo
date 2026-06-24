@@ -37,6 +37,12 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 
 ## Important Architecture
 
+- `Orynivo/OutputProfile.cs`: named audio output configuration (backend, device
+  IDs, display name); multiple profiles allow switching between output devices
+  without reconfiguring each time
+- `Orynivo/OutputProfileDialog.axaml/.cs`: dialog for creating or editing an
+  output profile; loads available devices asynchronously, validates unique
+  names, and exposes the confirmed result via `Result`
 - `Orynivo/Audio/SteinbergAsioStream.cs`: runtime-selecting C# wrapper for `AsioBridge.dll` and `CwAsioBridge.dll`
 - `Orynivo/Audio/FfmpegAudioPlayer.cs`: PCM path
 - `Orynivo/Audio/FfmpegPcmDecoder.cs`: FFmpeg PCM decoder process with an
@@ -76,7 +82,10 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - `third_party/cwasio/`: pinned MIT-licensed cwASIO host and compatibility sources
 - `Orynivo/SettingsView.*`: two-column settings view embedded in the main
   content area, with navigation on the left and the selected section on the
-  right
+  right; the output-profile dropdown shows a compact `Backend  ·  Device`
+  summary line (`OutputProfileSummaryTextBlock`) beneath it when a profile is
+  selected; `NavigateToSection(tag)` and `ScrollToEqualizerSection()` allow
+  the transport quick-pick buttons to jump directly into a settings section
 - `Orynivo/ThemeManager.cs`: sets global Avalonia resources for light and dark themes
 - `Orynivo/Controls/DataGridColumnWidthStore.cs`: validates, captures, and
   restores per-table pixel widths
@@ -107,6 +116,14 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - `AppSettings.PlaybackQueuePaths` and `PlaybackQueueIndex` preserve the editable
   **Up next** queue across restarts. Local paths and non-credential HTTP/HTTPS
   URLs may be stored; Plex-token and user-info URLs must never be persisted.
+- `AppSettings.OutputProfiles` persists all named output profiles;
+  `SelectedOutputProfileName` identifies the active one.
+  `SettingsStore.NormalizeOutputProfiles` migrates a previously configured
+  single device to a profile named "Standard" and derives the flat
+  `OutputBackend`, `SelectedDriverName`, `SelectedWasapiDeviceId`, and
+  `SelectedWasapiDeviceName` fields from the active profile on every load and
+  save. These flat fields remain in `AppSettings` for playback code that reads
+  them directly but must not be edited independently of their profile.
 - `AppSettings.ReplayGainMode` selects disabled, track, or album ReplayGain for PCM playback; native ASIO DSD remains bit-perfect
 - `AppSettings.AlwaysConvertDsdToPcm` forces DSF/DFF sources through FFmpeg and
   the PCM output path even when ASIO/cwASIO native DSD is available, allowing
@@ -466,6 +483,11 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   volume bidirectionally and the native ASIO bridge applies an atomic volume
   factor in its callback. Per-track ReplayGain remains part of PCM sample
   preparation.
+- `StartPlaybackAsync` accepts an optional `initialPosition` parameter. When
+  provided, the new player is seeked to that position immediately after
+  creation and before transport UI setup, ensuring no audio from position 0 is
+  heard. Used by the output quick-pick popup to resume at the exact track
+  position after a device switch.
 - The transport action buttons for artist information, lyrics, favorite, and shuffle are left-aligned above the position slider; previous/play/next remain independently centered
 - When the transport area becomes narrow, the centered previous/play/next group shifts right only enough to keep a 12 px gap from the left action buttons
 - The position slider keeps the standard thumb size but exposes a 30 px transparent vertical hit area; clicking anywhere in that area updates the seek position while the visible track remains 3 px high
@@ -538,7 +560,12 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - The album-detail card above its track table stretches across the available
   content width. Its favorite button appears immediately before the album title;
   cover search and **Save as playlist** remain adjacent themed actions.
-- The bottom transport bar shows artwork and track information, favorite state, playback controls, position, and volume
+- The bottom transport bar shows 58 × 58 px album artwork, track information,
+  favorite state, playback controls, position, volume, and two quick-pick
+  buttons (EQ and Output) below the volume control. The EQ popup contains a
+  profile ComboBox, a ⚙ settings button, and a themed enable/disable checkbox
+  (`PopupCheckBoxTheme`). The Output popup contains a profile ComboBox and a
+  ⚙ settings button. Both buttons use vector SVG path icons and tooltips.
 - **Up next** is a top-level sidebar view using the shared track table styling.
   It displays queue order, title, artist, album, duration, and themed
   move/remove actions, plus a header action to save the queue as a playlist.
