@@ -10,6 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Sanitized manual MusicBrainz cover-search queries to contain only letters,
+  numbers, and separating spaces, preventing punctuation such as hyphens from
+  interfering with album matches.
 - Fixed artist-filtered compilation albums hiding the full album header when
   opened from an artist drill-down. The cover, album metadata, actions, and
   **Show all album tracks** option now remain visible above the filtered

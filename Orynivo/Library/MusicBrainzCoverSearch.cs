@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace Orynivo.Library;
 
@@ -17,9 +18,14 @@ public sealed record CoverSearchResult(string ReleaseId, string Title, string? A
 /// </summary>
 public static class MusicBrainzCoverSearch
 {
+    private static readonly Regex NonAlphanumericCharacters = new(
+        @"[^\p{L}\p{N}]+",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
     /// <summary>
     /// Queries MusicBrainz for releases matching <paramref name="albumTitle"/> and fetches up to
-    /// 12 front-cover images from the Cover Art Archive.
+    /// 12 front-cover images from the Cover Art Archive. Characters other than Unicode letters
+    /// and numbers are replaced with spaces before the query is submitted.
     /// </summary>
     /// <param name="albumTitle">Album title to search for.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -28,10 +34,14 @@ public static class MusicBrainzCoverSearch
         string albumTitle,
         CancellationToken cancellationToken = default)
     {
+        var sanitizedAlbumTitle = SanitizeAlbumTitle(albumTitle);
+        if (sanitizedAlbumTitle.Length == 0)
+            return [];
+
         using var client = new HttpClient();
         client.DefaultRequestHeaders.UserAgent.ParseAdd("Orynivo/1.0 (album-artwork-search)");
 
-        var query = Uri.EscapeDataString($"release:\"{albumTitle}\"");
+        var query = Uri.EscapeDataString($"release:\"{sanitizedAlbumTitle}\"");
         using var response = await client.GetAsync(
             $"https://musicbrainz.org/ws/2/release/?query={query}&fmt=json&limit=12",
             cancellationToken);
@@ -79,4 +89,7 @@ public static class MusicBrainzCoverSearch
 
         return results;
     }
+
+    private static string SanitizeAlbumTitle(string albumTitle) =>
+        NonAlphanumericCharacters.Replace(albumTitle, " ").Trim();
 }

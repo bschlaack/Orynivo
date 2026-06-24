@@ -118,7 +118,8 @@ plus a multi-resolution Windows application icon based on the standalone logo.
   shown only when the current result contains multiple groups.
 - Playback history for local tracks, podcast episodes, and internet-radio
   sessions, including position and completion state
-- Artwork downloads through the Cover Art Archive and manual MusicBrainz search
+- Artwork downloads through the Cover Art Archive and manual MusicBrainz
+  search, with punctuation removed from album-title queries
 - Embedded or downloaded lyrics with synchronized LRC highlighting during playback
 - Manual LRCLIB lyrics search with editable title and artist, result preview,
   and explicit replacement of the cached lyrics

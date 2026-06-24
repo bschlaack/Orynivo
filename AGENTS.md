@@ -215,6 +215,8 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - Settings includes **Repair album artwork**, which re-reads a sample file per album through TagLib when historical assignments are missing
 - Settings includes **Download missing artwork**, using Cover Art Archive for albums with a `musicbrainz_release_id`
 - Missing covers show a placeholder and manual MusicBrainz search by editable album title
+- Manual MusicBrainz cover searches replace every character other than Unicode
+  letters and numbers with a separating space before submitting the album title.
 - The manual cover-search dialog uses the themed native title bar, shows search activity and explicit empty results, and can be run repeatedly
 - Album artwork has a context menu for deletion or reassignment through manual MusicBrainz search
 - Album cover assignment, reassignment, and deletion must preserve the selected
