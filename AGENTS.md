@@ -201,8 +201,14 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - Metadata extraction stores track and album ReplayGain values. The first scan of each configured root after ReplayGain support was added refreshes unchanged tracks once so existing libraries receive those values.
 - Opening the database runs a legacy-data migration that normalizes artists, albums, and artwork and removes old per-track artwork BLOBs
 - `album_artist_rebuild_v1` rebuilds album assignments strictly from `album_artist` so compilations are not split by track artist
-- `album_title_uniqueness_v1` consolidates albums by unique title and uses the first album artist when multiple artists exist
-- `RebuildAlbumsFromAlbumArtists()` must preserve existing `artwork_id` assignments
+- `album_title_uniqueness_v1` is the historical title-only consolidation
+  migration. `album_title_artist_identity_v1` supersedes it and rebuilds album
+  identity from normalized album title plus album artist, so equal titles by
+  different artists remain separate.
+- `RebuildAlbumsFromAlbumArtists()` preserves favorites and artwork only for
+  the matching title/album-artist pair. Newly separated albums recover their
+  own embedded cover from a sample source file instead of inheriting another
+  artist's artwork.
 - Settings includes **Repair album artwork**, which re-reads a sample file per album through TagLib when historical assignments are missing
 - Settings includes **Download missing artwork**, using Cover Art Archive for albums with a `musicbrainz_release_id`
 - Missing covers show a placeholder and manual MusicBrainz search by editable album title
@@ -679,10 +685,13 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 
 - **Artists**: distinct alphabetical artist list with table and artwork-card
   modes; double-click opens albums containing that artist
-- **Albums**: normalized unique-title list with favorite, 96 px thumbnail,
-  album, album artist, and year, plus a switchable artwork grid using 320 px
-  thumbnails
-- Album views show the album artist rather than combining track artists; when multiple album artists exist, the first is used
+- **Albums**: normalized title-plus-album-artist list with favorite, 96 px
+  thumbnail, album, album artist, and year, plus a switchable artwork grid
+  using 320 px thumbnails. Equal album titles by different artists are
+  separate album records and open separate full detail headers and covers.
+- Album views show the album artist rather than combining track artists; when
+  several album artists are encoded in one field, the first is used for album
+  identity.
 - Album images are converted to `ImageSource` only when visible elements load
 - `ContentRow` implements `INotifyPropertyChanged` so asynchronously loaded artwork appears immediately
 - **Now Playing**: shows a 96 px thumbnail and track favorite button; the button is disabled when the current file has no database track
@@ -690,7 +699,13 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   fixed-size artwork cards from the top-left; sparse artist/album card result
   sets must not be vertically centered. It uses `StyledProperty` for
   `ItemWidth` and `ItemHeight`
-- **Album tracks**: `GetTrackListByAlbum(albumId)` sorts by disc, track number, and file name; playback queues all visible album tracks
+- **Album tracks**: `GetTrackListByAlbum(albumId)` sorts by disc, track number,
+  and file name. When matching tracks come from multiple physical directories,
+  album titles, or primary track artists, the detail view renders separate
+  metadata headers and track tables from the actual track metadata. It displays
+  the physical album path (using `source_path` for CUE tracks), suppresses a
+  conflicting shared album header, and queues only the selected group on
+  double-click.
 - When album tracks are opened from an artist drill-down, the list initially contains only tracks by that artist; a localized **Show all album tracks** switch removes the artist filter and rebuilds the visible playback queue
 - The album-track view has a centered header with a large 240 px cover, album title, album artist, and optional year; artwork can be searched, reassigned, or deleted
 - **Favorites**: artist, album, and track lists and album cards can toggle their

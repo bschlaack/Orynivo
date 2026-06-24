@@ -102,7 +102,10 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 - Theme-aware table highlighting follows the currently audible track across
   library, search, playlist, radio, podcast, and Plex views
 - Album track details provide an in-place favorite button alongside the album
-  metadata
+  metadata. Album identity uses album title plus album artist, so equal titles
+  by different artists have independent list entries, full cover headers,
+  favorites, and artwork. Multiple physical copies of the same artist's album
+  remain separated into directory-specific track groups.
 - Playback history for local tracks, podcast episodes, and internet-radio
   sessions, including position and completion state
 - Artwork downloads through the Cover Art Archive and manual MusicBrainz search

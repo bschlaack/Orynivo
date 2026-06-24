@@ -99,6 +99,7 @@ public static class LocalizationManager
         resources["L_Cancel"] = Current.Cancel;
         resources["L_AddToPlaylist"] = Current.AddToPlaylist;
         resources["L_SaveAlbumAsPlaylist"] = Current.SaveAlbumAsPlaylist;
+        resources["L_AlbumPath"] = Current.AlbumPath;
         resources["L_SaveQueueAsPlaylist"] = Current.SaveQueueAsPlaylist;
         resources["L_NewPlaylist"] = Current.NewPlaylist;
         resources["L_NewPlaylistDialogTitle"] = Current.NewPlaylistDialogTitle;
@@ -585,6 +586,7 @@ public static class LocalizationManager
         , ImportM3u8Playlist = "M3U8-Playlist importieren"
         , ExportM3u8Playlist = "Als M3U8 exportieren"
         , SaveAlbumAsPlaylist = "Als Playlist speichern"
+        , AlbumPath = "Albumpfad"
         , UpNext = "Als Nächstes"
         , PlayNext = "Als Nächstes abspielen"
         , AppendToQueue = "An Warteschlange anhängen"
@@ -904,6 +906,7 @@ public static class LocalizationManager
         , ImportM3u8Playlist = "Import M3U8 playlist"
         , ExportM3u8Playlist = "Export as M3U8"
         , SaveAlbumAsPlaylist = "Save as playlist"
+        , AlbumPath = "Album path"
         , UpNext = "Up next"
         , PlayNext = "Play next"
         , AppendToQueue = "Append to queue"
@@ -1226,6 +1229,7 @@ public static class LocalizationManager
         , ImportM3u8Playlist = "Importer une playlist M3U8"
         , ExportM3u8Playlist = "Exporter au format M3U8"
         , SaveAlbumAsPlaylist = "Enregistrer comme playlist"
+        , AlbumPath = "Chemin de l’album"
         , UpNext = "À suivre"
         , PlayNext = "Lire ensuite"
         , AppendToQueue = "Ajouter à la file d’attente"
@@ -1545,6 +1549,7 @@ public static class LocalizationManager
         , ImportM3u8Playlist = "Importar lista M3U8"
         , ExportM3u8Playlist = "Exportar como M3U8"
         , SaveAlbumAsPlaylist = "Guardar como lista"
+        , AlbumPath = "Ruta del álbum"
         , UpNext = "A continuación"
         , PlayNext = "Reproducir a continuación"
         , AppendToQueue = "Añadir a la cola"

@@ -89,6 +89,7 @@ public partial class MainWindow : Window
     private string? _activeArtistFilterName;
     private bool _showAllAlbumTracks;
     private bool _updatingAlbumTrackScope;
+    private readonly List<DataGrid> _albumFolderGroupGrids = [];
     private readonly Stack<NavigationState> _navigationStack = [];
     private bool _restoringNavigationHistory;
     private readonly DispatcherTimer _searchTimer;
@@ -918,6 +919,13 @@ public partial class MainWindow : Window
             return false;
         }
     }
+
+    private sealed record AlbumTrackGroup(
+        string Directory,
+        string Album,
+        string? Artist,
+        string? Year,
+        List<ContentRow> Rows);
 
     private void PersistPlaybackQueue()
     {
@@ -3354,11 +3362,19 @@ public partial class MainWindow : Window
             UpdateNowPlayingTreeHighlights(child);
     }
 
-    private void ApplyColumns(string view)
+    private void ApplyColumns(
+        string view,
+        DataGrid? targetGrid = null,
+        bool captureCurrentWidths = true)
     {
-        CaptureContentDataGridColumnWidths();
-        _contentColumnWidthKey = GetContentColumnWidthKey(view);
-        ContentDataGrid.Columns.Clear();
+        var grid = targetGrid ?? ContentDataGrid;
+        if (captureCurrentWidths && ReferenceEquals(grid, ContentDataGrid))
+        {
+            CaptureContentDataGridColumnWidths();
+            _contentColumnWidthKey = GetContentColumnWidthKey(view);
+        }
+        var widthKey = GetContentColumnWidthKey(view);
+        grid.Columns.Clear();
         switch (view)
         {
             case "PlexArtists":
@@ -3406,8 +3422,8 @@ public partial class MainWindow : Window
                 break;
         }
 
-        DataGridColumnChooser.Apply(ContentDataGrid, _contentColumnWidthKey, _settings);
-        RestoreColumnWidths(_contentColumnWidthKey, ContentDataGrid);
+        DataGridColumnChooser.Apply(grid, widthKey, _settings);
+        RestoreColumnWidths(widthKey, grid);
 
         void AddEntityLink(
             string header,
@@ -3422,7 +3438,7 @@ public partial class MainWindow : Window
             var column = CreateEntityLinkColumn(header, prop, width, star, entityType, starWeight);
             column.Tag = key;
             column.IsVisible = defaultVisible;
-            ContentDataGrid.Columns.Add(column);
+            grid.Columns.Add(column);
         }
 
         void Add(
@@ -3466,7 +3482,7 @@ public partial class MainWindow : Window
             }
             column.Tag = key;
             column.IsVisible = defaultVisible;
-            ContentDataGrid.Columns.Add(column);
+            grid.Columns.Add(column);
         }
 
         void AddTrackColumns(bool includeFavorite, bool includeGenreByDefault)
@@ -3498,7 +3514,7 @@ public partial class MainWindow : Window
 
         void AddFavorite()
         {
-            ContentDataGrid.Columns.Add(new DataGridTemplateColumn
+            grid.Columns.Add(new DataGridTemplateColumn
             {
                 Header = "",
                 Width = new DataGridLength(42),
@@ -3532,7 +3548,7 @@ public partial class MainWindow : Window
 
         void AddThumbnail()
         {
-            ContentDataGrid.Columns.Add(new DataGridTemplateColumn
+            grid.Columns.Add(new DataGridTemplateColumn
             {
                 Header = "",
                 Width = new DataGridLength(64),
@@ -3554,7 +3570,7 @@ public partial class MainWindow : Window
 
         void AddArtistInfo()
         {
-            ContentDataGrid.Columns.Add(new DataGridTemplateColumn
+            grid.Columns.Add(new DataGridTemplateColumn
             {
                 Header = "",
                 Width = new DataGridLength(44),
@@ -3580,7 +3596,7 @@ public partial class MainWindow : Window
 
         void AddQueueActions()
         {
-            ContentDataGrid.Columns.Add(new DataGridTemplateColumn
+            grid.Columns.Add(new DataGridTemplateColumn
             {
                 Header = "",
                 Width = new DataGridLength(132),
@@ -4046,8 +4062,17 @@ public partial class MainWindow : Window
     {
         if (FindAncestor<Button>(e.Source as Visual) is not null)
             return;
-        if (ContentDataGrid.SelectedItem is not ContentRow row)
+        if (sender is not DataGrid grid ||
+            grid.SelectedItem is not ContentRow row)
             return;
+
+        if (row.EntityType == "Track" &&
+            grid.ItemsSource is IEnumerable<ContentRow> rows)
+        {
+            await PlayTrackFromRowsAsync(row, rows.ToList());
+            return;
+        }
+
         await HandleContentRowDoubleClickAsync(row);
     }
 
@@ -4253,19 +4278,75 @@ public partial class MainWindow : Window
         var result = await Task.Run(() =>
         {
             using var db = AudioDatabase.OpenDefault();
+            var tracks = db.GetTrackListByAlbum(albumId, artistId);
             return (
                 Album: db.GetAlbumById(albumId),
-                Tracks: db.GetTrackListByAlbum(albumId, artistId)
-                    .Select(ToTrackContentRow)
-                    .ToList());
+                Tracks: tracks,
+                Directories: db.GetAlbumTrackDirectories(albumId, artistId));
         });
-        var rows = result.Tracks;
+        var groupedRows = result.Tracks
+            .GroupBy(
+                track => (
+                    Directory: NormalizeAlbumGroupValue(
+                        result.Directories.TryGetValue(track.Id, out var directory)
+                            ? directory
+                            : Path.GetDirectoryName(track.Path)),
+                    Album: NormalizeAlbumGroupValue(track.Album),
+                    Artist: NormalizeAlbumGroupValue(
+                        string.IsNullOrWhiteSpace(track.AlbumArtist)
+                            ? track.Artist
+                            : track.AlbumArtist),
+                    Year: track.Year))
+            .Select(group =>
+            {
+                var first = group.First();
+                return new AlbumTrackGroup(
+                    result.Directories.TryGetValue(first.Id, out var directory)
+                        ? directory
+                        : Path.GetDirectoryName(first.Path) ?? string.Empty,
+                    string.IsNullOrWhiteSpace(first.Album)
+                        ? LocalizationManager.Current.Unknown
+                        : first.Album.Trim(),
+                    string.IsNullOrWhiteSpace(first.AlbumArtist)
+                        ? first.Artist?.Trim()
+                        : first.AlbumArtist.Trim(),
+                    first.Year?.ToString(CultureInfo.CurrentCulture),
+                    group.Select(ToTrackContentRow).ToList());
+            })
+            .OrderBy(group => group.Directory, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(group => group.Album, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(group => group.Artist, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+        var rows = groupedRows.SelectMany(group => group.Rows).ToList();
+        HideAlbumFolderGroups();
+        ContentDataGrid.IsVisible = true;
         ApplyColumns("Tracks");
         ContentDataGrid.ItemsSource = rows;
         ContentCountTextBlock.Text = LocalizationManager.FormatTrackCount(rows.Count);
         UpdateAlphabetIndex(null, false);
         ApplyAlbumDetailHeader(result.Album);
+        if (result.Album is not null)
+        {
+            var sharedHeaderConflicts = groupedRows.Any(group =>
+                !string.Equals(
+                    NormalizeAlbumGroupValue(group.Album),
+                    NormalizeAlbumGroupValue(result.Album.Album),
+                    StringComparison.Ordinal) ||
+                !string.Equals(
+                    NormalizeAlbumGroupValue(group.Artist),
+                    NormalizeAlbumGroupValue(result.Album.DisplayArtist),
+                    StringComparison.Ordinal) ||
+                !string.Equals(
+                    group.Year,
+                    result.Album.Year?.ToString(CultureInfo.CurrentCulture),
+                    StringComparison.Ordinal));
+            if (groupedRows.Count > 1 || sharedHeaderConflicts)
+                ShowAlbumFolderGroups(groupedRows, sharedHeaderConflicts);
+        }
     }
+
+    private static string NormalizeAlbumGroupValue(string? value) =>
+        value?.Trim().ToUpperInvariant() ?? string.Empty;
 
     private async void ShowAllAlbumTracksCheckBox_OnChanged(object? sender, RoutedEventArgs e)
     {
@@ -4284,7 +4365,14 @@ public partial class MainWindow : Window
             return;
         }
 
-        var row = new ContentRow
+        var row = CreateAlbumDetailRow(album);
+        EnsureArtworkHydrated(row);
+        AlbumDetailHeader.DataContext = row;
+        AlbumDetailHeader.IsVisible = true;
+    }
+
+    private static ContentRow CreateAlbumDetailRow(AlbumInfo album) =>
+        new()
         {
             Id = album.Id,
             AlbumId = album.Id,
@@ -4301,16 +4389,175 @@ public partial class MainWindow : Window
             EntityType = "Album",
             FilePath = ""
         };
-        EnsureArtworkHydrated(row);
-        AlbumDetailHeader.DataContext = row;
-        AlbumDetailHeader.IsVisible = true;
-    }
 
     private void HideAlbumDetailHeader()
     {
         AlbumDetailHeader.IsVisible = false;
         AlbumDetailHeader.DataContext = null;
         ShowAllAlbumTracksCheckBox.IsVisible = false;
+        HideAlbumFolderGroups();
+    }
+
+    private void ShowAlbumFolderGroups(
+        IReadOnlyList<AlbumTrackGroup> groups,
+        bool sharedHeaderConflicts)
+    {
+        AlbumFolderGroupsPanel.Children.Clear();
+        var hasDifferentMetadata = groups
+            .Select(group => (
+                Album: NormalizeAlbumGroupValue(group.Album),
+                Artist: NormalizeAlbumGroupValue(group.Artist),
+                Year: group.Year))
+            .Distinct()
+            .Skip(1)
+            .Any();
+        if (sharedHeaderConflicts || hasDifferentMetadata)
+            AlbumDetailHeader.IsVisible = false;
+
+        foreach (var group in groups)
+        {
+            var groupPanel = new StackPanel { Spacing = 10 };
+            groupPanel.Children.Add(CreateAlbumFolderGroupHeader(
+                group));
+
+            var grid = new DataGrid
+            {
+                ItemsSource = group.Rows,
+                Height = 45 + (group.Rows.Count * 40),
+                Background = FindResource<IBrush>("AppContentBrush"),
+                BorderThickness = new Thickness(0),
+                RowHeight = 40,
+                ColumnHeaderHeight = 44,
+                GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+                HorizontalGridLinesBrush = FindResource<IBrush>("AppGridLineBrush"),
+                AutoGenerateColumns = false,
+                CanUserResizeColumns = true,
+                IsReadOnly = true,
+                SelectionMode = DataGridSelectionMode.Single,
+                FontSize = 12
+            };
+            grid.SetValue(
+                ScrollViewer.VerticalScrollBarVisibilityProperty,
+                ScrollBarVisibility.Disabled);
+            grid.LoadingRow += ContentDataGrid_OnLoadingRow;
+            grid.DoubleTapped += ContentDataGrid_OnMouseDoubleClick;
+            ApplyColumns("Tracks", grid, captureCurrentWidths: false);
+            DataGridColumnChooser.Attach(
+                grid,
+                GetContentColumnWidthKey("Tracks"),
+                _settings);
+            grid.AddHandler(
+                PointerReleasedEvent,
+                AlbumFolderDataGrid_OnPointerReleased,
+                RoutingStrategies.Tunnel,
+                handledEventsToo: true);
+            _albumFolderGroupGrids.Add(grid);
+            groupPanel.Children.Add(grid);
+            AlbumFolderGroupsPanel.Children.Add(groupPanel);
+        }
+
+        ContentDataGrid.IsVisible = false;
+        AlbumFolderGroupsScrollViewer.IsVisible = true;
+    }
+
+    private Border CreateAlbumFolderGroupHeader(AlbumTrackGroup group)
+    {
+        var representativeTrack = group.Rows[0];
+        var albumRow = new ContentRow
+        {
+            Id = representativeTrack.Id,
+            AlbumId = representativeTrack.AlbumId,
+            ArtistId = representativeTrack.ArtistId,
+            Title = group.Album,
+            Artist = group.Artist,
+            Album = group.Album,
+            Year = group.Year,
+            EntityType = "AlbumGroup",
+            FilePath = representativeTrack.FilePath
+        };
+        var titleButton = new Button
+        {
+            Content = albumRow.Title,
+            Tag = albumRow,
+            FontSize = 20,
+            FontWeight = FontWeight.SemiBold,
+            Theme = FindResource<ControlTheme>("EntityLinkButtonTheme")
+        };
+        titleButton.Click += AlbumLinkButton_OnClick;
+
+        var artistButton = new Button
+        {
+            Content = albumRow.Artist,
+            Tag = albumRow,
+            FontSize = 14,
+            Foreground = FindResource<IBrush>("AppSecondaryTextBrush"),
+            Theme = FindResource<ControlTheme>("EntityLinkButtonTheme")
+        };
+        artistButton.Click += ArtistLinkButton_OnClick;
+
+        var metadataPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 10
+        };
+        if (!string.IsNullOrWhiteSpace(group.Artist))
+            metadataPanel.Children.Add(artistButton);
+        if (!string.IsNullOrWhiteSpace(albumRow.Year))
+        {
+            metadataPanel.Children.Add(new TextBlock
+            {
+                Text = albumRow.Year,
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = FindResource<IBrush>("AppMutedTextBrush")
+            });
+        }
+        metadataPanel.Children.Add(new TextBlock
+        {
+            Text = LocalizationManager.FormatTrackCount(group.Rows.Count),
+            VerticalAlignment = VerticalAlignment.Center,
+            Foreground = FindResource<IBrush>("AppMutedTextBrush")
+        });
+
+        var content = new StackPanel { Spacing = 5 };
+        content.Children.Add(titleButton);
+        content.Children.Add(metadataPanel);
+        content.Children.Add(new TextBlock
+        {
+            Text = $"{LocalizationManager.Current.AlbumPath}: {group.Directory}",
+            FontSize = 12,
+            Foreground = FindResource<IBrush>("AppMutedTextBrush"),
+            TextWrapping = TextWrapping.Wrap
+        });
+
+        return new Border
+        {
+            Padding = new Thickness(16, 12),
+            Background = FindResource<IBrush>("AppSurfaceBrush"),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(0, 16, 0, 16),
+            Child = content
+        };
+    }
+
+    private void HideAlbumFolderGroups()
+    {
+        AlbumFolderGroupsScrollViewer.IsVisible = false;
+        AlbumFolderGroupsPanel.Children.Clear();
+        _albumFolderGroupGrids.Clear();
+    }
+
+    private void AlbumFolderDataGrid_OnPointerReleased(
+        object? sender,
+        PointerReleasedEventArgs e)
+    {
+        if (sender is not DataGrid grid)
+            return;
+
+        var widthKey = GetContentColumnWidthKey("Tracks");
+        CaptureColumnWidths(widthKey, grid);
+        foreach (var otherGrid in _albumFolderGroupGrids.Where(other => !ReferenceEquals(other, grid)))
+            RestoreColumnWidths(widthKey, otherGrid);
     }
 
     private async Task ReloadAlbumDetailHeaderAsync(long albumId)

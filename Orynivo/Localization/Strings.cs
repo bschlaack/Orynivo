@@ -509,6 +509,8 @@ public sealed record LocalizedStrings(
     public string ExportM3u8Playlist { get; init; } = "";
     /// <summary>Gets the album-detail action label for saving the visible tracks to a playlist.</summary>
     public string SaveAlbumAsPlaylist { get; init; } = "";
+    /// <summary>Gets the label shown before a physical album directory.</summary>
+    public string AlbumPath { get; init; } = "";
     /// <summary>Gets the title of the editable playback queue view.</summary>
     public string UpNext { get; init; } = "";
     /// <summary>Gets the action label for inserting tracks after the current queue item.</summary>

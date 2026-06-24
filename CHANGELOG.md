@@ -4,6 +4,29 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+### Fixed
+
+- Fixed the cover-search confirmation button clipping the end of its localized
+  label. The button now sizes to its complete text while retaining a consistent
+  minimum size.
+- Fixed duplicate album copies appearing as one interleaved track list. When an
+  album resolves to multiple physical source directories, the album detail view
+  now renders one metadata header and track table per directory, shows each
+  album path, and starts playback from the selected physical copy. Group
+  headings use the tracks' actual album, artist, and year metadata instead of
+  the shared normalized album record; differing artists or album titles create
+  separate groups and suppress the misleading shared header.
+- Changed normalized album identity from title-only to album title plus album
+  artist. Equal titles by different artists now appear as independent albums
+  with their own full cover header, favorite state, artwork, and track list.
+  Existing libraries migrate automatically; newly separated records recover
+  embedded artwork from their own source files rather than copying another
+  artist's cover.
+
 ## [0.10.0] - 2026-06-22
 
 ### Added

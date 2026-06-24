@@ -1891,6 +1891,17 @@
                           FontSize="12"
                           LoadingRow="ContentDataGrid_OnLoadingRow"
                           DoubleTapped="ContentDataGrid_OnMouseDoubleClick"/>
+
+                <ScrollViewer x:Name="AlbumFolderGroupsScrollViewer"
+                              Grid.Row="1"
+                              IsVisible="False"
+                              Background="{DynamicResource AppContentBrush}"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel x:Name="AlbumFolderGroupsPanel"
+                                Margin="24,22,24,24"
+                                Spacing="18"/>
+                </ScrollViewer>
             </Grid>
 
             <ScrollViewer x:Name="SearchResultsScrollViewer"
