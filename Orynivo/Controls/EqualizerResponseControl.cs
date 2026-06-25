@@ -152,7 +152,7 @@ internal sealed class EqualizerResponseControl : Control
             PenLineCap.Flat,
             PenLineJoin.Miter,
             10);
-        var labelForeground = GetBrush("AppButtonTextBrush", Colors.White);
+        var labelForeground = new SolidColorBrush(Colors.White);
         var typeface = new Typeface(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold);
 
         for (var index = 0; index < _profile.Filters.Count; index++)

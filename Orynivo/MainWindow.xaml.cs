@@ -952,6 +952,9 @@ public partial class MainWindow : Window
 
     private void ApplySidebarNavigationSettings()
     {
+        InternetRadioNavItem.IsVisible = _settings.ShowInternetRadioItem;
+        PodcastsNavItem.IsVisible      = _settings.ShowPodcastsItem;
+        QueueNavItem.IsVisible         = _settings.ShowQueueItem;
         SetSidebarSectionVisibility(
             LocalLibraryHeaderItem,
             "LocalLibrary",
@@ -8905,6 +8908,9 @@ public partial class MainWindow : Window
                     window.SelectedLastFmApiKey,
                     StringComparison.Ordinal);
             var sidebarChanged =
+                _settings.ShowInternetRadioItem != window.ShowInternetRadioItem ||
+                _settings.ShowPodcastsItem != window.ShowPodcastsItem ||
+                _settings.ShowQueueItem != window.ShowQueueItem ||
                 _settings.ShowLocalLibrarySection != window.ShowLocalLibrarySection ||
                 _settings.ShowOwnRadiosSection != window.ShowOwnRadiosSection ||
                 _settings.ShowMyPodcastsSection != window.ShowMyPodcastsSection ||
@@ -8946,6 +8952,9 @@ public partial class MainWindow : Window
             _settings.LastFmApiKey           = window.SelectedLastFmApiKey;
             _settings.QobuzApplicationId      = window.SelectedQobuzApplicationId;
             _settings.PlexServers             = window.SelectedPlexServers.ToList();
+            _settings.ShowInternetRadioItem   = window.ShowInternetRadioItem;
+            _settings.ShowPodcastsItem        = window.ShowPodcastsItem;
+            _settings.ShowQueueItem           = window.ShowQueueItem;
             _settings.ShowLocalLibrarySection = window.ShowLocalLibrarySection;
             _settings.ShowOwnRadiosSection    = window.ShowOwnRadiosSection;
             _settings.ShowMyPodcastsSection   = window.ShowMyPodcastsSection;

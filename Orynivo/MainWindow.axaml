@@ -729,21 +729,21 @@
                     </StackPanel>
                 </ListBoxItem>
 
-                <ListBoxItem Tag="InternetRadio" Theme="{StaticResource NavItemTheme}">
+                <ListBoxItem x:Name="InternetRadioNavItem" Tag="InternetRadio" Theme="{StaticResource NavItemTheme}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="◉" Width="18" FontSize="13" VerticalAlignment="Center"/>
                         <TextBlock Text="{DynamicResource L_InternetRadio}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </ListBoxItem>
 
-                <ListBoxItem Tag="Podcasts" Theme="{StaticResource NavItemTheme}">
+                <ListBoxItem x:Name="PodcastsNavItem" Tag="Podcasts" Theme="{StaticResource NavItemTheme}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="◍" Width="18" FontSize="13" VerticalAlignment="Center"/>
                         <TextBlock Text="{DynamicResource L_Podcasts}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </ListBoxItem>
 
-                <ListBoxItem Tag="Queue" Theme="{StaticResource NavItemTheme}">
+                <ListBoxItem x:Name="QueueNavItem" Tag="Queue" Theme="{StaticResource NavItemTheme}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="≡" Width="18" FontSize="15" VerticalAlignment="Center"/>
                         <TextBlock Text="{DynamicResource L_UpNext}" VerticalAlignment="Center"/>
@@ -1036,7 +1036,7 @@
                                 Grid.Column="7"
                                 Margin="20,0,0,0"
                                 Padding="4"
-                                Background="#252640"
+                                Background="{DynamicResource AppButtonBrush}"
                                 CornerRadius="10"
                                 IsVisible="False">
                             <StackPanel Orientation="Horizontal">
@@ -1059,7 +1059,7 @@
                                 Grid.Column="7"
                                 Margin="20,0,0,0"
                                 Padding="3"
-                                Background="#252640"
+                                Background="{DynamicResource AppButtonBrush}"
                                 CornerRadius="9"
                                 IsVisible="False">
                             <StackPanel Orientation="Horizontal">

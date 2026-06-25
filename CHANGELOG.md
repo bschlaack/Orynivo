@@ -4,6 +4,21 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Internet Radio, Podcasts, and **Als Nächstes** (Up Next) sidebar items can
+  now be hidden individually in Settings > Appearance, consistent with the
+  existing accordion-section toggles.
+  (`AppSettings.ShowInternetRadioItem`, `ShowPodcastsItem`, `ShowQueueItem`)
+
+### Fixed
+
+- Fixed numbered circle labels on the equalizer frequency-response graph being
+  near-black in light theme. The circles are always filled with the accent
+  color, so the label text is now always white regardless of theme.
+
 ## [0.11.0] - 2026-06-25
 
 ### Added

@@ -546,6 +546,7 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - The full Orynivo logo appears on a light logo surface in the startup window and at the top of the main sidebar
 - The 220 px sidebar contains Dashboard, local library navigation, playlists, device information, About, and Settings
 - Local library, personal radio, pinned podcast, Plex server, and playlist sidebar groups use independently expandable accordion headers; expansion state is persisted
+- `AppSettings.ShowInternetRadioItem`, `ShowPodcastsItem`, and `ShowQueueItem` control visibility of the Internet Radio, Podcasts, and Up Next sidebar items from Settings > Appearance and default to visible
 - `AppSettings.ShowLocalLibrarySection`, `ShowOwnRadiosSection`, `ShowMyPodcastsSection`, `ShowPlexSection`, and `ShowPlaylistsSection` control group visibility from Settings > Appearance and default to visible
 - `AppSettings.IsLocalLibrarySectionExpanded`, `IsOwnRadiosSectionExpanded`, `IsMyPodcastsSectionExpanded`, `IsPlexSectionExpanded`, and `IsPlaylistsSectionExpanded` persist independent sidebar accordion states
 - About displays the author, library licenses, and the Steinberg ASIO trademark notice

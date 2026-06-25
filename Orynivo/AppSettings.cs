@@ -69,6 +69,12 @@ public sealed class AppSettings
     public string QobuzApplicationId { get; set; } = string.Empty;
     /// <summary>Gets or sets the configured Plex Media Servers.</summary>
     public List<PlexServerSettings> PlexServers { get; set; } = [];
+    /// <summary>Gets or sets a value indicating whether the Internet Radio sidebar item is visible.</summary>
+    public bool ShowInternetRadioItem { get; set; } = true;
+    /// <summary>Gets or sets a value indicating whether the Podcasts sidebar item is visible.</summary>
+    public bool ShowPodcastsItem { get; set; } = true;
+    /// <summary>Gets or sets a value indicating whether the Up Next sidebar item is visible.</summary>
+    public bool ShowQueueItem { get; set; } = true;
     /// <summary>Gets or sets a value indicating whether the Local Library sidebar section is visible.</summary>
     public bool ShowLocalLibrarySection { get; set; } = true;
     /// <summary>Gets or sets a value indicating whether the Own Radios sidebar section is visible.</summary>
