@@ -85,7 +85,35 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   right; the output-profile dropdown shows a compact `Backend  ·  Device`
   summary line (`OutputProfileSummaryTextBlock`) beneath it when a profile is
   selected; `NavigateToSection(tag)` and `ScrollToEqualizerSection()` allow
-  the transport quick-pick buttons to jump directly into a settings section
+  the transport quick-pick buttons to jump directly into a settings section;
+  the **Integration** navigation group contains the **MCP SERVER** section
+  (`Tag="Mcp"`) with an enable checkbox, configurable port field, and per-tool
+  enable/disable checkboxes for all 17 tools (stored in
+  `AppSettings.DisabledMcpTools`); `NavigateToSection("Mcp")` jumps there
+- `Orynivo/Mcp/McpPlayerBridge.cs`: thread-safe bridge between the MCP layer
+  and Avalonia's UI thread; `MainWindow` populates all delegate properties at
+  startup; `OnUiAsync` dispatches to `Dispatcher.UIThread` at
+  `DispatcherPriority.Normal`; records `PlayerState` and `QueueEntry` are
+  returned by the state and queue delegates; `DisabledTools` (`HashSet<string>?`)
+  and `IsToolEnabled(name)` control per-tool gating; `RefreshPlaylistsFunc`
+  triggers `LoadNavPlaylists` after MCP creates a playlist
+- `Orynivo/Mcp/McpTools.cs`: 17 MCP tools annotated with `[McpServerToolType]`
+  and `[McpServerTool]`; read-only tools are marked `ReadOnly = true,
+  Idempotent = true`; every tool guards with `bridge.IsToolEnabled(name)` and
+  returns `"Tool is disabled."` when off; `search_library` calls
+  `TrackSearchIndex.SearchByCategory` then `AudioDatabase.OpenDefault()` for id
+  resolution; property access uses `AlbumInfo.Album`, `AlbumInfo.DisplayArtist`,
+  and `ArtistInfo.Artist`; playlist tools use `GetAllPlaylists`,
+  `GetPlaylistById`, `GetPlaylistTracks`, `CreatePlaylist`, and
+  `CreateSmartPlaylist`; `get_play_history` uses `GetHistoryForDay` for a
+  specific date and `GetRecentHistory` for the N most recent entries;
+  `create_smart_playlist` accepts individual filter parameters and serialises
+  them to `SmartPlaylistCriteria` JSON
+- `Orynivo/Mcp/McpServerService.cs`: starts/stops an embedded Kestrel HTTP/SSE
+  server using `WebApplication`; binds to `http://localhost:{port}` via
+  `builder.WebHost.UseSetting("urls", …)`; maps MCP endpoint at `/mcp`;
+  logging is cleared so Kestrel output does not appear in the player console;
+  `IAsyncDisposable` — `DisposeAsync` delegates to `StopAsync`
 - `Orynivo/ThemeManager.cs`: sets global Avalonia resources for light and dark themes
 - `Orynivo/Controls/DataGridColumnWidthStore.cs`: validates, captures, and
   restores per-table pixel widths
@@ -137,6 +165,16 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - `AppSettings.DataGridColumnWidths` persists user-adjusted pixel widths per stable table/view key; dynamic main-content views capture their current widths before replacing columns
 - `AppSettings.VisibleDataGridColumns` persists selectable column IDs per table/view key; right-clicking any table header opens the context-appropriate column chooser flyout
 - `AppSettings.DataGridColumnOrders` persists drag-and-drop display order per stable table/view key; fixed artwork and action columns keep their structural positions
+- `AppSettings.McpServerEnabled` enables the embedded MCP server on startup
+  and when settings are saved; `AppSettings.McpServerPort` sets the TCP port
+  (default 49200); the server binds exclusively to `localhost`;
+  `AppSettings.DisabledMcpTools` persists the set of tool names whose
+  checkboxes are unchecked in Settings — an empty set means all tools are
+  active; the bridge reads this set on startup and after every settings save
+- `AppSettings.ShowInternetRadioItem`, `ShowPodcastsItem`, and `ShowQueueItem`
+  control the individual sidebar items for Internet Radio, Podcasts, and
+  **Up Next** from Settings > Appearance; they default to visible and are
+  independent of the accordion-section toggles
 - `AppSettings.Theme` stores the `Light` or `Dark` theme
 - `AppSettings.Language` stores `German`, `English`, `French`, or `Spanish`
 - `Orynivo/Library/TrackRecord.cs`: database track model containing tags and technical metadata
@@ -328,6 +366,13 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - `PlaylistMenuTag(long PlaylistId, IReadOnlyList<string> Paths)` stores paths directly
 - Folder nodes recursively collect tracks through `GetTrackPathsUnderDirectory`; empty folders have no menu
 - Main-window context menus use application theme resources and a custom border template without the default white icon strip
+- The global `ControlTheme x:Key="{x:Type ContextMenu}"` in `App.axaml`
+  provides a complete `Template` with a `Border` bound to `Background`,
+  `BorderBrush`, `BorderThickness`, and `CornerRadius`; this is required so
+  that programmatically created context menus (e.g. the built-in cut/copy/paste
+  menu of `NumericUpDown`) also render with theme colors instead of the
+  Fluent-default white popup background. Property-only themes without a
+  `Template` are silently ignored by the Fluent renderer.
 - Dynamically created menu objects receive their styles through Avalonia
   `ControlTheme` resources looked up via `TryGetResource`
 - Track, search-result, album-row, and folder-tree playlist actions follow the
@@ -546,6 +591,7 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - The full Orynivo logo appears on a light logo surface in the startup window and at the top of the main sidebar
 - The 220 px sidebar contains Dashboard, local library navigation, playlists, device information, About, and Settings
 - Local library, personal radio, pinned podcast, Plex server, and playlist sidebar groups use independently expandable accordion headers; expansion state is persisted
+- `AppSettings.ShowInternetRadioItem`, `ShowPodcastsItem`, and `ShowQueueItem` control visibility of the Internet Radio, Podcasts, and Up Next sidebar items from Settings > Appearance and default to visible
 - `AppSettings.ShowLocalLibrarySection`, `ShowOwnRadiosSection`, `ShowMyPodcastsSection`, `ShowPlexSection`, and `ShowPlaylistsSection` control group visibility from Settings > Appearance and default to visible
 - `AppSettings.IsLocalLibrarySectionExpanded`, `IsOwnRadiosSectionExpanded`, `IsMyPodcastsSectionExpanded`, `IsPlexSectionExpanded`, and `IsPlaylistsSectionExpanded` persist independent sidebar accordion states
 - About displays the author, library licenses, and the Steinberg ASIO trademark notice

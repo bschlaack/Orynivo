@@ -62,6 +62,7 @@
                 <TextBlock Classes="license" Text="Avalonia 11.2.0 — MIT License"/>
                 <TextBlock Classes="license" Text="SkiaSharp 2.88.9 — MIT License"/>
                 <TextBlock Classes="license" Text="Lucene.NET 4.8.0-beta00017 — Apache License 2.0"/>
+                <TextBlock Classes="license" Text="ModelContextProtocol C# SDK 1.4.0 — Apache License 2.0"/>
                 <TextBlock Classes="license" Text="Microsoft.Data.Sqlite 9.0.5 — MIT License"/>
                 <TextBlock Classes="license" Text="NAudio 2.3.0 — MIT License"/>
                 <TextBlock Classes="license" Text="TagLibSharp 2.3.0 — LGPL-2.1-only"/>

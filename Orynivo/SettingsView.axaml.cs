@@ -121,6 +121,12 @@ internal partial class SettingsView : UserControl
         EqualizerEnabledCheckBox.IsChecked = settings.EqualizerEnabled;
         RefreshEqualizerProfileText();
         RebuildEqualizerEditor();
+        McpServerEnabledCheckBox.IsChecked        = settings.McpServerEnabled;
+        McpServerPortNumericUpDown.Value          = settings.McpServerPort;
+        InitMcpToolCheckBoxes(settings.DisabledMcpTools);
+        ShowInternetRadioItemCheckBox.IsChecked = settings.ShowInternetRadioItem;
+        ShowPodcastsItemCheckBox.IsChecked      = settings.ShowPodcastsItem;
+        ShowQueueItemCheckBox.IsChecked         = settings.ShowQueueItem;
         ShowLocalLibrarySectionCheckBox.IsChecked = settings.ShowLocalLibrarySection;
         ShowOwnRadiosSectionCheckBox.IsChecked = settings.ShowOwnRadiosSection;
         ShowMyPodcastsSectionCheckBox.IsChecked = settings.ShowMyPodcastsSection;
@@ -193,10 +199,27 @@ internal partial class SettingsView : UserControl
     public IReadOnlyDictionary<string, string> SelectedPlexTokens => _plexTokens;
     /// <summary>Gets a value indicating whether Plex credentials were edited in this window.</summary>
     public bool PlexCredentialsChanged => _plexCredentialsChanged;
+    /// <summary>Gets a value indicating whether the MCP server should be enabled.</summary>
+    public bool McpServerEnabled => McpServerEnabledCheckBox.IsChecked == true;
+    /// <summary>Gets the TCP port configured for the MCP server.</summary>
+    public int McpServerPort => (int)(McpServerPortNumericUpDown.Value ?? 49200);
+    /// <summary>Gets the set of MCP tool names that should be disabled.</summary>
+    public HashSet<string> DisabledMcpTools => ReadDisabledMcpTools();
+    /// <summary>Gets a value indicating whether the Internet Radio sidebar item should be visible.</summary>
+    public bool ShowInternetRadioItem => ShowInternetRadioItemCheckBox.IsChecked == true;
+    /// <summary>Gets a value indicating whether the Podcasts sidebar item should be visible.</summary>
+    public bool ShowPodcastsItem => ShowPodcastsItemCheckBox.IsChecked == true;
+    /// <summary>Gets a value indicating whether the Up Next sidebar item should be visible.</summary>
+    public bool ShowQueueItem => ShowQueueItemCheckBox.IsChecked == true;
+    /// <summary>Gets a value indicating whether the Local Library sidebar section should be visible.</summary>
     public bool ShowLocalLibrarySection => ShowLocalLibrarySectionCheckBox.IsChecked == true;
+    /// <summary>Gets a value indicating whether the Own Radios sidebar section should be visible.</summary>
     public bool ShowOwnRadiosSection => ShowOwnRadiosSectionCheckBox.IsChecked == true;
+    /// <summary>Gets a value indicating whether the My Podcasts sidebar section should be visible.</summary>
     public bool ShowMyPodcastsSection => ShowMyPodcastsSectionCheckBox.IsChecked == true;
+    /// <summary>Gets a value indicating whether the Plex sidebar section should be visible.</summary>
     public bool ShowPlexSection => ShowPlexSectionCheckBox.IsChecked == true;
+    /// <summary>Gets a value indicating whether the Playlists sidebar section should be visible.</summary>
     public bool ShowPlaylistsSection => ShowPlaylistsSectionCheckBox.IsChecked == true;
 
     private static PlexServerSettings ClonePlexServer(PlexServerSettings server) => new()
@@ -345,6 +368,7 @@ internal partial class SettingsView : UserControl
         StreamingPanel.IsVisible   = tag == "Streaming";
         AppearancePanel.IsVisible  = tag == "Appearance";
         ArtistInfoPanel.IsVisible  = tag == "ArtistInfo";
+        McpPanel.IsVisible         = tag == "Mcp";
     }
 
     private void ArtistInfoSourceComboBox_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -1288,4 +1312,73 @@ internal partial class SettingsView : UserControl
 
     private void CancelButton_OnClick(object? sender, RoutedEventArgs e) =>
         CompletionRequested?.Invoke(this, false);
+
+    private static readonly (string ToolName, string PropName)[] McpToolDefs =
+    [
+        ("get_now_playing",       nameof(McpToolGetNowPlaying)),
+        ("get_queue",             nameof(McpToolGetQueue)),
+        ("play",                  nameof(McpToolPlay)),
+        ("pause_resume",          nameof(McpToolPauseResume)),
+        ("next_track",            nameof(McpToolNextTrack)),
+        ("previous_track",        nameof(McpToolPreviousTrack)),
+        ("stop",                  nameof(McpToolStop)),
+        ("seek",                  nameof(McpToolSeek)),
+        ("set_volume",            nameof(McpToolSetVolume)),
+        ("queue_append",          nameof(McpToolQueueAppend)),
+        ("queue_play_next",       nameof(McpToolQueuePlayNext)),
+        ("search_library",        nameof(McpToolSearchLibrary)),
+        ("list_playlists",        nameof(McpToolListPlaylists)),
+        ("get_playlist_tracks",   nameof(McpToolGetPlaylistTracks)),
+        ("create_playlist",       nameof(McpToolCreatePlaylist)),
+        ("create_smart_playlist", nameof(McpToolCreateSmartPlaylist)),
+        ("get_play_history",      nameof(McpToolGetPlayHistory)),
+    ];
+
+    /// <summary>Initialises each tool checkbox from the persisted disabled-tool set.</summary>
+    /// <param name="disabled">The set of currently disabled tool names.</param>
+    private void InitMcpToolCheckBoxes(HashSet<string> disabled)
+    {
+        McpToolGetNowPlaying.IsChecked       = !disabled.Contains("get_now_playing");
+        McpToolGetQueue.IsChecked            = !disabled.Contains("get_queue");
+        McpToolPlay.IsChecked                = !disabled.Contains("play");
+        McpToolPauseResume.IsChecked         = !disabled.Contains("pause_resume");
+        McpToolNextTrack.IsChecked           = !disabled.Contains("next_track");
+        McpToolPreviousTrack.IsChecked       = !disabled.Contains("previous_track");
+        McpToolStop.IsChecked                = !disabled.Contains("stop");
+        McpToolSeek.IsChecked                = !disabled.Contains("seek");
+        McpToolSetVolume.IsChecked           = !disabled.Contains("set_volume");
+        McpToolQueueAppend.IsChecked         = !disabled.Contains("queue_append");
+        McpToolQueuePlayNext.IsChecked       = !disabled.Contains("queue_play_next");
+        McpToolSearchLibrary.IsChecked       = !disabled.Contains("search_library");
+        McpToolListPlaylists.IsChecked       = !disabled.Contains("list_playlists");
+        McpToolGetPlaylistTracks.IsChecked   = !disabled.Contains("get_playlist_tracks");
+        McpToolCreatePlaylist.IsChecked      = !disabled.Contains("create_playlist");
+        McpToolCreateSmartPlaylist.IsChecked = !disabled.Contains("create_smart_playlist");
+        McpToolGetPlayHistory.IsChecked      = !disabled.Contains("get_play_history");
+    }
+
+    /// <summary>Reads the checkbox states and returns the set of tool names that are disabled.</summary>
+    /// <returns>A <see cref="HashSet{T}"/> of disabled MCP tool names.</returns>
+    private HashSet<string> ReadDisabledMcpTools()
+    {
+        var disabled = new HashSet<string>();
+        if (McpToolGetNowPlaying.IsChecked       != true) disabled.Add("get_now_playing");
+        if (McpToolGetQueue.IsChecked            != true) disabled.Add("get_queue");
+        if (McpToolPlay.IsChecked                != true) disabled.Add("play");
+        if (McpToolPauseResume.IsChecked         != true) disabled.Add("pause_resume");
+        if (McpToolNextTrack.IsChecked           != true) disabled.Add("next_track");
+        if (McpToolPreviousTrack.IsChecked       != true) disabled.Add("previous_track");
+        if (McpToolStop.IsChecked                != true) disabled.Add("stop");
+        if (McpToolSeek.IsChecked                != true) disabled.Add("seek");
+        if (McpToolSetVolume.IsChecked           != true) disabled.Add("set_volume");
+        if (McpToolQueueAppend.IsChecked         != true) disabled.Add("queue_append");
+        if (McpToolQueuePlayNext.IsChecked       != true) disabled.Add("queue_play_next");
+        if (McpToolSearchLibrary.IsChecked       != true) disabled.Add("search_library");
+        if (McpToolListPlaylists.IsChecked       != true) disabled.Add("list_playlists");
+        if (McpToolGetPlaylistTracks.IsChecked   != true) disabled.Add("get_playlist_tracks");
+        if (McpToolCreatePlaylist.IsChecked      != true) disabled.Add("create_playlist");
+        if (McpToolCreateSmartPlaylist.IsChecked != true) disabled.Add("create_smart_playlist");
+        if (McpToolGetPlayHistory.IsChecked      != true) disabled.Add("get_play_history");
+        return disabled;
+    }
 }

@@ -228,6 +228,20 @@
                          Theme="{StaticResource SettingsNavItemTheme}">
                 <TextBlock Text="{DynamicResource L_ArtistInfo}"/>
             </ListBoxItem>
+
+            <ListBoxItem IsHitTestVisible="False"
+                         Focusable="False"
+                         Padding="12,14,0,4"
+                         FontSize="10"
+                         FontWeight="Bold"
+                         Foreground="{DynamicResource AppMutedTextBrush}">
+                <TextBlock Text="{DynamicResource L_Integration}"/>
+            </ListBoxItem>
+            <ListBoxItem Tag="Mcp"
+                         FontSize="13"
+                         Theme="{StaticResource SettingsNavItemTheme}">
+                <TextBlock Text="{DynamicResource L_McpServer}"/>
+            </ListBoxItem>
         </ListBox>
 
         <Rectangle Grid.Column="1"
@@ -703,6 +717,18 @@
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"
                                Margin="0,0,0,8"/>
+                    <CheckBox x:Name="ShowInternetRadioItemCheckBox"
+                              Content="{DynamicResource L_InternetRadio}"
+                              Theme="{StaticResource SettingsCheckBoxTheme}"
+                              Margin="0,4"/>
+                    <CheckBox x:Name="ShowPodcastsItemCheckBox"
+                              Content="{DynamicResource L_Podcasts}"
+                              Theme="{StaticResource SettingsCheckBoxTheme}"
+                              Margin="0,4"/>
+                    <CheckBox x:Name="ShowQueueItemCheckBox"
+                              Content="{DynamicResource L_UpNext}"
+                              Theme="{StaticResource SettingsCheckBoxTheme}"
+                              Margin="0,4"/>
                     <CheckBox x:Name="ShowLocalLibrarySectionCheckBox"
                               Content="{DynamicResource L_LocalLibrary}"
                               Theme="{StaticResource SettingsCheckBoxTheme}"
@@ -723,6 +749,126 @@
                               Content="{DynamicResource L_Playlists}"
                               Theme="{StaticResource SettingsCheckBoxTheme}"
                               Margin="0,4"/>
+                </StackPanel>
+
+                <StackPanel x:Name="McpPanel"
+                            IsVisible="False">
+                    <TextBlock Text="{DynamicResource L_McpServer}"
+                               FontSize="15"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,20"/>
+                    <TextBlock Text="{DynamicResource L_McpServerHint}"
+                               FontSize="11"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,12"/>
+                    <CheckBox x:Name="McpServerEnabledCheckBox"
+                              Content="{DynamicResource L_McpServerEnabled}"
+                              Theme="{StaticResource SettingsCheckBoxTheme}"
+                              Margin="0,0,0,16"/>
+                    <TextBlock Text="{DynamicResource L_McpServerPort}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+                    <NumericUpDown x:Name="McpServerPortNumericUpDown"
+                                   Height="30"
+                                   Minimum="1024"
+                                   Maximum="65535"
+                                   Increment="1"
+                                   FormatString="0"
+                                   ClipValueToMinMax="True"
+                                   HorizontalAlignment="Stretch"
+                                   Margin="0,0,0,12"/>
+                    <TextBlock x:Name="McpServerStatusTextBlock"
+                               FontSize="11"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,20"/>
+
+                    <Border Height="1"
+                            Background="{DynamicResource AppGridLineBrush}"
+                            Margin="0,0,0,16"/>
+
+                    <TextBlock Text="{DynamicResource L_McpToolsHeader}"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+                    <TextBlock Text="{DynamicResource L_McpToolsHint}"
+                               FontSize="11"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,12"/>
+
+                    <UniformGrid Columns="2" Rows="9">
+                        <CheckBox x:Name="McpToolGetNowPlaying"
+                                  Content="get_now_playing"
+                                  Theme="{StaticResource SettingsCheckBoxTheme}"
+                                  Margin="0,0,8,6"/>
+                        <CheckBox x:Name="McpToolGetQueue"
+                                  Content="get_queue"
+                                  Theme="{StaticResource SettingsCheckBoxTheme}"
+                                  Margin="0,0,0,6"/>
+                        <CheckBox x:Name="McpToolPlay"
+                                  Content="play"
+                                  Theme="{StaticResource SettingsCheckBoxTheme}"
+                                  Margin="0,0,8,6"/>
+                        <CheckBox x:Name="McpToolPauseResume"
+                                  Content="pause_resume"
+                                  Theme="{StaticResource SettingsCheckBoxTheme}"
+                                  Margin="0,0,0,6"/>
+                        <CheckBox x:Name="McpToolNextTrack"
+                                  Content="next_track"
+                                  Theme="{StaticResource SettingsCheckBoxTheme}"
+                                  Margin="0,0,8,6"/>
+                        <CheckBox x:Name="McpToolPreviousTrack"
+                                  Content="previous_track"
+                                  Theme="{StaticResource SettingsCheckBoxTheme}"
+                                  Margin="0,0,0,6"/>
+                        <CheckBox x:Name="McpToolStop"
+                                  Content="stop"
+                                  Theme="{StaticResource SettingsCheckBoxTheme}"
+                                  Margin="0,0,8,6"/>
+                        <CheckBox x:Name="McpToolSeek"
+                                  Content="seek"
+                                  Theme="{StaticResource SettingsCheckBoxTheme}"
+                                  Margin="0,0,0,6"/>
+                        <CheckBox x:Name="McpToolSetVolume"
+                                  Content="set_volume"
+                                  Theme="{StaticResource SettingsCheckBoxTheme}"
+                                  Margin="0,0,8,6"/>
+                        <CheckBox x:Name="McpToolQueueAppend"
+                                  Content="queue_append"
+                                  Theme="{StaticResource SettingsCheckBoxTheme}"
+                                  Margin="0,0,0,6"/>
+                        <CheckBox x:Name="McpToolQueuePlayNext"
+                                  Content="queue_play_next"
+                                  Theme="{StaticResource SettingsCheckBoxTheme}"
+                                  Margin="0,0,8,6"/>
+                        <CheckBox x:Name="McpToolSearchLibrary"
+                                  Content="search_library"
+                                  Theme="{StaticResource SettingsCheckBoxTheme}"
+                                  Margin="0,0,0,6"/>
+                        <CheckBox x:Name="McpToolListPlaylists"
+                                  Content="list_playlists"
+                                  Theme="{StaticResource SettingsCheckBoxTheme}"
+                                  Margin="0,0,8,6"/>
+                        <CheckBox x:Name="McpToolGetPlaylistTracks"
+                                  Content="get_playlist_tracks"
+                                  Theme="{StaticResource SettingsCheckBoxTheme}"
+                                  Margin="0,0,0,6"/>
+                        <CheckBox x:Name="McpToolCreatePlaylist"
+                                  Content="create_playlist"
+                                  Theme="{StaticResource SettingsCheckBoxTheme}"
+                                  Margin="0,0,8,6"/>
+                        <CheckBox x:Name="McpToolCreateSmartPlaylist"
+                                  Content="create_smart_playlist"
+                                  Theme="{StaticResource SettingsCheckBoxTheme}"
+                                  Margin="0,0,0,6"/>
+                        <CheckBox x:Name="McpToolGetPlayHistory"
+                                  Content="get_play_history"
+                                  Theme="{StaticResource SettingsCheckBoxTheme}"
+                                  Margin="0,0,8,6"/>
+                    </UniformGrid>
                 </StackPanel>
 
             </Grid>

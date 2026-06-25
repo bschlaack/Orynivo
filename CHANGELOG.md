@@ -4,6 +4,43 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.12.0] - 2026-06-26
+
+### Added
+
+- Internet Radio, Podcasts, and **Als Nächstes** (Up Next) sidebar items can
+  now be hidden individually in Settings > Appearance, consistent with the
+  existing accordion-section toggles.
+  (`AppSettings.ShowInternetRadioItem`, `ShowPodcastsItem`, `ShowQueueItem`)
+- Added an embedded **MCP server** (Model Context Protocol) under
+  Settings > Integration. When enabled, the player starts an HTTP/SSE server on
+  a configurable local port (default 49200) that exposes 17 tools to any
+  MCP-compatible AI assistant (e.g. Claude Desktop):
+  `get_now_playing`, `get_queue`, `play`, `pause_resume`, `next_track`,
+  `previous_track`, `stop`, `seek`, `set_volume`, `queue_append`,
+  `queue_play_next`, `search_library`, `list_playlists`, `get_playlist_tracks`,
+  `create_playlist`, `create_smart_playlist`, and `get_play_history`. The
+  server is started and stopped immediately when Settings are saved; it only
+  binds to `localhost`.
+  (`AppSettings.McpServerEnabled`, `AppSettings.McpServerPort`,
+  `Orynivo/Mcp/McpPlayerBridge.cs`, `McpTools.cs`, `McpServerService.cs`)
+- MCP tools can now be individually enabled or disabled under
+  Settings > Integration. Disabled tools respond with `"Tool is disabled."` so
+  the AI assistant knows the capability is unavailable; the active set is
+  persisted in `AppSettings.DisabledMcpTools`.
+
+### Fixed
+
+- Fixed numbered circle labels on the equalizer frequency-response graph being
+  near-black in light theme. The circles are always filled with the accent
+  color, so the label text is now always white regardless of theme.
+- Fixed the right-click context menu of text inputs (e.g. the MCP server port
+  field) showing a white Fluent-theme popup regardless of the active theme. The
+  global `ContextMenu` `ControlTheme` in `App.axaml` now provides a complete
+  `Template` that binds `Background`, `BorderBrush`, `BorderThickness`, and
+  `CornerRadius` to theme resources, so all context menus render with
+  `AppSurfaceBrush` and `AppInputBorderBrush` in both light and dark mode.
+
 ## [0.11.0] - 2026-06-25
 
 ### Added

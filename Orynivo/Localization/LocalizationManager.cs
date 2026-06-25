@@ -273,6 +273,13 @@ public static class LocalizationManager
         resources["L_MediaType"] = Current.MediaType;
         resources["L_Close"] = Current.Close;
         resources["L_DailyHistoryNoEntries"] = Current.DailyHistoryNoEntries;
+        resources["L_Integration"]      = Current.Integration;
+        resources["L_McpServer"]        = Current.McpServer;
+        resources["L_McpServerHint"]    = Current.McpServerHint;
+        resources["L_McpServerEnabled"] = Current.McpServerEnabled;
+        resources["L_McpServerPort"]    = Current.McpServerPort;
+        resources["L_McpToolsHeader"]   = Current.McpToolsHeader;
+        resources["L_McpToolsHint"]     = Current.McpToolsHint;
     }
 
     private static readonly LocalizedStrings German = new(
@@ -621,6 +628,13 @@ public static class LocalizationManager
         , M3u8ImportFailed = "M3U8-Import fehlgeschlagen: {0}"
         , M3u8ExportCompleted = "Playlist »{0}« als M3U8 exportiert: {1} Einträge · {2} übersprungen."
         , M3u8ExportFailed = "M3U8-Export fehlgeschlagen: {0}"
+        , Integration      = "INTEGRATION"
+        , McpServer        = "MCP-Server"
+        , McpServerHint    = "Öffnet einen lokalen HTTP/SSE-Server, über den KI-Assistenten (z. B. Claude Desktop) den Player steuern und die Bibliothek durchsuchen können."
+        , McpServerEnabled = "MCP-Server aktivieren"
+        , McpServerPort    = "Port"
+        , McpToolsHeader   = "Tools"
+        , McpToolsHint     = "Einzelne Tools aktivieren oder deaktivieren."
     };
 
     private static readonly LocalizedStrings English = new(
@@ -951,6 +965,13 @@ public static class LocalizationManager
         , M3u8ImportFailed = "M3U8 import failed: {0}"
         , M3u8ExportCompleted = "Playlist '{0}' exported as M3U8: {1} entries · {2} skipped."
         , M3u8ExportFailed = "M3U8 export failed: {0}"
+        , Integration      = "INTEGRATION"
+        , McpServer        = "MCP Server"
+        , McpServerHint    = "Opens a local HTTP/SSE server that lets AI assistants (e.g. Claude Desktop) control the player and search the library."
+        , McpServerEnabled = "Enable MCP server"
+        , McpServerPort    = "Port"
+        , McpToolsHeader   = "Tools"
+        , McpToolsHint     = "Enable or disable individual tools."
     };
 
     private static readonly LocalizedStrings French = new(
@@ -1284,6 +1305,13 @@ public static class LocalizationManager
         , M3u8ImportFailed = "Échec de l’importation M3U8 : {0}"
         , M3u8ExportCompleted = "Playlist « {0} » exportée au format M3U8 : {1} entrées · {2} ignorées."
         , M3u8ExportFailed = "Échec de l’exportation M3U8 : {0}"
+        , Integration      = "INTÉGRATION"
+        , McpServer        = "Serveur MCP"
+        , McpServerHint    = "Ouvre un serveur HTTP/SSE local permettant aux assistants IA (ex. Claude Desktop) de contrôler le lecteur et de parcourir la bibliothèque."
+        , McpServerEnabled = "Activer le serveur MCP"
+        , McpServerPort    = "Port"
+        , McpToolsHeader   = "Outils"
+        , McpToolsHint     = "Activer ou désactiver des outils individuels."
     };
 
     private static readonly LocalizedStrings Spanish = new(
@@ -1614,6 +1642,13 @@ public static class LocalizationManager
         , M3u8ImportFailed = "Error al importar M3U8: {0}"
         , M3u8ExportCompleted = "Lista '{0}' exportada como M3U8: {1} entradas · {2} omitidas."
         , M3u8ExportFailed = "Error al exportar M3U8: {0}"
+        , Integration      = "INTEGRACIÓN"
+        , McpServer        = "Servidor MCP"
+        , McpServerHint    = "Abre un servidor HTTP/SSE local que permite a los asistentes de IA (p. ej. Claude Desktop) controlar el reproductor y buscar en la biblioteca."
+        , McpServerEnabled = "Activar servidor MCP"
+        , McpServerPort    = "Puerto"
+        , McpToolsHeader   = "Herramientas"
+        , McpToolsHint     = "Activar o desactivar herramientas individuales."
     };
 
     /// <summary>Gets the currently active <see cref="LocalizedStrings"/> instance.</summary>

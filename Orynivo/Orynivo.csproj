@@ -24,30 +24,20 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="..\Native\AsioBridge\x64\$(Configuration)\AsioBridge.dll"
-          Link="AsioBridge.dll"
-          CopyToOutputDirectory="PreserveNewest"
-          Condition="'$(IncludeAsioBridge)' == 'true' and Exists('..\Native\AsioBridge\x64\$(Configuration)\AsioBridge.dll')" />
-    <None Include="..\Native\CwAsioBridge\x64\$(Configuration)\CwAsioBridge.dll"
-          Link="CwAsioBridge.dll"
-          CopyToOutputDirectory="PreserveNewest"
-          Condition="'$(IncludeCwAsioBridge)' == 'true' and Exists('..\Native\CwAsioBridge\x64\$(Configuration)\CwAsioBridge.dll')" />
+    <None Include="..\Native\AsioBridge\x64\$(Configuration)\AsioBridge.dll" Link="AsioBridge.dll" CopyToOutputDirectory="PreserveNewest" Condition="'$(IncludeAsioBridge)' == 'true' and Exists('..\Native\AsioBridge\x64\$(Configuration)\AsioBridge.dll')" />
+    <None Include="..\Native\CwAsioBridge\x64\$(Configuration)\CwAsioBridge.dll" Link="CwAsioBridge.dll" CopyToOutputDirectory="PreserveNewest" Condition="'$(IncludeCwAsioBridge)' == 'true' and Exists('..\Native\CwAsioBridge\x64\$(Configuration)\CwAsioBridge.dll')" />
   </ItemGroup>
 
-  <Target Name="RemoveDisabledAsioBridge" AfterTargets="Build"
-          Condition="'$(IncludeAsioBridge)' != 'true'">
+  <Target Name="RemoveDisabledAsioBridge" AfterTargets="Build" Condition="'$(IncludeAsioBridge)' != 'true'">
     <Delete Files="$(TargetDir)AsioBridge.dll" />
   </Target>
-  <Target Name="RemoveDisabledAsioBridgeFromPublish" AfterTargets="Publish"
-          Condition="'$(IncludeAsioBridge)' != 'true'">
+  <Target Name="RemoveDisabledAsioBridgeFromPublish" AfterTargets="Publish" Condition="'$(IncludeAsioBridge)' != 'true'">
     <Delete Files="$(PublishDir)AsioBridge.dll" />
   </Target>
-  <Target Name="RemoveDisabledCwAsioBridge" AfterTargets="Build"
-          Condition="'$(IncludeCwAsioBridge)' != 'true'">
+  <Target Name="RemoveDisabledCwAsioBridge" AfterTargets="Build" Condition="'$(IncludeCwAsioBridge)' != 'true'">
     <Delete Files="$(TargetDir)CwAsioBridge.dll" />
   </Target>
-  <Target Name="RemoveDisabledCwAsioBridgeFromPublish" AfterTargets="Publish"
-          Condition="'$(IncludeCwAsioBridge)' != 'true'">
+  <Target Name="RemoveDisabledCwAsioBridgeFromPublish" AfterTargets="Publish" Condition="'$(IncludeCwAsioBridge)' != 'true'">
     <Delete Files="$(PublishDir)CwAsioBridge.dll" />
   </Target>
 
@@ -56,36 +46,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\LICENSE"
-          Link="LICENSE"
-          CopyToOutputDirectory="PreserveNewest"
-          CopyToPublishDirectory="PreserveNewest" />
-    <None Include="..\NOTICE"
-          Link="NOTICE"
-          CopyToOutputDirectory="PreserveNewest"
-          CopyToPublishDirectory="PreserveNewest" />
-    <None Include="..\THIRD_PARTY_NOTICES.md"
-          Link="THIRD_PARTY_NOTICES.md"
-          CopyToOutputDirectory="PreserveNewest"
-          CopyToPublishDirectory="PreserveNewest" />
-    <None Include="..\licenses\**\*"
-          Link="licenses\%(RecursiveDir)%(Filename)%(Extension)"
-          CopyToOutputDirectory="PreserveNewest"
-          CopyToPublishDirectory="PreserveNewest" />
-    <None Include="..\third_party\cwasio\LICENSE"
-          Link="licenses\cwASIO-MIT.txt"
-          CopyToOutputDirectory="PreserveNewest"
-          CopyToPublishDirectory="PreserveNewest" />
-    <None Include="$(NuGetPackageRoot)lucene.net\4.8.0-beta00017\NOTICE.txt"
-          Link="licenses\Lucene.NET-NOTICE.txt"
-          CopyToOutputDirectory="PreserveNewest"
-          CopyToPublishDirectory="PreserveNewest"
-          Condition="Exists('$(NuGetPackageRoot)lucene.net\4.8.0-beta00017\NOTICE.txt')" />
-    <None Include="$(NuGetPackageRoot)skiasharp\2.88.9\THIRD-PARTY-NOTICES.txt"
-          Link="licenses\SkiaSharp-THIRD-PARTY-NOTICES.txt"
-          CopyToOutputDirectory="PreserveNewest"
-          CopyToPublishDirectory="PreserveNewest"
-          Condition="Exists('$(NuGetPackageRoot)skiasharp\2.88.9\THIRD-PARTY-NOTICES.txt')" />
+    <None Include="..\LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\NOTICE" Link="NOTICE" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\THIRD_PARTY_NOTICES.md" Link="THIRD_PARTY_NOTICES.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\licenses\**\*" Link="licenses\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\third_party\cwasio\LICENSE" Link="licenses\cwASIO-MIT.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="$(NuGetPackageRoot)lucene.net\4.8.0-beta00017\NOTICE.txt" Link="licenses\Lucene.NET-NOTICE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('$(NuGetPackageRoot)lucene.net\4.8.0-beta00017\NOTICE.txt')" />
+    <None Include="$(NuGetPackageRoot)skiasharp\2.88.9\THIRD-PARTY-NOTICES.txt" Link="licenses\SkiaSharp-THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('$(NuGetPackageRoot)skiasharp\2.88.9\THIRD-PARTY-NOTICES.txt')" />
   </ItemGroup>
 
   <ItemGroup>
@@ -94,6 +61,8 @@
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.0" />
     <PackageReference Include="Avalonia.Controls.DataGrid" Version="11.2.0" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="11.2.0" />
+    <PackageReference Include="ModelContextProtocol" Version="1.4.0" />
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="1.4.0" />
     <PackageReference Include="SkiaSharp" Version="2.88.9" />
     <PackageReference Include="Avalonia.Diagnostics" Version="11.2.0" Condition="'$(Configuration)' == 'Debug'" />
     <PackageReference Include="Lucene.Net" Version="4.8.0-beta00017" />

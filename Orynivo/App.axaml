@@ -87,7 +87,22 @@
                 <Setter Property="Background"      Value="{DynamicResource AppSurfaceBrush}"/>
                 <Setter Property="BorderBrush"     Value="{DynamicResource AppInputBorderBrush}"/>
                 <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="CornerRadius"    Value="8"/>
                 <Setter Property="Padding"         Value="0,4"/>
+                <Setter Property="Template">
+                    <ControlTemplate>
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                Padding="{TemplateBinding Padding}">
+                            <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                                          VerticalScrollBarVisibility="Auto">
+                                <ItemsPresenter/>
+                            </ScrollViewer>
+                        </Border>
+                    </ControlTemplate>
+                </Setter>
             </ControlTheme>
 
             <!-- MenuItem -->

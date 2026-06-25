@@ -559,4 +559,18 @@ public sealed record LocalizedStrings(
     public string M3u8ExportCompleted { get; init; } = "";
     /// <summary>Gets the failed M3U8 export status message.</summary>
     public string M3u8ExportFailed { get; init; } = "";
+    /// <summary>Gets the Settings navigation label for the MCP server section.</summary>
+    public string McpServer { get; init; } = "";
+    /// <summary>Gets the hint text explaining what the MCP server does.</summary>
+    public string McpServerHint { get; init; } = "";
+    /// <summary>Gets the label for the MCP server enable checkbox.</summary>
+    public string McpServerEnabled { get; init; } = "";
+    /// <summary>Gets the label for the MCP server port input.</summary>
+    public string McpServerPort { get; init; } = "";
+    /// <summary>Gets the integration settings section group header.</summary>
+    public string Integration { get; init; } = "";
+    /// <summary>Gets the sub-section header for the individual MCP tool toggles.</summary>
+    public string McpToolsHeader { get; init; } = "";
+    /// <summary>Gets the hint text for the MCP tool enable/disable list.</summary>
+    public string McpToolsHint { get; init; } = "";
 }

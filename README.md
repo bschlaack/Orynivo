@@ -23,6 +23,9 @@ plus a multi-resolution Windows application icon based on the standalone logo.
 - Optional forced DSF/DFF-to-PCM conversion with ASIO/cwASIO, allowing volume,
   ReplayGain, and the parametric equalizer to affect DSD sources
 - PCM playback through `ffmpeg`
+- Multiple named output profiles for quickly switching between configured
+  output devices; a quick-pick popup in the transport bar selects the active
+  profile without opening Settings
 - Seeking, volume control, pause, and an editable persistent **Up next** queue
   with play-next/append actions, removal, reordering, playlist saving, and
   shuffle without repeating a track within the currently loaded queue
@@ -55,7 +58,8 @@ plus a multi-resolution Windows application icon based on the standalone logo.
   and main-content view
 - Space-saving accordion sections in the main sidebar, with configurable
   visibility and persisted independent expansion for library, personal radio,
-  podcast, and playlist sections
+  podcast, and playlist sections; the Internet Radio, Podcasts, and
+  **Up Next** sidebar items can each be hidden independently in Settings
 - Linked artist and album names for direct navigation to artist albums and album tracks
 - Session-wide Back navigation across sidebar views, search results, dashboard
   links, artist/album drill-downs, playlists, podcasts, radio, folders, and Plex
@@ -139,6 +143,14 @@ plus a multi-resolution Windows application icon based on the standalone logo.
   one logical item
 - Provider-neutral streaming interfaces with a prepared Qobuz configuration
   page for future approved partner API access
+- Embedded **MCP server** (Model Context Protocol) that, when enabled under
+  Settings > Integration, exposes 12 player-control and library-search tools
+  to any MCP-compatible AI assistant (e.g. Claude Desktop). Tools cover
+  playback control (`play`, `pause_resume`, `next_track`, `previous_track`,
+  `stop`, `seek`, `set_volume`), queue management (`queue_append`,
+  `queue_play_next`), and library lookup (`get_now_playing`, `get_queue`,
+  `search_library`). The server binds to `localhost` only; the TCP port is
+  configurable (default 49200)
 
 ## Supported Formats
 
@@ -221,8 +233,11 @@ the repository. Release artifacts therefore include `CwAsioBridge.dll`.
 .\Orynivo\bin\Debug\net8.0-windows10.0.19041.0\Orynivo.exe
 ```
 
-Library directories and the desired output device can then be selected in the
-settings view inside the main window. ReplayGain can be disabled or switched to track/album mode
+Library directories and the desired output device can then be configured in
+Settings. Named output profiles allow saving multiple backend and device
+combinations; a quick-pick popup on the transport bar switches between them
+without opening Settings. ReplayGain can be disabled or switched to
+track/album mode
 under the output-device settings. The first subsequent scan of each configured
 library root refreshes unchanged files once to import existing ReplayGain tags.
 Equalizer APO or AutoEQ `.txt`/`.cfg` profiles can be imported in the same
@@ -253,6 +268,7 @@ Orynivo/
 │   ├── Controls/            Custom Avalonia controls
 │   ├── Library/             SQLite database, scanner, search, and artwork cache
 │   ├── Localization/        German, English, French, and Spanish resources
+│   ├── Mcp/                 Embedded MCP server, player bridge, and tool definitions
 │   ├── Streaming/           Provider-neutral catalog, playback, and credential contracts
 │   └── MainWindow.*         Main user interface and navigation
 ├── build.ps1                Builds native bridges and the .NET application
