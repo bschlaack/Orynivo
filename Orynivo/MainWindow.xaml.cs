@@ -149,6 +149,8 @@ public partial class MainWindow : Window
     private WindowsEndpointVolumeSynchronizer? _endpointVolumeSynchronizer;
     private int _endpointVolumeSynchronizationVersion;
     private WindowsMediaTransportService? _windowsMediaTransport;
+    private readonly Mcp.McpPlayerBridge _mcpBridge = new();
+    private readonly Mcp.McpServerService _mcpServer = new();
     private bool _updatingVolumeFromSystem;
     private CancellationTokenSource _backgroundArtistLoadCts = new();
     private int _activeLyricIndex = -1;
@@ -385,6 +387,10 @@ public partial class MainWindow : Window
             await ShowSearchResultsAsync(SearchTextBox.Text ?? string.Empty);
         };
         LoadSettings();
+        InitMcpBridge();
+        _mcpBridge.DisabledTools = _settings.DisabledMcpTools;
+        if (_settings.McpServerEnabled)
+            _ = _mcpServer.StartAsync(_settings.McpServerPort, _mcpBridge);
         RestorePlaybackQueueState();
         _libraryWatcher = new LibraryWatcherService(OnWatchedLibraryChanged);
         _libraryWatcher.UpdatePaths(_settings.LibraryPaths);
@@ -441,9 +447,67 @@ public partial class MainWindow : Window
         Dispatcher.UIThread.Post(AttachContentDataGridVerticalScrollBar, DispatcherPriority.Loaded);
     }
 
+    private void InitMcpBridge()
+    {
+        using var db = Library.AudioDatabase.OpenDefault();
+        _mcpBridge.GetStateFunc = () =>
+        {
+            var status = _player is null ? "stopped"
+                : _player.IsPaused ? "paused"
+                : "playing";
+            return new Mcp.PlayerState(
+                status,
+                NowPlayingTitleBlock.Text,
+                NowPlayingArtistBlock.Text,
+                null,
+                _player is not null && _queueIndex >= 0 && _queueIndex < _queue.Count
+                    ? _queue[_queueIndex].FilePath : null,
+                _player?.Position.TotalSeconds ?? 0,
+                _player?.Duration.TotalSeconds ?? 0,
+                VolumeSlider.Value,
+                _queueIndex,
+                _queue.Count);
+        };
+        _mcpBridge.GetQueueFunc = () =>
+            _queue.Select((item, i) => new Mcp.QueueEntry(
+                i, i == _queueIndex, item.FilePath, item.FileName)).ToList();
+        _mcpBridge.PlayFileFunc    = path => StartPlaybackAsync(path);
+        _mcpBridge.TogglePauseFunc = TogglePlaybackAsync;
+        _mcpBridge.SkipNextFunc    = PlayNextAsync;
+        _mcpBridge.SkipPreviousFunc = PlayPreviousAsync;
+        _mcpBridge.StopFunc        = StopPlayback;
+        _mcpBridge.SeekFunc        = async seconds =>
+        {
+            if (_player?.CanSeek == true)
+                await _player.SeekAsync(TimeSpan.FromSeconds(seconds));
+        };
+        _mcpBridge.SetVolumeFunc   = v => VolumeSlider.Value = Math.Clamp(v, 0, 1);
+        _mcpBridge.AppendToQueueFunc = async path =>
+        {
+            _queue.Add(new PlaylistItem(path));
+            ResetQueuePlaybackState();
+            PersistPlaybackQueue();
+            RefreshQueueRowsIfVisible();
+            RefreshQueueNavigationButtons();
+            await RefreshActiveGaplessQueueAsync();
+        };
+        _mcpBridge.PlayNextFunc = async path =>
+        {
+            var insertIndex = Math.Clamp(_queueIndex + 1, 0, _queue.Count);
+            _queue.Insert(insertIndex, new PlaylistItem(path));
+            ResetQueuePlaybackState();
+            PersistPlaybackQueue();
+            RefreshQueueRowsIfVisible();
+            RefreshQueueNavigationButtons();
+            await RefreshActiveGaplessQueueAsync();
+        };
+        _mcpBridge.RefreshPlaylistsFunc = LoadNavPlaylists;
+    }
+
     protected override void OnClosed(EventArgs e)
     {
         CloseEmbeddedSettings();
+        _ = _mcpServer.StopAsync();
         ContentDataGrid.VerticalScroll -= ContentDataGrid_OnVerticalScroll;
         _libraryWatcher?.Dispose();
         _libraryWatcher = null;
@@ -8916,6 +8980,9 @@ public partial class MainWindow : Window
                 _settings.ShowMyPodcastsSection != window.ShowMyPodcastsSection ||
                 _settings.ShowPlexSection != window.ShowPlexSection ||
                 _settings.ShowPlaylistsSection != window.ShowPlaylistsSection;
+            var mcpChanged =
+                _settings.McpServerEnabled != window.McpServerEnabled ||
+                _settings.McpServerPort    != window.McpServerPort;
             var plexServersChanged = !PlexServerSettingsEqual(
                 _settings.PlexServers,
                 window.SelectedPlexServers);
@@ -8952,6 +9019,10 @@ public partial class MainWindow : Window
             _settings.LastFmApiKey           = window.SelectedLastFmApiKey;
             _settings.QobuzApplicationId      = window.SelectedQobuzApplicationId;
             _settings.PlexServers             = window.SelectedPlexServers.ToList();
+            _settings.McpServerEnabled        = window.McpServerEnabled;
+            _settings.McpServerPort           = window.McpServerPort;
+            _settings.DisabledMcpTools        = window.DisabledMcpTools;
+            _mcpBridge.DisabledTools          = _settings.DisabledMcpTools;
             _settings.ShowInternetRadioItem   = window.ShowInternetRadioItem;
             _settings.ShowPodcastsItem        = window.ShowPodcastsItem;
             _settings.ShowQueueItem           = window.ShowQueueItem;
@@ -8974,6 +9045,13 @@ public partial class MainWindow : Window
                 }
             }
             await Task.Run(() => _settingsStore.Save(_settings));
+            if (mcpChanged)
+            {
+                if (_settings.McpServerEnabled)
+                    await _mcpServer.StartAsync(_settings.McpServerPort, _mcpBridge);
+                else
+                    await _mcpServer.StopAsync();
+            }
             if (themeChanged)
             {
                 ThemeManager.Apply(_settings.Theme);

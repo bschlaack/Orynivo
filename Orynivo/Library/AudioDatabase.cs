@@ -3463,6 +3463,55 @@ public sealed class AudioDatabase : IDisposable
         return result;
     }
 
+    /// <summary>Returns the most recent play-history entries across all media types.</summary>
+    /// <param name="limit">Maximum number of entries to return.</param>
+    /// <returns>History entries ordered by start time descending.</returns>
+    public List<DailyHistoryEntry> GetRecentHistory(int limit = 20)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT ph.id,
+                   ph.track_id,
+                   ph.path,
+                   ph.started_at,
+                   COALESCE(ph.position_seconds, 0),
+                   ph.duration_seconds,
+                   ph.media_type,
+                   COALESCE(t.title, ph.title, t.file_name, ph.path),
+                   COALESCE(ar.name, t.artist, ph.subtitle),
+                   COALESCE(a.title, t.album),
+                   t.artist_id,
+                   t.album_id
+            FROM play_history ph
+            LEFT JOIN tracks t ON t.id = ph.track_id
+            LEFT JOIN artists ar ON ar.id = t.artist_id
+            LEFT JOIN albums a ON a.id = t.album_id
+            WHERE COALESCE(ph.position_seconds, 0) > 0
+            ORDER BY ph.started_at DESC, ph.id DESC
+            LIMIT $limit;
+            """;
+        cmd.Parameters.AddWithValue("$limit", limit);
+        using var r = cmd.ExecuteReader();
+        var result = new List<DailyHistoryEntry>();
+        while (r.Read())
+        {
+            result.Add(new DailyHistoryEntry(
+                r.GetInt64(0),
+                r.IsDBNull(1) ? null : r.GetInt64(1),
+                r.GetString(2),
+                DateTimeOffset.FromUnixTimeSeconds(r.GetInt64(3)).LocalDateTime,
+                r.GetDouble(4),
+                r.IsDBNull(5) ? null : r.GetDouble(5),
+                r.GetString(6),
+                r.GetString(7),
+                r.IsDBNull(8) ? null : r.GetString(8),
+                r.IsDBNull(9) ? null : r.GetString(9),
+                r.IsDBNull(10) ? null : r.GetInt64(10),
+                r.IsDBNull(11) ? null : r.GetInt64(11)));
+        }
+        return result;
+    }
+
     public List<(string Genre, double Seconds)> GetTopGenres(int limit = 10)
     {
         var agg = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);

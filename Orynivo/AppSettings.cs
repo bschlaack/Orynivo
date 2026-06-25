@@ -69,6 +69,12 @@ public sealed class AppSettings
     public string QobuzApplicationId { get; set; } = string.Empty;
     /// <summary>Gets or sets the configured Plex Media Servers.</summary>
     public List<PlexServerSettings> PlexServers { get; set; } = [];
+    /// <summary>Gets or sets a value indicating whether the MCP server is enabled.</summary>
+    public bool McpServerEnabled { get; set; }
+    /// <summary>Gets or sets the TCP port the MCP server listens on.</summary>
+    public int McpServerPort { get; set; } = 49200;
+    /// <summary>Gets or sets the set of MCP tool names that are individually disabled.</summary>
+    public HashSet<string> DisabledMcpTools { get; set; } = [];
     /// <summary>Gets or sets a value indicating whether the Internet Radio sidebar item is visible.</summary>
     public bool ShowInternetRadioItem { get; set; } = true;
     /// <summary>Gets or sets a value indicating whether the Podcasts sidebar item is visible.</summary>
