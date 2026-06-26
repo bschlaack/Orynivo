@@ -43,7 +43,7 @@ jobs:
           dotnet-version: 8.0.x
 
       - name: Restore dependencies
-        run: dotnet restore Orynivo/Orynivo.csproj
+        run: dotnet restore Orynivo/Orynivo.csproj --runtime win-x64
 
       - name: Build cwASIO bridge (Release)
         shell: pwsh
