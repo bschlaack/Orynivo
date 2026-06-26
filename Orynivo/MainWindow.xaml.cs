@@ -151,6 +151,7 @@ public partial class MainWindow : Window
     private WindowsMediaTransportService? _windowsMediaTransport;
     private readonly Mcp.McpPlayerBridge _mcpBridge = new();
     private readonly Mcp.McpServerService _mcpServer = new();
+    private AI.AiChatView _aiChatView = null!;
     private bool _updatingVolumeFromSystem;
     private CancellationTokenSource _backgroundArtistLoadCts = new();
     private int _activeLyricIndex = -1;
@@ -389,6 +390,9 @@ public partial class MainWindow : Window
         LoadSettings();
         InitMcpBridge();
         _mcpBridge.DisabledTools = _settings.DisabledMcpTools;
+        _aiChatView = AiChatViewControl;
+        _aiChatView.SetBridge(_mcpBridge);
+        _aiChatView.GetSettings = () => _settings.AiChat;
         if (_settings.McpServerEnabled)
             _ = _mcpServer.StartAsync(_settings.McpServerPort, _mcpBridge);
         RestorePlaybackQueueState();
@@ -500,6 +504,28 @@ public partial class MainWindow : Window
             RefreshQueueRowsIfVisible();
             RefreshQueueNavigationButtons();
             await RefreshActiveGaplessQueueAsync();
+        };
+        _mcpBridge.ClearQueueFunc = () =>
+        {
+            _queue.Clear();
+            _queueIndex = -1;
+            ResetQueuePlaybackState();
+            PersistPlaybackQueue();
+            RefreshQueueRowsIfVisible();
+            RefreshQueueNavigationButtons();
+        };
+        _mcpBridge.ReplaceQueueFunc = async paths =>
+        {
+            _queue.Clear();
+            foreach (var p in paths)
+                _queue.Add(new PlaylistItem(p));
+            _queueIndex = paths.Count > 0 ? 0 : -1;
+            ResetQueuePlaybackState();
+            PersistPlaybackQueue();
+            RefreshQueueRowsIfVisible();
+            RefreshQueueNavigationButtons();
+            if (paths.Count > 0)
+                await StartPlaybackAsync(paths[0]);
         };
         _mcpBridge.RefreshPlaylistsFunc = LoadNavPlaylists;
     }
@@ -1275,6 +1301,7 @@ public partial class MainWindow : Window
             "Tracks"  => LocalizationManager.Current.Tracks,
             "Folders" => LocalizationManager.Current.FolderStructure,
             "Queue" => LocalizationManager.Current.UpNext,
+            "AiChat" => LocalizationManager.Current.AiChat,
             "InternetRadio" => LocalizationManager.Current.InternetRadio,
             "Podcasts" => LocalizationManager.Current.Podcasts,
             _ when tag.StartsWith("PlexLibrary:", StringComparison.Ordinal) =>
@@ -1294,13 +1321,14 @@ public partial class MainWindow : Window
         UpdateAlphabetIndex(null, false);
         SearchResultsScrollViewer.IsVisible = false;
         DashboardScrollViewer.IsVisible = false;
+        AiChatViewControl.IsVisible = false;
         InternetRadioView.IsVisible = false;
         PodcastView.IsVisible = false;
         PodcastEpisodesView.IsVisible = false;
         HideAlbumDetailHeader();
         ContentCountTextBlock.Text  = "";
         UpdateLibraryIntroCard(tag);
-        SearchTextBox.IsVisible = !(tag is "InternetRadio" or "Podcasts" or "Queue" ||
+        SearchTextBox.IsVisible = !(tag is "InternetRadio" or "Podcasts" or "Queue" or "AiChat" ||
                                     tag.StartsWith("Radio:", StringComparison.Ordinal) ||
                                     tag.StartsWith("Podcast:", StringComparison.Ordinal) ||
                                     tag.StartsWith("PlexLibrary:", StringComparison.Ordinal));
@@ -1324,6 +1352,14 @@ public partial class MainWindow : Window
             ArtistArtworkListBox.IsVisible = false;
             DashboardScrollViewer.IsVisible = true;
             await ShowDashboardAsync();
+        }
+        else if (tag == "AiChat")
+        {
+            ContentDataGrid.IsVisible = false;
+            FolderTreeView.IsVisible = false;
+            AlbumArtworkListBox.IsVisible = false;
+            ArtistArtworkListBox.IsVisible = false;
+            AiChatViewControl.IsVisible = true;
         }
         else if (tag == "InternetRadio")
         {
@@ -9023,6 +9059,8 @@ public partial class MainWindow : Window
             _settings.McpServerPort           = window.McpServerPort;
             _settings.DisabledMcpTools        = window.DisabledMcpTools;
             _mcpBridge.DisabledTools          = _settings.DisabledMcpTools;
+            _settings.AiChat                  = window.AiChatSettingsValue;
+            _aiChatView.GetSettings           = () => _settings.AiChat;
             _settings.ShowInternetRadioItem   = window.ShowInternetRadioItem;
             _settings.ShowPodcastsItem        = window.ShowPodcastsItem;
             _settings.ShowQueueItem           = window.ShowQueueItem;

@@ -1,0 +1,172 @@
+<UserControl x:Class="Orynivo.AI.AiChatView"
+             xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ai="using:Orynivo.AI"
+             Background="{DynamicResource AppContentBrush}"
+             Foreground="{DynamicResource AppPrimaryTextBrush}">
+
+    <Grid RowDefinitions="*,Auto">
+
+        <!-- Messages -->
+        <ScrollViewer x:Name="MessagesScrollViewer"
+                      Grid.Row="0"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Padding="20,16,20,8">
+            <ItemsControl x:Name="MessagesControl">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="{x:Type ai:AiChatMessageVm}">
+                        <Grid Margin="0,3">
+
+                            <!-- User bubble -->
+                            <Border IsVisible="{Binding IsUser}"
+                                    HorizontalAlignment="Right"
+                                    MaxWidth="480"
+                                    Background="#6C63FF"
+                                    CornerRadius="14,14,2,14"
+                                    Padding="14,9">
+                                <TextBlock Text="{Binding Content}"
+                                           TextWrapping="Wrap"
+                                           Foreground="White"
+                                           FontSize="13"
+                                           LineHeight="20"/>
+                            </Border>
+
+                            <!-- Assistant bubble -->
+                            <Border IsVisible="{Binding IsAssistant}"
+                                    HorizontalAlignment="Left"
+                                    MaxWidth="560"
+                                    Background="{DynamicResource AppSurfaceBrush}"
+                                    BorderBrush="{DynamicResource AppInputBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="14,14,14,2"
+                                    Padding="14,9">
+                                <TextBlock Text="{Binding Content}"
+                                           TextWrapping="Wrap"
+                                           Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                           FontSize="13"
+                                           LineHeight="20"/>
+                            </Border>
+
+                            <!-- Tool status / error (centered, muted) -->
+                            <StackPanel IsVisible="{Binding IsToolStatus}"
+                                        HorizontalAlignment="Center"
+                                        Orientation="Horizontal"
+                                        Spacing="6"
+                                        Opacity="0.7">
+                                <TextBlock Text="⚙"
+                                           FontSize="11"
+                                           Foreground="{DynamicResource AppMutedTextBrush}"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding Content}"
+                                           FontSize="11"
+                                           FontStyle="Italic"
+                                           Foreground="{DynamicResource AppMutedTextBrush}"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <!-- Error -->
+                            <Border IsVisible="{Binding IsError}"
+                                    HorizontalAlignment="Left"
+                                    MaxWidth="560"
+                                    Background="#33E53935"
+                                    BorderBrush="#E53935"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
+                                    Padding="12,8">
+                                <TextBlock Text="{Binding Content}"
+                                           TextWrapping="Wrap"
+                                           Foreground="#E53935"
+                                           FontSize="12"/>
+                            </Border>
+
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- Input area -->
+        <Border Grid.Row="1"
+                Background="{DynamicResource AppSurfaceBrush}"
+                BorderBrush="{DynamicResource AppHeaderBorderBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="16,12">
+            <Grid ColumnDefinitions="*,Auto,Auto">
+
+                <TextBox x:Name="ChatInputBox"
+                         Grid.Column="0"
+                         AcceptsReturn="False"
+                         MinHeight="36"
+                         MaxHeight="120"
+                         FontSize="13"
+                         VerticalContentAlignment="Center"
+                         Watermark="{DynamicResource L_AiChatInputPlaceholder}"
+                         KeyDown="ChatInputBox_OnKeyDown"/>
+
+                <Button x:Name="SendButton"
+                        Grid.Column="1"
+                        Margin="8,0,0,0"
+                        MinWidth="80"
+                        Height="36"
+                        Padding="14,0"
+                        FontSize="12"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        Content="{DynamicResource L_AiChatSend}"
+                        Click="SendButton_OnClick">
+                    <Button.Styles>
+                        <Style Selector="Button">
+                            <Setter Property="Background" Value="#6C63FF"/>
+                            <Setter Property="Foreground" Value="White"/>
+                            <Setter Property="BorderThickness" Value="0"/>
+                            <Setter Property="CornerRadius" Value="8"/>
+                            <Setter Property="Cursor" Value="Hand"/>
+                        </Style>
+                        <Style Selector="Button:pointerover">
+                            <Setter Property="Background" Value="#5A52DD"/>
+                        </Style>
+                        <Style Selector="Button:pressed">
+                            <Setter Property="Background" Value="#4A43CC"/>
+                        </Style>
+                        <Style Selector="Button:disabled">
+                            <Setter Property="Opacity" Value="0.5"/>
+                        </Style>
+                    </Button.Styles>
+                </Button>
+
+                <Button x:Name="ClearButton"
+                        Grid.Column="2"
+                        Margin="6,0,0,0"
+                        MinWidth="70"
+                        Height="36"
+                        Padding="12,0"
+                        FontSize="12"
+                        HorizontalContentAlignment="Center"
+                        VerticalContentAlignment="Center"
+                        Content="{DynamicResource L_AiChatClear}"
+                        Click="ClearButton_OnClick">
+                    <Button.Styles>
+                        <Style Selector="Button">
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="Foreground" Value="{DynamicResource AppMutedTextBrush}"/>
+                            <Setter Property="BorderBrush" Value="{DynamicResource AppInputBorderBrush}"/>
+                            <Setter Property="BorderThickness" Value="1"/>
+                            <Setter Property="CornerRadius" Value="8"/>
+                            <Setter Property="Cursor" Value="Hand"/>
+                        </Style>
+                        <Style Selector="Button:pointerover">
+                            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+                            <Setter Property="Background" Value="{DynamicResource AppNavHoverBrush}"/>
+                        </Style>
+                        <Style Selector="Button:disabled">
+                            <Setter Property="Opacity" Value="0.5"/>
+                        </Style>
+                    </Button.Styles>
+                </Button>
+
+            </Grid>
+        </Border>
+
+    </Grid>
+</UserControl>

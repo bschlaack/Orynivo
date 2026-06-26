@@ -4,6 +4,31 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.13.0] - 2026-06-26
+
+### Added
+
+- **Embedded AI Chat** — a new sidebar view (KI-Chat / AI Chat) that sends
+  natural-language questions about the music library to any
+  OpenAI-compatible LLM endpoint (LM Studio, Ollama, OpenAI, Anthropic
+  compatibility layer, or any `/v1/chat/completions` provider). The model
+  has access to all 19 Orynivo player tools via function calling and
+  executes them directly against the player bridge and library database —
+  no external MCP server required. Responses stream token-by-token.
+  Configuration (endpoint URL, optional API key, model name, max tokens)
+  lives under Settings > Integration > AI Chat.
+  (`AppSettings.AiChat`, `Orynivo/AI/AiChatSettings.cs`,
+  `AiChatService.cs`, `AiToolDefinitions.cs`, `AiToolExecutor.cs`,
+  `AiChatView.axaml`)
+- Added `clear_queue` MCP/AI tool: empties the playback queue without
+  stopping the current track.
+- Added `replace_queue` MCP/AI tool: atomically replaces the entire
+  playback queue with a given list of tracks and starts playing from the
+  first one. The AI uses this automatically when the user asks to fill
+  the queue with new content, avoiding stale entries from a previous
+  session. Per-tool enable/disable checkboxes are available in
+  Settings > Integration > MCP Server.
+
 ## [0.12.0] - 2026-06-26
 
 ### Added

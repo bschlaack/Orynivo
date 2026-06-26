@@ -278,8 +278,21 @@ public static class LocalizationManager
         resources["L_McpServerHint"]    = Current.McpServerHint;
         resources["L_McpServerEnabled"] = Current.McpServerEnabled;
         resources["L_McpServerPort"]    = Current.McpServerPort;
-        resources["L_McpToolsHeader"]   = Current.McpToolsHeader;
-        resources["L_McpToolsHint"]     = Current.McpToolsHint;
+        resources["L_McpToolsHeader"]          = Current.McpToolsHeader;
+        resources["L_McpToolsHint"]            = Current.McpToolsHint;
+        resources["L_AiChat"]                  = Current.AiChat;
+        resources["L_AiChatSettings"]          = Current.AiChatSettings;
+        resources["L_AiChatHint"]              = Current.AiChatHint;
+        resources["L_AiChatEnabled"]           = Current.AiChatEnabled;
+        resources["L_AiChatEndpointUrl"]       = Current.AiChatEndpointUrl;
+        resources["L_AiChatApiKey"]            = Current.AiChatApiKey;
+        resources["L_AiChatLocalNote"]         = Current.AiChatLocalNote;
+        resources["L_AiChatModel"]             = Current.AiChatModel;
+        resources["L_AiChatMaxTokens"]         = Current.AiChatMaxTokens;
+        resources["L_AiChatInputPlaceholder"]  = Current.AiChatInputPlaceholder;
+        resources["L_AiChatSend"]              = Current.AiChatSend;
+        resources["L_AiChatClear"]             = Current.AiChatClear;
+        resources["L_AiChatNotEnabled"]        = Current.AiChatNotEnabled;
     }
 
     private static readonly LocalizedStrings German = new(
@@ -635,6 +648,19 @@ public static class LocalizationManager
         , McpServerPort    = "Port"
         , McpToolsHeader   = "Tools"
         , McpToolsHint     = "Einzelne Tools aktivieren oder deaktivieren."
+        , AiChat                = "KI-Chat"
+        , AiChatSettings        = "KI-Chat"
+        , AiChatHint            = "Verbindet sich mit einem lokalen oder cloudbasierten KI-Modell über eine OpenAI-kompatible API (z. B. LM Studio, Ollama, OpenAI). Dem Modell stehen alle 17 Orynivo-Tools zur Verfügung, um die Bibliothek zu durchsuchen, Playlisten zu verwalten und die Wiedergabe zu steuern."
+        , AiChatEnabled         = "KI-Chat aktivieren"
+        , AiChatEndpointUrl     = "Endpunkt-URL"
+        , AiChatApiKey          = "API-Schlüssel (optional)"
+        , AiChatLocalNote       = "LM Studio und Ollama benötigen keinen API-Schlüssel."
+        , AiChatModel           = "Modell"
+        , AiChatMaxTokens       = "Maximale Token"
+        , AiChatInputPlaceholder = "Frage stellen …"
+        , AiChatSend            = "Senden"
+        , AiChatClear           = "Löschen"
+        , AiChatNotEnabled      = "KI-Chat ist nicht aktiviert. Bitte unter Einstellungen › KI-Chat aktivieren."
     };
 
     private static readonly LocalizedStrings English = new(
@@ -972,6 +998,19 @@ public static class LocalizationManager
         , McpServerPort    = "Port"
         , McpToolsHeader   = "Tools"
         , McpToolsHint     = "Enable or disable individual tools."
+        , AiChat                = "AI Chat"
+        , AiChatSettings        = "AI Chat"
+        , AiChatHint            = "Connects to a local or cloud-based AI model via an OpenAI-compatible API (e.g. LM Studio, Ollama, OpenAI). The model has access to all 17 Orynivo tools to search the library, manage playlists, and control playback."
+        , AiChatEnabled         = "Enable AI Chat"
+        , AiChatEndpointUrl     = "Endpoint URL"
+        , AiChatApiKey          = "API key (optional)"
+        , AiChatLocalNote       = "LM Studio and Ollama do not require an API key."
+        , AiChatModel           = "Model"
+        , AiChatMaxTokens       = "Max tokens"
+        , AiChatInputPlaceholder = "Ask a question …"
+        , AiChatSend            = "Send"
+        , AiChatClear           = "Clear"
+        , AiChatNotEnabled      = "AI Chat is not enabled. Enable it in Settings › AI Chat."
     };
 
     private static readonly LocalizedStrings French = new(
@@ -1312,6 +1351,19 @@ public static class LocalizationManager
         , McpServerPort    = "Port"
         , McpToolsHeader   = "Outils"
         , McpToolsHint     = "Activer ou désactiver des outils individuels."
+        , AiChat                = "Chat IA"
+        , AiChatSettings        = "Chat IA"
+        , AiChatHint            = "Se connecte à un modèle IA local ou en nuage via une API compatible OpenAI (p. ex. LM Studio, Ollama, OpenAI). Le modèle dispose des 17 outils Orynivo pour rechercher la bibliothèque, gérer les listes de lecture et contrôler la lecture."
+        , AiChatEnabled         = "Activer le Chat IA"
+        , AiChatEndpointUrl     = "URL de l'endpoint"
+        , AiChatApiKey          = "Clé API (optionnel)"
+        , AiChatLocalNote       = "LM Studio et Ollama ne nécessitent pas de clé API."
+        , AiChatModel           = "Modèle"
+        , AiChatMaxTokens       = "Tokens max."
+        , AiChatInputPlaceholder = "Posez une question …"
+        , AiChatSend            = "Envoyer"
+        , AiChatClear           = "Effacer"
+        , AiChatNotEnabled      = "Le Chat IA n'est pas activé. Activez-le dans Paramètres › Chat IA."
     };
 
     private static readonly LocalizedStrings Spanish = new(
@@ -1649,6 +1701,19 @@ public static class LocalizationManager
         , McpServerPort    = "Puerto"
         , McpToolsHeader   = "Herramientas"
         , McpToolsHint     = "Activar o desactivar herramientas individuales."
+        , AiChat                = "Chat IA"
+        , AiChatSettings        = "Chat IA"
+        , AiChatHint            = "Se conecta a un modelo de IA local o en la nube a través de una API compatible con OpenAI (p. ej. LM Studio, Ollama, OpenAI). El modelo tiene acceso a las 17 herramientas de Orynivo para buscar la biblioteca, gestionar listas de reproducción y controlar la reproducción."
+        , AiChatEnabled         = "Activar Chat IA"
+        , AiChatEndpointUrl     = "URL del endpoint"
+        , AiChatApiKey          = "Clave API (opcional)"
+        , AiChatLocalNote       = "LM Studio y Ollama no requieren clave API."
+        , AiChatModel           = "Modelo"
+        , AiChatMaxTokens       = "Tokens máximos"
+        , AiChatInputPlaceholder = "Haz una pregunta …"
+        , AiChatSend            = "Enviar"
+        , AiChatClear           = "Borrar"
+        , AiChatNotEnabled      = "El Chat IA no está activado. Actívalo en Ajustes › Chat IA."
     };
 
     /// <summary>Gets the currently active <see cref="LocalizedStrings"/> instance.</summary>

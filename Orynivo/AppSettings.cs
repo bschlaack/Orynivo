@@ -1,3 +1,4 @@
+using Orynivo.AI;
 using Orynivo.Audio;
 
 namespace Orynivo;
@@ -101,6 +102,8 @@ public sealed class AppSettings
     public bool IsPlexSectionExpanded { get; set; }
     /// <summary>Gets or sets a value indicating whether the Playlists section is expanded.</summary>
     public bool IsPlaylistsSectionExpanded { get; set; }
+    /// <summary>Gets or sets the embedded AI chat configuration.</summary>
+    public AiChatSettings AiChat { get; set; } = new();
 }
 
 /// <summary>Connection settings for a single Plex Media Server entry.</summary>
