@@ -261,6 +261,13 @@ with older development environments, `C:\Dev\asiosdk_2.3`. When no SDK is
 found, only **cwASIO** is offered. When the SDK is available, Settings offers
 both **Steinberg ASIO** and **cwASIO**.
 
+## Download
+
+Download the latest Windows x64 build from Releases.
+
+- Portable ZIP: no installation required
+- Installer: recommended for normal users
+
 ## Build
 
 Clone the repository:
