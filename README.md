@@ -1,5 +1,24 @@
 # Orynivo
 
+A native Windows music player for local Hi-Fi libraries.
+
+ASIO/WASAPI · DSD/DSF/DFF · Gapless Playback · ReplayGain · Parametric EQ
+Plex · Radio · Podcasts · AI Chat · MCP Server
+
+## Why Orynivo?
+
+Orynivo is for people who still own and manage a local music library
+and want a modern Windows player with serious audio output support.
+
+- Bit-perfect/native DSD playback via ASIO
+- Exclusive WASAPI and ASIO output profiles
+- Gapless playback
+- CUE sheet support
+- ReplayGain and parametric EQ
+- Local library, playlists, smart playlists and full-text search
+- AI control via local LLMs, LM Studio/Ollama/OpenAI-compatible endpoints
+- MCP server for external AI assistants
+
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 A native Windows audio player with an Avalonia UI interface, local music
