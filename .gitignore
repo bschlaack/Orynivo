@@ -1,6 +1,7 @@
 bin/
 obj/
 artifacts/
+installer/Output/
 Native/AsioBridge/**/x64/
 Native/CwAsioBridge/**/x64/
 _verify_build/

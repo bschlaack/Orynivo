@@ -261,6 +261,13 @@ with older development environments, `C:\Dev\asiosdk_2.3`. When no SDK is
 found, only **cwASIO** is offered. When the SDK is available, Settings offers
 both **Steinberg ASIO** and **cwASIO**.
 
+## Download
+
+Download the latest Windows x64 build from Releases.
+
+- Portable ZIP: no installation required
+- Installer: recommended for normal users
+
 ## Build
 
 Clone the repository:
@@ -297,6 +304,26 @@ disables only the Steinberg bridge; `-SkipCwAsio` disables cwASIO.
 GitHub Actions builds cwASIO and the managed Avalonia project in Debug and
 Release. The Steinberg bridge remains excluded because its SDK is not stored in
 the repository. Release artifacts therefore include `CwAsioBridge.dll`.
+
+Pushing a version tag (e.g. `git tag v0.13.0 && git push origin v0.13.0`)
+triggers the separate release workflow, which publishes a self-contained
+Windows installer as a draft GitHub Release:
+
+```powershell
+git tag v0.13.0
+git push origin v0.13.0
+```
+
+The workflow produces two self-contained packages (no .NET prerequisite):
+
+- `Orynivo-0.13.0-win-x64-Setup.exe` — installer with Start Menu entry
+  and uninstaller
+- `Orynivo-0.13.0-win-x64-Portable.zip` — extract anywhere and run
+  `Orynivo.exe`; library data is always stored in `%LOCALAPPDATA%\Orynivo\`
+
+The release is created as a draft so you can review and publish it manually.
+To trigger a release build without a tag, use the **Release** workflow's
+manual dispatch in the Actions tab.
 
 ## Run
 
