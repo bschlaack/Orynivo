@@ -573,4 +573,30 @@ public sealed record LocalizedStrings(
     public string McpToolsHeader { get; init; } = "";
     /// <summary>Gets the hint text for the MCP tool enable/disable list.</summary>
     public string McpToolsHint { get; init; } = "";
+    /// <summary>Gets the sidebar navigation label for the AI chat view.</summary>
+    public string AiChat { get; init; } = "";
+    /// <summary>Gets the AI chat settings section title.</summary>
+    public string AiChatSettings { get; init; } = "";
+    /// <summary>Gets the introductory hint shown in the AI chat settings section.</summary>
+    public string AiChatHint { get; init; } = "";
+    /// <summary>Gets the enable/disable checkbox label for the AI chat.</summary>
+    public string AiChatEnabled { get; init; } = "";
+    /// <summary>Gets the label for the OpenAI-compatible endpoint URL field.</summary>
+    public string AiChatEndpointUrl { get; init; } = "";
+    /// <summary>Gets the label for the API key field.</summary>
+    public string AiChatApiKey { get; init; } = "";
+    /// <summary>Gets the note explaining that local models do not require an API key.</summary>
+    public string AiChatLocalNote { get; init; } = "";
+    /// <summary>Gets the label for the model-name field.</summary>
+    public string AiChatModel { get; init; } = "";
+    /// <summary>Gets the label for the max-tokens field.</summary>
+    public string AiChatMaxTokens { get; init; } = "";
+    /// <summary>Gets the watermark text shown inside the chat input box.</summary>
+    public string AiChatInputPlaceholder { get; init; } = "";
+    /// <summary>Gets the send button label.</summary>
+    public string AiChatSend { get; init; } = "";
+    /// <summary>Gets the clear-conversation button label.</summary>
+    public string AiChatClear { get; init; } = "";
+    /// <summary>Gets the message shown when AI chat is not enabled in settings.</summary>
+    public string AiChatNotEnabled { get; init; } = "";
 }

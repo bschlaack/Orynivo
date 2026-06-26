@@ -242,6 +242,11 @@
                          Theme="{StaticResource SettingsNavItemTheme}">
                 <TextBlock Text="{DynamicResource L_McpServer}"/>
             </ListBoxItem>
+            <ListBoxItem Tag="AiChat"
+                         FontSize="13"
+                         Theme="{StaticResource SettingsNavItemTheme}">
+                <TextBlock Text="{DynamicResource L_AiChat}"/>
+            </ListBoxItem>
         </ListBox>
 
         <Rectangle Grid.Column="1"
@@ -799,7 +804,7 @@
                                TextWrapping="Wrap"
                                Margin="0,0,0,12"/>
 
-                    <UniformGrid Columns="2" Rows="9">
+                    <UniformGrid Columns="2" Rows="10">
                         <CheckBox x:Name="McpToolGetNowPlaying"
                                   Content="get_now_playing"
                                   Theme="{StaticResource SettingsCheckBoxTheme}"
@@ -868,7 +873,77 @@
                                   Content="get_play_history"
                                   Theme="{StaticResource SettingsCheckBoxTheme}"
                                   Margin="0,0,8,6"/>
+                        <CheckBox x:Name="McpToolClearQueue"
+                                  Content="clear_queue"
+                                  Theme="{StaticResource SettingsCheckBoxTheme}"
+                                  Margin="0,0,0,6"/>
+                        <CheckBox x:Name="McpToolReplaceQueue"
+                                  Content="replace_queue"
+                                  Theme="{StaticResource SettingsCheckBoxTheme}"
+                                  Margin="0,0,8,6"/>
                     </UniformGrid>
+                </StackPanel>
+
+                <StackPanel x:Name="AiChatPanel"
+                            IsVisible="False">
+                    <TextBlock Text="{DynamicResource L_AiChatSettings}"
+                               FontSize="15"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,20"/>
+                    <TextBlock Text="{DynamicResource L_AiChatHint}"
+                               FontSize="11"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,14"/>
+                    <CheckBox x:Name="AiChatEnabledCheckBox"
+                              Content="{DynamicResource L_AiChatEnabled}"
+                              Theme="{StaticResource SettingsCheckBoxTheme}"
+                              Margin="0,0,0,18"/>
+
+                    <TextBlock Text="{DynamicResource L_AiChatEndpointUrl}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+                    <TextBox x:Name="AiChatEndpointUrlTextBox"
+                             Height="30"
+                             HorizontalAlignment="Stretch"
+                             Margin="0,0,0,14"/>
+
+                    <TextBlock Text="{DynamicResource L_AiChatApiKey}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+                    <TextBox x:Name="AiChatApiKeyTextBox"
+                             Height="30"
+                             PasswordChar="●"
+                             HorizontalAlignment="Stretch"
+                             Margin="0,0,0,4"/>
+                    <TextBlock Text="{DynamicResource L_AiChatLocalNote}"
+                               FontSize="10"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               Margin="0,0,0,14"/>
+
+                    <TextBlock Text="{DynamicResource L_AiChatModel}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+                    <TextBox x:Name="AiChatModelTextBox"
+                             Height="30"
+                             HorizontalAlignment="Stretch"
+                             Margin="0,0,0,14"/>
+
+                    <TextBlock Text="{DynamicResource L_AiChatMaxTokens}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+                    <NumericUpDown x:Name="AiChatMaxTokensNumericUpDown"
+                                   Height="30"
+                                   Minimum="256"
+                                   Maximum="32768"
+                                   Increment="256"
+                                   FormatString="0"
+                                   ClipValueToMinMax="True"
+                                   HorizontalAlignment="Stretch"/>
                 </StackPanel>
 
             </Grid>

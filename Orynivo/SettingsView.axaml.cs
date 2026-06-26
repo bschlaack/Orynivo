@@ -124,6 +124,11 @@ internal partial class SettingsView : UserControl
         McpServerEnabledCheckBox.IsChecked        = settings.McpServerEnabled;
         McpServerPortNumericUpDown.Value          = settings.McpServerPort;
         InitMcpToolCheckBoxes(settings.DisabledMcpTools);
+        AiChatEnabledCheckBox.IsChecked         = settings.AiChat.Enabled;
+        AiChatEndpointUrlTextBox.Text           = settings.AiChat.EndpointUrl;
+        AiChatApiKeyTextBox.Text                = settings.AiChat.ApiKey;
+        AiChatModelTextBox.Text                 = settings.AiChat.ModelName;
+        AiChatMaxTokensNumericUpDown.Value      = settings.AiChat.MaxTokens;
         ShowInternetRadioItemCheckBox.IsChecked = settings.ShowInternetRadioItem;
         ShowPodcastsItemCheckBox.IsChecked      = settings.ShowPodcastsItem;
         ShowQueueItemCheckBox.IsChecked         = settings.ShowQueueItem;
@@ -205,6 +210,15 @@ internal partial class SettingsView : UserControl
     public int McpServerPort => (int)(McpServerPortNumericUpDown.Value ?? 49200);
     /// <summary>Gets the set of MCP tool names that should be disabled.</summary>
     public HashSet<string> DisabledMcpTools => ReadDisabledMcpTools();
+    /// <summary>Gets the current AI chat settings from the UI controls.</summary>
+    public AI.AiChatSettings AiChatSettingsValue => new()
+    {
+        Enabled      = AiChatEnabledCheckBox.IsChecked == true,
+        EndpointUrl  = AiChatEndpointUrlTextBox.Text?.Trim() ?? "http://localhost:1234/v1",
+        ApiKey       = AiChatApiKeyTextBox.Text?.Trim() ?? string.Empty,
+        ModelName    = AiChatModelTextBox.Text?.Trim() ?? string.Empty,
+        MaxTokens    = (int)(AiChatMaxTokensNumericUpDown.Value ?? 2048)
+    };
     /// <summary>Gets a value indicating whether the Internet Radio sidebar item should be visible.</summary>
     public bool ShowInternetRadioItem => ShowInternetRadioItemCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether the Podcasts sidebar item should be visible.</summary>
@@ -369,6 +383,7 @@ internal partial class SettingsView : UserControl
         AppearancePanel.IsVisible  = tag == "Appearance";
         ArtistInfoPanel.IsVisible  = tag == "ArtistInfo";
         McpPanel.IsVisible         = tag == "Mcp";
+        AiChatPanel.IsVisible      = tag == "AiChat";
     }
 
     private void ArtistInfoSourceComboBox_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -1332,6 +1347,8 @@ internal partial class SettingsView : UserControl
         ("create_playlist",       nameof(McpToolCreatePlaylist)),
         ("create_smart_playlist", nameof(McpToolCreateSmartPlaylist)),
         ("get_play_history",      nameof(McpToolGetPlayHistory)),
+        ("clear_queue",           nameof(McpToolClearQueue)),
+        ("replace_queue",         nameof(McpToolReplaceQueue)),
     ];
 
     /// <summary>Initialises each tool checkbox from the persisted disabled-tool set.</summary>
@@ -1355,6 +1372,8 @@ internal partial class SettingsView : UserControl
         McpToolCreatePlaylist.IsChecked      = !disabled.Contains("create_playlist");
         McpToolCreateSmartPlaylist.IsChecked = !disabled.Contains("create_smart_playlist");
         McpToolGetPlayHistory.IsChecked      = !disabled.Contains("get_play_history");
+        McpToolClearQueue.IsChecked          = !disabled.Contains("clear_queue");
+        McpToolReplaceQueue.IsChecked        = !disabled.Contains("replace_queue");
     }
 
     /// <summary>Reads the checkbox states and returns the set of tool names that are disabled.</summary>
@@ -1379,6 +1398,8 @@ internal partial class SettingsView : UserControl
         if (McpToolCreatePlaylist.IsChecked      != true) disabled.Add("create_playlist");
         if (McpToolCreateSmartPlaylist.IsChecked != true) disabled.Add("create_smart_playlist");
         if (McpToolGetPlayHistory.IsChecked      != true) disabled.Add("get_play_history");
+        if (McpToolClearQueue.IsChecked          != true) disabled.Add("clear_queue");
+        if (McpToolReplaceQueue.IsChecked        != true) disabled.Add("replace_queue");
         return disabled;
     }
 }

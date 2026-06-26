@@ -3,13 +3,61 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 A native Windows audio player with an Avalonia UI interface, local music
-library, and ASIO and WASAPI playback.
+library, ASIO and WASAPI playback, and built-in AI control via an embedded
+chat and an MCP server.
 
 The application uses the Orynivo wordmark in the startup screen and sidebar,
 plus a multi-resolution Windows application icon based on the standalone logo.
 
 > This project is under active development. The database schema, user
 > interface, and available features may still change.
+
+## AI Integration
+
+Orynivo includes two complementary AI interfaces that share the same 19
+player-control, queue-management, and library tools.
+
+### Embedded AI Chat
+
+The **KI-Chat** sidebar view connects to any OpenAI-compatible LLM endpoint —
+[LM Studio](https://lmstudio.ai/), [Ollama](https://ollama.com/), OpenAI,
+Anthropic (via compatibility layer), or any custom `/v1/chat/completions`
+provider. No external configuration file or MCP server is required: tools are
+dispatched directly inside the application.
+
+Responses stream token by token. The model calls tools autonomously — asking
+*"Spiele alle Beatles-Alben"* makes it search the library, fill the queue with
+the results, and start playback, all in one turn.
+
+Configure the endpoint URL, optional API key, model name, and max-token limit
+under **Settings → Integration → KI-Chat/AI Chat**. LM Studio and Ollama work
+without an API key.
+
+**Available tools:**
+
+| Category | Tools |
+| --- | --- |
+| State | `get_now_playing`, `get_queue` |
+| Playback | `play`, `pause_resume`, `next_track`, `previous_track`, `stop`, `seek`, `set_volume` |
+| Queue | `queue_append`, `queue_play_next`, `clear_queue`, `replace_queue` |
+| Library | `search_library` |
+| Playlists | `list_playlists`, `get_playlist_tracks`, `create_playlist`, `create_smart_playlist` |
+| History | `get_play_history` |
+
+The model picks the right queue tool automatically: `replace_queue` clears the
+old list and starts playing immediately when the user asks for new content;
+`queue_append` adds to the existing queue when the user wants to add more;
+`clear_queue` empties the queue without interrupting the current track.
+
+### MCP Server
+
+The same 19 tools are available as an embedded **Model Context Protocol (MCP)**
+HTTP/SSE server for external AI assistants such as
+[Claude Desktop](https://claude.ai/download). Enable it under
+**Settings → Integration → MCP Server**, choose a port (default **49200**),
+and point your assistant at `http://localhost:49200/mcp`. The server binds to
+`localhost` only. Each of the 19 tools has an individual enable/disable toggle
+in Settings so you can limit what an external assistant is allowed to do.
 
 ## Features
 
@@ -60,12 +108,16 @@ plus a multi-resolution Windows application icon based on the standalone logo.
   visibility and persisted independent expansion for library, personal radio,
   podcast, and playlist sections; the Internet Radio, Podcasts, and
   **Up Next** sidebar items can each be hidden independently in Settings
-- Linked artist and album names for direct navigation to artist albums and album tracks
+- Linked artist and album names for direct navigation to artist albums and
+  album tracks
 - Session-wide Back navigation across sidebar views, search results, dashboard
   links, artist/album drill-downs, playlists, podcasts, radio, folders, and Plex
   library views
-- Conservative artist-name normalization for `feat.` credits and unambiguous case, accent, spacing, and punctuation variants, with a repair action for existing libraries
-- Live A-Z/# quick navigation beside alphabetically sorted artist, album, and track lists
+- Conservative artist-name normalization for `feat.` credits and unambiguous
+  case, accent, spacing, and punctuation variants, with a repair action for
+  existing libraries
+- Live A-Z/# quick navigation beside alphabetically sorted artist, album, and
+  track lists
 - Artist and album views with table and virtualized artwork modes, including
   Favorites-only filtering in both modes
 - Dashboard with recently added albums, second-precision playback calendar,

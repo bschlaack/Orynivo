@@ -198,6 +198,35 @@ public sealed class McpTools(McpPlayerBridge bridge)
         return $"Inserted as next: {System.IO.Path.GetFileName(path)}";
     }
 
+    /// <summary>Clears all items from the playback queue without stopping the current track.</summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Confirmation message.</returns>
+    [McpServerTool(Name = "clear_queue")]
+    [Description("Clears all items from the playback queue. The current track continues playing until it finishes, after which playback stops.")]
+    public async Task<string> ClearQueueAsync(CancellationToken ct = default)
+    {
+        if (!bridge.IsToolEnabled("clear_queue")) return "Tool is disabled.";
+        if (bridge.ClearQueueFunc is not null)
+            await bridge.OnUiAsync(bridge.ClearQueueFunc, ct);
+        return "Playback queue cleared.";
+    }
+
+    /// <summary>Replaces the entire playback queue with the given file paths and starts playback from the first track.</summary>
+    /// <param name="paths">Ordered list of absolute audio file paths for the new queue.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Confirmation message.</returns>
+    [McpServerTool(Name = "replace_queue")]
+    [Description("Replaces the entire playback queue with the given list of audio file paths and immediately starts playing the first track. Use this when you want to set the queue to specific content — prefer this over clearing then appending individually. Use queue_append to add to the existing queue instead.")]
+    public async Task<string> ReplaceQueueAsync(
+        [Description("Ordered list of absolute audio file paths to set as the new queue.")] string[] paths,
+        CancellationToken ct = default)
+    {
+        if (!bridge.IsToolEnabled("replace_queue")) return "Tool is disabled.";
+        if (bridge.ReplaceQueueFunc is not null)
+            await bridge.OnUiAsync(async () => await bridge.ReplaceQueueFunc(paths), ct);
+        return $"Queue replaced with {paths.Length} track(s).";
+    }
+
     // ------------------------------------------------------------------
     // Library search
     // ------------------------------------------------------------------

@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:Orynivo.Controls"
         xmlns:conv="using:Avalonia.Data.Converters"
+        xmlns:ai="using:Orynivo.AI"
         Title="Orynivo" Icon="avares://Orynivo/Assets/Orynivo.ico"
         Height="760" Width="1100"
         WindowState="Maximized"
@@ -750,6 +751,13 @@
                     </StackPanel>
                 </ListBoxItem>
 
+                <ListBoxItem x:Name="AiChatNavItem" Tag="AiChat" Theme="{StaticResource NavItemTheme}">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="✦" Width="18" FontSize="13" VerticalAlignment="Center"/>
+                        <TextBlock Text="{DynamicResource L_AiChat}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </ListBoxItem>
+
                 <ListBoxItem x:Name="LocalLibraryHeaderItem"
                              Tag="Section:LocalLibrary"
                              FontSize="10"
@@ -1162,6 +1170,13 @@
                           VerticalScrollBarVisibility="Auto">
                 <StackPanel x:Name="DashboardPanel" Margin="28,24,28,28"/>
             </ScrollViewer>
+
+            <!-- AI Chat -->
+            <ai:AiChatView x:Name="AiChatViewControl"
+                           Grid.Row="1"
+                           Grid.RowSpan="2"
+                           IsVisible="False"
+                           ZIndex="15"/>
 
             <Grid x:Name="InternetRadioView"
                   Grid.Row="1"

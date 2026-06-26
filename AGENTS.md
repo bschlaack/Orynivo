@@ -88,8 +88,9 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   the transport quick-pick buttons to jump directly into a settings section;
   the **Integration** navigation group contains the **MCP SERVER** section
   (`Tag="Mcp"`) with an enable checkbox, configurable port field, and per-tool
-  enable/disable checkboxes for all 17 tools (stored in
-  `AppSettings.DisabledMcpTools`); `NavigateToSection("Mcp")` jumps there
+  enable/disable checkboxes for all 19 tools (stored in
+  `AppSettings.DisabledMcpTools`); `NavigateToSection("Mcp")` jumps there;
+  the tool `UniformGrid` has `Rows="10"` for 19 tools (2 columns)
 - `Orynivo/Mcp/McpPlayerBridge.cs`: thread-safe bridge between the MCP layer
   and Avalonia's UI thread; `MainWindow` populates all delegate properties at
   startup; `OnUiAsync` dispatches to `Dispatcher.UIThread` at
@@ -97,7 +98,7 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   returned by the state and queue delegates; `DisabledTools` (`HashSet<string>?`)
   and `IsToolEnabled(name)` control per-tool gating; `RefreshPlaylistsFunc`
   triggers `LoadNavPlaylists` after MCP creates a playlist
-- `Orynivo/Mcp/McpTools.cs`: 17 MCP tools annotated with `[McpServerToolType]`
+- `Orynivo/Mcp/McpTools.cs`: 19 MCP tools annotated with `[McpServerToolType]`
   and `[McpServerTool]`; read-only tools are marked `ReadOnly = true,
   Idempotent = true`; every tool guards with `bridge.IsToolEnabled(name)` and
   returns `"Tool is disabled."` when off; `search_library` calls
@@ -108,12 +109,36 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   `CreateSmartPlaylist`; `get_play_history` uses `GetHistoryForDay` for a
   specific date and `GetRecentHistory` for the N most recent entries;
   `create_smart_playlist` accepts individual filter parameters and serialises
-  them to `SmartPlaylistCriteria` JSON
+  them to `SmartPlaylistCriteria` JSON; `clear_queue` empties the queue
+  without stopping the current track; `replace_queue` atomically replaces the
+  queue and starts playback of the first new track
 - `Orynivo/Mcp/McpServerService.cs`: starts/stops an embedded Kestrel HTTP/SSE
   server using `WebApplication`; binds to `http://localhost:{port}` via
   `builder.WebHost.UseSetting("urls", …)`; maps MCP endpoint at `/mcp`;
   logging is cleared so Kestrel output does not appear in the player console;
   `IAsyncDisposable` — `DisposeAsync` delegates to `StopAsync`
+- `Orynivo/AI/AiChatSettings.cs`: persisted configuration for the embedded AI
+  chat (endpoint URL, optional API key, model name, max tokens); stored as
+  `AppSettings.AiChat`
+- `Orynivo/AI/AiChatService.cs`: HTTP client for OpenAI-compatible
+  `/v1/chat/completions` endpoints using streaming SSE; internal tool-call
+  loop accumulates streamed function arguments, executes tools via
+  `AiToolExecutor`, and continues until the model emits `stop`; returns
+  `IAsyncEnumerable<AiStreamEvent>` (token, tool-call, error, done events);
+  conversation history is maintained across turns; `AiChatSettings` is read on
+  every send so settings changes take effect without restarting the view
+- `Orynivo/AI/AiToolDefinitions.cs`: builds the OpenAI function-calling schema
+  (`JsonObject` list) for all 19 Orynivo tools; definitions match the method
+  signatures in `McpTools.cs`
+- `Orynivo/AI/AiToolExecutor.cs`: dispatches tool calls received from the LLM
+  to `McpTools` methods by name; parses JSON arguments from the model; no MCP
+  transport involved — tools are invoked directly against the bridge and database
+- `Orynivo/AI/AiChatView.axaml/.cs`: embedded chat UI; user bubbles right-
+  aligned (accent color), assistant bubbles left-aligned (surface brush),
+  tool-call status centered and muted; streams tokens into the last assistant
+  message; Enter sends, Shift+Enter inserts a newline; Clear button wipes
+  history and resets `AiChatService`; `SetBridge(McpPlayerBridge)` wires the
+  executor; `GetSettings` delegate is read on each send
 - `Orynivo/ThemeManager.cs`: sets global Avalonia resources for light and dark themes
 - `Orynivo/Controls/DataGridColumnWidthStore.cs`: validates, captures, and
   restores per-table pixel widths
@@ -171,6 +196,12 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
   `AppSettings.DisabledMcpTools` persists the set of tool names whose
   checkboxes are unchecked in Settings — an empty set means all tools are
   active; the bridge reads this set on startup and after every settings save
+- `AppSettings.AiChat` stores the embedded AI chat configuration
+  (`AiChatSettings`): `Enabled`, `EndpointUrl` (default
+  `http://localhost:1234/v1`), `ApiKey`, `ModelName`, and `MaxTokens` (default
+  2048); any OpenAI-compatible provider works (LM Studio, Ollama, OpenAI,
+  etc.); API key is stored in `settings.json`; the `AiChatView` re-reads
+  `GetSettings` on every send so settings changes take effect immediately
 - `AppSettings.ShowInternetRadioItem`, `ShowPodcastsItem`, and `ShowQueueItem`
   control the individual sidebar items for Internet Radio, Podcasts, and
   **Up Next** from Settings > Appearance; they default to visible and are
