@@ -4,7 +4,7 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.14.0] - 2026-06-26
 
 ### Added
 
@@ -16,8 +16,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and uninstaller) and `Orynivo-{version}-win-x64-Portable.zip` (extract
   anywhere and run). No .NET installation is required on the target machine.
   Library data under `%LOCALAPPDATA%\Orynivo\` is preserved on uninstall.
-
-### Fixed
 
 ## [0.13.0] - 2026-06-26
 
