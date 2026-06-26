@@ -4,6 +4,21 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Added a Windows installer and portable ZIP built via GitHub Actions.
+  Pushing a version tag (e.g. `v0.14.0`) triggers the release workflow
+  (`.github/workflows/release.yml`), which publishes two self-contained
+  packages as a draft GitHub Release:
+  `Orynivo-{version}-win-x64-Setup.exe` (installer with Start Menu entry
+  and uninstaller) and `Orynivo-{version}-win-x64-Portable.zip` (extract
+  anywhere and run). No .NET installation is required on the target machine.
+  Library data under `%LOCALAPPDATA%\Orynivo\` is preserved on uninstall.
+
+### Fixed
+
 ## [0.13.0] - 2026-06-26
 
 ### Added

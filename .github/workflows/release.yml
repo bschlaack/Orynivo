@@ -1,0 +1,135 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number without v prefix (e.g. 0.13.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build installer and publish GitHub Release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: ver
+        shell: pwsh
+        run: |
+          if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+            $version = '${{ github.event.inputs.version }}'
+            $tag     = "v$version"
+          } else {
+            $tag     = '${{ github.ref_name }}'
+            $version = $tag.TrimStart('v')
+          }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "tag=$tag"         | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Building version $version (tag $tag)"
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore Orynivo/Orynivo.csproj
+
+      - name: Build cwASIO bridge (Release)
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} `
+            'Microsoft Visual Studio\Installer\vswhere.exe'
+          $inst = & $vswhere -latest -products '*' `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            -property installationPath
+          $msbuild = Join-Path $inst.Trim() 'MSBuild\Current\Bin\amd64\MSBuild.exe'
+          & $msbuild Native/CwAsioBridge/CwAsioBridge.vcxproj `
+            /p:Configuration=Release /p:Platform=x64
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Publish self-contained Windows build
+        shell: pwsh
+        run: >
+          dotnet publish Orynivo/Orynivo.csproj
+          --configuration Release
+          --runtime win-x64
+          --self-contained true
+          --no-restore
+          --output artifacts/Orynivo-win-x64
+          /p:IncludeAsioBridge=false
+          /p:IncludeCwAsioBridge=true
+          /p:AssemblyVersion=${{ steps.ver.outputs.version }}.0
+          /p:FileVersion=${{ steps.ver.outputs.version }}.0
+          /p:InformationalVersion=${{ steps.ver.outputs.version }}
+
+      - name: Create portable ZIP
+        shell: pwsh
+        run: |
+          $zip = "installer/Output/Orynivo-${{ steps.ver.outputs.version }}-win-x64-Portable.zip"
+          New-Item -ItemType Directory -Force installer/Output | Out-Null
+          Compress-Archive -Path artifacts/Orynivo-win-x64/* -DestinationPath $zip
+          Write-Host "Created $zip ($([math]::Round((Get-Item $zip).Length / 1MB, 1)) MB)"
+
+      - name: Compile Inno Setup installer
+        shell: pwsh
+        run: |
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          & $iscc /dAppVersion=${{ steps.ver.outputs.version }} installer\Orynivo.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Create GitHub Release (draft)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: Orynivo ${{ steps.ver.outputs.version }}
+          draft: true
+          generate_release_notes: false
+          files: |
+            installer/Output/Orynivo-${{ steps.ver.outputs.version }}-win-x64-Setup.exe
+            installer/Output/Orynivo-${{ steps.ver.outputs.version }}-win-x64-Portable.zip
+          body: |
+            ## Orynivo ${{ steps.ver.outputs.version }}
+
+            See [CHANGELOG.md](https://github.com/bschlaack/Orynivo/blob/main/CHANGELOG.md)
+            for a full list of changes.
+
+            ### Download
+
+            | Package | Description |
+            | --- | --- |
+            | `Orynivo-${{ steps.ver.outputs.version }}-win-x64-Setup.exe` | Installer — adds Start Menu entry and uninstaller |
+            | `Orynivo-${{ steps.ver.outputs.version }}-win-x64-Portable.zip` | Portable — extract anywhere and run `Orynivo.exe` |
+
+            Both packages are self-contained: .NET 8 is bundled,
+            no prerequisites required.
+
+            > **Windows SmartScreen:** an unsigned build may show a warning on
+            > first run. Click **More info → Run anyway** to proceed.
+
+            ### Updating (installer)
+
+            Run the new installer over an existing installation.
+            Library data, settings, and playlists are not affected.
+
+            ### Uninstalling (installer)
+
+            Use **Add or Remove Programs** in Windows Settings.
+            Library data under `%LOCALAPPDATA%\Orynivo\` is preserved.
+
+            ### Portable notes
+
+            Extract the ZIP to any folder (e.g. a USB drive) and run
+            `Orynivo.exe`. Library data is always written to
+            `%LOCALAPPDATA%\Orynivo\` on the current user profile,
+            regardless of where the executable lives.
