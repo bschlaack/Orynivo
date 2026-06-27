@@ -494,6 +494,35 @@ public sealed class AudioDatabase : IDisposable
         return result;
     }
 
+    /// <summary>Loads compact artist rows including cached profile metadata but no track rows.</summary>
+    /// <returns>Artists ordered by display name.</returns>
+    public List<ArtistInfo> GetArtistsWithProfiles()
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, name, is_favorite, biography, image_path,
+                   profile_source_url, profile_language, profile_fetched_at,
+                   image_is_manual
+            FROM artists
+            ORDER BY CASE WHEN name = '' THEN 1 ELSE 0 END,
+                     name COLLATE NOCASE;
+            """;
+        using var reader = cmd.ExecuteReader();
+        var result = new List<ArtistInfo>();
+        while (reader.Read())
+            result.Add(new ArtistInfo(
+                reader.GetInt64(0),
+                reader.GetString(1),
+                reader.GetInt32(2) != 0,
+                reader.IsDBNull(3) ? null : reader.GetString(3),
+                reader.IsDBNull(4) ? null : reader.GetString(4),
+                reader.IsDBNull(5) ? null : reader.GetString(5),
+                reader.IsDBNull(6) ? null : reader.GetString(6),
+                reader.IsDBNull(7) ? null : reader.GetInt64(7),
+                reader.GetInt32(8) != 0));
+        return result;
+    }
+
     public ArtistInfo? GetArtistById(long artistId)
     {
         using var cmd = _conn.CreateCommand();
@@ -556,7 +585,11 @@ public sealed class AudioDatabase : IDisposable
         cmd.ExecuteNonQuery();
     }
 
-    public void UpdateArtistImage(long artistId, string imagePath)
+    /// <summary>Stores a manually selected image path for an artist.</summary>
+    /// <param name="artistId">Artist identifier.</param>
+    /// <param name="imagePath">Absolute path to the cached artist image.</param>
+    /// <returns><see langword="true"/> when an artist row was updated.</returns>
+    public bool UpdateArtistImage(long artistId, string imagePath)
     {
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = """
@@ -567,7 +600,7 @@ public sealed class AudioDatabase : IDisposable
             """;
         Add(cmd, "$image_path", imagePath);
         Add(cmd, "$id", artistId);
-        cmd.ExecuteNonQuery();
+        return cmd.ExecuteNonQuery() > 0;
     }
 
     public ArtistInfo? FindArtistByName(string artistName, long? excludeArtistId = null)
@@ -1074,7 +1107,12 @@ public sealed class AudioDatabase : IDisposable
         return result;
     }
 
-    public void AttachArtworkToAlbum(long albumId, byte[] data, string? mimeType)
+    /// <summary>Stores artwork bytes in the artwork cache and attaches the resulting artwork to an album.</summary>
+    /// <param name="albumId">Album identifier.</param>
+    /// <param name="data">Raw image bytes.</param>
+    /// <param name="mimeType">Optional image MIME type.</param>
+    /// <returns><see langword="true"/> when an album row was updated.</returns>
+    public bool AttachArtworkToAlbum(long albumId, byte[] data, string? mimeType)
     {
         using var tx = _conn.BeginTransaction();
         var artworkId = EnsureArtwork(data, mimeType, tx);
@@ -1087,8 +1125,9 @@ public sealed class AudioDatabase : IDisposable
             """;
         Add(cmd, "$artwork_id", artworkId);
         Add(cmd, "$album_id", albumId);
-        cmd.ExecuteNonQuery();
+        var changed = cmd.ExecuteNonQuery() > 0;
         tx.Commit();
+        return changed;
     }
 
     public void ClearArtworkFromAlbum(long albumId)

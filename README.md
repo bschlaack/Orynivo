@@ -104,11 +104,18 @@ works directly in FFmpeg and browser URLs.
 | `POST /api/scan` | Trigger a full library scan |
 | `GET /api/scan` | Scan status with current root, processed/total counts, current file, last result, and errors |
 | `GET /api/artists` | All artists (id, name, favorite, biography/image flags) |
+| `GET /api/artists/{id}` | Complete artist metadata, including cached biography/source fields |
+| `POST /api/artists/{id}/profile` | Store client-refreshed artist biography/source fields and optional image bytes |
 | `GET /api/artists/{id}/albums` | Albums for one artist |
 | `GET /api/albums` | All albums (id, title, display artist, year, artwork paths) |
 | `GET /api/albums/{id}/tracks` | Track list for one album |
 | `GET /api/tracks` | Paginated track list (`?page=0&pageSize=500`) |
 | `GET /api/tracks/{id}` | Full metadata for one track |
+| `GET /api/folders/tracks` | Lightweight track rows for building a server library folder tree |
+| `GET /api/artwork/album/{id}?size=96` | Album artwork thumbnail or original image |
+| `PUT /api/artwork/album/{id}` | Store raw client-selected album artwork bytes on the server |
+| `GET /api/artwork/artist/{id}` | Artist image stored on the server |
+| `PUT /api/artwork/artist/{id}` | Store raw client-selected artist image bytes on the server |
 | `GET /api/playlists` | All playlists (regular and smart) |
 | `GET /api/playlists/{id}/tracks` | Resolved track list (smart playlists are evaluated live) |
 | `GET /api/search?q=` | Full-text search — returns matching tracks |
@@ -144,6 +151,8 @@ their drive roots. The same dialog can start a server scan and shows live
 progress while large directories are being scanned. Inaccessible subdirectories
 such as Linux `lost+found` folders are skipped instead of aborting the complete
 scan.
+Configured Orynivo Server connections appear in the main sidebar directly below
+the Local Library section.
 
 ### Running the server
 
@@ -192,6 +201,21 @@ byte-range streaming without FFmpeg.
   duration in transport metadata, play history, and **Up next**. Authenticated
   `?key=` stream URLs are not shown as titles and are not persisted in the
   playback queue.
+- Remote Orynivo Server sidebar entries now expose Artists, Albums, Tracks, and
+  Folder structure below each server. Remote Artists and Albums reuse the local
+  table/artwork masks, while remote artwork is loaded lazily from authenticated
+  server artwork endpoints and cached in the Windows client's local data
+  directory. Track search uses the normal header search box and runs through
+  the server's Lucene index.
+- Remote Orynivo Server artists, albums, and tracks can be marked as favorites;
+  those favorite flags are stored only in the Windows client's settings.
+- Remote Orynivo Server album covers and artist images can be searched from the
+  Windows client; the client uploads the selected image bytes to the server, and
+  the server stores them in its own artwork cache.
+- Remote Orynivo Server artist biographies can be refreshed from the Windows
+  client. Last.fm or Wikipedia requests run on the client; the server receives
+  only the resulting biography, source URL, language, and optional image bytes
+  to cache.
 - Windows System Media Transport Controls integration with global media keys,
   play/pause/previous/next/stop and seek requests, system-overlay and lock-screen
   metadata, album art, playback state, and timeline synchronization

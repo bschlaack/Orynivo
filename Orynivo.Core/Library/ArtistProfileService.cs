@@ -53,16 +53,45 @@ public static class ArtistProfileService
         string language,
         bool downloadImage = true,
         CancellationToken cancellationToken = default)
+        => await DownloadAsync(
+            artistId,
+            artistName,
+            language,
+            Source,
+            LastFmApiKey,
+            downloadImage,
+            cancellationToken);
+
+    /// <summary>
+    /// Downloads a biography and optional image for the given artist from the requested source.
+    /// Returns <see langword="null"/> when the artist cannot be found or <paramref name="artistName"/> is empty.
+    /// </summary>
+    /// <param name="artistId">Database artist ID used to name the image file on disk.</param>
+    /// <param name="artistName">Artist name to search for.</param>
+    /// <param name="language">Preferred content language (<c>en</c>, <c>de</c>, or <c>fr</c>).</param>
+    /// <param name="source">Biography source to query first.</param>
+    /// <param name="lastFmApiKey">Last.fm API key used when <paramref name="source"/> is <see cref="ArtistInfoSource.LastFm"/>.</param>
+    /// <param name="downloadImage">Whether to also attempt downloading an artist image.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The downloaded profile, or <see langword="null"/> when no profile was found.</returns>
+    public static async Task<ArtistProfileDownload?> DownloadAsync(
+        long artistId,
+        string artistName,
+        string language,
+        ArtistInfoSource source,
+        string? lastFmApiKey,
+        bool downloadImage = true,
+        CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(artistName))
             return null;
 
         language = language is "de" or "fr" ? language : "en";
 
-        if (Source == ArtistInfoSource.LastFm)
+        if (source == ArtistInfoSource.LastFm)
         {
             var result = await DownloadFromLastFmAsync(
-                artistId, artistName, language, downloadImage, cancellationToken);
+                artistId, artistName, language, lastFmApiKey, downloadImage, cancellationToken);
             if (result is not null)
                 return result;
             // Last.fm hat den Künstler nicht gefunden ("+nodirect", leere Bio, etc.) → Wikipedia
@@ -111,16 +140,17 @@ public static class ArtistProfileService
         long artistId,
         string artistName,
         string language,
+        string? lastFmApiKey,
         bool downloadImage,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(LastFmApiKey))
+        if (string.IsNullOrWhiteSpace(lastFmApiKey))
             return null;
 
         var name = Uri.EscapeDataString(artistName);
         var uri =
             $"https://ws.audioscrobbler.com/2.0/?method=artist.getinfo" +
-            $"&artist={name}&api_key={LastFmApiKey}&format=json&lang={language}";
+            $"&artist={name}&api_key={Uri.EscapeDataString(lastFmApiKey)}&format=json&lang={language}";
 
         await ThrottleAsync(cancellationToken);
 

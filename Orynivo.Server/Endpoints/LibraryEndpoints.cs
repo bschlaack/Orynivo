@@ -23,14 +23,44 @@ public static class LibraryEndpoints
         api.MapGet("/artists", () =>
         {
             using var db = AudioDatabase.OpenDefault();
-            return Results.Ok(db.GetArtistsLite().Select(a => new
+            return Results.Ok(db.GetArtistsWithProfiles().Select(ArtistDto));
+        });
+
+        api.MapGet("/artists/{artistId:long}", (long artistId) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            var artist = db.GetArtistById(artistId);
+            return artist is null ? Results.NotFound() : Results.Ok(ArtistDto(artist));
+        });
+
+        api.MapPost("/artists/{artistId:long}/profile", async (
+            long artistId,
+            ArtistProfileUpdateRequest request,
+            HttpContext context) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            var artist = db.GetArtistById(artistId);
+            if (artist is null) return Results.NotFound();
+
+            string? imagePath = null;
+            if (request.ImageData is { Length: > 0 })
             {
-                a.Id,
-                Name = a.Artist,
-                a.IsFavorite,
-                HasBiography = !string.IsNullOrEmpty(a.Biography),
-                HasImage = !string.IsNullOrEmpty(a.ImagePath)
-            }));
+                imagePath = await ArtistImageSearchService.SaveImageAsync(
+                    artistId,
+                    request.ImageData,
+                    request.ImageMimeType,
+                    context.RequestAborted);
+            }
+
+            db.UpdateArtistProfile(
+                artistId,
+                request.Biography,
+                imagePath,
+                request.SourceUrl,
+                request.Language ?? "en");
+
+            artist = db.GetArtistById(artistId);
+            return artist is null ? Results.NotFound() : Results.Ok(ArtistDto(artist));
         });
 
         api.MapGet("/artists/{artistId:long}/albums", (long artistId) =>
@@ -75,6 +105,23 @@ public static class LibraryEndpoints
             using var db = AudioDatabase.OpenDefault();
             var track = db.GetTrackById(trackId);
             return track is null ? Results.NotFound() : Results.Ok(TrackRecordDto(track));
+        });
+
+        // --- Folders -------------------------------------------------------
+
+        api.MapGet("/folders/tracks", () =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            return Results.Ok(db.GetTracksLite().Select(t => new
+            {
+                Id = db.GetTrackIdByPath(t.Path) ?? 0,
+                t.Path,
+                t.SourcePath,
+                t.FileName,
+                t.Title,
+                t.DiscNumber,
+                t.TrackNumber
+            }));
         });
 
         // --- Playlists -----------------------------------------------------
@@ -173,6 +220,8 @@ public static class LibraryEndpoints
     {
         t.Id,
         t.Path,
+        SourcePath = t.Path,
+        FileName = Path.GetFileName(t.Path),
         t.Title,
         t.SortTitle,
         t.Artist,
@@ -230,4 +279,31 @@ public static class LibraryEndpoints
         a.ThumbnailPath,
         a.IsFavorite
     };
+
+    private static object ArtistDto(ArtistInfo a) => new
+    {
+        a.Id,
+        Name = a.Artist,
+        a.IsFavorite,
+        a.Biography,
+        a.SourceUrl,
+        a.ProfileLanguage,
+        a.ProfileFetchedAt,
+        HasBiography = !string.IsNullOrEmpty(a.Biography),
+        HasImage = !string.IsNullOrEmpty(a.ImagePath),
+        a.ImageIsManual
+    };
 }
+
+/// <summary>Request body for storing a client-refreshed artist profile on the server.</summary>
+/// <param name="Biography">Downloaded artist biography, or <see langword="null"/> when no biography was found.</param>
+/// <param name="SourceUrl">Canonical source URL, or <see langword="null"/>.</param>
+/// <param name="Language">Preferred profile language.</param>
+/// <param name="ImageData">Optional client-downloaded artist image bytes.</param>
+/// <param name="ImageMimeType">MIME type for <paramref name="ImageData"/>.</param>
+public sealed record ArtistProfileUpdateRequest(
+    string? Biography,
+    string? SourceUrl,
+    string? Language,
+    byte[]? ImageData,
+    string? ImageMimeType);

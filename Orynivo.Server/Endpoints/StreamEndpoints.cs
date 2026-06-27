@@ -79,6 +79,52 @@ public static class StreamEndpoints
         });
 
         /// <summary>
+        /// Stores uploaded album artwork bytes and attaches them to the album.
+        /// </summary>
+        api.MapPut("/artwork/album/{albumId:long}", async (long albumId, HttpRequest request) =>
+        {
+            var data = await ReadImageUploadAsync(request);
+            if (data.Length == 0) return Results.BadRequest(new { error = "Artwork image data is required." });
+
+            using var db = AudioDatabase.OpenDefault();
+            return db.AttachArtworkToAlbum(albumId, data, request.ContentType)
+                ? Results.NoContent()
+                : Results.NotFound();
+        });
+
+        /// <summary>
+        /// Serves the manually cached artist image by artist database ID.
+        /// </summary>
+        api.MapGet("/artwork/artist/{artistId:long}", (long artistId) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            var artist = db.GetArtistById(artistId);
+            if (artist is null) return Results.NotFound();
+            if (string.IsNullOrEmpty(artist.ImagePath) || !File.Exists(artist.ImagePath))
+                return Results.NotFound();
+
+            return Results.File(artist.ImagePath, GuessImageMimeType(artist.ImagePath), enableRangeProcessing: false);
+        });
+
+        /// <summary>
+        /// Stores uploaded artist image bytes in the server-side image cache and marks the image as manual.
+        /// </summary>
+        api.MapPut("/artwork/artist/{artistId:long}", async (long artistId, HttpRequest request) =>
+        {
+            var data = await ReadImageUploadAsync(request);
+            if (data.Length == 0) return Results.BadRequest(new { error = "Artist image data is required." });
+
+            using var db = AudioDatabase.OpenDefault();
+            if (db.GetArtistById(artistId) is null)
+                return Results.NotFound();
+
+            var path = await ArtistImageSearchService.SaveImageAsync(artistId, data, request.ContentType, request.HttpContext.RequestAborted);
+            return db.UpdateArtistImage(artistId, path)
+                ? Results.NoContent()
+                : Results.NotFound();
+        });
+
+        /// <summary>
         /// Serves artwork for a track looked up by file path (encoded in <c>?p=</c>).
         /// </summary>
         api.MapGet("/artwork/track", (string p, int? size) =>
@@ -167,6 +213,16 @@ public static class StreamEndpoints
         return Results.Empty;
     }
 
+    private static async Task<byte[]> ReadImageUploadAsync(HttpRequest request)
+    {
+        const int maxImageBytes = 20 * 1024 * 1024;
+        await using var buffer = new MemoryStream();
+        await request.Body.CopyToAsync(buffer, request.HttpContext.RequestAborted);
+        return buffer.Length is 0 or > maxImageBytes
+            ? []
+            : buffer.ToArray();
+    }
+
     private static string BuildFfmpegArgs(string source, double start, double? end)
     {
         var startArg = start > 0
@@ -198,5 +254,13 @@ public static class StreamEndpoints
             ".dff"  => "audio/x-dff",
             ".wv"   => "audio/x-wavpack",
             _       => "application/octet-stream"
+        };
+
+    private static string GuessImageMimeType(string path) =>
+        Path.GetExtension(path).ToLowerInvariant() switch
+        {
+            ".png" => "image/png",
+            ".webp" => "image/webp",
+            _ => "image/jpeg"
         };
 }

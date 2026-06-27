@@ -113,8 +113,27 @@ public static class ArtistImageSearchService
         long artistId,
         ArtistImageSearchResult result,
         CancellationToken cancellationToken = default)
+        => await SaveImageAsync(artistId, result.ImageData, result.MimeType, cancellationToken);
+
+    /// <summary>
+    /// Writes raw image bytes to the artist-images directory, replacing any existing image for
+    /// <paramref name="artistId"/>, and returns the saved file path.
+    /// </summary>
+    /// <param name="artistId">Database artist ID used as the file name stem.</param>
+    /// <param name="imageData">Raw image bytes to store.</param>
+    /// <param name="mimeType">MIME type used to select the file extension.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Absolute path of the saved image file.</returns>
+    public static async Task<string> SaveImageAsync(
+        long artistId,
+        byte[] imageData,
+        string? mimeType,
+        CancellationToken cancellationToken = default)
     {
-        var extension = result.MimeType?.ToLowerInvariant() switch
+        if (imageData.Length == 0)
+            throw new ArgumentException("Image data is required.", nameof(imageData));
+
+        var extension = mimeType?.ToLowerInvariant() switch
         {
             "image/png" => ".png",
             "image/webp" => ".webp",
@@ -125,7 +144,7 @@ public static class ArtistImageSearchService
         var targetPath = Path.Combine(directory, artistId + extension);
         var temporaryPath = targetPath + ".tmp";
 
-        await File.WriteAllBytesAsync(temporaryPath, result.ImageData, cancellationToken);
+        await File.WriteAllBytesAsync(temporaryPath, imageData, cancellationToken);
         File.Move(temporaryPath, targetPath, true);
 
         foreach (var existingPath in Directory.EnumerateFiles(directory, artistId + ".*"))

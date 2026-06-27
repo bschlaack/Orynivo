@@ -8,7 +8,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Remote Orynivo Server albums and artists now support artwork management from
+  the Windows client. The client runs the existing cover/artist-image searches,
+  uploads the selected image bytes to the server, and the server stores them in
+  its local artwork caches without performing external artwork lookups itself.
+- Remote Orynivo Server artist biographies can now be refreshed from the
+  Windows client. Last.fm or Wikipedia requests run on the client, then the
+  server stores only the resulting cached biography, source URL, language, and
+  optional image bytes.
+- Remote Orynivo Server entries now expand into Artists, Albums, Tracks, and
+  Folder structure in the sidebar. Remote Artists and Albums reuse the local
+  table/artwork masks with lazy authenticated artwork loading and a local
+  client artwork cache, Remote Tracks uses the normal header search box through
+  the server's Lucene index, and remote artists, albums, and tracks support
+  client-side favorites stored in `settings.json`.
+
+### Changed
+
+- Moved the Orynivo Server accordion in the main sidebar directly below
+  Local Library.
+
 ### Fixed
+
+- Remote Orynivo Server artist-info buttons now open the selected server artist
+  instead of treating the server artist ID as a local library artist ID.
 
 ## [0.15.0] - 2026-06-27
 

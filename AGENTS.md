@@ -38,7 +38,9 @@ enums, `PlexServerSettings`, and `OrynivoServerSettings`), `PlexServerClient`,
 `OrynivoServerClient` (HTTP client for browsing and streaming a remote Orynivo Server
 library — provides `GetArtistsAsync`, `GetAlbumsByArtistAsync`, `GetAlbumsAsync`,
 `GetTracksByAlbumAsync`, `GetTracksAsync`, `TestConnectionAsync`, and static URL
-helpers `GetStreamUrl`/`GetAlbumArtworkUrl`).
+helpers `GetStreamUrl`/`GetAlbumArtworkUrl`/`GetArtistArtworkUrl`; also uploads
+client-selected album and artist artwork through `UploadAlbumArtworkAsync` and
+`UploadArtistImageAsync`).
 
 **Access control:** `InternalsVisibleTo("Orynivo")` is set in `AssemblyInfo.cs`
 so the Orynivo Windows app can access internal Core members (audio-processing
@@ -118,10 +120,18 @@ no Windows-specific dependencies; it runs on Windows, Linux, and macOS.
   file, last result, and errors
 - `Orynivo.Server/Endpoints/LibraryEndpoints.cs`: artists, albums, tracks,
   playlists (smart playlists resolved via `SmartPlaylistCriteria.Resolve`),
-  and Lucene search endpoints
+  and Lucene search endpoints; `GET /api/artists/{id}` returns complete
+  cached artist profile fields and `POST /api/artists/{id}/profile` stores
+  client-refreshed biography/source fields plus optional image bytes; Last.fm
+  or Wikipedia requests run on the client, not on the server; `GET`
+  `/api/folders/tracks` returns lightweight track rows for building the remote
+  server library folder tree
 - `Orynivo.Server/Endpoints/StreamEndpoints.cs`: byte-range streaming for
   regular audio files; on-the-fly FLAC transcode via FFmpeg pipe for CUE
-  virtual tracks; album and track artwork endpoints
+  virtual tracks; album, artist, and track artwork endpoints; `PUT`
+  `/api/artwork/album/{id}` and `/api/artwork/artist/{id}` accept raw image
+  bytes from authenticated clients and store them in the server-side artwork
+  caches
 - `Orynivo.Server/Endpoints/ConfigurationEndpoints.cs`: authenticated
   `/api/settings/library-paths` GET/PUT and `/api/files/directories?path=`
   endpoints; PUT persists `Orynivo:LibraryPaths` to `appsettings.json`,
@@ -293,11 +303,30 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
   and builds authenticated direct-part URLs
 - `Orynivo.Core/Streaming/OrynivoServerClient.cs`: HTTP client for a remote
   Orynivo Server; methods load artists, albums by artist, albums, tracks by
-  album, all tracks, server library paths, server directory listings, and scan
-  status; `SetLibraryPathsAsync` replaces the remote server's configured library
-  roots; `TriggerScanAsync` starts a remote scan; `GetStreamUrl` and
-  `GetAlbumArtworkUrl` are pure URL builders that include `?key=` so the URLs
-  can be passed directly to FFmpeg or Avalonia's image loader
+  album, all tracks, lightweight folder-tree tracks, server library paths,
+  server directory listings, and scan status; `SetLibraryPathsAsync` replaces
+  the remote server's configured library
+  roots; `TriggerScanAsync` starts a remote scan; `UploadAlbumArtworkAsync` and
+  `UploadArtistImageAsync` send client-selected image bytes to the server so the
+  server does not perform external artwork searches itself;
+  `UpdateArtistProfileAsync` sends client-refreshed biography/source fields and
+  optional image bytes for server-side caching, without sending the Last.fm API
+  key; `GetStreamUrl`, `GetAlbumArtworkUrl`, and `GetArtistArtworkUrl` are pure
+  URL builders that include `?key=` so the URLs can be passed directly to
+  FFmpeg or Avalonia's image loader
+- Remote Orynivo Server sidebar entries render one disabled server-name row
+  followed by Artists, Albums, Tracks, and Folder structure child rows. Remote
+  Artists and Albums reuse the local table/artwork masks and hydrate
+  authenticated server artwork lazily as rows or artwork cards become visible;
+  downloaded remote artwork is cached client-side under
+  `%LOCALAPPDATA%\Orynivo\remote-artworks\`.
+  Remote artist-info views must use the bound remote row/server profile data,
+  not local `AudioDatabase.GetArtistById`, because server IDs can collide with
+  local artist IDs.
+  Remote Tracks uses the normal header search box against the server's Lucene
+  `/api/search` endpoint instead of filtering a fully paged client-side list.
+  Remote folder tree nodes queue remote HTTP streams only and never expose
+  playlist persistence for credential-bearing server URLs.
 - `Orynivo/OrynivoServerDialog.axaml/.cs`: themed dialog for adding or editing a
   remote Orynivo Server (name, URL, API key, Test Connection); it can load, add,
   remove, and save the remote server's music directories through the server API,
@@ -309,7 +338,8 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
 - `AppSettings.OrynivoServers` stores configured remote server connections;
   `ShowOrynivoServerSection` and `IsOrynivoServerSectionExpanded` control
   sidebar visibility and expansion state; API keys are stored in `settings.json`
-  (same policy as AI chat key)
+  (same policy as AI chat key); `AppSettings.OrynivoServerFavorites` stores
+  client-side favorite keys for remote artists, albums, and tracks
 - `Orynivo/Streaming/WindowsPlexCredentialStore.cs`: stores per-server Plex
   access tokens in `%LOCALAPPDATA%\Orynivo\plex-credentials.dat` using Windows
   DPAPI for the current user
