@@ -32,7 +32,8 @@ builder.Services.AddSingleton(_ =>
         // we don't need an additional callback here for the server.
     }));
 
-builder.Services.AddHostedService<LibraryService>();
+builder.Services.AddSingleton<LibraryService>();
+builder.Services.AddHostedService(static services => services.GetRequiredService<LibraryService>());
 
 // ---- ASP.NET Core infrastructure ------------------------------------------
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
@@ -77,10 +78,11 @@ app.MapPost("/api/scan", (LibraryService svc) =>
 
 // Scan status
 app.MapGet("/api/scan", (LibraryService svc) =>
-    Results.Ok(new { IsRunning = svc.IsScanning }));
+    Results.Ok(svc.ScanStatus));
 
 app.MapLibraryEndpoints();
 app.MapStreamEndpoints();
+app.MapConfigurationEndpoints();
 
 // ---- Start ----------------------------------------------------------------
 var addr = builder.Configuration["Kestrel:Endpoints:Http:Url"] ?? "http://0.0.0.0:5280";

@@ -98,8 +98,11 @@ works directly in FFmpeg and browser URLs.
 | --- | --- |
 | `GET /api/health` | Status — no authentication required |
 | `GET /api/info` | Server name, version, and configured library paths |
+| `GET /api/settings/library-paths` | Configured library root paths |
+| `PUT /api/settings/library-paths` | Replace configured library root paths, persist them, refresh watchers, and start a scan |
+| `GET /api/files/directories?path=` | Browse server-side directories for remote path selection |
 | `POST /api/scan` | Trigger a full library scan |
-| `GET /api/scan` | Scan status (`{"IsRunning": true/false}`) |
+| `GET /api/scan` | Scan status with current root, processed/total counts, current file, last result, and errors |
 | `GET /api/artists` | All artists (id, name, favorite, biography/image flags) |
 | `GET /api/artists/{id}/albums` | Albums for one artist |
 | `GET /api/albums` | All albums (id, title, display artist, year, artwork paths) |
@@ -132,6 +135,15 @@ Edit `appsettings.json` before first use:
 
 The server binds to `http://0.0.0.0:5280` by default. Override the port in
 `appsettings.json` under `Kestrel:Endpoints:Http:Url`.
+
+When the Windows player is connected to an Orynivo Server, the server's music
+directories can also be managed from the Orynivo Server connection dialog in
+Settings. The directory browser shows the server filesystem, not the local
+Windows filesystem: Unix-like servers open at `/`, while Windows servers expose
+their drive roots. The same dialog can start a server scan and shows live
+progress while large directories are being scanned. Inaccessible subdirectories
+such as Linux `lost+found` folders are skipped instead of aborting the complete
+scan.
 
 ### Running the server
 
@@ -176,6 +188,10 @@ byte-range streaming without FFmpeg.
 - Seeking, volume control, pause, and an editable persistent **Up next** queue
   with play-next/append actions, removal, reordering, playlist saving, and
   shuffle without repeating a track within the currently loaded queue
+- Remote Orynivo Server tracks keep their library title, artist, album, and
+  duration in transport metadata, play history, and **Up next**. Authenticated
+  `?key=` stream URLs are not shown as titles and are not persisted in the
+  playback queue.
 - Windows System Media Transport Controls integration with global media keys,
   play/pause/previous/next/stop and seek requests, system-overlay and lock-screen
   metadata, album art, playback state, and timeline synchronization

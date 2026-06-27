@@ -24,6 +24,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (`X-Api-Key` header or `?key=` query parameter):
   - `GET /api/health` — unauthenticated status check
   - `GET /api/info` — server name, version, and library paths
+  - `GET`/`PUT /api/settings/library-paths` — read and replace server
+    library roots, persist them to `appsettings.json`, refresh watchers, and
+    start a scan
+  - `GET /api/files/directories?path=` — browse the server filesystem for
+    remote directory selection
   - `POST /api/scan` / `GET /api/scan` — trigger or monitor a library scan
   - `GET /api/artists`, `/api/artists/{id}/albums`
   - `GET /api/albums`, `/api/albums/{id}/tracks`
@@ -55,7 +60,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `orynivo-server.service` running as a dedicated `orynivo-server` system
   user. No .NET runtime is required on the target machine.
 
+- **Orynivo Server client** — the Windows player can now connect to remote
+  Orynivo Server instances running on the local network.  Add one or more
+  servers in Settings → Integration (name, URL, API key); each appears as an
+  accordion section in the sidebar.  Selecting a server opens an
+  Artists / Albums / Tracks view backed by the server's REST API; double-
+  clicking an artist or album drills down, and double-clicking a track starts
+  playback of that server's audio stream (authenticated HTTP URL passed
+  directly to FFmpeg — no file download required).  Album thumbnails are
+  fetched from the server's `/api/artwork/album/{id}?size=96` endpoint.
+  The server editor can also load, add, remove, and save the remote server's
+  music directories through a server-side directory browser, start a server
+  scan, and show live scan progress for large directories.
+  The Orynivo Server section visibility can be toggled from Settings →
+  Appearance.  API keys are stored in `settings.json` (the same policy as
+  the embedded AI chat key).
+
 ### Fixed
+
+- The Orynivo Server settings and remote directory browser dialogs now use
+  themed button and list-item templates for normal, hover, pressed, selected,
+  and disabled states, avoiding unreadable dark controls on dark backgrounds.
+- Server and local library scans now skip inaccessible subdirectories such as
+  Linux `lost+found` folders instead of aborting the complete scan with
+  `UnauthorizedAccessException`.
+- Orynivo Server stream URLs are no longer used as display titles in the
+  transport, Up Next view, play history, or media metadata. Remote server queue
+  entries now carry the track title, artist, album, duration, and format, and
+  authenticated `?key=` stream URLs are not persisted in the playback queue.
+- Settings now uses title-case labels for Plex and Orynivo Server sections
+  in the server configuration area, while sidebar and visibility-toggle labels
+  keep their all-caps section headings.
+- The Orynivo Server directory browser now shows the current server path in a
+  read-only field, uses a `..` list entry for parent navigation, and widens the
+  add-directory action so its text is not clipped.
+- On Unix-like Orynivo Server hosts, the remote directory browser now opens `/`
+  directly instead of showing a Windows-style drive-root view.
 
 ## [0.14.0] - 2026-06-26
 

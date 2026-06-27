@@ -93,3 +93,16 @@ public sealed class PlexServerSettings
     /// <summary>Gets or sets the base URL of the Plex server (e.g. <c>http://192.168.1.10:32400</c>).</summary>
     public string BaseUrl { get; set; } = string.Empty;
 }
+
+/// <summary>Persisted connection settings for one remote Orynivo Server instance.</summary>
+public sealed class OrynivoServerSettings
+{
+    /// <summary>Gets or sets the unique server identifier (GUID, no dashes).</summary>
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    /// <summary>Gets or sets the user-chosen display name for this server.</summary>
+    public string Name { get; set; } = string.Empty;
+    /// <summary>Gets or sets the base URL of the server (e.g. <c>http://192.168.1.10:5280</c>).</summary>
+    public string BaseUrl { get; set; } = string.Empty;
+    /// <summary>Gets or sets the pre-shared API key required by every request.</summary>
+    public string ApiKey { get; set; } = string.Empty;
+}

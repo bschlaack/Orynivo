@@ -31,6 +31,7 @@ internal partial class SettingsView : UserControl
     private readonly List<string> _libraryPaths = [];
     private readonly List<PlexServerSettings> _plexServers = [];
     private readonly Dictionary<string, string> _plexTokens = [];
+    private readonly List<OrynivoServerSettings> _orynivoServers = [];
     private readonly Dictionary<string, CancellationTokenSource> _activeScans = [];
     private readonly Action<List<string>>? _onLibraryPathsChanged;
     private readonly Action<bool, EqualizerProfile?>? _onEqualizerPreviewChanged;
@@ -135,8 +136,9 @@ internal partial class SettingsView : UserControl
         ShowLocalLibrarySectionCheckBox.IsChecked = settings.ShowLocalLibrarySection;
         ShowOwnRadiosSectionCheckBox.IsChecked = settings.ShowOwnRadiosSection;
         ShowMyPodcastsSectionCheckBox.IsChecked = settings.ShowMyPodcastsSection;
-        ShowPlexSectionCheckBox.IsChecked = settings.ShowPlexSection;
-        ShowPlaylistsSectionCheckBox.IsChecked = settings.ShowPlaylistsSection;
+        ShowPlexSectionCheckBox.IsChecked          = settings.ShowPlexSection;
+        ShowOrynivoServerSectionCheckBox.IsChecked = settings.ShowOrynivoServerSection;
+        ShowPlaylistsSectionCheckBox.IsChecked     = settings.ShowPlaylistsSection;
         ArtistInfoSourceComboBox.ItemsSource = Enum.GetValues<ArtistInfoSource>();
         ArtistInfoSourceComboBox.SelectedItem = settings.ArtistInfoSource;
         LastFmApiKeyTextBox.Text = settings.LastFmApiKey ?? string.Empty;
@@ -144,6 +146,7 @@ internal partial class SettingsView : UserControl
         LastFmPanel.IsVisible = settings.ArtistInfoSource == ArtistInfoSource.LastFm;
         _libraryPaths.AddRange(settings.LibraryPaths);
         _plexServers.AddRange((settings.PlexServers ?? []).Select(ClonePlexServer));
+        _orynivoServers.AddRange((settings.OrynivoServers ?? []).Select(CloneOrynivoServer));
         try
         {
             foreach (var credential in new WindowsPlexCredentialStore().LoadAll())
@@ -152,6 +155,7 @@ internal partial class SettingsView : UserControl
         catch { }
         RebuildDirectoryList();
         RebuildPlexServerList();
+        RebuildOrynivoServerList();
         _initializing = false;
         RefreshOutputProfileButtons();
         NavListBox.SelectedIndex = 1;
@@ -204,6 +208,9 @@ internal partial class SettingsView : UserControl
     public IReadOnlyDictionary<string, string> SelectedPlexTokens => _plexTokens;
     /// <summary>Gets a value indicating whether Plex credentials were edited in this window.</summary>
     public bool PlexCredentialsChanged => _plexCredentialsChanged;
+    /// <summary>Gets independent copies of all configured Orynivo Server connections.</summary>
+    public IReadOnlyList<OrynivoServerSettings> SelectedOrynivoServers =>
+        _orynivoServers.Select(CloneOrynivoServer).ToList().AsReadOnly();
     /// <summary>Gets a value indicating whether the MCP server should be enabled.</summary>
     public bool McpServerEnabled => McpServerEnabledCheckBox.IsChecked == true;
     /// <summary>Gets the TCP port configured for the MCP server.</summary>
@@ -233,6 +240,8 @@ internal partial class SettingsView : UserControl
     public bool ShowMyPodcastsSection => ShowMyPodcastsSectionCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether the Plex sidebar section should be visible.</summary>
     public bool ShowPlexSection => ShowPlexSectionCheckBox.IsChecked == true;
+    /// <summary>Gets a value indicating whether the Orynivo Server sidebar section should be visible.</summary>
+    public bool ShowOrynivoServerSection => ShowOrynivoServerSectionCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether the Playlists sidebar section should be visible.</summary>
     public bool ShowPlaylistsSection => ShowPlaylistsSectionCheckBox.IsChecked == true;
 
@@ -241,6 +250,14 @@ internal partial class SettingsView : UserControl
         Id = server.Id,
         Name = server.Name,
         BaseUrl = server.BaseUrl
+    };
+
+    private static OrynivoServerSettings CloneOrynivoServer(OrynivoServerSettings server) => new()
+    {
+        Id = server.Id,
+        Name = server.Name,
+        BaseUrl = server.BaseUrl,
+        ApiKey = server.ApiKey
     };
 
     private static OutputProfile CloneOutputProfile(OutputProfile profile) => new()
@@ -346,6 +363,82 @@ internal partial class SettingsView : UserControl
         _plexTokens.Remove(id);
         _plexCredentialsChanged = true;
         RebuildPlexServerList();
+    }
+
+    private void RebuildOrynivoServerList()
+    {
+        OrynivoServersPanel.Children.Clear();
+        var primaryBrush = AvaloniaApp.Current!.Resources["AppPrimaryTextBrush"] as IBrush;
+        var mutedBrush   = AvaloniaApp.Current!.Resources["AppMutedTextBrush"]   as IBrush;
+        foreach (var server in _orynivoServers)
+        {
+            var row = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var description = new StackPanel();
+            description.Children.Add(new TextBlock
+            {
+                Text = server.Name,
+                FontWeight = FontWeight.SemiBold,
+                Foreground = primaryBrush,
+                TextTrimming = TextTrimming.CharacterEllipsis
+            });
+            description.Children.Add(new TextBlock
+            {
+                Text = server.BaseUrl,
+                FontSize = 11,
+                Foreground = mutedBrush,
+                TextTrimming = TextTrimming.CharacterEllipsis
+            });
+            row.Children.Add(description);
+
+            var editButton = CreateStyledButton(LocalizationManager.Current.OrynivoEditServer, 80, 28, new Thickness(8, 0, 0, 0));
+            editButton.Tag    = server.Id;
+            editButton.Click += EditOrynivoServerButton_OnClick;
+            Grid.SetColumn(editButton, 1);
+            row.Children.Add(editButton);
+
+            var removeButton = CreateStyledButton(LocalizationManager.Current.OrynivoRemoveServer, 80, 28, new Thickness(8, 0, 0, 0));
+            removeButton.Tag    = server.Id;
+            removeButton.Click += RemoveOrynivoServerButton_OnClick;
+            Grid.SetColumn(removeButton, 2);
+            row.Children.Add(removeButton);
+
+            OrynivoServersPanel.Children.Add(row);
+        }
+    }
+
+    private async void AddOrynivoServerButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        var dialog = new OrynivoServerDialog();
+        if (await dialog.ShowDialog<bool?>(GetHostWindow()) != true)
+            return;
+        _orynivoServers.Add(dialog.Server);
+        RebuildOrynivoServerList();
+    }
+
+    private async void EditOrynivoServerButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string id })
+            return;
+        var index = _orynivoServers.FindIndex(s => s.Id == id);
+        if (index < 0)
+            return;
+        var dialog = new OrynivoServerDialog(_orynivoServers[index]);
+        if (await dialog.ShowDialog<bool?>(GetHostWindow()) != true)
+            return;
+        _orynivoServers[index] = dialog.Server;
+        RebuildOrynivoServerList();
+    }
+
+    private void RemoveOrynivoServerButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string id })
+            return;
+        _orynivoServers.RemoveAll(s => s.Id == id);
+        RebuildOrynivoServerList();
     }
 
     /// <summary>Stops background work and restores the original live equalizer preview when needed.</summary>

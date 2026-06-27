@@ -634,7 +634,7 @@
                                TextWrapping="Wrap"
                                Margin="0,0,0,24"/>
 
-                    <TextBlock Text="{DynamicResource L_PlexServers}"
+                    <TextBlock Text="{DynamicResource L_PlexServersSettings}"
                                FontSize="13"
                                FontWeight="SemiBold"
                                Margin="0,0,0,8"/>
@@ -651,6 +651,24 @@
                             Theme="{StaticResource SettingsButtonTheme}"
                             Content="{DynamicResource L_AddPlexServer}"
                             Click="AddPlexServerButton_OnClick"/>
+
+                    <TextBlock Text="{DynamicResource L_OrynivoServersSettings}"
+                               FontSize="13"
+                               FontWeight="SemiBold"
+                               Margin="0,28,0,8"/>
+                    <TextBlock Text="{DynamicResource L_OrynivoServersHint}"
+                               FontSize="11"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,12"/>
+                    <StackPanel x:Name="OrynivoServersPanel"/>
+                    <Button Width="140"
+                            Height="30"
+                            HorizontalAlignment="Left"
+                            Margin="0,8,0,0"
+                            Theme="{StaticResource SettingsButtonTheme}"
+                            Content="{DynamicResource L_AddOrynivoServer}"
+                            Click="AddOrynivoServerButton_OnClick"/>
                 </StackPanel>
 
                 <StackPanel x:Name="ArtistInfoPanel"
@@ -748,6 +766,10 @@
                               Margin="0,4"/>
                     <CheckBox x:Name="ShowPlexSectionCheckBox"
                               Content="{DynamicResource L_PlexServers}"
+                              Theme="{StaticResource SettingsCheckBoxTheme}"
+                              Margin="0,4"/>
+                    <CheckBox x:Name="ShowOrynivoServerSectionCheckBox"
+                              Content="{DynamicResource L_OrynivoServers}"
                               Theme="{StaticResource SettingsCheckBoxTheme}"
                               Margin="0,4"/>
                     <CheckBox x:Name="ShowPlaylistsSectionCheckBox"

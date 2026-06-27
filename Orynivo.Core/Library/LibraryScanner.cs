@@ -32,6 +32,12 @@ public static class LibraryScanner
         ".m4a", ".aac", ".ogg", ".opus", ".wma", ".cue"
     };
 
+    private static readonly EnumerationOptions RecursiveScanOptions = new()
+    {
+        RecurseSubdirectories = true,
+        IgnoreInaccessible = true
+    };
+
     /// <summary>
     /// Asynchronously scans <paramref name="rootPath"/> for audio files, skipping unchanged files,
     /// and upserts changed or new tracks into the database.
@@ -153,8 +159,9 @@ public static class LibraryScanner
         IProgress<ScanProgress>? progress,
         CancellationToken ct)
     {
+        progress?.Report(new ScanProgress(0, 0, rootPath));
         var discoveredFiles = Directory
-            .EnumerateFiles(rootPath, "*.*", SearchOption.AllDirectories)
+            .EnumerateFiles(rootPath, "*.*", RecursiveScanOptions)
             .Where(f => SupportedExtensions.Contains(Path.GetExtension(f)))
             .Select(Path.GetFullPath)
             .ToList();
