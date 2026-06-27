@@ -49,6 +49,14 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _plexViewCts;
     private readonly Dictionary<string, ContentRow> _plexTracksByUrl =
         new(StringComparer.Ordinal);
+    private readonly OrynivoServerClient _orynivoClient = new();
+    private OrynivoServerSettings? _activeOrynivoServer;
+    private string _activeOrynivoView = "Artists";
+    private int _orynivoNavigationLoadVersion;
+    private CancellationTokenSource? _orynivoViewCts;
+    private readonly Stack<(string View, long? FilterId, string? FilterName)> _orynivoNavigationStack = [];
+    private readonly Dictionary<string, ContentRow> _orynivoTracksByUrl =
+        new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, TreeViewItem> _localFolderTrackItems =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Border> _localFolderTrackHeaders =
@@ -474,7 +482,7 @@ public partial class MainWindow : Window
         };
         _mcpBridge.GetQueueFunc = () =>
             _queue.Select((item, i) => new Mcp.QueueEntry(
-                i, i == _queueIndex, item.FilePath, item.FileName)).ToList();
+                i, i == _queueIndex, item.FilePath, item.DisplayTitle)).ToList();
         _mcpBridge.PlayFileFunc    = path => StartPlaybackAsync(path);
         _mcpBridge.TogglePauseFunc = TogglePlaybackAsync;
         _mcpBridge.SkipNextFunc    = PlayNextAsync;
@@ -488,7 +496,7 @@ public partial class MainWindow : Window
         _mcpBridge.SetVolumeFunc   = v => VolumeSlider.Value = Math.Clamp(v, 0, 1);
         _mcpBridge.AppendToQueueFunc = async path =>
         {
-            _queue.Add(new PlaylistItem(path));
+            _queue.Add(CreatePlaylistItem(path));
             ResetQueuePlaybackState();
             PersistPlaybackQueue();
             RefreshQueueRowsIfVisible();
@@ -498,7 +506,7 @@ public partial class MainWindow : Window
         _mcpBridge.PlayNextFunc = async path =>
         {
             var insertIndex = Math.Clamp(_queueIndex + 1, 0, _queue.Count);
-            _queue.Insert(insertIndex, new PlaylistItem(path));
+            _queue.Insert(insertIndex, CreatePlaylistItem(path));
             ResetQueuePlaybackState();
             PersistPlaybackQueue();
             RefreshQueueRowsIfVisible();
@@ -518,7 +526,7 @@ public partial class MainWindow : Window
         {
             _queue.Clear();
             foreach (var p in paths)
-                _queue.Add(new PlaylistItem(p));
+                _queue.Add(CreatePlaylistItem(p));
             _queueIndex = paths.Count > 0 ? 0 : -1;
             ResetQueuePlaybackState();
             PersistPlaybackQueue();
@@ -814,6 +822,7 @@ public partial class MainWindow : Window
             }
 
             LoadPlexNavigationAsync();
+            LoadOrynivoServerNavigation();
 
             foreach (var pl in db.GetAllPlaylists())
             {
@@ -915,6 +924,34 @@ public partial class MainWindow : Window
         };
     }
 
+    private void LoadOrynivoServerNavigation()
+    {
+        var loadVersion = ++_orynivoNavigationLoadVersion;
+        foreach (var item in NavListBox.Items
+                     .OfType<ListBoxItem>()
+                     .Where(item => item.Tag is string tag &&
+                                    tag.StartsWith("OrynivoServer:", StringComparison.Ordinal))
+                     .ToList())
+            NavListBox.Items.Remove(item);
+
+        var insertIndex = NavListBox.Items.IndexOf(OrynivoServerHeaderItem) + 1;
+        foreach (var server in _settings.OrynivoServers ?? [])
+        {
+            if (loadVersion != _orynivoNavigationLoadVersion)
+                return;
+            var text = CreateSidebarEntryText($"   {server.Name}");
+            text.Foreground = FindResource<IBrush>("AppMutedTextBrush");
+            NavListBox.Items.Insert(insertIndex++, new ListBoxItem
+            {
+                Content = text,
+                Tag = $"OrynivoServer:{server.Id}",
+                Theme = FindResource<ControlTheme>("NavItemTheme")
+            });
+        }
+
+        ApplySidebarNavigationSettings();
+    }
+
     private TextBlock CreateSidebarEntryText(string text)
     {
         var tb = new TextBlock { Text = text };
@@ -949,7 +986,7 @@ public partial class MainWindow : Window
                               !uri.Scheme.Equals("cue", StringComparison.OrdinalIgnoreCase);
             if (isRemoteUrl || IsAvailableLocalTrack(path))
             {
-                _queue.Add(new PlaylistItem(path));
+                _queue.Add(CreatePlaylistItem(path));
             }
         }
 
@@ -990,7 +1027,8 @@ public partial class MainWindow : Window
             return false;
 
         return !uri.Query.Contains("X-Plex-Token", StringComparison.OrdinalIgnoreCase) &&
-               !uri.Query.Contains("token=", StringComparison.OrdinalIgnoreCase);
+               !uri.Query.Contains("token=", StringComparison.OrdinalIgnoreCase) &&
+               !uri.Query.Contains("key=", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsAvailableLocalTrack(string path)
@@ -1066,6 +1104,11 @@ public partial class MainWindow : Window
             _settings.ShowPlexSection,
             dynamicPrefix: "Plex");
         SetSidebarSectionVisibility(
+            OrynivoServerHeaderItem,
+            "OrynivoServer",
+            _settings.ShowOrynivoServerSection,
+            dynamicPrefix: "OrynivoServer:");
+        SetSidebarSectionVisibility(
             PlaylistsHeaderItem,
             "Playlists",
             _settings.ShowPlaylistsSection,
@@ -1087,6 +1130,7 @@ public partial class MainWindow : Window
             "OwnRadios" => OwnRadiosHeaderArrow,
             "MyPodcasts" => MyPodcastsHeaderArrow,
             "Plex" => PlexHeaderArrow,
+            "OrynivoServer" => OrynivoServerHeaderArrow,
             "Playlists" => PlaylistsHeaderArrow,
             _ => null
         };
@@ -1115,6 +1159,7 @@ public partial class MainWindow : Window
         "OwnRadios" => _settings.IsOwnRadiosSectionExpanded,
         "MyPodcasts" => _settings.IsMyPodcastsSectionExpanded,
         "Plex" => _settings.IsPlexSectionExpanded,
+        "OrynivoServer" => _settings.IsOrynivoServerSectionExpanded,
         "Playlists" => _settings.IsPlaylistsSectionExpanded,
         _ => false
     };
@@ -1134,6 +1179,9 @@ public partial class MainWindow : Window
                 break;
             case "Plex":
                 _settings.IsPlexSectionExpanded = isExpanded;
+                break;
+            case "OrynivoServer":
+                _settings.IsOrynivoServerSectionExpanded = isExpanded;
                 break;
             case "Playlists":
                 _settings.IsPlaylistsSectionExpanded = isExpanded;
@@ -1306,6 +1354,8 @@ public partial class MainWindow : Window
             "Podcasts" => LocalizationManager.Current.Podcasts,
             _ when tag.StartsWith("PlexLibrary:", StringComparison.Ordinal) =>
                 _activePlexSectionTitle ?? LocalizationManager.Current.PlexServers,
+            _ when tag.StartsWith("OrynivoServer:", StringComparison.Ordinal) =>
+                _activeOrynivoServer?.Name ?? LocalizationManager.Current.OrynivoServers,
             _ when tag.StartsWith("Radio:", StringComparison.Ordinal) => GetRadioName(tag),
             _ when tag.StartsWith("Podcast:", StringComparison.Ordinal) => GetPodcastName(tag),
             _         => tag.StartsWith("Playlist:") ? GetPlaylistName(tag) : tag
@@ -1331,10 +1381,12 @@ public partial class MainWindow : Window
         SearchTextBox.IsVisible = !(tag is "InternetRadio" or "Podcasts" or "Queue" or "AiChat" ||
                                     tag.StartsWith("Radio:", StringComparison.Ordinal) ||
                                     tag.StartsWith("Podcast:", StringComparison.Ordinal) ||
-                                    tag.StartsWith("PlexLibrary:", StringComparison.Ordinal));
+                                    tag.StartsWith("PlexLibrary:", StringComparison.Ordinal) ||
+                                    tag.StartsWith("OrynivoServer:", StringComparison.Ordinal));
         UpdateEntityFavoritesFilterToggle(tag);
         AlbumViewModeBorder.IsVisible = tag is "Albums" or "Artists";
         PlexViewModeBorder.IsVisible = tag.StartsWith("PlexLibrary:", StringComparison.Ordinal);
+        OrynivoServerViewModeBorder.IsVisible = tag.StartsWith("OrynivoServer:", StringComparison.Ordinal);
         if (tag is "Albums" or "Artists")
             SetViewModeButtons(tag == "Albums" ? _showAlbumArtworkView : _showArtistArtworkView);
         TrackFilterButton.IsVisible = tag == "Tracks" ? true : false;
@@ -1414,6 +1466,10 @@ public partial class MainWindow : Window
         else if (tag.StartsWith("PlexLibrary:", StringComparison.Ordinal))
         {
             await ShowPlexLibraryAsync(tag);
+        }
+        else if (tag.StartsWith("OrynivoServer:", StringComparison.Ordinal))
+        {
+            await ShowOrynivoServerAsync(tag);
         }
         else if (tag == "Folders")
         {
@@ -1604,6 +1660,190 @@ public partial class MainWindow : Window
 
     private async void PlexLoadMoreButton_OnClick(object? sender, RoutedEventArgs e)
         => await LoadPlexViewAsync(reset: false);
+
+    // ------------------------------------------------------------------
+    // Orynivo Server browsing
+    // ------------------------------------------------------------------
+
+    private async Task ShowOrynivoServerAsync(string tag)
+    {
+        var serverId = tag["OrynivoServer:".Length..];
+        _activeOrynivoServer = (_settings.OrynivoServers ?? [])
+            .FirstOrDefault(s => string.Equals(s.Id, serverId, StringComparison.Ordinal));
+        if (_activeOrynivoServer is null)
+            return;
+
+        _orynivoNavigationStack.Clear();
+        _activeOrynivoView = "Artists";
+        _updatingViewMode = true;
+        OrynivoArtistsViewRadioButton.IsChecked = true;
+        _updatingViewMode = false;
+        ContentTitleTextBlock.Text = _activeOrynivoServer.Name;
+        await LoadOrynivoViewAsync();
+    }
+
+    private async void OrynivoServerViewModeRadioButton_OnChecked(object? sender, RoutedEventArgs e)
+    {
+        if (!IsVisible || _updatingViewMode ||
+            sender is not RadioButton { IsChecked: true, Tag: string view } ||
+            _activeOrynivoServer is null)
+            return;
+
+        _orynivoNavigationStack.Clear();
+        _activeOrynivoView = view;
+        ContentTitleTextBlock.Text = _activeOrynivoServer.Name;
+        BackButton.IsVisible = _navigationStack.Count > 0;
+        await LoadOrynivoViewAsync();
+    }
+
+    private async Task LoadOrynivoViewAsync(long? filterArtistId = null, long? filterAlbumId = null)
+    {
+        if (_activeOrynivoServer is null)
+            return;
+
+        CancelAndDispose(ref _orynivoViewCts);
+        _orynivoViewCts = new CancellationTokenSource();
+        var ct = _orynivoViewCts.Token;
+        var server = _activeOrynivoServer;
+        var view = filterAlbumId.HasValue ? "AlbumTracks"
+            : filterArtistId.HasValue ? "ArtistAlbums"
+            : _activeOrynivoView;
+
+        ContentDataGrid.IsVisible = true;
+        FolderTreeView.IsVisible = false;
+        AlbumArtworkListBox.IsVisible = false;
+        ArtistArtworkListBox.IsVisible = false;
+        SearchResultsScrollViewer.IsVisible = false;
+        StatusTextBlock.Text = LocalizationManager.Current.OrynivoLoading;
+        ContentDataGrid.ItemsSource = null;
+
+        try
+        {
+            switch (view)
+            {
+                case "Artists":
+                {
+                    ApplyColumns("OrynivoArtist");
+                    var artists = await Task.Run(() => _orynivoClient.GetArtistsAsync(server, ct), ct);
+                    if (ct.IsCancellationRequested) return;
+                    var rows = artists.Select(a => new ContentRow
+                    {
+                        Title = a.Name,
+                        EntityType = "OrynivoArtist",
+                        ExternalId = a.Id.ToString(CultureInfo.InvariantCulture),
+                        IsFavorite = a.IsFavorite
+                    }).ToList();
+                    ContentDataGrid.ItemsSource = rows;
+                    ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(rows.Count);
+                    break;
+                }
+
+                case "ArtistAlbums":
+                {
+                    ApplyColumns("OrynivoAlbum");
+                    var albums = await Task.Run(() => _orynivoClient.GetAlbumsByArtistAsync(server, filterArtistId!.Value, ct), ct);
+                    if (ct.IsCancellationRequested) return;
+                    var rows = albums.Select(a => BuildOrynivoAlbumRow(server, a)).ToList();
+                    ContentDataGrid.ItemsSource = rows;
+                    ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(rows.Count);
+                    break;
+                }
+
+                case "Albums":
+                {
+                    ApplyColumns("OrynivoAlbum");
+                    var albums = await Task.Run(() => _orynivoClient.GetAlbumsAsync(server, ct), ct);
+                    if (ct.IsCancellationRequested) return;
+                    var rows = albums.Select(a => BuildOrynivoAlbumRow(server, a)).ToList();
+                    ContentDataGrid.ItemsSource = rows;
+                    ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(rows.Count);
+                    break;
+                }
+
+                case "AlbumTracks":
+                case "Tracks":
+                {
+                    ApplyColumns("OrynivoTrack");
+                    List<OrynivoTrackInfo> tracks;
+                    if (filterAlbumId.HasValue)
+                        tracks = await Task.Run(() => _orynivoClient.GetTracksByAlbumAsync(server, filterAlbumId.Value, ct), ct);
+                    else
+                        tracks = await Task.Run(() => _orynivoClient.GetTracksAsync(server, cancellationToken: ct), ct);
+                    if (ct.IsCancellationRequested) return;
+                    var rows = tracks.Select(t => BuildOrynivoTrackRow(server, t)).ToList();
+                    ContentDataGrid.ItemsSource = rows;
+                    ContentCountTextBlock.Text = LocalizationManager.FormatTrackCount(rows.Count);
+                    break;
+                }
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch
+        {
+            StatusTextBlock.Text = LocalizationManager.Current.OrynivoConnectionFailed;
+            return;
+        }
+
+        StatusTextBlock.Text = string.Empty;
+    }
+
+    private ContentRow BuildOrynivoAlbumRow(OrynivoServerSettings server, OrynivoAlbumInfo a)
+    {
+        var row = new ContentRow
+        {
+            Title = a.Album,
+            Artist = a.DisplayArtist ?? string.Empty,
+            Year = a.Year?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+            EntityType = "OrynivoAlbum",
+            ExternalId = a.Id.ToString(CultureInfo.InvariantCulture),
+            IsFavorite = a.IsFavorite
+        };
+        var artUrl = OrynivoServerClient.GetAlbumArtworkUrl(server, a.Id, 96);
+        _ = LoadOrynivoArtworkAsync(row, artUrl);
+        return row;
+    }
+
+    private ContentRow BuildOrynivoTrackRow(OrynivoServerSettings server, OrynivoTrackInfo t)
+    {
+        var streamUrl = OrynivoServerClient.GetStreamUrl(server, t.Id);
+        var span = t.Duration.HasValue ? TimeSpan.FromSeconds(t.Duration.Value) : TimeSpan.Zero;
+        var row = new ContentRow
+        {
+            FilePath = streamUrl,
+            Title = t.Title ?? string.Empty,
+            Artist = t.Artist ?? string.Empty,
+            Album = t.Album ?? string.Empty,
+            Year = t.Year?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+            TrackNumber = t.TrackNumber?.ToString(CultureInfo.InvariantCulture),
+            DiscNumber  = t.DiscNumber?.ToString(CultureInfo.InvariantCulture),
+            Duration    = span.TotalSeconds >= 3600
+                ? span.ToString(@"h\:mm\:ss")
+                : span.ToString(@"m\:ss"),
+            Bitrate    = t.Bitrate?.ToString(CultureInfo.InvariantCulture),
+            SampleRate = t.SampleRate?.ToString(CultureInfo.InvariantCulture),
+            BitDepth   = t.BitDepth?.ToString(CultureInfo.InvariantCulture),
+            Channels   = t.Channels?.ToString(CultureInfo.InvariantCulture),
+            Format     = t.Format ?? string.Empty,
+            IsFavorite = t.IsFavorite,
+            EntityType = "OrynivoTrack",
+            ExternalId = t.Id.ToString(CultureInfo.InvariantCulture),
+            KnownDuration = t.Duration.HasValue ? TimeSpan.FromSeconds(t.Duration.Value) : null
+        };
+        _orynivoTracksByUrl[streamUrl] = row;
+        return row;
+    }
+
+    private static async Task LoadOrynivoArtworkAsync(ContentRow row, string artUrl)
+    {
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+            var bytes = await http.GetByteArrayAsync(artUrl);
+            using var ms = new MemoryStream(bytes);
+            row.Artwork = new Bitmap(ms);
+        }
+        catch { }
+    }
 
     private async Task LoadPlexViewAsync(bool reset)
     {
@@ -3521,6 +3761,23 @@ public partial class MainWindow : Window
                 Add(LocalizationManager.Current.Duration, nameof(ContentRow.Duration), 70, "duration", right: true);
                 Add(LocalizationManager.Current.Format, nameof(ContentRow.Format), 80, "format");
                 break;
+            case "OrynivoArtist":
+                AddThumbnail();
+                Add(LocalizationManager.Current.Artist, nameof(ContentRow.Title), 0, "artist", star: true);
+                break;
+            case "OrynivoAlbum":
+                AddThumbnail();
+                Add(LocalizationManager.Current.Album, nameof(ContentRow.Title), 0, "album", star: true);
+                Add(LocalizationManager.Current.AlbumArtist, nameof(ContentRow.Artist), 220, "artist");
+                Add(LocalizationManager.Current.Year, nameof(ContentRow.Year), 70, "year", right: true);
+                break;
+            case "OrynivoTrack":
+                Add(LocalizationManager.Current.Title, nameof(ContentRow.Title), 0, "title", star: true);
+                Add(LocalizationManager.Current.Artist, nameof(ContentRow.Artist), 180, "artist");
+                Add(LocalizationManager.Current.Album, nameof(ContentRow.Album), 180, "album");
+                Add(LocalizationManager.Current.Duration, nameof(ContentRow.Duration), 70, "duration", right: true);
+                Add(LocalizationManager.Current.Format, nameof(ContentRow.Format), 80, "format");
+                break;
             case "Artists":
                 AddFavorite();
                 AddThumbnail();
@@ -3874,12 +4131,28 @@ public partial class MainWindow : Window
                     FilePath = item.FilePath
                 };
             }
+            else if (_orynivoTracksByUrl.TryGetValue(item.FilePath, out var orynivoRow))
+            {
+                row = new ContentRow
+                {
+                    Title = orynivoRow.Title,
+                    Artist = orynivoRow.Artist,
+                    Album = orynivoRow.Album,
+                    Duration = orynivoRow.Duration,
+                    Format = orynivoRow.Format,
+                    FilePath = item.FilePath
+                };
+            }
             else
             {
                 row = new ContentRow
                 {
-                    Title = Path.GetFileNameWithoutExtension(item.FilePath),
-                    FileName = Path.GetFileName(item.FilePath),
+                    Title = item.DisplayTitle,
+                    Artist = item.Artist,
+                    Album = item.Album,
+                    Duration = item.Duration ?? string.Empty,
+                    Format = item.Format,
+                    FileName = item.FileName,
                     FilePath = item.FilePath
                 };
             }
@@ -4146,7 +4419,7 @@ public partial class MainWindow : Window
 
             _queue.Clear();
             foreach (var t in folderTracks)
-                _queue.Add(new PlaylistItem(t.Path));
+            _queue.Add(CreatePlaylistItem(t.Path));
 
             _queueIndex = 0;
             for (int i = 0; i < _queue.Count; i++)
@@ -4332,6 +4605,28 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (row.EntityType == "OrynivoArtist" &&
+            long.TryParse(row.ExternalId, out var orynivoArtistId))
+        {
+            PushCurrentNavigationState();
+            _orynivoNavigationStack.Push((_activeOrynivoView, null, null));
+            ContentTitleTextBlock.Text = $"{_activeOrynivoServer?.Name} · {row.Title}";
+            BackButton.IsVisible = true;
+            await LoadOrynivoViewAsync(filterArtistId: orynivoArtistId);
+            return;
+        }
+
+        if (row.EntityType == "OrynivoAlbum" &&
+            long.TryParse(row.ExternalId, out var orynivoAlbumId))
+        {
+            PushCurrentNavigationState();
+            _orynivoNavigationStack.Push((_activeOrynivoView, null, null));
+            ContentTitleTextBlock.Text = $"{row.Artist} · {row.Title}";
+            BackButton.IsVisible = true;
+            await LoadOrynivoViewAsync(filterAlbumId: orynivoAlbumId);
+            return;
+        }
+
         if (row.EntityType == "Artist" && row.Id is long artistId)
         {
             await ShowArtistAlbumsAsync(artistId, row.Title ?? "(Unbekannt)");
@@ -4358,7 +4653,7 @@ public partial class MainWindow : Window
 
         _queue.Clear();
         foreach (var r in allRows.Where(r => !string.IsNullOrEmpty(r.FilePath)))
-            _queue.Add(new PlaylistItem(r.FilePath));
+            _queue.Add(ToPlaylistItem(r));
 
         _queueIndex = _queue.IndexOf(_queue.FirstOrDefault(p => p.FilePath == row.FilePath) ?? _queue[0]);
         ResetQueuePlaybackState();
@@ -4368,6 +4663,44 @@ public partial class MainWindow : Window
         try { await StartPlaybackAsync(row.FilePath); }
         catch (OperationCanceledException) { StatusTextBlock.Text = LocalizationManager.Current.PlaybackStopped; }
         catch (Exception ex) { StopPlayback(); StatusTextBlock.Text = ex.Message; }
+    }
+
+    private static PlaylistItem ToPlaylistItem(ContentRow row) =>
+        new(
+            row.FilePath,
+            string.IsNullOrWhiteSpace(row.Title) ? null : row.Title,
+            string.IsNullOrWhiteSpace(row.Artist) ? null : row.Artist,
+            string.IsNullOrWhiteSpace(row.Album) ? null : row.Album,
+            string.IsNullOrWhiteSpace(row.Duration) ? null : row.Duration,
+            string.IsNullOrWhiteSpace(row.Format) ? null : row.Format,
+            row.KnownDuration);
+
+    private PlaylistItem CreatePlaylistItem(string path)
+    {
+        if (_orynivoTracksByUrl.TryGetValue(path, out var orynivoRow))
+            return ToPlaylistItem(orynivoRow);
+        if (_plexTracksByUrl.TryGetValue(path, out var plexRow))
+            return ToPlaylistItem(plexRow);
+        return new PlaylistItem(path);
+    }
+
+    private PlaylistItem? GetPlaylistMetadata(string path)
+    {
+        var queueItem = _queue.FirstOrDefault(item =>
+            string.Equals(item.FilePath, path, StringComparison.OrdinalIgnoreCase));
+        if (queueItem is not null &&
+            (!string.IsNullOrWhiteSpace(queueItem.Title) ||
+             !string.IsNullOrWhiteSpace(queueItem.Artist) ||
+             !string.IsNullOrWhiteSpace(queueItem.Album)))
+        {
+            return queueItem;
+        }
+
+        if (_orynivoTracksByUrl.TryGetValue(path, out var orynivoRow))
+            return ToPlaylistItem(orynivoRow);
+        if (_plexTracksByUrl.TryGetValue(path, out var plexRow))
+            return ToPlaylistItem(plexRow);
+        return null;
     }
 
     private async Task ShowAlbumTracksAsync(long albumId, string albumTitle)
@@ -5291,7 +5624,7 @@ public partial class MainWindow : Window
 
         var insertIndex = Math.Clamp(_queueIndex + 1, 0, _queue.Count);
         foreach (var path in paths)
-            _queue.Insert(insertIndex++, new PlaylistItem(path));
+            _queue.Insert(insertIndex++, CreatePlaylistItem(path));
         ResetQueuePlaybackState();
         PersistPlaybackQueue();
         RefreshQueueRowsIfVisible();
@@ -5308,7 +5641,7 @@ public partial class MainWindow : Window
             return;
 
         foreach (var path in paths)
-            _queue.Add(new PlaylistItem(path));
+            _queue.Add(CreatePlaylistItem(path));
         ResetQueuePlaybackState();
         PersistPlaybackQueue();
         RefreshQueueRowsIfVisible();
@@ -7120,8 +7453,10 @@ public partial class MainWindow : Window
         _transportTimer.Start();
 
         // Now-playing anzeigen
+        var queueMetadata = GetPlaylistMetadata(filePath);
         var filename = podcastPlayback?.Episode.Title ??
                        radioStation?.Name ??
+                       queueMetadata?.DisplayTitle ??
                        Path.GetFileNameWithoutExtension(filePath);
         NowPlayingTitleBlock.Text  = filename;
         NowPlayingArtistBlock.Text = podcastPlayback?.Podcast.Name ??
@@ -7141,6 +7476,7 @@ public partial class MainWindow : Window
         if (radioStation is null && podcastPlayback is null)
         {
             var isPlexTrack = _plexTracksByUrl.TryGetValue(filePath, out var plexTrack);
+            var isOrynivoTrack = _orynivoTracksByUrl.TryGetValue(filePath, out var orynivoTrack);
             try
             {
                 using var db = AudioDatabase.OpenDefault();
@@ -7187,6 +7523,20 @@ public partial class MainWindow : Window
                 _currentTrackId = null;
                 _currentArtistId = null;
                 _currentArtistName = plexTrack.Artist;
+                _currentTrackIsFavorite = false;
+                NowPlayingArtistButton.IsEnabled = false;
+                LyricsButton.IsEnabled = false;
+                ArtistInfoButton.IsEnabled = false;
+            }
+            else if (isOrynivoTrack && orynivoTrack is not null)
+            {
+                NowPlayingTitleBlock.Text = orynivoTrack.Title ?? filename;
+                NowPlayingArtistBlock.Text = orynivoTrack.Artist ?? string.Empty;
+                NowPlayingArtworkImage.Source = orynivoTrack.Thumbnail ?? orynivoTrack.Artwork;
+                LyricsBackgroundImage.Source = null;
+                _currentTrackId = null;
+                _currentArtistId = null;
+                _currentArtistName = orynivoTrack.Artist;
                 _currentTrackIsFavorite = false;
                 NowPlayingArtistButton.IsEnabled = false;
                 LyricsButton.IsEnabled = false;
@@ -7347,6 +7697,9 @@ public partial class MainWindow : Window
                 KnownDuration: plexTrack.KnownDuration);
         }
 
+        if (_orynivoTracksByUrl.TryGetValue(path, out var orynivoTrack))
+            return new GaplessPlaybackItem(path, 1.0f, KnownDuration: orynivoTrack.KnownDuration);
+
         if (!CueSheetParser.IsVirtualPath(path))
             return new GaplessPlaybackItem(path, GetReplayGainFactor(path));
 
@@ -7417,9 +7770,10 @@ public partial class MainWindow : Window
 
     private void UpdateGaplessNowPlaying(string filePath, AudioFileInfo info)
     {
-        var filename = Path.GetFileNameWithoutExtension(filePath);
+        var metadata = GetPlaylistMetadata(filePath);
+        var filename = metadata?.DisplayTitle ?? Path.GetFileNameWithoutExtension(filePath);
         NowPlayingTitleBlock.Text = filename;
-        NowPlayingArtistBlock.Text = SelectedDriverTextBlock.Text;
+        NowPlayingArtistBlock.Text = metadata?.Artist ?? SelectedDriverTextBlock.Text;
         FileInfoTextBlock.Text = info.IsDsd
             ? $"{info.ContainerName.ToUpperInvariant()}  ·  {LocalizationManager.Current.DsdToPcmOutput}  ·  {info.OutputSampleRate:N0} Hz"
             : info.SourceSampleRate != info.OutputSampleRate
@@ -7427,6 +7781,7 @@ public partial class MainWindow : Window
                 : $"{info.CodecName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz  ·  {info.Channels} ch";
 
         var isPlexTrack = _plexTracksByUrl.TryGetValue(filePath, out var plexTrack);
+        var isOrynivoTrack = _orynivoTracksByUrl.TryGetValue(filePath, out var orynivoTrack);
         try
         {
             using var db = AudioDatabase.OpenDefault();
@@ -7473,6 +7828,20 @@ public partial class MainWindow : Window
             _currentTrackId = null;
             _currentArtistId = null;
             _currentArtistName = plexTrack.Artist;
+            _currentTrackIsFavorite = false;
+            NowPlayingArtistButton.IsEnabled = false;
+            LyricsButton.IsEnabled = false;
+            ArtistInfoButton.IsEnabled = false;
+        }
+        else if (isOrynivoTrack && orynivoTrack is not null)
+        {
+            NowPlayingTitleBlock.Text = orynivoTrack.Title ?? filename;
+            NowPlayingArtistBlock.Text = orynivoTrack.Artist ?? string.Empty;
+            NowPlayingArtworkImage.Source = orynivoTrack.Thumbnail ?? orynivoTrack.Artwork;
+            LyricsBackgroundImage.Source = null;
+            _currentTrackId = null;
+            _currentArtistId = null;
+            _currentArtistName = orynivoTrack.Artist;
             _currentTrackIsFavorite = false;
             NowPlayingArtistButton.IsEnabled = false;
             LyricsButton.IsEnabled = false;
@@ -7526,6 +7895,10 @@ public partial class MainWindow : Window
         else if (_plexTracksByUrl.TryGetValue(_currentFilePath, out var plexTrack))
         {
             album = plexTrack.Album ?? string.Empty;
+        }
+        else if (_orynivoTracksByUrl.TryGetValue(_currentFilePath, out var orynivoTrack))
+        {
+            album = orynivoTrack.Album ?? string.Empty;
         }
         else
         {
@@ -9015,6 +9388,7 @@ public partial class MainWindow : Window
                 _settings.ShowOwnRadiosSection != window.ShowOwnRadiosSection ||
                 _settings.ShowMyPodcastsSection != window.ShowMyPodcastsSection ||
                 _settings.ShowPlexSection != window.ShowPlexSection ||
+                _settings.ShowOrynivoServerSection != window.ShowOrynivoServerSection ||
                 _settings.ShowPlaylistsSection != window.ShowPlaylistsSection;
             var mcpChanged =
                 _settings.McpServerEnabled != window.McpServerEnabled ||
@@ -9022,6 +9396,9 @@ public partial class MainWindow : Window
             var plexServersChanged = !PlexServerSettingsEqual(
                 _settings.PlexServers,
                 window.SelectedPlexServers);
+            var orynivoServersChanged = !OrynivoServerSettingsEqual(
+                _settings.OrynivoServers,
+                window.SelectedOrynivoServers);
             var outputChanged =
                 _settings.OutputBackend != window.SelectedOutputBackend ||
                 !string.Equals(
@@ -9055,6 +9432,7 @@ public partial class MainWindow : Window
             _settings.LastFmApiKey           = window.SelectedLastFmApiKey;
             _settings.QobuzApplicationId      = window.SelectedQobuzApplicationId;
             _settings.PlexServers             = window.SelectedPlexServers.ToList();
+            _settings.OrynivoServers          = window.SelectedOrynivoServers.ToList();
             _settings.McpServerEnabled        = window.McpServerEnabled;
             _settings.McpServerPort           = window.McpServerPort;
             _settings.DisabledMcpTools        = window.DisabledMcpTools;
@@ -9067,8 +9445,9 @@ public partial class MainWindow : Window
             _settings.ShowLocalLibrarySection = window.ShowLocalLibrarySection;
             _settings.ShowOwnRadiosSection    = window.ShowOwnRadiosSection;
             _settings.ShowMyPodcastsSection   = window.ShowMyPodcastsSection;
-            _settings.ShowPlexSection         = window.ShowPlexSection;
-            _settings.ShowPlaylistsSection    = window.ShowPlaylistsSection;
+            _settings.ShowPlexSection              = window.ShowPlexSection;
+            _settings.ShowOrynivoServerSection     = window.ShowOrynivoServerSection;
+            _settings.ShowPlaylistsSection         = window.ShowPlaylistsSection;
             if (window.PlexCredentialsChanged)
             {
                 try
@@ -9105,6 +9484,8 @@ public partial class MainWindow : Window
                 LoadNavPlaylists();
             else if (sidebarChanged)
                 ApplySidebarNavigationSettings();
+            if (orynivoServersChanged)
+                LoadOrynivoServerNavigation();
             if (replayGainChanged && _player is not null)
             {
                 var currentFilePath = _currentFilePath;
@@ -9174,6 +9555,20 @@ public partial class MainWindow : Window
                    string.Equals(pair.First.Id, pair.Second.Id, StringComparison.Ordinal) &&
                    string.Equals(pair.First.Name, pair.Second.Name, StringComparison.Ordinal) &&
                    string.Equals(pair.First.BaseUrl, pair.Second.BaseUrl, StringComparison.Ordinal));
+    }
+
+    private static bool OrynivoServerSettingsEqual(
+        IReadOnlyList<OrynivoServerSettings>? left,
+        IReadOnlyList<OrynivoServerSettings>? right)
+    {
+        left ??= [];
+        right ??= [];
+        return left.Count == right.Count &&
+               left.Zip(right).All(pair =>
+                   string.Equals(pair.First.Id, pair.Second.Id, StringComparison.Ordinal) &&
+                   string.Equals(pair.First.Name, pair.Second.Name, StringComparison.Ordinal) &&
+                   string.Equals(pair.First.BaseUrl, pair.Second.BaseUrl, StringComparison.Ordinal) &&
+                   string.Equals(pair.First.ApiKey, pair.Second.ApiKey, StringComparison.Ordinal));
     }
 
     internal void PrepareForLibraryImport()

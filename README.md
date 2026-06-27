@@ -1,14 +1,15 @@
 # Orynivo
 
-A native Windows music player for local Hi-Fi libraries.
+A native Windows music player and cross-platform music server for local Hi-Fi libraries.
 
 ASIO/WASAPI · DSD/DSF/DFF · Gapless Playback · ReplayGain · Parametric EQ
-Plex · Radio · Podcasts · AI Chat · MCP Server
+Plex · Radio · Podcasts · AI Chat · MCP Server · Network Streaming
 
 ## Why Orynivo?
 
 Orynivo is for people who still own and manage a local music library
-and want a modern Windows player with serious audio output support.
+and want a modern Windows player with serious audio output support —
+and the ability to reach that library from any device on the local network.
 
 - Bit-perfect/native DSD playback via ASIO
 - Exclusive WASAPI and ASIO output profiles
@@ -18,6 +19,8 @@ and want a modern Windows player with serious audio output support.
 - Local library, playlists, smart playlists and full-text search
 - AI control via local LLMs, LM Studio/Ollama/OpenAI-compatible endpoints
 - MCP server for external AI assistants
+- **Orynivo Server** — headless cross-platform music server (Linux, macOS, Windows)
+  that exposes the same library over the local network via REST and HTTP streaming
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
@@ -78,6 +81,95 @@ and point your assistant at `http://localhost:49200/mcp`. The server binds to
 `localhost` only. Each of the 19 tools has an individual enable/disable toggle
 in Settings so you can limit what an external assistant is allowed to do.
 
+## Orynivo Server
+
+`Orynivo.Server` is a self-contained headless music server that runs on
+**Windows, Linux, and macOS**. It scans the same local library directories and
+exposes them over the local network so any HTTP client — another Orynivo
+instance, a media player, or a custom app — can browse and stream your music.
+
+### API
+
+All endpoints except `/api/health` require a pre-shared API key sent either as
+an `X-Api-Key` header or a `?key=` query parameter. The query-parameter form
+works directly in FFmpeg and browser URLs.
+
+| Endpoint | Description |
+| --- | --- |
+| `GET /api/health` | Status — no authentication required |
+| `GET /api/info` | Server name, version, and configured library paths |
+| `GET /api/settings/library-paths` | Configured library root paths |
+| `PUT /api/settings/library-paths` | Replace configured library root paths, persist them, refresh watchers, and start a scan |
+| `GET /api/files/directories?path=` | Browse server-side directories for remote path selection |
+| `POST /api/scan` | Trigger a full library scan |
+| `GET /api/scan` | Scan status with current root, processed/total counts, current file, last result, and errors |
+| `GET /api/artists` | All artists (id, name, favorite, biography/image flags) |
+| `GET /api/artists/{id}/albums` | Albums for one artist |
+| `GET /api/albums` | All albums (id, title, display artist, year, artwork paths) |
+| `GET /api/albums/{id}/tracks` | Track list for one album |
+| `GET /api/tracks` | Paginated track list (`?page=0&pageSize=500`) |
+| `GET /api/tracks/{id}` | Full metadata for one track |
+| `GET /api/playlists` | All playlists (regular and smart) |
+| `GET /api/playlists/{id}/tracks` | Resolved track list (smart playlists are evaluated live) |
+| `GET /api/search?q=` | Full-text search — returns matching tracks |
+| `GET /api/search/full?q=` | Category search — returns tracks, albums, and artists |
+| `GET /api/stream/{trackId}` | Byte-range HTTP streaming for regular files; FLAC transcode for CUE virtual tracks |
+| `GET /api/stream/path?p=` | Stream by absolute file path |
+| `GET /api/artwork/album/{id}?size=` | Album artwork (`size=96` or `size=320` for thumbnails) |
+| `GET /api/artwork/track?p=` | Track artwork by file path |
+
+### Configuration
+
+Edit `appsettings.json` before first use:
+
+```json
+{
+  "Orynivo": {
+    "ServerName": "Orynivo Server",
+    "ApiKey": "change-this-to-a-long-random-string",
+    "LibraryPaths": ["/music", "/mnt/nas/music"],
+    "ScanOnStartup": true
+  }
+}
+```
+
+The server binds to `http://0.0.0.0:5280` by default. Override the port in
+`appsettings.json` under `Kestrel:Endpoints:Http:Url`.
+
+When the Windows player is connected to an Orynivo Server, the server's music
+directories can also be managed from the Orynivo Server connection dialog in
+Settings. The directory browser shows the server filesystem, not the local
+Windows filesystem: Unix-like servers open at `/`, while Windows servers expose
+their drive roots. The same dialog can start a server scan and shows live
+progress while large directories are being scanned. Inaccessible subdirectories
+such as Linux `lost+found` folders are skipped instead of aborting the complete
+scan.
+
+### Running the server
+
+**dotnet:**
+
+```bash
+dotnet run --project Orynivo.Server/Orynivo.Server.csproj
+```
+
+**Linux (after package install):**
+
+```bash
+# Edit config first
+sudo nano /etc/orynivo-server/appsettings.json
+
+# Enable and start the service
+sudo systemctl enable --now orynivo-server
+
+# Check logs
+journalctl -u orynivo-server -f
+```
+
+FFmpeg must be installed separately on Linux and macOS and is required only for
+CUE-sheet track transcoding. Regular audio files are served directly via
+byte-range streaming without FFmpeg.
+
 ## Features
 
 - Playback through ASIO or exclusive-mode WASAPI
@@ -96,6 +188,10 @@ in Settings so you can limit what an external assistant is allowed to do.
 - Seeking, volume control, pause, and an editable persistent **Up next** queue
   with play-next/append actions, removal, reordering, playlist saving, and
   shuffle without repeating a track within the currently loaded queue
+- Remote Orynivo Server tracks keep their library title, artist, album, and
+  duration in transport metadata, play history, and **Up next**. Authenticated
+  `?key=` stream URLs are not shown as titles and are not persisted in the
+  playback queue.
 - Windows System Media Transport Controls integration with global media keys,
   play/pause/previous/next/stop and seek requests, system-overlay and lock-screen
   metadata, album art, playback state, and timeline synchronization
@@ -243,14 +339,16 @@ rate is used. Unsupported sample rates and bit depths are converted by
 
 ## Requirements
 
+### Windows player
+
 - Windows 10 or Windows 11, x64
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) (for building)
 - [FFmpeg](https://ffmpeg.org/) — downloaded automatically on first start if not
-  already present. To use a specific build instead, place `ffmpeg.exe` and
-  `ffprobe.exe` in `PATH` or next to `Orynivo.exe`.
+  already present. To use a specific build, place `ffmpeg.exe` and `ffprobe.exe`
+  in `PATH` or next to `Orynivo.exe`.
 - For cwASIO: Visual Studio 2022 with the **Desktop development with C++**
   workload and an installed ASIO driver
-- Optional for the separate Steinberg bridge: Steinberg ASIO SDK 2.3
+- Optional Steinberg bridge: Steinberg ASIO SDK 2.3
 
 The MIT-licensed cwASIO sources are included under `third_party/cwasio`, so the
 normal build provides ASIO support without the Steinberg SDK. The Steinberg
@@ -261,12 +359,39 @@ with older development environments, `C:\Dev\asiosdk_2.3`. When no SDK is
 found, only **cwASIO** is offered. When the SDK is available, Settings offers
 both **Steinberg ASIO** and **cwASIO**.
 
+### Orynivo Server
+
+- Linux, macOS, or Windows; x64 or ARM64
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) (for building;
+  not required when using a self-contained release package)
+- [FFmpeg](https://ffmpeg.org/) — recommended for CUE-sheet track transcoding
+  (Debian/Ubuntu: `apt install ffmpeg`; Fedora/Rocky: install from RPM Fusion)
+- No ASIO drivers or Windows dependencies
+
 ## Download
 
-Download the latest Windows x64 build from Releases.
+Download the latest builds from [Releases](https://github.com/bschlaack/Orynivo/releases).
 
-- Portable ZIP: no installation required
-- Installer: recommended for normal users
+### Windows player
+
+| Package | Description |
+| --- | --- |
+| `Orynivo-{version}-win-x64-Setup.exe` | Installer — Start Menu entry and uninstaller |
+| `Orynivo-{version}-win-x64-Portable.zip` | Portable — extract anywhere and run `Orynivo.exe` |
+
+Both packages are self-contained (.NET 8 bundled, no prerequisites).
+
+### Linux server
+
+| Package | Architecture |
+| --- | --- |
+| `orynivo-server_{version}_amd64.deb` | Debian / Ubuntu (x86-64) |
+| `orynivo-server_{version}_arm64.deb` | Debian / Ubuntu (ARM64 / Raspberry Pi) |
+| `orynivo-server-{version}-1.x86_64.rpm` | Fedora / Rocky / RHEL (x86-64) |
+| `orynivo-server-{version}-1.aarch64.rpm` | Fedora / Rocky / RHEL (ARM64) |
+
+All packages are self-contained (.NET 8 bundled). See the
+[Server section](#orynivo-server) for post-install setup.
 
 ## Build
 
@@ -276,6 +401,8 @@ Clone the repository:
 git clone https://github.com/bschlaack/Orynivo.git
 cd Orynivo
 ```
+
+### Windows player
 
 Create a debug build:
 
@@ -301,29 +428,43 @@ similarly be overridden with `-MSBuildPath` or `MSBUILD_EXE_PATH`.
 `-RequireAsio` makes a missing Steinberg SDK fail the build. `-SkipAsio`
 disables only the Steinberg bridge; `-SkipCwAsio` disables cwASIO.
 
-GitHub Actions builds cwASIO and the managed Avalonia project in Debug and
-Release. The Steinberg bridge remains excluded because its SDK is not stored in
-the repository. Release artifacts therefore include `CwAsioBridge.dll`.
+### Orynivo Server
 
-Pushing a version tag (e.g. `git tag v0.13.0 && git push origin v0.13.0`)
-triggers the separate release workflow, which publishes a self-contained
-Windows installer as a draft GitHub Release:
+The server has no native dependencies and builds on any platform:
 
-```powershell
-git tag v0.13.0
-git push origin v0.13.0
+```bash
+dotnet build Orynivo.Server/Orynivo.Server.csproj
+dotnet run --project Orynivo.Server/Orynivo.Server.csproj
 ```
 
-The workflow produces two self-contained packages (no .NET prerequisite):
+To publish a self-contained binary for a specific platform:
 
-- `Orynivo-0.13.0-win-x64-Setup.exe` — installer with Start Menu entry
-  and uninstaller
-- `Orynivo-0.13.0-win-x64-Portable.zip` — extract anywhere and run
-  `Orynivo.exe`; library data is always stored in `%LOCALAPPDATA%\Orynivo\`
+```bash
+# Linux x64
+dotnet publish Orynivo.Server/Orynivo.Server.csproj \
+  --runtime linux-x64 --self-contained true --output out/linux-x64
 
-The release is created as a draft so you can review and publish it manually.
-To trigger a release build without a tag, use the **Release** workflow's
-manual dispatch in the Actions tab.
+# Linux ARM64
+dotnet publish Orynivo.Server/Orynivo.Server.csproj \
+  --runtime linux-arm64 --self-contained true --output out/linux-arm64
+```
+
+### Release builds (GitHub Actions)
+
+Pushing a version tag triggers two parallel release workflows:
+
+```powershell
+git tag v0.14.0
+git push origin v0.14.0
+```
+
+| Workflow | Runner | Output |
+| --- | --- | --- |
+| `release.yml` | Windows | `Orynivo-{v}-win-x64-Setup.exe`, `Orynivo-{v}-win-x64-Portable.zip` |
+| `server-release.yml` | Ubuntu | `amd64`/`arm64` `.deb` and `x86_64`/`aarch64` `.rpm` packages |
+
+Both workflows upload to the same draft GitHub Release. To trigger a release
+without a tag, use **workflow dispatch** in the Actions tab.
 
 ## Run
 
@@ -361,15 +502,27 @@ Orynivo/
 ├── Native/AsioBridge/       Native C++ bridge for the Steinberg ASIO SDK
 ├── Native/CwAsioBridge/     Native C++ bridge built against cwASIO
 ├── third_party/cwasio/      Vendored cwASIO sources under the MIT License
-├── Orynivo/
+├── Orynivo.Core/            Cross-platform library (net8.0, no Windows deps)
+│   ├── Audio/               FFmpeg decoder, equalizer, ReplayGain utilities
+│   ├── Library/             SQLite database, scanner, Lucene search, models
+│   └── Streaming/           Provider-neutral streaming contracts and models
+├── Orynivo/                 Windows player (net8.0-windows, Avalonia UI)
 │   ├── Audio/               ASIO, WASAPI, PCM, and DSD playback
 │   ├── Controls/            Custom Avalonia controls
-│   ├── Library/             SQLite database, scanner, search, and artwork cache
 │   ├── Localization/        German, English, French, and Spanish resources
-│   ├── Mcp/                 Embedded MCP server, player bridge, and tool definitions
-│   ├── Streaming/           Provider-neutral catalog, playback, and credential contracts
+│   ├── Mcp/                 Embedded MCP server, player bridge, and tools
+│   ├── Streaming/           Windows credential stores and Plex client
 │   └── MainWindow.*         Main user interface and navigation
-├── build.ps1                Builds native bridges and the .NET application
+├── Orynivo.Server/          Cross-platform headless server (net8.0, ASP.NET Core)
+│   ├── Endpoints/           REST and streaming endpoint handlers
+│   ├── Middleware/          API key authentication
+│   ├── Services/            Library scan and file-system watcher service
+│   ├── Program.cs           Server entry point
+│   └── appsettings.json     Default configuration
+├── .github/
+│   ├── server-release/      systemd unit and package scripts for Linux releases
+│   └── workflows/           CI (dotnet-desktop.yml), Windows release, Server release
+├── build.ps1                Builds native bridges and the Windows .NET application
 └── Orynivo.sln              Visual Studio solution
 ```
 

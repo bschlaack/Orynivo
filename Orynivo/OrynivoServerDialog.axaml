@@ -1,0 +1,205 @@
+<Window x:Class="Orynivo.OrynivoServerDialog"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{DynamicResource L_OrynivoServerDialogTitle}"
+        Icon="avares://Orynivo/Assets/Orynivo.ico"
+        Width="600"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppSurfaceBrush}"
+        Foreground="{DynamicResource AppPrimaryTextBrush}">
+    <Window.Resources>
+        <ControlTheme x:Key="ServerDialogButtonTheme" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource AppButtonBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppButtonTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppButtonBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="5"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border x:Name="ButtonBorder"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          TextBlock.Foreground="{TemplateBinding Foreground}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+            <Style Selector="^:pointerover /template/ Border#ButtonBorder">
+                <Setter Property="Background" Value="{DynamicResource AppButtonHoverBrush}"/>
+            </Style>
+            <Style Selector="^:pressed /template/ Border#ButtonBorder">
+                <Setter Property="Background" Value="{DynamicResource AppButtonPressedBrush}"/>
+            </Style>
+            <Style Selector="^:disabled">
+                <Setter Property="Foreground" Value="{DynamicResource AppMutedTextBrush}"/>
+                <Setter Property="Opacity" Value="0.65"/>
+            </Style>
+        </ControlTheme>
+        <ControlTheme x:Key="ServerDialogPrimaryButtonTheme"
+                      TargetType="Button"
+                      BasedOn="{StaticResource ServerDialogButtonTheme}">
+            <Setter Property="Background" Value="{DynamicResource AppTransportPlayBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Style Selector="^:pointerover /template/ Border#ButtonBorder">
+                <Setter Property="Background" Value="{DynamicResource AppTransportPlayHoverBrush}"/>
+            </Style>
+            <Style Selector="^:pressed /template/ Border#ButtonBorder">
+                <Setter Property="Background" Value="{DynamicResource AppTransportPlayBrush}"/>
+            </Style>
+        </ControlTheme>
+    </Window.Resources>
+    <Grid Margin="24,20,24,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="{DynamicResource L_OrynivoServerName}"
+                   Foreground="{DynamicResource AppMutedTextBrush}"
+                   Margin="0,0,0,6"/>
+        <TextBox x:Name="NameTextBox"
+                 Grid.Row="1"
+                 Height="34"
+                 Padding="10,0"
+                 VerticalContentAlignment="Center"
+                 Background="{DynamicResource AppInputBrush}"
+                 Foreground="{DynamicResource AppPrimaryTextBrush}"
+                 BorderBrush="{DynamicResource AppInputBorderBrush}"
+                 Margin="0,0,0,14"/>
+
+        <TextBlock Grid.Row="2"
+                   Text="{DynamicResource L_OrynivoServerUrl}"
+                   Foreground="{DynamicResource AppMutedTextBrush}"
+                   Margin="0,0,0,6"/>
+        <TextBox x:Name="UrlTextBox"
+                 Grid.Row="3"
+                 Height="34"
+                 Padding="10,0"
+                 VerticalContentAlignment="Center"
+                 Background="{DynamicResource AppInputBrush}"
+                 Foreground="{DynamicResource AppPrimaryTextBrush}"
+                 BorderBrush="{DynamicResource AppInputBorderBrush}"
+                 Margin="0,0,0,14"/>
+
+        <TextBlock Grid.Row="4"
+                   Text="{DynamicResource L_OrynivoServerApiKey}"
+                   Foreground="{DynamicResource AppMutedTextBrush}"
+                   Margin="0,0,0,6"/>
+        <TextBox x:Name="ApiKeyTextBox"
+                 Grid.Row="5"
+                 Height="34"
+                 Padding="10,0"
+                 VerticalContentAlignment="Center"
+                 PasswordChar="&#x2022;"
+                 Background="{DynamicResource AppInputBrush}"
+                 Foreground="{DynamicResource AppPrimaryTextBrush}"
+                 BorderBrush="{DynamicResource AppInputBorderBrush}"
+                 Margin="0,0,0,8"/>
+
+        <TextBlock x:Name="StatusTextBlock"
+                   Grid.Row="6"
+                   MinHeight="18"
+                   Foreground="{DynamicResource AppMutedTextBrush}"
+                   TextWrapping="Wrap"
+                   Margin="0,0,0,16"/>
+
+        <TextBlock Grid.Row="7"
+                   Text="{DynamicResource L_OrynivoServerDirectories}"
+                   Foreground="{DynamicResource AppMutedTextBrush}"
+                   Margin="0,0,0,6"/>
+
+        <StackPanel Grid.Row="8"
+                    Margin="0,0,0,16">
+            <ScrollViewer MaxHeight="110"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel x:Name="ServerDirectoriesPanel"/>
+            </ScrollViewer>
+            <StackPanel Orientation="Horizontal"
+                        Margin="0,6,0,0">
+                <Button x:Name="LoadServerDirectoriesButton"
+                        Content="{DynamicResource L_OrynivoLoadServerDirectories}"
+                        Width="170"
+                        Height="30"
+                        Margin="0,0,8,0"
+                        Theme="{StaticResource ServerDialogButtonTheme}"
+                        Click="LoadServerDirectoriesButton_OnClick"/>
+                <Button x:Name="AddServerDirectoryButton"
+                        Content="{DynamicResource L_OrynivoAddServerDirectory}"
+                        Width="190"
+                        Height="30"
+                        Theme="{StaticResource ServerDialogButtonTheme}"
+                        Click="AddServerDirectoryButton_OnClick"/>
+            </StackPanel>
+        </StackPanel>
+
+        <StackPanel Grid.Row="9"
+                    Margin="0,0,0,16">
+            <Grid>
+                <TextBlock Text="{DynamicResource L_OrynivoServerScan}"
+                           Foreground="{DynamicResource AppMutedTextBrush}"
+                           VerticalAlignment="Center"/>
+                <Button x:Name="TriggerServerScanButton"
+                        Content="{DynamicResource L_OrynivoStartServerScan}"
+                        Width="130"
+                        Height="30"
+                        HorizontalAlignment="Right"
+                        Theme="{StaticResource ServerDialogButtonTheme}"
+                        Click="TriggerServerScanButton_OnClick"/>
+            </Grid>
+            <ProgressBar x:Name="ServerScanProgressBar"
+                         Height="6"
+                         Minimum="0"
+                         Maximum="100"
+                         Value="0"
+                         Margin="0,8,0,6"
+                         Foreground="{DynamicResource AppTransportPlayBrush}"
+                         Background="{DynamicResource AppInputBrush}"/>
+            <TextBlock x:Name="ServerScanStatusTextBlock"
+                       MinHeight="18"
+                       Foreground="{DynamicResource AppMutedTextBrush}"
+                       TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <Grid Grid.Row="10">
+            <Button x:Name="TestConnectionButton"
+                    Content="{DynamicResource L_OrynivoTestConnection}"
+                    Width="140"
+                    Height="34"
+                    HorizontalAlignment="Left"
+                    Theme="{StaticResource ServerDialogButtonTheme}"
+                    Click="TestConnectionButton_OnClick"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="{DynamicResource L_Cancel}"
+                        Width="90"
+                        Height="34"
+                        Margin="0,0,8,0"
+                        Theme="{StaticResource ServerDialogButtonTheme}"
+                        Click="CancelButton_OnClick"/>
+                <Button Content="{DynamicResource L_Save}"
+                        Width="90"
+                        Height="34"
+                        Theme="{StaticResource ServerDialogPrimaryButtonTheme}"
+                        Click="SaveButton_OnClick"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

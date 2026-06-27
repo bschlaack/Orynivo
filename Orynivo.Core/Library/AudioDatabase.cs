@@ -397,6 +397,20 @@ public sealed class AudioDatabase : IDisposable
     }
 
     /// <summary>
+    /// Returns the full <see cref="TrackRecord"/> for the given database identifier, or <see langword="null"/> when not found.
+    /// </summary>
+    /// <param name="id">Database track identifier.</param>
+    /// <returns>The matching <see cref="TrackRecord"/>, or <see langword="null"/>.</returns>
+    public TrackRecord? GetTrackById(long id)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = "SELECT * FROM tracks WHERE id = $id LIMIT 1;";
+        cmd.Parameters.AddWithValue("$id", id);
+        using var reader = cmd.ExecuteReader();
+        return reader.Read() ? MapRow(reader) : null;
+    }
+
+    /// <summary>
     /// Determines whether tracks below a library root need a one-time metadata refresh for ReplayGain tags.
     /// </summary>
     /// <param name="rootPath">Configured library root path.</param>

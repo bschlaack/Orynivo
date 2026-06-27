@@ -7,7 +7,7 @@ namespace Orynivo.Audio;
 /// Owns one FFmpeg PCM decoder and an initial decoded block used to prepare the
 /// next track before the current track reaches its end.
 /// </summary>
-internal sealed class FfmpegPcmDecoder : IDisposable
+public sealed class FfmpegPcmDecoder : IDisposable
 {
     private readonly Process _process;
     private byte[]? _prefetchedBytes;

@@ -4,12 +4,62 @@
 
 Windows audio player with:
 
-- Avalonia UI 11 frontend in `Orynivo/`
+- Cross-platform core library in `Orynivo.Core/`
+  (library scan, database, search, streaming models)
+- Avalonia UI 11 frontend in `Orynivo/` (Windows-only; references `Orynivo.Core`)
+- Cross-platform headless music server in `Orynivo.Server/`
+  (ASP.NET Core; references `Orynivo.Core`; exposes REST + streaming over the local network)
 - Native Steinberg ASIO bridge in `Native/AsioBridge/`
 - MIT-licensed cwASIO bridge in `Native/CwAsioBridge/`
 - PCM playback through `ffmpeg`
 - Native DSF/DFF DSD playback through ASIO
 - Real-time DSF/DFF-to-PCM conversion through `ffmpeg` for WASAPI playback
+
+## Orynivo.Core
+
+`Orynivo.Core` is a `net8.0` class library with no platform-specific dependencies.
+It holds everything needed to scan, store, index, and serve the music library:
+
+**Orynivo.Core/Library/**: `AudioDatabase`, `LibraryScanner`, `LibraryWatcherService`,
+`LibraryBackupService`, `TrackSearchIndex`, `CueSheetParser`, `M3u8PlaylistService`,
+`LyricsService`, `RadioBrowserService`, `RadioStreamMetadataService`, `PodcastService`,
+`ArtistProfileService`, `ArtistImageSearchService`, `ArtistNameNormalizer`,
+`ArtworkCache`, `MusicBrainzCoverSearch`, model records, `ArtistInfoSource` enum.
+
+**Orynivo.Core/Audio/**: `ReplayGain`, `ReplayGainMode`, `EqualizerApoParser`,
+`ParametricEqualizer`, `FfmpegPcmDecoder`, `FfmpegLocator` (cross-platform:
+auto-downloads FFmpeg on Windows; expects system-installed FFmpeg on Linux/macOS),
+`EqualizerProfile`, `EqualizerFilter`, `EqualizerFilterType`.
+
+**Orynivo.Core/Streaming/**: `IStreamingCatalog`, `IStreamingPlaybackProvider`,
+`IStreamingCredentialStore`, `StreamingModels` (all streaming model records,
+enums, `PlexServerSettings`, and `OrynivoServerSettings`), `PlexServerClient`,
+`OrynivoServerClient` (HTTP client for browsing and streaming a remote Orynivo Server
+library — provides `GetArtistsAsync`, `GetAlbumsByArtistAsync`, `GetAlbumsAsync`,
+`GetTracksByAlbumAsync`, `GetTracksAsync`, `TestConnectionAsync`, and static URL
+helpers `GetStreamUrl`/`GetAlbumArtworkUrl`).
+
+**Access control:** `InternalsVisibleTo("Orynivo")` is set in `AssemblyInfo.cs`
+so the Orynivo Windows app can access internal Core members (audio-processing
+internals). `Orynivo.Server` does **not** have this grant and uses only the
+public Core surface.
+
+`SmartPlaylistCriteria.Resolve(candidates)` evaluates stored filter criteria
+against the compact track set from `AudioDatabase.GetSmartPlaylistTracks()` and
+returns ordered, optionally limited results. Both the app and the server use
+this method so the filtering logic lives only in Core.
+
+`LibraryWatcherService(Action)` and `UpdatePaths(paths)` are public so
+`Orynivo.Server` can start watching configured library roots.
+`AudioDatabase.GetTrackById(long)` is public for track-by-ID lookup in the
+stream endpoint.
+
+Windows-only items that remain exclusively in `Orynivo/`:
+
+- `Audio/SteinbergAsioStream`, `FfmpegAudioPlayer`, `WasapiAudioPlayer`, `WasapiDeviceProvider`,
+  `DsfAudioPlayer`, `DffAudioPlayer`, `WindowsEndpointVolumeSynchronizer`
+- `WindowsMediaTransportService`, `Streaming/WindowsStreamingCredentialStore`,
+  `Streaming/WindowsPlexCredentialStore`, all Avalonia UI files
 
 ## Build and Run
 
@@ -34,6 +84,61 @@ build and publish output.
 Avalonia project in Debug and Release. It intentionally excludes only the
 Steinberg bridge because that SDK is not stored in the repository. The Release
 artifact therefore contains cwASIO support without Steinberg SDK files.
+
+## Orynivo.Server
+
+`Orynivo.Server` is a `net8.0` ASP.NET Core Minimal API server that exposes
+the local music library over the network. It references `Orynivo.Core` and has
+no Windows-specific dependencies; it runs on Windows, Linux, and macOS.
+
+**Configuration** (`appsettings.json`, section `Orynivo`):
+- `ApiKey` — pre-shared key required in every request (`X-Api-Key` header or
+  `?key=` query param; query param enables direct use in FFmpeg URLs)
+- `LibraryPaths` — list of root directories to scan
+- `ScanOnStartup` — run a full scan when the server starts (default `true`)
+- `ServerName` — display name returned by `/api/info`
+- Default bind: `http://0.0.0.0:5280`
+
+**Key files:**
+- `Orynivo.Server/Program.cs`: builds and starts the server; calls
+  `FfmpegLocator.EnsureAvailableAsync()`, registers `LibraryWatcherService`
+  and the `LibraryService` hosted service, maps all endpoints including
+  remote configuration and directory browsing
+- `Orynivo.Server/ServerSettings.cs`: configuration POCO bound from the
+  `Orynivo` config section
+- `Orynivo.Server/Middleware/ApiKeyMiddleware.cs`: skips `/api/health`,
+  validates `X-Api-Key` header or `?key=` query param, returns 401 JSON
+- `Orynivo.Server/Services/LibraryService.cs`: `IHostedService` that calls
+  `LibraryWatcherService.UpdatePaths` on start and runs full scans via the
+  static `LibraryScanner.ScanAsync`; exposes `TriggerScan()` for manual
+  trigger and `ScanStatus` with current root, processed/total counts, current
+  file, last result, and errors
+- `Orynivo.Server/Endpoints/LibraryEndpoints.cs`: artists, albums, tracks,
+  playlists (smart playlists resolved via `SmartPlaylistCriteria.Resolve`),
+  and Lucene search endpoints
+- `Orynivo.Server/Endpoints/StreamEndpoints.cs`: byte-range streaming for
+  regular audio files; on-the-fly FLAC transcode via FFmpeg pipe for CUE
+  virtual tracks; album and track artwork endpoints
+- `Orynivo.Server/Endpoints/ConfigurationEndpoints.cs`: authenticated
+  `/api/settings/library-paths` GET/PUT and `/api/files/directories?path=`
+  endpoints; PUT persists `Orynivo:LibraryPaths` to `appsettings.json`,
+  refreshes `LibraryWatcherService`, and starts a scan
+
+**Build:**
+```
+dotnet build Orynivo.Server/Orynivo.Server.csproj
+dotnet run --project Orynivo.Server/Orynivo.Server.csproj
+```
+
+**Linux packages** — `.github/workflows/server-release.yml` (triggered on the
+same `v*` tags as the Windows release) builds self-contained binaries for
+`linux-x64` and `linux-arm64` and publishes four packages to the draft
+GitHub Release: `amd64`/`arm64` DEB and `x86_64`/`aarch64` RPM.
+Support files live in `.github/server-release/` (systemd unit, postinst/prerm
+scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
+`/usr/bin/orynivo-server` symlink, ship a default config at
+`/etc/orynivo-server/appsettings.json`, and register
+`orynivo-server.service` running as the `orynivo-server` system user.
 
 ## Important Architecture
 
@@ -159,6 +264,10 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - `Orynivo/Streaming/QobuzStreamingProvider.cs`: inactive Qobuz scaffold; do not add unofficial endpoints, enable it only with approved partner API documentation
 - `Orynivo/Streaming/WindowsStreamingCredentialStore.cs`: stores future provider secrets and tokens in `%LOCALAPPDATA%\Orynivo\streaming-credentials.dat` using Windows DPAPI for the current user
 - `Orynivo/Streaming/PlexServerClient.cs`: queries configured Plex Media Servers, exposes only music library sections (`type=artist`), pages artists/albums/tracks, resolves drill-down children, browses folders lazily, and builds authenticated direct-part URLs
+- `Orynivo.Core/Streaming/OrynivoServerClient.cs`: HTTP client for a remote Orynivo Server; methods load artists, albums by artist, albums, tracks by album, all tracks, server library paths, server directory listings, and scan status; `SetLibraryPathsAsync` replaces the remote server's configured library roots; `TriggerScanAsync` starts a remote scan; `GetStreamUrl` and `GetAlbumArtworkUrl` are pure URL builders that include `?key=` so the URLs can be passed directly to FFmpeg or Avalonia's image loader
+- `Orynivo/OrynivoServerDialog.axaml/.cs`: themed dialog for adding or editing a remote Orynivo Server (name, URL, API key, Test Connection); it can load, add, remove, and save the remote server's music directories through the server API, start a remote scan, and show live scan progress; returned server record is stored in `AppSettings.OrynivoServers`
+- `Orynivo/RemoteDirectoryBrowserDialog.axaml/.cs`: browses the remote server filesystem through `/api/files/directories?path=` and returns a server-side directory path for `OrynivoServerDialog`
+- `AppSettings.OrynivoServers` stores configured remote server connections; `ShowOrynivoServerSection` and `IsOrynivoServerSectionExpanded` control sidebar visibility and expansion state; API keys are stored in `settings.json` (same policy as AI chat key)
 - `Orynivo/Streaming/WindowsPlexCredentialStore.cs`: stores per-server Plex access tokens in `%LOCALAPPDATA%\Orynivo\plex-credentials.dat` using Windows DPAPI for the current user
 - `AppSettings.PlexServers` stores Plex server IDs, display names, and base URLs; Plex tokens must not be added to `settings.json`
 - `AppSettings.QobuzApplicationId` stores only the non-secret Qobuz application identifier; client secrets and tokens must not be added to `settings.json`
@@ -168,7 +277,8 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 - `AppSettings.Volume` and `AppSettings.LastTrackPath` preserve volume and the last selected or played track; restoration requires both the file and database entry to exist
 - `AppSettings.PlaybackQueuePaths` and `PlaybackQueueIndex` preserve the editable
   **Up next** queue across restarts. Local paths and non-credential HTTP/HTTPS
-  URLs may be stored; Plex-token and user-info URLs must never be persisted.
+  URLs may be stored; Plex-token, Orynivo Server `?key=`, and user-info URLs
+  must never be persisted.
 - `AppSettings.OutputProfiles` persists all named output profiles;
   `SelectedOutputProfileName` identifies the active one.
   `SettingsStore.NormalizeOutputProfiles` migrates a previously configured

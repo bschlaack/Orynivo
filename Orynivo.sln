@@ -9,6 +9,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Native", "Native", "{2F2BA0
 EndProject
 Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "AsioBridge", "Native\AsioBridge\AsioBridge.vcxproj", "{0E34C595-0B68-4E07-B221-C742A893C2A8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orynivo.Core", "Orynivo.Core\Orynivo.Core.csproj", "{7A36F0DB-1C50-4631-B33A-8578856A3AAB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orynivo.Server", "Orynivo.Server\Orynivo.Server.csproj", "{88F4262E-1CDE-4160-AC29-425C6B9D7D5A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -39,11 +43,35 @@ Global
 		{0E34C595-0B68-4E07-B221-C742A893C2A8}.Release|x64.ActiveCfg = Release|x64
 		{0E34C595-0B68-4E07-B221-C742A893C2A8}.Release|x64.Build.0 = Release|x64
 		{0E34C595-0B68-4E07-B221-C742A893C2A8}.Release|x86.ActiveCfg = Release|x64
-	EndGlobalSection
-	GlobalSection(NestedProjects) = preSolution
-		{0E34C595-0B68-4E07-B221-C742A893C2A8} = {2F2BA0B1-8447-348E-8DA4-622F0257D38B}
+		{7A36F0DB-1C50-4631-B33A-8578856A3AAB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7A36F0DB-1C50-4631-B33A-8578856A3AAB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7A36F0DB-1C50-4631-B33A-8578856A3AAB}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{7A36F0DB-1C50-4631-B33A-8578856A3AAB}.Debug|x64.Build.0 = Debug|Any CPU
+		{7A36F0DB-1C50-4631-B33A-8578856A3AAB}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{7A36F0DB-1C50-4631-B33A-8578856A3AAB}.Debug|x86.Build.0 = Debug|Any CPU
+		{7A36F0DB-1C50-4631-B33A-8578856A3AAB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7A36F0DB-1C50-4631-B33A-8578856A3AAB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7A36F0DB-1C50-4631-B33A-8578856A3AAB}.Release|x64.ActiveCfg = Release|Any CPU
+		{7A36F0DB-1C50-4631-B33A-8578856A3AAB}.Release|x64.Build.0 = Release|Any CPU
+		{7A36F0DB-1C50-4631-B33A-8578856A3AAB}.Release|x86.ActiveCfg = Release|Any CPU
+		{7A36F0DB-1C50-4631-B33A-8578856A3AAB}.Release|x86.Build.0 = Release|Any CPU
+		{88F4262E-1CDE-4160-AC29-425C6B9D7D5A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{88F4262E-1CDE-4160-AC29-425C6B9D7D5A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{88F4262E-1CDE-4160-AC29-425C6B9D7D5A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{88F4262E-1CDE-4160-AC29-425C6B9D7D5A}.Debug|x64.Build.0 = Debug|Any CPU
+		{88F4262E-1CDE-4160-AC29-425C6B9D7D5A}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{88F4262E-1CDE-4160-AC29-425C6B9D7D5A}.Debug|x86.Build.0 = Debug|Any CPU
+		{88F4262E-1CDE-4160-AC29-425C6B9D7D5A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{88F4262E-1CDE-4160-AC29-425C6B9D7D5A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{88F4262E-1CDE-4160-AC29-425C6B9D7D5A}.Release|x64.ActiveCfg = Release|Any CPU
+		{88F4262E-1CDE-4160-AC29-425C6B9D7D5A}.Release|x64.Build.0 = Release|Any CPU
+		{88F4262E-1CDE-4160-AC29-425C6B9D7D5A}.Release|x86.ActiveCfg = Release|Any CPU
+		{88F4262E-1CDE-4160-AC29-425C6B9D7D5A}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{0E34C595-0B68-4E07-B221-C742A893C2A8} = {2F2BA0B1-8447-348E-8DA4-622F0257D38B}
 	EndGlobalSection
 EndGlobal

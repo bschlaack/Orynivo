@@ -1,5 +1,7 @@
 using Orynivo.AI;
 using Orynivo.Audio;
+using Orynivo.Library;
+using Orynivo.Streaming;
 
 namespace Orynivo;
 
@@ -70,6 +72,8 @@ public sealed class AppSettings
     public string QobuzApplicationId { get; set; } = string.Empty;
     /// <summary>Gets or sets the configured Plex Media Servers.</summary>
     public List<PlexServerSettings> PlexServers { get; set; } = [];
+    /// <summary>Gets or sets the configured remote Orynivo Server instances.</summary>
+    public List<OrynivoServerSettings> OrynivoServers { get; set; } = [];
     /// <summary>Gets or sets a value indicating whether the MCP server is enabled.</summary>
     public bool McpServerEnabled { get; set; }
     /// <summary>Gets or sets the TCP port the MCP server listens on.</summary>
@@ -90,6 +94,8 @@ public sealed class AppSettings
     public bool ShowMyPodcastsSection { get; set; } = true;
     /// <summary>Gets or sets a value indicating whether the Plex sidebar section is visible.</summary>
     public bool ShowPlexSection { get; set; } = true;
+    /// <summary>Gets or sets a value indicating whether the Orynivo Server sidebar section is visible.</summary>
+    public bool ShowOrynivoServerSection { get; set; } = true;
     /// <summary>Gets or sets a value indicating whether the Playlists sidebar section is visible.</summary>
     public bool ShowPlaylistsSection { get; set; } = true;
     /// <summary>Gets or sets a value indicating whether the Local Library section is expanded.</summary>
@@ -100,21 +106,12 @@ public sealed class AppSettings
     public bool IsMyPodcastsSectionExpanded { get; set; }
     /// <summary>Gets or sets a value indicating whether the Plex section is expanded.</summary>
     public bool IsPlexSectionExpanded { get; set; }
+    /// <summary>Gets or sets a value indicating whether the Orynivo Server section is expanded.</summary>
+    public bool IsOrynivoServerSectionExpanded { get; set; }
     /// <summary>Gets or sets a value indicating whether the Playlists section is expanded.</summary>
     public bool IsPlaylistsSectionExpanded { get; set; }
     /// <summary>Gets or sets the embedded AI chat configuration.</summary>
     public AiChatSettings AiChat { get; set; } = new();
-}
-
-/// <summary>Connection settings for a single Plex Media Server entry.</summary>
-public sealed class PlexServerSettings
-{
-    /// <summary>Gets or sets the unique server identifier (GUID, no dashes).</summary>
-    public string Id { get; set; } = Guid.NewGuid().ToString("N");
-    /// <summary>Gets or sets the user-chosen display name for this server.</summary>
-    public string Name { get; set; } = string.Empty;
-    /// <summary>Gets or sets the base URL of the Plex server (e.g. <c>http://192.168.1.10:32400</c>).</summary>
-    public string BaseUrl { get; set; } = string.Empty;
 }
 
 /// <summary>Application colour theme.</summary>
@@ -124,13 +121,4 @@ public enum AppTheme
     Light,
     /// <summary>Dark colour scheme.</summary>
     Dark
-}
-
-/// <summary>Data source for artist biography text.</summary>
-public enum ArtistInfoSource
-{
-    /// <summary>Fetch artist biography from Wikipedia.</summary>
-    Wikipedia,
-    /// <summary>Fetch artist biography from Last.fm (requires an API key).</summary>
-    LastFm
 }

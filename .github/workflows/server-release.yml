@@ -1,0 +1,169 @@
+name: Server Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number without v prefix (e.g. 0.14.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.rid }} packages
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: linux-x64
+            deb_arch: amd64
+            rpm_arch: x86_64
+          - rid: linux-arm64
+            deb_arch: arm64
+            rpm_arch: aarch64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            TAG="v${VERSION}"
+          else
+            TAG="${{ github.ref_name }}"
+            VERSION="${TAG#v}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}"         >> "$GITHUB_OUTPUT"
+          echo "Building version ${VERSION} (tag ${TAG})"
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore Orynivo.Server/Orynivo.Server.csproj --runtime ${{ matrix.rid }}
+
+      - name: Publish Orynivo.Server (${{ matrix.rid }})
+        run: >
+          dotnet publish Orynivo.Server/Orynivo.Server.csproj
+          --configuration Release
+          --runtime ${{ matrix.rid }}
+          --self-contained true
+          --no-restore
+          --output publish/${{ matrix.rid }}
+          /p:AssemblyVersion=${{ steps.ver.outputs.version }}.0
+          /p:FileVersion=${{ steps.ver.outputs.version }}.0
+          /p:InformationalVersion=${{ steps.ver.outputs.version }}
+
+      - name: Prepare staging directory
+        run: |
+          STAGE="stage/${{ matrix.rid }}"
+          PUB="publish/${{ matrix.rid }}"
+
+          mkdir -p "${STAGE}/usr/lib/orynivo-server"
+          mkdir -p "${STAGE}/usr/bin"
+          mkdir -p "${STAGE}/etc/orynivo-server"
+          mkdir -p "${STAGE}/lib/systemd/system"
+
+          # Copy published server binaries and runtime
+          cp -r "${PUB}/." "${STAGE}/usr/lib/orynivo-server/"
+          chmod 755 "${STAGE}/usr/lib/orynivo-server/Orynivo.Server"
+
+          # Convenience symlink on PATH
+          ln -sf /usr/lib/orynivo-server/Orynivo.Server \
+              "${STAGE}/usr/bin/orynivo-server"
+
+          # Default configuration — users must set ApiKey and LibraryPaths
+          cp Orynivo.Server/appsettings.json \
+              "${STAGE}/etc/orynivo-server/appsettings.json"
+
+          # systemd unit
+          cp .github/server-release/orynivo-server.service \
+              "${STAGE}/lib/systemd/system/orynivo-server.service"
+
+      - name: Install fpm
+        run: sudo gem install fpm --no-document
+
+      # ---- Debian / Ubuntu (.deb) ----------------------------------------
+
+      - name: Create DEB package
+        run: |
+          VERSION="${{ steps.ver.outputs.version }}"
+          STAGE="stage/${{ matrix.rid }}"
+
+          chmod +x .github/server-release/postinst.sh \
+                   .github/server-release/prerm.sh
+          mkdir -p packages
+
+          DEB_DESC="Orynivo headless music server — scans a local library and exposes it over the network via REST and HTTP audio streaming. Edit /etc/orynivo-server/appsettings.json (set ApiKey and LibraryPaths), then: systemctl enable --now orynivo-server. Requires ffmpeg for CUE-sheet track transcoding."
+
+          fpm \
+            --input-type dir \
+            --output-type deb \
+            --name orynivo-server \
+            --version "${VERSION}" \
+            --architecture "${{ matrix.deb_arch }}" \
+            --description "${DEB_DESC}" \
+            --url "https://github.com/bschlaack/Orynivo" \
+            --vendor "Björn Schlaack" \
+            --maintainer "Björn Schlaack <bschlaack@gmail.com>" \
+            --license MIT \
+            --category sound \
+            --after-install .github/server-release/postinst.sh \
+            --before-remove .github/server-release/prerm.sh \
+            --config-files /etc/orynivo-server/appsettings.json \
+            --deb-recommends ffmpeg \
+            --package "packages/orynivo-server_${VERSION}_${{ matrix.deb_arch }}.deb" \
+            --chdir "${STAGE}" \
+            .
+
+      # ---- Red Hat / Fedora / Rocky (.rpm) -------------------------------
+
+      - name: Create RPM package
+        run: |
+          VERSION="${{ steps.ver.outputs.version }}"
+          STAGE="stage/${{ matrix.rid }}"
+
+          chmod +x .github/server-release/rpm-postinst.sh \
+                   .github/server-release/rpm-preun.sh
+
+          RPM_DESC="Orynivo headless music server. Scans a local library and exposes it over the network via REST and HTTP audio streaming. Edit /etc/orynivo-server/appsettings.json (set ApiKey and LibraryPaths), then: systemctl enable --now orynivo-server. ffmpeg (e.g. from RPM Fusion) is required for CUE-sheet track transcoding."
+
+          fpm \
+            --input-type dir \
+            --output-type rpm \
+            --name orynivo-server \
+            --version "${VERSION}" \
+            --architecture "${{ matrix.rpm_arch }}" \
+            --description "${RPM_DESC}" \
+            --url "https://github.com/bschlaack/Orynivo" \
+            --vendor "Björn Schlaack" \
+            --license MIT \
+            --after-install .github/server-release/rpm-postinst.sh \
+            --before-remove .github/server-release/rpm-preun.sh \
+            --config-files /etc/orynivo-server/appsettings.json \
+            --rpm-summary "Orynivo headless music server" \
+            --package "packages/orynivo-server-${VERSION}-1.${{ matrix.rpm_arch }}.rpm" \
+            --chdir "${STAGE}" \
+            .
+
+      # ---- Upload to GitHub Release (draft) ------------------------------
+
+      - name: Upload packages to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          draft: true
+          files: packages/*

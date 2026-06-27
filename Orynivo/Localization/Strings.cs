@@ -444,6 +444,7 @@ public sealed record LocalizedStrings(
     public string PodcastEpisodeDuration { get; init; } = "";
     public string PodcastDescriptionUnavailable { get; init; } = "";
     public string PlexServers { get; init; } = "";
+    public string PlexServersSettings { get; init; } = "";
     public string PlexServersHint { get; init; } = "";
     public string AddPlexServer { get; init; } = "";
     public string PlexServerDialogTitle { get; init; } = "";
@@ -460,6 +461,88 @@ public sealed record LocalizedStrings(
     public string PlexRemoveServer { get; init; } = "";
     public string PlexNoAudioLibraries { get; init; } = "";
     public string PlexLoading { get; init; } = "";
+    /// <summary>Gets the Orynivo Server sidebar section header label.</summary>
+    public string OrynivoServers { get; init; } = "";
+    /// <summary>Gets the Settings label for configured Orynivo Server connections.</summary>
+    public string OrynivoServersSettings { get; init; } = "";
+    /// <summary>Gets the hint text below the Orynivo Server section header in Settings.</summary>
+    public string OrynivoServersHint { get; init; } = "";
+    /// <summary>Gets the label for the Add Orynivo Server button.</summary>
+    public string AddOrynivoServer { get; init; } = "";
+    /// <summary>Gets the title for the Add/Edit Orynivo Server dialog.</summary>
+    public string OrynivoServerDialogTitle { get; init; } = "";
+    /// <summary>Gets the name field label in the Orynivo Server dialog.</summary>
+    public string OrynivoServerName { get; init; } = "";
+    /// <summary>Gets the URL field label in the Orynivo Server dialog.</summary>
+    public string OrynivoServerUrl { get; init; } = "";
+    /// <summary>Gets the API key field label in the Orynivo Server dialog.</summary>
+    public string OrynivoServerApiKey { get; init; } = "";
+    /// <summary>Gets the Test Connection button label in the Orynivo Server dialog.</summary>
+    public string OrynivoTestConnection { get; init; } = "";
+    /// <summary>Gets the testing-in-progress message in the Orynivo Server dialog.</summary>
+    public string OrynivoTestingConnection { get; init; } = "";
+    /// <summary>Gets the success message shown after a successful connection test.</summary>
+    public string OrynivoConnectionSuccessful { get; init; } = "";
+    /// <summary>Gets the failure message shown after a failed connection test.</summary>
+    public string OrynivoConnectionFailed { get; init; } = "";
+    /// <summary>Gets the validation message shown when required fields are empty.</summary>
+    public string OrynivoServerFieldsRequired { get; init; } = "";
+    /// <summary>Gets the Edit button label for Orynivo Server rows in Settings.</summary>
+    public string OrynivoEditServer { get; init; } = "";
+    /// <summary>Gets the Remove button label for Orynivo Server rows in Settings.</summary>
+    public string OrynivoRemoveServer { get; init; } = "";
+    /// <summary>Gets the loading status message while an Orynivo Server view loads.</summary>
+    public string OrynivoLoading { get; init; } = "";
+    /// <summary>Gets the heading for remote server library directories.</summary>
+    public string OrynivoServerDirectories { get; init; } = "";
+    /// <summary>Gets the command label for loading remote server library directories.</summary>
+    public string OrynivoLoadServerDirectories { get; init; } = "";
+    /// <summary>Gets the command label for adding a remote server library directory.</summary>
+    public string OrynivoAddServerDirectory { get; init; } = "";
+    /// <summary>Gets the message shown while remote server library directories are loading.</summary>
+    public string OrynivoLoadingServerDirectories { get; init; } = "";
+    /// <summary>Gets the message shown after remote server library directories loaded.</summary>
+    public string OrynivoServerDirectoriesLoaded { get; init; } = "";
+    /// <summary>Gets the message shown when remote server library directories cannot be loaded.</summary>
+    public string OrynivoServerDirectoriesLoadFailed { get; init; } = "";
+    /// <summary>Gets the message shown while remote server library directories are saving.</summary>
+    public string OrynivoSavingServerDirectories { get; init; } = "";
+    /// <summary>Gets the message shown when remote server library directories cannot be saved.</summary>
+    public string OrynivoServerDirectoriesSaveFailed { get; init; } = "";
+    /// <summary>Gets the empty-state text for remote server library directories.</summary>
+    public string OrynivoNoServerDirectories { get; init; } = "";
+    /// <summary>Gets the remote server directory browser window title.</summary>
+    public string OrynivoServerDirectoryBrowserTitle { get; init; } = "";
+    /// <summary>Gets the remote directory browser root-list label.</summary>
+    public string OrynivoServerDirectoryRoots { get; init; } = "";
+    /// <summary>Gets the remote directory browser parent-directory command label.</summary>
+    public string OrynivoServerDirectoryUp { get; init; } = "";
+    /// <summary>Gets the remote directory browser select command label.</summary>
+    public string OrynivoSelectServerDirectory { get; init; } = "";
+    /// <summary>Gets the message shown while a remote directory is loading.</summary>
+    public string OrynivoServerDirectoryLoading { get; init; } = "";
+    /// <summary>Gets the message shown when a remote directory cannot be loaded.</summary>
+    public string OrynivoServerDirectoryLoadFailed { get; init; } = "";
+    /// <summary>Gets the message shown when a remote directory has no subdirectories.</summary>
+    public string OrynivoServerDirectoryEmpty { get; init; } = "";
+    /// <summary>Gets the remote server scan section label.</summary>
+    public string OrynivoServerScan { get; init; } = "";
+    /// <summary>Gets the command label for starting a remote server scan.</summary>
+    public string OrynivoStartServerScan { get; init; } = "";
+    /// <summary>Gets the message shown while a remote server scan is starting.</summary>
+    public string OrynivoServerScanStarting { get; init; } = "";
+    /// <summary>Gets the message shown when a remote server scan cannot be started.</summary>
+    public string OrynivoServerScanStartFailed { get; init; } = "";
+    /// <summary>Gets the idle remote server scan message.</summary>
+    public string OrynivoServerScanIdle { get; init; } = "";
+    /// <summary>Gets the remote server scan discovery message.</summary>
+    public string OrynivoServerScanDiscovering { get; init; } = "";
+    /// <summary>Gets the remote server scan progress format.</summary>
+    public string OrynivoServerScanProgress { get; init; } = "";
+    /// <summary>Gets the remote server scan completed format.</summary>
+    public string OrynivoServerScanCompleted { get; init; } = "";
+    /// <summary>Gets the remote server scan failure format.</summary>
+    public string OrynivoServerScanFailed { get; init; } = "";
     public string LoadMore { get; init; } = "";
     public string FfmpegDownloading { get; init; } = "";
     public string FfmpegDownloadFailed { get; init; } = "";
