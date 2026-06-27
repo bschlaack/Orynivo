@@ -4,6 +4,59 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- **Orynivo.Core** — extracted the cross-platform library layer from the
+  Windows player into a standalone `net8.0` class library.  `Orynivo.Core`
+  contains `AudioDatabase`, `LibraryScanner`, `LibraryWatcherService`,
+  `TrackSearchIndex`, `FfmpegLocator` (cross-platform; auto-downloads FFmpeg
+  on Windows, expects system FFmpeg on Linux/macOS), `FfmpegPcmDecoder`,
+  `ParametricEqualizer`, `EqualizerProfile`, `SmartPlaylistCriteria` (now
+  includes a `Resolve()` method that applies filtering and ordering without
+  UI code), and all library model records. The existing Orynivo Windows
+  player references `Orynivo.Core` and retains `InternalsVisibleTo` access
+  for audio-processing internals.
+- **Orynivo.Server** — new cross-platform headless music server
+  (`net8.0`, ASP.NET Core Minimal API) that exposes the local library over
+  the network via a REST API secured with a pre-shared API key
+  (`X-Api-Key` header or `?key=` query parameter):
+  - `GET /api/health` — unauthenticated status check
+  - `GET /api/info` — server name, version, and library paths
+  - `POST /api/scan` / `GET /api/scan` — trigger or monitor a library scan
+  - `GET /api/artists`, `/api/artists/{id}/albums`
+  - `GET /api/albums`, `/api/albums/{id}/tracks`
+  - `GET /api/tracks`, `/api/tracks/{id}`
+  - `GET /api/playlists`, `/api/playlists/{id}/tracks`
+    (smart playlists are resolved live against stored criteria)
+  - `GET /api/search?q=`, `/api/search/full?q=`
+    (full-text Lucene search across tracks, albums, and artists)
+  - `GET /api/stream/{trackId}` — byte-range HTTP streaming for regular
+    audio files; on-the-fly FLAC transcode via FFmpeg for CUE virtual tracks
+  - `GET /api/stream/path?p=` — stream by absolute file path
+  - `GET /api/artwork/album/{albumId}?size=` — serve album artwork
+  - `GET /api/artwork/track?p=` — serve track artwork by file path
+  - Configured via `appsettings.json` (`Orynivo:ApiKey`,
+    `Orynivo:LibraryPaths`, `Orynivo:ScanOnStartup`, `Orynivo:ServerName`)
+  - Binds to `http://0.0.0.0:5280` by default
+- **Linux server packages** — pushing a version tag also triggers
+  `.github/workflows/server-release.yml`, which builds self-contained
+  `Orynivo.Server` binaries for `linux-x64` and `linux-arm64` and adds four
+  packages to the same draft GitHub Release:
+  `orynivo-server_{version}_amd64.deb`,
+  `orynivo-server_{version}_arm64.deb`,
+  `orynivo-server-{version}-1.x86_64.rpm`,
+  `orynivo-server-{version}-1.aarch64.rpm`.
+  Each package installs to `/usr/lib/orynivo-server/`, places a
+  `/usr/bin/orynivo-server` symlink, ships a default config at
+  `/etc/orynivo-server/appsettings.json` (marked as a conffile so
+  upgrades do not overwrite user edits), and registers a systemd unit
+  `orynivo-server.service` running as a dedicated `orynivo-server` system
+  user. No .NET runtime is required on the target machine.
+
+### Fixed
+
 ## [0.14.0] - 2026-06-26
 
 ### Added

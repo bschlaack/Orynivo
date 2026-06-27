@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>Orynivo.Core</AssemblyName>
+    <RootNamespace>Orynivo</RootNamespace>
+    <Product>Orynivo.Core</Product>
+    <Authors>Björn Schlaack</Authors>
+    <Copyright>Copyright © 2026 Björn Schlaack</Copyright>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/bschlaack/Orynivo</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Lucene.Net"                  Version="4.8.0-beta00017" />
+    <PackageReference Include="Lucene.Net.Analysis.Common"  Version="4.8.0-beta00017" />
+    <PackageReference Include="Lucene.Net.QueryParser"      Version="4.8.0-beta00017" />
+    <PackageReference Include="Microsoft.Data.Sqlite"       Version="9.0.5" />
+    <PackageReference Include="SkiaSharp"                   Version="2.88.9" />
+    <PackageReference Include="TagLibSharp"                 Version="2.3.0" />
+  </ItemGroup>
+
+</Project>

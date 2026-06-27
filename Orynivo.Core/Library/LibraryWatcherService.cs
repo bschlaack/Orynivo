@@ -6,7 +6,7 @@ namespace Orynivo.Library;
 /// <summary>
 /// Watches configured library roots, debounces file-system events, and runs periodic full reconciliation scans.
 /// </summary>
-internal sealed class LibraryWatcherService : IDisposable
+public sealed class LibraryWatcherService : IDisposable
 {
     private static readonly TimeSpan DebounceDelay = TimeSpan.FromMilliseconds(900);
     private static readonly TimeSpan InitialFullScanDelay = TimeSpan.FromMinutes(10);
@@ -26,7 +26,7 @@ internal sealed class LibraryWatcherService : IDisposable
     /// Initializes the watcher service.
     /// </summary>
     /// <param name="libraryChanged">Callback invoked after database or index content changes.</param>
-    internal LibraryWatcherService(Action libraryChanged)
+    public LibraryWatcherService(Action libraryChanged)
     {
         _libraryChanged = libraryChanged;
         _fullScanTimer = new Timer(
@@ -40,7 +40,7 @@ internal sealed class LibraryWatcherService : IDisposable
     /// Replaces the watched root set with the supplied configured library paths.
     /// </summary>
     /// <param name="paths">Configured library root paths.</param>
-    internal void UpdatePaths(IEnumerable<string> paths)
+    public void UpdatePaths(IEnumerable<string> paths)
     {
         var normalized = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var path in paths.Where(path => !string.IsNullOrWhiteSpace(path)))

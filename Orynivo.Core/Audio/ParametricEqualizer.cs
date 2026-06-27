@@ -4,7 +4,7 @@ namespace Orynivo.Audio;
 /// Applies a stereo parametric equalizer and crossfades profile changes to
 /// avoid discontinuities during PCM playback.
 /// </summary>
-internal sealed class ParametricEqualizer
+public sealed class ParametricEqualizer
 {
     private const int TransitionMilliseconds = 50;
     private readonly int _sampleRate;

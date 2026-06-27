@@ -4,12 +4,58 @@
 
 Windows audio player with:
 
-- Avalonia UI 11 frontend in `Orynivo/`
+- Cross-platform core library in `Orynivo.Core/`
+  (library scan, database, search, streaming models)
+- Avalonia UI 11 frontend in `Orynivo/` (Windows-only; references `Orynivo.Core`)
+- Cross-platform headless music server in `Orynivo.Server/`
+  (ASP.NET Core; references `Orynivo.Core`; exposes REST + streaming over the local network)
 - Native Steinberg ASIO bridge in `Native/AsioBridge/`
 - MIT-licensed cwASIO bridge in `Native/CwAsioBridge/`
 - PCM playback through `ffmpeg`
 - Native DSF/DFF DSD playback through ASIO
 - Real-time DSF/DFF-to-PCM conversion through `ffmpeg` for WASAPI playback
+
+## Orynivo.Core
+
+`Orynivo.Core` is a `net8.0` class library with no platform-specific dependencies.
+It holds everything needed to scan, store, index, and serve the music library:
+
+**Orynivo.Core/Library/**: `AudioDatabase`, `LibraryScanner`, `LibraryWatcherService`,
+`LibraryBackupService`, `TrackSearchIndex`, `CueSheetParser`, `M3u8PlaylistService`,
+`LyricsService`, `RadioBrowserService`, `RadioStreamMetadataService`, `PodcastService`,
+`ArtistProfileService`, `ArtistImageSearchService`, `ArtistNameNormalizer`,
+`ArtworkCache`, `MusicBrainzCoverSearch`, model records, `ArtistInfoSource` enum.
+
+**Orynivo.Core/Audio/**: `ReplayGain`, `ReplayGainMode`, `EqualizerApoParser`,
+`ParametricEqualizer`, `FfmpegPcmDecoder`, `FfmpegLocator` (cross-platform:
+auto-downloads FFmpeg on Windows; expects system-installed FFmpeg on Linux/macOS),
+`EqualizerProfile`, `EqualizerFilter`, `EqualizerFilterType`.
+
+**Orynivo.Core/Streaming/**: `IStreamingCatalog`, `IStreamingPlaybackProvider`,
+`IStreamingCredentialStore`, `StreamingModels` (all streaming model records,
+enums, and `PlexServerSettings`), `PlexServerClient`.
+
+**Access control:** `InternalsVisibleTo("Orynivo")` is set in `AssemblyInfo.cs`
+so the Orynivo Windows app can access internal Core members (audio-processing
+internals). `Orynivo.Server` does **not** have this grant and uses only the
+public Core surface.
+
+`SmartPlaylistCriteria.Resolve(candidates)` evaluates stored filter criteria
+against the compact track set from `AudioDatabase.GetSmartPlaylistTracks()` and
+returns ordered, optionally limited results. Both the app and the server use
+this method so the filtering logic lives only in Core.
+
+`LibraryWatcherService(Action)` and `UpdatePaths(paths)` are public so
+`Orynivo.Server` can start watching configured library roots.
+`AudioDatabase.GetTrackById(long)` is public for track-by-ID lookup in the
+stream endpoint.
+
+Windows-only items that remain exclusively in `Orynivo/`:
+
+- `Audio/SteinbergAsioStream`, `FfmpegAudioPlayer`, `WasapiAudioPlayer`, `WasapiDeviceProvider`,
+  `DsfAudioPlayer`, `DffAudioPlayer`, `WindowsEndpointVolumeSynchronizer`
+- `WindowsMediaTransportService`, `Streaming/WindowsStreamingCredentialStore`,
+  `Streaming/WindowsPlexCredentialStore`, all Avalonia UI files
 
 ## Build and Run
 
@@ -34,6 +80,55 @@ build and publish output.
 Avalonia project in Debug and Release. It intentionally excludes only the
 Steinberg bridge because that SDK is not stored in the repository. The Release
 artifact therefore contains cwASIO support without Steinberg SDK files.
+
+## Orynivo.Server
+
+`Orynivo.Server` is a `net8.0` ASP.NET Core Minimal API server that exposes
+the local music library over the network. It references `Orynivo.Core` and has
+no Windows-specific dependencies; it runs on Windows, Linux, and macOS.
+
+**Configuration** (`appsettings.json`, section `Orynivo`):
+- `ApiKey` — pre-shared key required in every request (`X-Api-Key` header or
+  `?key=` query param; query param enables direct use in FFmpeg URLs)
+- `LibraryPaths` — list of root directories to scan
+- `ScanOnStartup` — run a full scan when the server starts (default `true`)
+- `ServerName` — display name returned by `/api/info`
+- Default bind: `http://0.0.0.0:5280`
+
+**Key files:**
+- `Orynivo.Server/Program.cs`: builds and starts the server; calls
+  `FfmpegLocator.EnsureAvailableAsync()`, registers `LibraryWatcherService`
+  and the `LibraryService` hosted service, maps all endpoints
+- `Orynivo.Server/ServerSettings.cs`: configuration POCO bound from the
+  `Orynivo` config section
+- `Orynivo.Server/Middleware/ApiKeyMiddleware.cs`: skips `/api/health`,
+  validates `X-Api-Key` header or `?key=` query param, returns 401 JSON
+- `Orynivo.Server/Services/LibraryService.cs`: `IHostedService` that calls
+  `LibraryWatcherService.UpdatePaths` on start and runs full scans via the
+  static `LibraryScanner.ScanAsync`; exposes `TriggerScan()` for manual
+  trigger and `IsScanning` for status
+- `Orynivo.Server/Endpoints/LibraryEndpoints.cs`: artists, albums, tracks,
+  playlists (smart playlists resolved via `SmartPlaylistCriteria.Resolve`),
+  and Lucene search endpoints
+- `Orynivo.Server/Endpoints/StreamEndpoints.cs`: byte-range streaming for
+  regular audio files; on-the-fly FLAC transcode via FFmpeg pipe for CUE
+  virtual tracks; album and track artwork endpoints
+
+**Build:**
+```
+dotnet build Orynivo.Server/Orynivo.Server.csproj
+dotnet run --project Orynivo.Server/Orynivo.Server.csproj
+```
+
+**Linux packages** — `.github/workflows/server-release.yml` (triggered on the
+same `v*` tags as the Windows release) builds self-contained binaries for
+`linux-x64` and `linux-arm64` and publishes four packages to the draft
+GitHub Release: `amd64`/`arm64` DEB and `x86_64`/`aarch64` RPM.
+Support files live in `.github/server-release/` (systemd unit, postinst/prerm
+scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
+`/usr/bin/orynivo-server` symlink, ship a default config at
+`/etc/orynivo-server/appsettings.json`, and register
+`orynivo-server.service` running as the `orynivo-server` system user.
 
 ## Important Architecture
 

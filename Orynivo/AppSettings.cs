@@ -1,5 +1,7 @@
 using Orynivo.AI;
 using Orynivo.Audio;
+using Orynivo.Library;
+using Orynivo.Streaming;
 
 namespace Orynivo;
 
@@ -106,17 +108,6 @@ public sealed class AppSettings
     public AiChatSettings AiChat { get; set; } = new();
 }
 
-/// <summary>Connection settings for a single Plex Media Server entry.</summary>
-public sealed class PlexServerSettings
-{
-    /// <summary>Gets or sets the unique server identifier (GUID, no dashes).</summary>
-    public string Id { get; set; } = Guid.NewGuid().ToString("N");
-    /// <summary>Gets or sets the user-chosen display name for this server.</summary>
-    public string Name { get; set; } = string.Empty;
-    /// <summary>Gets or sets the base URL of the Plex server (e.g. <c>http://192.168.1.10:32400</c>).</summary>
-    public string BaseUrl { get; set; } = string.Empty;
-}
-
 /// <summary>Application colour theme.</summary>
 public enum AppTheme
 {
@@ -124,13 +115,4 @@ public enum AppTheme
     Light,
     /// <summary>Dark colour scheme.</summary>
     Dark
-}
-
-/// <summary>Data source for artist biography text.</summary>
-public enum ArtistInfoSource
-{
-    /// <summary>Fetch artist biography from Wikipedia.</summary>
-    Wikipedia,
-    /// <summary>Fetch artist biography from Last.fm (requires an API key).</summary>
-    LastFm
 }

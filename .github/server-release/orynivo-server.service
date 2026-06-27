@@ -1,0 +1,20 @@
+[Unit]
+Description=Orynivo Music Server
+Documentation=https://github.com/bschlaack/Orynivo
+After=network.target
+
+[Service]
+Type=simple
+User=orynivo-server
+Group=orynivo-server
+WorkingDirectory=/usr/lib/orynivo-server
+ExecStart=/usr/lib/orynivo-server/Orynivo.Server
+EnvironmentFile=-/etc/default/orynivo-server
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=orynivo-server
+
+[Install]
+WantedBy=multi-user.target
