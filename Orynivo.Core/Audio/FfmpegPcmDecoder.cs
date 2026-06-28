@@ -83,6 +83,7 @@ public sealed class FfmpegPcmDecoder : IDisposable
         {
             FileName = "ffmpeg",
             Arguments = $"-v error {httpInputOptions}-ss {localSeek.TotalSeconds.ToString(CultureInfo.InvariantCulture)} {inputArgument} {durationArgument}-vn -f {sampleFormat} -acodec {codec} -ac 2 -ar {outputSampleRate} pipe:1",
+            WorkingDirectory = FfmpegLocator.GetSafeWorkingDirectory(),
             RedirectStandardInput = usesConcatInput,
             RedirectStandardOutput = true,
             RedirectStandardError = true,

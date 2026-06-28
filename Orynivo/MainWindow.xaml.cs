@@ -51,6 +51,7 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, ContentRow> _plexTracksByUrl =
         new(StringComparer.Ordinal);
     private readonly LocalLibraryCatalogProvider _localCatalogProvider = new();
+    private readonly LocalLibraryPlaylistProvider _localPlaylistProvider = new();
     private readonly LocalNowPlayingMetadataProvider _localNowPlayingProvider = new();
     private INowPlayingMetadataProvider? _currentNowPlayingProvider;
     private ContentRow? _currentOrynivoTrackRow;
@@ -219,7 +220,8 @@ public partial class MainWindow : Window
         string Title,
         string View,
         IReadOnlyList<ContentRow> Rows);
-    private sealed record PlaylistMenuTag(long PlaylistId, IReadOnlyList<string> Paths);
+    private sealed record PlaylistActionTag(ILibraryPlaylistProvider Provider, long PlaylistId, PlaylistSelection Selection);
+    private sealed record NewPlaylistActionTag(ILibraryPlaylistProvider Provider, PlaylistSelection Selection);
     private sealed record OrynivoPlaylistMenuTag(OrynivoServerSettings Server, long PlaylistId, IReadOnlyList<long> TrackIds);
     private sealed record RemovePlaylistEntryTag(long PlaylistEntryId);
     private sealed record RemoveOrynivoPlaylistEntryTag(OrynivoServerSettings Server, long PlaylistEntryId);
@@ -6947,10 +6949,11 @@ public partial class MainWindow : Window
     private MenuFlyout BuildPlaylistContextFlyout(IReadOnlyList<string> paths)
     {
         var menu = CreateSidebarMenuFlyout();
-        if (TryGetOrynivoPlaylistTarget(paths, out var server, out var trackIds) && server is not null)
-            AppendOrynivoPlaylistItems(menu, server, trackIds);
+        if (TryCreatePlaylistSelection(paths, out var provider, out var selection))
+            AppendPlaylistItems(menu, provider, selection);
         else
-            AppendPlaylistItems(menu, paths);
+            foreach (var item in CreateQueueMenuItems(paths))
+                menu.Items.Add(item);
         return menu;
     }
 
@@ -6964,31 +6967,33 @@ public partial class MainWindow : Window
 
     private void AppendPlaylistItems(MenuFlyout menu, IReadOnlyList<string> paths)
     {
-        foreach (var item in CreatePlaylistMenuItems(paths))
-            menu.Items.Add(item);
+        if (!TryCreatePlaylistSelection(paths, out var provider, out var selection))
+            return;
+        AppendPlaylistItems(menu, provider, selection);
     }
 
     private void AppendPlaylistItems(ItemsControl menu, IReadOnlyList<string> paths)
     {
-        foreach (var item in CreatePlaylistMenuItems(paths))
+        if (!TryCreatePlaylistSelection(paths, out var provider, out var selection))
+            return;
+        AppendPlaylistItems(menu, provider, selection);
+    }
+
+    private void AppendPlaylistItems(ItemsControl menu, ILibraryPlaylistProvider provider, PlaylistSelection selection)
+    {
+        foreach (var item in CreatePlaylistMenuItems(provider, selection))
             menu.Items.Add(item);
     }
 
-    private void AppendOrynivoPlaylistItems(ItemsControl menu, OrynivoServerSettings server, IReadOnlyList<long> trackIds)
+    private void AppendPlaylistItems(MenuFlyout menu, ILibraryPlaylistProvider provider, PlaylistSelection selection)
     {
-        foreach (var item in CreateOrynivoPlaylistMenuItems(server, trackIds))
+        foreach (var item in CreatePlaylistMenuItems(provider, selection))
             menu.Items.Add(item);
     }
 
-    private void AppendOrynivoPlaylistItems(MenuFlyout menu, OrynivoServerSettings server, IReadOnlyList<long> trackIds)
+    private IReadOnlyList<Control> CreatePlaylistMenuItems(ILibraryPlaylistProvider provider, PlaylistSelection selection)
     {
-        foreach (var item in CreateOrynivoPlaylistMenuItems(server, trackIds))
-            menu.Items.Add(item);
-    }
-
-    private IReadOnlyList<Control> CreatePlaylistMenuItems(IReadOnlyList<string> paths)
-    {
-        var items = new List<Control>(CreateQueueMenuItems(paths));
+        var items = new List<Control>(CreateQueueMenuItems(selection.QueuePaths));
         items.Add(new Separator());
 
         var header = CreateFlyoutMenuItem(
@@ -7003,18 +7008,12 @@ public partial class MainWindow : Window
         var sep0 = new Separator();
         items.Add(sep0);
 
-        List<PlaylistRecord> playlists;
-        try
-        {
-            using var db = AudioDatabase.OpenDefault();
-            playlists = db.GetAllPlaylists().ToList();
-        }
-        catch { playlists = []; }
+        var playlists = provider.GetWritablePlaylists();
 
         foreach (var pl in playlists)
         {
             var item = CreateFlyoutMenuItem(pl.Name);
-            item.Tag = new PlaylistMenuTag(pl.Id, paths);
+            item.Tag = new PlaylistActionTag(provider, pl.Id, selection);
             item.Click += PlaylistMenuItem_OnClick;
             items.Add(item);
         }
@@ -7026,49 +7025,38 @@ public partial class MainWindow : Window
         }
 
         var newItem = CreateFlyoutMenuItem(LocalizationManager.Current.NewPlaylist);
-        newItem.Tag = paths;
+        newItem.Tag = new NewPlaylistActionTag(provider, selection);
         newItem.Click += NewPlaylistMenuItem_OnClick;
         items.Add(newItem);
         return items;
     }
 
-    private IReadOnlyList<Control> CreateOrynivoPlaylistMenuItems(OrynivoServerSettings server, IReadOnlyList<long> trackIds)
+    private bool TryCreatePlaylistSelection(
+        IReadOnlyList<string> paths,
+        out ILibraryPlaylistProvider provider,
+        out PlaylistSelection selection)
     {
-        var items = new List<Control>(CreateQueueMenuItems(
-            _orynivoTracksByUrl.Values
-                .Where(row => row.OrynivoServer?.Id == server.Id && row.Id is long id && trackIds.Contains(id))
-                .Select(row => row.FilePath)
-                .ToList()));
-        items.Add(new Separator());
-
-        var header = CreateFlyoutMenuItem(
-            LocalizationManager.Current.AddToPlaylist,
-            new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF)));
-        header.IsHitTestVisible = false;
-        header.Focusable = false;
-        header.FontSize = 11;
-        header.FontWeight = FontWeight.SemiBold;
-        items.Add(header);
-        items.Add(new Separator());
-
-        foreach (var pair in _orynivoPlaylistsByTag)
+        if (TryGetOrynivoPlaylistTarget(paths, out var server, out var trackIds) && server is not null)
         {
-            var parts = pair.Key.Split(':');
-            if (parts.Length != 3 || parts[1] != server.Id || pair.Value.IsSmartPlaylist)
-                continue;
-
-            var item = CreateFlyoutMenuItem(pair.Value.Name);
-            item.Tag = new OrynivoPlaylistMenuTag(server, pair.Value.Id, trackIds);
-            item.Click += OrynivoPlaylistMenuItem_OnClick;
-            items.Add(item);
+            provider = new OrynivoServerPlaylistProvider(server, _orynivoClient, GetCachedOrynivoPlaylists);
+            selection = new PlaylistSelection(paths, [], trackIds);
+            return true;
         }
 
-        var newItem = CreateFlyoutMenuItem(LocalizationManager.Current.NewPlaylist);
-        newItem.Tag = new OrynivoPlaylistMenuTag(server, 0, trackIds);
-        newItem.Click += NewOrynivoPlaylistMenuItem_OnClick;
-        items.Add(newItem);
-        return items;
+        provider = _localPlaylistProvider;
+        selection = new PlaylistSelection(paths, paths, []);
+        return paths.Count > 0 && paths.All(CanPersistQueuePath);
     }
+
+    private IReadOnlyList<OrynivoPlaylistInfo> GetCachedOrynivoPlaylists(OrynivoServerSettings server) =>
+        _orynivoPlaylistsByTag
+            .Where(pair =>
+            {
+                var parts = pair.Key.Split(':');
+                return parts.Length == 3 && parts[1] == server.Id;
+            })
+            .Select(pair => pair.Value)
+            .ToList();
 
     private bool TryGetOrynivoPlaylistTarget(
         IReadOnlyList<string> paths,
@@ -7154,54 +7142,73 @@ public partial class MainWindow : Window
         await RefreshActiveGaplessQueueAsync();
     }
 
-    private void PlaylistMenuItem_OnClick(object? sender, RoutedEventArgs e)
+    private async void PlaylistMenuItem_OnClick(object? sender, RoutedEventArgs e)
     {
-        if (sender is not MenuItem { Tag: PlaylistMenuTag tag })
+        if (sender is not MenuItem { Tag: PlaylistActionTag tag })
             return;
 
-        var paths = tag.Paths;
-        if (paths.Count == 0) return;
+        var tracksCount = GetPlaylistSelectionTrackCount(tag.Selection);
+        if (tracksCount == 0)
+            return;
 
-        string playlistName;
-        try
+        var playlistName = tag.Provider
+            .GetWritablePlaylists()
+            .FirstOrDefault(playlist => playlist.Id == tag.PlaylistId)
+            ?.Name ?? string.Empty;
+        var ok = await tag.Provider.AddTracksAsync(tag.PlaylistId, tag.Selection);
+        if (!ok)
         {
-            using var db = AudioDatabase.OpenDefault();
-            playlistName = db.GetPlaylistById(tag.PlaylistId)?.Name ?? string.Empty;
-            foreach (var path in paths)
-                db.AddTrackToPlaylist(tag.PlaylistId, path, db.GetTrackIdByPath(path));
+            StatusTextBlock.Text = tag.Provider.NavigationRefresh == PlaylistNavigationRefresh.OrynivoServer
+                ? LocalizationManager.Current.OrynivoConnectionFailed
+                : string.Empty;
+            return;
         }
-        catch { return; }
 
-        StatusTextBlock.Text = paths.Count == 1
+        RefreshPlaylistNavigation(tag.Provider.NavigationRefresh);
+
+        StatusTextBlock.Text = tracksCount == 1
             ? string.Format(LocalizationManager.Current.TrackAddedToPlaylist, playlistName)
-            : string.Format(LocalizationManager.Current.TracksAddedToPlaylist, paths.Count, playlistName);
+            : string.Format(LocalizationManager.Current.TracksAddedToPlaylist, tracksCount, playlistName);
     }
 
     private async void NewPlaylistMenuItem_OnClick(object? sender, RoutedEventArgs e)
     {
-        if (sender is not MenuItem { Tag: IReadOnlyList<string> paths })
+        if (sender is not MenuItem { Tag: NewPlaylistActionTag tag })
             return;
 
         var dialog = new NewPlaylistDialog();
         if (await dialog.ShowDialog<bool>(this) == false || string.IsNullOrWhiteSpace(dialog.PlaylistName))
             return;
 
-        if (paths.Count == 0) return;
+        var tracksCount = GetPlaylistSelectionTrackCount(tag.Selection);
+        if (tracksCount == 0)
+            return;
 
         var playlistName = dialog.PlaylistName.Trim();
-        try
+        var playlist = await tag.Provider.CreatePlaylistAsync(playlistName, tag.Selection);
+        if (playlist is null)
         {
-            using var db = AudioDatabase.OpenDefault();
-            var playlistId = db.CreatePlaylist(playlistName);
-            foreach (var path in paths)
-                db.AddTrackToPlaylist(playlistId, path, db.GetTrackIdByPath(path));
+            StatusTextBlock.Text = tag.Provider.NavigationRefresh == PlaylistNavigationRefresh.OrynivoServer
+                ? LocalizationManager.Current.OrynivoConnectionFailed
+                : string.Empty;
+            return;
         }
-        catch { return; }
 
-        LoadNavPlaylists();
-        StatusTextBlock.Text = paths.Count == 1
+        RefreshPlaylistNavigation(tag.Provider.NavigationRefresh);
+        StatusTextBlock.Text = tracksCount == 1
             ? string.Format(LocalizationManager.Current.TrackAddedToPlaylist, playlistName)
-            : string.Format(LocalizationManager.Current.TracksAddedToPlaylist, paths.Count, playlistName);
+            : string.Format(LocalizationManager.Current.TracksAddedToPlaylist, tracksCount, playlistName);
+    }
+
+    private static int GetPlaylistSelectionTrackCount(PlaylistSelection selection) =>
+        selection.RemoteTrackIds.Count > 0 ? selection.RemoteTrackIds.Count : selection.LocalPaths.Count;
+
+    private void RefreshPlaylistNavigation(PlaylistNavigationRefresh refresh)
+    {
+        if (refresh == PlaylistNavigationRefresh.OrynivoServer)
+            LoadOrynivoServerNavigation();
+        else
+            LoadNavPlaylists();
     }
 
     private List<string> GetPathsForRow(ContentRow row)
@@ -10389,48 +10396,6 @@ public partial class MainWindow : Window
         await ReloadVisibleArtistListAsync(result.ArtistId);
         await ShowArtistInfoAsync(result.ArtistId, forceRefresh: false);
         _ = RebuildSearchIndexAfterArtistRenameAsync();
-    }
-
-    private async void OrynivoPlaylistMenuItem_OnClick(object? sender, RoutedEventArgs e)
-    {
-        if (sender is not MenuItem { Tag: OrynivoPlaylistMenuTag tag } || tag.TrackIds.Count == 0)
-            return;
-
-        var ok = await _orynivoClient.AddTracksToPlaylistAsync(tag.Server, tag.PlaylistId, tag.TrackIds);
-        if (!ok)
-        {
-            StatusTextBlock.Text = LocalizationManager.Current.OrynivoConnectionFailed;
-            return;
-        }
-
-        LoadOrynivoServerNavigation();
-        var name = _orynivoPlaylistsByTag.Values.FirstOrDefault(p => p.Id == tag.PlaylistId)?.Name ?? string.Empty;
-        StatusTextBlock.Text = tag.TrackIds.Count == 1
-            ? string.Format(LocalizationManager.Current.TrackAddedToPlaylist, name)
-            : string.Format(LocalizationManager.Current.TracksAddedToPlaylist, tag.TrackIds.Count, name);
-    }
-
-    private async void NewOrynivoPlaylistMenuItem_OnClick(object? sender, RoutedEventArgs e)
-    {
-        if (sender is not MenuItem { Tag: OrynivoPlaylistMenuTag tag } || tag.TrackIds.Count == 0)
-            return;
-
-        var dialog = new NewPlaylistDialog();
-        if (await dialog.ShowDialog<bool>(this) == false || string.IsNullOrWhiteSpace(dialog.PlaylistName))
-            return;
-
-        var playlistName = dialog.PlaylistName.Trim();
-        var playlist = await _orynivoClient.CreatePlaylistAsync(tag.Server, playlistName, tag.TrackIds);
-        if (playlist is null)
-        {
-            StatusTextBlock.Text = LocalizationManager.Current.OrynivoConnectionFailed;
-            return;
-        }
-
-        LoadOrynivoServerNavigation();
-        StatusTextBlock.Text = tag.TrackIds.Count == 1
-            ? string.Format(LocalizationManager.Current.TrackAddedToPlaylist, playlistName)
-            : string.Format(LocalizationManager.Current.TracksAddedToPlaylist, tag.TrackIds.Count, playlistName);
     }
 
     private async Task EditOrynivoArtistNameAsync(ContentRow row)

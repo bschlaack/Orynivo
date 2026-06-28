@@ -52,6 +52,7 @@ public static class FfmpegLocator
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        EnsureValidCurrentDirectory();
         var appDir = AppContext.BaseDirectory;
         var localFfmpeg  = Path.Combine(appDir, FfmpegBinary);
         var localFfprobe = Path.Combine(appDir, FfprobeBinary);
@@ -93,6 +94,56 @@ public static class FfmpegLocator
         {
             _ = ex;
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Returns an existing directory that can safely be used as
+    /// <see cref="System.Diagnostics.ProcessStartInfo.WorkingDirectory"/> for FFmpeg child processes.
+    /// </summary>
+    /// <returns>The application base directory when it exists; otherwise the Orynivo data directory or temp directory.</returns>
+    public static string GetSafeWorkingDirectory()
+    {
+        if (Directory.Exists(AppContext.BaseDirectory))
+        {
+            return AppContext.BaseDirectory;
+        }
+
+        try
+        {
+            Directory.CreateDirectory(AppPaths.DataRoot);
+            return AppPaths.DataRoot;
+        }
+        catch
+        {
+            return Path.GetTempPath();
+        }
+    }
+
+    /// <summary>
+    /// Resets the process current directory when a shortcut or installer left it pointing to a missing path.
+    /// </summary>
+    public static void EnsureValidCurrentDirectory()
+    {
+        try
+        {
+            if (Directory.Exists(Environment.CurrentDirectory))
+            {
+                return;
+            }
+        }
+        catch
+        {
+            // Fall through to reset below.
+        }
+
+        try
+        {
+            Environment.CurrentDirectory = GetSafeWorkingDirectory();
+        }
+        catch
+        {
+            // Child process start calls still receive an explicit safe working directory.
         }
     }
 

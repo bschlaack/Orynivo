@@ -4,6 +4,21 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.18.0] - 2026-06-28
+
+### Added
+
+- Added a shared playlist provider layer for local and remote Orynivo Server
+  libraries so track/album/folder context menus use the same playlist actions
+  while persisting entries to the correct local database or remote server.
+
+### Fixed
+
+- FFmpeg and FFprobe child processes now always receive a valid working
+  directory, and startup repairs a missing current directory left by stale
+  shortcuts or installer paths, avoiding launch failures that referenced an old
+  `%LOCALAPPDATA%\Programs\Orynivo` path.
+
 ## [0.17.0] - 2026-06-28
 
 ### Fixed

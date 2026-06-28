@@ -227,7 +227,10 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
   GitHub Releases, extracts the binaries into the per-user cache, and prepends
   that directory to the current-process PATH. Do not write downloaded FFmpeg
   binaries into the install directory because setup installs may live under
-  `Program Files` without user write access.
+  `Program Files` without user write access. FFmpeg/FFprobe child processes must
+  use `FfmpegLocator.GetSafeWorkingDirectory()` as their
+  `ProcessStartInfo.WorkingDirectory`; stale installer shortcuts can otherwise
+  leave the process current directory pointing to a deleted install path.
 - `Orynivo/Audio/DsfAudioPlayer.cs`: native DSF-to-DSD path
 - `Orynivo/Audio/DffAudioPlayer.cs`: native DFF/DSDIFF-to-DSD path
 - `Orynivo/Audio/WasapiAudioPlayer.cs`: exclusive-mode WASAPI PCM path; converts
@@ -377,6 +380,11 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
 - `Orynivo/Streaming/WindowsStreamingCredentialStore.cs`: stores future provider
   secrets and tokens in `%LOCALAPPDATA%\Orynivo\streaming-credentials.dat` using
   Windows DPAPI for the current user
+- `Orynivo/PlaylistProviders.cs`: provider-neutral playlist persistence for
+  local SQLite playlists and remote Orynivo Server playlists. Track, album, and
+  folder context menu actions should build a `PlaylistSelection` and route
+  add/create operations through `ILibraryPlaylistProvider` instead of branching
+  directly on local vs. server storage in UI handlers.
 - `Orynivo/Streaming/PlexServerClient.cs`: queries configured Plex Media Servers,
   exposes only music library sections (`type=artist`), pages
   artists/albums/tracks, resolves drill-down children, browses folders lazily,
@@ -848,6 +856,11 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
   **Play next** and **Append to queue**, followed by existing playlists and
   **New playlist...**. Plex tracks expose only the in-memory queue actions so
   authenticated URLs cannot be written to playlist or settings storage.
+- Local and remote Orynivo Server playlist context actions use
+  `ILibraryPlaylistProvider`, `LocalLibraryPlaylistProvider`,
+  `OrynivoServerPlaylistProvider`, and `PlaylistSelection`. Do not add separate
+  local/server add-to-playlist handlers; provider selection belongs in the
+  menu-building layer and mutation handlers should call the provider interface.
 - Selecting a playlist immediately adds the track or all album tracks and
   updates the status bar
 - The album-detail header includes **Save as playlist**. It reads the current
