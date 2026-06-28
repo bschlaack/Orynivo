@@ -510,6 +510,13 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
   remote request is in flight. Cache remote folder-track lists under
   `%LOCALAPPDATA%\Orynivo\remote-folder-cache\` and reuse them only while the
   server's `LibraryChangedAt` scan status timestamp matches the cached value.
+  The unfiltered remote Tracks list is loaded with a large page size (one or two
+  requests instead of one per 500 rows) and is likewise cached under
+  `%LOCALAPPDATA%\Orynivo\remote-track-cache\`, reused while the server's
+  `LibraryChangedAt` matches the cached value. That cache stores mapped
+  `LibraryCatalogTrack` rows, so its file key includes the server API key
+  (cached playback URLs embed the key) and client-side favourites are re-applied
+  after loading instead of trusting the cached favourite flags.
   While a remote track plays, the transport lyrics and artist-info buttons work
   through `OrynivoServerNowPlayingMetadataProvider` (see
   `Orynivo/NowPlayingMetadataProviders.cs`): lyrics and the artist

@@ -220,6 +220,10 @@ public partial class MainWindow : Window
         long LibraryChangedAt,
         long CachedAt,
         List<OrynivoTrackLiteInfo> Tracks);
+    private sealed record OrynivoTrackListCache(
+        long LibraryChangedAt,
+        long CachedAt,
+        List<LibraryCatalogTrack> Tracks);
     private sealed record PlexNavigationState(
         string Title,
         string View,
@@ -2169,7 +2173,6 @@ public partial class MainWindow : Window
                 case "AlbumTracks":
                 case "Tracks":
                 {
-                    ApplyColumns("Tracks");
                     AlbumViewModeBorder.IsVisible = false;
                     IReadOnlyList<LibraryCatalogTrack> catalogTracks;
                     if (filterAlbumId.HasValue)
@@ -2182,12 +2185,20 @@ public partial class MainWindow : Window
                             .Select(f => f with { IsFavorite = IsOrynivoFavorite(server, "Track", f.Id) })
                             .ToList();
                         if (ct.IsCancellationRequested) return;
-                        catalogTracks = await ResolveOrynivoTrackRowsAsync(provider, ct);
+                        catalogTracks = await ResolveOrynivoTrackRowsAsync(server, provider, ct);
                     }
                     if (ct.IsCancellationRequested) return;
+                    // Build the columns immediately before binding, mirroring the local
+                    // Tracks view. Applying them before the long-running async load lets
+                    // the DataGrid run layout passes while still empty; Avalonia then
+                    // fails to realize the rows that are bound in the async continuation,
+                    // leaving only the column headers visible (most noticeable with the
+                    // large unfiltered track set, while the small favourites set still
+                    // happened to render).
+                    ApplyColumns("Tracks");
                     var rows = catalogTracks.Select(ToCatalogTrackContentRow).ToList();
+                    ContentDataGrid.ItemsSource = rows;
                     UpdateAlphabetIndex(rows, true);
-                    BindRemoteTrackRows(rows);
                     ContentCountTextBlock.Text = LocalizationManager.FormatTrackCount(rows.Count);
                     break;
                 }
@@ -2223,20 +2234,117 @@ public partial class MainWindow : Window
     private OrynivoServerNowPlayingMetadataProvider CreateOrynivoNowPlayingProvider(OrynivoServerSettings server)
         => new(server, _orynivoClient);
 
-    private static async Task<List<LibraryCatalogTrack>> LoadAllOrynivoTracksAsync(
+    private async Task<List<LibraryCatalogTrack>> LoadAllOrynivoTracksAsync(
+        OrynivoServerSettings server,
         ILibraryCatalogProvider provider,
         CancellationToken cancellationToken)
     {
-        const int pageSize = 500;
-        var result = new List<LibraryCatalogTrack>();
-        for (var page = 0; ; page++)
+        // The server reports when its library index last changed; reuse the
+        // locally cached track list while that timestamp is unchanged so the
+        // full list does not have to be downloaded on every visit.
+        var scanStatus = await _orynivoClient.GetScanStatusAsync(server, cancellationToken);
+        var libraryChangedAt = scanStatus?.LibraryChangedAt;
+        List<LibraryCatalogTrack>? tracks = null;
+        if (libraryChangedAt.HasValue)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var batch = await provider.GetTracksAsync(page, pageSize, cancellationToken);
-            result.AddRange(batch);
-            if (batch.Count < pageSize)
-                return result;
+            // Reading and deserializing the (potentially large) cache file runs on
+            // a background thread so the UI thread is never blocked on disk I/O.
+            tracks = await Task.Run(
+                () => TryLoadOrynivoTrackListCache(server, libraryChangedAt.Value, out var cached)
+                    ? cached
+                    : null,
+                cancellationToken);
         }
+
+        if (tracks is null)
+        {
+            // Use a large page size so even big libraries load in one or two
+            // requests. A page size of 500 issued one round-trip per 500 tracks,
+            // which on a ~75k-track library meant ~150 sequential HTTP requests and
+            // over a minute of loading, leaving the Tracks view apparently empty
+            // (only the small favourites set, fetched in a single by-id request,
+            // appeared). The server returns tens of thousands of rows per request in
+            // well under a second, so a large page loads the whole library almost
+            // instantly while staying comfortably below the client's HTTP timeout.
+            const int pageSize = 50000;
+            tracks = [];
+            for (var page = 0; ; page++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var batch = await provider.GetTracksAsync(page, pageSize, cancellationToken);
+                tracks.AddRange(batch);
+                if (batch.Count < pageSize)
+                    break;
+            }
+
+            if (libraryChangedAt.HasValue)
+            {
+                var toCache = tracks;
+                await Task.Run(
+                    () => SaveOrynivoTrackListCache(server, libraryChangedAt.Value, toCache),
+                    cancellationToken);
+            }
+        }
+
+        // Favourites are stored client-side and can change without the server's
+        // library timestamp changing, so re-apply them after loading (including
+        // from the cache) instead of trusting the cached favourite flags.
+        return tracks
+            .Select(track => track with { IsFavorite = IsOrynivoFavorite(server, "Track", track.Id) })
+            .ToList();
+    }
+
+    private static bool TryLoadOrynivoTrackListCache(
+        OrynivoServerSettings server,
+        long libraryChangedAt,
+        out List<LibraryCatalogTrack> tracks)
+    {
+        tracks = [];
+        try
+        {
+            var path = GetOrynivoTrackListCachePath(server);
+            if (!File.Exists(path))
+                return false;
+            var cache = JsonSerializer.Deserialize<OrynivoTrackListCache>(File.ReadAllText(path));
+            if (cache?.Tracks is null || cache.LibraryChangedAt != libraryChangedAt)
+                return false;
+            tracks = cache.Tracks;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void SaveOrynivoTrackListCache(
+        OrynivoServerSettings server,
+        long libraryChangedAt,
+        IReadOnlyList<LibraryCatalogTrack> tracks)
+    {
+        try
+        {
+            var path = GetOrynivoTrackListCachePath(server);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            var cache = new OrynivoTrackListCache(
+                libraryChangedAt,
+                DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                tracks.ToList());
+            File.WriteAllText(path, JsonSerializer.Serialize(cache));
+        }
+        catch
+        {
+            // Cache failures must never prevent browsing a remote server.
+        }
+    }
+
+    private static string GetOrynivoTrackListCachePath(OrynivoServerSettings server)
+    {
+        // Include the API key in the cache key: cached playback paths embed the
+        // key, so a key change must invalidate the cache to avoid stale URLs.
+        var key = Convert.ToHexString(
+            SHA256.HashData(Encoding.UTF8.GetBytes($"{server.Id}|{server.BaseUrl}|{server.ApiKey}")));
+        return AppPaths.GetDataPath("remote-track-cache", $"{key}.json");
     }
 
     /// <summary>
@@ -2248,6 +2356,7 @@ public partial class MainWindow : Window
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The track rows to display.</returns>
     private async Task<IReadOnlyList<LibraryCatalogTrack>> ResolveOrynivoTrackRowsAsync(
+        OrynivoServerSettings server,
         ILibraryCatalogProvider provider,
         CancellationToken cancellationToken)
     {
@@ -2258,7 +2367,7 @@ public partial class MainWindow : Window
         }
         if (!string.IsNullOrWhiteSpace(SearchTextBox.Text))
             return await provider.SearchTracksAsync(SearchTextBox.Text.Trim(), 500, cancellationToken);
-        return await LoadAllOrynivoTracksAsync(provider, cancellationToken);
+        return await LoadAllOrynivoTracksAsync(server, provider, cancellationToken);
     }
 
     /// <summary>Re-resolves and rebinds remote Tracks rows after a facet filter change.</summary>
@@ -2267,7 +2376,7 @@ public partial class MainWindow : Window
         if (_activeOrynivoServer is null)
             return;
         var provider = CreateOrynivoCatalogProvider(_activeOrynivoServer);
-        var catalogTracks = await ResolveOrynivoTrackRowsAsync(provider, CancellationToken.None);
+        var catalogTracks = await ResolveOrynivoTrackRowsAsync(_activeOrynivoServer, provider, CancellationToken.None);
         var rows = catalogTracks.Select(ToCatalogTrackContentRow).ToList();
         BindRemoteTrackRows(rows);
         UpdateAlphabetIndex(rows, true);
@@ -2277,19 +2386,7 @@ public partial class MainWindow : Window
 
     private void BindRemoteTrackRows(IReadOnlyList<ContentRow> rows)
     {
-        ContentDataGrid.ItemsSource = null;
         ContentDataGrid.ItemsSource = rows;
-        ContentDataGrid.InvalidateMeasure();
-        ContentDataGrid.InvalidateVisual();
-        Dispatcher.UIThread.Post(() =>
-        {
-            if (ReferenceEquals(ContentDataGrid.ItemsSource, rows))
-            {
-                ContentDataGrid.InvalidateMeasure();
-                ContentDataGrid.InvalidateVisual();
-                ContentDataGrid.UpdateLayout();
-            }
-        }, DispatcherPriority.Loaded);
     }
 
     private void ShowOrynivoFolderLoadingState()
@@ -2299,7 +2396,11 @@ public partial class MainWindow : Window
         FolderTreeView.Items.Clear();
         FolderTreeView.Items.Add(new TreeViewItem
         {
-            Header = LocalizationManager.Current.OrynivoLoading,
+            Header = new TextBlock
+            {
+                Text = LocalizationManager.Current.OrynivoLoading,
+                Foreground = FindResource<IBrush>("AppMutedTextBrush")
+            },
             IsEnabled = false
         });
         ContentCountTextBlock.Text = string.Empty;

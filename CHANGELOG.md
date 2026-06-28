@@ -4,12 +4,31 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.30.0] - 2026-06-29
 
 ### Added
 
+- Remote Orynivo Server Tracks now caches the downloaded full track list under
+  `%LOCALAPPDATA%\Orynivo\remote-track-cache\` and reuses it while the server's
+  `LibraryChangedAt` scan timestamp is unchanged, so revisiting the Tracks view
+  no longer re-downloads the whole library. The cache key includes the API key
+  (cached playback URLs embed it) and client-side favourites are re-applied after
+  loading so toggling a favourite is never masked by stale cached flags.
+
 ### Fixed
 
+- Remote Orynivo Server folder view loading placeholder now uses the themed muted
+  text brush, so the "loading" message is readable on the dark background instead
+  of rendering as black text.
+- Remote Orynivo Server Tracks now loads the unfiltered track list with a large
+  page size instead of 500 rows per request. On a large library (~75k tracks)
+  the old paging issued ~150 sequential HTTP requests and took over a minute, so
+  the Tracks view appeared empty unless the favourites filter (a single request)
+  was active; it now loads the whole library in one or two requests within a
+  couple of seconds.
+- Remote Orynivo Server Tracks now applies its table columns immediately before
+  binding the loaded rows (matching the local Tracks view) instead of before the
+  async server load, so the DataGrid reliably realizes the rows.
 - Remote Orynivo Server folder playback now registers full track metadata before
   queuing streams, so the transport shows title/artist/artwork and enables
   lyrics, artist info, favourites, and playlist actions like the local folder
