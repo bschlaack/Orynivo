@@ -3,6 +3,7 @@ using System.Globalization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
+using Orynivo.Audio;
 using Orynivo.Library;
 
 namespace Orynivo.Server.Endpoints;
@@ -248,6 +249,7 @@ public static class StreamEndpoints
             {
                 FileName               = "ffmpeg",
                 Arguments              = args,
+                WorkingDirectory       = FfmpegLocator.GetSafeWorkingDirectory(),
                 RedirectStandardOutput = true,
                 RedirectStandardError  = true,
                 UseShellExecute        = false,

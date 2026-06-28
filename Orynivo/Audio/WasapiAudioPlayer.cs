@@ -601,6 +601,7 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
         {
             FileName = "ffprobe",
             Arguments = $"-v error {httpInputOptions}-select_streams a:0 -show_entries stream=codec_name,sample_rate,channels,duration -of json \"{filePath}\"",
+            WorkingDirectory = FfmpegLocator.GetSafeWorkingDirectory(),
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,

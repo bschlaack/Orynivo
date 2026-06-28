@@ -230,7 +230,9 @@ byte-range streaming without FFmpeg.
 - Playlists live under the Library sidebar: local playlists are grouped below
   Local, and each Orynivo Server exposes its own Playlists node populated from
   that server. Adding/removing tracks and creating/deleting regular playlists
-  for remote server tracks writes to the selected server.
+  for remote server tracks writes to the selected server. Local and remote
+  track, album, and folder context menus use the same playlist-provider action
+  path and route persistence to the correct local database or server.
 - Remote Orynivo Server artists, albums, and tracks can be marked as favorites;
   those favorite flags are stored only in the Windows client's settings.
 - Remote Orynivo Server album covers and artist images can be searched from the

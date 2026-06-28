@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using Orynivo.Audio;
 
 namespace Orynivo.Library;
 
@@ -66,6 +67,7 @@ public sealed class RadioStreamMetadataService
         var startInfo = new ProcessStartInfo
         {
             FileName = "ffprobe",
+            WorkingDirectory = FfmpegLocator.GetSafeWorkingDirectory(),
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
