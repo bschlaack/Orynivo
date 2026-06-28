@@ -84,3 +84,4 @@ Filename: "{app}\{#AppExe}"; \
 ; Remove files downloaded at runtime (ffmpeg binaries) during uninstall.
 ; User library data under %LOCALAPPDATA%\Orynivo\ is intentionally preserved.
 Type: filesandordirs; Name: "{app}\ffmpeg"
+Type: filesandordirs; Name: "{localappdata}\Orynivo\ffmpeg"

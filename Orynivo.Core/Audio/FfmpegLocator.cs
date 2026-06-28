@@ -7,7 +7,7 @@ namespace Orynivo.Audio;
 
 /// <summary>
 /// Locates <c>ffmpeg</c> and <c>ffprobe</c> binaries, downloading a pre-built package on Windows
-/// when the binaries are absent from the application directory and the system PATH.
+/// when the binaries are absent from the application directory, the user cache, and the system PATH.
 /// On Linux and macOS the binaries must be installed separately via the system package manager
 /// (e.g. <c>apt install ffmpeg</c>, <c>brew install ffmpeg</c>).
 /// After a successful locate or download the directory that contains the binaries is prepended
@@ -35,8 +35,8 @@ public static class FfmpegLocator
 
     /// <summary>
     /// Ensures that <c>ffmpeg</c> and <c>ffprobe</c> are reachable as child processes.
-    /// On Windows, downloads the BtbN LGPL-essential build when neither the application directory
-    /// nor the system PATH contains the binaries.
+    /// On Windows, downloads the BtbN LGPL-essential build when neither the application directory,
+    /// the per-user FFmpeg cache, nor the system PATH contains the binaries.
     /// On Linux and macOS, returns <see langword="false"/> when the binaries are not already on PATH.
     /// </summary>
     /// <param name="progress">
@@ -55,10 +55,19 @@ public static class FfmpegLocator
         var appDir = AppContext.BaseDirectory;
         var localFfmpeg  = Path.Combine(appDir, FfmpegBinary);
         var localFfprobe = Path.Combine(appDir, FfprobeBinary);
+        var userDir = AppPaths.GetDataPath("ffmpeg");
+        var userFfmpeg = Path.Combine(userDir, FfmpegBinary);
+        var userFfprobe = Path.Combine(userDir, FfprobeBinary);
 
         if (File.Exists(localFfmpeg) && File.Exists(localFfprobe))
         {
             PrependToPath(appDir);
+            return true;
+        }
+
+        if (File.Exists(userFfmpeg) && File.Exists(userFfprobe))
+        {
+            PrependToPath(userDir);
             return true;
         }
 
@@ -71,9 +80,10 @@ public static class FfmpegLocator
         try
         {
             progress?.Report("Downloading FFmpeg…");
-            await DownloadAndExtractWindowsAsync(localFfmpeg, localFfprobe, progress, cancellationToken)
+            Directory.CreateDirectory(userDir);
+            await DownloadAndExtractWindowsAsync(userFfmpeg, userFfprobe, progress, cancellationToken)
                 .ConfigureAwait(false);
-            PrependToPath(appDir);
+            PrependToPath(userDir);
             return true;
         }
         catch (Exception ex) when (ex is HttpRequestException
