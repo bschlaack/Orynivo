@@ -203,7 +203,9 @@ byte-range streaming without FFmpeg.
 - PCM playback through `ffmpeg`
 - Multiple named output profiles for quickly switching between configured
   output devices; a quick-pick popup in the transport bar selects the active
-  profile without opening Settings
+  profile without opening Settings. On first start, Orynivo creates and selects
+  a `Default` WASAPI profile from the Windows default multimedia output device
+  when no output has been configured yet.
 - Seeking, volume control, pause, and an editable persistent **Up next** queue
   with play-next/append actions, removal, reordering, playlist saving, and
   shuffle without repeating a track within the currently loaded queue
@@ -373,7 +375,8 @@ The user interface recognizes, among others:
 `WMA`, and CUE sheets referencing PCM source files such as FLAC or WAV.
 
 PCM formats are decoded by `ffmpeg`, which Orynivo downloads automatically on
-first start if not already installed. Actual codec support depends on the build.
+Windows into `%LOCALAPPDATA%\Orynivo\ffmpeg` on first start if not already
+installed. Actual codec support depends on the build.
 For CUE sheets, Orynivo uses `INDEX 01` boundaries to seek and stop FFmpeg
 within the referenced source file; no temporary split files are created.
 When WASAPI is selected, DSD audio in DSF or DFF containers is converted to PCM
@@ -391,7 +394,7 @@ rate is used. Unsupported sample rates and bit depths are converted by
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) (for building)
 - [FFmpeg](https://ffmpeg.org/) — downloaded automatically on first start if not
   already present. To use a specific build, place `ffmpeg.exe` and `ffprobe.exe`
-  in `PATH` or next to `Orynivo.exe`.
+  in `PATH`, next to `Orynivo.exe`, or in `%LOCALAPPDATA%\Orynivo\ffmpeg`.
 - For cwASIO: Visual Studio 2022 with the **Desktop development with C++**
   workload and an installed ASIO driver
 - Optional Steinberg bridge: Steinberg ASIO SDK 2.3
@@ -521,7 +524,9 @@ without a tag, use **workflow dispatch** in the Actions tab.
 ```
 
 Library directories and the desired output device can then be configured in
-Settings. Named output profiles allow saving multiple backend and device
+Settings. When no output has been configured yet, Orynivo creates a `Default`
+WASAPI output from the Windows default multimedia output device so playback
+works without manual setup. Named output profiles allow saving multiple backend and device
 combinations; a quick-pick popup on the transport bar switches between them
 without opening Settings. ReplayGain can be disabled or switched to
 track/album mode
@@ -667,8 +672,9 @@ provided in [`licenses/`](licenses/) and are copied into build and publish
 outputs.
 
 FFmpeg is run as a separate executable. If it is not installed, Orynivo
-downloads the BtbN LGPL essentials build. FFmpeg remains subject to its own
-license and is not covered by the Orynivo license.
+downloads the BtbN LGPL essentials build into `%LOCALAPPDATA%\Orynivo\ffmpeg`
+on Windows. FFmpeg remains subject to its own license and is not covered by the
+Orynivo license.
 
 ASIO is a trademark and software of Steinberg Media Technologies GmbH. The
 optional Steinberg ASIO SDK is not included in this repository and must be

@@ -22,6 +22,15 @@ public static class WasapiDeviceProvider
         return result;
     }
 
+    /// <summary>Returns the default Windows multimedia render endpoint when one is available.</summary>
+    /// <returns>The default WASAPI render endpoint, or <see langword="null"/> when Windows has no active default output.</returns>
+    public static WasapiDeviceInfo? GetDefaultRenderDevice()
+    {
+        using var enumerator = new MMDeviceEnumerator();
+        using var device = enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+        return new WasapiDeviceInfo(device.ID, device.FriendlyName);
+    }
+
     /// <summary>Opens and returns the <see cref="MMDevice"/> for the given device ID. Caller must dispose.</summary>
     /// <param name="id">MMDevice ID as returned by <see cref="GetRenderDevices"/>.</param>
     public static MMDevice GetRenderDevice(string id)

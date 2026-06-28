@@ -221,11 +221,13 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
   of seeking the HTTP stream itself (which binary-searches seektable-less files
   over many range round-trips). Plex and other HTTP inputs keep client-side
   `-ss` seeking.
-- `Orynivo/Audio/FfmpegLocator.cs`: checks `AppContext.BaseDirectory` and PATH
-  for `ffmpeg.exe`/`ffprobe.exe` at startup; when absent, downloads the BtbN
-  LGPL-essential Windows build from GitHub Releases, extracts the binaries
-  next to the executable, and prepends the directory to the current-process
-  PATH
+- `Orynivo/Audio/FfmpegLocator.cs`: checks `AppContext.BaseDirectory`,
+  `%LOCALAPPDATA%\Orynivo\ffmpeg`, and PATH for `ffmpeg.exe`/`ffprobe.exe` at
+  startup; when absent on Windows, downloads the BtbN LGPL-essential build from
+  GitHub Releases, extracts the binaries into the per-user cache, and prepends
+  that directory to the current-process PATH. Do not write downloaded FFmpeg
+  binaries into the install directory because setup installs may live under
+  `Program Files` without user write access.
 - `Orynivo/Audio/DsfAudioPlayer.cs`: native DSF-to-DSD path
 - `Orynivo/Audio/DffAudioPlayer.cs`: native DFF/DSDIFF-to-DSD path
 - `Orynivo/Audio/WasapiAudioPlayer.cs`: exclusive-mode WASAPI PCM path; converts
@@ -535,8 +537,11 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
   single device to a profile named "Standard" and derives the flat
   `OutputBackend`, `SelectedDriverName`, `SelectedWasapiDeviceId`, and
   `SelectedWasapiDeviceName` fields from the active profile on every load and
-  save. These flat fields remain in `AppSettings` for playback code that reads
-  them directly but must not be edited independently of their profile.
+  save. When no profile or legacy output device exists, it creates and selects a
+  `Default` WASAPI profile from the Windows default multimedia render endpoint
+  so a first-run installation can play audio without manual device setup. These
+  flat fields remain in `AppSettings` for playback code that reads them directly
+  but must not be edited independently of their profile.
 - `AppSettings.ReplayGainMode` selects disabled, track, or album ReplayGain for
   PCM playback; native ASIO DSD remains bit-perfect
 - `AppSettings.AlwaysConvertDsdToPcm` forces DSF/DFF sources through FFmpeg and

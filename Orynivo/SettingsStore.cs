@@ -28,7 +28,10 @@ public sealed class SettingsStore
     {
         if (!File.Exists(_filePath))
         {
-            return new AppSettings();
+            var defaultSettings = new AppSettings();
+            NormalizeEqualizerProfiles(defaultSettings);
+            NormalizeOutputProfiles(defaultSettings);
+            return defaultSettings;
         }
 
         try
@@ -41,7 +44,10 @@ public sealed class SettingsStore
         }
         catch
         {
-            return new AppSettings();
+            var defaultSettings = new AppSettings();
+            NormalizeEqualizerProfiles(defaultSettings);
+            NormalizeOutputProfiles(defaultSettings);
+            return defaultSettings;
         }
     }
 
@@ -84,16 +90,22 @@ public sealed class SettingsStore
         }
 
         var selected = settings.OutputProfiles.FirstOrDefault(p =>
-            string.Equals(p.Name, settings.SelectedOutputProfileName, StringComparison.OrdinalIgnoreCase));
+            string.Equals(p.Name, settings.SelectedOutputProfileName, StringComparison.OrdinalIgnoreCase) &&
+            IsUsableOutputProfile(p))
+            ?? settings.OutputProfiles.FirstOrDefault(IsUsableOutputProfile);
 
         if (selected is null)
         {
-            settings.SelectedOutputProfileName = null;
-            settings.OutputBackend = OutputBackend.Wasapi;
-            settings.SelectedDriverName = null;
-            settings.SelectedWasapiDeviceId = null;
-            settings.SelectedWasapiDeviceName = null;
-            return;
+            selected = CreateDefaultWasapiProfile(settings.OutputProfiles);
+            if (selected is null)
+            {
+                settings.SelectedOutputProfileName = null;
+                settings.OutputBackend = OutputBackend.Wasapi;
+                settings.SelectedDriverName = null;
+                settings.SelectedWasapiDeviceId = null;
+                settings.SelectedWasapiDeviceName = null;
+                return;
+            }
         }
 
         settings.SelectedOutputProfileName = selected.Name;
@@ -101,6 +113,54 @@ public sealed class SettingsStore
         settings.SelectedDriverName = selected.SelectedDriverName;
         settings.SelectedWasapiDeviceId = selected.SelectedWasapiDeviceId;
         settings.SelectedWasapiDeviceName = selected.SelectedWasapiDeviceName;
+    }
+
+    /// <summary>
+    /// Determines whether an output profile contains the minimum device selection needed for playback.
+    /// </summary>
+    /// <param name="profile">Output profile to inspect.</param>
+    /// <returns><see langword="true"/> when the profile can be selected for playback; otherwise <see langword="false"/>.</returns>
+    private static bool IsUsableOutputProfile(OutputProfile profile) =>
+        profile.Backend switch
+        {
+            OutputBackend.Wasapi => !string.IsNullOrWhiteSpace(profile.SelectedWasapiDeviceId),
+            OutputBackend.Asio or OutputBackend.CwAsio => !string.IsNullOrWhiteSpace(profile.SelectedDriverName),
+            _ => false
+        };
+
+    /// <summary>
+    /// Creates or updates the first-run WASAPI output profile from the default Windows render endpoint when available.
+    /// </summary>
+    /// <param name="profiles">Existing output profiles to update when a profile named <c>Default</c> already exists.</param>
+    /// <returns>The default output profile, or <see langword="null"/> when no WASAPI device is available.</returns>
+    private static OutputProfile? CreateDefaultWasapiProfile(IList<OutputProfile> profiles)
+    {
+        try
+        {
+            var device = WasapiDeviceProvider.GetDefaultRenderDevice();
+            if (device is null)
+            {
+                return null;
+            }
+
+            var profile = profiles.FirstOrDefault(p =>
+                string.Equals(p.Name, "Default", StringComparison.OrdinalIgnoreCase));
+            if (profile is null)
+            {
+                profile = new OutputProfile { Name = "Default" };
+                profiles.Add(profile);
+            }
+
+            profile.Backend = OutputBackend.Wasapi;
+            profile.SelectedDriverName = null;
+            profile.SelectedWasapiDeviceId = device.Id;
+            profile.SelectedWasapiDeviceName = device.Name;
+            return profile;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>Normalizes multi-profile equalizer settings and migrates the legacy single profile.</summary>

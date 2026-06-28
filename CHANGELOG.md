@@ -4,6 +4,18 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.17.0] - 2026-06-28
+
+### Fixed
+
+- Automatic FFmpeg download on Windows now stores downloaded binaries in
+  `%LOCALAPPDATA%\Orynivo\ffmpeg` instead of the application install directory,
+  so setup installations under `Program Files` work without elevation.
+- On first start or after a missing/corrupt output configuration, Orynivo now
+  creates and selects a `Default` WASAPI output profile using the Windows
+  default multimedia output device so playback can work without manual device
+  setup.
+
 ## [0.16.0] - 2026-06-28
 
 ### Added
