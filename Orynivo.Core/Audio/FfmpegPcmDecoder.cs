@@ -50,13 +50,39 @@ public sealed class FfmpegPcmDecoder : IDisposable
             ? $"-t {remaining.TotalSeconds.ToString(CultureInfo.InvariantCulture)} "
             : string.Empty;
         var usesConcatInput = filePaths.Count > 1;
+
+        // FFmpeg's default stream analysis window is 5 s / 5 MB. Over HTTP it blocks on
+        // that probe on every decoder start, so the first play and every seek of a remote
+        // track stall for ~5 s. Audio container headers are tiny, so cap the probe and
+        // add HTTP reconnect resilience for the single-URL remote/Plex case.
+        var isHttpInput = !usesConcatInput &&
+            (filePaths[0].StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+             filePaths[0].StartsWith("https://", StringComparison.OrdinalIgnoreCase));
+
+        // Server-side seek: seeking a seektable-less file over HTTP makes the client
+        // binary-search via many range round-trips (~5 s). An Orynivo Server stream
+        // endpoint (`/api/stream/`) instead seeks the local file and transcodes from the
+        // offset, so the client decodes the offset stream from position 0. Plex and other
+        // HTTP sources keep client-side seeking.
+        var useServerSideSeek = isHttpInput &&
+            absolutePosition > TimeSpan.Zero &&
+            filePaths[0].Contains("/api/stream/", StringComparison.OrdinalIgnoreCase);
+        var localSeek = useServerSideSeek ? TimeSpan.Zero : absolutePosition;
+        var singleInputUrl = useServerSideSeek
+            ? AppendSeekQuery(filePaths[0], absolutePosition.TotalSeconds)
+            : filePaths[0];
+
         var inputArgument = usesConcatInput
             ? $"-f concat -safe 0 -protocol_whitelist file,pipe,http,https,tcp,tls,crypto -i pipe:0"
-            : $"-i \"{filePaths[0]}\"";
+            : $"-i \"{singleInputUrl}\"";
+        var httpInputOptions = isHttpInput
+            ? "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 2 -analyzeduration 500000 -probesize 500000 "
+            : string.Empty;
+
         var process = Process.Start(new ProcessStartInfo
         {
             FileName = "ffmpeg",
-            Arguments = $"-v error -ss {absolutePosition.TotalSeconds.ToString(CultureInfo.InvariantCulture)} {inputArgument} {durationArgument}-vn -f {sampleFormat} -acodec {codec} -ac 2 -ar {outputSampleRate} pipe:1",
+            Arguments = $"-v error {httpInputOptions}-ss {localSeek.TotalSeconds.ToString(CultureInfo.InvariantCulture)} {inputArgument} {durationArgument}-vn -f {sampleFormat} -acodec {codec} -ac 2 -ar {outputSampleRate} pipe:1",
             RedirectStandardInput = usesConcatInput,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
@@ -89,6 +115,16 @@ public sealed class FfmpegPcmDecoder : IDisposable
 
     private static string EscapeConcatPath(string path) =>
         path.Replace("'", "'\\''", StringComparison.Ordinal);
+
+    /// <summary>Appends a server-side seek (<c>ss</c>) query parameter to a stream URL.</summary>
+    /// <param name="url">Base stream URL, which may already carry a query string.</param>
+    /// <param name="seconds">Seek offset in seconds.</param>
+    /// <returns>The URL with the <c>ss</c> parameter appended.</returns>
+    private static string AppendSeekQuery(string url, double seconds)
+    {
+        var separator = url.Contains('?', StringComparison.Ordinal) ? '&' : '?';
+        return $"{url}{separator}ss={seconds.ToString("F6", CultureInfo.InvariantCulture)}";
+    }
 
     /// <summary>Reads decoded PCM, returning prefetched bytes before the process pipe.</summary>
     internal async ValueTask<int> ReadAsync(Memory<byte> destination, CancellationToken cancellationToken)

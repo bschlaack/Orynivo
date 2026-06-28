@@ -98,7 +98,7 @@ public sealed class AppSettings
     public bool ShowPlexSection { get; set; } = true;
     /// <summary>Gets or sets a legacy value for the removed Orynivo Server sidebar section.</summary>
     public bool ShowOrynivoServerSection { get; set; } = true;
-    /// <summary>Gets or sets a value indicating whether the Playlists sidebar section is visible.</summary>
+    /// <summary>Gets or sets a legacy value for the removed Playlists sidebar section visibility toggle. Playlists are now a child group of the Local node and follow the Library section visibility.</summary>
     public bool ShowPlaylistsSection { get; set; } = true;
     /// <summary>Gets or sets a value indicating whether the Library section is expanded.</summary>
     public bool IsLocalLibrarySectionExpanded { get; set; } = true;
@@ -106,6 +106,8 @@ public sealed class AppSettings
     public bool IsLocalMediaLibraryGroupExpanded { get; set; } = true;
     /// <summary>Gets or sets remote Orynivo Server identifiers whose Library sidebar groups are collapsed.</summary>
     public HashSet<string> CollapsedOrynivoServerLibraryGroups { get; set; } = [];
+    /// <summary>Gets or sets remote Orynivo Server identifiers whose Playlists sidebar child group is collapsed.</summary>
+    public HashSet<string> CollapsedOrynivoServerPlaylistGroups { get; set; } = [];
     /// <summary>Gets or sets a value indicating whether the Own Radios section is expanded.</summary>
     public bool IsOwnRadiosSectionExpanded { get; set; }
     /// <summary>Gets or sets a value indicating whether the My Podcasts section is expanded.</summary>

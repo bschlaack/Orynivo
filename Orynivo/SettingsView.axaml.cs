@@ -137,7 +137,6 @@ internal partial class SettingsView : UserControl
         ShowOwnRadiosSectionCheckBox.IsChecked = settings.ShowOwnRadiosSection;
         ShowMyPodcastsSectionCheckBox.IsChecked = settings.ShowMyPodcastsSection;
         ShowPlexSectionCheckBox.IsChecked          = settings.ShowPlexSection;
-        ShowPlaylistsSectionCheckBox.IsChecked     = settings.ShowPlaylistsSection;
         ArtistInfoSourceComboBox.ItemsSource = Enum.GetValues<ArtistInfoSource>();
         ArtistInfoSourceComboBox.SelectedItem = settings.ArtistInfoSource;
         LastFmApiKeyTextBox.Text = settings.LastFmApiKey ?? string.Empty;
@@ -239,8 +238,6 @@ internal partial class SettingsView : UserControl
     public bool ShowMyPodcastsSection => ShowMyPodcastsSectionCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether the Plex sidebar section should be visible.</summary>
     public bool ShowPlexSection => ShowPlexSectionCheckBox.IsChecked == true;
-    /// <summary>Gets a value indicating whether the Playlists sidebar section should be visible.</summary>
-    public bool ShowPlaylistsSection => ShowPlaylistsSectionCheckBox.IsChecked == true;
 
     private static PlexServerSettings ClonePlexServer(PlexServerSettings server) => new()
     {

@@ -143,13 +143,33 @@ runtime dependency.
   for in-library navigation; `GET` `/api/tracks/facets` returns lightweight
   facet rows (`TrackFacetInfo`) and `POST` `/api/tracks/by-ids` returns track
   rows for a posted ID list, together powering the remote Tracks facet filters;
+  `GET /api/playlists` (including `FilterCriteria` for smart playlists),
+  `GET /api/playlists/{id}/tracks` (smart playlists are resolved server-side
+  through `SmartPlaylistCriteria.Resolve` using the server's own favourite
+  flags), `POST /api/playlists/{id}/resolve` (resolves a smart playlist while
+  overriding favourite state with the client-supplied favourite track IDs,
+  because remote favourites live client-side; this is what the Windows client
+  uses to open remote smart playlists so a `FavoritesOnly` criterion matches the
+  client's favourites instead of the server's unset flags),
+  `POST /api/playlists`,
+  `POST /api/playlists/smart` and `PUT /api/playlists/{id}/smart` (create and
+  update a smart playlist from client-supplied criteria, which the server
+  re-validates through `SmartPlaylistCriteria`),
+  `POST /api/playlists/{id}/tracks`, `DELETE /api/playlists/{id}`, and
+  `DELETE /api/playlist-tracks/{id}` expose server-side playlist browsing and
+  regular- and smart-playlist editing for remote clients; remote playlist writes
+  must use server-side track IDs, never credential-bearing stream URLs;
   `GET` `/api/folders/tracks` returns lightweight track
   rows for building the remote server library folder tree and must materialize
   the response before disposing the SQLite connection because JSON serialization
   runs after the route handler returns
 - `Orynivo.Server/Endpoints/StreamEndpoints.cs`: byte-range streaming for
   regular audio files; on-the-fly FLAC transcode via FFmpeg pipe for CUE
-  virtual tracks; album, artist, and track artwork endpoints (track artwork is
+  virtual tracks; `GET /api/stream/{trackId}?ss=<seconds>` performs a fast
+  server-side seek by transcoding the local file from that offset to FLAC (used
+  by remote clients so in-track seeking does not binary-search a seektable-less
+  file over HTTP); the transcode/FFmpeg process is stopped when the client
+  disconnects; album, artist, and track artwork endpoints (track artwork is
   served both by file path via `/api/artwork/track?p=` and by database ID via
   `/api/artwork/track/{id}` with an optional `?size=`); album artwork
   requests fall back to an on-demand embedded-artwork repair for the requested
@@ -190,7 +210,17 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
   `AsioBridge.dll` and `CwAsioBridge.dll`
 - `Orynivo/Audio/FfmpegAudioPlayer.cs`: PCM path
 - `Orynivo/Audio/FfmpegPcmDecoder.cs`: FFmpeg PCM decoder process with an
-  initial prefetched block used for gapless transitions
+  initial prefetched block used for gapless transitions. For `http(s)` inputs it
+  caps FFmpeg's stream analysis (`-analyzeduration`/`-probesize`) and adds
+  reconnect options so the first decode of a remote/HTTP track does not block on
+  FFmpeg's default 5 s probe window. The PCM probe paths
+  (`FfmpegAudioPlayer.ProbeAsync`, `WasapiAudioPlayer.ProbeAsync`) apply the same
+  capped `ffprobe` settings for HTTP inputs. Seeking a remote Orynivo Server
+  stream (URL contains `/api/stream/`) uses **server-side seek**: the decoder
+  appends `?ss=<seconds>` and decodes the offset stream from position 0 instead
+  of seeking the HTTP stream itself (which binary-searches seektable-less files
+  over many range round-trips). Plex and other HTTP inputs keep client-side
+  `-ss` seeking.
 - `Orynivo/Audio/FfmpegLocator.cs`: checks `AppContext.BaseDirectory` and PATH
   for `ffmpeg.exe`/`ffprobe.exe` at startup; when absent, downloads the BtbN
   LGPL-essential Windows build from GitHub Releases, extracts the binaries
@@ -355,7 +385,12 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
   album, all tracks, tracks by ID list (`GetTracksByIdsAsync`), track facet rows
   (`GetTrackFacetsAsync`), lightweight folder-tree tracks, per-track cached lyrics
   (`GetTrackLyricsAsync`/`UploadTrackLyricsAsync`), remote artist rename/merge
-  (`RenameArtistAsync`), server library paths,
+  (`RenameArtistAsync`), server playlists (`GetPlaylistsAsync`, which now also
+  carries each smart playlist's `FilterCriteria`), playlist tracks, regular
+  playlist create/append/delete, smart-playlist create/update
+  (`CreateSmartPlaylistAsync`/`UpdateSmartPlaylistAsync`), and smart-playlist
+  resolution with client-side favourites
+  (`ResolveSmartPlaylistTracksAsync`), server library paths,
   server directory listings, and scan status; `SetLibraryPathsAsync` replaces
   the remote server's configured library
   roots; `TriggerScanAsync` starts a remote scan; `UploadAlbumArtworkAsync` and
@@ -368,15 +403,33 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
   be passed directly to FFmpeg or Avalonia's image loader
 - The main sidebar library accordion is labelled **Library**/**Bibliothek**.
   Local media live under a collapsible **Local** child node followed by local
-  Artists, Albums, Tracks, and Folder structure. Configured remote Orynivo
+  Artists, Albums, Tracks, Folder structure, and a nested local Playlists group.
+  The complete **Local** child node (and its rows/playlists) is hidden whenever
+  no local library directory is configured (`AppSettings.LibraryPaths` empty).
+  When neither a local directory nor any Orynivo Server is configured, a hint
+  row (`LibraryEmptyHintItem`, `L_LibraryEmptyHint`) is shown directly under the
+  Library header telling the user to add local directories or one or more Orynivo
+  Servers in Settings. The hint disappears immediately when a directory or server
+  is added because `ApplyLibrarySectionVisibility` re-runs on every settings save,
+  navigation rebuild, and the live directory-change callback.
+  Configured remote Orynivo
   Server entries are rendered in that same Library accordion, after the local
   media rows, as one collapsible server-name row followed by Artists, Albums,
-  Tracks, and Folder structure child rows. There is no separate Orynivo Server
+  Tracks, Folder structure, and a collapsible Playlists child group; server
+  playlists are downloaded when the sidebar navigation is built and are
+  displayed below that server's Playlists group. The local Playlists group is a
+  child of the Local node, indented to align with the local Artists/Albums/
+  Tracks/Folder rows, and its entries are indented one level deeper. Both the
+  local and each server's Playlists group are independently collapsible while
+  keeping their playlist entries nested. There is no separate Orynivo Server
   sidebar accordion or separate Orynivo Server sidebar visibility setting;
   `ShowLocalLibrarySection` and `IsLocalLibrarySectionExpanded` control the
   complete Library accordion, including remote Orynivo Server rows.
-  `IsLocalMediaLibraryGroupExpanded` persists the Local child group state, and
-  `CollapsedOrynivoServerLibraryGroups` persists collapsed server child groups.
+  `IsLocalMediaLibraryGroupExpanded` persists the Local child group state,
+  `IsPlaylistsSectionExpanded` persists the local Playlists child group state,
+  `CollapsedOrynivoServerLibraryGroups` persists collapsed server child groups,
+  and `CollapsedOrynivoServerPlaylistGroups` persists collapsed per-server
+  Playlists child groups.
   Remote
   Artists, Albums, and Tracks reuse the **same** local table/artwork column masks
   (`ApplyColumns("Artists"/"Albums"/"Tracks")`), intro card
@@ -399,6 +452,18 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
   expose the same **Show all album tracks** checkbox used by local album
   details. Persisting remote album tracks as local playlists must
   remain disabled because the paths contain credential-bearing server URLs.
+  Remote playlist actions must target the track's own server and persist
+  playlist entries on that server through `OrynivoServerClient`, using remote
+  track IDs. Local playlist actions remain SQLite-based and are displayed under
+  the Local Playlists group. Smart playlists work identically for local and
+  remote libraries: the remote Tracks **Save smart playlist** action and the
+  sidebar **Edit smart playlist** context entry persist criteria on the server
+  through `CreateSmartPlaylistAsync`/`UpdateSmartPlaylistAsync`, while the server
+  resolves them live through `SmartPlaylistCriteria.Resolve`. Because remote
+  favourites are client-side, the client opens a remote smart playlist through
+  `ResolveSmartPlaylistTracksAsync` (`POST /api/playlists/{id}/resolve`), sending
+  its favourite track IDs so a `FavoritesOnly` criterion matches the client's
+  favourites; regular remote playlists still use `GetPlaylistTracksAsync`.
   Back navigation must capture remote album details as remote states carrying
   the Orynivo Server navigation tag; never restore a remote album detail through
   the local `ShowAlbumTracksAsync` path because server and local album IDs can
@@ -426,6 +491,11 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
   The remote track's server and primary artist ID are carried on its
   `ContentRow` (`OrynivoServer`, `ArtistId`); the now-playing artist button
   stays disabled for remote tracks because it navigates the local album view.
+  The transport favourite (heart) button is enabled for a playing remote track
+  and toggles the client-side favourite (`OrynivoServerFavorites`) for that
+  track via `CurrentOrynivoFavoriteTarget`; the change is written to
+  `settings.json` and reflected in any visible remote track rows. For local
+  tracks it still writes `tracks.is_favorite`.
 - `Orynivo/OrynivoServerDialog.axaml/.cs`: themed dialog for adding or editing a
   remote Orynivo Server (name, URL, API key, Test Connection); it can load, add,
   remove, and save the remote server's music directories through the server API,
@@ -1049,23 +1119,33 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
   bar
 - The full Orynivo logo appears on a light logo surface in the startup window
   and at the top of the main sidebar
-- The 220 px sidebar contains Dashboard, local library navigation, playlists,
-  device information, About, and Settings
-- Local library, personal radio, pinned podcast, Plex server, and playlist
-  sidebar groups use independently expandable accordion headers; expansion state
-  is persisted
+- The 220 px sidebar contains Dashboard, library navigation with local and
+  Orynivo Server playlists, device information, About, and Settings
+- Library, personal radio, pinned podcast, and Plex server sidebar groups use
+  independently expandable accordion headers; local playlists are a nested
+  Library child group and their expansion state is persisted
+- `NavListBox` must keep its non-virtualizing `StackPanel` `ItemsPanel`. The
+  sidebar collapse/expand logic toggles `ListBoxItem.IsVisible` directly; a
+  virtualizing panel recycles containers and drops those values, which breaks
+  the accordion groups (and is worsened by variable-height rows such as the
+  empty-library hint). Do not reintroduce virtualization here.
 - `AppSettings.ShowInternetRadioItem`, `ShowPodcastsItem`, and `ShowQueueItem`
   control visibility of the Internet Radio, Podcasts, and Up Next sidebar items
   from Settings > Appearance and default to visible
 - `AppSettings.ShowLocalLibrarySection`, `ShowOwnRadiosSection`,
-  `ShowMyPodcastsSection`, `ShowPlexSection`, and `ShowPlaylistsSection` control
-  group visibility from Settings > Appearance and default to visible
+  `ShowMyPodcastsSection`, and `ShowPlexSection` control group visibility from
+  Settings > Appearance and default to visible. (`ShowPlaylistsSection` is a
+  retained legacy setting with no UI control; the Playlists group is now a child
+  of the Local node and follows the Library section visibility.)
 - `AppSettings.IsLocalLibrarySectionExpanded`, `IsOwnRadiosSectionExpanded`,
   `IsMyPodcastsSectionExpanded`, `IsPlexSectionExpanded`, and
   `IsPlaylistsSectionExpanded` persist independent sidebar accordion states
-- `AppSettings.IsLocalMediaLibraryGroupExpanded` and
-  `CollapsedOrynivoServerLibraryGroups` persist the nested Local and Orynivo
-  Server child-group expansion states inside the Library sidebar accordion
+- `AppSettings.IsLocalMediaLibraryGroupExpanded`,
+  `CollapsedOrynivoServerLibraryGroups`, and
+  `CollapsedOrynivoServerPlaylistGroups` persist the nested Local, Orynivo
+  Server, and per-server Playlists child-group expansion states inside the
+  Library sidebar accordion; `IsPlaylistsSectionExpanded` persists the local
+  Playlists child group
 - About displays the author, library licenses, and the Steinberg ASIO trademark
   notice
 - The content header continues the native title-bar/sidebar appearance and shows
@@ -1382,12 +1462,19 @@ asynchronous file I/O from the UI thread
   artist, album, duration, recently added/played windows, never played,
   playback-count ranges, alphabetical/random/recent/least-recent ordering, and
   a result limit.
-- **Save smart playlist**: available in Tracks only when filters are active;
-  opens the compact `NewPlaylistDialog`, serializes the active favourite,
-  genre, format, and bitrate facets, and calls `CreateSmartPlaylist`.
+- **Save smart playlist**: available in the local and remote Orynivo Server
+  Tracks views only when facet filters are active; opens the compact
+  `NewPlaylistDialog` and serializes the active favourite, genre, format, and
+  bitrate facets through the shared `BuildCurrentTrackFilterCriteria` helper. In
+  the local Tracks view it calls `AudioDatabase.CreateSmartPlaylist`; in a remote
+  Tracks view it calls `OrynivoServerClient.CreateSmartPlaylistAsync` so the
+  smart playlist is persisted on that server.
 - Right-clicking a smart playlist in the sidebar exposes **Edit smart
-  playlist**, which opens `SmartPlaylistDialog` with the stored name and full
-  criteria. Saving updates `filter_criteria` without replacing playlist rows.
+  playlist**, which opens the shared `SmartPlaylistDialog` with the stored name
+  and full criteria. Local smart playlists update `filter_criteria` through
+  `AudioDatabase.UpdateSmartPlaylist`; remote Orynivo Server smart playlists
+  update through `OrynivoServerClient.UpdateSmartPlaylistAsync` on the track's
+  own server. Saving never replaces playlist rows.
 - Right-clicking the Playlists accordion header exposes **Import M3U8
   playlist**. Imports are UTF-8, resolve relative local paths against the M3U8
   directory, preserve missing local paths, and retain HTTP/HTTPS entries.

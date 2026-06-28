@@ -206,6 +206,7 @@ public static class LibraryEndpoints
                 p.Description,
                 p.TrackCount,
                 p.IsSmartPlaylist,
+                p.FilterCriteria,
                 p.CreatedAt,
                 p.ModifiedAt
             }).ToList();
@@ -219,29 +220,124 @@ public static class LibraryEndpoints
             if (playlist is null) return Results.NotFound();
 
             if (playlist.IsSmartPlaylist && playlist.FilterCriteria is not null)
-            {
-                SmartPlaylistCriteria criteria;
-                try { criteria = JsonSerializer.Deserialize<SmartPlaylistCriteria>(playlist.FilterCriteria)!; }
-                catch { return Results.BadRequest(new { error = "Invalid smart playlist criteria." }); }
+                return ResolveSmartPlaylistTracks(db, playlist, favoriteOverride: null);
 
-                var candidates = db.GetSmartPlaylistTracks();
-                var resolved = criteria.Resolve(candidates);
-                var ids = resolved.Select(t => t.Id).ToList();
-                var tracks = db.GetTrackListByIds(ids);
-                return Results.Ok(tracks.Select(TrackDto).ToList());
-            }
-
-            var entries = db.GetPlaylistTracks(playlistId);
+            var entries = db.GetPlaylistTracks(playlistId).ToList();
             var playlistTracks = entries.Select(e => new
             {
-                e.Id,
-                e.PlaylistId,
+                PlaylistEntryId = e.Id,
                 e.Path,
-                e.TrackId,
                 e.Position,
-                e.AddedAt
+                Track = e.TrackId is long trackId
+                    ? db.GetTrackListByIds([trackId]).FirstOrDefault()
+                    : db.GetTrackListByPaths([e.Path]).FirstOrDefault()
             }).ToList();
-            return Results.Ok(playlistTracks);
+            return Results.Ok(playlistTracks.Select(e => new
+            {
+                e.PlaylistEntryId,
+                e.Position,
+                e.Path,
+                Track = e.Track is null ? null : TrackDto(e.Track)
+            }).ToList());
+        });
+
+        api.MapPost("/playlists/{playlistId:long}/resolve", (long playlistId, SmartPlaylistResolveRequest request) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            var playlist = db.GetPlaylistById(playlistId);
+            if (playlist is null) return Results.NotFound();
+            if (!playlist.IsSmartPlaylist || playlist.FilterCriteria is null)
+                return Results.BadRequest(new { error = "Not a smart playlist." });
+
+            // Remote favourites are client-side: the client supplies its favourite
+            // track IDs so a FavoritesOnly criterion resolves against them instead of
+            // the server's own (unset) is_favorite flags.
+            var favoriteOverride = new HashSet<long>(request.FavoriteTrackIds ?? []);
+            return ResolveSmartPlaylistTracks(db, playlist, favoriteOverride);
+        });
+
+        api.MapPost("/playlists", (PlaylistCreateRequest request) =>
+        {
+            var name = request.Name?.Trim();
+            if (string.IsNullOrWhiteSpace(name))
+                return Results.BadRequest();
+
+            using var db = AudioDatabase.OpenDefault();
+            var playlistId = db.CreatePlaylist(name);
+            foreach (var trackId in request.TrackIds ?? [])
+            {
+                var track = db.GetTrackById(trackId);
+                if (track is not null)
+                    db.AddTrackToPlaylist(playlistId, track.Path, track.Id);
+            }
+
+            var playlist = db.GetPlaylistById(playlistId);
+            return playlist is null ? Results.NotFound() : Results.Ok(PlaylistDto(playlist));
+        });
+
+        api.MapPost("/playlists/smart", (SmartPlaylistSaveRequest request) =>
+        {
+            var name = request.Name?.Trim();
+            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(request.FilterCriteria))
+                return Results.BadRequest();
+            if (!TryNormalizeSmartCriteria(request.FilterCriteria, out var json))
+                return Results.BadRequest(new { error = "Invalid smart playlist criteria." });
+
+            using var db = AudioDatabase.OpenDefault();
+            var playlistId = db.CreateSmartPlaylist(name, json);
+            var playlist = db.GetPlaylistById(playlistId);
+            return playlist is null ? Results.NotFound() : Results.Ok(PlaylistDto(playlist));
+        });
+
+        api.MapPut("/playlists/{playlistId:long}/smart", (long playlistId, SmartPlaylistSaveRequest request) =>
+        {
+            var name = request.Name?.Trim();
+            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(request.FilterCriteria))
+                return Results.BadRequest();
+            if (!TryNormalizeSmartCriteria(request.FilterCriteria, out var json))
+                return Results.BadRequest(new { error = "Invalid smart playlist criteria." });
+
+            using var db = AudioDatabase.OpenDefault();
+            var playlist = db.GetPlaylistById(playlistId);
+            if (playlist is null || !playlist.IsSmartPlaylist)
+                return Results.NotFound();
+
+            db.UpdateSmartPlaylist(playlistId, name, json);
+            var updated = db.GetPlaylistById(playlistId);
+            return updated is null ? Results.NotFound() : Results.Ok(PlaylistDto(updated));
+        });
+
+        api.MapPost("/playlists/{playlistId:long}/tracks", (long playlistId, PlaylistTrackAppendRequest request) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            var playlist = db.GetPlaylistById(playlistId);
+            if (playlist is null || playlist.IsSmartPlaylist)
+                return Results.NotFound();
+
+            foreach (var trackId in request.TrackIds ?? [])
+            {
+                var track = db.GetTrackById(trackId);
+                if (track is not null)
+                    db.AddTrackToPlaylist(playlistId, track.Path, track.Id);
+            }
+
+            return Results.NoContent();
+        });
+
+        api.MapDelete("/playlists/{playlistId:long}", (long playlistId) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            if (db.GetPlaylistById(playlistId) is null)
+                return Results.NotFound();
+            db.DeletePlaylist(playlistId);
+            return Results.NoContent();
+        });
+
+        api.MapDelete("/playlist-tracks/{playlistEntryId:long}", (long playlistEntryId) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            db.RemoveTrackFromPlaylist(playlistEntryId);
+            return Results.NoContent();
         });
 
         // --- Search --------------------------------------------------------
@@ -377,6 +473,73 @@ public static class LibraryEndpoints
         HasImage = !string.IsNullOrEmpty(a.ImagePath),
         a.ImageIsManual
     };
+
+    private static object PlaylistDto(PlaylistRecord p) => new
+    {
+        p.Id,
+        p.Name,
+        p.Description,
+        p.TrackCount,
+        p.IsSmartPlaylist,
+        p.FilterCriteria,
+        p.CreatedAt,
+        p.ModifiedAt
+    };
+
+    /// <summary>Resolves a smart playlist's tracks, optionally overriding favourite state with a client-supplied set.</summary>
+    /// <param name="db">Open library database.</param>
+    /// <param name="playlist">Smart playlist whose <see cref="PlaylistRecord.FilterCriteria"/> is resolved.</param>
+    /// <param name="favoriteOverride">Track IDs the requesting client treats as favourites, or <see langword="null"/> to use the server's stored favourite flags.</param>
+    /// <returns>An HTTP result with the resolved playlist track rows.</returns>
+    private static IResult ResolveSmartPlaylistTracks(
+        AudioDatabase db,
+        PlaylistRecord playlist,
+        HashSet<long>? favoriteOverride)
+    {
+        SmartPlaylistCriteria criteria;
+        try { criteria = JsonSerializer.Deserialize<SmartPlaylistCriteria>(playlist.FilterCriteria!)!; }
+        catch { return Results.BadRequest(new { error = "Invalid smart playlist criteria." }); }
+
+        var candidates = favoriteOverride is null
+            ? db.GetSmartPlaylistTracks()
+            : db.GetSmartPlaylistTracks()
+                .Select(t => t with { IsFavorite = favoriteOverride.Contains(t.Id) })
+                .ToList();
+        var resolved = criteria.Resolve(candidates);
+        var ids = resolved.Select(t => t.Id).ToList();
+        var tracks = db.GetTrackListByIds(ids);
+        return Results.Ok(tracks.Select((track, index) => new
+        {
+            PlaylistEntryId = 0L,
+            Position = index + 1,
+            track.Path,
+            Track = TrackDto(track)
+        }).ToList());
+    }
+
+    /// <summary>Validates client-supplied smart-playlist criteria and returns a canonical serialized form.</summary>
+    /// <param name="filterCriteria">Raw criteria JSON from the client.</param>
+    /// <param name="normalized">Re-serialized criteria when valid; otherwise an empty string.</param>
+    /// <returns><see langword="true"/> when <paramref name="filterCriteria"/> is valid smart-playlist criteria.</returns>
+    private static bool TryNormalizeSmartCriteria(string filterCriteria, out string normalized)
+    {
+        try
+        {
+            var criteria = JsonSerializer.Deserialize<SmartPlaylistCriteria>(filterCriteria);
+            if (criteria is null)
+            {
+                normalized = string.Empty;
+                return false;
+            }
+            normalized = JsonSerializer.Serialize(criteria);
+            return true;
+        }
+        catch
+        {
+            normalized = string.Empty;
+            return false;
+        }
+    }
 }
 
 /// <summary>Request body for storing a client-refreshed artist profile on the server.</summary>
@@ -408,3 +571,21 @@ public sealed record ArtistRenameResponse(ArtistRenameResult? Result, object? Ma
 public sealed record TrackLyricsUpdateRequest(
     string? PlainLyrics,
     string? SyncedLyrics);
+
+/// <summary>Request body for creating a regular server playlist.</summary>
+/// <param name="Name">Playlist display name.</param>
+/// <param name="TrackIds">Initial server-side track IDs.</param>
+public sealed record PlaylistCreateRequest(string? Name, IReadOnlyList<long>? TrackIds);
+
+/// <summary>Request body for appending tracks to a server playlist.</summary>
+/// <param name="TrackIds">Server-side track IDs to append.</param>
+public sealed record PlaylistTrackAppendRequest(IReadOnlyList<long>? TrackIds);
+
+/// <summary>Request body for creating or updating a smart server playlist.</summary>
+/// <param name="Name">Playlist display name.</param>
+/// <param name="FilterCriteria">Serialized <see cref="SmartPlaylistCriteria"/> JSON.</param>
+public sealed record SmartPlaylistSaveRequest(string? Name, string? FilterCriteria);
+
+/// <summary>Request body for resolving a smart playlist with client-side favourite state.</summary>
+/// <param name="FavoriteTrackIds">Track IDs the requesting client treats as favourites.</param>
+public sealed record SmartPlaylistResolveRequest(IReadOnlyList<long>? FavoriteTrackIds);

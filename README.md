@@ -123,6 +123,10 @@ works directly in FFmpeg and browser URLs.
 | `PUT /api/artwork/artist/{id}` | Store raw client-selected artist image bytes on the server |
 | `GET /api/playlists` | All playlists (regular and smart) |
 | `GET /api/playlists/{id}/tracks` | Resolved track list (smart playlists are evaluated live) |
+| `POST /api/playlists` | Create a regular playlist from server-side track IDs |
+| `POST /api/playlists/{id}/tracks` | Append server-side track IDs to a regular playlist |
+| `DELETE /api/playlists/{id}` | Delete a playlist on the server |
+| `DELETE /api/playlist-tracks/{id}` | Remove one entry from a server playlist |
 | `GET /api/search?q=` | Full-text search — returns matching tracks |
 | `GET /api/search/full?q=` | Category search — returns tracks, albums, and artists |
 | `GET /api/stream/{trackId}` | Byte-range HTTP streaming for regular files; FLAC transcode for CUE virtual tracks |
@@ -221,6 +225,10 @@ byte-range streaming without FFmpeg.
 - Opening a remote server album from a selected artist initially scopes the
   album tracks to that artist, with the same checkbox used by local albums to
   show every track on the album.
+- Playlists live under the Library sidebar: local playlists are grouped below
+  Local, and each Orynivo Server exposes its own Playlists node populated from
+  that server. Adding/removing tracks and creating/deleting regular playlists
+  for remote server tracks writes to the selected server.
 - Remote Orynivo Server artists, albums, and tracks can be marked as favorites;
   those favorite flags are stored only in the Windows client's settings.
 - Remote Orynivo Server album covers and artist images can be searched from the

@@ -776,10 +776,6 @@
                               Content="{DynamicResource L_PlexServers}"
                               Theme="{StaticResource SettingsCheckBoxTheme}"
                               Margin="0,4"/>
-                    <CheckBox x:Name="ShowPlaylistsSectionCheckBox"
-                              Content="{DynamicResource L_Playlists}"
-                              Theme="{StaticResource SettingsCheckBoxTheme}"
-                              Margin="0,4"/>
                 </StackPanel>
 
                 <StackPanel x:Name="McpPanel"

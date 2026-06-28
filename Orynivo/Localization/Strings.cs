@@ -610,6 +610,8 @@ public sealed record LocalizedStrings(
     public string InvalidSmartPlaylistCriteria { get; init; } = "";
     /// <summary>Gets the sidebar action label for editing a smart playlist.</summary>
     public string EditSmartPlaylist { get; init; } = "";
+    /// <summary>Gets the hint shown under the Library header when no local directories or Orynivo Servers are configured.</summary>
+    public string LibraryEmptyHint { get; init; } = "";
     /// <summary>Gets the status message shown after a smart playlist was updated.</summary>
     public string SmartPlaylistUpdated { get; init; } = "";
     /// <summary>Gets the command label for importing an M3U8 playlist.</summary>

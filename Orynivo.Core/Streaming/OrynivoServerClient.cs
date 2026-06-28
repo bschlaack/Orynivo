@@ -138,6 +138,50 @@ public sealed record OrynivoTrackSearchResult(IReadOnlyList<OrynivoTrackInfo> Tr
 /// <param name="FetchedAt">Unix-seconds timestamp of the last lyrics lookup, or <see langword="null"/>.</param>
 public sealed record OrynivoLyrics(string? PlainLyrics, string? SyncedLyrics, long? FetchedAt = null);
 
+/// <summary>Playlist entry returned by a remote Orynivo Server.</summary>
+/// <param name="Id">Playlist database ID.</param>
+/// <param name="Name">Playlist display name.</param>
+/// <param name="Description">Optional playlist description.</param>
+/// <param name="TrackCount">Number of tracks in the playlist.</param>
+/// <param name="IsSmartPlaylist">Whether the playlist is backed by smart criteria.</param>
+/// <param name="CreatedAt">Creation timestamp in Unix seconds.</param>
+/// <param name="ModifiedAt">Modification timestamp in Unix seconds.</param>
+/// <param name="FilterCriteria">Serialized smart-playlist criteria JSON, or <see langword="null"/> for a regular playlist.</param>
+public sealed record OrynivoPlaylistInfo(
+    long Id,
+    string Name,
+    string? Description,
+    int TrackCount,
+    bool IsSmartPlaylist,
+    long CreatedAt,
+    long ModifiedAt,
+    string? FilterCriteria = null);
+
+/// <summary>Track row inside a remote Orynivo Server playlist.</summary>
+/// <param name="PlaylistEntryId">Playlist entry database ID.</param>
+/// <param name="Position">One-based playlist position.</param>
+/// <param name="Path">Stored server-side path.</param>
+/// <param name="Track">Resolved track metadata, or <see langword="null"/> when the original file no longer exists.</param>
+public sealed record OrynivoPlaylistTrackInfo(long PlaylistEntryId, int Position, string Path, OrynivoTrackInfo? Track);
+
+/// <summary>Request body for creating a regular playlist on a remote Orynivo Server.</summary>
+/// <param name="Name">Playlist display name.</param>
+/// <param name="TrackIds">Initial server-side track IDs.</param>
+public sealed record OrynivoPlaylistCreateRequest(string Name, IReadOnlyList<long> TrackIds);
+
+/// <summary>Request body for appending tracks to a regular playlist on a remote Orynivo Server.</summary>
+/// <param name="TrackIds">Server-side track IDs to append.</param>
+public sealed record OrynivoPlaylistTrackAppendRequest(IReadOnlyList<long> TrackIds);
+
+/// <summary>Request body for creating or updating a smart playlist on a remote Orynivo Server.</summary>
+/// <param name="Name">Playlist display name.</param>
+/// <param name="FilterCriteria">Serialized smart-playlist criteria JSON.</param>
+public sealed record OrynivoSmartPlaylistSaveRequest(string Name, string FilterCriteria);
+
+/// <summary>Request body for resolving a remote smart playlist using client-side favourites.</summary>
+/// <param name="FavoriteTrackIds">Server-side track IDs the client treats as favourites.</param>
+public sealed record OrynivoSmartPlaylistResolveRequest(IReadOnlyList<long> FavoriteTrackIds);
+
 /// <summary>Server info returned by <c>/api/info</c>.</summary>
 public sealed record OrynivoServerInfo(
     string Name,
@@ -445,6 +489,198 @@ public sealed class OrynivoServerClient : IDisposable
         }
         catch { return []; }
     }
+
+    /// <summary>Returns playlists stored on the remote server.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Playlist rows, or an empty list on error.</returns>
+    public async Task<List<OrynivoPlaylistInfo>> GetPlaylistsAsync(
+        OrynivoServerSettings server,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await GetJsonAsync<List<OrynivoPlaylistInfo>>(server, "/api/playlists", cancellationToken) ?? [];
+        }
+        catch { return []; }
+    }
+
+    /// <summary>Returns resolved tracks for a remote playlist.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="playlistId">Remote playlist identifier.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Playlist track rows, or an empty list on error.</returns>
+    public async Task<List<OrynivoPlaylistTrackInfo>> GetPlaylistTracksAsync(
+        OrynivoServerSettings server,
+        long playlistId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await GetJsonAsync<List<OrynivoPlaylistTrackInfo>>(
+                server,
+                $"/api/playlists/{playlistId}/tracks",
+                cancellationToken) ?? [];
+        }
+        catch { return []; }
+    }
+
+    /// <summary>Creates a regular playlist on the remote server.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="name">Playlist name.</param>
+    /// <param name="trackIds">Initial server-side track IDs.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The created playlist, or <see langword="null"/> on error.</returns>
+    public async Task<OrynivoPlaylistInfo?> CreatePlaylistAsync(
+        OrynivoServerSettings server,
+        string name,
+        IReadOnlyList<long> trackIds,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, BuildUrl(server, "/api/playlists"))
+            {
+                Content = JsonContent.Create(new OrynivoPlaylistCreateRequest(name, trackIds), options: JsonOptions)
+            };
+            request.Headers.Add("X-Api-Key", server.ApiKey);
+            using var response = await _http.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+                return null;
+            return await response.Content.ReadFromJsonAsync<OrynivoPlaylistInfo>(JsonOptions, cancellationToken);
+        }
+        catch { return null; }
+    }
+
+    /// <summary>Resolves a remote smart playlist using the client's favourite track IDs.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="playlistId">Remote smart playlist identifier.</param>
+    /// <param name="favoriteTrackIds">Server-side track IDs the client treats as favourites.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Resolved playlist track rows, or an empty list on error.</returns>
+    public async Task<List<OrynivoPlaylistTrackInfo>> ResolveSmartPlaylistTracksAsync(
+        OrynivoServerSettings server,
+        long playlistId,
+        IReadOnlyList<long> favoriteTrackIds,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, BuildUrl(server, $"/api/playlists/{playlistId}/resolve"))
+            {
+                Content = JsonContent.Create(new OrynivoSmartPlaylistResolveRequest(favoriteTrackIds), options: JsonOptions)
+            };
+            request.Headers.Add("X-Api-Key", server.ApiKey);
+            using var response = await _http.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+                return [];
+            return await response.Content.ReadFromJsonAsync<List<OrynivoPlaylistTrackInfo>>(JsonOptions, cancellationToken) ?? [];
+        }
+        catch { return []; }
+    }
+
+    /// <summary>Creates a smart playlist on the remote server.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="name">Playlist name.</param>
+    /// <param name="filterCriteria">Serialized smart-playlist criteria JSON.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The created playlist, or <see langword="null"/> on error.</returns>
+    public async Task<OrynivoPlaylistInfo?> CreateSmartPlaylistAsync(
+        OrynivoServerSettings server,
+        string name,
+        string filterCriteria,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, BuildUrl(server, "/api/playlists/smart"))
+            {
+                Content = JsonContent.Create(new OrynivoSmartPlaylistSaveRequest(name, filterCriteria), options: JsonOptions)
+            };
+            request.Headers.Add("X-Api-Key", server.ApiKey);
+            using var response = await _http.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+                return null;
+            return await response.Content.ReadFromJsonAsync<OrynivoPlaylistInfo>(JsonOptions, cancellationToken);
+        }
+        catch { return null; }
+    }
+
+    /// <summary>Updates a smart playlist's name and criteria on the remote server.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="playlistId">Remote playlist identifier.</param>
+    /// <param name="name">New playlist name.</param>
+    /// <param name="filterCriteria">Serialized smart-playlist criteria JSON.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The updated playlist, or <see langword="null"/> on error.</returns>
+    public async Task<OrynivoPlaylistInfo?> UpdateSmartPlaylistAsync(
+        OrynivoServerSettings server,
+        long playlistId,
+        string name,
+        string filterCriteria,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Put, BuildUrl(server, $"/api/playlists/{playlistId}/smart"))
+            {
+                Content = JsonContent.Create(new OrynivoSmartPlaylistSaveRequest(name, filterCriteria), options: JsonOptions)
+            };
+            request.Headers.Add("X-Api-Key", server.ApiKey);
+            using var response = await _http.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+                return null;
+            return await response.Content.ReadFromJsonAsync<OrynivoPlaylistInfo>(JsonOptions, cancellationToken);
+        }
+        catch { return null; }
+    }
+
+    /// <summary>Appends tracks to a regular playlist on the remote server.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="playlistId">Remote playlist identifier.</param>
+    /// <param name="trackIds">Server-side track IDs to append.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when the server accepted the update.</returns>
+    public async Task<bool> AddTracksToPlaylistAsync(
+        OrynivoServerSettings server,
+        long playlistId,
+        IReadOnlyList<long> trackIds,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, BuildUrl(server, $"/api/playlists/{playlistId}/tracks"))
+            {
+                Content = JsonContent.Create(new OrynivoPlaylistTrackAppendRequest(trackIds), options: JsonOptions)
+            };
+            request.Headers.Add("X-Api-Key", server.ApiKey);
+            using var response = await _http.SendAsync(request, cancellationToken);
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>Deletes a playlist on the remote server.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="playlistId">Remote playlist identifier.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when the server deleted the playlist.</returns>
+    public async Task<bool> DeletePlaylistAsync(
+        OrynivoServerSettings server,
+        long playlistId,
+        CancellationToken cancellationToken = default)
+        => await SendNoContentAsync(server, HttpMethod.Delete, $"/api/playlists/{playlistId}", cancellationToken);
+
+    /// <summary>Removes a playlist entry on the remote server.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="playlistEntryId">Playlist entry identifier.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when the server removed the entry.</returns>
+    public async Task<bool> RemovePlaylistEntryAsync(
+        OrynivoServerSettings server,
+        long playlistEntryId,
+        CancellationToken cancellationToken = default)
+        => await SendNoContentAsync(server, HttpMethod.Delete, $"/api/playlist-tracks/{playlistEntryId}", cancellationToken);
 
     /// <summary>
     /// Returns a page of tracks from the server's library.
@@ -823,6 +1059,22 @@ public sealed class OrynivoServerClient : IDisposable
             {
                 Content = content
             };
+            request.Headers.Add("X-Api-Key", server.ApiKey);
+            using var response = await _http.SendAsync(request, cancellationToken);
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    private async Task<bool> SendNoContentAsync(
+        OrynivoServerSettings server,
+        HttpMethod method,
+        string path,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(method, BuildUrl(server, path));
             request.Headers.Add("X-Api-Key", server.ApiKey);
             using var response = await _http.SendAsync(request, cancellationToken);
             return response.IsSuccessStatusCode;

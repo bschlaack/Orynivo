@@ -51,6 +51,7 @@ public static class LocalizationManager
         var resources = AvaloniaApp.Current!.Resources;
         resources["L_LocalLibrary"] = Current.LocalLibrary;
         resources["L_LocalMedia"] = Current.LocalMedia;
+        resources["L_LibraryEmptyHint"] = Current.LibraryEmptyHint;
         resources["L_Artists"] = Current.Artists;
         resources["L_Albums"] = Current.Albums;
         resources["L_Tracks"] = Current.Tracks;
@@ -318,7 +319,7 @@ public static class LocalizationManager
     }
 
     private static readonly LocalizedStrings German = new(
-        "BIBLIOTHEK", "Künstler", "Alben", "Tracks", "Ordnerstruktur", "Suche", "PLAYLISTS", "Über", "Einstellungen",
+        "BIBLIOTHEK", "Künstler", "Alben", "Tracks", "Ordnerstruktur", "Suche", "Playlists", "Über", "Einstellungen",
         "Filter", "Favoriten", "Audiotypen", "Bitrate",
         "Kein Gerät ausgewählt.", "DARSTELLUNG", "Farbschema", "Sprache", "WIEDERGABE", "Ausgabegerät",
         "BIBLIOTHEK", "Verzeichnisse", "+ Verzeichnis hinzufügen", "Datenbankwartung",
@@ -689,6 +690,7 @@ public static class LocalizationManager
         , CreateSmartPlaylist = "Smart-Playlist erstellen"
         , InvalidSmartPlaylistCriteria = "Bitte gültige Zahlen und widerspruchsfreie Mindest-/Maximalwerte eingeben. „Noch nie gespielt“ kann nicht mit einer kürzlichen Wiedergabe oder einer Mindestanzahl kombiniert werden."
         , EditSmartPlaylist = "Smart-Playlist bearbeiten"
+        , LibraryEmptyHint = "Noch keine Medienquelle eingerichtet. Lege in den Einstellungen lokale Verzeichnisse oder einen oder mehrere Orynivo Server an."
         , SmartPlaylistUpdated = "Smart-Playlist »{0}« aktualisiert."
         , ImportM3u8Playlist = "M3U8-Playlist importieren"
         , ExportM3u8Playlist = "Als M3U8 exportieren"
@@ -731,7 +733,7 @@ public static class LocalizationManager
     };
 
     private static readonly LocalizedStrings English = new(
-        "LIBRARY", "Artists", "Albums", "Tracks", "Folder structure", "Search", "PLAYLISTS", "About", "Settings",
+        "LIBRARY", "Artists", "Albums", "Tracks", "Folder structure", "Search", "Playlists", "About", "Settings",
         "Filter", "Favorites", "Audio types", "Bitrate",
         "No device selected.", "APPEARANCE", "Color scheme", "Language", "PLAYBACK", "Output device",
         "LIBRARY", "Directories", "+ Add directory", "Database maintenance",
@@ -1083,6 +1085,7 @@ public static class LocalizationManager
         , CreateSmartPlaylist = "Create smart playlist"
         , InvalidSmartPlaylistCriteria = "Enter valid numbers and consistent minimum/maximum values. “Never played” cannot be combined with recent playback or a positive minimum play count."
         , EditSmartPlaylist = "Edit smart playlist"
+        , LibraryEmptyHint = "No media source configured yet. Add local directories or one or more Orynivo Servers in the settings."
         , SmartPlaylistUpdated = "Smart playlist '{0}' updated."
         , ImportM3u8Playlist = "Import M3U8 playlist"
         , ExportM3u8Playlist = "Export as M3U8"
@@ -1125,7 +1128,7 @@ public static class LocalizationManager
     };
 
     private static readonly LocalizedStrings French = new(
-        "BIBLIOTHÈQUE", "Artistes", "Albums", "Titres", "Arborescence", "Recherche", "PLAYLISTS", "À propos", "Paramètres",
+        "BIBLIOTHÈQUE", "Artistes", "Albums", "Titres", "Arborescence", "Recherche", "Playlists", "À propos", "Paramètres",
         "Filtre", "Favoris", "Types audio", "Débit",
         "Aucun appareil sélectionné.", "APPARENCE", "Thème", "Langue", "LECTURE", "Périphérique de sortie",
         "BIBLIOTHÈQUE", "Dossiers", "+ Ajouter un dossier", "Maintenance de la base",
@@ -1480,6 +1483,7 @@ public static class LocalizationManager
         , CreateSmartPlaylist = "Créer la playlist intelligente"
         , InvalidSmartPlaylistCriteria = "Saisissez des nombres valides et des valeurs minimum/maximum cohérentes. « Jamais lu » ne peut pas être combiné avec une lecture récente ou un minimum de lectures positif."
         , EditSmartPlaylist = "Modifier la playlist intelligente"
+        , LibraryEmptyHint = "Aucune source multimédia configurée. Ajoutez des répertoires locaux ou un ou plusieurs serveurs Orynivo dans les paramètres."
         , SmartPlaylistUpdated = "Playlist intelligente « {0} » mise à jour."
         , ImportM3u8Playlist = "Importer une playlist M3U8"
         , ExportM3u8Playlist = "Exporter au format M3U8"
@@ -1522,7 +1526,7 @@ public static class LocalizationManager
     };
 
     private static readonly LocalizedStrings Spanish = new(
-        "BIBLIOTECA", "Artistas", "Álbumes", "Pistas", "Estructura de carpetas", "Búsqueda", "LISTAS", "Acerca de", "Ajustes",
+        "BIBLIOTECA", "Artistas", "Álbumes", "Pistas", "Estructura de carpetas", "Búsqueda", "Listas", "Acerca de", "Ajustes",
         "Filtro", "Favoritos", "Tipos de audio", "Tasa de bits",
         "Ningún dispositivo seleccionado.", "APARIENCIA", "Esquema de color", "Idioma", "REPRODUCCIÓN", "Dispositivo de salida",
         "BIBLIOTECA", "Directorios", "+ Agregar directorio", "Mantenimiento de base de datos",
@@ -1874,6 +1878,7 @@ public static class LocalizationManager
         , CreateSmartPlaylist = "Crear lista inteligente"
         , InvalidSmartPlaylistCriteria = "Introduce números válidos y valores mínimos/máximos coherentes. «Nunca reproducido» no puede combinarse con reproducción reciente ni con un mínimo positivo de reproducciones."
         , EditSmartPlaylist = "Editar lista inteligente"
+        , LibraryEmptyHint = "Aún no hay ninguna fuente multimedia configurada. Añade directorios locales o uno o varios servidores Orynivo en los ajustes."
         , SmartPlaylistUpdated = "Lista inteligente '{0}' actualizada."
         , ImportM3u8Playlist = "Importar lista M3U8"
         , ExportM3u8Playlist = "Exportar como M3U8"

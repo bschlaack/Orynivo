@@ -61,7 +61,7 @@
                 <ControlTemplate>
                     <Border x:Name="Bd"
                             Background="{TemplateBinding Background}"
-                            Padding="24,12,14,5"
+                            Padding="24,12,12,5"
                             ClipToBounds="True">
                         <ContentPresenter Content="{TemplateBinding Content}"
                                           VerticalAlignment="Center"
@@ -722,6 +722,14 @@
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                      SelectionChanged="NavListBox_OnSelectionChanged"
                      PointerReleased="NavListBox_OnPreviewMouseLeftButtonUp">
+                <!-- Non-virtualizing panel: the sidebar toggles ListBoxItem.IsVisible
+                     directly. A VirtualizingStackPanel recycles containers and loses
+                     those IsVisible values, which breaks the collapse/expand groups. -->
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel/>
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
 
                 <ListBoxItem Tag="Dashboard" Theme="{StaticResource NavItemTheme}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -782,6 +790,17 @@
                               StrokeLineCap="Round"
                               StrokeJoin="Round"/>
                     </Grid>
+                </ListBoxItem>
+                <ListBoxItem x:Name="LibraryEmptyHintItem"
+                             IsHitTestVisible="False"
+                             Focusable="False"
+                             IsVisible="False"
+                             Theme="{StaticResource NavItemTheme}">
+                    <TextBlock Text="{DynamicResource L_LibraryEmptyHint}"
+                               TextWrapping="Wrap"
+                               FontSize="11"
+                               Margin="16,2,4,2"
+                               Foreground="{DynamicResource AppMutedTextBrush}"/>
                 </ListBoxItem>
                 <ListBoxItem x:Name="LocalLibraryRootItem"
                              Tag="LibraryGroup:LocalMedia"

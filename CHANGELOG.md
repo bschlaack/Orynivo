@@ -8,6 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- The transport favourite (heart) button now works while playing a remote
+  Orynivo Server track and toggles the client-side favourite for that track
+  (stored in `settings.json`), mirroring the change in any visible remote track
+  rows. Previously the button was only active for local tracks.
+- When no local library directory and no Orynivo Server are configured, the
+  Library sidebar now shows a hint pointing to Settings to add local directories
+  or one or more Orynivo Servers. The complete Local node is hidden until a
+  library directory exists, and the hint disappears immediately once a directory
+  or server is added.
 - The transport lyrics and artist-info buttons now work while playing a track
   from a remote Orynivo Server. Lyrics are fetched from LRCLIB and the artist
   biography/image from Wikipedia or Last.fm on the client, then cached on the
@@ -59,6 +68,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Remote Orynivo Server artist-info views now expose the same rename/merge and
   Wikimedia image-search actions as local artists. Renames and merges are
   committed through the server and rebuild the server Lucene index.
+- Local playlists now appear under the Local node in the Library sidebar.
+  Each configured Orynivo Server now exposes server-side playlists under its
+  own Playlists node; regular remote playlists can be created, deleted, filled
+  with server tracks, opened, played, and edited by removing entries.
+- Smart playlists now work for remote Orynivo Servers exactly like for local
+  media. The remote Tracks view gained the **Save smart playlist** action (when
+  facet filters are active), and remote smart playlists expose **Edit smart
+  playlist** in the sidebar context menu. Criteria are persisted on the server
+  through new `POST /api/playlists/smart` and `PUT /api/playlists/{id}/smart`
+  endpoints and resolved live server-side. The local and remote save paths share
+  the same `SmartPlaylistCriteria` model, `SmartPlaylistDialog`, and a shared
+  criteria-builder helper. Because remote favourites are stored client-side,
+  opening a remote smart playlist resolves it through a new
+  `POST /api/playlists/{id}/resolve` endpoint that receives the client's
+  favourite track IDs, so a Favourites-only remote smart playlist correctly
+  returns the client's favourited tracks instead of an empty list.
 - Remote Orynivo Server entries now expand into Artists, Albums, Tracks, and
   Folder structure in the sidebar. Remote Artists and Albums reuse the local
   table/artwork masks with lazy authenticated artwork loading and a local
@@ -77,6 +102,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Settings no longer exposes a separate Orynivo Server sidebar visibility
   toggle; the Library sidebar toggle controls both local media and configured
   Orynivo Server entries.
+- Removed the now-defunct Playlists toggle from Settings > Appearance > sidebar
+  sections. Playlists are a child group of the Local node and follow the Library
+  section visibility; the legacy `ShowPlaylistsSection` setting is retained for
+  compatibility but has no UI control.
 - Orynivo Server track DTOs now include the extended metadata needed by the
   shared track tables, including genre, totals, composer, BPM, file size, added
   date, and ReplayGain values when available.
@@ -90,6 +119,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Remote Orynivo Server (and other HTTP-streamed) tracks now start much faster.
+  FFmpeg/ffprobe were blocking on their default 5-second / 5 MB stream-analysis
+  window on every decoder start over HTTP, which made the first play of a remote
+  track stall for ~5 seconds. The probe window is now capped (with HTTP reconnect
+  resilience) for `http(s)` inputs in the decoder and both PCM probe paths.
+- Seeking within a remote Orynivo Server track is now near-instant. Previously
+  the client seeked the HTTP stream itself, which for seektable-less files means
+  FFmpeg binary-searches via many range round-trips (~5 seconds). The client now
+  requests the stream with `?ss=<seconds>` and the server seeks the local file
+  and transcodes from that offset (fast local seek), so the client decodes the
+  offset stream from position 0. Plex and other HTTP sources keep client-side
+  seeking. The server stream/transcode is also now stopped promptly when the
+  client disconnects (e.g. on a rapid re-seek).
+- The Library/sidebar sections again collapse and expand reliably. The sidebar
+  navigation list is now backed by a non-virtualizing panel; the previous
+  virtualizing panel recycled item containers and lost the per-item visibility
+  set in code (made worse by the variable-height empty-library hint row), which
+  made section toggles need two clicks and could re-expand collapsed groups.
+  This also fixes the empty-library hint occasionally showing even when local
+  directories or a server were configured.
+- The local and per-server Playlists groups in the Library sidebar are now
+  correctly indented as children of their Local/server node (aligned with the
+  Artists/Albums/Tracks/Folder rows) instead of protruding to the section edge;
+  their playlist entries are indented one level deeper. Local and remote server
+  library rows now share the same margin-based indentation. Each Orynivo
+  Server's Playlists node is now an independently collapsible group like the
+  local one, persisted in `CollapsedOrynivoServerPlaylistGroups`.
+- The Playlists sidebar group label is now title-cased ("Playlists"/"Listas")
+  instead of the all-caps section-header form, matching the other library child
+  rows.
+- The sidebar accordion collapse chevrons now line up vertically across section
+  headers and collapsible library groups; the section-header right padding was
+  matched to the navigation-item padding so the arrows are flush.
 - Double-clicking a track in a remote Orynivo Server album now plays the track
   instead of navigating to an unrelated local album. The remote track list no
   longer leaves the album view-mode toggle visible, and the album drill-down
