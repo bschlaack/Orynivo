@@ -4,6 +4,13 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.19.0] - 2026-06-28
+
+### Fixed
+
+- Windows FFmpeg auto-download now resolves the current BtbN release asset via
+  the GitHub API instead of relying on the removed `essentials_build` ZIP name.
+
 ## [0.18.0] - 2026-06-28
 
 ### Added

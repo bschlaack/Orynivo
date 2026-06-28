@@ -223,12 +223,13 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
   `-ss` seeking.
 - `Orynivo/Audio/FfmpegLocator.cs`: checks `AppContext.BaseDirectory`,
   `%LOCALAPPDATA%\Orynivo\ffmpeg`, and PATH for `ffmpeg.exe`/`ffprobe.exe` at
-  startup; when absent on Windows, downloads the BtbN LGPL-essential build from
-  GitHub Releases, extracts the binaries into the per-user cache, and prepends
-  that directory to the current-process PATH. Do not write downloaded FFmpeg
-  binaries into the install directory because setup installs may live under
-  `Program Files` without user write access. FFmpeg/FFprobe child processes must
-  use `FfmpegLocator.GetSafeWorkingDirectory()` as their
+  startup; when absent on Windows, resolves the current BtbN Windows LGPL ZIP
+  asset through the GitHub release API, extracts `ffmpeg.exe` and `ffprobe.exe`
+  into the per-user cache, and prepends that directory to the current-process
+  PATH. Do not write downloaded FFmpeg binaries into the install directory
+  because setup installs may live under `Program Files` without user write
+  access. FFmpeg/FFprobe child processes must use
+  `FfmpegLocator.GetSafeWorkingDirectory()` as their
   `ProcessStartInfo.WorkingDirectory`; stale installer shortcuts can otherwise
   leave the process current directory pointing to a deleted install path.
 - `Orynivo/Audio/DsfAudioPlayer.cs`: native DSF-to-DSD path

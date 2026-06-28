@@ -378,7 +378,9 @@ The user interface recognizes, among others:
 
 PCM formats are decoded by `ffmpeg`, which Orynivo downloads automatically on
 Windows into `%LOCALAPPDATA%\Orynivo\ffmpeg` on first start if not already
-installed. Actual codec support depends on the build.
+installed. The Windows downloader resolves the current BtbN LGPL ZIP asset from
+the GitHub release API so it is not tied to one fixed archive name. Actual codec
+support depends on the build.
 For CUE sheets, Orynivo uses `INDEX 01` boundaries to seek and stop FFmpeg
 within the referenced source file; no temporary split files are created.
 When WASAPI is selected, DSD audio in DSF or DFF containers is converted to PCM
@@ -675,8 +677,8 @@ outputs.
 
 FFmpeg is run as a separate executable. If it is not installed, Orynivo
 downloads the BtbN LGPL essentials build into `%LOCALAPPDATA%\Orynivo\ffmpeg`
-on Windows. FFmpeg remains subject to its own license and is not covered by the
-Orynivo license.
+on Windows by resolving the current release asset through the GitHub API. FFmpeg
+remains subject to its own license and is not covered by the Orynivo license.
 
 ASIO is a trademark and software of Steinberg Media Technologies GmbH. The
 optional Steinberg ASIO SDK is not included in this repository and must be

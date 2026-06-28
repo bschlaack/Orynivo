@@ -2,6 +2,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
 using System.Runtime.InteropServices;
+using System.Text.Json;
 
 namespace Orynivo.Audio;
 
@@ -16,16 +17,8 @@ namespace Orynivo.Audio;
 /// </summary>
 public static class FfmpegLocator
 {
-    // BtbN LGPL-essential Windows build (GitHub Releases, latest)
-    private const string WindowsDownloadUrl =
-        "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/" +
-        "ffmpeg-master-latest-win64-lgpl-essentials_build.zip";
-
-    private const string WindowsZipFfmpegEntry =
-        "ffmpeg-master-latest-win64-lgpl-essentials_build/bin/ffmpeg.exe";
-
-    private const string WindowsZipFfprobeEntry =
-        "ffmpeg-master-latest-win64-lgpl-essentials_build/bin/ffprobe.exe";
+    private const string WindowsReleaseApiUrl =
+        "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest";
 
     private static string FfmpegBinary =>
         RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "ffmpeg.exe" : "ffmpeg";
@@ -177,8 +170,10 @@ public static class FfmpegLocator
         using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
         client.DefaultRequestHeaders.UserAgent.ParseAdd("Orynivo/1.0");
 
+        var downloadUrl = await ResolveWindowsDownloadUrlAsync(client, cancellationToken)
+            .ConfigureAwait(false);
         using var response = await client.GetAsync(
-            WindowsDownloadUrl,
+            downloadUrl,
             HttpCompletionOption.ResponseHeadersRead,
             cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
@@ -207,8 +202,8 @@ public static class FfmpegLocator
             }
 
             using var zip = ZipFile.OpenRead(tempFile);
-            ExtractEntry(zip, WindowsZipFfmpegEntry,  targetFfmpeg);
-            ExtractEntry(zip, WindowsZipFfprobeEntry, targetFfprobe);
+            ExtractBinaryEntry(zip, FfmpegBinary, targetFfmpeg);
+            ExtractBinaryEntry(zip, FfprobeBinary, targetFfprobe);
         }
         finally
         {
@@ -216,11 +211,100 @@ public static class FfmpegLocator
         }
     }
 
-    private static void ExtractEntry(ZipArchive zip, string entryPath, string targetPath)
+    private static async Task<string> ResolveWindowsDownloadUrlAsync(
+        HttpClient client,
+        CancellationToken cancellationToken)
     {
-        var entry = zip.GetEntry(entryPath)
-            ?? throw new InvalidDataException(
-                $"Expected entry '{entryPath}' not found in the downloaded archive.");
+        using var releaseResponse = await client.GetAsync(WindowsReleaseApiUrl, cancellationToken)
+            .ConfigureAwait(false);
+        releaseResponse.EnsureSuccessStatusCode();
+
+        await using var releaseStream = await releaseResponse.Content
+            .ReadAsStreamAsync(cancellationToken)
+            .ConfigureAwait(false);
+        using var releaseJson = await JsonDocument.ParseAsync(
+            releaseStream,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        var release = releaseJson.RootElement;
+        if (!release.TryGetProperty("assets_url", out var assetsUrlJson))
+        {
+            throw new InvalidDataException("BtbN release response does not contain an assets_url.");
+        }
+
+        var assetsUrl = assetsUrlJson.GetString();
+        if (string.IsNullOrWhiteSpace(assetsUrl))
+        {
+            throw new InvalidDataException("BtbN release response contains an empty assets_url.");
+        }
+
+        var architectureToken = RuntimeInformation.ProcessArchitecture == Architecture.Arm64
+            ? "winarm64"
+            : "win64";
+        for (var page = 1; page <= 5; page++)
+        {
+            var pageUrl = $"{assetsUrl}?per_page=100&page={page}";
+            using var assetsResponse = await client.GetAsync(pageUrl, cancellationToken)
+                .ConfigureAwait(false);
+            assetsResponse.EnsureSuccessStatusCode();
+            await using var assetsStream = await assetsResponse.Content
+                .ReadAsStreamAsync(cancellationToken)
+                .ConfigureAwait(false);
+            using var assetsJson = await JsonDocument.ParseAsync(
+                assetsStream,
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+
+            var bestUrl = assetsJson.RootElement
+                .EnumerateArray()
+                .Select(TryReadAsset)
+                .Where(asset => asset is not null)
+                .Select(asset => asset!.Value)
+                .Where(asset =>
+                    asset.Name.Contains(architectureToken, StringComparison.OrdinalIgnoreCase) &&
+                    asset.Name.Contains("lgpl", StringComparison.OrdinalIgnoreCase) &&
+                    asset.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) &&
+                    !asset.Name.Contains("shared", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(asset => asset.Name.StartsWith("ffmpeg-master-", StringComparison.OrdinalIgnoreCase))
+                .ThenBy(asset => asset.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(asset => asset.Url)
+                .FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(bestUrl))
+            {
+                return bestUrl;
+            }
+        }
+
+        throw new InvalidDataException("No suitable BtbN Windows LGPL FFmpeg ZIP asset was found.");
+    }
+
+    private static (string Name, string Url)? TryReadAsset(JsonElement asset)
+    {
+        if (!asset.TryGetProperty("name", out var nameJson) ||
+            !asset.TryGetProperty("browser_download_url", out var urlJson))
+        {
+            return null;
+        }
+
+        var name = nameJson.GetString();
+        var url = urlJson.GetString();
+        return string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(url)
+            ? null
+            : (name, url);
+    }
+
+    private static void ExtractBinaryEntry(ZipArchive zip, string binaryName, string targetPath)
+    {
+        var entry = zip.Entries.FirstOrDefault(e =>
+            string.Equals(e.Name, binaryName, StringComparison.OrdinalIgnoreCase) &&
+            e.FullName.Contains("/bin/", StringComparison.OrdinalIgnoreCase))
+            ?? zip.Entries.FirstOrDefault(e =>
+                string.Equals(e.Name, binaryName, StringComparison.OrdinalIgnoreCase));
+        if (entry is null)
+        {
+            throw new InvalidDataException(
+                $"Expected binary '{binaryName}' not found in the downloaded archive.");
+        }
+
         entry.ExtractToFile(targetPath, overwrite: true);
     }
 }
