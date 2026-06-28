@@ -102,7 +102,7 @@ works directly in FFmpeg and browser URLs.
 | `PUT /api/settings/library-paths` | Replace configured library root paths, persist them, refresh watchers, and start a scan |
 | `GET /api/files/directories?path=` | Browse server-side directories for remote path selection |
 | `POST /api/scan` | Trigger a full library scan |
-| `GET /api/scan` | Scan status with current root, processed/total counts, current file, last result, and errors |
+| `GET /api/scan` | Scan status with current root, processed/total counts, current file, last result, errors, and `LibraryChangedAt` for client cache invalidation |
 | `GET /api/artists` | All artists (id, name, favorite, biography/image flags) |
 | `GET /api/artists/{id}` | Complete artist metadata, including cached biography/source fields |
 | `POST /api/artists/{id}/profile` | Store client-refreshed artist biography/source fields and optional image bytes |
@@ -116,7 +116,7 @@ works directly in FFmpeg and browser URLs.
 | `PUT /api/tracks/{id}/lyrics` | Store client-downloaded lyrics on the server |
 | `GET /api/tracks/facets` | Lightweight facet rows (genre, format, bitrate) for the Tracks filter |
 | `POST /api/tracks/by-ids` | Track rows for a list of track IDs (facet-filtered results) |
-| `GET /api/folders/tracks` | Lightweight track rows for building a server library folder tree |
+| `GET /api/folders/tracks` | Lightweight track rows plus playback metadata for building a server library folder tree |
 | `GET /api/artwork/album/{id}?size=96` | Album artwork thumbnail or original image |
 | `PUT /api/artwork/album/{id}` | Store raw client-selected album artwork bytes on the server |
 | `GET /api/artwork/artist/{id}` | Artist image stored on the server |
@@ -220,7 +220,9 @@ byte-range streaming without FFmpeg.
   table/artwork masks, while remote artwork is loaded lazily from authenticated
   server artwork endpoints and cached in the Windows client's local data
   directory. Track search uses the normal header search box and runs through
-  the server's Lucene index.
+  the server's Lucene index. The remote folder tree shows a loading placeholder
+  while server data is being fetched and caches the folder-track list until the
+  server reports a newer `LibraryChangedAt` timestamp.
 - Remote Orynivo Server artist-info pages support renaming/merging artists and
   assigning Wikimedia artist images. The Windows client performs the image
   search and uploads the selected image to the server.

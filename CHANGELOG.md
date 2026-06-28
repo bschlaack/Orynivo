@@ -4,6 +4,36 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+### Fixed
+
+- Remote Orynivo Server folder playback now registers full track metadata before
+  queuing streams, so the transport shows title/artist/artwork and enables
+  lyrics, artist info, favourites, and playlist actions like the local folder
+  view.
+- Remote Orynivo Server folder context menus now route credential-bearing stream
+  URLs through the server playlist provider instead of falling back to queue-only
+  actions, so files and folders can be saved to playlists on that server.
+- Remote Orynivo Server Tracks now explicitly refreshes the table layout after
+  async row binding so the view appears immediately without requiring an
+  unrelated sidebar interaction.
+- Remote Orynivo Server Tracks now binds rows immediately instead of leaving the
+  table source empty until a deferred layout pass, fixing an initially blank
+  Tracks view.
+- Remote Orynivo Server folder views now clear stale local folder nodes before
+  loading, show a server-loading placeholder, and cache the server folder-track
+  list under `%LOCALAPPDATA%\Orynivo\remote-folder-cache\`. The cache is reused
+  until the server reports a newer library-change timestamp.
+- Library accordion headers are no longer treated as navigable views, preventing
+  raw `LibraryGroup:...` tags from replacing the content title.
+- Orynivo Server scan status now exposes `LibraryChangedAt`, a persisted Unix
+  timestamp updated when a scan or file watcher run adds, updates, or removes
+  indexed tracks, so clients can invalidate remote caches without downloading
+  the full list first.
+
 ## [0.19.0] - 2026-06-28
 
 ### Fixed

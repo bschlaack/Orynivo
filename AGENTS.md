@@ -126,7 +126,8 @@ runtime dependency.
   `LibraryWatcherService.UpdatePaths` on start and runs full scans via the
   static `LibraryScanner.ScanAsync`; exposes `TriggerScan()` for manual
   trigger and `ScanStatus` with current root, processed/total counts, current
-  file, last result, and errors
+  file, last result, errors, and a persisted `LibraryChangedAt` Unix timestamp
+  that updates when scans or watcher runs add, update, or remove indexed tracks
 - `Orynivo.Server/Endpoints/LibraryEndpoints.cs`: artists, albums, tracks,
   playlists (smart playlists resolved via `SmartPlaylistCriteria.Resolve`),
   and Lucene search endpoints; `GET /api/artists/{id}` returns complete
@@ -159,9 +160,10 @@ runtime dependency.
   `DELETE /api/playlist-tracks/{id}` expose server-side playlist browsing and
   regular- and smart-playlist editing for remote clients; remote playlist writes
   must use server-side track IDs, never credential-bearing stream URLs;
-  `GET` `/api/folders/tracks` returns lightweight track
-  rows for building the remote server library folder tree and must materialize
-  the response before disposing the SQLite connection because JSON serialization
+  `GET` `/api/folders/tracks` returns lightweight track rows plus playback
+  metadata (artist, album, duration, format, primary `ArtistId`, `AlbumId`) for
+  building the remote server library folder tree and must materialize the
+  response before disposing the SQLite connection because JSON serialization
   runs after the route handler returns
 - `Orynivo.Server/Endpoints/StreamEndpoints.cs`: byte-range streaming for
   regular audio files; on-the-fly FLAC transcode via FFmpeg pipe for CUE
@@ -402,7 +404,8 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
   (`CreateSmartPlaylistAsync`/`UpdateSmartPlaylistAsync`), and smart-playlist
   resolution with client-side favourites
   (`ResolveSmartPlaylistTracksAsync`), server library paths,
-  server directory listings, and scan status; `SetLibraryPathsAsync` replaces
+  server directory listings, and scan status including `LibraryChangedAt` for
+  remote client cache invalidation; `SetLibraryPathsAsync` replaces
   the remote server's configured library
   roots; `TriggerScanAsync` starts a remote scan; `UploadAlbumArtworkAsync` and
   `UploadArtistImageAsync` send client-selected image bytes to the server so the
@@ -493,8 +496,20 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
   `/api/search`) coexists; facet filters take precedence when active. The facet
   rows live in `_orynivoTrackFacets` while a remote Tracks view is active and are
   cleared otherwise.
-  Remote folder tree nodes queue remote HTTP streams only and never expose
-  playlist persistence for credential-bearing server URLs.
+  Remote folder tree file nodes must register the same `ContentRow` metadata as
+  remote Tracks rows before queuing playback. This is required so the transport
+  shows title/artist/artwork instead of authenticated stream URLs and enables
+  lyrics, artist-info, favorite, and server-playlist actions. Remote folder
+  playlist persistence must use server-side track IDs through
+  `OrynivoServerPlaylistProvider`, never credential-bearing stream URLs. When
+  `/api/folders/tracks` lacks the newer playback metadata because an older
+  server is connected, the client may batch-hydrate folder track metadata through
+  `/api/tracks/by-ids` before registering the folder rows. Before loading remote
+  folder data, clear any existing local folder nodes and show the localized
+  server-loading placeholder; do not display stale local tree data while the
+  remote request is in flight. Cache remote folder-track lists under
+  `%LOCALAPPDATA%\Orynivo\remote-folder-cache\` and reuse them only while the
+  server's `LibraryChangedAt` scan status timestamp matches the cached value.
   While a remote track plays, the transport lyrics and artist-info buttons work
   through `OrynivoServerNowPlayingMetadataProvider` (see
   `Orynivo/NowPlayingMetadataProviders.cs`): lyrics and the artist

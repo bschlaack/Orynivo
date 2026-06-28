@@ -119,6 +119,14 @@ public sealed record OrynivoTrackInfo(
 /// <param name="Title">Optional track title.</param>
 /// <param name="DiscNumber">Optional disc number.</param>
 /// <param name="TrackNumber">Optional track number.</param>
+/// <param name="Artist">Track artist, or <see langword="null"/>.</param>
+/// <param name="AlbumArtist">Album artist, or <see langword="null"/>.</param>
+/// <param name="Album">Album title, or <see langword="null"/>.</param>
+/// <param name="Duration">Duration in seconds, or <see langword="null"/>.</param>
+/// <param name="Format">Audio format label, or <see langword="null"/>.</param>
+/// <param name="IsFavorite">Whether the track is marked as favorite on the server.</param>
+/// <param name="ArtistId">Database ID of the primary artist, or <see langword="null"/>.</param>
+/// <param name="AlbumId">Database ID of the album, or <see langword="null"/>.</param>
 public sealed record OrynivoTrackLiteInfo(
     long Id,
     string Path,
@@ -126,7 +134,15 @@ public sealed record OrynivoTrackLiteInfo(
     string FileName,
     string? Title,
     int? DiscNumber,
-    int? TrackNumber);
+    int? TrackNumber,
+    string? Artist = null,
+    string? AlbumArtist = null,
+    string? Album = null,
+    double? Duration = null,
+    string? Format = null,
+    bool IsFavorite = false,
+    long? ArtistId = null,
+    long? AlbumId = null);
 
 /// <summary>Track search response returned by the Orynivo Server API.</summary>
 /// <param name="Tracks">Matching track rows.</param>
@@ -212,6 +228,14 @@ public sealed record OrynivoScanResult(
     int Failed);
 
 /// <summary>Current scan progress reported by a remote Orynivo Server.</summary>
+/// <param name="IsRunning">Whether a scan is currently running.</param>
+/// <param name="Path">Library root currently being scanned.</param>
+/// <param name="Current">Number of processed files in the current root.</param>
+/// <param name="Total">Total files discovered in the current root.</param>
+/// <param name="CurrentFile">File currently being processed.</param>
+/// <param name="LastResult">Summary of the last completed root scan.</param>
+/// <param name="Error">Last scan error, if any.</param>
+/// <param name="LibraryChangedAt">Unix timestamp of the last scan that changed indexed tracks.</param>
 public sealed record OrynivoScanStatus(
     bool IsRunning,
     string? Path,
@@ -219,7 +243,8 @@ public sealed record OrynivoScanStatus(
     int Total,
     string? CurrentFile,
     OrynivoScanResult? LastResult,
-    string? Error);
+    string? Error,
+    long? LibraryChangedAt = null);
 
 /// <summary>Request body used to store a client-refreshed artist profile on a remote Orynivo Server.</summary>
 /// <param name="Biography">Downloaded artist biography, or <see langword="null"/> when no biography was found.</param>

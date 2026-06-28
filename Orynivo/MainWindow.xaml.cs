@@ -216,6 +216,10 @@ public partial class MainWindow : Window
     private sealed record FolderTag(bool IsFile, string FilePath, string FolderPath);
     private sealed record PlexFolderTag(string Key, bool IsTrack, ContentRow? Track);
     private sealed record AlphabetTreeTarget(string Key, TreeViewItem Item);
+    private sealed record OrynivoFolderTrackCache(
+        long LibraryChangedAt,
+        long CachedAt,
+        List<OrynivoTrackLiteInfo> Tracks);
     private sealed record PlexNavigationState(
         string Title,
         string View,
@@ -1477,7 +1481,7 @@ public partial class MainWindow : Window
             return;
         if (NavListBox.SelectedItem is not ListBoxItem { Tag: string tag })
             return;
-        if (tag.StartsWith("Section:", StringComparison.Ordinal))
+        if (IsNavigationContainerTag(tag))
             return;
 
         CloseEmbeddedSettings();
@@ -1494,7 +1498,7 @@ public partial class MainWindow : Window
             return;
         if (FindAncestor<ListBoxItem>(e.Source as Visual) is not { Tag: string tag, IsSelected: true })
             return;
-        if (tag.StartsWith("Section:", StringComparison.Ordinal))
+        if (IsNavigationContainerTag(tag))
             return;
 
         // Beim erneuten Klick auf den bereits markierten Hauptpunkt feuert kein SelectionChanged.
@@ -1506,6 +1510,10 @@ public partial class MainWindow : Window
         ResetDrilldownState(clearNavigationHistory: false);
         await ShowTopLevelViewAsync(tag);
     }
+
+    private static bool IsNavigationContainerTag(string tag) =>
+        tag.StartsWith("Section:", StringComparison.Ordinal) ||
+        tag.StartsWith("LibraryGroup:", StringComparison.Ordinal);
 
     private void ResetDrilldownState(bool clearNavigationHistory = true)
     {
@@ -2179,7 +2187,7 @@ public partial class MainWindow : Window
                     if (ct.IsCancellationRequested) return;
                     var rows = catalogTracks.Select(ToCatalogTrackContentRow).ToList();
                     UpdateAlphabetIndex(rows, true);
-                    ContentDataGrid.ItemsSource = rows;
+                    BindRemoteTrackRows(rows);
                     ContentCountTextBlock.Text = LocalizationManager.FormatTrackCount(rows.Count);
                     break;
                 }
@@ -2188,9 +2196,12 @@ public partial class MainWindow : Window
                 {
                     ContentDataGrid.IsVisible = false;
                     FolderTreeView.IsVisible = true;
-                    var tracks = await Task.Run(() => _orynivoClient.GetTrackFoldersAsync(server, ct), ct);
+                    ShowOrynivoFolderLoadingState();
+                    var tracks = await LoadOrynivoFolderTracksAsync(server, ct);
                     if (ct.IsCancellationRequested) return;
-                    BuildOrynivoFolderTree(server, tracks);
+                    var metadata = await LoadOrynivoFolderTrackMetadataAsync(server, tracks, ct);
+                    if (ct.IsCancellationRequested) return;
+                    BuildOrynivoFolderTree(server, tracks, metadata);
                     ContentCountTextBlock.Text = LocalizationManager.FormatTrackCount(tracks.Count);
                     break;
                 }
@@ -2258,27 +2269,195 @@ public partial class MainWindow : Window
         var provider = CreateOrynivoCatalogProvider(_activeOrynivoServer);
         var catalogTracks = await ResolveOrynivoTrackRowsAsync(provider, CancellationToken.None);
         var rows = catalogTracks.Select(ToCatalogTrackContentRow).ToList();
-        ContentDataGrid.ItemsSource = rows;
+        BindRemoteTrackRows(rows);
         UpdateAlphabetIndex(rows, true);
         ContentCountTextBlock.Text = LocalizationManager.FormatTrackCount(rows.Count);
         UpdateSaveSmartPlaylistButtonState();
     }
 
+    private void BindRemoteTrackRows(IReadOnlyList<ContentRow> rows)
+    {
+        ContentDataGrid.ItemsSource = null;
+        ContentDataGrid.ItemsSource = rows;
+        ContentDataGrid.InvalidateMeasure();
+        ContentDataGrid.InvalidateVisual();
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (ReferenceEquals(ContentDataGrid.ItemsSource, rows))
+            {
+                ContentDataGrid.InvalidateMeasure();
+                ContentDataGrid.InvalidateVisual();
+                ContentDataGrid.UpdateLayout();
+            }
+        }, DispatcherPriority.Loaded);
+    }
+
+    private void ShowOrynivoFolderLoadingState()
+    {
+        _localFolderTrackItems.Clear();
+        _localFolderTrackHeaders.Clear();
+        FolderTreeView.Items.Clear();
+        FolderTreeView.Items.Add(new TreeViewItem
+        {
+            Header = LocalizationManager.Current.OrynivoLoading,
+            IsEnabled = false
+        });
+        ContentCountTextBlock.Text = string.Empty;
+    }
+
+    private async Task<List<OrynivoTrackLiteInfo>> LoadOrynivoFolderTracksAsync(
+        OrynivoServerSettings server,
+        CancellationToken cancellationToken)
+    {
+        var scanStatus = await _orynivoClient.GetScanStatusAsync(server, cancellationToken);
+        var libraryChangedAt = scanStatus?.LibraryChangedAt;
+        if (libraryChangedAt.HasValue &&
+            TryLoadOrynivoFolderTrackCache(server, libraryChangedAt.Value, out var cachedTracks))
+        {
+            return cachedTracks;
+        }
+
+        var tracks = await _orynivoClient.GetTrackFoldersAsync(server, cancellationToken);
+        if (libraryChangedAt.HasValue)
+            SaveOrynivoFolderTrackCache(server, libraryChangedAt.Value, tracks);
+        return tracks;
+    }
+
+    private static bool TryLoadOrynivoFolderTrackCache(
+        OrynivoServerSettings server,
+        long libraryChangedAt,
+        out List<OrynivoTrackLiteInfo> tracks)
+    {
+        tracks = [];
+        try
+        {
+            var path = GetOrynivoFolderTrackCachePath(server);
+            if (!File.Exists(path))
+                return false;
+            var cache = JsonSerializer.Deserialize<OrynivoFolderTrackCache>(File.ReadAllText(path));
+            if (cache?.Tracks is null || cache.LibraryChangedAt != libraryChangedAt)
+                return false;
+            tracks = cache.Tracks;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void SaveOrynivoFolderTrackCache(
+        OrynivoServerSettings server,
+        long libraryChangedAt,
+        IReadOnlyList<OrynivoTrackLiteInfo> tracks)
+    {
+        try
+        {
+            var path = GetOrynivoFolderTrackCachePath(server);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            var cache = new OrynivoFolderTrackCache(
+                libraryChangedAt,
+                DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                tracks.ToList());
+            File.WriteAllText(path, JsonSerializer.Serialize(cache));
+        }
+        catch
+        {
+            // Cache failures must never prevent browsing a remote server.
+        }
+    }
+
+    private static string GetOrynivoFolderTrackCachePath(OrynivoServerSettings server)
+    {
+        var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{server.Id}|{server.BaseUrl}")));
+        return AppPaths.GetDataPath("remote-folder-cache", $"{key}.json");
+    }
+
+    private async Task<Dictionary<long, OrynivoTrackInfo>> LoadOrynivoFolderTrackMetadataAsync(
+        OrynivoServerSettings server,
+        IReadOnlyList<OrynivoTrackLiteInfo> tracks,
+        CancellationToken cancellationToken)
+    {
+        var result = new Dictionary<long, OrynivoTrackInfo>();
+        if (tracks.All(track =>
+                !string.IsNullOrWhiteSpace(track.Artist) ||
+                !string.IsNullOrWhiteSpace(track.Album) ||
+                track.ArtistId.HasValue ||
+                track.AlbumId.HasValue))
+        {
+            return result;
+        }
+
+        var ids = tracks
+            .Where(track => track.Id > 0)
+            .Select(track => track.Id)
+            .Distinct()
+            .ToList();
+        const int batchSize = 500;
+        for (var index = 0; index < ids.Count; index += batchSize)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var batch = ids.Skip(index).Take(batchSize).ToList();
+            var rows = await _orynivoClient.GetTracksByIdsAsync(server, batch, cancellationToken);
+            foreach (var row in rows)
+                result[row.Id] = row;
+        }
+
+        return result;
+    }
+
     private void BuildOrynivoFolderTree(
         OrynivoServerSettings server,
-        IReadOnlyList<OrynivoTrackLiteInfo> tracks)
+        IReadOnlyList<OrynivoTrackLiteInfo> tracks,
+        IReadOnlyDictionary<long, OrynivoTrackInfo> metadata)
     {
         var localTracks = tracks
             .Where(track => track.Id > 0)
-            .Select(track => new TrackLite(
-                OrynivoServerClient.GetStreamUrl(server, track.Id),
-                string.IsNullOrWhiteSpace(track.SourcePath) ? track.Path : track.SourcePath,
-                track.FileName,
-                track.Title,
-                track.DiscNumber,
-                track.TrackNumber))
+            .Select(track =>
+            {
+                var row = metadata.TryGetValue(track.Id, out var fullTrack)
+                    ? ToOrynivoTrackContentRow(server, fullTrack)
+                    : ToOrynivoTrackContentRow(server, track);
+                return new TrackLite(
+                    row.FilePath,
+                    string.IsNullOrWhiteSpace(track.SourcePath) ? track.Path : track.SourcePath,
+                    track.FileName,
+                    track.Title,
+                    track.DiscNumber,
+                    track.TrackNumber);
+            })
             .ToList();
         BuildFolderTree(localTracks);
+    }
+
+    private ContentRow ToOrynivoTrackContentRow(OrynivoServerSettings server, OrynivoTrackLiteInfo track)
+    {
+        var streamUrl = OrynivoServerClient.GetStreamUrl(server, track.Id);
+        var row = new ContentRow
+        {
+            Title = track.Title?.Trim() ?? track.FileName.Trim(),
+            AlphabetIndexText = track.Title?.Trim() ?? track.FileName.Trim(),
+            Id = track.Id,
+            Artist = track.Artist,
+            Album = track.Album,
+            AlbumArtist = track.AlbumArtist,
+            TrackNumber = FormatPartNumber(track.TrackNumber, null),
+            DiscNumber = FormatPartNumber(track.DiscNumber, null),
+            Duration = FormatSeconds(track.Duration),
+            Format = track.Format?.ToUpperInvariant(),
+            FileName = track.FileName,
+            FilePath = streamUrl,
+            SourcePath = string.IsNullOrWhiteSpace(track.SourcePath) ? track.Path : track.SourcePath,
+            IsFavorite = IsOrynivoFavorite(server, "Track", track.Id),
+            ArtistId = track.ArtistId,
+            AlbumId = track.AlbumId,
+            EntityType = "OrynivoTrack",
+            ExternalId = track.Id.ToString(CultureInfo.InvariantCulture),
+            KnownDuration = track.Duration.HasValue ? TimeSpan.FromSeconds(track.Duration.Value) : null,
+            OrynivoServer = server
+        };
+        _orynivoTracksByUrl[streamUrl] = row;
+        return row;
     }
 
     private static async Task LoadOrynivoArtworkAsync(ContentRow row, string artUrl)
@@ -6903,7 +7082,7 @@ public partial class MainWindow : Window
             if (paths.Count == 0)
                 return;
             treeItem.IsSelected = true;
-            treeItem.ContextFlyout = isPlexTrack || paths.Any(path => !CanPersistQueuePath(path))
+            treeItem.ContextFlyout = isPlexTrack
                 ? BuildQueueContextFlyout(paths)
                 : BuildPlaylistContextFlyout(paths);
         }
