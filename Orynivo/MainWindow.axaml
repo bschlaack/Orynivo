@@ -783,36 +783,32 @@
                               StrokeJoin="Round"/>
                     </Grid>
                 </ListBoxItem>
-                <ListBoxItem x:Name="ArtistsNavItem" Tag="Artists" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_Artists}" Classes="navItemText"/></ListBoxItem>
-                <ListBoxItem x:Name="AlbumsNavItem" Tag="Albums" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_Albums}" Classes="navItemText"/></ListBoxItem>
-                <ListBoxItem x:Name="TracksNavItem" Tag="Tracks" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_Tracks}" Classes="navItemText"/></ListBoxItem>
-                <ListBoxItem x:Name="FoldersNavItem" Tag="Folders" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_FolderStructure}" Classes="navItemText"/></ListBoxItem>
-
-                <ListBoxItem x:Name="OrynivoServerHeaderItem"
-                             Tag="Section:OrynivoServer"
-                             FontSize="10"
-                             FontWeight="Bold"
-                             Theme="{StaticResource NavSectionHeaderTheme}">
+                <ListBoxItem x:Name="LocalLibraryRootItem"
+                             Tag="LibraryGroup:LocalMedia"
+                             Theme="{StaticResource NavItemTheme}">
                     <Grid HorizontalAlignment="Stretch">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="20"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="{DynamicResource L_OrynivoServers}"
-                                   TextTrimming="CharacterEllipsis"/>
-                        <Path x:Name="OrynivoServerHeaderArrow"
+                        <TextBlock Text="{DynamicResource L_LocalMedia}" Classes="navItemText" FontWeight="SemiBold"/>
+                        <Path x:Name="LocalMediaGroupArrow"
                               Grid.Column="1"
                               Width="8"
                               Height="5"
                               HorizontalAlignment="Center"
                               VerticalAlignment="Center"
-                              Data="M 0 0 L 4 5 L 8 0"
+                              Data="M 0 5 L 4 0 L 8 5"
                               Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
                               StrokeThickness="1.4"
                               StrokeLineCap="Round"
                               StrokeJoin="Round"/>
                     </Grid>
                 </ListBoxItem>
+                <ListBoxItem x:Name="ArtistsNavItem" Tag="Artists" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_Artists}" Margin="16,0,0,0" Classes="navItemText"/></ListBoxItem>
+                <ListBoxItem x:Name="AlbumsNavItem" Tag="Albums" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_Albums}" Margin="16,0,0,0" Classes="navItemText"/></ListBoxItem>
+                <ListBoxItem x:Name="TracksNavItem" Tag="Tracks" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_Tracks}" Margin="16,0,0,0" Classes="navItemText"/></ListBoxItem>
+                <ListBoxItem x:Name="FoldersNavItem" Tag="Folders" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_FolderStructure}" Margin="16,0,0,0" Classes="navItemText"/></ListBoxItem>
 
                 <ListBoxItem x:Name="OwnRadiosHeaderItem"
                              Tag="Section:OwnRadios"
@@ -1976,7 +1972,8 @@
                                         Padding="14,7"
                                         Theme="{StaticResource HeaderFilterButtonTheme}"
                                         Click="SearchCoverButton_OnClick"/>
-                                <Button Content="{DynamicResource L_SaveAlbumAsPlaylist}"
+                                <Button x:Name="AlbumSaveAsPlaylistButton"
+                                        Content="{DynamicResource L_SaveAlbumAsPlaylist}"
                                         Padding="14,7"
                                         Theme="{StaticResource HeaderFilterButtonTheme}"
                                         Click="AlbumSaveAsPlaylistButton_OnClick"/>

@@ -88,7 +88,7 @@ public sealed class AppSettings
     public bool ShowPodcastsItem { get; set; } = true;
     /// <summary>Gets or sets a value indicating whether the Up Next sidebar item is visible.</summary>
     public bool ShowQueueItem { get; set; } = true;
-    /// <summary>Gets or sets a value indicating whether the Local Library sidebar section is visible.</summary>
+    /// <summary>Gets or sets a value indicating whether the Library sidebar section is visible.</summary>
     public bool ShowLocalLibrarySection { get; set; } = true;
     /// <summary>Gets or sets a value indicating whether the Own Radios sidebar section is visible.</summary>
     public bool ShowOwnRadiosSection { get; set; } = true;
@@ -96,19 +96,23 @@ public sealed class AppSettings
     public bool ShowMyPodcastsSection { get; set; } = true;
     /// <summary>Gets or sets a value indicating whether the Plex sidebar section is visible.</summary>
     public bool ShowPlexSection { get; set; } = true;
-    /// <summary>Gets or sets a value indicating whether the Orynivo Server sidebar section is visible.</summary>
+    /// <summary>Gets or sets a legacy value for the removed Orynivo Server sidebar section.</summary>
     public bool ShowOrynivoServerSection { get; set; } = true;
     /// <summary>Gets or sets a value indicating whether the Playlists sidebar section is visible.</summary>
     public bool ShowPlaylistsSection { get; set; } = true;
-    /// <summary>Gets or sets a value indicating whether the Local Library section is expanded.</summary>
+    /// <summary>Gets or sets a value indicating whether the Library section is expanded.</summary>
     public bool IsLocalLibrarySectionExpanded { get; set; } = true;
+    /// <summary>Gets or sets a value indicating whether the local media group inside the Library section is expanded.</summary>
+    public bool IsLocalMediaLibraryGroupExpanded { get; set; } = true;
+    /// <summary>Gets or sets remote Orynivo Server identifiers whose Library sidebar groups are collapsed.</summary>
+    public HashSet<string> CollapsedOrynivoServerLibraryGroups { get; set; } = [];
     /// <summary>Gets or sets a value indicating whether the Own Radios section is expanded.</summary>
     public bool IsOwnRadiosSectionExpanded { get; set; }
     /// <summary>Gets or sets a value indicating whether the My Podcasts section is expanded.</summary>
     public bool IsMyPodcastsSectionExpanded { get; set; }
     /// <summary>Gets or sets a value indicating whether the Plex section is expanded.</summary>
     public bool IsPlexSectionExpanded { get; set; }
-    /// <summary>Gets or sets a value indicating whether the Orynivo Server section is expanded.</summary>
+    /// <summary>Gets or sets a legacy value for the removed Orynivo Server section expansion state.</summary>
     public bool IsOrynivoServerSectionExpanded { get; set; }
     /// <summary>Gets or sets a value indicating whether the Playlists section is expanded.</summary>
     public bool IsPlaylistsSectionExpanded { get; set; }

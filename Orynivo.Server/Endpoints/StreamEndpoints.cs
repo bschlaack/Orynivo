@@ -140,6 +140,24 @@ public static class StreamEndpoints
             if (path is null) return Results.NotFound();
             return Results.File(path, GuessImageMimeType(path), enableRangeProcessing: false);
         });
+
+        /// <summary>
+        /// Serves artwork for a track looked up by its database ID.
+        /// Use <c>?size=96</c> or <c>?size=320</c> for thumbnails; omit for the original.
+        /// </summary>
+        api.MapGet("/artwork/track/{trackId:long}", (long trackId, int? size) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            var track = db.GetTrackById(trackId);
+            if (track is null) return Results.NotFound();
+
+            var artworkPaths = db.GetArtworkPathsByTrackPath(track.Path);
+            if (artworkPaths is null) return Results.NotFound();
+
+            var path = SelectExistingArtworkPath(artworkPaths, size);
+            if (path is null) return Results.NotFound();
+            return Results.File(path, GuessImageMimeType(path), enableRangeProcessing: false);
+        });
     }
 
     private static async Task<IResult> BuildStreamResult(

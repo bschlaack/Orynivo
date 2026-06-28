@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Orynivo.Library;
 
 namespace Orynivo.Streaming;
 
@@ -35,6 +36,7 @@ public sealed record OrynivoArtistInfo(
 /// <param name="ArtworkPath">Server-side 320-px artwork path, or <see langword="null"/> when the album has no cover.</param>
 /// <param name="ThumbnailPath">Server-side 96-px thumbnail path, or <see langword="null"/> when the album has no cover.</param>
 /// <param name="IsFavorite">Whether the album is marked as favorite on the server.</param>
+/// <param name="ArtistId">Database ID of the album artist, or <see langword="null"/>.</param>
 public sealed record OrynivoAlbumInfo(
     long Id,
     string Album,
@@ -42,7 +44,8 @@ public sealed record OrynivoAlbumInfo(
     int? Year,
     string? ArtworkPath = null,
     string? ThumbnailPath = null,
-    bool IsFavorite = false);
+    bool IsFavorite = false,
+    long? ArtistId = null);
 
 /// <summary>Track entry returned by the Orynivo Server API.</summary>
 /// <param name="Id">Database ID of the track.</param>
@@ -74,6 +77,7 @@ public sealed record OrynivoAlbumInfo(
 /// <param name="Format">Audio format label, or <see langword="null"/>.</param>
 /// <param name="IsFavorite">Whether the track is marked as favorite on the server.</param>
 /// <param name="IsCueTrack">Whether the track is a CUE virtual track.</param>
+/// <param name="ArtistId">Database ID of the primary artist, or <see langword="null"/>.</param>
 public sealed record OrynivoTrackInfo(
     long Id,
     string Path,
@@ -103,7 +107,9 @@ public sealed record OrynivoTrackInfo(
     string? ReplayGainAlbum = null,
     string? Format = null,
     bool IsFavorite = false,
-    bool IsCueTrack = false);
+    bool IsCueTrack = false,
+    long? ArtistId = null,
+    long? AlbumId = null);
 
 /// <summary>Lightweight remote track entry used for folder-tree construction.</summary>
 /// <param name="Id">Database ID of the track.</param>
@@ -125,6 +131,12 @@ public sealed record OrynivoTrackLiteInfo(
 /// <summary>Track search response returned by the Orynivo Server API.</summary>
 /// <param name="Tracks">Matching track rows.</param>
 public sealed record OrynivoTrackSearchResult(IReadOnlyList<OrynivoTrackInfo> Tracks);
+
+/// <summary>Cached lyrics for a single track returned by the Orynivo Server API.</summary>
+/// <param name="PlainLyrics">Unsynchronised plain-text lyrics, or <see langword="null"/>.</param>
+/// <param name="SyncedLyrics">LRC-formatted synchronised lyrics, or <see langword="null"/>.</param>
+/// <param name="FetchedAt">Unix-seconds timestamp of the last lyrics lookup, or <see langword="null"/>.</param>
+public sealed record OrynivoLyrics(string? PlainLyrics, string? SyncedLyrics, long? FetchedAt = null);
 
 /// <summary>Server info returned by <c>/api/info</c>.</summary>
 public sealed record OrynivoServerInfo(
@@ -177,6 +189,16 @@ public sealed record ArtistProfileUpdateRequest(
     string Language,
     byte[]? ImageData,
     string? ImageMimeType);
+
+/// <summary>Request body for renaming or merging an artist on a remote Orynivo Server.</summary>
+/// <param name="ArtistName">Requested artist display name.</param>
+/// <param name="PreferredArtistId">Artist ID whose profile should survive a merge, or <see langword="null"/> to only rename or detect a collision.</param>
+public sealed record OrynivoArtistRenameRequest(string ArtistName, long? PreferredArtistId = null);
+
+/// <summary>Response body for a remote artist rename or merge request.</summary>
+/// <param name="Result">Committed rename result, or <see langword="null"/> when a matching artist must be confirmed first.</param>
+/// <param name="MatchingArtist">Matching artist that would be merged, or <see langword="null"/> when the rename was committed.</param>
+public sealed record OrynivoArtistRenameResponse(ArtistRenameResult? Result, OrynivoArtistInfo? MatchingArtist);
 
 /// <summary>
 /// HTTP client for browsing and streaming a remote Orynivo Server library.
@@ -243,6 +265,26 @@ public sealed class OrynivoServerClient : IDisposable
                    ?? [];
         }
         catch { return []; }
+    }
+
+    /// <summary>
+    /// Returns the cached profile of a single artist on the remote server.
+    /// </summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="artistId">Database ID of the artist.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The artist entry, or <see langword="null"/> when missing or the request fails.</returns>
+    public async Task<OrynivoArtistInfo?> GetArtistAsync(
+        OrynivoServerSettings server,
+        long artistId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await GetJsonAsync<OrynivoArtistInfo>(
+                server, $"/api/artists/{artistId}", cancellationToken);
+        }
+        catch { return null; }
     }
 
     // ------------------------------------------------------------------
@@ -323,6 +365,41 @@ public sealed class OrynivoServerClient : IDisposable
             if (!response.IsSuccessStatusCode)
                 return null;
             return await response.Content.ReadFromJsonAsync<OrynivoArtistInfo>(JsonOptions, cancellationToken);
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// Renames an artist on a remote Orynivo Server, or merges two artists when a preferred survivor is supplied.
+    /// </summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="artistId">Database ID of the artist being edited.</param>
+    /// <param name="artistName">Requested artist display name.</param>
+    /// <param name="preferredArtistId">Artist ID whose profile should survive a merge, or <see langword="null"/> to only rename or detect a collision.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Rename response, or <see langword="null"/> when the request fails.</returns>
+    public async Task<OrynivoArtistRenameResponse?> RenameArtistAsync(
+        OrynivoServerSettings server,
+        long artistId,
+        string artistName,
+        long? preferredArtistId = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(
+                HttpMethod.Post,
+                BuildUrl(server, $"/api/artists/{artistId}/rename"))
+            {
+                Content = JsonContent.Create(
+                    new OrynivoArtistRenameRequest(artistName, preferredArtistId),
+                    options: JsonOptions)
+            };
+            request.Headers.Add("X-Api-Key", server.ApiKey);
+            using var response = await _http.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+                return null;
+            return await response.Content.ReadFromJsonAsync<OrynivoArtistRenameResponse>(JsonOptions, cancellationToken);
         }
         catch { return null; }
     }
@@ -415,6 +492,110 @@ public sealed class OrynivoServerClient : IDisposable
             return result?.Tracks.ToList() ?? [];
         }
         catch { return []; }
+    }
+
+    /// <summary>
+    /// Returns lightweight facet rows (id, favorite, genre, format, bitrate) for every track,
+    /// used to build the Tracks filter facets client-side.
+    /// </summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Facet rows, or empty on error.</returns>
+    public async Task<List<TrackFacetInfo>> GetTrackFacetsAsync(
+        OrynivoServerSettings server,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await GetJsonAsync<List<TrackFacetInfo>>(server, "/api/tracks/facets", cancellationToken)
+                   ?? [];
+        }
+        catch { return []; }
+    }
+
+    /// <summary>
+    /// Returns full track rows for the specified track identifiers, preserving the requested order.
+    /// </summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="ids">Track identifiers to resolve.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Matching track rows, or empty on error.</returns>
+    public async Task<List<OrynivoTrackInfo>> GetTracksByIdsAsync(
+        OrynivoServerSettings server,
+        IReadOnlyList<long> ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+            return [];
+        try
+        {
+            using var request = new HttpRequestMessage(
+                HttpMethod.Post,
+                BuildUrl(server, "/api/tracks/by-ids"))
+            {
+                Content = JsonContent.Create(ids, options: JsonOptions)
+            };
+            request.Headers.Add("X-Api-Key", server.ApiKey);
+            using var response = await _http.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+                return [];
+            return await response.Content.ReadFromJsonAsync<List<OrynivoTrackInfo>>(JsonOptions, cancellationToken)
+                   ?? [];
+        }
+        catch { return []; }
+    }
+
+    /// <summary>
+    /// Returns the server-cached lyrics for a track, if any.
+    /// </summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="trackId">Database ID of the track.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Cached lyrics, or <see langword="null"/> when none are stored or the request fails.</returns>
+    public async Task<OrynivoLyrics?> GetTrackLyricsAsync(
+        OrynivoServerSettings server,
+        long trackId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await GetJsonAsync<OrynivoLyrics>(
+                server, $"/api/tracks/{trackId}/lyrics", cancellationToken);
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// Uploads client-downloaded lyrics for a track so the server caches them.
+    /// </summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="trackId">Database ID of the track.</param>
+    /// <param name="plainLyrics">Unsynchronised plain-text lyrics, or <see langword="null"/>.</param>
+    /// <param name="syncedLyrics">LRC-formatted synchronised lyrics, or <see langword="null"/>.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when the server accepted the lyrics.</returns>
+    public async Task<bool> UploadTrackLyricsAsync(
+        OrynivoServerSettings server,
+        long trackId,
+        string? plainLyrics,
+        string? syncedLyrics,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(
+                HttpMethod.Put,
+                BuildUrl(server, $"/api/tracks/{trackId}/lyrics"))
+            {
+                Content = JsonContent.Create(
+                    new OrynivoLyrics(plainLyrics, syncedLyrics),
+                    options: JsonOptions)
+            };
+            request.Headers.Add("X-Api-Key", server.ApiKey);
+            using var response = await _http.SendAsync(request, cancellationToken);
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
     }
 
     /// <summary>
@@ -595,6 +776,19 @@ public sealed class OrynivoServerClient : IDisposable
     /// <returns>Authenticated HTTP URL for the artist image.</returns>
     public static string GetArtistArtworkUrl(OrynivoServerSettings server, long artistId)
         => $"{server.BaseUrl.TrimEnd('/')}/api/artwork/artist/{artistId}?key={Uri.EscapeDataString(server.ApiKey)}";
+
+    /// <summary>
+    /// Returns the URL for a track's artwork thumbnail by track ID.
+    /// </summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="trackId">Database ID of the track.</param>
+    /// <param name="size">Thumbnail size (<c>96</c> or <c>320</c>); omit for the original.</param>
+    /// <returns>The authenticated track-artwork URL.</returns>
+    public static string GetTrackArtworkUrl(OrynivoServerSettings server, long trackId, int? size = null)
+    {
+        var sizeParam = size is int s ? $"size={s}&" : string.Empty;
+        return $"{server.BaseUrl.TrimEnd('/')}/api/artwork/track/{trackId}?{sizeParam}key={Uri.EscapeDataString(server.ApiKey)}";
+    }
 
     // ------------------------------------------------------------------
     // Internals

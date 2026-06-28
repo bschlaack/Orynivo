@@ -106,11 +106,16 @@ works directly in FFmpeg and browser URLs.
 | `GET /api/artists` | All artists (id, name, favorite, biography/image flags) |
 | `GET /api/artists/{id}` | Complete artist metadata, including cached biography/source fields |
 | `POST /api/artists/{id}/profile` | Store client-refreshed artist biography/source fields and optional image bytes |
+| `POST /api/artists/{id}/rename` | Rename one artist or merge it with a matching artist |
 | `GET /api/artists/{id}/albums` | Albums for one artist |
 | `GET /api/albums` | All albums (id, title, display artist, year, artwork paths) |
 | `GET /api/albums/{id}/tracks` | Track list for one album |
 | `GET /api/tracks` | Paginated track list (`?page=0&pageSize=500`) |
 | `GET /api/tracks/{id}` | Full metadata for one track |
+| `GET /api/tracks/{id}/lyrics` | Cached plain/synced lyrics for one track |
+| `PUT /api/tracks/{id}/lyrics` | Store client-downloaded lyrics on the server |
+| `GET /api/tracks/facets` | Lightweight facet rows (genre, format, bitrate) for the Tracks filter |
+| `POST /api/tracks/by-ids` | Track rows for a list of track IDs (facet-filtered results) |
 | `GET /api/folders/tracks` | Lightweight track rows for building a server library folder tree |
 | `GET /api/artwork/album/{id}?size=96` | Album artwork thumbnail or original image |
 | `PUT /api/artwork/album/{id}` | Store raw client-selected album artwork bytes on the server |
@@ -124,6 +129,7 @@ works directly in FFmpeg and browser URLs.
 | `GET /api/stream/path?p=` | Stream by absolute file path |
 | `GET /api/artwork/album/{id}?size=` | Album artwork (`size=96` or `size=320` for thumbnails) |
 | `GET /api/artwork/track?p=` | Track artwork by file path |
+| `GET /api/artwork/track/{id}?size=` | Track artwork by track ID (`size=96` or `size=320` for thumbnails) |
 
 ### Configuration
 
@@ -151,8 +157,8 @@ while Windows servers expose their drive roots. The same dialog can start a
 server scan and shows live progress while large directories are being scanned.
 Inaccessible subdirectories such as Linux `lost+found` folders are skipped
 instead of aborting the complete scan.
-Configured Orynivo Server connections appear in the main sidebar directly below
-the Local Library section.
+Configured Orynivo Server connections appear in the main sidebar inside the
+Library section, below the Local media node.
 
 ### Running the server
 
@@ -201,12 +207,17 @@ byte-range streaming without FFmpeg.
   duration in transport metadata, play history, and **Up next**. Authenticated
   `?key=` stream URLs are not shown as titles and are not persisted in the
   playback queue.
-- Remote Orynivo Server sidebar entries now expose Artists, Albums, Tracks, and
-  Folder structure below each server. Remote Artists and Albums reuse the local
+- Remote Orynivo Server sidebar entries now appear in the main Library section,
+  below the Local media node, and expose Artists, Albums, Tracks, and Folder
+  structure below each server. The Local media node and each server node are
+  individually collapsible. Remote Artists and Albums reuse the local
   table/artwork masks, while remote artwork is loaded lazily from authenticated
   server artwork endpoints and cached in the Windows client's local data
   directory. Track search uses the normal header search box and runs through
   the server's Lucene index.
+- Remote Orynivo Server artist-info pages support renaming/merging artists and
+  assigning Wikimedia artist images. The Windows client performs the image
+  search and uploads the selected image to the server.
 - Remote Orynivo Server artists, albums, and tracks can be marked as favorites;
   those favorite flags are stored only in the Windows client's settings.
 - Remote Orynivo Server album covers and artist images can be searched from the

@@ -321,7 +321,8 @@
             </ControlTheme>
 
             <!-- ── Localisation string resources (initial German; overwritten by LocalizationManager) ── -->
-            <x:String x:Key="L_LocalLibrary">LOKALE BIBLIOTHEK</x:String>
+            <x:String x:Key="L_LocalLibrary">BIBLIOTHEK</x:String>
+            <x:String x:Key="L_LocalMedia">Lokal</x:String>
             <x:String x:Key="L_Artists">Künstler</x:String>
             <x:String x:Key="L_Albums">Alben</x:String>
             <x:String x:Key="L_Tracks">Tracks</x:String>

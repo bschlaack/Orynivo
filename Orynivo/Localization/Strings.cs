@@ -145,6 +145,8 @@ public sealed record LocalizedStrings(
     string CrashMessageWithoutLog)
 {
     public string OutputType { get; init; } = "";
+    /// <summary>Gets the label for the local media node inside the library sidebar section.</summary>
+    public string LocalMedia { get; init; } = "";
     public string AsioOutputDevice { get; init; } = "";
     public string CwAsioOutputDevice { get; init; } = "";
     public string SteinbergAsio { get; init; } = "";

@@ -50,22 +50,39 @@ public static partial class LyricsService
     /// </summary>
     /// <param name="track">Track whose lyrics to fetch; <c>Title</c> and <c>Artist</c> must be set.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    public static async Task<LyricsDownloadResult?> DownloadAsync(
+    public static Task<LyricsDownloadResult?> DownloadAsync(
         TrackRecord track,
         CancellationToken cancellationToken = default)
+        => DownloadAsync(track.Title, track.Artist, track.Album, track.Duration, cancellationToken);
+
+    /// <summary>
+    /// Downloads plain and/or synchronised lyrics for the given track metadata from LRCLIB.
+    /// Returns <see langword="null"/> when title or artist is missing or LRCLIB returns no result.
+    /// </summary>
+    /// <param name="title">Track title; required.</param>
+    /// <param name="artist">Track artist; required.</param>
+    /// <param name="album">Album name, or <see langword="null"/>.</param>
+    /// <param name="duration">Duration in seconds, or <see langword="null"/>.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public static async Task<LyricsDownloadResult?> DownloadAsync(
+        string? title,
+        string? artist,
+        string? album,
+        double? duration,
+        CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(track.Title) || string.IsNullOrWhiteSpace(track.Artist))
+        if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(artist))
             return null;
 
         var parameters = new List<string>
         {
-            $"track_name={Uri.EscapeDataString(track.Title)}",
-            $"artist_name={Uri.EscapeDataString(track.Artist)}"
+            $"track_name={Uri.EscapeDataString(title)}",
+            $"artist_name={Uri.EscapeDataString(artist)}"
         };
-        if (!string.IsNullOrWhiteSpace(track.Album))
-            parameters.Add($"album_name={Uri.EscapeDataString(track.Album)}");
-        if (track.Duration is > 0)
-            parameters.Add($"duration={Math.Round(track.Duration.Value).ToString(CultureInfo.InvariantCulture)}");
+        if (!string.IsNullOrWhiteSpace(album))
+            parameters.Add($"album_name={Uri.EscapeDataString(album)}");
+        if (duration is > 0)
+            parameters.Add($"duration={Math.Round(duration.Value).ToString(CultureInfo.InvariantCulture)}");
 
         using var response = await Client.GetAsync(
             "https://lrclib.net/api/get?" + string.Join("&", parameters),

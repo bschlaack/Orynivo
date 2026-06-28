@@ -8,10 +8,43 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- The transport lyrics and artist-info buttons now work while playing a track
+  from a remote Orynivo Server. Lyrics are fetched from LRCLIB and the artist
+  biography/image from Wikipedia or Last.fm on the client, then cached on the
+  server (consistent with the existing artwork/biography upload pattern). A new
+  `INowPlayingMetadataProvider` abstraction with local and Orynivo Server
+  implementations (`Orynivo/NowPlayingMetadataProviders.cs`) drives both flows.
+- New server endpoints `GET`/`PUT /api/tracks/{id}/lyrics` cache per-track
+  lyrics; the remote track DTO now also carries the primary `ArtistId` so the
+  client can resolve and cache the playing track's artist profile.
+- The transport cover (bottom-left) and the lyrics background now display for
+  remote Orynivo Server tracks. Cover loading is unified for local and remote
+  tracks through `INowPlayingMetadataProvider.GetArtworkAsync`, backed by a new
+  `GET /api/artwork/track/{id}` server endpoint.
+- The Windows System Media Transport Controls (lock screen / media overlay) now
+  show album artwork for remote Orynivo Server tracks via the authenticated
+  track-artwork URL.
+- The remote Orynivo Server Artists, Albums, and Tracks views now match the local
+  library views: the same column masks with clickable artist/album links, the
+  artist-info button, thumbnails, the full set of optional track columns, the
+  intro card, and the per-entity Favorites-only toggle. Clicking an artist/album
+  link or double-clicking navigates within the remote library.
+- The remote Tracks view gained the same Genre/Audio-Type/Bitrate facet filters as
+  the local Tracks view, backed by new server aggregation endpoints
+  `GET /api/tracks/facets` and `POST /api/tracks/by-ids`. The remote track DTO now
+  also carries `AlbumId`, and the album DTO carries `ArtistId`, to drive
+  in-library navigation.
+
 - Added a shared local/remote library catalog provider layer in the Windows
   client. Local `AudioDatabase` rows and remote Orynivo Server responses now map
   into common artist, album, and track models before reaching the reusable UI
   masks.
+- Remote Orynivo Server album drill-downs now use the shared album-track detail
+  surface with the local-style album header, cover actions, favorite toggle,
+  and grouped track tables.
+- Back navigation from remote Orynivo Server album details now preserves the
+  remote server context instead of restoring the same numeric album ID against
+  the local library.
 - Remote Orynivo Server albums and artists now support artwork management from
   the Windows client. The client runs the existing cover/artist-image searches,
   uploads the selected image bytes to the server, and the server stores them in
@@ -20,6 +53,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Windows client. Last.fm or Wikipedia requests run on the client, then the
   server stores only the resulting cached biography, source URL, language, and
   optional image bytes.
+- Remote Orynivo Server artist-info views now expose the same rename/merge and
+  Wikimedia image-search actions as local artists. Renames and merges are
+  committed through the server and rebuild the server Lucene index.
 - Remote Orynivo Server entries now expand into Artists, Albums, Tracks, and
   Folder structure in the sidebar. Remote Artists and Albums reuse the local
   table/artwork masks with lazy authenticated artwork loading and a local
@@ -29,8 +65,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- Moved the Orynivo Server accordion in the main sidebar directly below
-  Local Library.
+- Renamed the main sidebar's local-library section to Library. Local media now
+  appear under a "Local" node, and configured Orynivo Servers with their
+  Artists, Albums, Tracks, and Folder structure entries are listed in the same
+  Library section instead of in a separate Orynivo Server section.
+- The Local media node and each configured Orynivo Server node inside the
+  Library sidebar section are now individually collapsible.
+- Settings no longer exposes a separate Orynivo Server sidebar visibility
+  toggle; the Library sidebar toggle controls both local media and configured
+  Orynivo Server entries.
 - Orynivo Server track DTOs now include the extended metadata needed by the
   shared track tables, including genre, totals, composer, BPM, file size, added
   date, and ReplayGain values when available.
@@ -44,6 +87,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Double-clicking a track in a remote Orynivo Server album now plays the track
+  instead of navigating to an unrelated local album. The remote track list no
+  longer leaves the album view-mode toggle visible, and the album drill-down
+  no longer mistakes a remote track row's ID for a local album ID.
 - Remote Orynivo Server artist-info buttons now open the selected server artist
   instead of treating the server artist ID as a local library artist ID.
 - Remote Orynivo Server album and artist artwork grids now load existing

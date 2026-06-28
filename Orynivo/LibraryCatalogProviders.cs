@@ -47,6 +47,7 @@ internal sealed record LibraryCatalogArtist(
 /// <param name="ArtworkPath">Local artwork path or authenticated remote artwork URL.</param>
 /// <param name="ThumbnailPath">Local thumbnail path or authenticated remote thumbnail URL.</param>
 /// <param name="IsFavorite">Whether the album is a favorite in the active client context.</param>
+/// <param name="ArtistId">Provider-local album-artist identifier, or <see langword="null"/>.</param>
 internal sealed record LibraryCatalogAlbum(
     LibraryCatalogSource Source,
     long Id,
@@ -55,12 +56,14 @@ internal sealed record LibraryCatalogAlbum(
     int? Year,
     string? ArtworkPath,
     string? ThumbnailPath,
-    bool IsFavorite);
+    bool IsFavorite,
+    long? ArtistId = null);
 
 /// <summary>Track metadata returned by a library catalog provider.</summary>
 /// <param name="Source">Catalog source that produced the track.</param>
 /// <param name="Id">Provider-local track identifier.</param>
 /// <param name="PlaybackPath">Local file path or authenticated remote stream URL used for playback.</param>
+/// <param name="SourcePath">Physical source path used for grouping and display, or <see langword="null"/>.</param>
 /// <param name="FileName">File name.</param>
 /// <param name="Title">Track title.</param>
 /// <param name="Artist">Track artist.</param>
@@ -87,10 +90,13 @@ internal sealed record LibraryCatalogAlbum(
 /// <param name="ReplayGainTrack">Track ReplayGain value.</param>
 /// <param name="ReplayGainAlbum">Album ReplayGain value.</param>
 /// <param name="KnownDuration">Authoritative playback duration.</param>
+/// <param name="ArtistId">Provider-local primary-artist identifier, or <see langword="null"/>.</param>
+/// <param name="AlbumId">Provider-local album identifier, or <see langword="null"/>.</param>
 internal sealed record LibraryCatalogTrack(
     LibraryCatalogSource Source,
     long Id,
     string PlaybackPath,
+    string? SourcePath,
     string FileName,
     string? Title,
     string? Artist,
@@ -116,7 +122,9 @@ internal sealed record LibraryCatalogTrack(
     long? AddedAt,
     string? ReplayGainTrack,
     string? ReplayGainAlbum,
-    TimeSpan? KnownDuration = null);
+    TimeSpan? KnownDuration = null,
+    long? ArtistId = null,
+    long? AlbumId = null);
 
 /// <summary>Common catalog surface for local and remote music libraries.</summary>
 internal interface ILibraryCatalogProvider
@@ -140,6 +148,13 @@ internal interface ILibraryCatalogProvider
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Album rows.</returns>
     Task<IReadOnlyList<LibraryCatalogAlbum>> GetAlbumsAsync(bool includeArtwork, CancellationToken cancellationToken = default);
+
+    /// <summary>Loads one album by provider-local identifier.</summary>
+    /// <param name="albumId">Provider-local album identifier.</param>
+    /// <param name="includeArtwork">Whether artwork availability/path metadata should be loaded.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The matching album, or <see langword="null"/> when it is unavailable.</returns>
+    Task<LibraryCatalogAlbum?> GetAlbumAsync(long albumId, bool includeArtwork, CancellationToken cancellationToken = default);
 
     /// <summary>Loads albums for an artist from the provider.</summary>
     /// <param name="artistId">Provider-local artist identifier.</param>
@@ -167,6 +182,12 @@ internal interface ILibraryCatalogProvider
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Matching track rows.</returns>
     Task<IReadOnlyList<LibraryCatalogTrack>> SearchTracksAsync(string query, int limit, CancellationToken cancellationToken = default);
+
+    /// <summary>Loads tracks for the specified provider-local identifiers.</summary>
+    /// <param name="ids">Track identifiers to resolve.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Matching track rows.</returns>
+    Task<IReadOnlyList<LibraryCatalogTrack>> GetTracksByIdsAsync(IReadOnlyList<long> ids, CancellationToken cancellationToken = default);
 
     /// <summary>Stores album artwork in the provider.</summary>
     /// <param name="albumId">Provider-local album identifier.</param>
@@ -206,6 +227,14 @@ internal sealed class LocalLibraryCatalogProvider : ILibraryCatalogProvider
     }
 
     /// <inheritdoc/>
+    public Task<LibraryCatalogAlbum?> GetAlbumAsync(long albumId, bool includeArtwork, CancellationToken cancellationToken = default)
+    {
+        using var db = AudioDatabase.OpenDefault();
+        var album = db.GetAlbumById(albumId);
+        return Task.FromResult(album is null ? null : ToAlbum(album));
+    }
+
+    /// <inheritdoc/>
     public Task<IReadOnlyList<LibraryCatalogAlbum>> GetAlbumsByArtistAsync(long artistId, bool includeArtwork, CancellationToken cancellationToken = default)
     {
         using var db = AudioDatabase.OpenDefault();
@@ -241,6 +270,14 @@ internal sealed class LocalLibraryCatalogProvider : ILibraryCatalogProvider
     }
 
     /// <inheritdoc/>
+    public Task<IReadOnlyList<LibraryCatalogTrack>> GetTracksByIdsAsync(IReadOnlyList<long> ids, CancellationToken cancellationToken = default)
+    {
+        using var db = AudioDatabase.OpenDefault();
+        return Task.FromResult<IReadOnlyList<LibraryCatalogTrack>>(
+            db.GetTrackListByIds(ids).Select(ToTrack).ToList());
+    }
+
+    /// <inheritdoc/>
     public Task<bool> SetAlbumArtworkAsync(long albumId, byte[] imageData, string? mimeType, CancellationToken cancellationToken = default)
     {
         using var db = AudioDatabase.OpenDefault();
@@ -268,11 +305,13 @@ internal sealed class LocalLibraryCatalogProvider : ILibraryCatalogProvider
         album.Year,
         album.ArtworkPath,
         album.ThumbnailPath,
-        album.IsFavorite);
+        album.IsFavorite,
+        album.ArtistId);
 
     private static LibraryCatalogTrack ToTrack(TrackListInfo track) => new(
         LibraryCatalogSource.Local,
         track.Id,
+        track.Path,
         track.Path,
         track.FileName,
         track.Title,
@@ -299,7 +338,9 @@ internal sealed class LocalLibraryCatalogProvider : ILibraryCatalogProvider
         track.AddedAt,
         track.ReplayGainTrack,
         track.ReplayGainAlbum,
-        track.Duration.HasValue ? TimeSpan.FromSeconds(track.Duration.Value) : null);
+        track.Duration.HasValue ? TimeSpan.FromSeconds(track.Duration.Value) : null,
+        track.ArtistId,
+        track.AlbumId);
 }
 
 /// <summary>Remote Orynivo Server-backed catalog provider.</summary>
@@ -347,6 +388,15 @@ internal sealed class OrynivoServerLibraryCatalogProvider : ILibraryCatalogProvi
     }
 
     /// <inheritdoc/>
+    public async Task<LibraryCatalogAlbum?> GetAlbumAsync(long albumId, bool includeArtwork, CancellationToken cancellationToken = default)
+    {
+        var albums = await _client.GetAlbumsAsync(_server, cancellationToken);
+        return albums.FirstOrDefault(album => album.Id == albumId) is { } album
+            ? ToAlbum(album)
+            : null;
+    }
+
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<LibraryCatalogAlbum>> GetAlbumsByArtistAsync(long artistId, bool includeArtwork, CancellationToken cancellationToken = default)
     {
         var albums = await _client.GetAlbumsByArtistAsync(_server, artistId, cancellationToken);
@@ -371,6 +421,13 @@ internal sealed class OrynivoServerLibraryCatalogProvider : ILibraryCatalogProvi
     public async Task<IReadOnlyList<LibraryCatalogTrack>> SearchTracksAsync(string query, int limit, CancellationToken cancellationToken = default)
     {
         var tracks = await _client.SearchTracksAsync(_server, query, limit, cancellationToken);
+        return tracks.Select(ToTrack).ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<IReadOnlyList<LibraryCatalogTrack>> GetTracksByIdsAsync(IReadOnlyList<long> ids, CancellationToken cancellationToken = default)
+    {
+        var tracks = await _client.GetTracksByIdsAsync(_server, ids, cancellationToken);
         return tracks.Select(ToTrack).ToList();
     }
 
@@ -409,7 +466,8 @@ internal sealed class OrynivoServerLibraryCatalogProvider : ILibraryCatalogProvi
         string.IsNullOrWhiteSpace(album.ThumbnailPath)
             ? null
             : OrynivoServerClient.GetAlbumArtworkUrl(_server, album.Id, 96),
-        _isFavorite("Album", album.Id));
+        _isFavorite("Album", album.Id),
+        album.ArtistId);
 
     private LibraryCatalogTrack ToTrack(OrynivoTrackInfo track)
     {
@@ -418,6 +476,7 @@ internal sealed class OrynivoServerLibraryCatalogProvider : ILibraryCatalogProvi
             LibraryCatalogSource.OrynivoServer,
             track.Id,
             streamUrl,
+            track.SourcePath ?? track.Path,
             track.FileName,
             track.Title,
             track.Artist,
@@ -443,6 +502,8 @@ internal sealed class OrynivoServerLibraryCatalogProvider : ILibraryCatalogProvi
             track.AddedAt,
             track.ReplayGainTrack,
             track.ReplayGainAlbum,
-            track.Duration.HasValue ? TimeSpan.FromSeconds(track.Duration.Value) : null);
+            track.Duration.HasValue ? TimeSpan.FromSeconds(track.Duration.Value) : null,
+            track.ArtistId,
+            track.AlbumId);
     }
 }

@@ -137,7 +137,6 @@ internal partial class SettingsView : UserControl
         ShowOwnRadiosSectionCheckBox.IsChecked = settings.ShowOwnRadiosSection;
         ShowMyPodcastsSectionCheckBox.IsChecked = settings.ShowMyPodcastsSection;
         ShowPlexSectionCheckBox.IsChecked          = settings.ShowPlexSection;
-        ShowOrynivoServerSectionCheckBox.IsChecked = settings.ShowOrynivoServerSection;
         ShowPlaylistsSectionCheckBox.IsChecked     = settings.ShowPlaylistsSection;
         ArtistInfoSourceComboBox.ItemsSource = Enum.GetValues<ArtistInfoSource>();
         ArtistInfoSourceComboBox.SelectedItem = settings.ArtistInfoSource;
@@ -232,7 +231,7 @@ internal partial class SettingsView : UserControl
     public bool ShowPodcastsItem => ShowPodcastsItemCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether the Up Next sidebar item should be visible.</summary>
     public bool ShowQueueItem => ShowQueueItemCheckBox.IsChecked == true;
-    /// <summary>Gets a value indicating whether the Local Library sidebar section should be visible.</summary>
+    /// <summary>Gets a value indicating whether the Library sidebar section should be visible.</summary>
     public bool ShowLocalLibrarySection => ShowLocalLibrarySectionCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether the Own Radios sidebar section should be visible.</summary>
     public bool ShowOwnRadiosSection => ShowOwnRadiosSectionCheckBox.IsChecked == true;
@@ -240,8 +239,6 @@ internal partial class SettingsView : UserControl
     public bool ShowMyPodcastsSection => ShowMyPodcastsSectionCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether the Plex sidebar section should be visible.</summary>
     public bool ShowPlexSection => ShowPlexSectionCheckBox.IsChecked == true;
-    /// <summary>Gets a value indicating whether the Orynivo Server sidebar section should be visible.</summary>
-    public bool ShowOrynivoServerSection => ShowOrynivoServerSectionCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether the Playlists sidebar section should be visible.</summary>
     public bool ShowPlaylistsSection => ShowPlaylistsSectionCheckBox.IsChecked == true;
 

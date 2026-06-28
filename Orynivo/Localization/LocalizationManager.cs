@@ -50,6 +50,7 @@ public static class LocalizationManager
 
         var resources = AvaloniaApp.Current!.Resources;
         resources["L_LocalLibrary"] = Current.LocalLibrary;
+        resources["L_LocalMedia"] = Current.LocalMedia;
         resources["L_Artists"] = Current.Artists;
         resources["L_Albums"] = Current.Albums;
         resources["L_Tracks"] = Current.Tracks;
@@ -317,7 +318,7 @@ public static class LocalizationManager
     }
 
     private static readonly LocalizedStrings German = new(
-        "LOKALE BIBLIOTHEK", "Künstler", "Alben", "Tracks", "Ordnerstruktur", "Suche", "PLAYLISTS", "Über", "Einstellungen",
+        "BIBLIOTHEK", "Künstler", "Alben", "Tracks", "Ordnerstruktur", "Suche", "PLAYLISTS", "Über", "Einstellungen",
         "Filter", "Favoriten", "Audiotypen", "Bitrate",
         "Kein Gerät ausgewählt.", "DARSTELLUNG", "Farbschema", "Sprache", "WIEDERGABE", "Ausgabegerät",
         "BIBLIOTHEK", "Verzeichnisse", "+ Verzeichnis hinzufügen", "Datenbankwartung",
@@ -383,6 +384,7 @@ public static class LocalizationManager
         CwAsio = "cwASIO",
         WasapiOutputDevice = "WASAPI-Ausgabegerät",
         DeviceInfo = "Geräteinfo",
+        LocalMedia = "Lokal",
         OutputProfile = "Ausgabe",
         OutputProfileCreate = "Ausgabe erstellen",
         OutputProfileConfigure = "Ausgabe konfigurieren",
@@ -729,7 +731,7 @@ public static class LocalizationManager
     };
 
     private static readonly LocalizedStrings English = new(
-        "LOCAL LIBRARY", "Artists", "Albums", "Tracks", "Folder structure", "Search", "PLAYLISTS", "About", "Settings",
+        "LIBRARY", "Artists", "Albums", "Tracks", "Folder structure", "Search", "PLAYLISTS", "About", "Settings",
         "Filter", "Favorites", "Audio types", "Bitrate",
         "No device selected.", "APPEARANCE", "Color scheme", "Language", "PLAYBACK", "Output device",
         "LIBRARY", "Directories", "+ Add directory", "Database maintenance",
@@ -792,6 +794,7 @@ public static class LocalizationManager
         CwAsioOutputDevice = "cwASIO output device", SteinbergAsio = "Steinberg ASIO", CwAsio = "cwASIO",
         DeviceInfo = "Device information",
         OutputProfile = "Output",
+        LocalMedia = "Local",
         OutputProfileCreate = "Create output",
         OutputProfileConfigure = "Configure output",
         OutputProfileDelete = "Delete output",
@@ -1122,7 +1125,7 @@ public static class LocalizationManager
     };
 
     private static readonly LocalizedStrings French = new(
-        "BIBLIOTHÈQUE LOCALE", "Artistes", "Albums", "Titres", "Arborescence", "Recherche", "PLAYLISTS", "À propos", "Paramètres",
+        "BIBLIOTHÈQUE", "Artistes", "Albums", "Titres", "Arborescence", "Recherche", "PLAYLISTS", "À propos", "Paramètres",
         "Filtre", "Favoris", "Types audio", "Débit",
         "Aucun appareil sélectionné.", "APPARENCE", "Thème", "Langue", "LECTURE", "Périphérique de sortie",
         "BIBLIOTHÈQUE", "Dossiers", "+ Ajouter un dossier", "Maintenance de la base",
@@ -1188,6 +1191,7 @@ public static class LocalizationManager
         CwAsioOutputDevice = "Périphérique de sortie cwASIO", SteinbergAsio = "Steinberg ASIO", CwAsio = "cwASIO",
         DeviceInfo = "Informations sur le périphérique",
         OutputProfile = "Sortie",
+        LocalMedia = "Local",
         OutputProfileCreate = "Créer une sortie",
         OutputProfileConfigure = "Configurer la sortie",
         OutputProfileDelete = "Supprimer la sortie",
@@ -1518,7 +1522,7 @@ public static class LocalizationManager
     };
 
     private static readonly LocalizedStrings Spanish = new(
-        "BIBLIOTECA LOCAL", "Artistas", "Álbumes", "Pistas", "Estructura de carpetas", "Búsqueda", "LISTAS", "Acerca de", "Ajustes",
+        "BIBLIOTECA", "Artistas", "Álbumes", "Pistas", "Estructura de carpetas", "Búsqueda", "LISTAS", "Acerca de", "Ajustes",
         "Filtro", "Favoritos", "Tipos de audio", "Tasa de bits",
         "Ningún dispositivo seleccionado.", "APARIENCIA", "Esquema de color", "Idioma", "REPRODUCCIÓN", "Dispositivo de salida",
         "BIBLIOTECA", "Directorios", "+ Agregar directorio", "Mantenimiento de base de datos",
@@ -1581,6 +1585,7 @@ public static class LocalizationManager
         CwAsioOutputDevice = "Dispositivo de salida cwASIO", SteinbergAsio = "Steinberg ASIO", CwAsio = "cwASIO",
         DeviceInfo = "Información del dispositivo",
         OutputProfile = "Salida",
+        LocalMedia = "Local",
         OutputProfileCreate = "Crear salida",
         OutputProfileConfigure = "Configurar salida",
         OutputProfileDelete = "Eliminar salida",

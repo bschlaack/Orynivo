@@ -42,7 +42,10 @@ helpers `GetStreamUrl`/`GetAlbumArtworkUrl`/`GetArtistArtworkUrl`; also uploads
 client-selected album and artist artwork through `UploadAlbumArtworkAsync` and
 `UploadArtistImageAsync`; remote track DTOs mirror the local list metadata used
 by shared table masks, including genre, track/disc totals, composer, BPM, file
-size, added date, and ReplayGain fields when the server supports them).
+size, added date, primary `ArtistId`, and ReplayGain fields when the server
+supports them. It also exposes `GetArtistAsync` for a single cached artist
+profile and per-track lyrics caching via `GetTrackLyricsAsync` /
+`UploadTrackLyricsAsync`).
 
 **Access control:** `InternalsVisibleTo("Orynivo")` is set in `AssemblyInfo.cs`
 so the Orynivo Windows app can access internal Core members (audio-processing
@@ -127,16 +130,28 @@ runtime dependency.
 - `Orynivo.Server/Endpoints/LibraryEndpoints.cs`: artists, albums, tracks,
   playlists (smart playlists resolved via `SmartPlaylistCriteria.Resolve`),
   and Lucene search endpoints; `GET /api/artists/{id}` returns complete
-  cached artist profile fields and `POST /api/artists/{id}/profile` stores
-  client-refreshed biography/source fields plus optional image bytes; Last.fm
-  or Wikipedia requests run on the client, not on the server; `GET`
-  `/api/folders/tracks` returns lightweight track rows for building the remote
-  server library folder tree and must materialize the response before disposing
-  the SQLite connection because JSON serialization runs after the route handler
-  returns
+  cached artist profile fields, `POST /api/artists/{id}/profile` stores
+  client-refreshed biography/source fields plus optional image bytes, and
+  `POST /api/artists/{id}/rename` renames or merges artists then rebuilds the
+  server Lucene index; Last.fm,
+  Wikipedia, and Wikimedia image-search requests run on the client, not on the
+  server; `GET`
+  `/api/tracks/{id}/lyrics` returns cached plain/synced lyrics with the last
+  fetch timestamp and `PUT /api/tracks/{id}/lyrics` stores client-downloaded
+  LRCLIB lyrics (the LRCLIB request runs on the client); the track DTO includes
+  the primary `ArtistId` and `AlbumId`, and the album DTO includes `ArtistId`,
+  for in-library navigation; `GET` `/api/tracks/facets` returns lightweight
+  facet rows (`TrackFacetInfo`) and `POST` `/api/tracks/by-ids` returns track
+  rows for a posted ID list, together powering the remote Tracks facet filters;
+  `GET` `/api/folders/tracks` returns lightweight track
+  rows for building the remote server library folder tree and must materialize
+  the response before disposing the SQLite connection because JSON serialization
+  runs after the route handler returns
 - `Orynivo.Server/Endpoints/StreamEndpoints.cs`: byte-range streaming for
   regular audio files; on-the-fly FLAC transcode via FFmpeg pipe for CUE
-  virtual tracks; album, artist, and track artwork endpoints; album artwork
+  virtual tracks; album, artist, and track artwork endpoints (track artwork is
+  served both by file path via `/api/artwork/track?p=` and by database ID via
+  `/api/artwork/track/{id}` with an optional `?size=`); album artwork
   requests fall back to an on-demand embedded-artwork repair for the requested
   album before returning 404; `PUT` `/api/artwork/album/{id}` and
   `/api/artwork/artist/{id}` accept raw image bytes from authenticated clients
@@ -197,6 +212,21 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
   maps `AudioDatabase` rows, and `OrynivoServerLibraryCatalogProvider` maps
   `OrynivoServerClient` responses into the same UI-facing models so library
   masks can be reused instead of branching on local vs. server rows.
+- `Orynivo/NowPlayingMetadataProviders.cs`: reusable abstraction for the
+  transport lyrics, artist-info, and cover views. `INowPlayingMetadataProvider`
+  exposes `GetCachedLyricsAsync`/`DownloadLyricsAsync`, `GetArtistProfileAsync`,
+  and `GetArtworkAsync` (the transport cover + lyrics background, returned as
+  local file paths; the remote implementation downloads the server track
+  artwork into the local remote-artwork cache);
+  `LocalNowPlayingMetadataProvider` reads/writes the local SQLite library, and
+  `OrynivoServerNowPlayingMetadataProvider` reads/writes a remote server's
+  lyrics and artist-profile caches. The client always performs the external
+  LRCLIB/Wikipedia/Last.fm fetch and uploads the result; the server only caches
+  it. `MainWindow` selects the provider for the currently playing track
+  (`_currentNowPlayingProvider`) so lyrics and artist info work identically for
+  local and remote tracks. Remote tracks keep the now-playing artist button
+  disabled because it navigates the local album view; only the artist-info
+  detail view is enabled for them.
 - `Orynivo/Audio/WindowsEndpointVolumeSynchronizer.cs`: bidirectional
   synchronization between the transport volume slider and the selected
   Windows render endpoint's master volume
@@ -320,8 +350,12 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
   artists/albums/tracks, resolves drill-down children, browses folders lazily,
   and builds authenticated direct-part URLs
 - `Orynivo.Core/Streaming/OrynivoServerClient.cs`: HTTP client for a remote
-  Orynivo Server; methods load artists, albums by artist, albums, tracks by
-  album, all tracks, lightweight folder-tree tracks, server library paths,
+  Orynivo Server; methods load artists, a single artist profile (`GetArtistAsync`),
+  albums by artist, albums, tracks by
+  album, all tracks, tracks by ID list (`GetTracksByIdsAsync`), track facet rows
+  (`GetTrackFacetsAsync`), lightweight folder-tree tracks, per-track cached lyrics
+  (`GetTrackLyricsAsync`/`UploadTrackLyricsAsync`), remote artist rename/merge
+  (`RenameArtistAsync`), server library paths,
   server directory listings, and scan status; `SetLibraryPathsAsync` replaces
   the remote server's configured library
   roots; `TriggerScanAsync` starts a remote scan; `UploadAlbumArtworkAsync` and
@@ -329,22 +363,66 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
   server does not perform external artwork searches itself;
   `UpdateArtistProfileAsync` sends client-refreshed biography/source fields and
   optional image bytes for server-side caching, without sending the Last.fm API
-  key; `GetStreamUrl`, `GetAlbumArtworkUrl`, and `GetArtistArtworkUrl` are pure
-  URL builders that include `?key=` so the URLs can be passed directly to
-  FFmpeg or Avalonia's image loader
-- Remote Orynivo Server sidebar entries render one disabled server-name row
-  followed by Artists, Albums, Tracks, and Folder structure child rows. Remote
-  Artists and Albums reuse the local table/artwork masks and hydrate
-  authenticated server artwork lazily as rows or artwork cards become visible;
-  downloaded remote artwork is cached client-side under
+  key; `GetStreamUrl`, `GetAlbumArtworkUrl`, `GetArtistArtworkUrl`, and
+  `GetTrackArtworkUrl` are pure URL builders that include `?key=` so the URLs can
+  be passed directly to FFmpeg or Avalonia's image loader
+- The main sidebar library accordion is labelled **Library**/**Bibliothek**.
+  Local media live under a collapsible **Local** child node followed by local
+  Artists, Albums, Tracks, and Folder structure. Configured remote Orynivo
+  Server entries are rendered in that same Library accordion, after the local
+  media rows, as one collapsible server-name row followed by Artists, Albums,
+  Tracks, and Folder structure child rows. There is no separate Orynivo Server
+  sidebar accordion or separate Orynivo Server sidebar visibility setting;
+  `ShowLocalLibrarySection` and `IsLocalLibrarySectionExpanded` control the
+  complete Library accordion, including remote Orynivo Server rows.
+  `IsLocalMediaLibraryGroupExpanded` persists the Local child group state, and
+  `CollapsedOrynivoServerLibraryGroups` persists collapsed server child groups.
+  Remote
+  Artists, Albums, and Tracks reuse the **same** local table/artwork column masks
+  (`ApplyColumns("Artists"/"Albums"/"Tracks")`), intro card
+  (`UpdateLibraryIntroCard`), per-entity Favorites-only toggle, and A-Z index as
+  the local library. There are no separate `Orynivo*` column masks. Server
+  artwork hydrates lazily as rows or artwork cards become visible; downloaded
+  remote artwork is cached client-side under
   `%LOCALAPPDATA%\Orynivo\remote-artworks\`.
+  Artist/album entity links and double-click navigate **within** the remote
+  library via `OpenOrynivoArtistAlbumsAsync`/`OpenOrynivoAlbumTracksAsync`
+  (the link handlers `ArtistLinkButton_OnClick`/`AlbumLinkButton_OnClick`
+  dispatch by `EntityType` prefix `"Orynivo"`). This requires remote rows to
+  carry IDs: remote track rows have `ArtistId`/`AlbumId`, remote album rows have
+  `ArtistId`.
+  Remote album drill-downs use the shared provider-backed album-track detail
+  surface with the same album header/card, cover actions, favorite toggle, and
+  grouped track tables as local albums; do not route server albums to a separate
+  plain track-list view. Persisting remote album tracks as local playlists must
+  remain disabled because the paths contain credential-bearing server URLs.
+  Back navigation must capture remote album details as remote states carrying
+  the Orynivo Server navigation tag; never restore a remote album detail through
+  the local `ShowAlbumTracksAsync` path because server and local album IDs can
+  collide.
   Remote artist-info views must use the bound remote row/server profile data,
   not local `AudioDatabase.GetArtistById`, because server IDs can collide with
-  local artist IDs.
-  Remote Tracks uses the normal header search box against the server's Lucene
-  `/api/search` endpoint instead of filtering a fully paged client-side list.
+  local artist IDs. The remote artist-info rename/merge and Wikimedia image
+  actions must call the Orynivo Server API (`RenameArtistAsync`,
+  `UploadArtistImageAsync`) and update the remote row/detail view rather than
+  writing to the local database.
+  Remote Tracks offers the same Genre/Audio-Type/Bitrate facet filters as local,
+  reusing the client's `MatchesTrackFilters`/facet-popup logic fed by the server
+  aggregation endpoint `/api/tracks/facets` (favorite state overridden with the
+  client-side favorites); filtered results load via `/api/tracks/by-ids`
+  (`ResolveOrynivoTrackRowsAsync`). The header search box (server Lucene
+  `/api/search`) coexists; facet filters take precedence when active. The facet
+  rows live in `_orynivoTrackFacets` while a remote Tracks view is active and are
+  cleared otherwise.
   Remote folder tree nodes queue remote HTTP streams only and never expose
   playlist persistence for credential-bearing server URLs.
+  While a remote track plays, the transport lyrics and artist-info buttons work
+  through `OrynivoServerNowPlayingMetadataProvider` (see
+  `Orynivo/NowPlayingMetadataProviders.cs`): lyrics and the artist
+  biography/image are fetched on the client and cached on that track's server.
+  The remote track's server and primary artist ID are carried on its
+  `ContentRow` (`OrynivoServer`, `ArtistId`); the now-playing artist button
+  stays disabled for remote tracks because it navigates the local album view.
 - `Orynivo/OrynivoServerDialog.axaml/.cs`: themed dialog for adding or editing a
   remote Orynivo Server (name, URL, API key, Test Connection); it can load, add,
   remove, and save the remote server's music directories through the server API,
@@ -353,11 +431,14 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
 - `Orynivo/RemoteDirectoryBrowserDialog.axaml/.cs`: browses the remote server
   filesystem through `/api/files/directories?path=` and returns a server-side
   directory path for `OrynivoServerDialog`
-- `AppSettings.OrynivoServers` stores configured remote server connections;
-  `ShowOrynivoServerSection` and `IsOrynivoServerSectionExpanded` control
-  sidebar visibility and expansion state; API keys are stored in `settings.json`
-  (same policy as AI chat key); `AppSettings.OrynivoServerFavorites` stores
-  client-side favorite keys for remote artists, albums, and tracks
+- `AppSettings.OrynivoServers` stores configured remote server connections; API
+  keys are stored in `settings.json` (same policy as AI chat key);
+  `AppSettings.OrynivoServerFavorites` stores client-side favorite keys for
+  remote artists, albums, and tracks. Legacy `ShowOrynivoServerSection` and
+  `IsOrynivoServerSectionExpanded` settings may still exist in persisted JSON
+  for compatibility, but the current sidebar renders remote servers under the
+  main Library accordion controlled by `ShowLocalLibrarySection` and
+  `IsLocalLibrarySectionExpanded`.
 - `Orynivo/Streaming/WindowsPlexCredentialStore.cs`: stores per-server Plex
   access tokens in `%LOCALAPPDATA%\Orynivo\plex-credentials.dat` using Windows
   DPAPI for the current user
@@ -825,8 +906,10 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
   Global commands dispatch onto Avalonia's UI thread and reuse Orynivo's normal
   play, pause, previous, next, stop, and seek paths.
 - SMTC metadata follows local tracks, gapless transitions, podcasts, Plex
-  tracks, and changing internet-radio ICY metadata. Local artwork uses the
-  managed artwork cache; podcast/radio artwork uses its public catalog URL.
+  tracks, remote Orynivo Server tracks, and changing internet-radio ICY
+  metadata. Local artwork uses the managed artwork cache; podcast/radio artwork
+  uses its public catalog URL; remote Orynivo Server artwork uses the
+  authenticated `GetTrackArtworkUrl` (`?key=`) so Windows fetches it directly.
 - The SMTC timeline is refreshed at most every five seconds during playback and
   immediately after track changes or seeks.
 - `SteinbergAsioStream.IsBackendAvailable()` validates each native bridge and
@@ -977,6 +1060,9 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
 - `AppSettings.IsLocalLibrarySectionExpanded`, `IsOwnRadiosSectionExpanded`,
   `IsMyPodcastsSectionExpanded`, `IsPlexSectionExpanded`, and
   `IsPlaylistsSectionExpanded` persist independent sidebar accordion states
+- `AppSettings.IsLocalMediaLibraryGroupExpanded` and
+  `CollapsedOrynivoServerLibraryGroups` persist the nested Local and Orynivo
+  Server child-group expansion states inside the Library sidebar accordion
 - About displays the author, library licenses, and the Steinberg ASIO trademark
   notice
 - The content header continues the native title-bar/sidebar appearance and shows

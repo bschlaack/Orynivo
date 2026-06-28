@@ -26,7 +26,8 @@ public sealed record AlbumInfo(
     int? Year,
     string? ArtworkPath,
     string? ThumbnailPath,
-    bool IsFavorite);
+    bool IsFavorite,
+    long? ArtistId = null);
 
 /// <summary>Lightweight track row for list and search tables; omits artwork and lyrics payloads.</summary>
 /// <param name="Path">Absolute audio-file path.</param>
@@ -56,6 +57,8 @@ public sealed record AlbumInfo(
 /// <param name="AddedAt">Library-added timestamp in Unix seconds.</param>
 /// <param name="ReplayGainTrack">Track ReplayGain value.</param>
 /// <param name="ReplayGainAlbum">Album ReplayGain value.</param>
+/// <param name="ArtistId">Database identifier of the primary artist, or <see langword="null"/>.</param>
+/// <param name="AlbumId">Database identifier of the album, or <see langword="null"/>.</param>
 public sealed record TrackListInfo(
     string Path,
     string FileName,
@@ -83,7 +86,9 @@ public sealed record TrackListInfo(
     long? FileSize,
     long AddedAt,
     string? ReplayGainTrack,
-    string? ReplayGainAlbum);
+    string? ReplayGainAlbum,
+    long? ArtistId = null,
+    long? AlbumId = null);
 
 /// <summary>Minimal track row for filter/facet building; carries only classification fields.</summary>
 /// <param name="Id">Track database identifier.</param>
@@ -457,6 +462,35 @@ public sealed class AudioDatabase : IDisposable
         cmd.ExecuteNonQuery();
     }
 
+    /// <summary>Stores downloaded plain and synchronised lyrics for the track with the given identifier.</summary>
+    /// <param name="trackId">Database identifier of the track to update.</param>
+    /// <param name="plainLyrics">Unsynchronised plain-text lyrics, or <see langword="null"/>.</param>
+    /// <param name="syncedLyrics">LRC-formatted synchronised lyrics, or <see langword="null"/>.</param>
+    /// <param name="source">Label identifying where the lyrics were obtained.</param>
+    /// <returns><see langword="true"/> when a matching track row was updated.</returns>
+    public bool UpdateDownloadedLyricsById(
+        long trackId,
+        string? plainLyrics,
+        string? syncedLyrics,
+        string source)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            UPDATE tracks
+            SET downloaded_lyrics = $plain,
+                synced_lyrics = $synced,
+                lyrics_source = $source,
+                lyrics_fetched_at = $fetched_at
+            WHERE id = $id;
+            """;
+        Add(cmd, "$plain", (object?)plainLyrics ?? DBNull.Value);
+        Add(cmd, "$synced", (object?)syncedLyrics ?? DBNull.Value);
+        Add(cmd, "$source", source);
+        Add(cmd, "$fetched_at", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        Add(cmd, "$id", trackId);
+        return cmd.ExecuteNonQuery() > 0;
+    }
+
     public IEnumerable<TrackRecord> GetAll()
     {
         using var cmd = _conn.CreateCommand();
@@ -807,7 +841,8 @@ public sealed class AudioDatabase : IDisposable
                 CASE WHEN al.year = 0 THEN NULL ELSE al.year END AS year,
                 aw.thumb_320_path,
                 aw.thumb_96_path,
-                al.is_favorite
+                al.is_favorite,
+                al.artist_id
             FROM albums al
             LEFT JOIN artists ar ON ar.id = al.artist_id
             LEFT JOIN artworks aw ON aw.id = al.artwork_id
@@ -823,7 +858,8 @@ public sealed class AudioDatabase : IDisposable
                 CASE WHEN al.year = 0 THEN NULL ELSE al.year END AS year,
                 NULL AS thumb_320_path,
                 NULL AS thumb_96_path,
-                al.is_favorite
+                al.is_favorite,
+                al.artist_id
             FROM albums al
             LEFT JOIN artists ar ON ar.id = al.artist_id
             ORDER BY
@@ -841,7 +877,8 @@ public sealed class AudioDatabase : IDisposable
                 reader.IsDBNull(3) || reader.GetInt32(3) == 0 ? null : reader.GetInt32(3),
                 reader.IsDBNull(4) ? null : reader.GetString(4),
                 reader.IsDBNull(5) ? null : reader.GetString(5),
-                reader.GetInt32(6) != 0));
+                reader.GetInt32(6) != 0,
+                reader.IsDBNull(7) ? null : reader.GetInt64(7)));
         return result;
     }
 
@@ -1220,7 +1257,8 @@ public sealed class AudioDatabase : IDisposable
                 reader.IsDBNull(3) ? null : reader.GetInt32(3),
                 reader.IsDBNull(4) ? null : reader.GetString(4),
                 reader.IsDBNull(5) ? null : reader.GetString(5),
-                reader.GetInt32(6) != 0));
+                reader.GetInt32(6) != 0,
+                artistId));
         return result;
     }
 
@@ -1390,7 +1428,7 @@ public sealed class AudioDatabase : IDisposable
                 path, file_name, title, artist, album, album_artist, genre, format, bitrate,
                 duration, sort_title, id, is_favorite, year, track_number, track_total,
                 disc_number, disc_total, sample_rate, bit_depth, channels, composer, bpm,
-                file_size, added_at, replay_gain_track, replay_gain_album
+                file_size, added_at, replay_gain_track, replay_gain_album, artist_id, album_id
             FROM tracks
             ORDER BY COALESCE(sort_title, title, file_name) COLLATE NOCASE;
             """;
@@ -1409,7 +1447,7 @@ public sealed class AudioDatabase : IDisposable
                 path, file_name, title, artist, album, album_artist, genre, format, bitrate,
                 duration, sort_title, id, is_favorite, year, track_number, track_total,
                 disc_number, disc_total, sample_rate, bit_depth, channels, composer, bpm,
-                file_size, added_at, replay_gain_track, replay_gain_album
+                file_size, added_at, replay_gain_track, replay_gain_album, artist_id, album_id
             FROM tracks
             WHERE album_id = $album_id
               AND ($artist_id IS NULL OR artist_id = $artist_id)
@@ -1480,7 +1518,7 @@ public sealed class AudioDatabase : IDisposable
                     path, file_name, title, artist, album, album_artist, genre, format, bitrate,
                     duration, sort_title, id, is_favorite, year, track_number, track_total,
                     disc_number, disc_total, sample_rate, bit_depth, channels, composer, bpm,
-                    file_size, added_at, replay_gain_track, replay_gain_album
+                    file_size, added_at, replay_gain_track, replay_gain_album, artist_id, album_id
                 FROM tracks
                 WHERE id IN ({string.Join(", ", parameters)});
                 """;
@@ -1521,7 +1559,7 @@ public sealed class AudioDatabase : IDisposable
                     path, file_name, title, artist, album, album_artist, genre, format, bitrate,
                     duration, sort_title, id, is_favorite, year, track_number, track_total,
                     disc_number, disc_total, sample_rate, bit_depth, channels, composer, bpm,
-                    file_size, added_at, replay_gain_track, replay_gain_album
+                    file_size, added_at, replay_gain_track, replay_gain_album, artist_id, album_id
                 FROM tracks
                 WHERE path IN ({string.Join(", ", parameters)});
                 """;
@@ -1639,7 +1677,9 @@ public sealed class AudioDatabase : IDisposable
         reader.IsDBNull(23) ? null : reader.GetInt64(23),
         reader.GetInt64(24),
         reader.IsDBNull(25) ? null : reader.GetString(25),
-        reader.IsDBNull(26) ? null : reader.GetString(26));
+        reader.IsDBNull(26) ? null : reader.GetString(26),
+        reader.IsDBNull(27) ? null : reader.GetInt64(27),
+        reader.IsDBNull(28) ? null : reader.GetInt64(28));
 
     /// <summary>Loads distinct albums referenced by the specified track identifiers.</summary>
     /// <param name="ids">Track identifiers.</param>

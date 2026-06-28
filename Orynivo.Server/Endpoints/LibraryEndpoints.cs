@@ -63,6 +63,37 @@ public static class LibraryEndpoints
             return artist is null ? Results.NotFound() : Results.Ok(ArtistDto(artist));
         });
 
+        api.MapPost("/artists/{artistId:long}/rename", (long artistId, ArtistRenameRequest request) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            var artist = db.GetArtistById(artistId);
+            if (artist is null)
+                return Results.NotFound();
+
+            var artistName = request.ArtistName?.Trim();
+            if (string.IsNullOrWhiteSpace(artistName))
+                return Results.BadRequest();
+
+            ArtistRenameResult result;
+            if (request.PreferredArtistId is long preferredArtistId)
+            {
+                var match = db.FindArtistByName(artistName, artistId);
+                if (match is null)
+                    return Results.BadRequest();
+                result = db.MergeArtists(artistId, match.Id, preferredArtistId, artistName);
+            }
+            else
+            {
+                var match = db.FindArtistByName(artistName, artistId);
+                if (match is not null)
+                    return Results.Ok(new ArtistRenameResponse(null, ArtistDto(match)));
+                result = db.RenameArtist(artistId, artistName);
+            }
+
+            TrackSearchIndex.Rebuild(db.GetAll());
+            return Results.Ok(new ArtistRenameResponse(result, null));
+        });
+
         api.MapGet("/artists/{artistId:long}/albums", (long artistId) =>
         {
             using var db = AudioDatabase.OpenDefault();
@@ -102,11 +133,47 @@ public static class LibraryEndpoints
             return Results.Ok(tracks);
         });
 
+        api.MapGet("/tracks/facets", () =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            return Results.Ok(db.GetTrackFacets());
+        });
+
+        api.MapPost("/tracks/by-ids", (long[] ids) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            return Results.Ok(db.GetTrackListByIds(ids).Select(TrackDto).ToList());
+        });
+
         api.MapGet("/tracks/{trackId:long}", (long trackId) =>
         {
             using var db = AudioDatabase.OpenDefault();
             var track = db.GetTrackById(trackId);
             return track is null ? Results.NotFound() : Results.Ok(TrackRecordDto(track));
+        });
+
+        api.MapGet("/tracks/{trackId:long}/lyrics", (long trackId) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            var track = db.GetTrackById(trackId);
+            if (track is null) return Results.NotFound();
+            return Results.Ok(new
+            {
+                plainLyrics = track.DownloadedLyrics ?? track.Lyrics,
+                syncedLyrics = track.SyncedLyrics,
+                fetchedAt = track.LyricsFetchedAt
+            });
+        });
+
+        api.MapPut("/tracks/{trackId:long}/lyrics", (long trackId, TrackLyricsUpdateRequest request) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            var updated = db.UpdateDownloadedLyricsById(
+                trackId,
+                request.PlainLyrics,
+                request.SyncedLyrics,
+                "LRCLIB");
+            return updated ? Results.Ok() : Results.NotFound();
         });
 
         // --- Folders -------------------------------------------------------
@@ -251,6 +318,8 @@ public static class LibraryEndpoints
         t.ReplayGainAlbum,
         t.Format,
         t.IsFavorite,
+        t.ArtistId,
+        t.AlbumId,
         IsCueTrack = t.Path.StartsWith("cue://", StringComparison.OrdinalIgnoreCase)
     };
 
@@ -291,7 +360,8 @@ public static class LibraryEndpoints
         a.Year,
         a.ArtworkPath,
         a.ThumbnailPath,
-        a.IsFavorite
+        a.IsFavorite,
+        a.ArtistId
     };
 
     private static object ArtistDto(ArtistInfo a) => new
@@ -321,3 +391,20 @@ public sealed record ArtistProfileUpdateRequest(
     string? Language,
     byte[]? ImageData,
     string? ImageMimeType);
+
+/// <summary>Request body for renaming or merging an artist.</summary>
+/// <param name="ArtistName">Requested artist display name.</param>
+/// <param name="PreferredArtistId">Artist ID whose profile should survive a merge, or <see langword="null"/> to only rename or detect a collision.</param>
+public sealed record ArtistRenameRequest(string? ArtistName, long? PreferredArtistId);
+
+/// <summary>Response body for an artist rename or merge operation.</summary>
+/// <param name="Result">Committed rename result, or <see langword="null"/> when a matching artist must be confirmed first.</param>
+/// <param name="MatchingArtist">Matching artist DTO, or <see langword="null"/> when the rename was committed.</param>
+public sealed record ArtistRenameResponse(ArtistRenameResult? Result, object? MatchingArtist);
+
+/// <summary>Request body for storing client-downloaded lyrics on the server.</summary>
+/// <param name="PlainLyrics">Unsynchronised plain-text lyrics, or <see langword="null"/>.</param>
+/// <param name="SyncedLyrics">LRC-formatted synchronised lyrics, or <see langword="null"/>.</param>
+public sealed record TrackLyricsUpdateRequest(
+    string? PlainLyrics,
+    string? SyncedLyrics);
