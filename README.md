@@ -104,19 +104,36 @@ works directly in FFmpeg and browser URLs.
 | `POST /api/scan` | Trigger a full library scan |
 | `GET /api/scan` | Scan status with current root, processed/total counts, current file, last result, and errors |
 | `GET /api/artists` | All artists (id, name, favorite, biography/image flags) |
+| `GET /api/artists/{id}` | Complete artist metadata, including cached biography/source fields |
+| `POST /api/artists/{id}/profile` | Store client-refreshed artist biography/source fields and optional image bytes |
+| `POST /api/artists/{id}/rename` | Rename one artist or merge it with a matching artist |
 | `GET /api/artists/{id}/albums` | Albums for one artist |
 | `GET /api/albums` | All albums (id, title, display artist, year, artwork paths) |
 | `GET /api/albums/{id}/tracks` | Track list for one album |
 | `GET /api/tracks` | Paginated track list (`?page=0&pageSize=500`) |
 | `GET /api/tracks/{id}` | Full metadata for one track |
+| `GET /api/tracks/{id}/lyrics` | Cached plain/synced lyrics for one track |
+| `PUT /api/tracks/{id}/lyrics` | Store client-downloaded lyrics on the server |
+| `GET /api/tracks/facets` | Lightweight facet rows (genre, format, bitrate) for the Tracks filter |
+| `POST /api/tracks/by-ids` | Track rows for a list of track IDs (facet-filtered results) |
+| `GET /api/folders/tracks` | Lightweight track rows for building a server library folder tree |
+| `GET /api/artwork/album/{id}?size=96` | Album artwork thumbnail or original image |
+| `PUT /api/artwork/album/{id}` | Store raw client-selected album artwork bytes on the server |
+| `GET /api/artwork/artist/{id}` | Artist image stored on the server |
+| `PUT /api/artwork/artist/{id}` | Store raw client-selected artist image bytes on the server |
 | `GET /api/playlists` | All playlists (regular and smart) |
 | `GET /api/playlists/{id}/tracks` | Resolved track list (smart playlists are evaluated live) |
+| `POST /api/playlists` | Create a regular playlist from server-side track IDs |
+| `POST /api/playlists/{id}/tracks` | Append server-side track IDs to a regular playlist |
+| `DELETE /api/playlists/{id}` | Delete a playlist on the server |
+| `DELETE /api/playlist-tracks/{id}` | Remove one entry from a server playlist |
 | `GET /api/search?q=` | Full-text search — returns matching tracks |
 | `GET /api/search/full?q=` | Category search — returns tracks, albums, and artists |
 | `GET /api/stream/{trackId}` | Byte-range HTTP streaming for regular files; FLAC transcode for CUE virtual tracks |
 | `GET /api/stream/path?p=` | Stream by absolute file path |
 | `GET /api/artwork/album/{id}?size=` | Album artwork (`size=96` or `size=320` for thumbnails) |
 | `GET /api/artwork/track?p=` | Track artwork by file path |
+| `GET /api/artwork/track/{id}?size=` | Track artwork by track ID (`size=96` or `size=320` for thumbnails) |
 
 ### Configuration
 
@@ -138,12 +155,14 @@ The server binds to `http://0.0.0.0:5280` by default. Override the port in
 
 When the Windows player is connected to an Orynivo Server, the server's music
 directories can also be managed from the Orynivo Server connection dialog in
-Settings. The directory browser shows the server filesystem, not the local
-Windows filesystem: Unix-like servers open at `/`, while Windows servers expose
-their drive roots. The same dialog can start a server scan and shows live
-progress while large directories are being scanned. Inaccessible subdirectories
-such as Linux `lost+found` folders are skipped instead of aborting the complete
-scan.
+Settings → Library → Orynivo Server. The directory browser shows the server
+filesystem, not the local Windows filesystem: Unix-like servers open at `/`,
+while Windows servers expose their drive roots. The same dialog can start a
+server scan and shows live progress while large directories are being scanned.
+Inaccessible subdirectories such as Linux `lost+found` folders are skipped
+instead of aborting the complete scan.
+Configured Orynivo Server connections appear in the main sidebar inside the
+Library section, below the Local media node.
 
 ### Running the server
 
@@ -192,6 +211,33 @@ byte-range streaming without FFmpeg.
   duration in transport metadata, play history, and **Up next**. Authenticated
   `?key=` stream URLs are not shown as titles and are not persisted in the
   playback queue.
+- Remote Orynivo Server sidebar entries now appear in the main Library section,
+  below the Local media node, and expose Artists, Albums, Tracks, and Folder
+  structure below each server. The Local media node and each server node are
+  individually collapsible. Remote Artists and Albums reuse the local
+  table/artwork masks, while remote artwork is loaded lazily from authenticated
+  server artwork endpoints and cached in the Windows client's local data
+  directory. Track search uses the normal header search box and runs through
+  the server's Lucene index.
+- Remote Orynivo Server artist-info pages support renaming/merging artists and
+  assigning Wikimedia artist images. The Windows client performs the image
+  search and uploads the selected image to the server.
+- Opening a remote server album from a selected artist initially scopes the
+  album tracks to that artist, with the same checkbox used by local albums to
+  show every track on the album.
+- Playlists live under the Library sidebar: local playlists are grouped below
+  Local, and each Orynivo Server exposes its own Playlists node populated from
+  that server. Adding/removing tracks and creating/deleting regular playlists
+  for remote server tracks writes to the selected server.
+- Remote Orynivo Server artists, albums, and tracks can be marked as favorites;
+  those favorite flags are stored only in the Windows client's settings.
+- Remote Orynivo Server album covers and artist images can be searched from the
+  Windows client; the client uploads the selected image bytes to the server, and
+  the server stores them in its own artwork cache.
+- Remote Orynivo Server artist biographies can be refreshed from the Windows
+  client. Last.fm or Wikipedia requests run on the client; the server receives
+  only the resulting biography, source URL, language, and optional image bytes
+  to cache.
 - Windows System Media Transport Controls integration with global media keys,
   play/pause/previous/next/stop and seek requests, system-overlay and lock-screen
   metadata, album art, playback state, and timeline synchronization
@@ -366,6 +412,8 @@ both **Steinberg ASIO** and **cwASIO**.
   not required when using a self-contained release package)
 - [FFmpeg](https://ffmpeg.org/) — recommended for CUE-sheet track transcoding
   (Debian/Ubuntu: `apt install ffmpeg`; Fedora/Rocky: install from RPM Fusion)
+- Artwork thumbnail generation uses the bundled SkiaSharp native Linux assets;
+  ImageMagick or other external image conversion tools are not required.
 - No ASIO drivers or Windows dependencies
 
 ## Download

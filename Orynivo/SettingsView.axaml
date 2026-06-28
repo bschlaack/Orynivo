@@ -186,6 +186,11 @@
                          Theme="{StaticResource SettingsNavItemTheme}">
                 <TextBlock Text="{DynamicResource L_Directories}"/>
             </ListBoxItem>
+            <ListBoxItem Tag="OrynivoServers"
+                         FontSize="13"
+                         Theme="{StaticResource SettingsNavItemTheme}">
+                <TextBlock Text="{DynamicResource L_OrynivoServersSettings}"/>
+            </ListBoxItem>
 
             <ListBoxItem IsHitTestVisible="False"
                          Focusable="False"
@@ -212,7 +217,7 @@
             <ListBoxItem Tag="Appearance"
                          FontSize="13"
                          Theme="{StaticResource SettingsNavItemTheme}">
-                <TextBlock Text="{DynamicResource L_Appearance}"/>
+                <TextBlock Text="{DynamicResource L_AppearanceNavItem}"/>
             </ListBoxItem>
 
             <ListBoxItem IsHitTestVisible="False"
@@ -226,7 +231,7 @@
             <ListBoxItem Tag="ArtistInfo"
                          FontSize="13"
                          Theme="{StaticResource SettingsNavItemTheme}">
-                <TextBlock Text="{DynamicResource L_ArtistInfo}"/>
+                <TextBlock Text="{DynamicResource L_ArtistInfoNavItem}"/>
             </ListBoxItem>
 
             <ListBoxItem IsHitTestVisible="False"
@@ -601,6 +606,27 @@
                                TextWrapping="Wrap"/>
                 </StackPanel>
 
+                <StackPanel x:Name="OrynivoServersSettingsPanel"
+                            IsVisible="False">
+                    <TextBlock Text="{DynamicResource L_OrynivoServersSettings}"
+                               FontSize="15"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,8"/>
+                    <TextBlock Text="{DynamicResource L_OrynivoServersHint}"
+                               FontSize="11"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,12"/>
+                    <StackPanel x:Name="OrynivoServersPanel"/>
+                    <Button Width="140"
+                            Height="30"
+                            HorizontalAlignment="Left"
+                            Margin="0,8,0,0"
+                            Theme="{StaticResource SettingsButtonTheme}"
+                            Content="{DynamicResource L_AddOrynivoServer}"
+                            Click="AddOrynivoServerButton_OnClick"/>
+                </StackPanel>
+
                 <StackPanel x:Name="StreamingPanel"
                             IsVisible="False">
                     <TextBlock Text="{DynamicResource L_StreamingServices}"
@@ -651,24 +677,6 @@
                             Theme="{StaticResource SettingsButtonTheme}"
                             Content="{DynamicResource L_AddPlexServer}"
                             Click="AddPlexServerButton_OnClick"/>
-
-                    <TextBlock Text="{DynamicResource L_OrynivoServersSettings}"
-                               FontSize="13"
-                               FontWeight="SemiBold"
-                               Margin="0,28,0,8"/>
-                    <TextBlock Text="{DynamicResource L_OrynivoServersHint}"
-                               FontSize="11"
-                               Foreground="{DynamicResource AppMutedTextBrush}"
-                               TextWrapping="Wrap"
-                               Margin="0,0,0,12"/>
-                    <StackPanel x:Name="OrynivoServersPanel"/>
-                    <Button Width="140"
-                            Height="30"
-                            HorizontalAlignment="Left"
-                            Margin="0,8,0,0"
-                            Theme="{StaticResource SettingsButtonTheme}"
-                            Content="{DynamicResource L_AddOrynivoServer}"
-                            Click="AddOrynivoServerButton_OnClick"/>
                 </StackPanel>
 
                 <StackPanel x:Name="ArtistInfoPanel"
@@ -766,14 +774,6 @@
                               Margin="0,4"/>
                     <CheckBox x:Name="ShowPlexSectionCheckBox"
                               Content="{DynamicResource L_PlexServers}"
-                              Theme="{StaticResource SettingsCheckBoxTheme}"
-                              Margin="0,4"/>
-                    <CheckBox x:Name="ShowOrynivoServerSectionCheckBox"
-                              Content="{DynamicResource L_OrynivoServers}"
-                              Theme="{StaticResource SettingsCheckBoxTheme}"
-                              Margin="0,4"/>
-                    <CheckBox x:Name="ShowPlaylistsSectionCheckBox"
-                              Content="{DynamicResource L_Playlists}"
                               Theme="{StaticResource SettingsCheckBoxTheme}"
                               Margin="0,4"/>
                 </StackPanel>

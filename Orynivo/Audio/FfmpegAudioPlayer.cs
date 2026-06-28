@@ -531,10 +531,18 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
 
     private static async Task<AudioFileInfo> ProbeAsync(string filePath, CancellationToken cancellationToken)
     {
+        // Over HTTP, ffprobe otherwise blocks on its default 5 s / 5 MB analysis window,
+        // which is the main reason the first play of a remote track is slow. Audio headers
+        // are tiny, so cap the probe and add reconnect resilience for remote inputs.
+        var isHttpInput = filePath.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                          filePath.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+        var httpInputOptions = isHttpInput
+            ? "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 2 -analyzeduration 500000 -probesize 500000 "
+            : string.Empty;
         using var process = Process.Start(new ProcessStartInfo
         {
             FileName = "ffprobe",
-            Arguments = $"-v error -select_streams a:0 -show_entries stream=codec_name,sample_rate,channels,duration -of json \"{filePath}\"",
+            Arguments = $"-v error {httpInputOptions}-select_streams a:0 -show_entries stream=codec_name,sample_rate,channels,duration -of json \"{filePath}\"",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,

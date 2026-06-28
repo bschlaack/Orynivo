@@ -61,7 +61,7 @@
                 <ControlTemplate>
                     <Border x:Name="Bd"
                             Background="{TemplateBinding Background}"
-                            Padding="24,12,14,5"
+                            Padding="24,12,12,5"
                             ClipToBounds="True">
                         <ContentPresenter Content="{TemplateBinding Content}"
                                           VerticalAlignment="Center"
@@ -722,6 +722,14 @@
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                      SelectionChanged="NavListBox_OnSelectionChanged"
                      PointerReleased="NavListBox_OnPreviewMouseLeftButtonUp">
+                <!-- Non-virtualizing panel: the sidebar toggles ListBoxItem.IsVisible
+                     directly. A VirtualizingStackPanel recycles containers and loses
+                     those IsVisible values, which breaks the collapse/expand groups. -->
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel/>
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
 
                 <ListBoxItem Tag="Dashboard" Theme="{StaticResource NavItemTheme}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -783,10 +791,43 @@
                               StrokeJoin="Round"/>
                     </Grid>
                 </ListBoxItem>
-                <ListBoxItem x:Name="ArtistsNavItem" Tag="Artists" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_Artists}" Classes="navItemText"/></ListBoxItem>
-                <ListBoxItem x:Name="AlbumsNavItem" Tag="Albums" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_Albums}" Classes="navItemText"/></ListBoxItem>
-                <ListBoxItem x:Name="TracksNavItem" Tag="Tracks" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_Tracks}" Classes="navItemText"/></ListBoxItem>
-                <ListBoxItem x:Name="FoldersNavItem" Tag="Folders" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_FolderStructure}" Classes="navItemText"/></ListBoxItem>
+                <ListBoxItem x:Name="LibraryEmptyHintItem"
+                             IsHitTestVisible="False"
+                             Focusable="False"
+                             IsVisible="False"
+                             Theme="{StaticResource NavItemTheme}">
+                    <TextBlock Text="{DynamicResource L_LibraryEmptyHint}"
+                               TextWrapping="Wrap"
+                               FontSize="11"
+                               Margin="16,2,4,2"
+                               Foreground="{DynamicResource AppMutedTextBrush}"/>
+                </ListBoxItem>
+                <ListBoxItem x:Name="LocalLibraryRootItem"
+                             Tag="LibraryGroup:LocalMedia"
+                             Theme="{StaticResource NavItemTheme}">
+                    <Grid HorizontalAlignment="Stretch">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="20"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{DynamicResource L_LocalMedia}" Classes="navItemText" FontWeight="SemiBold"/>
+                        <Path x:Name="LocalMediaGroupArrow"
+                              Grid.Column="1"
+                              Width="8"
+                              Height="5"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center"
+                              Data="M 0 5 L 4 0 L 8 5"
+                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                              StrokeThickness="1.4"
+                              StrokeLineCap="Round"
+                              StrokeJoin="Round"/>
+                    </Grid>
+                </ListBoxItem>
+                <ListBoxItem x:Name="ArtistsNavItem" Tag="Artists" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_Artists}" Margin="16,0,0,0" Classes="navItemText"/></ListBoxItem>
+                <ListBoxItem x:Name="AlbumsNavItem" Tag="Albums" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_Albums}" Margin="16,0,0,0" Classes="navItemText"/></ListBoxItem>
+                <ListBoxItem x:Name="TracksNavItem" Tag="Tracks" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_Tracks}" Margin="16,0,0,0" Classes="navItemText"/></ListBoxItem>
+                <ListBoxItem x:Name="FoldersNavItem" Tag="Folders" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_FolderStructure}" Margin="16,0,0,0" Classes="navItemText"/></ListBoxItem>
 
                 <ListBoxItem x:Name="OwnRadiosHeaderItem"
                              Tag="Section:OwnRadios"
@@ -853,32 +894,6 @@
                         <TextBlock Text="{DynamicResource L_PlexServers}"
                                    TextTrimming="CharacterEllipsis"/>
                         <Path x:Name="PlexHeaderArrow"
-                              Grid.Column="1"
-                              Width="8"
-                              Height="5"
-                              HorizontalAlignment="Center"
-                              VerticalAlignment="Center"
-                              Data="M 0 0 L 4 5 L 8 0"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
-                              StrokeThickness="1.4"
-                              StrokeLineCap="Round"
-                              StrokeJoin="Round"/>
-                    </Grid>
-                </ListBoxItem>
-
-                <ListBoxItem x:Name="OrynivoServerHeaderItem"
-                             Tag="Section:OrynivoServer"
-                             FontSize="10"
-                             FontWeight="Bold"
-                             Theme="{StaticResource NavSectionHeaderTheme}">
-                    <Grid HorizontalAlignment="Stretch">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="20"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="{DynamicResource L_OrynivoServers}"
-                                   TextTrimming="CharacterEllipsis"/>
-                        <Path x:Name="OrynivoServerHeaderArrow"
                               Grid.Column="1"
                               Width="8"
                               Height="5"
@@ -1976,7 +1991,8 @@
                                         Padding="14,7"
                                         Theme="{StaticResource HeaderFilterButtonTheme}"
                                         Click="SearchCoverButton_OnClick"/>
-                                <Button Content="{DynamicResource L_SaveAlbumAsPlaylist}"
+                                <Button x:Name="AlbumSaveAsPlaylistButton"
+                                        Content="{DynamicResource L_SaveAlbumAsPlaylist}"
                                         Padding="14,7"
                                         Theme="{StaticResource HeaderFilterButtonTheme}"
                                         Click="AlbumSaveAsPlaylistButton_OnClick"/>
@@ -2572,13 +2588,15 @@
                                     VerticalAlignment="Center"
                                     Theme="{StaticResource EntityLinkButtonTheme}"
                                     Click="ArtistInfoTitleButton_OnClick"/>
-                            <Button Grid.Column="1"
+                            <Button x:Name="EditArtistNameButton"
+                                    Grid.Column="1"
                                     Margin="0,0,8,0"
                                     Padding="12,6"
                                     Theme="{StaticResource HeaderFilterButtonTheme}"
                                     Content="{DynamicResource L_EditArtistName}"
                                     Click="EditArtistNameButton_OnClick"/>
-                            <Button Grid.Column="2"
+                            <Button x:Name="SearchArtistImageButton"
+                                    Grid.Column="2"
                                     Margin="0,0,8,0"
                                     Padding="12,6"
                                     Theme="{StaticResource HeaderFilterButtonTheme}"

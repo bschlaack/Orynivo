@@ -30,7 +30,8 @@ public static class StreamEndpoints
         api.MapGet("/stream/{trackId:long}", async (
             long trackId,
             HttpContext ctx,
-            ILoggerFactory loggerFactory) =>
+            ILoggerFactory loggerFactory,
+            double? ss) =>
         {
             var logger = loggerFactory.CreateLogger("Orynivo.Server.Stream");
             using var db = AudioDatabase.OpenDefault();
@@ -38,7 +39,7 @@ public static class StreamEndpoints
             if (track is null) return Results.NotFound();
 
             return await BuildStreamResult(track.Path, track.SourcePath,
-                track.SegmentStart, track.SegmentEnd, ctx, logger);
+                track.SegmentStart, track.SegmentEnd, ctx, logger, ss);
         });
 
         /// <summary>
@@ -67,15 +68,63 @@ public static class StreamEndpoints
             var album = db.GetAlbumById(albumId);
             if (album is null) return Results.NotFound();
 
-            var path = size switch
+            var artworkPaths = db.EnsureArtworkFilesForAlbum(albumId);
+            var path = SelectExistingArtworkPath(artworkPaths, size);
+            if (path is null
+                && LibraryScanner.RepairMissingAlbumArtwork(albumId))
             {
-                96  => album.ThumbnailPath,
-                320 => album.ThumbnailPath,
-                _   => album.ArtworkPath
-            };
+                artworkPaths = db.EnsureArtworkFilesForAlbum(albumId);
+                path = SelectExistingArtworkPath(artworkPaths, size);
+            }
 
-            if (string.IsNullOrEmpty(path) || !File.Exists(path)) return Results.NotFound();
-            return Results.File(path, "image/jpeg", enableRangeProcessing: false);
+            if (path is null) return Results.NotFound();
+            return Results.File(path, GuessImageMimeType(path), enableRangeProcessing: false);
+        });
+
+        /// <summary>
+        /// Stores uploaded album artwork bytes and attaches them to the album.
+        /// </summary>
+        api.MapPut("/artwork/album/{albumId:long}", async (long albumId, HttpRequest request) =>
+        {
+            var data = await ReadImageUploadAsync(request);
+            if (data.Length == 0) return Results.BadRequest(new { error = "Artwork image data is required." });
+
+            using var db = AudioDatabase.OpenDefault();
+            return db.AttachArtworkToAlbum(albumId, data, request.ContentType)
+                ? Results.NoContent()
+                : Results.NotFound();
+        });
+
+        /// <summary>
+        /// Serves the manually cached artist image by artist database ID.
+        /// </summary>
+        api.MapGet("/artwork/artist/{artistId:long}", (long artistId) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            var artist = db.GetArtistById(artistId);
+            if (artist is null) return Results.NotFound();
+            if (string.IsNullOrEmpty(artist.ImagePath) || !File.Exists(artist.ImagePath))
+                return Results.NotFound();
+
+            return Results.File(artist.ImagePath, GuessImageMimeType(artist.ImagePath), enableRangeProcessing: false);
+        });
+
+        /// <summary>
+        /// Stores uploaded artist image bytes in the server-side image cache and marks the image as manual.
+        /// </summary>
+        api.MapPut("/artwork/artist/{artistId:long}", async (long artistId, HttpRequest request) =>
+        {
+            var data = await ReadImageUploadAsync(request);
+            if (data.Length == 0) return Results.BadRequest(new { error = "Artist image data is required." });
+
+            using var db = AudioDatabase.OpenDefault();
+            if (db.GetArtistById(artistId) is null)
+                return Results.NotFound();
+
+            var path = await ArtistImageSearchService.SaveImageAsync(artistId, data, request.ContentType, request.HttpContext.RequestAborted);
+            return db.UpdateArtistImage(artistId, path)
+                ? Results.NoContent()
+                : Results.NotFound();
         });
 
         /// <summary>
@@ -87,15 +136,28 @@ public static class StreamEndpoints
             var artworkPaths = db.GetArtworkPathsByTrackPath(p);
             if (artworkPaths is null) return Results.NotFound();
 
-            var path = size switch
-            {
-                96  => artworkPaths.Thumb96Path,
-                320 => artworkPaths.Thumb320Path,
-                _   => artworkPaths.OriginalPath
-            };
+            var path = SelectExistingArtworkPath(artworkPaths, size);
 
-            if (string.IsNullOrEmpty(path) || !File.Exists(path)) return Results.NotFound();
-            return Results.File(path, "image/jpeg", enableRangeProcessing: false);
+            if (path is null) return Results.NotFound();
+            return Results.File(path, GuessImageMimeType(path), enableRangeProcessing: false);
+        });
+
+        /// <summary>
+        /// Serves artwork for a track looked up by its database ID.
+        /// Use <c>?size=96</c> or <c>?size=320</c> for thumbnails; omit for the original.
+        /// </summary>
+        api.MapGet("/artwork/track/{trackId:long}", (long trackId, int? size) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            var track = db.GetTrackById(trackId);
+            if (track is null) return Results.NotFound();
+
+            var artworkPaths = db.GetArtworkPathsByTrackPath(track.Path);
+            if (artworkPaths is null) return Results.NotFound();
+
+            var path = SelectExistingArtworkPath(artworkPaths, size);
+            if (path is null) return Results.NotFound();
+            return Results.File(path, GuessImageMimeType(path), enableRangeProcessing: false);
         });
     }
 
@@ -105,20 +167,60 @@ public static class StreamEndpoints
         double? segmentStart,
         double? segmentEnd,
         HttpContext ctx,
-        ILogger logger)
+        ILogger logger,
+        double? seekSeconds = null)
     {
         // CUE virtual track: transcode the segment to FLAC via FFmpeg
         if (trackPath.StartsWith("cue://", StringComparison.OrdinalIgnoreCase)
             && sourcePath is not null)
         {
             return await TranscodeCueSegmentAsync(
-                sourcePath, segmentStart ?? 0, segmentEnd, ctx, logger);
+                sourcePath, (segmentStart ?? 0) + (seekSeconds ?? 0), segmentEnd, ctx, logger);
         }
 
-        // Regular file: serve with byte-range support
         if (!File.Exists(trackPath)) return Results.NotFound();
+
+        // Server-side seek: a remote client navigating within the track requests the
+        // stream with ?ss=<seconds>. Seeking the local file and transcoding from that
+        // offset is far faster than the client binary-searching a seektable-less file
+        // over HTTP. The client then decodes the offset stream from position 0.
+        if (seekSeconds is > 0)
+            return await TranscodeFromOffsetAsync(trackPath, seekSeconds.Value, ctx, logger);
+
+        // Regular file: serve with byte-range support
         var mime = GuessMimeType(trackPath);
         return Results.File(trackPath, mime, enableRangeProcessing: true);
+    }
+
+    /// <summary>
+    /// Pipes the audio file re-encoded to FLAC from <paramref name="startSeconds"/> using a fast
+    /// local input seek. Used for remote client seeking within a track.
+    /// </summary>
+    /// <param name="sourcePath">Local audio file path.</param>
+    /// <param name="startSeconds">Seek offset in seconds.</param>
+    /// <param name="ctx">HTTP context whose response body receives the stream.</param>
+    /// <param name="logger">Logger for FFmpeg diagnostics.</param>
+    /// <returns>An empty result after the FFmpeg output has been piped to the response.</returns>
+    private static Task<IResult> TranscodeFromOffsetAsync(
+        string sourcePath,
+        double startSeconds,
+        HttpContext ctx,
+        ILogger logger)
+        => TranscodeCueSegmentAsync(sourcePath, startSeconds, null, ctx, logger);
+
+    private static string? SelectExistingArtworkPath(ArtworkPaths? artworkPaths, int? size)
+    {
+        if (artworkPaths is null)
+            return null;
+
+        string?[] candidates = size switch
+        {
+            96  => [artworkPaths.Thumb96Path, artworkPaths.OriginalPath, artworkPaths.Thumb320Path],
+            320 => [artworkPaths.Thumb320Path, artworkPaths.OriginalPath, artworkPaths.Thumb96Path],
+            _   => [artworkPaths.OriginalPath, artworkPaths.Thumb320Path, artworkPaths.Thumb96Path]
+        };
+
+        return candidates.FirstOrDefault(path => !string.IsNullOrEmpty(path) && File.Exists(path));
     }
 
     /// <summary>
@@ -156,15 +258,41 @@ public static class StreamEndpoints
         try
         {
             ffmpeg.Start();
-            await ffmpeg.StandardOutput.BaseStream.CopyToAsync(ctx.Response.Body);
-            await ffmpeg.WaitForExitAsync();
+            await ffmpeg.StandardOutput.BaseStream.CopyToAsync(ctx.Response.Body, ctx.RequestAborted);
+            await ffmpeg.WaitForExitAsync(ctx.RequestAborted);
+        }
+        catch (OperationCanceledException)
+        {
+            // Client disconnected (e.g. seeked again); stop transcoding promptly.
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "FFmpeg transcode failed for {Source}", sourcePath);
         }
+        finally
+        {
+            try
+            {
+                if (!ffmpeg.HasExited)
+                    ffmpeg.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+                // Process already gone.
+            }
+        }
 
         return Results.Empty;
+    }
+
+    private static async Task<byte[]> ReadImageUploadAsync(HttpRequest request)
+    {
+        const int maxImageBytes = 20 * 1024 * 1024;
+        await using var buffer = new MemoryStream();
+        await request.Body.CopyToAsync(buffer, request.HttpContext.RequestAborted);
+        return buffer.Length is 0 or > maxImageBytes
+            ? []
+            : buffer.ToArray();
     }
 
     private static string BuildFfmpegArgs(string source, double start, double? end)
@@ -198,5 +326,13 @@ public static class StreamEndpoints
             ".dff"  => "audio/x-dff",
             ".wv"   => "audio/x-wavpack",
             _       => "application/octet-stream"
+        };
+
+    private static string GuessImageMimeType(string path) =>
+        Path.GetExtension(path).ToLowerInvariant() switch
+        {
+            ".png" => "image/png",
+            ".webp" => "image/webp",
+            _ => "image/jpeg"
         };
 }

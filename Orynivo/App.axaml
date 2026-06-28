@@ -321,7 +321,9 @@
             </ControlTheme>
 
             <!-- ── Localisation string resources (initial German; overwritten by LocalizationManager) ── -->
-            <x:String x:Key="L_LocalLibrary">LOKALE BIBLIOTHEK</x:String>
+            <x:String x:Key="L_LocalLibrary">BIBLIOTHEK</x:String>
+            <x:String x:Key="L_LocalMedia">Lokal</x:String>
+            <x:String x:Key="L_LibraryEmptyHint">Noch keine Medienquelle eingerichtet. Lege in den Einstellungen lokale Verzeichnisse oder einen oder mehrere Orynivo Server an.</x:String>
             <x:String x:Key="L_Artists">Künstler</x:String>
             <x:String x:Key="L_Albums">Alben</x:String>
             <x:String x:Key="L_Tracks">Tracks</x:String>
@@ -337,7 +339,7 @@
             <x:String x:Key="L_Close">Schließen</x:String>
             <x:String x:Key="L_DailyHistoryNoEntries">Für diesen Tag sind keine Wiedergaben vorhanden.</x:String>
             <x:String x:Key="L_FolderStructure">Ordnerstruktur</x:String>
-            <x:String x:Key="L_Playlists">PLAYLISTS</x:String>
+            <x:String x:Key="L_Playlists">Playlists</x:String>
             <x:String x:Key="L_Settings">⚙   Einstellungen</x:String>
             <x:String x:Key="L_Table">Tabelle</x:String>
             <x:String x:Key="L_Artwork">Artwork</x:String>

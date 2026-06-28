@@ -145,6 +145,8 @@ public sealed record LocalizedStrings(
     string CrashMessageWithoutLog)
 {
     public string OutputType { get; init; } = "";
+    /// <summary>Gets the label for the local media node inside the library sidebar section.</summary>
+    public string LocalMedia { get; init; } = "";
     public string AsioOutputDevice { get; init; } = "";
     public string CwAsioOutputDevice { get; init; } = "";
     public string SteinbergAsio { get; init; } = "";
@@ -152,6 +154,10 @@ public sealed record LocalizedStrings(
     public string WasapiOutputDevice { get; init; } = "";
     public string DeviceInfo { get; init; } = "";
     public string DatabaseOptimizeHint { get; init; } = "";
+    /// <summary>Gets the normal-case Appearance navigation item label.</summary>
+    public string AppearanceNavItem { get; init; } = "";
+    /// <summary>Gets the normal-case artist information navigation item label.</summary>
+    public string ArtistInfoNavItem { get; init; } = "";
     public string NormalizeArtists { get; init; } = "";
     public string NormalizeArtistsHint { get; init; } = "";
     public string ArtistsNormalizing { get; init; } = "";
@@ -604,6 +610,8 @@ public sealed record LocalizedStrings(
     public string InvalidSmartPlaylistCriteria { get; init; } = "";
     /// <summary>Gets the sidebar action label for editing a smart playlist.</summary>
     public string EditSmartPlaylist { get; init; } = "";
+    /// <summary>Gets the hint shown under the Library header when no local directories or Orynivo Servers are configured.</summary>
+    public string LibraryEmptyHint { get; init; } = "";
     /// <summary>Gets the status message shown after a smart playlist was updated.</summary>
     public string SmartPlaylistUpdated { get; init; } = "";
     /// <summary>Gets the command label for importing an M3U8 playlist.</summary>

@@ -105,6 +105,19 @@ public static class LibraryScanner
         => Task.Run(() => RepairMissingAlbumArtwork(progress, cancellationToken), cancellationToken);
 
     /// <summary>
+    /// Re-reads embedded artwork for one album that is missing artwork in the database.
+    /// </summary>
+    /// <param name="albumId">Identifier of the album to repair.</param>
+    /// <returns><see langword="true"/> when artwork was found and attached to the album.</returns>
+    public static bool RepairMissingAlbumArtwork(long albumId)
+    {
+        using var db = AudioDatabase.OpenDefault();
+        var samplePath = db.GetAlbumMissingArtworkSamplePath(albumId);
+        return !string.IsNullOrWhiteSpace(samplePath)
+               && RepairAlbumArtwork(db, albumId, samplePath);
+    }
+
+    /// <summary>
     /// Downloads front-cover images from the Cover Art Archive for albums that have a MusicBrainz release ID
     /// but no artwork in the database.
     /// </summary>
@@ -531,25 +544,31 @@ public static class LibraryScanner
             var (albumId, path) = albums[i];
             progress?.Report(new ScanProgress(i + 1, albums.Count, path));
 
-            try
-            {
-                using var tagFile = TagLib.File.Create(path);
-                var pic = tagFile.Tag.Pictures?.FirstOrDefault(p => p.Type == PictureType.FrontCover)
-                       ?? tagFile.Tag.Pictures?.FirstOrDefault();
-                var data = pic?.Data?.Data;
-                if (data is null || data.Length == 0)
-                    continue;
-
-                db.AttachArtworkToAlbum(albumId, data, NullIfEmpty(pic?.MimeType));
+            if (RepairAlbumArtwork(db, albumId, path))
                 repaired++;
-            }
-            catch
-            {
-                // Defekte oder nicht lesbare Dateien überspringen; Rest der Reparatur läuft weiter.
-            }
         }
 
         return repaired;
+    }
+
+    private static bool RepairAlbumArtwork(AudioDatabase db, long albumId, string path)
+    {
+        try
+        {
+            using var tagFile = TagLib.File.Create(path);
+            var pic = tagFile.Tag.Pictures?.FirstOrDefault(p => p.Type == PictureType.FrontCover)
+                   ?? tagFile.Tag.Pictures?.FirstOrDefault();
+            var data = pic?.Data?.Data;
+            if (data is null || data.Length == 0)
+                return false;
+
+            return db.AttachArtworkToAlbum(albumId, data, NullIfEmpty(pic?.MimeType));
+        }
+        catch
+        {
+            // Skip corrupt or unreadable files so the remaining repair can continue.
+            return false;
+        }
     }
 
     private static string? NullIfEmpty(string? s)

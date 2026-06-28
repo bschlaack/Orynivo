@@ -50,6 +50,8 @@ public static class LocalizationManager
 
         var resources = AvaloniaApp.Current!.Resources;
         resources["L_LocalLibrary"] = Current.LocalLibrary;
+        resources["L_LocalMedia"] = Current.LocalMedia;
+        resources["L_LibraryEmptyHint"] = Current.LibraryEmptyHint;
         resources["L_Artists"] = Current.Artists;
         resources["L_Albums"] = Current.Albums;
         resources["L_Tracks"] = Current.Tracks;
@@ -75,6 +77,8 @@ public static class LocalizationManager
         resources["L_Language"] = Current.Language;
         resources["L_Playback"] = Current.Playback;
         resources["L_OutputDevice"] = Current.OutputDevice;
+        resources["L_AppearanceNavItem"] = Current.AppearanceNavItem;
+        resources["L_ArtistInfoNavItem"] = Current.ArtistInfoNavItem;
         resources["L_Library"] = Current.Library;
         resources["L_Directories"] = Current.Directories;
         resources["L_AddDirectory"] = Current.AddDirectory;
@@ -315,9 +319,9 @@ public static class LocalizationManager
     }
 
     private static readonly LocalizedStrings German = new(
-        "LOKALE BIBLIOTHEK", "Künstler", "Alben", "Tracks", "Ordnerstruktur", "Suche", "PLAYLISTS", "Über", "Einstellungen",
+        "BIBLIOTHEK", "Künstler", "Alben", "Tracks", "Ordnerstruktur", "Suche", "Playlists", "Über", "Einstellungen",
         "Filter", "Favoriten", "Audiotypen", "Bitrate",
-        "Kein Gerät ausgewählt.", "Darstellung", "Farbschema", "Sprache", "WIEDERGABE", "Ausgabegerät",
+        "Kein Gerät ausgewählt.", "DARSTELLUNG", "Farbschema", "Sprache", "WIEDERGABE", "Ausgabegerät",
         "BIBLIOTHEK", "Verzeichnisse", "+ Verzeichnis hinzufügen", "Datenbankwartung",
         "Datenbank optimieren", "Album-Cover reparieren", "Fehlende Cover-Artworks herunterladen",
         "Automatischer Download findet nur Cover, wenn eine MusicBrainz-ID gesetzt ist. Für freiere Suchen nutze die Schaltfläche direkt in der Albumansicht.",
@@ -362,7 +366,7 @@ public static class LocalizationManager
         "Songtext wird geladen …", "Songtext wird von LRCLIB heruntergeladen …",
         "Für diesen Track sind keine Metadaten verfügbar.", "Kein Songtext gefunden.",
         "Songtext konnte nicht heruntergeladen werden.",
-        "Künstlerinfo", "Künstlerinfo anzeigen", "Künstlerinfo neu laden", "Künstlerinfo schließen",
+        "KÜNSTLERINFO", "Künstlerinfo anzeigen", "Künstlerinfo neu laden", "Künstlerinfo schließen",
         "Künstlerinfo wird geladen …", "Künstlerinfo wird heruntergeladen …",
         "Keine Künstlerinfo gefunden.", "Künstlerinfo konnte nicht heruntergeladen werden.",
         "Kein Bild heruntergeladen", "Bilddatei fehlt", "Bild konnte nicht geladen werden",
@@ -381,6 +385,7 @@ public static class LocalizationManager
         CwAsio = "cwASIO",
         WasapiOutputDevice = "WASAPI-Ausgabegerät",
         DeviceInfo = "Geräteinfo",
+        LocalMedia = "Lokal",
         OutputProfile = "Ausgabe",
         OutputProfileCreate = "Ausgabe erstellen",
         OutputProfileConfigure = "Ausgabe konfigurieren",
@@ -392,6 +397,8 @@ public static class LocalizationManager
         OutputProfileDeleteTitle = "Ausgabe löschen",
         OutputProfileDeleteConfirm = "Soll die Ausgabe »{0}« wirklich gelöscht werden?",
         DatabaseOptimizeHint = "Freigegebene Seiten werden entfernt; danach ist die Datei physisch kleiner.",
+        AppearanceNavItem = "Darstellung",
+        ArtistInfoNavItem = "Künstlerinfo",
         AsioBridgeMissing = "Dieser Build enthält keine ASIO-Unterstützung. Bitte WASAPI verwenden.",
         KernelStreamingUnavailable = "Kernel Streaming ist auswählbar, aber noch nicht als Wiedergabe-Backend implementiert.",
         AddMusicDirectory = "Musikverzeichnis hinzufügen",
@@ -683,6 +690,7 @@ public static class LocalizationManager
         , CreateSmartPlaylist = "Smart-Playlist erstellen"
         , InvalidSmartPlaylistCriteria = "Bitte gültige Zahlen und widerspruchsfreie Mindest-/Maximalwerte eingeben. „Noch nie gespielt“ kann nicht mit einer kürzlichen Wiedergabe oder einer Mindestanzahl kombiniert werden."
         , EditSmartPlaylist = "Smart-Playlist bearbeiten"
+        , LibraryEmptyHint = "Noch keine Medienquelle eingerichtet. Lege in den Einstellungen lokale Verzeichnisse oder einen oder mehrere Orynivo Server an."
         , SmartPlaylistUpdated = "Smart-Playlist »{0}« aktualisiert."
         , ImportM3u8Playlist = "M3U8-Playlist importieren"
         , ExportM3u8Playlist = "Als M3U8 exportieren"
@@ -725,9 +733,9 @@ public static class LocalizationManager
     };
 
     private static readonly LocalizedStrings English = new(
-        "LOCAL LIBRARY", "Artists", "Albums", "Tracks", "Folder structure", "Search", "PLAYLISTS", "About", "Settings",
+        "LIBRARY", "Artists", "Albums", "Tracks", "Folder structure", "Search", "Playlists", "About", "Settings",
         "Filter", "Favorites", "Audio types", "Bitrate",
-        "No device selected.", "Appearance", "Color scheme", "Language", "PLAYBACK", "Output device",
+        "No device selected.", "APPEARANCE", "Color scheme", "Language", "PLAYBACK", "Output device",
         "LIBRARY", "Directories", "+ Add directory", "Database maintenance",
         "Optimize database", "Repair album artwork", "Download missing artwork",
         "Automatic download only finds covers when a MusicBrainz ID is present. For freer searches, use the button directly in the album view.",
@@ -772,7 +780,7 @@ public static class LocalizationManager
         "Loading lyrics …", "Downloading lyrics from LRCLIB …",
         "No metadata is available for this track.", "No lyrics found.",
         "Lyrics could not be downloaded.",
-        "Artist information", "Show artist information", "Refresh artist information", "Close artist information",
+        "ARTIST INFORMATION", "Show artist information", "Refresh artist information", "Close artist information",
         "Loading artist information …", "Downloading artist information …",
         "No artist information found.", "Artist information could not be downloaded.",
         "No image downloaded", "Image file missing", "Failed to load image",
@@ -788,6 +796,7 @@ public static class LocalizationManager
         CwAsioOutputDevice = "cwASIO output device", SteinbergAsio = "Steinberg ASIO", CwAsio = "cwASIO",
         DeviceInfo = "Device information",
         OutputProfile = "Output",
+        LocalMedia = "Local",
         OutputProfileCreate = "Create output",
         OutputProfileConfigure = "Configure output",
         OutputProfileDelete = "Delete output",
@@ -797,6 +806,7 @@ public static class LocalizationManager
         OutputProfileNameExists = "An output with this name already exists.",
         OutputProfileDeleteTitle = "Delete output",
         OutputProfileDeleteConfirm = "Are you sure you want to delete the output “{0}”?", DatabaseOptimizeHint = "Released pages are removed so the file becomes physically smaller.",
+        AppearanceNavItem = "Appearance", ArtistInfoNavItem = "Artist information",
         AsioBridgeMissing = "This build does not include ASIO support. Please use WASAPI.",
         KernelStreamingUnavailable = "Kernel Streaming can be selected but is not implemented as a playback backend yet.",
         AddMusicDirectory = "Add music directory", TrackCountTooltip = "Number of tracks in the database",
@@ -1075,6 +1085,7 @@ public static class LocalizationManager
         , CreateSmartPlaylist = "Create smart playlist"
         , InvalidSmartPlaylistCriteria = "Enter valid numbers and consistent minimum/maximum values. “Never played” cannot be combined with recent playback or a positive minimum play count."
         , EditSmartPlaylist = "Edit smart playlist"
+        , LibraryEmptyHint = "No media source configured yet. Add local directories or one or more Orynivo Servers in the settings."
         , SmartPlaylistUpdated = "Smart playlist '{0}' updated."
         , ImportM3u8Playlist = "Import M3U8 playlist"
         , ExportM3u8Playlist = "Export as M3U8"
@@ -1117,9 +1128,9 @@ public static class LocalizationManager
     };
 
     private static readonly LocalizedStrings French = new(
-        "BIBLIOTHÈQUE LOCALE", "Artistes", "Albums", "Titres", "Arborescence", "Recherche", "PLAYLISTS", "À propos", "Paramètres",
+        "BIBLIOTHÈQUE", "Artistes", "Albums", "Titres", "Arborescence", "Recherche", "Playlists", "À propos", "Paramètres",
         "Filtre", "Favoris", "Types audio", "Débit",
-        "Aucun appareil sélectionné.", "Apparence", "Thème", "Langue", "LECTURE", "Périphérique de sortie",
+        "Aucun appareil sélectionné.", "APPARENCE", "Thème", "Langue", "LECTURE", "Périphérique de sortie",
         "BIBLIOTHÈQUE", "Dossiers", "+ Ajouter un dossier", "Maintenance de la base",
         "Optimiser la base", "Réparer les pochettes", "Télécharger les pochettes manquantes",
         "Le téléchargement automatique ne trouve des pochettes que si un identifiant MusicBrainz est présent. Pour une recherche plus libre, utilisez le bouton directement dans la vue des albums.",
@@ -1164,7 +1175,7 @@ public static class LocalizationManager
         "Chargement des paroles …", "Téléchargement des paroles depuis LRCLIB …",
         "Aucune métadonnée n’est disponible pour ce titre.", "Aucune parole trouvée.",
         "Impossible de télécharger les paroles.",
-        "Informations sur l’artiste", "Afficher les informations sur l’artiste",
+        "INFORMATIONS SUR L’ARTISTE", "Afficher les informations sur l’artiste",
         "Actualiser les informations sur l’artiste", "Fermer les informations sur l’artiste",
         "Chargement des informations sur l’artiste …",
         "Téléchargement des informations sur l’artiste …",
@@ -1183,6 +1194,7 @@ public static class LocalizationManager
         CwAsioOutputDevice = "Périphérique de sortie cwASIO", SteinbergAsio = "Steinberg ASIO", CwAsio = "cwASIO",
         DeviceInfo = "Informations sur le périphérique",
         OutputProfile = "Sortie",
+        LocalMedia = "Local",
         OutputProfileCreate = "Créer une sortie",
         OutputProfileConfigure = "Configurer la sortie",
         OutputProfileDelete = "Supprimer la sortie",
@@ -1192,6 +1204,7 @@ public static class LocalizationManager
         OutputProfileNameExists = "Une sortie portant ce nom existe déjà.",
         OutputProfileDeleteTitle = "Supprimer la sortie",
         OutputProfileDeleteConfirm = "Voulez-vous vraiment supprimer la sortie « {0} » ?", DatabaseOptimizeHint = "Les pages libérées sont supprimées afin de réduire physiquement le fichier.",
+        AppearanceNavItem = "Apparence", ArtistInfoNavItem = "Informations sur l’artiste",
         AsioBridgeMissing = "Cette version ne comprend pas la prise en charge ASIO. Utilisez WASAPI.",
         KernelStreamingUnavailable = "Kernel Streaming peut être sélectionné, mais ce mode de lecture n’est pas encore implémenté.",
         AddMusicDirectory = "Ajouter un dossier musical", TrackCountTooltip = "Nombre de titres dans la base",
@@ -1470,6 +1483,7 @@ public static class LocalizationManager
         , CreateSmartPlaylist = "Créer la playlist intelligente"
         , InvalidSmartPlaylistCriteria = "Saisissez des nombres valides et des valeurs minimum/maximum cohérentes. « Jamais lu » ne peut pas être combiné avec une lecture récente ou un minimum de lectures positif."
         , EditSmartPlaylist = "Modifier la playlist intelligente"
+        , LibraryEmptyHint = "Aucune source multimédia configurée. Ajoutez des répertoires locaux ou un ou plusieurs serveurs Orynivo dans les paramètres."
         , SmartPlaylistUpdated = "Playlist intelligente « {0} » mise à jour."
         , ImportM3u8Playlist = "Importer une playlist M3U8"
         , ExportM3u8Playlist = "Exporter au format M3U8"
@@ -1512,9 +1526,9 @@ public static class LocalizationManager
     };
 
     private static readonly LocalizedStrings Spanish = new(
-        "BIBLIOTECA LOCAL", "Artistas", "Álbumes", "Pistas", "Estructura de carpetas", "Búsqueda", "LISTAS", "Acerca de", "Ajustes",
+        "BIBLIOTECA", "Artistas", "Álbumes", "Pistas", "Estructura de carpetas", "Búsqueda", "Listas", "Acerca de", "Ajustes",
         "Filtro", "Favoritos", "Tipos de audio", "Tasa de bits",
-        "Ningún dispositivo seleccionado.", "Apariencia", "Esquema de color", "Idioma", "REPRODUCCIÓN", "Dispositivo de salida",
+        "Ningún dispositivo seleccionado.", "APARIENCIA", "Esquema de color", "Idioma", "REPRODUCCIÓN", "Dispositivo de salida",
         "BIBLIOTECA", "Directorios", "+ Agregar directorio", "Mantenimiento de base de datos",
         "Optimizar base de datos", "Reparar portadas de álbum", "Descargar portadas faltantes",
         "La descarga automática solo encuentra portadas cuando hay un ID de MusicBrainz presente. Para búsquedas más libres, usa el botón directamente en la vista del álbum.",
@@ -1559,7 +1573,7 @@ public static class LocalizationManager
         "Cargando letra …", "Descargando letra desde LRCLIB …",
         "No hay metadatos disponibles para esta pista.", "No se encontró letra.",
         "No se pudo descargar la letra.",
-        "Información del artista", "Mostrar información del artista", "Actualizar información del artista", "Cerrar información del artista",
+        "INFORMACIÓN DEL ARTISTA", "Mostrar información del artista", "Actualizar información del artista", "Cerrar información del artista",
         "Cargando información del artista …", "Descargando información del artista …",
         "No se encontró información del artista.", "No se pudo descargar la información del artista.",
         "Ninguna imagen descargada", "Archivo de imagen faltante", "Error al cargar la imagen",
@@ -1575,6 +1589,7 @@ public static class LocalizationManager
         CwAsioOutputDevice = "Dispositivo de salida cwASIO", SteinbergAsio = "Steinberg ASIO", CwAsio = "cwASIO",
         DeviceInfo = "Información del dispositivo",
         OutputProfile = "Salida",
+        LocalMedia = "Local",
         OutputProfileCreate = "Crear salida",
         OutputProfileConfigure = "Configurar salida",
         OutputProfileDelete = "Eliminar salida",
@@ -1584,6 +1599,7 @@ public static class LocalizationManager
         OutputProfileNameExists = "Ya existe una salida con este nombre.",
         OutputProfileDeleteTitle = "Eliminar salida",
         OutputProfileDeleteConfirm = "¿Seguro que quieres eliminar la salida «{0}»?", DatabaseOptimizeHint = "Las páginas liberadas se eliminan para reducir físicamente el archivo.",
+        AppearanceNavItem = "Apariencia", ArtistInfoNavItem = "Información del artista",
         AsioBridgeMissing = "Esta compilación no incluye compatibilidad con ASIO. Utiliza WASAPI.",
         KernelStreamingUnavailable = "Kernel Streaming se puede seleccionar, pero todavía no está implementado como backend de reproducción.",
         AddMusicDirectory = "Agregar directorio de música", TrackCountTooltip = "Número de pistas en la base de datos",
@@ -1862,6 +1878,7 @@ public static class LocalizationManager
         , CreateSmartPlaylist = "Crear lista inteligente"
         , InvalidSmartPlaylistCriteria = "Introduce números válidos y valores mínimos/máximos coherentes. «Nunca reproducido» no puede combinarse con reproducción reciente ni con un mínimo positivo de reproducciones."
         , EditSmartPlaylist = "Editar lista inteligente"
+        , LibraryEmptyHint = "Aún no hay ninguna fuente multimedia configurada. Añade directorios locales o uno o varios servidores Orynivo en los ajustes."
         , SmartPlaylistUpdated = "Lista inteligente '{0}' actualizada."
         , ImportM3u8Playlist = "Importar lista M3U8"
         , ExportM3u8Playlist = "Exportar como M3U8"

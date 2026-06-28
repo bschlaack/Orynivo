@@ -26,7 +26,8 @@ public sealed record AlbumInfo(
     int? Year,
     string? ArtworkPath,
     string? ThumbnailPath,
-    bool IsFavorite);
+    bool IsFavorite,
+    long? ArtistId = null);
 
 /// <summary>Lightweight track row for list and search tables; omits artwork and lyrics payloads.</summary>
 /// <param name="Path">Absolute audio-file path.</param>
@@ -56,6 +57,8 @@ public sealed record AlbumInfo(
 /// <param name="AddedAt">Library-added timestamp in Unix seconds.</param>
 /// <param name="ReplayGainTrack">Track ReplayGain value.</param>
 /// <param name="ReplayGainAlbum">Album ReplayGain value.</param>
+/// <param name="ArtistId">Database identifier of the primary artist, or <see langword="null"/>.</param>
+/// <param name="AlbumId">Database identifier of the album, or <see langword="null"/>.</param>
 public sealed record TrackListInfo(
     string Path,
     string FileName,
@@ -83,7 +86,9 @@ public sealed record TrackListInfo(
     long? FileSize,
     long AddedAt,
     string? ReplayGainTrack,
-    string? ReplayGainAlbum);
+    string? ReplayGainAlbum,
+    long? ArtistId = null,
+    long? AlbumId = null);
 
 /// <summary>Minimal track row for filter/facet building; carries only classification fields.</summary>
 /// <param name="Id">Track database identifier.</param>
@@ -457,6 +462,35 @@ public sealed class AudioDatabase : IDisposable
         cmd.ExecuteNonQuery();
     }
 
+    /// <summary>Stores downloaded plain and synchronised lyrics for the track with the given identifier.</summary>
+    /// <param name="trackId">Database identifier of the track to update.</param>
+    /// <param name="plainLyrics">Unsynchronised plain-text lyrics, or <see langword="null"/>.</param>
+    /// <param name="syncedLyrics">LRC-formatted synchronised lyrics, or <see langword="null"/>.</param>
+    /// <param name="source">Label identifying where the lyrics were obtained.</param>
+    /// <returns><see langword="true"/> when a matching track row was updated.</returns>
+    public bool UpdateDownloadedLyricsById(
+        long trackId,
+        string? plainLyrics,
+        string? syncedLyrics,
+        string source)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            UPDATE tracks
+            SET downloaded_lyrics = $plain,
+                synced_lyrics = $synced,
+                lyrics_source = $source,
+                lyrics_fetched_at = $fetched_at
+            WHERE id = $id;
+            """;
+        Add(cmd, "$plain", (object?)plainLyrics ?? DBNull.Value);
+        Add(cmd, "$synced", (object?)syncedLyrics ?? DBNull.Value);
+        Add(cmd, "$source", source);
+        Add(cmd, "$fetched_at", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        Add(cmd, "$id", trackId);
+        return cmd.ExecuteNonQuery() > 0;
+    }
+
     public IEnumerable<TrackRecord> GetAll()
     {
         using var cmd = _conn.CreateCommand();
@@ -472,6 +506,35 @@ public sealed class AudioDatabase : IDisposable
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = """
             SELECT id, name, is_favorite, NULL AS biography, image_path,
+                   profile_source_url, profile_language, profile_fetched_at,
+                   image_is_manual
+            FROM artists
+            ORDER BY CASE WHEN name = '' THEN 1 ELSE 0 END,
+                     name COLLATE NOCASE;
+            """;
+        using var reader = cmd.ExecuteReader();
+        var result = new List<ArtistInfo>();
+        while (reader.Read())
+            result.Add(new ArtistInfo(
+                reader.GetInt64(0),
+                reader.GetString(1),
+                reader.GetInt32(2) != 0,
+                reader.IsDBNull(3) ? null : reader.GetString(3),
+                reader.IsDBNull(4) ? null : reader.GetString(4),
+                reader.IsDBNull(5) ? null : reader.GetString(5),
+                reader.IsDBNull(6) ? null : reader.GetString(6),
+                reader.IsDBNull(7) ? null : reader.GetInt64(7),
+                reader.GetInt32(8) != 0));
+        return result;
+    }
+
+    /// <summary>Loads compact artist rows including cached profile metadata but no track rows.</summary>
+    /// <returns>Artists ordered by display name.</returns>
+    public List<ArtistInfo> GetArtistsWithProfiles()
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, name, is_favorite, biography, image_path,
                    profile_source_url, profile_language, profile_fetched_at,
                    image_is_manual
             FROM artists
@@ -556,7 +619,11 @@ public sealed class AudioDatabase : IDisposable
         cmd.ExecuteNonQuery();
     }
 
-    public void UpdateArtistImage(long artistId, string imagePath)
+    /// <summary>Stores a manually selected image path for an artist.</summary>
+    /// <param name="artistId">Artist identifier.</param>
+    /// <param name="imagePath">Absolute path to the cached artist image.</param>
+    /// <returns><see langword="true"/> when an artist row was updated.</returns>
+    public bool UpdateArtistImage(long artistId, string imagePath)
     {
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = """
@@ -567,7 +634,7 @@ public sealed class AudioDatabase : IDisposable
             """;
         Add(cmd, "$image_path", imagePath);
         Add(cmd, "$id", artistId);
-        cmd.ExecuteNonQuery();
+        return cmd.ExecuteNonQuery() > 0;
     }
 
     public ArtistInfo? FindArtistByName(string artistName, long? excludeArtistId = null)
@@ -774,7 +841,8 @@ public sealed class AudioDatabase : IDisposable
                 CASE WHEN al.year = 0 THEN NULL ELSE al.year END AS year,
                 aw.thumb_320_path,
                 aw.thumb_96_path,
-                al.is_favorite
+                al.is_favorite,
+                al.artist_id
             FROM albums al
             LEFT JOIN artists ar ON ar.id = al.artist_id
             LEFT JOIN artworks aw ON aw.id = al.artwork_id
@@ -790,7 +858,8 @@ public sealed class AudioDatabase : IDisposable
                 CASE WHEN al.year = 0 THEN NULL ELSE al.year END AS year,
                 NULL AS thumb_320_path,
                 NULL AS thumb_96_path,
-                al.is_favorite
+                al.is_favorite,
+                al.artist_id
             FROM albums al
             LEFT JOIN artists ar ON ar.id = al.artist_id
             ORDER BY
@@ -808,7 +877,8 @@ public sealed class AudioDatabase : IDisposable
                 reader.IsDBNull(3) || reader.GetInt32(3) == 0 ? null : reader.GetInt32(3),
                 reader.IsDBNull(4) ? null : reader.GetString(4),
                 reader.IsDBNull(5) ? null : reader.GetString(5),
-                reader.GetInt32(6) != 0));
+                reader.GetInt32(6) != 0,
+                reader.IsDBNull(7) ? null : reader.GetInt64(7)));
         return result;
     }
 
@@ -1038,11 +1108,13 @@ public sealed class AudioDatabase : IDisposable
         }
     }
 
+    /// <summary>Finds one physical sample track path for every album without assigned artwork.</summary>
+    /// <returns>Album identifiers with a readable sample path candidate.</returns>
     public List<(long AlbumId, string Path)> GetAlbumsMissingArtworkSamplePaths()
     {
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = """
-            SELECT al.id, MIN(t.path) AS sample_path
+            SELECT al.id, MIN(COALESCE(NULLIF(t.source_path, ''), t.path)) AS sample_path
             FROM albums al
             JOIN tracks t ON t.album_id = al.id
             WHERE al.artwork_id IS NULL
@@ -1053,6 +1125,24 @@ public sealed class AudioDatabase : IDisposable
         while (reader.Read())
             result.Add((reader.GetInt64(0), reader.GetString(1)));
         return result;
+    }
+
+    /// <summary>Finds one physical sample track path for an album when it has no assigned artwork.</summary>
+    /// <param name="albumId">Identifier of the album to inspect.</param>
+    /// <returns>A readable sample path candidate, or <see langword="null"/> when the album has artwork or no tracks.</returns>
+    public string? GetAlbumMissingArtworkSamplePath(long albumId)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT MIN(COALESCE(NULLIF(t.source_path, ''), t.path)) AS sample_path
+            FROM albums al
+            JOIN tracks t ON t.album_id = al.id
+            WHERE al.id = $album_id
+              AND al.artwork_id IS NULL
+            GROUP BY al.id;
+            """;
+        Add(cmd, "$album_id", albumId);
+        return cmd.ExecuteScalar() as string;
     }
 
     public List<(long AlbumId, string ReleaseId)> GetAlbumsMissingArtworkReleaseIds()
@@ -1074,7 +1164,12 @@ public sealed class AudioDatabase : IDisposable
         return result;
     }
 
-    public void AttachArtworkToAlbum(long albumId, byte[] data, string? mimeType)
+    /// <summary>Stores artwork bytes in the artwork cache and attaches the resulting artwork to an album.</summary>
+    /// <param name="albumId">Album identifier.</param>
+    /// <param name="data">Raw image bytes.</param>
+    /// <param name="mimeType">Optional image MIME type.</param>
+    /// <returns><see langword="true"/> when an album row was updated.</returns>
+    public bool AttachArtworkToAlbum(long albumId, byte[] data, string? mimeType)
     {
         using var tx = _conn.BeginTransaction();
         var artworkId = EnsureArtwork(data, mimeType, tx);
@@ -1087,8 +1182,9 @@ public sealed class AudioDatabase : IDisposable
             """;
         Add(cmd, "$artwork_id", artworkId);
         Add(cmd, "$album_id", albumId);
-        cmd.ExecuteNonQuery();
+        var changed = cmd.ExecuteNonQuery() > 0;
         tx.Commit();
+        return changed;
     }
 
     public void ClearArtworkFromAlbum(long albumId)
@@ -1161,7 +1257,8 @@ public sealed class AudioDatabase : IDisposable
                 reader.IsDBNull(3) ? null : reader.GetInt32(3),
                 reader.IsDBNull(4) ? null : reader.GetString(4),
                 reader.IsDBNull(5) ? null : reader.GetString(5),
-                reader.GetInt32(6) != 0));
+                reader.GetInt32(6) != 0,
+                artistId));
         return result;
     }
 
@@ -1331,7 +1428,7 @@ public sealed class AudioDatabase : IDisposable
                 path, file_name, title, artist, album, album_artist, genre, format, bitrate,
                 duration, sort_title, id, is_favorite, year, track_number, track_total,
                 disc_number, disc_total, sample_rate, bit_depth, channels, composer, bpm,
-                file_size, added_at, replay_gain_track, replay_gain_album
+                file_size, added_at, replay_gain_track, replay_gain_album, artist_id, album_id
             FROM tracks
             ORDER BY COALESCE(sort_title, title, file_name) COLLATE NOCASE;
             """;
@@ -1350,7 +1447,7 @@ public sealed class AudioDatabase : IDisposable
                 path, file_name, title, artist, album, album_artist, genre, format, bitrate,
                 duration, sort_title, id, is_favorite, year, track_number, track_total,
                 disc_number, disc_total, sample_rate, bit_depth, channels, composer, bpm,
-                file_size, added_at, replay_gain_track, replay_gain_album
+                file_size, added_at, replay_gain_track, replay_gain_album, artist_id, album_id
             FROM tracks
             WHERE album_id = $album_id
               AND ($artist_id IS NULL OR artist_id = $artist_id)
@@ -1421,7 +1518,7 @@ public sealed class AudioDatabase : IDisposable
                     path, file_name, title, artist, album, album_artist, genre, format, bitrate,
                     duration, sort_title, id, is_favorite, year, track_number, track_total,
                     disc_number, disc_total, sample_rate, bit_depth, channels, composer, bpm,
-                    file_size, added_at, replay_gain_track, replay_gain_album
+                    file_size, added_at, replay_gain_track, replay_gain_album, artist_id, album_id
                 FROM tracks
                 WHERE id IN ({string.Join(", ", parameters)});
                 """;
@@ -1462,7 +1559,7 @@ public sealed class AudioDatabase : IDisposable
                     path, file_name, title, artist, album, album_artist, genre, format, bitrate,
                     duration, sort_title, id, is_favorite, year, track_number, track_total,
                     disc_number, disc_total, sample_rate, bit_depth, channels, composer, bpm,
-                    file_size, added_at, replay_gain_track, replay_gain_album
+                    file_size, added_at, replay_gain_track, replay_gain_album, artist_id, album_id
                 FROM tracks
                 WHERE path IN ({string.Join(", ", parameters)});
                 """;
@@ -1580,7 +1677,9 @@ public sealed class AudioDatabase : IDisposable
         reader.IsDBNull(23) ? null : reader.GetInt64(23),
         reader.GetInt64(24),
         reader.IsDBNull(25) ? null : reader.GetString(25),
-        reader.IsDBNull(26) ? null : reader.GetString(26));
+        reader.IsDBNull(26) ? null : reader.GetString(26),
+        reader.IsDBNull(27) ? null : reader.GetInt64(27),
+        reader.IsDBNull(28) ? null : reader.GetInt64(28));
 
     /// <summary>Loads distinct albums referenced by the specified track identifiers.</summary>
     /// <param name="ids">Track identifiers.</param>
@@ -1726,6 +1825,80 @@ public sealed class AudioDatabase : IDisposable
     public void SetArtistFavorite(long id, bool value) => SetFavorite("artists", id, value);
     public void SetAlbumFavorite(long id, bool value) => SetFavorite("albums", id, value);
 
+    /// <summary>Gets cached artwork file paths for an album.</summary>
+    /// <param name="albumId">Album identifier.</param>
+    /// <returns>Cached artwork paths, or <see langword="null"/> when the album has no artwork row.</returns>
+    public ArtworkPaths? GetArtworkPathsByAlbumId(long albumId)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT aw.original_path, aw.thumb_96_path, aw.thumb_320_path
+            FROM albums al
+            LEFT JOIN artworks aw ON aw.id = al.artwork_id
+            WHERE al.id = $album_id
+            LIMIT 1;
+            """;
+        Add(cmd, "$album_id", albumId);
+        using var reader = cmd.ExecuteReader();
+        return reader.Read() && !reader.IsDBNull(0)
+            ? new ArtworkPaths(
+                reader.GetString(0),
+                reader.IsDBNull(1) ? null : reader.GetString(1),
+                reader.IsDBNull(2) ? null : reader.GetString(2))
+            : null;
+    }
+
+    /// <summary>Ensures cached artwork files exist for an album and returns their paths.</summary>
+    /// <param name="albumId">Album identifier.</param>
+    /// <returns>Cached artwork paths, or <see langword="null"/> when the album has no artwork payload.</returns>
+    public ArtworkPaths? EnsureArtworkFilesForAlbum(long albumId)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT aw.id, aw.content_hash, aw.mime_type, aw.data, aw.original_path, aw.thumb_96_path, aw.thumb_320_path
+            FROM albums al
+            LEFT JOIN artworks aw ON aw.id = al.artwork_id
+            WHERE al.id = $album_id
+            LIMIT 1;
+            """;
+        Add(cmd, "$album_id", albumId);
+        using var reader = cmd.ExecuteReader();
+        if (!reader.Read() || reader.IsDBNull(0) || reader.IsDBNull(3))
+            return null;
+
+        var artworkId = reader.GetInt64(0);
+        var hash = reader.GetString(1);
+        var mimeType = reader.IsDBNull(2) ? null : reader.GetString(2);
+        var data = (byte[])reader.GetValue(3);
+        var original = reader.IsDBNull(4) ? null : reader.GetString(4);
+        var thumb96 = reader.IsDBNull(5) ? null : reader.GetString(5);
+        var thumb320 = reader.IsDBNull(6) ? null : reader.GetString(6);
+        reader.Close();
+
+        if (File.Exists(original) && File.Exists(thumb96) && File.Exists(thumb320))
+            return new ArtworkPaths(original, thumb96, thumb320);
+
+        var files = ArtworkCache.EnsureFiles(hash, data, mimeType);
+        using var update = _conn.CreateCommand();
+        update.CommandText = """
+            UPDATE artworks
+            SET original_path = $original,
+                thumb_96_path = $thumb96,
+                thumb_320_path = $thumb320
+            WHERE id = $id;
+            """;
+        Add(update, "$original", files.OriginalPath);
+        Add(update, "$thumb96", files.Thumb96Path);
+        Add(update, "$thumb320", files.Thumb320Path);
+        Add(update, "$id", artworkId);
+        update.ExecuteNonQuery();
+
+        return new ArtworkPaths(files.OriginalPath, files.Thumb96Path, files.Thumb320Path);
+    }
+
+    /// <summary>Gets cached artwork file paths for a track's album.</summary>
+    /// <param name="path">Track path.</param>
+    /// <returns>Cached artwork paths, or <see langword="null"/> when the track or album has no artwork row.</returns>
     public ArtworkPaths? GetArtworkPathsByTrackPath(string path)
     {
         using var cmd = _conn.CreateCommand();
@@ -2132,6 +2305,12 @@ public sealed class AudioDatabase : IDisposable
         {
             MigrateArtworkFiles();
             SetMeta("artwork_files_v1", "done");
+        }
+        var artworkRoot = AppPaths.GetDataPath("artworks");
+        if (!string.Equals(GetMeta("artwork_files_root_v1"), artworkRoot, StringComparison.Ordinal))
+        {
+            RepairArtworkFilesForCurrentRoot();
+            SetMeta("artwork_files_root_v1", artworkRoot);
         }
         if (!string.Equals(GetMeta("trim_track_titles_v1"), "done", StringComparison.Ordinal))
         {
@@ -2816,6 +2995,51 @@ public sealed class AudioDatabase : IDisposable
 
         foreach (var row in rows)
         {
+            var files = ArtworkCache.EnsureFiles(row.Hash, row.Data, row.Mime);
+            using var update = _conn.CreateCommand();
+            update.CommandText = """
+                UPDATE artworks
+                SET original_path = $original,
+                    thumb_96_path = $thumb96,
+                    thumb_320_path = $thumb320
+                WHERE id = $id;
+                """;
+            Add(update, "$original", files.OriginalPath);
+            Add(update, "$thumb96", files.Thumb96Path);
+            Add(update, "$thumb320", files.Thumb320Path);
+            Add(update, "$id", row.Id);
+            update.ExecuteNonQuery();
+        }
+    }
+
+    private void RepairArtworkFilesForCurrentRoot()
+    {
+        using var select = _conn.CreateCommand();
+        select.CommandText = """
+            SELECT id, content_hash, mime_type, data, original_path, thumb_96_path, thumb_320_path
+            FROM artworks
+            WHERE data IS NOT NULL;
+            """;
+        using var reader = select.ExecuteReader();
+        var rows = new List<(long Id, string Hash, string? Mime, byte[] Data, string? Original, string? Thumb96, string? Thumb320)>();
+        while (reader.Read())
+        {
+            rows.Add((
+                reader.GetInt64(0),
+                reader.GetString(1),
+                reader.IsDBNull(2) ? null : reader.GetString(2),
+                (byte[])reader.GetValue(3),
+                reader.IsDBNull(4) ? null : reader.GetString(4),
+                reader.IsDBNull(5) ? null : reader.GetString(5),
+                reader.IsDBNull(6) ? null : reader.GetString(6)));
+        }
+        reader.Close();
+
+        foreach (var row in rows)
+        {
+            if (File.Exists(row.Original) && File.Exists(row.Thumb96) && File.Exists(row.Thumb320))
+                continue;
+
             var files = ArtworkCache.EnsureFiles(row.Hash, row.Data, row.Mime);
             using var update = _conn.CreateCommand();
             update.CommandText = """

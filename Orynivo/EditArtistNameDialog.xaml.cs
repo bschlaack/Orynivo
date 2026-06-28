@@ -7,12 +7,13 @@ namespace Orynivo;
 
 /// <summary>
 /// Modal dialog for renaming an artist. Owns the complete confirmation lifecycle:
-/// the rename transaction runs on a background thread, and the dialog closes only
-/// after the SQLite operation succeeds.
+/// the supplied rename callback runs before the dialog closes, and collisions
+/// are returned to the caller for an explicit merge decision.
 /// </summary>
 public partial class EditArtistNameDialog : Window
 {
     private readonly long _artistId;
+    private readonly Func<long, string, Task<(ArtistRenameResult? Result, ArtistInfo? MatchingArtist)>> _commitAsync;
     private string _artistName = string.Empty;
 
     /// <summary>Gets the trimmed artist name captured when the dialog was confirmed.</summary>
@@ -38,8 +39,23 @@ public partial class EditArtistNameDialog : Window
     /// <param name="artistId">Database ID of the artist to rename.</param>
     /// <param name="artistName">Current display name shown in the text field.</param>
     public EditArtistNameDialog(long artistId, string artistName)
+        : this(artistId, artistName, CommitLocalRenameAsync)
+    {
+    }
+
+    /// <summary>
+    /// Initializes the dialog for the given artist using a caller-provided commit callback.
+    /// </summary>
+    /// <param name="artistId">Database ID of the artist to rename.</param>
+    /// <param name="artistName">Current display name shown in the text field.</param>
+    /// <param name="commitAsync">Callback that commits the rename or reports a matching artist.</param>
+    public EditArtistNameDialog(
+        long artistId,
+        string artistName,
+        Func<long, string, Task<(ArtistRenameResult? Result, ArtistInfo? MatchingArtist)>> commitAsync)
     {
         _artistId = artistId;
+        _commitAsync = commitAsync;
         InitializeComponent();
         NameTextBox.Text = artistName;
         _artistName = artistName.Trim();
@@ -83,14 +99,7 @@ public partial class EditArtistNameDialog : Window
         StatusTextBlock.IsVisible = true;
         try
         {
-            var (result, matching) = await Task.Run(() =>
-            {
-                using var db = AudioDatabase.OpenDefault();
-                var match = db.FindArtistByName(name, _artistId);
-                if (match is not null)
-                    return ((ArtistRenameResult?)null, match);
-                return (db.RenameArtist(_artistId, name), (ArtistInfo?)null);
-            });
+            var (result, matching) = await _commitAsync(_artistId, name);
             Result = result;
             MatchingArtist = matching;
             _artistName = name;
@@ -109,4 +118,16 @@ public partial class EditArtistNameDialog : Window
     }
 
     private void CancelButton_OnClick(object? sender, RoutedEventArgs e) => Close(false);
+
+    private static Task<(ArtistRenameResult? Result, ArtistInfo? MatchingArtist)> CommitLocalRenameAsync(
+        long artistId,
+        string artistName)
+        => Task.Run(() =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            var match = db.FindArtistByName(artistName, artistId);
+            if (match is not null)
+                return ((ArtistRenameResult?)null, match);
+            return ((ArtistRenameResult?)db.RenameArtist(artistId, artistName), (ArtistInfo?)null);
+        });
 }
