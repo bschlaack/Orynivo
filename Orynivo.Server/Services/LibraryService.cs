@@ -147,6 +147,11 @@ public sealed class LibraryService : IHostedService, IDisposable
                     path, result.Total, result.Added, result.Updated, result.Removed, result.Failed);
             }
 
+            _logger.LogInformation("Repairing missing album artwork from embedded track metadata");
+            SetScanStatus(new ServerScanStatus(true, null, 0, 0, "album-artwork-repair", ScanStatus.LastResult, null));
+            var repairedArtwork = await LibraryScanner.RepairMissingAlbumArtworkAsync(cancellationToken: cancellationToken);
+            _logger.LogInformation("Album artwork repair complete: {Count} albums repaired", repairedArtwork);
+
             _logger.LogInformation("Library scan complete");
         }
         catch (OperationCanceledException)

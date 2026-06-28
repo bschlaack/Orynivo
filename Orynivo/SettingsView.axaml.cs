@@ -470,13 +470,14 @@ internal partial class SettingsView : UserControl
     {
         if (NavListBox.SelectedItem is not ListBoxItem { Tag: string tag })
             return;
-        AudioDevicePanel.IsVisible = tag == "AudioDevice";
-        LibraryPanel.IsVisible     = tag == "Library";
-        StreamingPanel.IsVisible   = tag == "Streaming";
-        AppearancePanel.IsVisible  = tag == "Appearance";
-        ArtistInfoPanel.IsVisible  = tag == "ArtistInfo";
-        McpPanel.IsVisible         = tag == "Mcp";
-        AiChatPanel.IsVisible      = tag == "AiChat";
+        AudioDevicePanel.IsVisible             = tag == "AudioDevice";
+        LibraryPanel.IsVisible                 = tag == "Library";
+        OrynivoServersSettingsPanel.IsVisible  = tag == "OrynivoServers";
+        StreamingPanel.IsVisible               = tag == "Streaming";
+        AppearancePanel.IsVisible              = tag == "Appearance";
+        ArtistInfoPanel.IsVisible              = tag == "ArtistInfo";
+        McpPanel.IsVisible                     = tag == "Mcp";
+        AiChatPanel.IsVisible                  = tag == "AiChat";
     }
 
     private void ArtistInfoSourceComboBox_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)

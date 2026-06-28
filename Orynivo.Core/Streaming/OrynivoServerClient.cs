@@ -32,13 +32,17 @@ public sealed record OrynivoArtistInfo(
 /// <param name="Album">Album title.</param>
 /// <param name="DisplayArtist">Display artist for the album, or <see langword="null"/>.</param>
 /// <param name="Year">Album year, or <see langword="null"/>.</param>
+/// <param name="ArtworkPath">Server-side 320-px artwork path, or <see langword="null"/> when the album has no cover.</param>
+/// <param name="ThumbnailPath">Server-side 96-px thumbnail path, or <see langword="null"/> when the album has no cover.</param>
 /// <param name="IsFavorite">Whether the album is marked as favorite on the server.</param>
 public sealed record OrynivoAlbumInfo(
     long Id,
     string Album,
     string? DisplayArtist,
     int? Year,
-    bool IsFavorite);
+    string? ArtworkPath = null,
+    string? ThumbnailPath = null,
+    bool IsFavorite = false);
 
 /// <summary>Track entry returned by the Orynivo Server API.</summary>
 /// <param name="Id">Database ID of the track.</param>
@@ -49,14 +53,24 @@ public sealed record OrynivoAlbumInfo(
 /// <param name="Artist">Track artist, or <see langword="null"/>.</param>
 /// <param name="AlbumArtist">Album artist, or <see langword="null"/>.</param>
 /// <param name="Album">Album title, or <see langword="null"/>.</param>
+/// <param name="SortTitle">Sort title, or <see langword="null"/>.</param>
 /// <param name="Year">Track year, or <see langword="null"/>.</param>
 /// <param name="TrackNumber">Track number, or <see langword="null"/>.</param>
+/// <param name="TrackTotal">Track total, or <see langword="null"/>.</param>
 /// <param name="DiscNumber">Disc number, or <see langword="null"/>.</param>
+/// <param name="DiscTotal">Disc total, or <see langword="null"/>.</param>
+/// <param name="Genre">Genre text, or <see langword="null"/>.</param>
 /// <param name="Duration">Duration in seconds, or <see langword="null"/>.</param>
 /// <param name="Bitrate">Bitrate in kbps, or <see langword="null"/>.</param>
 /// <param name="SampleRate">Sample rate in Hz, or <see langword="null"/>.</param>
 /// <param name="BitDepth">Bit depth, or <see langword="null"/>.</param>
 /// <param name="Channels">Channel count, or <see langword="null"/>.</param>
+/// <param name="Composer">Composer text, or <see langword="null"/>.</param>
+/// <param name="Bpm">Beats per minute, or <see langword="null"/>.</param>
+/// <param name="FileSize">File size in bytes, or <see langword="null"/>.</param>
+/// <param name="AddedAt">Library-added timestamp in Unix seconds, or <see langword="null"/>.</param>
+/// <param name="ReplayGainTrack">Track ReplayGain value, or <see langword="null"/>.</param>
+/// <param name="ReplayGainAlbum">Album ReplayGain value, or <see langword="null"/>.</param>
 /// <param name="Format">Audio format label, or <see langword="null"/>.</param>
 /// <param name="IsFavorite">Whether the track is marked as favorite on the server.</param>
 /// <param name="IsCueTrack">Whether the track is a CUE virtual track.</param>
@@ -69,17 +83,27 @@ public sealed record OrynivoTrackInfo(
     string? Artist,
     string? AlbumArtist,
     string? Album,
-    int? Year,
-    int? TrackNumber,
-    int? DiscNumber,
-    double? Duration,
-    int? Bitrate,
-    int? SampleRate,
-    int? BitDepth,
-    int? Channels,
-    string? Format,
-    bool IsFavorite,
-    bool IsCueTrack);
+    string? SortTitle = null,
+    int? Year = null,
+    int? TrackNumber = null,
+    int? TrackTotal = null,
+    int? DiscNumber = null,
+    int? DiscTotal = null,
+    string? Genre = null,
+    double? Duration = null,
+    int? Bitrate = null,
+    int? SampleRate = null,
+    int? BitDepth = null,
+    int? Channels = null,
+    string? Composer = null,
+    int? Bpm = null,
+    long? FileSize = null,
+    long? AddedAt = null,
+    string? ReplayGainTrack = null,
+    string? ReplayGainAlbum = null,
+    string? Format = null,
+    bool IsFavorite = false,
+    bool IsCueTrack = false);
 
 /// <summary>Lightweight remote track entry used for folder-tree construction.</summary>
 /// <param name="Id">Database ID of the track.</param>

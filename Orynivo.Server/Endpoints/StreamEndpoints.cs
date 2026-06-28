@@ -67,15 +67,17 @@ public static class StreamEndpoints
             var album = db.GetAlbumById(albumId);
             if (album is null) return Results.NotFound();
 
-            var path = size switch
+            var artworkPaths = db.EnsureArtworkFilesForAlbum(albumId);
+            var path = SelectExistingArtworkPath(artworkPaths, size);
+            if (path is null
+                && LibraryScanner.RepairMissingAlbumArtwork(albumId))
             {
-                96  => album.ThumbnailPath,
-                320 => album.ThumbnailPath,
-                _   => album.ArtworkPath
-            };
+                artworkPaths = db.EnsureArtworkFilesForAlbum(albumId);
+                path = SelectExistingArtworkPath(artworkPaths, size);
+            }
 
-            if (string.IsNullOrEmpty(path) || !File.Exists(path)) return Results.NotFound();
-            return Results.File(path, "image/jpeg", enableRangeProcessing: false);
+            if (path is null) return Results.NotFound();
+            return Results.File(path, GuessImageMimeType(path), enableRangeProcessing: false);
         });
 
         /// <summary>
@@ -133,15 +135,10 @@ public static class StreamEndpoints
             var artworkPaths = db.GetArtworkPathsByTrackPath(p);
             if (artworkPaths is null) return Results.NotFound();
 
-            var path = size switch
-            {
-                96  => artworkPaths.Thumb96Path,
-                320 => artworkPaths.Thumb320Path,
-                _   => artworkPaths.OriginalPath
-            };
+            var path = SelectExistingArtworkPath(artworkPaths, size);
 
-            if (string.IsNullOrEmpty(path) || !File.Exists(path)) return Results.NotFound();
-            return Results.File(path, "image/jpeg", enableRangeProcessing: false);
+            if (path is null) return Results.NotFound();
+            return Results.File(path, GuessImageMimeType(path), enableRangeProcessing: false);
         });
     }
 
@@ -165,6 +162,21 @@ public static class StreamEndpoints
         if (!File.Exists(trackPath)) return Results.NotFound();
         var mime = GuessMimeType(trackPath);
         return Results.File(trackPath, mime, enableRangeProcessing: true);
+    }
+
+    private static string? SelectExistingArtworkPath(ArtworkPaths? artworkPaths, int? size)
+    {
+        if (artworkPaths is null)
+            return null;
+
+        string?[] candidates = size switch
+        {
+            96  => [artworkPaths.Thumb96Path, artworkPaths.OriginalPath, artworkPaths.Thumb320Path],
+            320 => [artworkPaths.Thumb320Path, artworkPaths.OriginalPath, artworkPaths.Thumb96Path],
+            _   => [artworkPaths.OriginalPath, artworkPaths.Thumb320Path, artworkPaths.Thumb96Path]
+        };
+
+        return candidates.FirstOrDefault(path => !string.IsNullOrEmpty(path) && File.Exists(path));
     }
 
     /// <summary>

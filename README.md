@@ -145,12 +145,12 @@ The server binds to `http://0.0.0.0:5280` by default. Override the port in
 
 When the Windows player is connected to an Orynivo Server, the server's music
 directories can also be managed from the Orynivo Server connection dialog in
-Settings. The directory browser shows the server filesystem, not the local
-Windows filesystem: Unix-like servers open at `/`, while Windows servers expose
-their drive roots. The same dialog can start a server scan and shows live
-progress while large directories are being scanned. Inaccessible subdirectories
-such as Linux `lost+found` folders are skipped instead of aborting the complete
-scan.
+Settings → Library → Orynivo Server. The directory browser shows the server
+filesystem, not the local Windows filesystem: Unix-like servers open at `/`,
+while Windows servers expose their drive roots. The same dialog can start a
+server scan and shows live progress while large directories are being scanned.
+Inaccessible subdirectories such as Linux `lost+found` folders are skipped
+instead of aborting the complete scan.
 Configured Orynivo Server connections appear in the main sidebar directly below
 the Local Library section.
 
@@ -390,6 +390,8 @@ both **Steinberg ASIO** and **cwASIO**.
   not required when using a self-contained release package)
 - [FFmpeg](https://ffmpeg.org/) — recommended for CUE-sheet track transcoding
   (Debian/Ubuntu: `apt install ffmpeg`; Fedora/Rocky: install from RPM Fusion)
+- Artwork thumbnail generation uses the bundled SkiaSharp native Linux assets;
+  ImageMagick or other external image conversion tools are not required.
 - No ASIO drivers or Windows dependencies
 
 ## Download

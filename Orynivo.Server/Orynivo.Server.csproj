@@ -15,6 +15,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="2.88.9" />
     <ProjectReference Include="..\Orynivo.Core\Orynivo.Core.csproj" />
   </ItemGroup>
 

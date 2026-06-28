@@ -50,6 +50,7 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _plexViewCts;
     private readonly Dictionary<string, ContentRow> _plexTracksByUrl =
         new(StringComparer.Ordinal);
+    private readonly LocalLibraryCatalogProvider _localCatalogProvider = new();
     private readonly OrynivoServerClient _orynivoClient = new();
     private OrynivoServerSettings? _activeOrynivoServer;
     private string _activeOrynivoView = "Artists";
@@ -950,7 +951,11 @@ public partial class MainWindow : Window
                      .ToList())
             NavListBox.Items.Remove(item);
 
-        var insertIndex = NavListBox.Items.IndexOf(OrynivoServerHeaderItem) + 1;
+        var headerIndex = NavListBox.Items.IndexOf(OrynivoServerHeaderItem);
+        if (headerIndex < 0)
+            return;
+
+        var insertIndex = headerIndex + 1;
         foreach (var server in _settings.OrynivoServers ?? [])
         {
             if (loadVersion != _orynivoNavigationLoadVersion)
@@ -1773,6 +1778,7 @@ public partial class MainWindow : Window
         _orynivoViewCts = new CancellationTokenSource();
         var ct = _orynivoViewCts.Token;
         var server = _activeOrynivoServer;
+        var provider = CreateOrynivoCatalogProvider(server);
         var view = filterAlbumId.HasValue ? "AlbumTracks"
             : filterArtistId.HasValue ? "ArtistAlbums"
             : _activeOrynivoView;
@@ -1792,28 +1798,9 @@ public partial class MainWindow : Window
                 case "Artists":
                 {
                     ApplyColumns("OrynivoArtist");
-                    var artists = await Task.Run(() => _orynivoClient.GetArtistsAsync(server, ct), ct);
+                    var artists = await provider.GetArtistsAsync(ct);
                     if (ct.IsCancellationRequested) return;
-                    var rows = artists.Select(a =>
-                    {
-                        var row = new ContentRow
-                        {
-                            Id = a.Id,
-                            Title = a.Name,
-                            Biography = a.Biography,
-                            SourceUrl = a.SourceUrl,
-                            ProfileLanguage = a.ProfileLanguage,
-                            ProfileFetchedAt = a.ProfileFetchedAt,
-                            ImageIsManual = a.ImageIsManual,
-                            EntityType = "OrynivoArtist",
-                            ExternalId = a.Id.ToString(CultureInfo.InvariantCulture),
-                            IsFavorite = IsOrynivoFavorite(server, "Artist", a.Id)
-                        };
-                        var artUrl = OrynivoServerClient.GetArtistArtworkUrl(server, a.Id);
-                        row.ArtworkPath = artUrl;
-                        row.ThumbnailPath = artUrl;
-                        return row;
-                    })
+                    var rows = artists.Select(ToCatalogArtistContentRow)
                     .Where(row => !_trackFavoritesOnly || row.IsFavorite)
                     .ToList();
                     AlbumViewModeBorder.IsVisible = true;
@@ -1831,9 +1818,12 @@ public partial class MainWindow : Window
                 case "ArtistAlbums":
                 {
                     ApplyColumns("OrynivoAlbum");
-                    var albums = await Task.Run(() => _orynivoClient.GetAlbumsByArtistAsync(server, filterArtistId!.Value, ct), ct);
+                    var albums = await provider.GetAlbumsByArtistAsync(
+                        filterArtistId!.Value,
+                        includeArtwork: true,
+                        cancellationToken: ct);
                     if (ct.IsCancellationRequested) return;
-                    var rows = albums.Select(a => BuildOrynivoAlbumRow(server, a))
+                    var rows = albums.Select(ToCatalogAlbumContentRow)
                         .Where(row => !_trackFavoritesOnly || row.IsFavorite)
                         .ToList();
                     AlbumViewModeBorder.IsVisible = true;
@@ -1851,9 +1841,9 @@ public partial class MainWindow : Window
                 case "Albums":
                 {
                     ApplyColumns("OrynivoAlbum");
-                    var albums = await Task.Run(() => _orynivoClient.GetAlbumsAsync(server, ct), ct);
+                    var albums = await provider.GetAlbumsAsync(includeArtwork: true, cancellationToken: ct);
                     if (ct.IsCancellationRequested) return;
-                    var rows = albums.Select(a => BuildOrynivoAlbumRow(server, a))
+                    var rows = albums.Select(ToCatalogAlbumContentRow)
                         .Where(row => !_trackFavoritesOnly || row.IsFavorite)
                         .ToList();
                     AlbumViewModeBorder.IsVisible = true;
@@ -1872,15 +1862,15 @@ public partial class MainWindow : Window
                 case "Tracks":
                 {
                     ApplyColumns("OrynivoTrack");
-                    List<OrynivoTrackInfo> tracks;
+                    IReadOnlyList<LibraryCatalogTrack> catalogTracks;
                     if (filterAlbumId.HasValue)
-                        tracks = await Task.Run(() => _orynivoClient.GetTracksByAlbumAsync(server, filterAlbumId.Value, ct), ct);
+                        catalogTracks = await provider.GetTracksByAlbumAsync(filterAlbumId.Value, ct);
                     else if (!string.IsNullOrWhiteSpace(SearchTextBox.Text))
-                        tracks = await _orynivoClient.SearchTracksAsync(server, SearchTextBox.Text.Trim(), cancellationToken: ct);
+                        catalogTracks = await provider.SearchTracksAsync(SearchTextBox.Text.Trim(), 500, ct);
                     else
-                        tracks = await LoadAllOrynivoTracksAsync(server, ct);
+                        catalogTracks = await LoadAllOrynivoTracksAsync(provider, ct);
                     if (ct.IsCancellationRequested) return;
-                    var rows = tracks.Select(t => BuildOrynivoTrackRow(server, t))
+                    var rows = catalogTracks.Select(ToCatalogTrackContentRow)
                         .Where(row => !_trackFavoritesOnly || row.IsFavorite)
                         .ToList();
                     UpdateAlphabetIndex(rows, true);
@@ -1911,65 +1901,19 @@ public partial class MainWindow : Window
         StatusTextBlock.Text = string.Empty;
     }
 
-    private ContentRow BuildOrynivoAlbumRow(OrynivoServerSettings server, OrynivoAlbumInfo a)
-    {
-        var row = new ContentRow
-        {
-            Id = a.Id,
-            Title = a.Album,
-            Artist = a.DisplayArtist ?? string.Empty,
-            Year = a.Year?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-            EntityType = "OrynivoAlbum",
-            ExternalId = a.Id.ToString(CultureInfo.InvariantCulture),
-            IsFavorite = IsOrynivoFavorite(server, "Album", a.Id)
-        };
-        var artUrl = OrynivoServerClient.GetAlbumArtworkUrl(server, a.Id, 96);
-        row.ArtworkPath = OrynivoServerClient.GetAlbumArtworkUrl(server, a.Id, 320);
-        row.ThumbnailPath = artUrl;
-        return row;
-    }
+    private OrynivoServerLibraryCatalogProvider CreateOrynivoCatalogProvider(OrynivoServerSettings server)
+        => new(server, _orynivoClient, (entityType, id) => IsOrynivoFavorite(server, entityType, id));
 
-    private ContentRow BuildOrynivoTrackRow(OrynivoServerSettings server, OrynivoTrackInfo t)
-    {
-        var streamUrl = OrynivoServerClient.GetStreamUrl(server, t.Id);
-        var span = t.Duration.HasValue ? TimeSpan.FromSeconds(t.Duration.Value) : TimeSpan.Zero;
-        var row = new ContentRow
-        {
-            Id = t.Id,
-            FilePath = streamUrl,
-            Title = t.Title ?? string.Empty,
-            Artist = t.Artist ?? string.Empty,
-            Album = t.Album ?? string.Empty,
-            Year = t.Year?.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-            TrackNumber = t.TrackNumber?.ToString(CultureInfo.InvariantCulture),
-            DiscNumber  = t.DiscNumber?.ToString(CultureInfo.InvariantCulture),
-            Duration    = span.TotalSeconds >= 3600
-                ? span.ToString(@"h\:mm\:ss")
-                : span.ToString(@"m\:ss"),
-            Bitrate    = t.Bitrate?.ToString(CultureInfo.InvariantCulture),
-            SampleRate = t.SampleRate?.ToString(CultureInfo.InvariantCulture),
-            BitDepth   = t.BitDepth?.ToString(CultureInfo.InvariantCulture),
-            Channels   = t.Channels?.ToString(CultureInfo.InvariantCulture),
-            Format     = t.Format ?? string.Empty,
-            IsFavorite = IsOrynivoFavorite(server, "Track", t.Id),
-            EntityType = "OrynivoTrack",
-            ExternalId = t.Id.ToString(CultureInfo.InvariantCulture),
-            KnownDuration = t.Duration.HasValue ? TimeSpan.FromSeconds(t.Duration.Value) : null
-        };
-        _orynivoTracksByUrl[streamUrl] = row;
-        return row;
-    }
-
-    private async Task<List<OrynivoTrackInfo>> LoadAllOrynivoTracksAsync(
-        OrynivoServerSettings server,
+    private static async Task<List<LibraryCatalogTrack>> LoadAllOrynivoTracksAsync(
+        ILibraryCatalogProvider provider,
         CancellationToken cancellationToken)
     {
         const int pageSize = 500;
-        var result = new List<OrynivoTrackInfo>();
+        var result = new List<LibraryCatalogTrack>();
         for (var page = 0; ; page++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var batch = await _orynivoClient.GetTracksAsync(server, page, pageSize, cancellationToken);
+            var batch = await provider.GetTracksAsync(page, pageSize, cancellationToken);
             result.AddRange(batch);
             if (batch.Count < pageSize)
                 return result;
@@ -2781,47 +2725,28 @@ public partial class MainWindow : Window
                     .Select(ToTrackContentRow)
                     .ToList(),
 
-                "Artists" => db.GetArtistsLite()
+                "Artists" => _localCatalogProvider.GetArtistsAsync()
+                    .GetAwaiter()
+                    .GetResult()
                     .Where(a => !_artistFavoritesOnly || a.IsFavorite)
-                    .Select(a => new ContentRow
-                    {
-                        Id       = a.Id,
-                        ArtistId = a.Id,
-                        Title    = string.IsNullOrEmpty(a.Artist) ? LocalizationManager.Current.Unknown : a.Artist,
-                        IsFavorite = a.IsFavorite,
-                        ArtworkPath = a.ImagePath,
-                        ThumbnailPath = a.ImagePath,
-                        Biography = a.Biography,
-                        SourceUrl = a.SourceUrl,
-                        ProfileLanguage = a.ProfileLanguage,
-                        ProfileFetchedAt = a.ProfileFetchedAt,
-                        ImageIsManual = a.ImageIsManual,
-                        EntityType = "Artist",
-                        FilePath = ""
-                    }).ToList(),
+                    .Select(ToCatalogArtistContentRow)
+                    .ToList(),
 
                 "Albums" => (_activeArtistFilterId is long artistId
-                        ? db.GetAlbumsByArtist(artistId, _showAlbumArtworkView)
-                        : db.GetAlbumsLite(_showAlbumArtworkView))
+                        ? _localCatalogProvider.GetAlbumsByArtistAsync(artistId, _showAlbumArtworkView)
+                        : _localCatalogProvider.GetAlbumsAsync(_showAlbumArtworkView))
+                    .GetAwaiter()
+                    .GetResult()
                     .Where(a => !_albumFavoritesOnly || a.IsFavorite)
-                    .Select(a => new ContentRow
-                    {
-                        Title    = string.IsNullOrEmpty(a.Album) ? LocalizationManager.Current.Unknown : a.Album,
-                        Id       = a.Id,
-                        AlbumId  = a.Id,
-                        Artist   = string.IsNullOrEmpty(a.DisplayArtist) ? null : a.DisplayArtist,
-                        Year     = a.Year?.ToString(),
-                        ArtworkPath = a.ArtworkPath,
-                        ThumbnailPath = a.ThumbnailPath,
-                        IsFavorite = a.IsFavorite,
-                        EntityType = "Album",
-                        FilePath = ""
-                    }).ToList(),
+                    .Select(ToCatalogAlbumContentRow)
+                    .ToList(),
 
                 _ => (_activeAlbumFilterId is long albumId
-                        ? db.GetTrackListByAlbum(albumId)
-                        : db.GetTrackList())  // "Tracks" und Fallback
-                    .Select(ToTrackContentRow)
+                        ? _localCatalogProvider.GetTracksByAlbumAsync(albumId)
+                        : _localCatalogProvider.GetTracksAsync())  // "Tracks" und Fallback
+                    .GetAwaiter()
+                    .GetResult()
+                    .Select(ToCatalogTrackContentRow)
                     .ToList()
             };
         }
@@ -2877,6 +2802,86 @@ public partial class MainWindow : Window
         ReplayGainAlbum = FormatReplayGainDisplay(t.ReplayGainAlbum),
         FilePath = t.Path,
         IsFavorite = t.IsFavorite
+    };
+
+    private ContentRow ToCatalogTrackContentRow(LibraryCatalogTrack track)
+    {
+        var row = new ContentRow
+        {
+            Title = track.Title?.Trim() ?? track.FileName.Trim(),
+            AlphabetIndexText = track.SortTitle?.Trim() ?? track.Title?.Trim() ?? track.FileName.Trim(),
+            Id = track.Id,
+            Artist = track.Artist,
+            Album = track.Album,
+            AlbumArtist = track.AlbumArtist,
+            Year = track.Year?.ToString(CultureInfo.CurrentCulture),
+            TrackNumber = FormatPartNumber(track.TrackNumber, track.TrackTotal),
+            DiscNumber = FormatPartNumber(track.DiscNumber, track.DiscTotal),
+            Duration = FormatSeconds(track.Duration),
+            Genre = track.Genre,
+            Format = track.Format?.ToUpperInvariant(),
+            Bitrate = track.Bitrate is > 0 ? $"{track.Bitrate:N0} kbps" : null,
+            SampleRate = track.SampleRate is > 0 ? $"{track.SampleRate:N0} Hz" : null,
+            BitDepth = track.BitDepth is > 0 ? $"{track.BitDepth:N0} Bit" : null,
+            Channels = track.Channels?.ToString(CultureInfo.CurrentCulture),
+            Composer = track.Composer,
+            Bpm = track.Bpm?.ToString(CultureInfo.CurrentCulture),
+            FileName = track.FileName,
+            FileSize = FormatFileSize(track.FileSize),
+            AddedAt = track.AddedAt.HasValue
+                ? DateTimeOffset.FromUnixTimeSeconds(track.AddedAt.Value)
+                    .ToLocalTime()
+                    .ToString("d", CultureInfo.CurrentCulture)
+                : null,
+            ReplayGainTrack = FormatReplayGainDisplay(track.ReplayGainTrack),
+            ReplayGainAlbum = FormatReplayGainDisplay(track.ReplayGainAlbum),
+            FilePath = track.PlaybackPath,
+            IsFavorite = track.IsFavorite,
+            EntityType = track.Source == LibraryCatalogSource.OrynivoServer ? "OrynivoTrack" : "Track",
+            ExternalId = track.Source == LibraryCatalogSource.OrynivoServer
+                ? track.Id.ToString(CultureInfo.InvariantCulture)
+                : null,
+            KnownDuration = track.KnownDuration
+        };
+        if (track.Source == LibraryCatalogSource.OrynivoServer)
+            _orynivoTracksByUrl[track.PlaybackPath] = row;
+        return row;
+    }
+
+    private static ContentRow ToCatalogAlbumContentRow(LibraryCatalogAlbum album) => new()
+    {
+        Id = album.Id,
+        AlbumId = album.Id,
+        Title = string.IsNullOrEmpty(album.Title) ? LocalizationManager.Current.Unknown : album.Title,
+        Artist = string.IsNullOrEmpty(album.DisplayArtist) ? null : album.DisplayArtist,
+        Year = album.Year?.ToString(CultureInfo.CurrentCulture),
+        ArtworkPath = album.ArtworkPath,
+        ThumbnailPath = album.ThumbnailPath,
+        IsFavorite = album.IsFavorite,
+        EntityType = album.Source == LibraryCatalogSource.OrynivoServer ? "OrynivoAlbum" : "Album",
+        ExternalId = album.Source == LibraryCatalogSource.OrynivoServer
+            ? album.Id.ToString(CultureInfo.InvariantCulture)
+            : null
+    };
+
+    private static ContentRow ToCatalogArtistContentRow(LibraryCatalogArtist artist) => new()
+    {
+        Id = artist.Id,
+        ArtistId = artist.Id,
+        Title = string.IsNullOrEmpty(artist.Name) ? LocalizationManager.Current.Unknown : artist.Name,
+        IsFavorite = artist.IsFavorite,
+        ArtworkPath = artist.ArtworkPath,
+        ThumbnailPath = artist.ThumbnailPath,
+        Biography = artist.Biography,
+        SourceUrl = artist.SourceUrl,
+        ProfileLanguage = artist.ProfileLanguage,
+        ProfileFetchedAt = artist.ProfileFetchedAt,
+        ImageIsManual = artist.ImageIsManual,
+        EntityType = artist.Source == LibraryCatalogSource.OrynivoServer ? "OrynivoArtist" : "Artist",
+        ExternalId = artist.Source == LibraryCatalogSource.OrynivoServer
+            ? artist.Id.ToString(CultureInfo.InvariantCulture)
+            : null,
+        FilePath = ""
     };
 
     private static TrackListInfo ToTrackListInfo(TrackRecord track) => new(
@@ -3778,10 +3783,21 @@ public partial class MainWindow : Window
 
         var scrollViewer = listBox.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
         if (scrollViewer is null)
+        {
+            HydrateInitialArtworkRows(rows);
+            Dispatcher.UIThread.Post(() => QueueHydrateVisibleArtworkRows(listBox), DispatcherPriority.Loaded);
             return;
+        }
 
         var itemWidth = ReferenceEquals(listBox, AlbumArtworkListBox) ? 196d : 216d;
         var itemHeight = ReferenceEquals(listBox, AlbumArtworkListBox) ? 292d : 260d;
+        if (scrollViewer.Viewport.Width <= 0 || scrollViewer.Viewport.Height <= 0)
+        {
+            HydrateInitialArtworkRows(rows);
+            Dispatcher.UIThread.Post(() => QueueHydrateVisibleArtworkRows(listBox), DispatcherPriority.Loaded);
+            return;
+        }
+
         var perRow = Math.Max(1, (int)Math.Floor(scrollViewer.Viewport.Width / itemWidth));
         var firstRow = Math.Max(0, (int)Math.Floor(scrollViewer.Offset.Y / itemHeight) - 1);
         var lastRow = Math.Min(
@@ -3789,6 +3805,17 @@ public partial class MainWindow : Window
             (int)Math.Ceiling((scrollViewer.Offset.Y + scrollViewer.Viewport.Height) / itemHeight) + 1);
 
         for (var index = firstRow * perRow; index < rows.Count && index <= ((lastRow + 1) * perRow) - 1; index++)
+        {
+            QueueArtworkHydration(rows[index]);
+            if (rows[index].EntityType == "Artist")
+                _ = EnsureArtistProfileAsync(rows[index]);
+        }
+    }
+
+    private void HydrateInitialArtworkRows(IReadOnlyList<ContentRow> rows)
+    {
+        var count = Math.Min(ArtworkPageSize, rows.Count);
+        for (var index = 0; index < count; index++)
         {
             QueueArtworkHydration(rows[index]);
             if (rows[index].EntityType == "Artist")
@@ -3835,7 +3862,7 @@ public partial class MainWindow : Window
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
             row.ArtworkLoadQueued = false;
-            row.ArtworkLoadCompleted = true;
+            row.ArtworkLoadCompleted = image is not null || !IsHttpUrl(path);
             if (string.Equals(row.ArtworkPath, path, StringComparison.OrdinalIgnoreCase))
                 row.Artwork = image;
         }, DispatcherPriority.Background);
@@ -3872,7 +3899,7 @@ public partial class MainWindow : Window
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
             row.ThumbnailLoadQueued = false;
-            row.ThumbnailLoadCompleted = true;
+            row.ThumbnailLoadCompleted = image is not null || !IsHttpUrl(url);
             if (string.Equals(row.ThumbnailPath, url, StringComparison.OrdinalIgnoreCase))
                 row.Thumbnail = image;
         }, DispatcherPriority.Background);
@@ -5473,12 +5500,23 @@ public partial class MainWindow : Window
         if (sender is not Button { Tag: ContentRow row })
             return;
 
+        if (row.EntityType == "OrynivoAlbum" &&
+            _activeOrynivoServer is not null &&
+            long.TryParse(row.ExternalId, out var remoteAlbumId))
+        {
+            await OpenOrynivoAlbumCoverSearchAsync(_activeOrynivoServer, remoteAlbumId, row);
+            return;
+        }
+
         await OpenCoverSearchAsync(row);
     }
 
     private async void DeleteCoverMenuItem_OnClick(object? sender, RoutedEventArgs e)
     {
-        if (sender is not MenuItem { Tag: ContentRow { Id: long albumId } })
+        if (sender is not MenuItem { Tag: ContentRow { Id: long albumId } row })
+            return;
+
+        if (row.EntityType == "OrynivoAlbum")
             return;
 
         var verticalOffset = CaptureCurrentVerticalOffset();
@@ -5495,6 +5533,14 @@ public partial class MainWindow : Window
     {
         if (sender is not MenuItem { Tag: ContentRow row })
             return;
+
+        if (row.EntityType == "OrynivoAlbum" &&
+            _activeOrynivoServer is not null &&
+            long.TryParse(row.ExternalId, out var remoteAlbumId))
+        {
+            await OpenOrynivoAlbumCoverSearchAsync(_activeOrynivoServer, remoteAlbumId, row);
+            return;
+        }
 
         await OpenCoverSearchAsync(row);
     }
@@ -5596,8 +5642,7 @@ public partial class MainWindow : Window
         if (await dialog.ShowDialog<bool>(this) == false || dialog.SelectedResult is not { } selected)
             return;
 
-        using (var db = AudioDatabase.OpenDefault())
-            db.AttachArtworkToAlbum(albumId, selected.ImageData, selected.MimeType);
+        await _localCatalogProvider.SetAlbumArtworkAsync(albumId, selected.ImageData, selected.MimeType);
 
         if (_activeAlbumFilterId == albumId)
             await ReloadAlbumDetailHeaderAsync(albumId);
@@ -5614,17 +5659,16 @@ public partial class MainWindow : Window
         if (await dialog.ShowDialog<bool>(this) == false || dialog.SelectedResult is not { } selected)
             return;
 
-        var uploaded = await _orynivoClient.UploadAlbumArtworkAsync(
-            server,
-            albumId,
-            selected.ImageData,
-            selected.MimeType);
+        var provider = CreateOrynivoCatalogProvider(server);
+        var uploaded = await provider.SetAlbumArtworkAsync(albumId, selected.ImageData, selected.MimeType);
         if (!uploaded)
         {
             StatusTextBlock.Text = LocalizationManager.Current.OrynivoConnectionFailed;
             return;
         }
 
+        row.ArtworkPath ??= OrynivoServerClient.GetAlbumArtworkUrl(server, albumId, 320);
+        row.ThumbnailPath ??= OrynivoServerClient.GetAlbumArtworkUrl(server, albumId, 96);
         ApplyRemoteArtwork(row, selected.ImageData);
         StatusTextBlock.Text = string.Empty;
     }
@@ -6082,6 +6126,20 @@ public partial class MainWindow : Window
         // Vorherige dynamisch hinzugefügte Playlist-Einträge entfernen (erste 2: DeleteCover, ReassignCover)
         while (menu.Items.Count > 2)
             menu.Items.RemoveAt(menu.Items.Count - 1);
+
+        var isRemoteAlbum = row.EntityType == "OrynivoAlbum";
+        if (menu.Items.Count > 0 && menu.Items[0] is MenuItem deleteItem)
+            deleteItem.IsVisible = !isRemoteAlbum;
+        if (menu.Items.Count > 1 && menu.Items[1] is MenuItem reassignItem)
+        {
+            reassignItem.Header = isRemoteAlbum
+                ? LocalizationManager.Current.SearchCover
+                : LocalizationManager.Current.ReassignCover;
+            reassignItem.IsVisible = true;
+        }
+
+        if (isRemoteAlbum)
+            return;
 
         AppendPlaylistItems(menu, GetPathsForRow(row));
     }
@@ -10121,6 +10179,7 @@ public partial class MainWindow : Window
             var orynivoServersChanged = !OrynivoServerSettingsEqual(
                 _settings.OrynivoServers,
                 window.SelectedOrynivoServers);
+            var hadOrynivoServers = _settings.OrynivoServers.Count > 0;
             var outputChanged =
                 _settings.OutputBackend != window.SelectedOutputBackend ||
                 !string.Equals(
@@ -10155,6 +10214,8 @@ public partial class MainWindow : Window
             _settings.QobuzApplicationId      = window.SelectedQobuzApplicationId;
             _settings.PlexServers             = window.SelectedPlexServers.ToList();
             _settings.OrynivoServers          = window.SelectedOrynivoServers.ToList();
+            if (!hadOrynivoServers && _settings.OrynivoServers.Count > 0)
+                _settings.IsOrynivoServerSectionExpanded = true;
             _settings.McpServerEnabled        = window.McpServerEnabled;
             _settings.McpServerPort           = window.McpServerPort;
             _settings.DisabledMcpTools        = window.DisabledMcpTools;

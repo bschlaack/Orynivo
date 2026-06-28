@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Added a shared local/remote library catalog provider layer in the Windows
+  client. Local `AudioDatabase` rows and remote Orynivo Server responses now map
+  into common artist, album, and track models before reaching the reusable UI
+  masks.
 - Remote Orynivo Server albums and artists now support artwork management from
   the Windows client. The client runs the existing cover/artist-image searches,
   uploads the selected image bytes to the server, and the server stores them in
@@ -27,11 +31,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Moved the Orynivo Server accordion in the main sidebar directly below
   Local Library.
+- Orynivo Server track DTOs now include the extended metadata needed by the
+  shared track tables, including genre, totals, composer, BPM, file size, added
+  date, and ReplayGain values when available.
+- Settings navigation group headings are now consistently uppercase in every
+  supported language.
+- Settings navigation child items now keep normal title casing even when their
+  parent group heading is uppercase.
+- Orynivo Server connection settings now live under their own Settings >
+  Library > Orynivo Server entry instead of Settings > Streaming services or
+  the local directories page.
 
 ### Fixed
 
 - Remote Orynivo Server artist-info buttons now open the selected server artist
   instead of treating the server artist ID as a local library artist ID.
+- Remote Orynivo Server album and artist artwork grids now load existing
+  artwork on initial navigation instead of showing placeholders until a later
+  artwork assignment refreshes the rows.
+- The remote Orynivo Server album artwork button and cover context menu now use
+  the remote server artwork upload path instead of accidentally switching the
+  view to the local album library.
+- Adding the first Orynivo Server now expands and rebuilds the sidebar section
+  so the configured server appears under the Orynivo Server header after saving.
+- Orynivo Server scans now run a missing-album-artwork repair pass after full
+  scans and use physical source paths for CUE albums, allowing existing embedded
+  covers to populate server-side album artwork even when tracks were otherwise
+  unchanged.
+- Orynivo Server album artwork requests now fall back to an on-demand embedded
+  artwork repair for the requested album, so existing file covers can appear
+  without a manual client-side cover assignment.
+- Artwork file caches are now verified against the current application data
+  root. If a server database contains artwork rows whose cached image files are
+  missing or point to another environment, the original and thumbnail files are
+  recreated from the SQLite artwork payload and the stored paths are updated.
+- Album artwork endpoints now repair missing cached image files for the
+  requested album on demand and fall back to the original artwork file when a
+  requested thumbnail file is unavailable.
+- The Linux Orynivo Server project now references the SkiaSharp native Linux
+  assets so album-artwork thumbnail generation works in headless deployments
+  without requiring an external image conversion tool.
+- Orynivo Server folder browsing now materializes `/api/folders/tracks` before
+  disposing SQLite, fixing the closed-connection exception that prevented the
+  remote folder structure from loading.
 
 ## [0.15.0] - 2026-06-27
 

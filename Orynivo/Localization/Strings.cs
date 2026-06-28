@@ -152,6 +152,10 @@ public sealed record LocalizedStrings(
     public string WasapiOutputDevice { get; init; } = "";
     public string DeviceInfo { get; init; } = "";
     public string DatabaseOptimizeHint { get; init; } = "";
+    /// <summary>Gets the normal-case Appearance navigation item label.</summary>
+    public string AppearanceNavItem { get; init; } = "";
+    /// <summary>Gets the normal-case artist information navigation item label.</summary>
+    public string ArtistInfoNavItem { get; init; } = "";
     public string NormalizeArtists { get; init; } = "";
     public string NormalizeArtistsHint { get; init; } = "";
     public string ArtistsNormalizing { get; init; } = "";

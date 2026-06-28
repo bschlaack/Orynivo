@@ -40,7 +40,9 @@ library — provides `GetArtistsAsync`, `GetAlbumsByArtistAsync`, `GetAlbumsAsyn
 `GetTracksByAlbumAsync`, `GetTracksAsync`, `TestConnectionAsync`, and static URL
 helpers `GetStreamUrl`/`GetAlbumArtworkUrl`/`GetArtistArtworkUrl`; also uploads
 client-selected album and artist artwork through `UploadAlbumArtworkAsync` and
-`UploadArtistImageAsync`).
+`UploadArtistImageAsync`; remote track DTOs mirror the local list metadata used
+by shared table masks, including genre, track/disc totals, composer, BPM, file
+size, added date, and ReplayGain fields when the server supports them).
 
 **Access control:** `InternalsVisibleTo("Orynivo")` is set in `AssemblyInfo.cs`
 so the Orynivo Windows app can access internal Core members (audio-processing
@@ -93,6 +95,10 @@ artifact therefore contains cwASIO support without Steinberg SDK files.
 `Orynivo.Server` is a `net8.0` ASP.NET Core Minimal API server that exposes
 the local music library over the network. It references `Orynivo.Core` and has
 no Windows-specific dependencies; it runs on Windows, Linux, and macOS.
+The server project references `SkiaSharp.NativeAssets.Linux.NoDependencies` so
+Linux packages include the native SkiaSharp library required for artwork
+thumbnail generation; do not replace this with an external ImageMagick/convert
+runtime dependency.
 
 **Configuration** (`appsettings.json`, section `Orynivo`):
 
@@ -125,13 +131,16 @@ no Windows-specific dependencies; it runs on Windows, Linux, and macOS.
   client-refreshed biography/source fields plus optional image bytes; Last.fm
   or Wikipedia requests run on the client, not on the server; `GET`
   `/api/folders/tracks` returns lightweight track rows for building the remote
-  server library folder tree
+  server library folder tree and must materialize the response before disposing
+  the SQLite connection because JSON serialization runs after the route handler
+  returns
 - `Orynivo.Server/Endpoints/StreamEndpoints.cs`: byte-range streaming for
   regular audio files; on-the-fly FLAC transcode via FFmpeg pipe for CUE
-  virtual tracks; album, artist, and track artwork endpoints; `PUT`
-  `/api/artwork/album/{id}` and `/api/artwork/artist/{id}` accept raw image
-  bytes from authenticated clients and store them in the server-side artwork
-  caches
+  virtual tracks; album, artist, and track artwork endpoints; album artwork
+  requests fall back to an on-demand embedded-artwork repair for the requested
+  album before returning 404; `PUT` `/api/artwork/album/{id}` and
+  `/api/artwork/artist/{id}` accept raw image bytes from authenticated clients
+  and store them in the server-side artwork caches
 - `Orynivo.Server/Endpoints/ConfigurationEndpoints.cs`: authenticated
   `/api/settings/library-paths` GET/PUT and `/api/files/directories?path=`
   endpoints; PUT persists `Orynivo:LibraryPaths` to `appsettings.json`,
@@ -182,6 +191,12 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
   Transport Controls host for global media buttons, lock-screen/system-overlay
   metadata, artwork, playback status, and timeline updates; its `MediaPlayer`
   instance is control-only and never outputs Orynivo audio
+- `Orynivo/LibraryCatalogProviders.cs`: shared catalog abstraction for local
+  and remote Orynivo libraries. `ILibraryCatalogProvider` exposes common
+  artist, album, track, search, and album-artwork operations; `LocalLibraryCatalogProvider`
+  maps `AudioDatabase` rows, and `OrynivoServerLibraryCatalogProvider` maps
+  `OrynivoServerClient` responses into the same UI-facing models so library
+  masks can be reused instead of branching on local vs. server rows.
 - `Orynivo/Audio/WindowsEndpointVolumeSynchronizer.cs`: bidirectional
   synchronization between the transport volume slider and the selected
   Windows render endpoint's master volume
@@ -217,6 +232,9 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
   enable/disable checkboxes for all 19 tools (stored in
   `AppSettings.DisabledMcpTools`); `NavigateToSection("Mcp")` jumps there;
   the tool `UniformGrid` has `Rows="10"` for 19 tools (2 columns)
+  Remote Orynivo Server connection management belongs under its own
+  **Orynivo Server** navigation item in the **BIBLIOTHEK** settings group, not
+  under local directories or Streaming.
 - `Orynivo/Mcp/McpPlayerBridge.cs`: thread-safe bridge between the MCP layer
   and Avalonia's UI thread; `MainWindow` populates all delegate properties at
   startup; `OnUiAsync` dispatches to `Dispatcher.UIThread` at
@@ -546,6 +564,10 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
   from each physical album.
 - Settings includes **Repair album artwork**, which re-reads a sample file per
   album through TagLib when historical assignments are missing
+- Orynivo Server full scans run the same missing-album-artwork repair after
+  scanning configured roots, so unchanged tracks with embedded covers can still
+  populate missing server-side album artwork. The repair sample query must use
+  physical `source_path` for CUE/virtual tracks instead of the `cue://` path.
 - Settings includes **Download missing artwork**, using Cover Art Archive for
   albums with a `musicbrainz_release_id`
 - Missing covers show a placeholder and manual MusicBrainz search by editable
@@ -570,6 +592,10 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
 - The main window starts maximized
 - `artwork_files_v1` exports legacy artwork BLOBs into the file cache;
   `artworks.data` remains for compatibility with old `NOT NULL` schemas
+  Artwork file paths are also verified per current app-data artwork root; when
+  cached files are missing or point to another environment, originals and
+  thumbnails are recreated from `artworks.data` and the stored paths are
+  updated.
 - Thumbnail generation is intentionally fault tolerant; invalid embedded artwork
   must not prevent startup
 - `normalized_library_v1` prevents expensive legacy migration checks on every
@@ -977,6 +1003,11 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
 - Settings opens inside the main window and uses a two-column layout with
   navigation on the left and content on the right
 - Settings navigation reuses the main sidebar theme resources
+- Settings navigation group headings must be uppercase in every supported
+  language, including **WIEDERGABE/PLAYBACK**, **BIBLIOTHEK/LIBRARY**,
+  **DARSTELLUNG/APPEARANCE**, **KÜNSTLERINFO/ARTIST INFORMATION**, and
+  **INTEGRATION**. Child navigation items under those headings use normal
+  language-specific title casing, not all caps.
 - All Settings buttons use the shared themed button style, including dynamic
   scan and remove buttons
 - Settings ComboBoxes use fully themed templates, inputs should stretch to the

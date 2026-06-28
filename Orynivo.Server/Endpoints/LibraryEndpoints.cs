@@ -23,7 +23,7 @@ public static class LibraryEndpoints
         api.MapGet("/artists", () =>
         {
             using var db = AudioDatabase.OpenDefault();
-            return Results.Ok(db.GetArtistsWithProfiles().Select(ArtistDto));
+            return Results.Ok(db.GetArtistsWithProfiles().Select(ArtistDto).ToList());
         });
 
         api.MapGet("/artists/{artistId:long}", (long artistId) =>
@@ -68,8 +68,8 @@ public static class LibraryEndpoints
             using var db = AudioDatabase.OpenDefault();
             var artist = db.GetArtistById(artistId);
             if (artist is null) return Results.NotFound();
-            var albums = db.GetAlbumsByArtist(artistId, includeArtwork: false);
-            return Results.Ok(albums.Select(AlbumDto));
+            var albums = db.GetAlbumsByArtist(artistId, includeArtwork: true);
+            return Results.Ok(albums.Select(AlbumDto).ToList());
         });
 
         // --- Albums --------------------------------------------------------
@@ -77,7 +77,7 @@ public static class LibraryEndpoints
         api.MapGet("/albums", () =>
         {
             using var db = AudioDatabase.OpenDefault();
-            return Results.Ok(db.GetAlbumsLite(includeArtwork: false).Select(AlbumDto));
+            return Results.Ok(db.GetAlbumsLite(includeArtwork: true).Select(AlbumDto).ToList());
         });
 
         api.MapGet("/albums/{albumId:long}/tracks", (long albumId) =>
@@ -86,7 +86,7 @@ public static class LibraryEndpoints
             var tracks = db.GetTrackListByAlbum(albumId);
             return tracks.Count == 0
                 ? Results.NotFound()
-                : Results.Ok(tracks.Select(TrackDto));
+                : Results.Ok(tracks.Select(TrackDto).ToList());
         });
 
         // --- Tracks --------------------------------------------------------
@@ -94,10 +94,12 @@ public static class LibraryEndpoints
         api.MapGet("/tracks", (int page = 0, int pageSize = 500) =>
         {
             using var db = AudioDatabase.OpenDefault();
-            return Results.Ok(db.GetTrackList()
+            var tracks = db.GetTrackList()
                 .Skip(page * pageSize)
                 .Take(pageSize)
-                .Select(TrackDto));
+                .Select(TrackDto)
+                .ToList();
+            return Results.Ok(tracks);
         });
 
         api.MapGet("/tracks/{trackId:long}", (long trackId) =>
@@ -112,7 +114,7 @@ public static class LibraryEndpoints
         api.MapGet("/folders/tracks", () =>
         {
             using var db = AudioDatabase.OpenDefault();
-            return Results.Ok(db.GetTracksLite().Select(t => new
+            var tracks = db.GetTracksLite().Select(t => new
             {
                 Id = db.GetTrackIdByPath(t.Path) ?? 0,
                 t.Path,
@@ -121,7 +123,8 @@ public static class LibraryEndpoints
                 t.Title,
                 t.DiscNumber,
                 t.TrackNumber
-            }));
+            }).ToList();
+            return Results.Ok(tracks);
         });
 
         // --- Playlists -----------------------------------------------------
@@ -129,7 +132,7 @@ public static class LibraryEndpoints
         api.MapGet("/playlists", () =>
         {
             using var db = AudioDatabase.OpenDefault();
-            return Results.Ok(db.GetAllPlaylists().Select(p => new
+            var playlists = db.GetAllPlaylists().Select(p => new
             {
                 p.Id,
                 p.Name,
@@ -138,7 +141,8 @@ public static class LibraryEndpoints
                 p.IsSmartPlaylist,
                 p.CreatedAt,
                 p.ModifiedAt
-            }));
+            }).ToList();
+            return Results.Ok(playlists);
         });
 
         api.MapGet("/playlists/{playlistId:long}/tracks", (long playlistId) =>
@@ -157,11 +161,11 @@ public static class LibraryEndpoints
                 var resolved = criteria.Resolve(candidates);
                 var ids = resolved.Select(t => t.Id).ToList();
                 var tracks = db.GetTrackListByIds(ids);
-                return Results.Ok(tracks.Select(TrackDto));
+                return Results.Ok(tracks.Select(TrackDto).ToList());
             }
 
             var entries = db.GetPlaylistTracks(playlistId);
-            return Results.Ok(entries.Select(e => new
+            var playlistTracks = entries.Select(e => new
             {
                 e.Id,
                 e.PlaylistId,
@@ -169,7 +173,8 @@ public static class LibraryEndpoints
                 e.TrackId,
                 e.Position,
                 e.AddedAt
-            }));
+            }).ToList();
+            return Results.Ok(playlistTracks);
         });
 
         // --- Search --------------------------------------------------------
@@ -183,7 +188,7 @@ public static class LibraryEndpoints
             if (ids.Count == 0) return Results.Ok(new { tracks = Array.Empty<object>() });
 
             using var db = AudioDatabase.OpenDefault();
-            return Results.Ok(new { tracks = db.GetTrackListByIds(ids).Select(TrackDto) });
+            return Results.Ok(new { tracks = db.GetTrackListByIds(ids).Select(TrackDto).ToList() });
         });
 
         api.MapGet("/search/full", (string q, int limit = 30) =>
@@ -207,7 +212,7 @@ public static class LibraryEndpoints
             using var db = AudioDatabase.OpenDefault();
 
             var tracks  = trackIds.Count  > 0 ? db.GetTrackListByIds(trackIds).Select(TrackDto).ToList()  : [];
-            var albums  = albumIds.Count  > 0 ? db.GetAlbumsLite().Where(a => albumIds.Contains(a.Id)).Select(AlbumDto).ToList() : [];
+            var albums  = albumIds.Count  > 0 ? db.GetAlbumsLite(includeArtwork: true).Where(a => albumIds.Contains(a.Id)).Select(AlbumDto).ToList() : [];
             var artists = artistIds.Count > 0
                 ? db.GetArtistsLite().Where(a => artistIds.Contains(a.Id)).Select(a => new { a.Id, Name = a.Artist, a.IsFavorite }).ToList()
                 : [];
@@ -227,14 +232,23 @@ public static class LibraryEndpoints
         t.Artist,
         t.AlbumArtist,
         t.Album,
+        t.Genre,
         t.Year,
         t.TrackNumber,
+        t.TrackTotal,
         t.DiscNumber,
+        t.DiscTotal,
         t.Duration,
         t.Bitrate,
         t.SampleRate,
         t.BitDepth,
         t.Channels,
+        t.Composer,
+        t.Bpm,
+        t.FileSize,
+        t.AddedAt,
+        t.ReplayGainTrack,
+        t.ReplayGainAlbum,
         t.Format,
         t.IsFavorite,
         IsCueTrack = t.Path.StartsWith("cue://", StringComparison.OrdinalIgnoreCase)
