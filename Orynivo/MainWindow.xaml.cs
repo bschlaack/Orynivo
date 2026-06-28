@@ -107,6 +107,8 @@ public partial class MainWindow : Window
     private string? _activeAlbumFilterTitle;
     private long? _activeArtistFilterId;
     private string? _activeArtistFilterName;
+    private ILibraryCatalogProvider? _activeAlbumCatalogProvider;
+    private LibraryCatalogAlbum? _activeCatalogAlbum;
     private bool _showAllAlbumTracks;
     private bool _updatingAlbumTrackScope;
     private readonly List<DataGrid> _albumFolderGroupGrids = [];
@@ -223,7 +225,8 @@ public partial class MainWindow : Window
         long? ArtistFilterId,
         string? ArtistFilterName,
         string? SearchQuery = null,
-        double? VerticalOffset = null);
+        double? VerticalOffset = null,
+        string? NavigationTag = null);
 
     private sealed class RadioStationViewModel
     {
@@ -1373,6 +1376,8 @@ public partial class MainWindow : Window
         _activeAlbumFilterTitle = null;
         _activeArtistFilterId = null;
         _activeArtistFilterName = null;
+        _activeAlbumCatalogProvider = null;
+        _activeCatalogAlbum = null;
         _plexNavigationStack.Clear();
         if (clearNavigationHistory)
             _navigationStack.Clear();
@@ -1411,10 +1416,11 @@ public partial class MainWindow : Window
             return new NavigationState(
                 "OrynivoAlbumTracks",
                 orynivoAlbumId,
-                null,
-                _currentTopLevelTag,
+                _activeArtistFilterId,
+                _activeArtistFilterName,
                 _activeAlbumFilterTitle,
-                CaptureCurrentVerticalOffset());
+                CaptureCurrentVerticalOffset(),
+                _currentTopLevelTag);
         }
 
         if (_activeAlbumFilterId is long albumId)
@@ -1991,7 +1997,7 @@ public partial class MainWindow : Window
                     IReadOnlyList<LibraryCatalogTrack> catalogTracks;
                     if (filterAlbumId.HasValue)
                     {
-                        catalogTracks = await provider.GetTracksByAlbumAsync(filterAlbumId.Value, ct);
+                        catalogTracks = await provider.GetTracksByAlbumAsync(filterAlbumId.Value, filterArtistId, ct);
                     }
                     else
                     {
@@ -5257,6 +5263,8 @@ public partial class MainWindow : Window
     {
         PushCurrentNavigationState();
         _orynivoNavigationStack.Push((_activeOrynivoView, null, null));
+        _activeArtistFilterId = artistId;
+        _activeArtistFilterName = title;
         ContentTitleTextBlock.Text = $"{_activeOrynivoServer?.Name} · {title}";
         BackButton.IsVisible = true;
         await LoadOrynivoViewAsync(filterArtistId: artistId);
@@ -5285,7 +5293,7 @@ public partial class MainWindow : Window
                         null,
                         null,
                         IsOrynivoFavorite(_activeOrynivoServer, "Album", albumId));
-        await ShowProviderAlbumTracksAsync(provider, album);
+        await ShowProviderAlbumTracksAsync(provider, album, _activeArtistFilterId, _activeArtistFilterName);
     }
 
     private async Task OpenOrynivoAlbumTracksAsync(ContentRow row)
@@ -5311,13 +5319,15 @@ public partial class MainWindow : Window
                         row.ThumbnailPath,
                         row.IsFavorite,
                         row.ArtistId);
-        await ShowProviderAlbumTracksAsync(provider, album);
+        await ShowProviderAlbumTracksAsync(provider, album, _activeArtistFilterId, _activeArtistFilterName);
     }
 
     private async Task RestoreOrynivoAlbumTracksAsync(
         string? navigationTag,
         long albumId,
         string? albumTitle,
+        long? artistFilterId,
+        string? artistFilterName,
         double? verticalOffset)
     {
         if (string.IsNullOrWhiteSpace(navigationTag))
@@ -5339,7 +5349,7 @@ public partial class MainWindow : Window
                         null,
                         null,
                         IsOrynivoFavorite(_activeOrynivoServer, "Album", albumId));
-        await ShowProviderAlbumTracksAsync(provider, album);
+        await ShowProviderAlbumTracksAsync(provider, album, artistFilterId, artistFilterName);
         RestoreSelectionFromCurrentItems(null, verticalOffset);
     }
 
@@ -5405,6 +5415,8 @@ public partial class MainWindow : Window
         PushCurrentNavigationState();
         _activeAlbumFilterId = albumId;
         _activeAlbumFilterTitle = albumTitle;
+        _activeAlbumCatalogProvider = null;
+        _activeCatalogAlbum = null;
         _showAllAlbumTracks = false;
         UpdateLibraryIntroCard(null);
         UpdateEntityFavoritesFilterToggle(null);
@@ -5498,16 +5510,22 @@ public partial class MainWindow : Window
 
     private async Task ShowProviderAlbumTracksAsync(
         ILibraryCatalogProvider provider,
-        LibraryCatalogAlbum album)
+        LibraryCatalogAlbum album,
+        long? artistFilterId = null,
+        string? artistFilterName = null)
     {
         _activeAlbumFilterId = album.Id;
         _activeAlbumFilterTitle = album.Title;
+        _activeArtistFilterId = artistFilterId;
+        _activeArtistFilterName = artistFilterName;
+        _activeAlbumCatalogProvider = provider;
+        _activeCatalogAlbum = album;
         _showAllAlbumTracks = false;
         UpdateLibraryIntroCard(null);
         UpdateEntityFavoritesFilterToggle(null);
         _updatingAlbumTrackScope = true;
         ShowAllAlbumTracksCheckBox.IsChecked = false;
-        ShowAllAlbumTracksCheckBox.IsVisible = false;
+        ShowAllAlbumTracksCheckBox.IsVisible = artistFilterId.HasValue;
         _updatingAlbumTrackScope = false;
         ContentTitleTextBlock.Text = $"{LocalizationManager.Current.Tracks} · {album.Title}";
         AlbumViewModeBorder.IsVisible = false;
@@ -5521,7 +5539,19 @@ public partial class MainWindow : Window
         PodcastView.IsVisible = false;
         UpdateAlphabetIndex(null, false);
 
-        var catalogTracks = await provider.GetTracksByAlbumAsync(album.Id);
+        await ReloadVisibleProviderAlbumTracksAsync();
+    }
+
+    private async Task ReloadVisibleProviderAlbumTracksAsync()
+    {
+        if (_activeAlbumCatalogProvider is not { } provider ||
+            _activeCatalogAlbum is not { } album)
+        {
+            return;
+        }
+
+        var artistId = _showAllAlbumTracks ? null : _activeArtistFilterId;
+        var catalogTracks = await provider.GetTracksByAlbumAsync(album.Id, artistId);
         var rows = catalogTracks.Select(ToCatalogTrackContentRow).ToList();
         var groupedRows = rows
             .GroupBy(row => (
@@ -5579,7 +5609,10 @@ public partial class MainWindow : Window
             return;
 
         _showAllAlbumTracks = ShowAllAlbumTracksCheckBox.IsChecked == true;
-        await ReloadVisibleAlbumTracksAsync();
+        if (_activeAlbumCatalogProvider is not null)
+            await ReloadVisibleProviderAlbumTracksAsync();
+        else
+            await ReloadVisibleAlbumTracksAsync();
     }
 
     private void ApplyAlbumDetailHeader(AlbumInfo? album)
@@ -6197,9 +6230,11 @@ public partial class MainWindow : Window
 
             case "OrynivoAlbumTracks" when state.SelectedId is long albumId:
                 await RestoreOrynivoAlbumTracksAsync(
-                    state.ArtistFilterName,
+                    state.NavigationTag,
                     albumId,
                     state.SearchQuery,
+                    state.ArtistFilterId,
+                    state.ArtistFilterName,
                     state.VerticalOffset);
                 return;
 

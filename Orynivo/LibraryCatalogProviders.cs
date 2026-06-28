@@ -172,9 +172,10 @@ internal interface ILibraryCatalogProvider
 
     /// <summary>Loads tracks for an album from the provider.</summary>
     /// <param name="albumId">Provider-local album identifier.</param>
+    /// <param name="artistId">Optional provider-local primary-artist filter.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Track rows.</returns>
-    Task<IReadOnlyList<LibraryCatalogTrack>> GetTracksByAlbumAsync(long albumId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<LibraryCatalogTrack>> GetTracksByAlbumAsync(long albumId, long? artistId = null, CancellationToken cancellationToken = default);
 
     /// <summary>Searches tracks in the provider.</summary>
     /// <param name="query">Search query.</param>
@@ -253,11 +254,11 @@ internal sealed class LocalLibraryCatalogProvider : ILibraryCatalogProvider
     }
 
     /// <inheritdoc/>
-    public Task<IReadOnlyList<LibraryCatalogTrack>> GetTracksByAlbumAsync(long albumId, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<LibraryCatalogTrack>> GetTracksByAlbumAsync(long albumId, long? artistId = null, CancellationToken cancellationToken = default)
     {
         using var db = AudioDatabase.OpenDefault();
         return Task.FromResult<IReadOnlyList<LibraryCatalogTrack>>(
-            db.GetTrackListByAlbum(albumId).Select(ToTrack).ToList());
+            db.GetTrackListByAlbum(albumId, artistId).Select(ToTrack).ToList());
     }
 
     /// <inheritdoc/>
@@ -411,10 +412,13 @@ internal sealed class OrynivoServerLibraryCatalogProvider : ILibraryCatalogProvi
     }
 
     /// <inheritdoc/>
-    public async Task<IReadOnlyList<LibraryCatalogTrack>> GetTracksByAlbumAsync(long albumId, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<LibraryCatalogTrack>> GetTracksByAlbumAsync(long albumId, long? artistId = null, CancellationToken cancellationToken = default)
     {
         var tracks = await _client.GetTracksByAlbumAsync(_server, albumId, cancellationToken);
-        return tracks.Select(ToTrack).ToList();
+        return tracks
+            .Where(track => artistId is null || track.ArtistId == artistId)
+            .Select(ToTrack)
+            .ToList();
     }
 
     /// <inheritdoc/>

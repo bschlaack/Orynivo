@@ -218,6 +218,9 @@ byte-range streaming without FFmpeg.
 - Remote Orynivo Server artist-info pages support renaming/merging artists and
   assigning Wikimedia artist images. The Windows client performs the image
   search and uploads the selected image to the server.
+- Opening a remote server album from a selected artist initially scopes the
+  album tracks to that artist, with the same checkbox used by local albums to
+  show every track on the album.
 - Remote Orynivo Server artists, albums, and tracks can be marked as favorites;
   those favorite flags are stored only in the Windows client's settings.
 - Remote Orynivo Server album covers and artist images can be searched from the

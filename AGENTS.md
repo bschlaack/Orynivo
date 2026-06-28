@@ -394,7 +394,10 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
   Remote album drill-downs use the shared provider-backed album-track detail
   surface with the same album header/card, cover actions, favorite toggle, and
   grouped track tables as local albums; do not route server albums to a separate
-  plain track-list view. Persisting remote album tracks as local playlists must
+  plain track-list view. When a remote album is opened from a remote artist's
+  album list, the detail view must initially scope tracks to that artist and
+  expose the same **Show all album tracks** checkbox used by local album
+  details. Persisting remote album tracks as local playlists must
   remain disabled because the paths contain credential-bearing server URLs.
   Back navigation must capture remote album details as remote states carrying
   the Orynivo Server navigation tag; never restore a remote album detail through

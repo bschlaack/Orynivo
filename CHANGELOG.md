@@ -29,8 +29,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   artist-info button, thumbnails, the full set of optional track columns, the
   intro card, and the per-entity Favorites-only toggle. Clicking an artist/album
   link or double-clicking navigates within the remote library.
-- The remote Tracks view gained the same Genre/Audio-Type/Bitrate facet filters as
-  the local Tracks view, backed by new server aggregation endpoints
+- The remote Tracks view gained the same Genre/Audio-Type/Bitrate facet filters
+  as the local Tracks view, backed by new server aggregation endpoints
   `GET /api/tracks/facets` and `POST /api/tracks/by-ids`. The remote track DTO now
   also carries `AlbumId`, and the album DTO carries `ArtistId`, to drive
   in-library navigation.
@@ -42,6 +42,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Remote Orynivo Server album drill-downs now use the shared album-track detail
   surface with the local-style album header, cover actions, favorite toggle,
   and grouped track tables.
+- Remote Orynivo Server album drill-downs opened from a selected artist now
+  initially show only that artist's tracks and expose the same "show all album
+  tracks" checkbox as local albums.
 - Back navigation from remote Orynivo Server album details now preserves the
   remote server context instead of restoring the same numeric album ID against
   the local library.
