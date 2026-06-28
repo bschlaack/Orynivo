@@ -13,6 +13,7 @@ var settings = builder.Configuration
     .Get<ServerSettings>() ?? new ServerSettings();
 
 builder.Services.AddSingleton(settings);
+builder.Services.AddSingleton<ServerLibraryChangeTracker>();
 
 // ---- Library services -----------------------------------------------------
 // FfmpegLocator is cross-platform: auto-downloads FFmpeg on Windows,
@@ -25,12 +26,8 @@ using (var db = AudioDatabase.OpenDefault())
     _ = db; // migrations run in constructor; nothing else needed here
 
 // The file-system watcher notifies LibraryService via the hosted-service start path.
-builder.Services.AddSingleton(_ =>
-    new LibraryWatcherService(() =>
-    {
-        // Re-scan on file-system events is handled inside LibraryWatcherService;
-        // we don't need an additional callback here for the server.
-    }));
+builder.Services.AddSingleton(static services =>
+    new LibraryWatcherService(services.GetRequiredService<ServerLibraryChangeTracker>().Touch));
 
 builder.Services.AddSingleton<LibraryService>();
 builder.Services.AddHostedService(static services => services.GetRequiredService<LibraryService>());

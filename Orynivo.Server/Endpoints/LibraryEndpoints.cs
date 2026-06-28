@@ -181,15 +181,28 @@ public static class LibraryEndpoints
         api.MapGet("/folders/tracks", () =>
         {
             using var db = AudioDatabase.OpenDefault();
-            var tracks = db.GetTracksLite().Select(t => new
+            var rowsByPath = db.GetTrackList().ToDictionary(t => t.Path, StringComparer.OrdinalIgnoreCase);
+            var tracks = db.GetTracksLite().Select(t =>
             {
-                Id = db.GetTrackIdByPath(t.Path) ?? 0,
-                t.Path,
-                t.SourcePath,
-                t.FileName,
-                t.Title,
-                t.DiscNumber,
-                t.TrackNumber
+                rowsByPath.TryGetValue(t.Path, out var row);
+                return new
+                {
+                    Id = row?.Id ?? db.GetTrackIdByPath(t.Path) ?? 0,
+                    t.Path,
+                    t.SourcePath,
+                    t.FileName,
+                    Title = row?.Title ?? t.Title,
+                    t.DiscNumber,
+                    t.TrackNumber,
+                    Artist = row?.Artist,
+                    AlbumArtist = row?.AlbumArtist,
+                    Album = row?.Album,
+                    Duration = row?.Duration,
+                    Format = row?.Format,
+                    IsFavorite = row?.IsFavorite ?? false,
+                    ArtistId = row?.ArtistId,
+                    AlbumId = row?.AlbumId
+                };
             }).ToList();
             return Results.Ok(tracks);
         });

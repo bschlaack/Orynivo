@@ -1,4 +1,6 @@
+using System.Globalization;
 using Microsoft.Extensions.Logging;
+using Orynivo;
 using Orynivo.Library;
 
 namespace Orynivo.Server.Services;
@@ -13,6 +15,7 @@ public sealed class LibraryService : IHostedService, IDisposable
     private readonly ILogger<LibraryService> _logger;
     private readonly ServerSettings _settings;
     private readonly LibraryWatcherService _watcher;
+    private readonly ServerLibraryChangeTracker _libraryChangeTracker;
     private readonly SemaphoreSlim _scanGate = new(1, 1);
     private readonly object _progressLock = new();
 
@@ -23,14 +26,18 @@ public sealed class LibraryService : IHostedService, IDisposable
     /// <param name="logger">Logger for diagnostic output.</param>
     /// <param name="settings">Server configuration containing library paths and startup options.</param>
     /// <param name="watcher">File-system watcher that keeps the library in sync.</param>
+    /// <param name="libraryChangeTracker">Tracker for the server library change timestamp.</param>
     public LibraryService(
         ILogger<LibraryService> logger,
         ServerSettings settings,
-        LibraryWatcherService watcher)
+        LibraryWatcherService watcher,
+        ServerLibraryChangeTracker libraryChangeTracker)
     {
         _logger = logger;
         _settings = settings;
         _watcher = watcher;
+        _libraryChangeTracker = libraryChangeTracker;
+        _scanStatus = _scanStatus with { LibraryChangedAt = _libraryChangeTracker.LibraryChangedAt };
     }
 
     /// <summary>Gets a value indicating whether a library scan is currently running.</summary>
@@ -42,7 +49,7 @@ public sealed class LibraryService : IHostedService, IDisposable
         get
         {
             lock (_progressLock)
-                return _scanStatus;
+                return _scanStatus with { LibraryChangedAt = _libraryChangeTracker.LibraryChangedAt };
         }
     }
 
@@ -133,6 +140,8 @@ public sealed class LibraryService : IHostedService, IDisposable
                     path,
                     progress: progress,
                     cancellationToken: cancellationToken);
+                if (HasLibraryChanges(result))
+                    _libraryChangeTracker.Touch();
                 SetScanStatus(new ServerScanStatus(
                     true,
                     path,
@@ -175,15 +184,94 @@ public sealed class LibraryService : IHostedService, IDisposable
 
     private void SetScanStatus(ServerScanStatus status)
     {
+        if (status.LibraryChangedAt is null)
+            status = status with { LibraryChangedAt = _libraryChangeTracker.LibraryChangedAt };
         lock (_progressLock)
             _scanStatus = status;
     }
+
+    private static bool HasLibraryChanges(ScanResult result)
+        => result.Added > 0 || result.Updated > 0 || result.Removed > 0;
 
     /// <inheritdoc/>
     public void Dispose()
     {
         _scanGate.Dispose();
         _watcher.Dispose();
+    }
+}
+
+/// <summary>
+/// Persists and exposes the remote-server library change timestamp used by clients for cache invalidation.
+/// </summary>
+public sealed class ServerLibraryChangeTracker
+{
+    private readonly object _sync = new();
+    private long _libraryChangedAt;
+
+    /// <summary>Initialises the tracker and creates a baseline timestamp when none exists yet.</summary>
+    public ServerLibraryChangeTracker()
+    {
+        _libraryChangedAt = LoadLibraryChangedAt() ?? DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        Persist(_libraryChangedAt);
+    }
+
+    /// <summary>Gets the current library change timestamp as Unix seconds.</summary>
+    public long LibraryChangedAt
+    {
+        get
+        {
+            lock (_sync)
+                return _libraryChangedAt;
+        }
+    }
+
+    /// <summary>Updates and persists the library change timestamp to the current UTC time.</summary>
+    public void Touch()
+    {
+        var value = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        lock (_sync)
+        {
+            if (value <= _libraryChangedAt)
+                value = _libraryChangedAt + 1;
+            _libraryChangedAt = value;
+            Persist(value);
+        }
+    }
+
+    private static string LibraryChangedAtPath => AppPaths.GetDataPath("server-library-changed-at.txt");
+
+    private static long? LoadLibraryChangedAt()
+    {
+        try
+        {
+            var path = LibraryChangedAtPath;
+            if (!File.Exists(path))
+                return null;
+            var text = File.ReadAllText(path).Trim();
+            return long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
+                ? value
+                : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static void Persist(long value)
+    {
+        try
+        {
+            Directory.CreateDirectory(AppPaths.DataRoot);
+            File.WriteAllText(
+                LibraryChangedAtPath,
+                value.ToString(CultureInfo.InvariantCulture));
+        }
+        catch
+        {
+            // Cache invalidation is an optimisation; serving the library must continue if persistence fails.
+        }
     }
 }
 
@@ -195,6 +283,7 @@ public sealed class LibraryService : IHostedService, IDisposable
 /// <param name="CurrentFile">File currently being processed, or the root path while discovery is running.</param>
 /// <param name="LastResult">Summary of the last completed root scan.</param>
 /// <param name="Error">Last scan error, if any.</param>
+/// <param name="LibraryChangedAt">Unix timestamp of the last scan that changed indexed tracks.</param>
 public sealed record ServerScanStatus(
     bool IsRunning,
     string? Path,
@@ -202,4 +291,5 @@ public sealed record ServerScanStatus(
     int Total,
     string? CurrentFile,
     ScanResult? LastResult,
-    string? Error);
+    string? Error,
+    long? LibraryChangedAt = null);
