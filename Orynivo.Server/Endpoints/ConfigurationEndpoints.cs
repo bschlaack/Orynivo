@@ -11,6 +11,13 @@ public static class ConfigurationEndpoints
 {
     private static readonly object AppSettingsWriteLock = new();
 
+    /// <summary>
+    /// Editable configuration file shipped by the Linux DEB/RPM packages. It is
+    /// owned by the service user and preserved across package upgrades, unlike the
+    /// copy under the read-only content root (<c>/usr/lib/orynivo-server</c>).
+    /// </summary>
+    public const string LinuxConfigFilePath = "/etc/orynivo-server/appsettings.json";
+
     /// <summary>Registers server configuration and directory browsing routes on <paramref name="app"/>.</summary>
     /// <param name="app">The endpoint route builder to register routes on.</param>
     public static void MapConfigurationEndpoints(this IEndpointRouteBuilder app)
@@ -87,9 +94,29 @@ public static class ConfigurationEndpoints
         catch { return false; }
     }
 
+    /// <summary>
+    /// Resolves the configuration file to persist runtime settings changes to.
+    /// Prefers the editable, service-writable <see cref="LinuxConfigFilePath"/>
+    /// when its directory exists (Linux packages); otherwise falls back to the
+    /// content-root <c>appsettings.json</c> (development and Windows).
+    /// </summary>
+    /// <param name="contentRootPath">The application content root path.</param>
+    /// <returns>The absolute path of the settings file to write.</returns>
+    private static string ResolveWritableSettingsPath(string contentRootPath)
+    {
+        if (!OperatingSystem.IsWindows() &&
+            Path.GetDirectoryName(LinuxConfigFilePath) is { } etcDir &&
+            Directory.Exists(etcDir))
+        {
+            return LinuxConfigFilePath;
+        }
+
+        return Path.Combine(contentRootPath, "appsettings.json");
+    }
+
     private static void PersistLibraryPaths(string contentRootPath, ServerSettings settings, IReadOnlyList<string> paths)
     {
-        var appSettingsPath = Path.Combine(contentRootPath, "appsettings.json");
+        var appSettingsPath = ResolveWritableSettingsPath(contentRootPath);
         lock (AppSettingsWriteLock)
         {
             JsonObject root;
