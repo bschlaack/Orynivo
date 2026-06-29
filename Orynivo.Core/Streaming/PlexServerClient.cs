@@ -1,3 +1,4 @@
+using System.IO;
 using System.Net.Http;
 using System.Text.Json;
 using System.Xml.Linq;
@@ -173,26 +174,41 @@ public sealed class PlexServerClient
                         mediaArray.ValueKind == JsonValueKind.Array
                 ? mediaArray.EnumerateArray().FirstOrDefault()
                 : default;
-            var partKeys = media.ValueKind == JsonValueKind.Object &&
-                           media.TryGetProperty("Part", out var partArray) &&
-                           partArray.ValueKind == JsonValueKind.Array
-                ? partArray.EnumerateArray()
-                    .Select(part => GetString(part, "key"))
-                    .Where(static key => !string.IsNullOrWhiteSpace(key))
-                    .Cast<string>()
-                    .ToArray()
+            var parts = media.ValueKind == JsonValueKind.Object &&
+                        media.TryGetProperty("Part", out var partArray) &&
+                        partArray.ValueKind == JsonValueKind.Array
+                ? partArray.EnumerateArray().ToArray()
                 : [];
+            var partKeys = parts
+                .Select(part => GetString(part, "key"))
+                .Where(static key => !string.IsNullOrWhiteSpace(key))
+                .Cast<string>()
+                .ToArray();
+            var ratingKey = GetString(item, "ratingKey");
+            // Plex returns tracks whose files carry no title tag with an empty
+            // "title" (common for audio-book/Hörspiel folders named NNN.mp3).
+            // Fall back to the source file name so those tracks are not dropped
+            // by the empty-title filter below, which made such folders look empty.
+            var title = GetString(item, "title") ?? string.Empty;
+            if (title.Length == 0)
+            {
+                var file = parts
+                    .Select(part => GetString(part, "file"))
+                    .FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value));
+                if (!string.IsNullOrWhiteSpace(file))
+                    title = Path.GetFileNameWithoutExtension(file);
+            }
             return new PlexMediaItem(
                 GetString(item, "key") ?? string.Empty,
-                GetString(item, "ratingKey") ?? string.Empty,
-                GetString(item, "title") ?? string.Empty,
+                ratingKey ?? string.Empty,
+                title,
                 GetString(item, "grandparentTitle") ?? GetString(item, "parentTitle"),
                 GetString(item, "parentTitle"),
                 GetInt(item, "year") ?? GetInt(item, "parentYear"),
                 GetLong(item, "duration"),
                 GetString(media, "container") ?? GetString(media, "audioCodec"),
                 partKeys,
-                string.IsNullOrWhiteSpace(GetString(item, "ratingKey")));
+                string.IsNullOrWhiteSpace(ratingKey));
         }).Where(item => item.Title.Length > 0).ToList();
         return new PlexMediaPage(items, totalSize);
     }

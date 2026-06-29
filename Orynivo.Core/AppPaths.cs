@@ -14,12 +14,33 @@ public static class AppPaths
     /// <summary>Legacy product name whose data is migrated on first launch.</summary>
     public const string LegacyProductName = "Player";
 
-    /// <summary>Root data directory: <c>%LOCALAPPDATA%\Orynivo\</c>.</summary>
-    public static string DataRoot { get; } = Path.Combine(
-        Environment.GetFolderPath(
-            Environment.SpecialFolder.LocalApplicationData,
-            Environment.SpecialFolderOption.Create),
-        ProductName);
+    /// <summary>
+    /// Environment variable that overrides the data directory. Used by the Linux
+    /// server package so the systemd service writes to a dedicated, service-owned
+    /// directory (e.g. <c>/var/lib/orynivo-server</c>) instead of relying on a
+    /// writable <c>$HOME</c>, which a <c>--no-create-home</c> service user lacks.
+    /// </summary>
+    public const string DataDirEnvironmentVariable = "ORYNIVO_DATA_DIR";
+
+    /// <summary>
+    /// Root data directory. Defaults to <c>%LOCALAPPDATA%\Orynivo\</c> (or
+    /// <c>$HOME/.local/share/Orynivo</c> on Linux/macOS) but can be overridden
+    /// with the <see cref="DataDirEnvironmentVariable"/> environment variable.
+    /// </summary>
+    public static string DataRoot { get; } = ResolveDataRoot();
+
+    private static string ResolveDataRoot()
+    {
+        var overridePath = Environment.GetEnvironmentVariable(DataDirEnvironmentVariable);
+        if (!string.IsNullOrWhiteSpace(overridePath))
+            return overridePath;
+
+        return Path.Combine(
+            Environment.GetFolderPath(
+                Environment.SpecialFolder.LocalApplicationData,
+                Environment.SpecialFolderOption.Create),
+            ProductName);
+    }
 
     /// <summary>Legacy data directory: <c>%LOCALAPPDATA%\Player\</c>.</summary>
     public static string LegacyDataRoot { get; } = Path.Combine(

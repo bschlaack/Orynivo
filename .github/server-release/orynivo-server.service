@@ -9,6 +9,12 @@ User=orynivo-server
 Group=orynivo-server
 WorkingDirectory=/usr/lib/orynivo-server
 ExecStart=/usr/lib/orynivo-server/Orynivo.Server
+# systemd creates /var/lib/orynivo-server owned by the service user; the server
+# stores its database, caches, and downloaded artwork there. Without a writable
+# data directory the --no-create-home service user cannot create the SQLite
+# database under $HOME and the process aborts on startup.
+StateDirectory=orynivo-server
+Environment=ORYNIVO_DATA_DIR=/var/lib/orynivo-server
 EnvironmentFile=-/etc/default/orynivo-server
 Restart=on-failure
 RestartSec=10

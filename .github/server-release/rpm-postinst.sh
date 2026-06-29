@@ -15,4 +15,9 @@ chmod 755 /usr/lib/orynivo-server/Orynivo.Server
 chown -R root:root /usr/lib/orynivo-server
 chown -R orynivo-server:orynivo-server /etc/orynivo-server
 
+# Data directory for the service (SQLite database, caches, downloaded artwork).
+# The service user has no writable home, so the server is pointed here via
+# ORYNIVO_DATA_DIR in the systemd unit; create it owned by the service user.
+install -d -o orynivo-server -g orynivo-server /var/lib/orynivo-server
+
 systemctl daemon-reload
