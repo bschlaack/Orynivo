@@ -508,10 +508,19 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   reusing the client's `MatchesTrackFilters`/facet-popup logic fed by the server
   aggregation endpoint `/api/tracks/facets` (favorite state overridden with the
   client-side favorites); filtered results load via `/api/tracks/by-ids`
-  (`ResolveOrynivoTrackRowsAsync`). The header search box (server Lucene
-  `/api/search`) coexists; facet filters take precedence when active. The facet
-  rows live in `_orynivoTrackFacets` while a remote Tracks view is active and are
-  cleared otherwise.
+  (`ResolveOrynivoTrackRowsAsync`). Typing in the header search box while a remote
+  Tracks view is active shows the shared three-section search result (Tracks,
+  Albums, Artists) via `ShowOrynivoSearchResultsAsync`, backed by the server
+  `/api/search/full` endpoint (`OrynivoServerClient.SearchFullAsync` /
+  `OrynivoServerLibraryCatalogProvider.SearchFullAsync`), mirroring the local
+  `ShowSearchResultsAsync`. Result rows carry `Orynivo*` entity types so the
+  shared link columns and the `SearchAlbumsDataGrid`/`SearchArtistsDataGrid`
+  double-click handlers navigate within the remote library, and remote tracks
+  play directly from the result list. Clearing the search box restores the remote
+  Tracks list. The three search-result sections use the same accent-bordered card
+  style as the library headline/intro card for local and remote results. The
+  facet rows live in `_orynivoTrackFacets` while a remote Tracks view is active
+  and are cleared otherwise.
   Remote folder tree file nodes must register the same `ContentRow` metadata as
   remote Tracks rows before queuing playback. This is required so the transport
   shows title/artist/artwork instead of authenticated stream URLs and enables

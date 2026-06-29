@@ -4,6 +4,24 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Searching within a remote Orynivo Server Tracks view now shows the same
+  three-section result (Tracks, Albums, Artists) as the local library search,
+  backed by the server's `/api/search/full` endpoint. Result rows navigate
+  within the remote library (album/artist links and double-click) and remote
+  tracks play directly from the result list.
+
+### Changed
+
+- The three search-result sections (Tracks, Albums, Artists) now use the same
+  accent-bordered card style (`#6C63FF`, `CornerRadius="0,24,0,24"`) as the
+  library headline/intro card, for both local and remote search results.
+
+### Fixed
+
 ## [0.20.2] - 2026-06-29
 
 ### Fixed

@@ -435,6 +435,26 @@ internal sealed class OrynivoServerLibraryCatalogProvider : ILibraryCatalogProvi
         return tracks.Select(ToTrack).ToList();
     }
 
+    /// <summary>
+    /// Performs a categorised search (tracks, albums, artists) against the remote
+    /// server, mirroring the local library search result sections.
+    /// </summary>
+    /// <param name="query">Search query.</param>
+    /// <param name="limit">Maximum result count per category.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Matching tracks, albums, and artists mapped to catalog models.</returns>
+    public async Task<(IReadOnlyList<LibraryCatalogTrack> Tracks,
+                       IReadOnlyList<LibraryCatalogAlbum> Albums,
+                       IReadOnlyList<LibraryCatalogArtist> Artists)> SearchFullAsync(
+        string query, int limit, CancellationToken cancellationToken = default)
+    {
+        var result = await _client.SearchFullAsync(_server, query, limit, cancellationToken);
+        return (
+            result.Tracks.Select(ToTrack).ToList(),
+            result.Albums.Select(ToAlbum).ToList(),
+            result.Artists.Select(ToArtist).ToList());
+    }
+
     /// <inheritdoc/>
     public async Task<bool> SetAlbumArtworkAsync(long albumId, byte[] imageData, string? mimeType, CancellationToken cancellationToken = default)
         => await _client.UploadAlbumArtworkAsync(_server, albumId, imageData, mimeType, cancellationToken);

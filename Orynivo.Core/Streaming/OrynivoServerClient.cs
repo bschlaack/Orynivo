@@ -148,6 +148,15 @@ public sealed record OrynivoTrackLiteInfo(
 /// <param name="Tracks">Matching track rows.</param>
 public sealed record OrynivoTrackSearchResult(IReadOnlyList<OrynivoTrackInfo> Tracks);
 
+/// <summary>Categorised search response (tracks, albums, artists) from the Orynivo Server API.</summary>
+/// <param name="Tracks">Matching track rows.</param>
+/// <param name="Albums">Matching album rows.</param>
+/// <param name="Artists">Matching artist rows.</param>
+public sealed record OrynivoFullSearchResult(
+    IReadOnlyList<OrynivoTrackInfo> Tracks,
+    IReadOnlyList<OrynivoAlbumInfo> Albums,
+    IReadOnlyList<OrynivoArtistInfo> Artists);
+
 /// <summary>Cached lyrics for a single track returned by the Orynivo Server API.</summary>
 /// <param name="PlainLyrics">Unsynchronised plain-text lyrics, or <see langword="null"/>.</param>
 /// <param name="SyncedLyrics">LRC-formatted synchronised lyrics, or <see langword="null"/>.</param>
@@ -753,6 +762,35 @@ public sealed class OrynivoServerClient : IDisposable
             return result?.Tracks.ToList() ?? [];
         }
         catch { return []; }
+    }
+
+    /// <summary>
+    /// Performs a categorised search (tracks, albums, artists) using the server's
+    /// Lucene index, mirroring the local library's search result.
+    /// </summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="query">Search query.</param>
+    /// <param name="limit">Maximum result count per category.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Matching tracks, albums, and artists, or empty results on error.</returns>
+    public async Task<OrynivoFullSearchResult> SearchFullAsync(
+        OrynivoServerSettings server,
+        string query,
+        int limit = 50,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await GetJsonAsync<OrynivoFullSearchResult>(
+                server,
+                $"/api/search/full?q={Uri.EscapeDataString(query)}&limit={limit}",
+                cancellationToken);
+            return result ?? new OrynivoFullSearchResult([], [], []);
+        }
+        catch
+        {
+            return new OrynivoFullSearchResult([], [], []);
+        }
     }
 
     /// <summary>

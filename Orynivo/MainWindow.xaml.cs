@@ -430,7 +430,7 @@ public partial class MainWindow : Window
             if (_currentTopLevelTag?.StartsWith("OrynivoServer:", StringComparison.Ordinal) == true &&
                 _activeOrynivoView == "Tracks")
             {
-                await LoadOrynivoViewAsync();
+                await ShowOrynivoSearchResultsAsync(SearchTextBox.Text ?? string.Empty);
             }
             else
             {
@@ -719,8 +719,11 @@ public partial class MainWindow : Window
                 {
                     LoadNavPlaylists();
                     if (SearchResultsScrollViewer.IsVisible &&
-                        !string.IsNullOrWhiteSpace(SearchTextBox.Text))
+                        !string.IsNullOrWhiteSpace(SearchTextBox.Text) &&
+                        _currentTopLevelTag?.StartsWith("OrynivoServer:", StringComparison.Ordinal) != true)
                     {
+                        // Local library changes must not replace a remote server's
+                        // search results with local ones.
                         await ShowSearchResultsAsync(SearchTextBox.Text);
                     }
                     else if (_currentTopLevelTag is "Dashboard" or "Artists" or "Albums" or "Tracks" or "Folders" ||
@@ -4160,6 +4163,72 @@ public partial class MainWindow : Window
         textBlock.IsVisible = count == 0;
     }
 
+    /// <summary>
+    /// Shows the shared three-section (tracks/albums/artists) search result view for the
+    /// active remote Orynivo Server, mirroring the local <see cref="ShowSearchResultsAsync"/>.
+    /// </summary>
+    /// <param name="query">The search query; an empty value restores the remote Tracks list.</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    private async Task ShowOrynivoSearchResultsAsync(string query)
+    {
+        if (_activeOrynivoServer is not { } server)
+            return;
+
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            // Clearing the search box restores the full remote Tracks list.
+            await LoadOrynivoViewAsync();
+            return;
+        }
+
+        LyricsView.IsVisible = false;
+        ArtistInfoView.IsVisible = false;
+        PodcastInfoView.IsVisible = false;
+        UpdateEntityFavoritesFilterToggle(null);
+
+        if (!SearchResultsScrollViewer.IsVisible)
+            PushCurrentNavigationState();
+        UpdateAlphabetIndex(null, false);
+        UpdateLibraryIntroCard(null);
+        ContentTitleTextBlock.Text = LocalizationManager.Current.Search;
+        AlbumViewModeBorder.IsVisible = false;
+        TrackFilterButton.IsVisible = false;
+        SaveSmartPlaylistButton.IsVisible = false;
+        ContentDataGrid.IsVisible = false;
+        FolderTreeView.IsVisible = false;
+        AlbumArtworkListBox.IsVisible = false;
+        ArtistArtworkListBox.IsVisible = false;
+        SearchResultsScrollViewer.IsVisible = true;
+        DashboardScrollViewer.IsVisible = false;
+        InternetRadioView.IsVisible = false;
+        PodcastView.IsVisible = false;
+        HideAlbumDetailHeader();
+
+        var provider = CreateOrynivoCatalogProvider(server);
+        var (tracks, albums, artists) = await provider.SearchFullAsync(query.Trim(), 50);
+
+        // A newer query may have started while this request was in flight.
+        if (!string.Equals((SearchTextBox.Text ?? string.Empty).Trim(), query.Trim(), StringComparison.Ordinal))
+            return;
+
+        var trackRows = tracks.Select(ToCatalogTrackContentRow).ToList();
+        var albumRows = albums.Select(ToCatalogAlbumContentRow).ToList();
+        var artistRows = artists.Select(ToCatalogArtistContentRow).ToList();
+
+        ApplySearchColumns();
+        SearchTracksDataGrid.ItemsSource = trackRows;
+        SearchAlbumsDataGrid.ItemsSource = albumRows;
+        SearchArtistsDataGrid.ItemsSource = artistRows;
+        UpdateSearchEmptyState(SearchTracksEmptyTextBlock, trackRows.Count, LocalizationManager.Current.SearchTermNotFoundInTracks, query);
+        UpdateSearchEmptyState(SearchAlbumsEmptyTextBlock, albumRows.Count, LocalizationManager.Current.SearchTermNotFoundInAlbums, query);
+        UpdateSearchEmptyState(SearchArtistsEmptyTextBlock, artistRows.Count, LocalizationManager.Current.SearchTermNotFoundInArtists, query);
+        ContentCountTextBlock.Text = string.Format(
+            LocalizationManager.Current.SearchResultSummary,
+            trackRows.Count,
+            albumRows.Count,
+            artistRows.Count);
+    }
+
     private static Dictionary<long, float> BuildEntityScores(
         IReadOnlyDictionary<long, long> trackToEntityIds,
         IReadOnlyDictionary<long, float> trackScores)
@@ -5703,20 +5772,35 @@ public partial class MainWindow : Window
     {
         if (FindAncestor<Button>(e.Source as Visual) is not null)
             return;
-        if (SearchAlbumsDataGrid.SelectedItem is ContentRow { Id: long albumId } row)
+        if (SearchAlbumsDataGrid.SelectedItem is not ContentRow { Id: long albumId } row)
+            return;
+
+        // Remote albums must open within the remote library; their IDs can collide
+        // with local album IDs, so never route them through the local album view.
+        if (row.EntityType == "OrynivoAlbum")
         {
-            await ShowAlbumTracksAsync(albumId, row.Title ?? LocalizationManager.Current.Unknown);
+            await OpenOrynivoAlbumTracksAsync(row);
+            return;
         }
+
+        await ShowAlbumTracksAsync(albumId, row.Title ?? LocalizationManager.Current.Unknown);
     }
 
     private async void SearchArtistsDataGrid_OnMouseDoubleClick(object? sender, Avalonia.Input.TappedEventArgs e)
     {
         if (FindAncestor<Button>(e.Source as Visual) is not null)
             return;
-        if (SearchArtistsDataGrid.SelectedItem is ContentRow { Id: long artistId } row)
+        if (SearchArtistsDataGrid.SelectedItem is not ContentRow { Id: long artistId } row)
+            return;
+
+        // Remote artists must open within the remote library (IDs can collide).
+        if (row.EntityType == "OrynivoArtist")
         {
-            await ShowArtistAlbumsAsync(artistId, row.Title ?? LocalizationManager.Current.Unknown);
+            await OpenOrynivoArtistAlbumsAsync(artistId, row.Title);
+            return;
         }
+
+        await ShowArtistAlbumsAsync(artistId, row.Title ?? LocalizationManager.Current.Unknown);
     }
 
     private async void ArtistLinkButton_OnClick(object? sender, RoutedEventArgs e)
