@@ -180,8 +180,14 @@ runtime dependency.
   and store them in the server-side artwork caches
 - `Orynivo.Server/Endpoints/ConfigurationEndpoints.cs`: authenticated
   `/api/settings/library-paths` GET/PUT and `/api/files/directories?path=`
-  endpoints; PUT persists `Orynivo:LibraryPaths` to `appsettings.json`,
-  refreshes `LibraryWatcherService`, and starts a scan
+  endpoints; PUT persists `Orynivo:LibraryPaths`, refreshes
+  `LibraryWatcherService`, and starts a scan. Settings are written to the
+  editable, service-writable config (`/etc/orynivo-server/appsettings.json` via
+  `ConfigurationEndpoints.LinuxConfigFilePath` when that directory exists,
+  otherwise the content-root `appsettings.json`); the content-root copy under
+  `/usr/lib/orynivo-server` is root-owned/read-only and overwritten on package
+  upgrades. `Program.cs` layers the same `/etc` file on top of the bundled
+  defaults at startup (optional, so it is a no-op on Windows/dev)
 
 **Build:**
 

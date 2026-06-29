@@ -4,6 +4,18 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.20.2] - 2026-06-29
+
+### Fixed
+
+- The Linux Orynivo Server now reads and writes its editable configuration at
+  `/etc/orynivo-server/appsettings.json`. It is layered on top of the bundled
+  defaults at startup, and runtime changes (such as adding a library directory
+  through the client) are persisted there instead of to the read-only,
+  root-owned content-root copy under `/usr/lib/orynivo-server`, which previously
+  failed with `UnauthorizedAccessException` and is also overwritten on package
+  upgrades.
+
 ## [0.20.1] - 2026-06-29
 
 ### Fixed

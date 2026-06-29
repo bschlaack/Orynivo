@@ -13,7 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 // /etc file on top of the bundled defaults so edits there take effect. The file
 // is optional and absent on Windows, so this is a no-op there.
 builder.Configuration.AddJsonFile(
-    "/etc/orynivo-server/appsettings.json", optional: true, reloadOnChange: true);
+    ConfigurationEndpoints.LinuxConfigFilePath, optional: true, reloadOnChange: true);
 
 var settings = builder.Configuration
     .GetSection("Orynivo")
