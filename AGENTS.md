@@ -200,6 +200,16 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
 `/etc/orynivo-server/appsettings.json`, and register
 `orynivo-server.service` running as the `orynivo-server` system user.
 
+The `orynivo-server` service user is created with `--no-create-home` and has no
+writable `$HOME`, so the default data directory (`$HOME/.local/share/Orynivo`)
+cannot be created. `AppPaths.DataRoot` therefore honours the
+`ORYNIVO_DATA_DIR` environment variable, and the systemd unit sets
+`ORYNIVO_DATA_DIR=/var/lib/orynivo-server` plus `StateDirectory=orynivo-server`
+(the post-install also creates `/var/lib/orynivo-server` owned by the service
+user). The server's SQLite database, caches, and downloaded artwork live there.
+Do not remove the data-directory override or the systemd unit will abort on
+startup with `UnauthorizedAccessException`/`SIGABRT`.
+
 ## Important Architecture
 
 - `Orynivo/OutputProfile.cs`: named audio output configuration (backend, device

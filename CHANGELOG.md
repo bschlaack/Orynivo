@@ -4,6 +4,24 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.20.1] - 2026-06-29
+
+### Fixed
+
+- The Linux Orynivo Server package no longer crashes on startup
+  (`UnauthorizedAccessException` / `SIGABRT`) when run as the `orynivo-server`
+  systemd service. The service user has no writable home, so resolving the data
+  directory via `$HOME/.local/share` failed. The data directory can now be
+  overridden with the `ORYNIVO_DATA_DIR` environment variable; the systemd unit
+  sets it to `/var/lib/orynivo-server` (created via `StateDirectory` and the
+  package post-install) so the database, caches, and artwork are stored in a
+  dedicated service-owned directory.
+- Plex folder browsing now shows tracks whose files have no title tag. Such
+  tracks are returned by Plex with an empty title (common for audio-book
+  folders containing files like `001.mp3`) and were dropped by the empty-title
+  filter, making those folders appear empty when expanded. The track now falls
+  back to its source file name.
+
 ## [0.20.0] - 2026-06-29
 
 ### Added

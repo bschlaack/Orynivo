@@ -8,6 +8,13 @@ using Orynivo.Server.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 // ---- Configuration --------------------------------------------------------
+// On Linux the editable configuration is installed to /etc/orynivo-server by the
+// DEB/RPM package, while the service runs from /usr/lib/orynivo-server. Layer the
+// /etc file on top of the bundled defaults so edits there take effect. The file
+// is optional and absent on Windows, so this is a no-op there.
+builder.Configuration.AddJsonFile(
+    "/etc/orynivo-server/appsettings.json", optional: true, reloadOnChange: true);
+
 var settings = builder.Configuration
     .GetSection("Orynivo")
     .Get<ServerSettings>() ?? new ServerSettings();
