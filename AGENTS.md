@@ -130,7 +130,10 @@ runtime dependency.
   that updates when scans or watcher runs add, update, or remove indexed tracks
 - `Orynivo.Server/Endpoints/LibraryEndpoints.cs`: artists, albums, tracks,
   playlists (smart playlists resolved via `SmartPlaylistCriteria.Resolve`),
-  and Lucene search endpoints; `GET /api/artists/{id}` returns complete
+  and Lucene search endpoints; `GET /api/albums/recent` returns the most
+  recently added albums (id, title, artist, `ArtistId`, `AddedAt`, `HasArtwork`)
+  for the client dashboard's cross-library Recently Added widget;
+  `GET /api/artists/{id}` returns complete
   cached artist profile fields, `POST /api/artists/{id}/profile` stores
   client-refreshed biography/source fields plus optional image bytes, and
   `POST /api/artists/{id}/rename` renames or merges artists then rebuilds the
@@ -278,9 +281,9 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   LRCLIB/Wikipedia/Last.fm fetch and uploads the result; the server only caches
   it. `MainWindow` selects the provider for the currently playing track
   (`_currentNowPlayingProvider`) so lyrics and artist info work identically for
-  local and remote tracks. Remote tracks keep the now-playing artist button
-  disabled because it navigates the local album view; only the artist-info
-  detail view is enabled for them.
+  local and remote tracks. For a remote track the now-playing artist button
+  navigates within that track's server library (`OpenOrynivoArtistAlbumsAsync`
+  using the row's `OrynivoServer` and `ArtistId`), not the local album view.
 - `Orynivo/Audio/WindowsEndpointVolumeSynchronizer.cs`: bidirectional
   synchronization between the transport volume slider and the selected
   Windows render endpoint's master volume
@@ -547,8 +550,9 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   `Orynivo/NowPlayingMetadataProviders.cs`): lyrics and the artist
   biography/image are fetched on the client and cached on that track's server.
   The remote track's server and primary artist ID are carried on its
-  `ContentRow` (`OrynivoServer`, `ArtistId`); the now-playing artist button
-  stays disabled for remote tracks because it navigates the local album view.
+  `ContentRow` (`OrynivoServer`, `ArtistId`); the now-playing artist button is
+  enabled for a remote track and navigates within that track's server library
+  (`OpenOrynivoArtistAlbumsAsync`) rather than the local album view.
   The transport favourite (heart) button is enabled for a playing remote track
   and toggles the client-side favourite (`OrynivoServerFavorites`) for that
   track via `CurrentOrynivoFavoriteTarget`; the change is written to
@@ -714,8 +718,10 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   under `%LOCALAPPDATA%\Orynivo\artworks\` as `original`, `thumb_96`, and `thumb_320`
 - `favorites` is an older generic extension point; visible favorites use the
   direct flags
-- `play_history` records local tracks, podcast episodes, and internet-radio
-  sessions with media type, display title/subtitle, optional external ID,
+- `play_history` records local tracks, remote Orynivo Server and Plex tracks,
+  podcast episodes, and internet-radio sessions with media type, display
+  title/subtitle, optional external ID, an optional `genre` captured at playback
+  time (so genre statistics include tracks without a local library row),
     playback start/end, duration, final position, and completion state
 - `radio_stations` stores personal Radio Browser stations by stable station
   UUID, including stream URL, logo, country, codec, bitrate, and tags
@@ -1414,8 +1420,15 @@ asynchronous file I/O from the UI thread
   Radio Browser tags. Selected genres use OR semantics, technical tags are
   excluded, and unavailable selections are removed after a new search.
 - The page contains:
-  1. **Recently added albums**: horizontal artwork strip of up to 12 albums;
-  selecting a card opens album tracks and supports Back navigation
+  1. **Recently added albums**: horizontal artwork strip of up to 12 albums,
+  merging the local library with every configured remote Orynivo Server
+  (`LoadRecentAlbumsAsync`, sorted by each album's last-added timestamp).
+  Local cards open the local album/artist; remote cards (`DashboardAlbum.Server`
+  set) load artwork from the server via `LoadRemoteArtworkImageAsync` and open
+  within that remote library (`OpenOrynivoAlbumTracksAsync` /
+  `OpenOrynivoArtistAlbumsAsync`). Backed by the server endpoint
+  `GET /api/albums/recent` (`OrynivoServerClient.GetRecentAlbumsAsync`); servers
+  without it are skipped. Selecting a card supports Back navigation
   2. **Calendar**: Monday-first month grid with day number, `HH:mm:ss` playback
   time, top three linked genres, today highlight, and month navigation
   3. **Top 10 genres**: descending proportional bars with `HH:mm:ss` duration,
@@ -1426,10 +1439,14 @@ asynchronous file I/O from the UI thread
   start playback; album and artist links open their existing drill-down views.
   Daily-history cells without an available action must render as plain text, not
   disabled link-style buttons.
-- Data comes from `GetRecentAlbums`, `GetCalendarData`, and `GetTopGenres`
-- Dashboard calendar playback time includes tracks, podcasts, and internet radio;
-  top-genre statistics remain limited to local tracks because they require
-  library genre metadata
+- Data comes from `GetRecentAlbums` (now also exposing `ArtistId`/`AddedAt` for
+  cross-library merging), `GetCalendarData`, and `GetTopGenres`
+- Dashboard calendar playback time includes local, remote Orynivo Server, and
+  Plex tracks, podcasts, and internet radio. Top-genre statistics (the Top genres
+  section and per-day calendar genres) include local, remote Orynivo Server, and
+  Plex tracks: the genre query uses `COALESCE(tracks.genre, play_history.genre)`
+  over a `LEFT JOIN`, falling back to the genre captured at playback time
+  (`ResolveNowPlayingGenre`) for tracks without a local library row
 - Clicking a dashboard genre opens Tracks with only that genre facet selected;
   other track filters are cleared and the genre filter section is expanded
 - `RecentAlbumInfo` and `CalendarDayData` are records in `AudioDatabase.cs`

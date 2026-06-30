@@ -4,10 +4,16 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.20.2] - 2026-06-30
 
 ### Added
 
+- The Dashboard's "Recently added albums" strip now also includes albums from
+  every configured remote Orynivo Server, merged with the local library and
+  sorted by when each album was last added. Remote cards load their artwork from
+  the server (cached locally) and navigate within the remote library. A new
+  server endpoint `GET /api/albums/recent` backs this; older servers without it
+  are simply skipped.
 - Searching within a remote Orynivo Server Tracks view now shows the same
   three-section result (Tracks, Albums, Artists) as the local library search,
   backed by the server's `/api/search/full` endpoint. Result rows navigate
@@ -21,6 +27,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   library headline/intro card, for both local and remote search results.
 
 ### Fixed
+
+- The Dashboard genre statistics (Top genres and the per-day calendar genres) now
+  include remote Orynivo Server and Plex tracks. Their genre is captured at
+  playback time in a new `play_history.genre` column, so genre stats no longer
+  require a local library row. The calendar's daily total playback time already
+  counted these tracks.
+- The now-playing artist button is now enabled while a remote Orynivo Server
+  track plays and opens that artist within the track's server library (instead of
+  staying disabled to avoid opening an unrelated local artist).
+- Clicking the artist link on a dashboard recent-album card no longer also opens
+  the album, and dashboard/search remote albums now clear any leftover artist
+  filter so they show all of their tracks instead of appearing empty.
+- Opening a remote Orynivo Server view (e.g. an artist's albums) from a dashboard
+  recent-album card now hides the dashboard, internet-radio, podcast, lyrics, and
+  artist-info views, so the loaded remote content is actually shown instead of
+  staying hidden behind the previous view (which made the album view appear
+  empty).
 
 ## [0.20.2] - 2026-06-29
 

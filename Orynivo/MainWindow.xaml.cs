@@ -2096,8 +2096,19 @@ public partial class MainWindow : Window
         AlbumArtworkListBox.IsVisible = false;
         ArtistArtworkListBox.IsVisible = false;
         SearchResultsScrollViewer.IsVisible = false;
+        // Hide the other full-area views so navigating into a remote view from the
+        // dashboard, radio, podcast, lyrics, or artist-info view (e.g. a dashboard
+        // recent-album card) does not leave that view covering the remote content.
+        DashboardScrollViewer.IsVisible = false;
+        InternetRadioView.IsVisible = false;
+        PodcastView.IsVisible = false;
+        LyricsView.IsVisible = false;
+        ArtistInfoView.IsVisible = false;
+        PodcastInfoView.IsVisible = false;
         StatusTextBlock.Text = LocalizationManager.Current.OrynivoLoading;
         ContentDataGrid.ItemsSource = null;
+        if (view != "AlbumTracks")
+            HideAlbumDetailHeader();
         UpdateLibraryIntroCard(view is "Artists" or "Albums" or "Tracks" or "Folders" ? view : null);
         UpdateEntityFavoritesFilterToggle(_currentTopLevelTag);
         TrackFilterButton.IsVisible = view == "Tracks";
@@ -5779,6 +5790,10 @@ public partial class MainWindow : Window
         // with local album IDs, so never route them through the local album view.
         if (row.EntityType == "OrynivoAlbum")
         {
+            // Search has no artist context; clear any stale artist filter so the
+            // album shows all of its tracks.
+            _activeArtistFilterId = null;
+            _activeArtistFilterName = null;
             await OpenOrynivoAlbumTracksAsync(row);
             return;
         }
@@ -5876,6 +5891,17 @@ public partial class MainWindow : Window
     private async void NowPlayingArtistButton_OnClick(object? sender, RoutedEventArgs e)
     {
         e.Handled = true;
+
+        // A remote server track navigates within its own server library; its server
+        // and artist ID are carried on the now-playing row (local artist IDs would
+        // open an unrelated local artist).
+        if (_currentOrynivoTrackRow is { OrynivoServer: { } server, ArtistId: long remoteArtistId })
+        {
+            _activeOrynivoServer = server;
+            await OpenOrynivoArtistAlbumsAsync(remoteArtistId, _currentArtistName);
+            return;
+        }
+
         if (_currentArtistId is long artistId)
             await ShowArtistAlbumsAsync(
                 artistId,
@@ -9565,9 +9591,10 @@ public partial class MainWindow : Window
                     if (orynivoTrack.Id is long favoriteTrackId)
                         _currentTrackIsFavorite = IsOrynivoFavorite(trackServer, "Track", favoriteTrackId);
                 }
-                // NowPlayingArtistButton stays disabled: it navigates the local album view,
-                // which would open an unrelated local artist for a remote server artist ID.
-                NowPlayingArtistButton.IsEnabled = false;
+                // The now-playing artist button navigates within the remote library
+                // using the row's server and artist ID (see NowPlayingArtistButton_OnClick).
+                NowPlayingArtistButton.IsEnabled = orynivoTrack.ArtistId is not null
+                    && !string.IsNullOrWhiteSpace(orynivoTrack.Artist);
                 LyricsButton.IsEnabled = !string.IsNullOrWhiteSpace(orynivoTrack.Title)
                     && !string.IsNullOrWhiteSpace(orynivoTrack.Artist);
                 ArtistInfoButton.IsEnabled = orynivoTrack.ArtistId is not null
@@ -9667,7 +9694,8 @@ public partial class MainWindow : Window
                     db.GetTrackIdByPath(filePath),
                     player.Duration.TotalSeconds > 0 ? player.Duration.TotalSeconds : null,
                     title: NowPlayingTitleBlock.Text,
-                    subtitle: NowPlayingArtistBlock.Text);
+                    subtitle: NowPlayingArtistBlock.Text,
+                    genre: ResolveNowPlayingGenre(filePath));
             }
         }
         catch
@@ -9887,7 +9915,10 @@ public partial class MainWindow : Window
                 if (orynivoTrack.Id is long favoriteTrackId)
                     _currentTrackIsFavorite = IsOrynivoFavorite(trackServer, "Track", favoriteTrackId);
             }
-            NowPlayingArtistButton.IsEnabled = false;
+            // The now-playing artist button navigates within the remote library
+            // using the row's server and artist ID (see NowPlayingArtistButton_OnClick).
+            NowPlayingArtistButton.IsEnabled = orynivoTrack.ArtistId is not null
+                && !string.IsNullOrWhiteSpace(orynivoTrack.Artist);
             LyricsButton.IsEnabled = !string.IsNullOrWhiteSpace(orynivoTrack.Title)
                 && !string.IsNullOrWhiteSpace(orynivoTrack.Artist);
             ArtistInfoButton.IsEnabled = orynivoTrack.ArtistId is not null
@@ -9989,6 +10020,23 @@ public partial class MainWindow : Window
             artworkUri));
     }
 
+    /// <summary>
+    /// Resolves the genre to store with a play-history entry for non-local tracks
+    /// (remote Orynivo Server and Plex), so genre statistics include them. Local
+    /// tracks return <see langword="null"/> because their genre is resolved through
+    /// the <c>play_history.track_id</c> join.
+    /// </summary>
+    /// <param name="filePath">Playing file path or stream URL.</param>
+    /// <returns>The captured genre, or <see langword="null"/> when none applies.</returns>
+    private string? ResolveNowPlayingGenre(string filePath)
+    {
+        if (_currentOrynivoTrackRow?.Genre is { } orynivoGenre && !string.IsNullOrWhiteSpace(orynivoGenre))
+            return orynivoGenre;
+        if (_plexTracksByUrl.TryGetValue(filePath, out var plexRow) && !string.IsNullOrWhiteSpace(plexRow.Genre))
+            return plexRow.Genre;
+        return null;
+    }
+
     private void StartLocalPlaybackHistory(string filePath)
     {
         try
@@ -10001,7 +10049,8 @@ public partial class MainWindow : Window
                     ? _currentPlaybackDuration.TotalSeconds
                     : null,
                 title: NowPlayingTitleBlock.Text,
-                subtitle: NowPlayingArtistBlock.Text);
+                subtitle: NowPlayingArtistBlock.Text,
+                genre: ResolveNowPlayingGenre(filePath));
         }
         catch
         {
@@ -12147,11 +12196,7 @@ public partial class MainWindow : Window
         DashboardPanel.Children.Clear();
         _calendarInner = null;
 
-        var recentAlbums = await Task.Run(() =>
-        {
-            using var db = AudioDatabase.OpenDefault();
-            return db.GetRecentAlbums(12);
-        });
+        var recentAlbums = await LoadRecentAlbumsAsync();
 
         var calendarData = await Task.Run(() =>
         {
@@ -12240,7 +12285,72 @@ public partial class MainWindow : Window
         };
     }
 
-    private void DashboardBuildRecentAlbums(List<RecentAlbumInfo> albums)
+    /// <summary>A recently added album for the dashboard, from the local library or a remote server.</summary>
+    /// <param name="Id">Album identifier within its source library.</param>
+    /// <param name="Title">Album title.</param>
+    /// <param name="Artist">Display artist name.</param>
+    /// <param name="ArtistId">Album-artist identifier, or <see langword="null"/>.</param>
+    /// <param name="AddedAt">Unix timestamp of the most recently added track in the album.</param>
+    /// <param name="Server">The owning remote server, or <see langword="null"/> for the local library.</param>
+    /// <param name="LocalThumbPath">Local 96-px thumbnail path for local albums, or <see langword="null"/>.</param>
+    /// <param name="HasArtwork">Whether artwork is available for the album.</param>
+    private sealed record DashboardAlbum(
+        long Id,
+        string Title,
+        string Artist,
+        long? ArtistId,
+        long AddedAt,
+        OrynivoServerSettings? Server,
+        string? LocalThumbPath,
+        bool HasArtwork);
+
+    /// <summary>
+    /// Loads the recently added albums for the dashboard, merging the local library with every
+    /// configured remote Orynivo Server and keeping the globally most recent entries.
+    /// </summary>
+    /// <returns>The merged, recency-sorted recently added albums.</returns>
+    private async Task<List<DashboardAlbum>> LoadRecentAlbumsAsync()
+    {
+        const int perSource = 12;
+
+        var local = await Task.Run(() =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            return db.GetRecentAlbums(perSource);
+        });
+
+        var combined = local
+            .Select(a => new DashboardAlbum(
+                a.Id, a.Title, a.Artist, a.ArtistId, a.AddedAt,
+                null, a.ThumbPath, !string.IsNullOrEmpty(a.ThumbPath)))
+            .ToList();
+
+        var servers = _settings.OrynivoServers ?? [];
+        if (servers.Count > 0)
+        {
+            var remoteTasks = servers
+                .Select(server => (Server: server, Task: _orynivoClient.GetRecentAlbumsAsync(server, perSource)))
+                .ToList();
+            try { await Task.WhenAll(remoteTasks.Select(t => t.Task)); }
+            catch { /* Individual failures already yield empty lists. */ }
+
+            foreach (var (server, task) in remoteTasks)
+            {
+                if (!task.IsCompletedSuccessfully)
+                    continue;
+                combined.AddRange(task.Result.Select(a => new DashboardAlbum(
+                    a.Id, a.Title, a.Artist, a.ArtistId, a.AddedAt,
+                    server, null, a.HasArtwork)));
+            }
+        }
+
+        return combined
+            .OrderByDescending(a => a.AddedAt)
+            .Take(perSource)
+            .ToList();
+    }
+
+    private void DashboardBuildRecentAlbums(List<DashboardAlbum> albums)
     {
         var scroll = new ScrollViewer
         {
@@ -12261,7 +12371,7 @@ public partial class MainWindow : Window
         DashboardPanel.Children.Add(scroll);
     }
 
-    private Control BuildAlbumCard(RecentAlbumInfo album)
+    private Control BuildAlbumCard(DashboardAlbum album)
     {
         var card = new Border
         {
@@ -12277,34 +12387,41 @@ public partial class MainWindow : Window
 
         var stack = new StackPanel();
 
+        // Artwork host: a placeholder background with an image layered on top, so
+        // remote artwork can be filled in asynchronously without rebuilding the card.
         var img = new Image
         {
             Width   = 140,
             Height  = 140,
             Stretch = Stretch.UniformToFill
         };
-
-        if (!string.IsNullOrEmpty(album.ThumbPath) && File.Exists(album.ThumbPath))
+        var artworkHost = new Border
         {
-            try
-            {
-                using var bmpStream = File.OpenRead(album.ThumbPath);
-                img.Source = new Bitmap(bmpStream);
-            }
-            catch { img.Source = null; }
-        }
-
-        var placeholder = new Border
-        {
-            Width  = 140,
-            Height = 140,
-            Background = FindResource<IBrush>("AppArtworkPlaceholderBrush")
+            Width      = 140,
+            Height     = 140,
+            Background  = FindResource<IBrush>("AppArtworkPlaceholderBrush"),
+            ClipToBounds = true,
+            Child      = img
         };
+        stack.Children.Add(artworkHost);
 
-        if (img.Source is null)
-            stack.Children.Add(placeholder);
-        else
-            stack.Children.Add(img);
+        if (album.Server is null)
+        {
+            if (!string.IsNullOrEmpty(album.LocalThumbPath) && File.Exists(album.LocalThumbPath))
+            {
+                try
+                {
+                    using var bmpStream = File.OpenRead(album.LocalThumbPath);
+                    img.Source = new Bitmap(bmpStream);
+                }
+                catch { img.Source = null; }
+            }
+        }
+        else if (album.HasArtwork)
+        {
+            var artUrl = OrynivoServerClient.GetAlbumArtworkUrl(album.Server, album.Id, 320);
+            _ = LoadDashboardRemoteArtworkAsync(img, artUrl);
+        }
 
         var albumButton = new Button
         {
@@ -12318,7 +12435,7 @@ public partial class MainWindow : Window
         albumButton.Click += (_, e) =>
         {
             e.Handled = true;
-            _ = ShowAlbumTracksAsync(album.Id, album.Title);
+            _ = OpenDashboardAlbumAsync(album);
         };
         stack.Children.Add(albumButton);
 
@@ -12333,22 +12450,77 @@ public partial class MainWindow : Window
         artistButton.Click += async (_, e) =>
         {
             e.Handled = true;
-            using var db = AudioDatabase.OpenDefault();
-            if (db.GetAlbumArtistId(album.Id) is long artistId)
-            {
-                await ShowArtistAlbumsAsync(artistId, album.Artist);
-            }
+            await OpenDashboardArtistAsync(album);
         };
         stack.Children.Add(artistButton);
 
         card.Child = stack;
 
-        card.PointerReleased += (_, _) =>
+        card.PointerReleased += (_, e) =>
         {
-            _ = ShowAlbumTracksAsync(album.Id, album.Title);
+            // Ignore releases on the album/artist link buttons so clicking the artist
+            // navigates to the artist instead of also opening the album.
+            if (FindAncestor<Button>(e.Source as Visual) is not null)
+                return;
+            _ = OpenDashboardAlbumAsync(album);
         };
 
         return card;
+    }
+
+    /// <summary>Fills a dashboard album card's image with remote server artwork (cached locally).</summary>
+    /// <param name="image">The card image control to populate.</param>
+    /// <param name="artUrl">The authenticated remote artwork URL.</param>
+    /// <returns>A task representing the asynchronous load.</returns>
+    private async Task LoadDashboardRemoteArtworkAsync(Image image, string artUrl)
+    {
+        try
+        {
+            var bitmap = await LoadRemoteArtworkImageAsync(artUrl, 320);
+            if (bitmap is not null)
+                image.Source = bitmap;
+        }
+        catch { }
+    }
+
+    /// <summary>Opens a dashboard album's tracks, in the local or the owning remote server library.</summary>
+    /// <param name="album">The dashboard album to open.</param>
+    /// <returns>A task representing the asynchronous navigation.</returns>
+    private async Task OpenDashboardAlbumAsync(DashboardAlbum album)
+    {
+        if (album.Server is null)
+        {
+            await ShowAlbumTracksAsync(album.Id, album.Title);
+            return;
+        }
+
+        // The dashboard has no artist context, so clear any stale artist filter
+        // left from earlier browsing; otherwise the album would be scoped to that
+        // artist's tracks and appear empty.
+        _activeArtistFilterId = null;
+        _activeArtistFilterName = null;
+        _activeOrynivoServer = album.Server;
+        await OpenOrynivoAlbumTracksAsync(album.Id, album.Title, album.Artist);
+    }
+
+    /// <summary>Opens a dashboard album artist, in the local or the owning remote server library.</summary>
+    /// <param name="album">The dashboard album whose artist to open.</param>
+    /// <returns>A task representing the asynchronous navigation.</returns>
+    private async Task OpenDashboardArtistAsync(DashboardAlbum album)
+    {
+        if (album.Server is null)
+        {
+            using var db = AudioDatabase.OpenDefault();
+            if (db.GetAlbumArtistId(album.Id) is long artistId)
+                await ShowArtistAlbumsAsync(artistId, album.Artist);
+            return;
+        }
+
+        if (album.ArtistId is long remoteArtistId)
+        {
+            _activeOrynivoServer = album.Server;
+            await OpenOrynivoArtistAlbumsAsync(remoteArtistId, album.Artist);
+        }
     }
 
     private void DashboardBuildCalendar(List<CalendarDayData> data)

@@ -111,6 +111,12 @@ public static class LibraryEndpoints
             return Results.Ok(db.GetAlbumsLite(includeArtwork: true).Select(AlbumDto).ToList());
         });
 
+        api.MapGet("/albums/recent", (int limit = 12) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            return Results.Ok(db.GetRecentAlbums(limit).Select(RecentAlbumDto).ToList());
+        });
+
         api.MapGet("/albums/{albumId:long}/tracks", (long albumId) =>
         {
             using var db = AudioDatabase.OpenDefault();
@@ -471,6 +477,16 @@ public static class LibraryEndpoints
         a.ThumbnailPath,
         a.IsFavorite,
         a.ArtistId
+    };
+
+    private static object RecentAlbumDto(RecentAlbumInfo a) => new
+    {
+        a.Id,
+        Title = a.Title,
+        Artist = a.Artist,
+        a.ArtistId,
+        a.AddedAt,
+        HasArtwork = !string.IsNullOrEmpty(a.ThumbPath)
     };
 
     private static object ArtistDto(ArtistInfo a) => new
