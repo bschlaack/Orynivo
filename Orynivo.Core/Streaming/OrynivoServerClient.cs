@@ -47,6 +47,21 @@ public sealed record OrynivoAlbumInfo(
     bool IsFavorite = false,
     long? ArtistId = null);
 
+/// <summary>Recently added album entry returned by the Orynivo Server dashboard endpoint.</summary>
+/// <param name="Id">Database album identifier.</param>
+/// <param name="Title">Album title.</param>
+/// <param name="Artist">Display artist name.</param>
+/// <param name="ArtistId">Database album-artist identifier, or <see langword="null"/>.</param>
+/// <param name="AddedAt">Unix timestamp of the most recently added track in the album.</param>
+/// <param name="HasArtwork">Whether the album has server-side artwork.</param>
+public sealed record OrynivoRecentAlbum(
+    long Id,
+    string Title,
+    string Artist,
+    long? ArtistId,
+    long AddedAt,
+    bool HasArtwork);
+
 /// <summary>Track entry returned by the Orynivo Server API.</summary>
 /// <param name="Id">Database ID of the track.</param>
 /// <param name="Path">Playable library path.</param>
@@ -147,6 +162,15 @@ public sealed record OrynivoTrackLiteInfo(
 /// <summary>Track search response returned by the Orynivo Server API.</summary>
 /// <param name="Tracks">Matching track rows.</param>
 public sealed record OrynivoTrackSearchResult(IReadOnlyList<OrynivoTrackInfo> Tracks);
+
+/// <summary>Categorised search response (tracks, albums, artists) from the Orynivo Server API.</summary>
+/// <param name="Tracks">Matching track rows.</param>
+/// <param name="Albums">Matching album rows.</param>
+/// <param name="Artists">Matching artist rows.</param>
+public sealed record OrynivoFullSearchResult(
+    IReadOnlyList<OrynivoTrackInfo> Tracks,
+    IReadOnlyList<OrynivoAlbumInfo> Albums,
+    IReadOnlyList<OrynivoArtistInfo> Artists);
 
 /// <summary>Cached lyrics for a single track returned by the Orynivo Server API.</summary>
 /// <param name="PlainLyrics">Unsynchronised plain-text lyrics, or <see langword="null"/>.</param>
@@ -394,6 +418,27 @@ public sealed class OrynivoServerClient : IDisposable
         try
         {
             return await GetJsonAsync<List<OrynivoAlbumInfo>>(server, "/api/albums", cancellationToken)
+                   ?? [];
+        }
+        catch { return []; }
+    }
+
+    /// <summary>
+    /// Returns the most recently added albums for the dashboard's Recently Added widget.
+    /// </summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="limit">Maximum number of albums to return.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Recently added album entries, or empty on error or when the server is too old.</returns>
+    public async Task<List<OrynivoRecentAlbum>> GetRecentAlbumsAsync(
+        OrynivoServerSettings server,
+        int limit = 12,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await GetJsonAsync<List<OrynivoRecentAlbum>>(
+                       server, $"/api/albums/recent?limit={limit}", cancellationToken)
                    ?? [];
         }
         catch { return []; }
@@ -753,6 +798,35 @@ public sealed class OrynivoServerClient : IDisposable
             return result?.Tracks.ToList() ?? [];
         }
         catch { return []; }
+    }
+
+    /// <summary>
+    /// Performs a categorised search (tracks, albums, artists) using the server's
+    /// Lucene index, mirroring the local library's search result.
+    /// </summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="query">Search query.</param>
+    /// <param name="limit">Maximum result count per category.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Matching tracks, albums, and artists, or empty results on error.</returns>
+    public async Task<OrynivoFullSearchResult> SearchFullAsync(
+        OrynivoServerSettings server,
+        string query,
+        int limit = 50,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await GetJsonAsync<OrynivoFullSearchResult>(
+                server,
+                $"/api/search/full?q={Uri.EscapeDataString(query)}&limit={limit}",
+                cancellationToken);
+            return result ?? new OrynivoFullSearchResult([], [], []);
+        }
+        catch
+        {
+            return new OrynivoFullSearchResult([], [], []);
+        }
     }
 
     /// <summary>

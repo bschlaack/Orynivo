@@ -149,7 +149,13 @@ public sealed record TrackLite(
 }
 
 /// <summary>Album summary entry used by the dashboard's Recently Added widget.</summary>
-public sealed record RecentAlbumInfo(long Id, string Title, string Artist, string? ThumbPath);
+/// <param name="Id">Database album identifier.</param>
+/// <param name="Title">Album title.</param>
+/// <param name="Artist">Display artist name.</param>
+/// <param name="ThumbPath">Local 96-px thumbnail path, or <see langword="null"/> when no artwork exists.</param>
+/// <param name="ArtistId">Database album-artist identifier, or <see langword="null"/>.</param>
+/// <param name="AddedAt">Unix timestamp of the most recently added track in the album.</param>
+public sealed record RecentAlbumInfo(long Id, string Title, string Artist, string? ThumbPath, long? ArtistId = null, long AddedAt = 0);
 
 /// <summary>Aggregated listening data for a single calendar day.</summary>
 public sealed record CalendarDayData(int Day, double TotalSeconds, IReadOnlyList<string> TopGenres);
@@ -1278,16 +1284,17 @@ public sealed class AudioDatabase : IDisposable
         string mediaType = "track",
         string? title = null,
         string? subtitle = null,
-        string? externalId = null)
+        string? externalId = null,
+        string? genre = null)
     {
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = """
             INSERT INTO play_history (
                 track_id, path, started_at, duration_seconds,
-                media_type, title, subtitle, external_id)
+                media_type, title, subtitle, external_id, genre)
             VALUES (
                 $track_id, $path, $started_at, $duration_seconds,
-                $media_type, $title, $subtitle, $external_id)
+                $media_type, $title, $subtitle, $external_id, $genre)
             RETURNING id;
             """;
         Add(cmd, "$track_id", trackId);
@@ -1298,6 +1305,7 @@ public sealed class AudioDatabase : IDisposable
         Add(cmd, "$title", title);
         Add(cmd, "$subtitle", subtitle);
         Add(cmd, "$external_id", externalId);
+        Add(cmd, "$genre", string.IsNullOrWhiteSpace(genre) ? null : genre);
         return (long)cmd.ExecuteScalar()!;
     }
 
@@ -2281,6 +2289,9 @@ public sealed class AudioDatabase : IDisposable
         EnsureColumn("play_history", "title", "TEXT");
         EnsureColumn("play_history", "subtitle", "TEXT");
         EnsureColumn("play_history", "external_id", "TEXT");
+        // Genre captured at playback time so genre statistics can include tracks
+        // without a local library row (remote Orynivo Server and Plex tracks).
+        EnsureColumn("play_history", "genre", "TEXT");
 
         if (!string.Equals(GetMeta("normalized_library_v1"), "done", StringComparison.Ordinal))
         {
@@ -3565,6 +3576,7 @@ public sealed class AudioDatabase : IDisposable
                    COALESCE(a.title, '')  AS title,
                    COALESCE(ar.name, '')  AS artist,
                    art.thumb_96_path,
+                   a.artist_id,
                    MAX(COALESCE(t.added_at, 0)) AS last_added
             FROM albums a
             LEFT JOIN artists  ar  ON ar.id  = a.artist_id
@@ -3580,7 +3592,9 @@ public sealed class AudioDatabase : IDisposable
         while (r.Read())
             result.Add(new RecentAlbumInfo(
                 r.GetInt64(0), r.GetString(1), r.GetString(2),
-                r.IsDBNull(3) ? null : r.GetString(3)));
+                r.IsDBNull(3) ? null : r.GetString(3),
+                r.IsDBNull(4) ? null : r.GetInt64(4),
+                r.IsDBNull(5) ? 0 : r.GetInt64(5)));
         return result;
     }
 
@@ -3608,16 +3622,19 @@ public sealed class AudioDatabase : IDisposable
         var dayGenres = new Dictionary<int, Dictionary<string, double>>();
         using (var cmd = _conn.CreateCommand())
         {
+            // COALESCE so remote/Plex tracks (genre stored in play_history.genre)
+            // contribute to the per-day genre breakdown like local tracks.
             cmd.CommandText = """
                 SELECT CAST(strftime('%d', ph.started_at, 'unixepoch', 'localtime') AS INTEGER) AS day,
                        SUM(COALESCE(ph.position_seconds, 0)) AS secs,
-                       t.genre
+                       COALESCE(t.genre, ph.genre) AS genre
                 FROM play_history ph
-                JOIN tracks t ON t.id = ph.track_id
+                LEFT JOIN tracks t ON t.id = ph.track_id
                 WHERE strftime('%Y-%m', ph.started_at, 'unixepoch', 'localtime') = $ym
                   AND ph.position_seconds > 0
-                  AND t.genre IS NOT NULL AND t.genre != ''
-                GROUP BY day, t.genre;
+                  AND COALESCE(t.genre, ph.genre) IS NOT NULL
+                  AND COALESCE(t.genre, ph.genre) != ''
+                GROUP BY day, COALESCE(t.genre, ph.genre);
                 """;
             cmd.Parameters.AddWithValue("$ym", ym);
             using var r = cmd.ExecuteReader();
@@ -3754,13 +3771,17 @@ public sealed class AudioDatabase : IDisposable
     {
         var agg = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
         using var cmd = _conn.CreateCommand();
+        // COALESCE so that remote/Plex tracks (no local row, genre captured at
+        // playback time in play_history.genre) are included alongside local tracks.
         cmd.CommandText = """
-            SELECT t.genre, SUM(COALESCE(ph.position_seconds, 0)) AS secs
+            SELECT COALESCE(t.genre, ph.genre) AS genre,
+                   SUM(COALESCE(ph.position_seconds, 0)) AS secs
             FROM play_history ph
-            JOIN tracks t ON t.id = ph.track_id
+            LEFT JOIN tracks t ON t.id = ph.track_id
             WHERE ph.position_seconds > 0
-              AND t.genre IS NOT NULL AND t.genre != ''
-            GROUP BY t.genre
+              AND COALESCE(t.genre, ph.genre) IS NOT NULL
+              AND COALESCE(t.genre, ph.genre) != ''
+            GROUP BY COALESCE(t.genre, ph.genre)
             ORDER BY secs DESC;
             """;
         using var r = cmd.ExecuteReader();
