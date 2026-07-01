@@ -587,10 +587,12 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
 - `AppSettings.Volume` and `AppSettings.LastTrackPath` preserve volume and the
   last selected or played track; restoration requires both the file and database
   entry to exist
-- `AppSettings.PlaybackQueuePaths` and `PlaybackQueueIndex` preserve the editable
-  **Up next** queue across restarts. Local paths and non-credential HTTP/HTTPS
-  URLs may be stored; Plex-token, Orynivo Server `?key=`, and user-info URLs
-  must never be persisted.
+- The editable **Up next** queue is persisted in the SQLite library database
+  (`playback_queue` table), not in `settings.json`. Legacy
+  `AppSettings.PlaybackQueuePaths` and `PlaybackQueueIndex` values are imported
+  once and then cleared. Local paths and non-credential HTTP/HTTPS URLs may be
+  stored; Plex-token, Orynivo Server `?key=`, and user-info URLs must never be
+  persisted.
 - `AppSettings.OutputProfiles` persists all named output profiles;
   `SelectedOutputProfileName` identifies the active one.
   `SettingsStore.NormalizeOutputProfiles` migrates a previously configured
@@ -1232,12 +1234,22 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
 - The album-detail card above its track table stretches across the available
   content width. Its favorite button appears immediately before the album title;
   cover search and **Save as playlist** remain adjacent themed actions.
-- The bottom transport bar shows 58 × 58 px album artwork, track information,
+- The bottom transport bar is a full-width, flush bar (top separator only, no
+  floating card) showing 72 × 72 px rounded album artwork, track information,
   favorite state, playback controls, position, volume, and two quick-pick
   buttons (EQ and Output) below the volume control. The EQ popup contains a
   profile ComboBox, a ⚙ settings button, and a themed enable/disable checkbox
   (`PopupCheckBoxTheme`). The Output popup contains a profile ComboBox and a
   ⚙ settings button. Both buttons use vector SVG path icons and tooltips.
+- The transport uses a cover-derived accent brush (`AppTransportAccentBrush`,
+  default `#6C63FF`) for the position-slider progress fill/thumb and the
+  play/pause button background. `UpdateTransportAccentFromArtwork` recomputes it
+  whenever the now-playing cover changes (subscribed on
+  `NowPlayingArtworkImage.Source`): `ExtractAccentColor` samples a 24 × 24 scaled
+  copy, bins pixels by hue weighted by saturation × value, and normalises the
+  dominant vibrant hue. It falls back to the default accent when there is no
+  artwork or extraction fails; the brush is mutated in place so `DynamicResource`
+  consumers repaint.
 - **Up next** is a top-level sidebar view using the shared track table styling.
   It displays queue order, title, artist, album, duration, and themed
   move/remove actions, plus a header action to save the queue as a playlist.
@@ -1319,6 +1331,11 @@ asynchronous file I/O from the UI thread
 - TextBox normal, pointer-over, and focused Fluent theme resources must remain
   synchronized with `AppInputBrush`, `AppPrimaryTextBrush`, and the active
   input-border colors so entered text keeps sufficient contrast in both themes
+- Any text placed on an accent, selected, tinted, image-derived, or otherwise
+  colored background must use an explicit contrast-safe foreground resource
+  (for example `AppAccentTextBrush` or a dynamically computed foreground), not a
+  hard-coded assumption such as white text. Check dark and light themes before
+  accepting new color combinations.
 - Empty artwork areas use a dedicated placeholder resource
 - Tables, lists, and trees must not expose default-white backgrounds in dark mode
 - DataGrid and ScrollViewer backgrounds are overridden via Avalonia styles in

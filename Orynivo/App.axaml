@@ -17,60 +17,63 @@
     <Application.Resources>
         <ResourceDictionary>
             <!-- ── Theme brushes (overwritten at runtime by ThemeManager) ── -->
-            <SolidColorBrush x:Key="AppSidebarBrush"             Color="#13142A"/>
-            <SolidColorBrush x:Key="AppHeaderBrush"              Color="#13142A"/>
-            <SolidColorBrush x:Key="AppHeaderBorderBrush"        Color="#1E1F38"/>
-            <SolidColorBrush x:Key="AppContentBrush"             Color="#18192E"/>
-            <SolidColorBrush x:Key="AppSurfaceBrush"             Color="#20213A"/>
-            <SolidColorBrush x:Key="AppSurfaceHoverBrush"        Color="#292B47"/>
-            <SolidColorBrush x:Key="AppSurfaceSelectedBrush"     Color="#343654"/>
-            <SolidColorBrush x:Key="AppNowPlayingRowBrush"       Color="#302B5A"/>
-            <SolidColorBrush x:Key="AppNavHoverBrush"            Color="#1F2038"/>
-            <SolidColorBrush x:Key="AppNavSelectedBrush"         Color="#252640"/>
-            <SolidColorBrush x:Key="AppNavTextBrush"             Color="#9999BB"/>
-            <SolidColorBrush x:Key="AppNavHoverTextBrush"        Color="#CCCCEE"/>
+            <SolidColorBrush x:Key="AppAccentBrush"              Color="#4FDDBD"/>
+            <SolidColorBrush x:Key="AppAccentTextBrush"          Color="#102033"/>
+            <SolidColorBrush x:Key="AppAccentSoftBrush"          Color="#163E3C"/>
+            <SolidColorBrush x:Key="AppSidebarBrush"             Color="#0E1116"/>
+            <SolidColorBrush x:Key="AppHeaderBrush"              Color="#11151B"/>
+            <SolidColorBrush x:Key="AppHeaderBorderBrush"        Color="#20262E"/>
+            <SolidColorBrush x:Key="AppContentBrush"             Color="#141922"/>
+            <SolidColorBrush x:Key="AppSurfaceBrush"             Color="#1A2029"/>
+            <SolidColorBrush x:Key="AppSurfaceHoverBrush"        Color="#222B36"/>
+            <SolidColorBrush x:Key="AppSurfaceSelectedBrush"     Color="#26333E"/>
+            <SolidColorBrush x:Key="AppNowPlayingRowBrush"       Color="#173B38"/>
+            <SolidColorBrush x:Key="AppNavHoverBrush"            Color="#171D25"/>
+            <SolidColorBrush x:Key="AppNavSelectedBrush"         Color="#1B2F35"/>
+            <SolidColorBrush x:Key="AppNavTextBrush"             Color="#98A2B3"/>
+            <SolidColorBrush x:Key="AppNavHoverTextBrush"        Color="#D6DEE8"/>
             <SolidColorBrush x:Key="AppNavSelectedTextBrush"     Color="#FFFFFF"/>
-            <SolidColorBrush x:Key="AppPrimaryTextBrush"         Color="#F7F7FF"/>
-            <SolidColorBrush x:Key="AppSecondaryTextBrush"       Color="#A0A0C8"/>
-            <SolidColorBrush x:Key="AppMutedTextBrush"           Color="#7777AA"/>
-            <SolidColorBrush x:Key="AppGridLineBrush"            Color="#2A2C46"/>
-            <SolidColorBrush x:Key="AppColumnHeaderBrush"        Color="#20213A"/>
-            <SolidColorBrush x:Key="AppTransportBrush"           Color="#13142A"/>
-            <SolidColorBrush x:Key="AppTransportBorderBrush"     Color="#1E1F38"/>
+            <SolidColorBrush x:Key="AppPrimaryTextBrush"         Color="#F4F7FA"/>
+            <SolidColorBrush x:Key="AppSecondaryTextBrush"       Color="#AAB4C3"/>
+            <SolidColorBrush x:Key="AppMutedTextBrush"           Color="#6F7B8B"/>
+            <SolidColorBrush x:Key="AppGridLineBrush"            Color="#27313D"/>
+            <SolidColorBrush x:Key="AppColumnHeaderBrush"        Color="#161D26"/>
+            <SolidColorBrush x:Key="AppTransportBrush"           Color="#0E1116"/>
+            <SolidColorBrush x:Key="AppTransportBorderBrush"     Color="#20262E"/>
             <SolidColorBrush x:Key="AppTransportPrimaryTextBrush" Color="#FFFFFF"/>
-            <SolidColorBrush x:Key="AppTransportButtonBrush"     Color="#252640"/>
-            <SolidColorBrush x:Key="AppTransportButtonHoverBrush" Color="#343654"/>
-            <SolidColorBrush x:Key="AppTransportButtonDisabledBrush" Color="#20213A"/>
-            <SolidColorBrush x:Key="AppTransportButtonTextBrush" Color="#CCCCEE"/>
+            <SolidColorBrush x:Key="AppTransportButtonBrush"     Color="#1A2029"/>
+            <SolidColorBrush x:Key="AppTransportButtonHoverBrush" Color="#26313D"/>
+            <SolidColorBrush x:Key="AppTransportButtonDisabledBrush" Color="#171D25"/>
+            <SolidColorBrush x:Key="AppTransportButtonTextBrush" Color="#D6DEE8"/>
             <SolidColorBrush x:Key="AppTransportButtonHoverTextBrush" Color="#FFFFFF"/>
             <SolidColorBrush x:Key="AppTransportButtonDisabledTextBrush" Color="#3A3A55"/>
-            <SolidColorBrush x:Key="AppTransportPlayBrush"       Color="#6C63FF"/>
-            <SolidColorBrush x:Key="AppTransportPlayHoverBrush"  Color="#7B73FF"/>
-            <SolidColorBrush x:Key="AppTransportPlayDisabledBrush" Color="#2A2B45"/>
+            <SolidColorBrush x:Key="AppTransportPlayBrush"       Color="#4FDDBD"/>
+            <SolidColorBrush x:Key="AppTransportPlayHoverBrush"  Color="#67E8CC"/>
+            <SolidColorBrush x:Key="AppTransportPlayDisabledBrush" Color="#26313D"/>
             <SolidColorBrush x:Key="AppTransportPlayDisabledTextBrush" Color="#3A3A55"/>
-            <SolidColorBrush x:Key="AppArtworkPlaceholderBrush"  Color="#252640"/>
-            <SolidColorBrush x:Key="AppScrollbarTrackBrush"      Color="#20213A"/>
-            <SolidColorBrush x:Key="AppScrollbarThumbBrush"      Color="#343654"/>
-            <SolidColorBrush x:Key="AppScrollbarThumbHoverBrush" Color="#45486B"/>
-            <SolidColorBrush x:Key="AppButtonBrush"              Color="#252640"/>
-            <SolidColorBrush x:Key="AppButtonHoverBrush"         Color="#343654"/>
-            <SolidColorBrush x:Key="AppButtonPressedBrush"       Color="#3E4162"/>
-            <SolidColorBrush x:Key="AppButtonTextBrush"          Color="#F7F7FF"/>
-            <SolidColorBrush x:Key="AppButtonBorderBrush"        Color="#343654"/>
-            <SolidColorBrush x:Key="AppInputBrush"               Color="#20213A"/>
-            <SolidColorBrush x:Key="AppInputBorderBrush"         Color="#343654"/>
-            <SolidColorBrush x:Key="TextControlBackground"       Color="#20213A"/>
-            <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#20213A"/>
-            <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#20213A"/>
-            <SolidColorBrush x:Key="TextControlForeground"       Color="#F7F7FF"/>
-            <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#F7F7FF"/>
-            <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#F7F7FF"/>
-            <SolidColorBrush x:Key="TextControlBorderBrush"      Color="#343654"/>
-            <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#45486B"/>
-            <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#6C63FF"/>
-            <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#7777AA"/>
-            <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver" Color="#7777AA"/>
-            <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#7777AA"/>
+            <SolidColorBrush x:Key="AppArtworkPlaceholderBrush"  Color="#222A35"/>
+            <SolidColorBrush x:Key="AppScrollbarTrackBrush"      Color="#171D25"/>
+            <SolidColorBrush x:Key="AppScrollbarThumbBrush"      Color="#344150"/>
+            <SolidColorBrush x:Key="AppScrollbarThumbHoverBrush" Color="#465568"/>
+            <SolidColorBrush x:Key="AppButtonBrush"              Color="#1B232D"/>
+            <SolidColorBrush x:Key="AppButtonHoverBrush"         Color="#26313D"/>
+            <SolidColorBrush x:Key="AppButtonPressedBrush"       Color="#31404E"/>
+            <SolidColorBrush x:Key="AppButtonTextBrush"          Color="#F4F7FA"/>
+            <SolidColorBrush x:Key="AppButtonBorderBrush"        Color="#344150"/>
+            <SolidColorBrush x:Key="AppInputBrush"               Color="#111820"/>
+            <SolidColorBrush x:Key="AppInputBorderBrush"         Color="#344150"/>
+            <SolidColorBrush x:Key="TextControlBackground"       Color="#111820"/>
+            <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#141C25"/>
+            <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#111820"/>
+            <SolidColorBrush x:Key="TextControlForeground"       Color="#F4F7FA"/>
+            <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#F4F7FA"/>
+            <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#F4F7FA"/>
+            <SolidColorBrush x:Key="TextControlBorderBrush"      Color="#344150"/>
+            <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#465568"/>
+            <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#4FDDBD"/>
+            <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#6F7B8B"/>
+            <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver" Color="#6F7B8B"/>
+            <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#6F7B8B"/>
             <SolidColorBrush x:Key="AppDsdSupportedBrush"        Color="#F7F7FF"/>
             <SolidColorBrush x:Key="AppDsdUnsupportedBrush"      Color="#5B5D79"/>
             <SolidColorBrush x:Key="TreeViewItemForeground" Color="#A0A0C8"/>
@@ -216,7 +219,7 @@
                 <Style Selector="^:selected">
                     <Setter Property="Background" Value="{DynamicResource AppSurfaceSelectedBrush}"/>
                     <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
-                    <Setter Property="BorderBrush" Value="#6C63FF"/>
+                    <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}"/>
                 </Style>
             </ControlTheme>
 

@@ -10,6 +10,11 @@
         MinHeight="600" MinWidth="800">
     <Window.Resources>
 
+        <!-- Cover-derived transport accent. Updated at runtime from the current
+             artwork (UpdateTransportAccentFromArtwork); defaults to the app accent. -->
+        <SolidColorBrush x:Key="AppTransportAccentBrush" Color="#4FDDBD"/>
+        <SolidColorBrush x:Key="AppTransportAccentTextBrush" Color="#102033"/>
+
         <!-- Sidebar nav item -->
         <ControlTheme x:Key="NavItemTheme" TargetType="ListBoxItem">
             <Setter Property="Foreground" Value="{DynamicResource AppNavTextBrush}"/>
@@ -23,9 +28,11 @@
                 <ControlTemplate>
                     <Border x:Name="Bd"
                             Background="Transparent"
-                            BorderThickness="3,0,0,0"
+                            BorderThickness="1"
                             BorderBrush="Transparent"
-                            Padding="21,8,12,8"
+                            Padding="14,8,12,8"
+                            Margin="10,2"
+                            CornerRadius="8"
                             ClipToBounds="True">
                         <ContentPresenter Content="{TemplateBinding Content}"
                                           VerticalAlignment="Center"
@@ -35,7 +42,7 @@
             </Setter>
             <Style Selector="^:selected /template/ Border#Bd">
                 <Setter Property="Background" Value="{DynamicResource AppNavSelectedBrush}"/>
-                <Setter Property="BorderBrush" Value="#6C63FF"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}"/>
             </Style>
             <Style Selector="^:selected">
                 <Setter Property="Foreground" Value="{DynamicResource AppNavSelectedTextBrush}"/>
@@ -61,7 +68,8 @@
                 <ControlTemplate>
                     <Border x:Name="Bd"
                             Background="{TemplateBinding Background}"
-                            Padding="24,12,12,5"
+                            Padding="14,12,12,6"
+                            Margin="10,2"
                             ClipToBounds="True">
                         <ContentPresenter Content="{TemplateBinding Content}"
                                           VerticalAlignment="Center"
@@ -82,14 +90,14 @@
             <Setter Property="Background" Value="{DynamicResource AppTransportButtonBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource AppTransportButtonTextBrush}"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Width" Value="34"/>
-            <Setter Property="Height" Value="34"/>
+            <Setter Property="Width" Value="36"/>
+            <Setter Property="Height" Value="36"/>
             <Setter Property="FontSize" Value="16"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <ControlTemplate>
                     <Border x:Name="Bd" Background="{TemplateBinding Background}"
-                            CornerRadius="17">
+                            CornerRadius="18">
                         <ContentPresenter Content="{TemplateBinding Content}"
                                           HorizontalAlignment="Center"
                                           VerticalAlignment="Center"/>
@@ -112,16 +120,16 @@
 
         <!-- Transport primary button (play/pause) -->
         <ControlTheme x:Key="PlayBtnTheme" TargetType="Button">
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Background" Value="{DynamicResource AppTransportPlayBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppTransportAccentTextBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource AppTransportAccentBrush}"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Width" Value="44"/>
-            <Setter Property="Height" Value="44"/>
+            <Setter Property="Width" Value="50"/>
+            <Setter Property="Height" Value="50"/>
             <Setter Property="FontSize" Value="18"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <ControlTemplate>
-                    <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="22">
+                    <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="25">
                         <ContentPresenter Content="{TemplateBinding Content}"
                                           HorizontalAlignment="Center"
                                           VerticalAlignment="Center"/>
@@ -160,7 +168,7 @@
                             <Path x:Name="CheckMark"
                                   Width="9" Height="7"
                                   Data="M 0 3.5 L 3 6.5 L 9 0"
-                                  Stroke="White" StrokeThickness="2"
+                                  Stroke="{DynamicResource AppAccentTextBrush}" StrokeThickness="2"
                                   StrokeLineCap="Round" StrokeJoin="Round"
                                   IsVisible="False"/>
                         </Border>
@@ -174,11 +182,11 @@
                 </ControlTemplate>
             </Setter>
             <Style Selector="^:pointerover /template/ Border#CheckBorder">
-                <Setter Property="BorderBrush" Value="#6C63FF"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}"/>
             </Style>
             <Style Selector="^:checked /template/ Border#CheckBorder">
-                <Setter Property="Background" Value="#6C63FF"/>
-                <Setter Property="BorderBrush" Value="#6C63FF"/>
+                <Setter Property="Background" Value="{DynamicResource AppAccentBrush}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}"/>
             </Style>
             <Style Selector="^:checked /template/ Path#CheckMark">
                 <Setter Property="IsVisible" Value="True"/>
@@ -213,14 +221,14 @@
         <!-- Back navigation button -->
         <ControlTheme x:Key="HeaderIconButtonTheme" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Foreground" Value="#8FA7FF"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <ControlTemplate>
                     <Border x:Name="Bd"
                             Background="{TemplateBinding Background}"
-                            CornerRadius="4">
+                            CornerRadius="8">
                         <ContentPresenter Content="{TemplateBinding Content}"
                                           HorizontalAlignment="Center"
                                           VerticalAlignment="Center"/>
@@ -228,13 +236,13 @@
                 </ControlTemplate>
             </Setter>
             <Style Selector="^:pointerover /template/ Border#Bd">
-                <Setter Property="Background" Value="#252640"/>
+                <Setter Property="Background" Value="{DynamicResource AppSurfaceHoverBrush}"/>
             </Style>
             <Style Selector="^:pointerover">
-                <Setter Property="Foreground" Value="#B5C4FF"/>
+                <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
             </Style>
             <Style Selector="^:pressed /template/ Border#Bd">
-                <Setter Property="Background" Value="#303251"/>
+                <Setter Property="Background" Value="{DynamicResource AppSurfaceSelectedBrush}"/>
             </Style>
         </ControlTheme>
 
@@ -245,6 +253,8 @@
             <Setter Property="BorderBrush" Value="{DynamicResource AppButtonBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="MinHeight" Value="30"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <ControlTemplate>
@@ -252,7 +262,7 @@
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
-                            CornerRadius="8">
+                            CornerRadius="15">
                         <ContentPresenter Content="{TemplateBinding Content}"
                                           Margin="{TemplateBinding Padding}"
                                           HorizontalAlignment="Center"
@@ -262,6 +272,7 @@
             </Setter>
             <Style Selector="^:pointerover /template/ Border#Bd">
                 <Setter Property="Background" Value="{DynamicResource AppButtonHoverBrush}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}"/>
             </Style>
             <Style Selector="^:pressed /template/ Border#Bd">
                 <Setter Property="Background" Value="{DynamicResource AppButtonPressedBrush}"/>
@@ -277,6 +288,7 @@
         <ControlTheme x:Key="HeaderCheckBoxTheme" TargetType="CheckBox">
             <Setter Property="Foreground" Value="{DynamicResource AppSecondaryTextBrush}"/>
             <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="Template">
@@ -288,13 +300,13 @@
                                 Width="16"
                                 Height="16"
                                 Background="{DynamicResource AppInputBrush}"
-                                BorderBrush="#8FA7FF"
+                                BorderBrush="{DynamicResource AppAccentBrush}"
                                 BorderThickness="1.2"
                                 CornerRadius="4">
                             <Path x:Name="CheckMark"
                                   Data="M 3 8 L 6.3 11.2 L 13 4.5"
-                                  Stroke="White"
                                   StrokeThickness="1.9"
+                                  Stroke="{DynamicResource AppAccentTextBrush}"
                                   StrokeLineCap="Round"
                                   StrokeJoin="Round"
                                   IsVisible="False"/>
@@ -308,12 +320,12 @@
                 <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
             </Style>
             <Style Selector="^:pointerover /template/ Border#Box">
-                <Setter Property="BorderBrush" Value="#B5C4FF"/>
-                <Setter Property="Background" Value="#252640"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}"/>
+                <Setter Property="Background" Value="{DynamicResource AppButtonHoverBrush}"/>
             </Style>
             <Style Selector="^:checked /template/ Border#Box">
-                <Setter Property="Background" Value="#6C63FF"/>
-                <Setter Property="BorderBrush" Value="#8FA7FF"/>
+                <Setter Property="Background" Value="{DynamicResource AppAccentBrush}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}"/>
             </Style>
             <Style Selector="^:checked /template/ Path#CheckMark">
                 <Setter Property="IsVisible" Value="True"/>
@@ -399,7 +411,7 @@
                           Background="Transparent">
                         <Border Height="3"
                                 VerticalAlignment="Center"
-                                Background="#2E2F4A"
+                                Background="{DynamicResource AppGridLineBrush}"
                                 CornerRadius="1.5"/>
                         <Track Name="PART_Track"
                                Minimum="{TemplateBinding Minimum}"
@@ -412,7 +424,7 @@
                                     <RepeatButton.Template>
                                         <ControlTemplate TargetType="RepeatButton">
                                             <Border Height="3" VerticalAlignment="Center"
-                                                    Background="#6C63FF" CornerRadius="1.5"/>
+                                                    Background="{DynamicResource AppTransportAccentBrush}" CornerRadius="1.5"/>
                                         </ControlTemplate>
                                     </RepeatButton.Template>
                                 </RepeatButton>
@@ -427,7 +439,7 @@
                                                      Width="14"
                                                      Height="14"
                                                      Fill="White"
-                                                     Stroke="#6C63FF"
+                                                     Stroke="{DynamicResource AppTransportAccentBrush}"
                                                      StrokeThickness="1"/>
                                         </ControlTemplate>
                                     </Thumb.Template>
@@ -438,7 +450,7 @@
                                     <RepeatButton.Template>
                                         <ControlTemplate TargetType="RepeatButton">
                                             <Border Height="3" VerticalAlignment="Center"
-                                                    Background="#2E2F4A" CornerRadius="1.5"/>
+                                                    Background="{DynamicResource AppGridLineBrush}" CornerRadius="1.5"/>
                                         </ControlTemplate>
                                     </RepeatButton.Template>
                                 </RepeatButton>
@@ -473,13 +485,13 @@
                 <Setter Property="Background" Value="{DynamicResource AppNavHoverBrush}"/>
             </Style>
             <Style Selector="^:pointerover">
-                <Setter Property="Foreground" Value="#6C63FF"/>
+                <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}"/>
             </Style>
             <Style Selector="^.active /template/ Border#Bd">
-                <Setter Property="Background" Value="#6C63FF"/>
+                <Setter Property="Background" Value="{DynamicResource AppAccentBrush}"/>
             </Style>
             <Style Selector="^.active">
-                <Setter Property="Foreground" Value="White"/>
+                <Setter Property="Foreground" Value="{DynamicResource AppAccentTextBrush}"/>
             </Style>
             <Style Selector="^:disabled">
                 <Setter Property="Foreground" Value="{DynamicResource AppMutedTextBrush}"/>
@@ -507,24 +519,25 @@
                 </ControlTemplate>
             </Setter>
             <Style Selector="^:pointerover /template/ TextBlock#Text">
-                <Setter Property="Foreground" Value="#6C63FF"/>
+                <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}"/>
                 <Setter Property="TextDecorations" Value="Underline"/>
             </Style>
         </ControlTheme>
 
         <!-- Segmented view mode switcher -->
         <ControlTheme x:Key="ViewModeRadioTheme" TargetType="RadioButton">
-            <Setter Property="Foreground" Value="#666688"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppSecondaryTextBrush}"/>
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Padding" Value="22,9"/>
+            <Setter Property="Padding" Value="22,10"/>
             <Setter Property="FontSize" Value="12"/>
-            <Setter Property="MinHeight" Value="36"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="MinHeight" Value="38"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <ControlTemplate>
                     <Border x:Name="Bd"
                             Background="{TemplateBinding Background}"
-                            CornerRadius="6">
+                            CornerRadius="10">
                         <ContentPresenter Content="{TemplateBinding Content}"
                                           HorizontalAlignment="Center"
                                           VerticalAlignment="Center"/>
@@ -532,13 +545,13 @@
                 </ControlTemplate>
             </Setter>
             <Style Selector="^:checked /template/ Border#Bd">
-                <Setter Property="Background" Value="#6C63FF"/>
+                <Setter Property="Background" Value="{DynamicResource AppAccentBrush}"/>
             </Style>
             <Style Selector="^:checked">
-                <Setter Property="Foreground" Value="White"/>
+                <Setter Property="Foreground" Value="{DynamicResource AppAccentTextBrush}"/>
             </Style>
             <Style Selector="^:pointerover:not(:checked) /template/ Border#Bd">
-                <Setter Property="Background" Value="#DDDDF5"/>
+                <Setter Property="Background" Value="{DynamicResource AppSurfaceHoverBrush}"/>
             </Style>
         </ControlTheme>
 
@@ -551,6 +564,18 @@
             <Setter Property="BorderBrush" Value="{DynamicResource AppGridLineBrush}"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="HeadersVisibility" Value="Column"/>
+            <Setter Property="RowHeight" Value="42"/>
+            <Setter Property="GridLinesVisibility" Value="None"/>
+        </Style>
+        <Style Selector="TextBox">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="MinHeight" Value="32"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="CornerRadius" Value="16"/>
+            <Setter Property="Background" Value="{DynamicResource AppInputBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppInputBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
         </Style>
         <Style Selector="Button">
             <Setter Property="FontSize" Value="11"/>
@@ -572,7 +597,7 @@
             <Setter Property="BorderBrush" Value="{DynamicResource AppGridLineBrush}"/>
         </Style>
         <Style Selector="DataGridRow">
-            <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource AppContentBrush}"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
         </Style>
@@ -622,13 +647,13 @@
             <Setter Property="Foreground" Value="{DynamicResource AppSecondaryTextBrush}"/>
         </Style>
         <Style Selector="TreeViewItem /template/ ToggleButton:pointerover">
-            <Setter Property="Foreground" Value="#6C63FF"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}"/>
         </Style>
         <Style Selector="TreeViewItem ToggleButton">
             <Setter Property="Foreground" Value="{DynamicResource AppSecondaryTextBrush}"/>
         </Style>
         <Style Selector="TreeViewItem ToggleButton:pointerover">
-            <Setter Property="Foreground" Value="#6C63FF"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}"/>
         </Style>
         <Style Selector="TreeViewItem /template/ PathIcon">
             <Setter Property="Foreground" Value="{DynamicResource AppSecondaryTextBrush}"/>
@@ -638,16 +663,16 @@
             <Setter Property="Stroke" Value="{DynamicResource AppSecondaryTextBrush}"/>
         </Style>
         <Style Selector="TreeViewItem /template/ ToggleButton:pointerover Path">
-            <Setter Property="Fill" Value="#6C63FF"/>
-            <Setter Property="Stroke" Value="#6C63FF"/>
+            <Setter Property="Fill" Value="{DynamicResource AppAccentBrush}"/>
+            <Setter Property="Stroke" Value="{DynamicResource AppAccentBrush}"/>
         </Style>
         <Style Selector="TreeViewItem ToggleButton Path">
             <Setter Property="Fill" Value="{DynamicResource AppSecondaryTextBrush}"/>
             <Setter Property="Stroke" Value="{DynamicResource AppSecondaryTextBrush}"/>
         </Style>
         <Style Selector="TreeViewItem ToggleButton:pointerover Path">
-            <Setter Property="Fill" Value="#6C63FF"/>
-            <Setter Property="Stroke" Value="#6C63FF"/>
+            <Setter Property="Fill" Value="{DynamicResource AppAccentBrush}"/>
+            <Setter Property="Stroke" Value="{DynamicResource AppAccentBrush}"/>
         </Style>
         <Style Selector="TreeViewItem:selected">
             <Setter Property="Background" Value="{DynamicResource AppSurfaceSelectedBrush}"/>
@@ -690,7 +715,7 @@
             </Grid.RowDefinitions>
 
             <!-- App title -->
-            <Border Padding="18,16,18,14" BorderThickness="0,0,0,1" BorderBrush="#1E1F38">
+            <Border Padding="18,16,18,14" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource AppHeaderBorderBrush}">
                 <StackPanel>
                     <Border Padding="9,7"
                             CornerRadius="0,18,0,18">
@@ -705,7 +730,7 @@
                                Stretch="Uniform"/>
                     </Border>
                     <TextBlock x:Name="SelectedDriverTextBlock"
-                               Foreground="#7777AA" FontSize="10" Margin="4,8,4,0"
+                               Foreground="{DynamicResource AppMutedTextBrush}" FontSize="10" Margin="4,8,4,0"
                                Text="{DynamicResource L_NoDeviceSelected}"
                                TextTrimming="CharacterEllipsis"/>
                 </StackPanel>
@@ -785,7 +810,7 @@
                               HorizontalAlignment="Center"
                               VerticalAlignment="Center"
                               Data="M 0 0 L 4 5 L 8 0"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                              Stroke="{DynamicResource AppNavHoverTextBrush}"
                               StrokeThickness="1.4"
                               StrokeLineCap="Round"
                               StrokeJoin="Round"/>
@@ -818,7 +843,7 @@
                               HorizontalAlignment="Center"
                               VerticalAlignment="Center"
                               Data="M 0 5 L 4 0 L 8 5"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                              Stroke="{DynamicResource AppNavHoverTextBrush}"
                               StrokeThickness="1.4"
                               StrokeLineCap="Round"
                               StrokeJoin="Round"/>
@@ -848,7 +873,7 @@
                               HorizontalAlignment="Center"
                               VerticalAlignment="Center"
                               Data="M 0 0 L 4 5 L 8 0"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                              Stroke="{DynamicResource AppNavHoverTextBrush}"
                               StrokeThickness="1.4"
                               StrokeLineCap="Round"
                               StrokeJoin="Round"/>
@@ -874,7 +899,7 @@
                               HorizontalAlignment="Center"
                               VerticalAlignment="Center"
                               Data="M 0 0 L 4 5 L 8 0"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                              Stroke="{DynamicResource AppNavHoverTextBrush}"
                               StrokeThickness="1.4"
                               StrokeLineCap="Round"
                               StrokeJoin="Round"/>
@@ -900,7 +925,7 @@
                               HorizontalAlignment="Center"
                               VerticalAlignment="Center"
                               Data="M 0 0 L 4 5 L 8 0"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                              Stroke="{DynamicResource AppNavHoverTextBrush}"
                               StrokeThickness="1.4"
                               StrokeLineCap="Round"
                               StrokeJoin="Round"/>
@@ -926,7 +951,7 @@
                               HorizontalAlignment="Center"
                               VerticalAlignment="Center"
                               Data="M 0 0 L 4 5 L 8 0"
-                              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                              Stroke="{DynamicResource AppNavHoverTextBrush}"
                               StrokeThickness="1.4"
                               StrokeLineCap="Round"
                               StrokeJoin="Round"/>
@@ -939,7 +964,7 @@
             <TextBlock x:Name="StatusTextBlock"
                        Grid.Row="2"
                        Padding="24,8"
-                       Foreground="#44445A" FontSize="10"
+                       Foreground="{DynamicResource AppMutedTextBrush}" FontSize="10"
                        TextWrapping="Wrap"/>
 
             <!-- About -->
@@ -1072,7 +1097,7 @@
                         <TextBox x:Name="SearchTextBox"
                                 Grid.Column="6"
                                  Width="240"
-                                 Height="30"
+                                 Height="32"
                                  Margin="20,0,0,0"
                                  VerticalContentAlignment="Center"
                                  Background="{DynamicResource AppInputBrush}"
@@ -1084,9 +1109,11 @@
                         <Border x:Name="AlbumViewModeBorder"
                                 Grid.Column="7"
                                 Margin="20,0,0,0"
-                                Padding="4"
+                                Padding="3"
                                 Background="{DynamicResource AppButtonBrush}"
-                                CornerRadius="10"
+                                BorderBrush="{DynamicResource AppButtonBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="14"
                                 IsVisible="False">
                             <StackPanel Orientation="Horizontal">
                                 <RadioButton x:Name="AlbumTableViewRadioButton"
@@ -1109,7 +1136,9 @@
                                 Margin="20,0,0,0"
                                 Padding="3"
                                 Background="{DynamicResource AppButtonBrush}"
-                                CornerRadius="9"
+                                BorderBrush="{DynamicResource AppButtonBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="14"
                                 IsVisible="False">
                             <StackPanel Orientation="Horizontal">
                                 <RadioButton x:Name="PlexArtistsViewRadioButton"
@@ -1152,7 +1181,9 @@
                                 Margin="20,0,0,0"
                                 Padding="3"
                                 Background="{DynamicResource AppButtonBrush}"
-                                CornerRadius="9"
+                                BorderBrush="{DynamicResource AppButtonBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="14"
                                 IsVisible="False">
                             <StackPanel Orientation="Horizontal">
                                 <RadioButton x:Name="OrynivoArtistsViewRadioButton"
@@ -1206,7 +1237,7 @@
                     Margin="28,16,28,10"
                     Padding="24,16"
                     Background="{DynamicResource AppSurfaceBrush}"
-                    BorderBrush="#6C63FF"
+                    BorderBrush="{DynamicResource AppAccentBrush}"
                     BorderThickness="1"
                     CornerRadius="0,24,0,24"
                     IsVisible="False">
@@ -1228,7 +1259,7 @@
                     <TextBlock x:Name="LibraryIntroIconTextBlock"
                                Grid.Column="1"
                                FontSize="30"
-                               Foreground="#6C63FF"
+                               Foreground="{DynamicResource AppAccentBrush}"
                                VerticalAlignment="Center"/>
                 </Grid>
             </Border>
@@ -1267,7 +1298,7 @@
                         Padding="24"
                         IsVisible="False"
                         Background="{DynamicResource AppSurfaceBrush}"
-                        BorderBrush="#6C63FF"
+                        BorderBrush="{DynamicResource AppAccentBrush}"
                         BorderThickness="1"
                         CornerRadius="0,24,0,24">
                     <Grid>
@@ -1295,7 +1326,7 @@
                             <TextBlock Text="{DynamicResource L_RadioNowPlaying}"
                                        FontSize="12"
                                        FontWeight="Bold"
-                                       Foreground="#6C63FF"/>
+                                       Foreground="{DynamicResource AppAccentBrush}"/>
                             <TextBlock x:Name="RadioNowPlayingStation"
                                        Margin="0,7,0,0"
                                        FontSize="28"
@@ -1325,7 +1356,7 @@
                         Margin="28,24,28,14"
                         Padding="24"
                         Background="{DynamicResource AppSurfaceBrush}"
-                        BorderBrush="#6C63FF"
+                        BorderBrush="{DynamicResource AppAccentBrush}"
                         BorderThickness="1"
                         CornerRadius="0,24,0,24">
                     <Grid>
@@ -1346,7 +1377,7 @@
                         <TextBlock Grid.Column="1"
                                    Text="◉"
                                    FontSize="38"
-                                   Foreground="#6C63FF"
+                                   Foreground="{DynamicResource AppAccentBrush}"
                                    VerticalAlignment="Center"/>
                     </Grid>
                 </Border>
@@ -1541,7 +1572,7 @@
                 <Border Margin="28,24,28,14"
                         Padding="24"
                         Background="{DynamicResource AppSurfaceBrush}"
-                        BorderBrush="#6C63FF"
+                        BorderBrush="{DynamicResource AppAccentBrush}"
                         BorderThickness="1"
                         CornerRadius="0,24,0,24">
                     <Grid>
@@ -1562,7 +1593,7 @@
                         <TextBlock Grid.Column="1"
                                    Text="◍"
                                    FontSize="38"
-                                   Foreground="#6C63FF"
+                                   Foreground="{DynamicResource AppAccentBrush}"
                                    VerticalAlignment="Center"/>
                     </Grid>
                 </Border>
@@ -1785,7 +1816,7 @@
                     <Border Margin="28,24,28,14"
                             Padding="24"
                             Background="{DynamicResource AppSurfaceBrush}"
-                            BorderBrush="#6C63FF"
+                            BorderBrush="{DynamicResource AppAccentBrush}"
                             BorderThickness="1"
                             CornerRadius="0,24,0,24">
                         <Grid>
@@ -1813,7 +1844,7 @@
                                 <TextBlock Text="{DynamicResource L_PodcastOverview}"
                                            FontSize="12"
                                            FontWeight="Bold"
-                                           Foreground="#6C63FF"/>
+                                           Foreground="{DynamicResource AppAccentBrush}"/>
                                 <TextBlock x:Name="PodcastEpisodesTitle"
                                            Margin="0,5,0,0"
                                            FontSize="28"
@@ -1902,7 +1933,7 @@
                         Padding="22"
                         HorizontalAlignment="Stretch"
                         Background="{DynamicResource AppSurfaceBrush}"
-                        BorderBrush="#6C63FF"
+                        BorderBrush="{DynamicResource AppAccentBrush}"
                         BorderThickness="1"
                         CornerRadius="0,24,0,24">
                     <Grid>
@@ -1940,8 +1971,8 @@
                                     <Button Content="{DynamicResource L_SearchCover}"
                                             Tag="{Binding}"
                                             Padding="14,7"
-                                            Background="#6C63FF"
-                                            Foreground="White"
+                                            Background="{DynamicResource AppAccentBrush}"
+                                            Foreground="{DynamicResource AppAccentTextBrush}"
                                             BorderThickness="0"
                                             Cursor="Hand"
                                             Click="SearchCoverButton_OnClick"/>
@@ -2045,7 +2076,7 @@
                           VerticalScrollBarVisibility="Auto">
                 <StackPanel Margin="18">
                     <Border Background="{DynamicResource AppSurfaceBrush}"
-                            BorderBrush="#6C63FF"
+                            BorderBrush="{DynamicResource AppAccentBrush}"
                             BorderThickness="1"
                             CornerRadius="0,24,0,24"
                             Padding="14"
@@ -2077,7 +2108,7 @@
                         </StackPanel>
                     </Border>
                     <Border Background="{DynamicResource AppSurfaceBrush}"
-                            BorderBrush="#6C63FF"
+                            BorderBrush="{DynamicResource AppAccentBrush}"
                             BorderThickness="1"
                             CornerRadius="0,24,0,24"
                             Padding="14"
@@ -2109,7 +2140,7 @@
                         </StackPanel>
                     </Border>
                     <Border Background="{DynamicResource AppSurfaceBrush}"
-                            BorderBrush="#6C63FF"
+                            BorderBrush="{DynamicResource AppAccentBrush}"
                             BorderThickness="1"
                             CornerRadius="0,24,0,24"
                             Padding="14">
@@ -2181,12 +2212,15 @@
                                 Margin="8"
                                 Padding="10"
                                 Background="{DynamicResource AppSurfaceBrush}"
-                                CornerRadius="0,20,0,20">
+                                BorderBrush="{DynamicResource AppGridLineBrush}"
+                                BorderThickness="1"
+                                CornerRadius="0,18,0,18">
                             <StackPanel>
                                 <Border Width="160"
                                         Height="160"
-                                        Background="#E4E4F0"
-                                        CornerRadius="6">
+                                        Background="{DynamicResource AppArtworkPlaceholderBrush}"
+                                        CornerRadius="0,14,0,14"
+                                        ClipToBounds="True">
                                     <Border.ContextMenu>
                                         <ContextMenu Opening="AlbumArtworkContextMenu_OnOpened">
                                             <MenuItem Header="{DynamicResource L_DeleteCover}"
@@ -2218,8 +2252,8 @@
                                                     HorizontalContentAlignment="Center"
                                                     VerticalContentAlignment="Center"
                                                     Padding="0"
-                                                    Background="#6C63FF"
-                                                    Foreground="White"
+                                                    Background="{DynamicResource AppAccentBrush}"
+                                                    Foreground="{DynamicResource AppAccentTextBrush}"
                                                     BorderThickness="0"
                                                     Cursor="Hand"
                                                     Click="SearchCoverButton_OnClick"/>
@@ -2257,7 +2291,7 @@
                                         VerticalContentAlignment="Center"
                                         Background="Transparent"
                                         BorderThickness="0"
-                                        Foreground="#6C63FF"
+                                        Foreground="{DynamicResource AppAccentBrush}"
                                         FontSize="15"
                                         Cursor="Hand"
                                         Click="FavoriteButton_OnClick"/>
@@ -2295,15 +2329,17 @@
                     <DataTemplate>
                         <Border Width="200"
                                 Margin="8"
-                                Padding="10"
+                                Padding="12"
                                 Background="{DynamicResource AppSurfaceBrush}"
-                                CornerRadius="0,20,0,20">
+                                BorderBrush="{DynamicResource AppGridLineBrush}"
+                                BorderThickness="1"
+                                CornerRadius="0,18,0,18">
                             <Grid>
                                 <StackPanel>
-                                    <Border Width="180"
-                                            Height="180"
+                                    <Border Width="176"
+                                            Height="176"
                                             Background="{DynamicResource AppArtworkPlaceholderBrush}"
-                                            CornerRadius="90"
+                                            CornerRadius="0,24,0,24"
                                             ClipToBounds="True">
                                         <Grid>
                                             <Image Source="{Binding Artwork}"
@@ -2330,7 +2366,7 @@
                                             HorizontalAlignment="Center"
                                             Background="Transparent"
                                             BorderThickness="0"
-                                            Foreground="#6C63FF"
+                                            Foreground="{DynamicResource AppAccentBrush}"
                                             FontSize="15"
                                             Cursor="Hand"
                                             Click="FavoriteButton_OnClick"/>
@@ -2344,7 +2380,7 @@
                                         Padding="4,2"
                                         Background="Transparent"
                                         BorderThickness="0"
-                                        Foreground="#6C63FF"
+                                        Foreground="{DynamicResource AppAccentBrush}"
                                         FontSize="13"
                                         Cursor="Hand"
                                         Click="ArtistInfoListButton_OnClick"/>
@@ -2543,7 +2579,7 @@
                                    TextWrapping="Wrap"
                                    FontSize="19"
                                    FontWeight="SemiBold"
-                                   Foreground="#6C63FF"/>
+                                   Foreground="{DynamicResource AppAccentBrush}"/>
                         <TextBlock x:Name="PodcastInfoMetadata"
                                    Grid.Row="4"
                                    Margin="0,10,0,24"
@@ -2707,10 +2743,11 @@
                 <!-- Now playing -->
                 <Grid VerticalAlignment="Center" Margin="0,0,16,0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="68"/>
+                        <ColumnDefinition Width="84"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <Border Width="58" Height="58" Background="{DynamicResource AppArtworkPlaceholderBrush}" CornerRadius="6">
+                    <Border Width="72" Height="72" Background="{DynamicResource AppArtworkPlaceholderBrush}"
+                            CornerRadius="10" ClipToBounds="True">
                         <Image x:Name="NowPlayingArtworkImage" Stretch="UniformToFill"/>
                     </Border>
                     <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
@@ -2860,7 +2897,7 @@
                             <ColumnDefinition Width="42"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock x:Name="CurrentTimeTextBlock"
-                                   Foreground="#6666AA" FontSize="11"
+                                   Foreground="{DynamicResource AppMutedTextBrush}" FontSize="11"
                                    VerticalAlignment="Center" HorizontalAlignment="Right"
                                    Margin="0,0,8,0" Text="0:00"/>
                         <Slider x:Name="PositionSlider"
@@ -2871,7 +2908,7 @@
                                 ValueChanged="PositionSlider_OnValueChanged"/>
                         <TextBlock x:Name="DurationTextBlock"
                                    Grid.Column="2"
-                                   Foreground="#6666AA" FontSize="11"
+                                   Foreground="{DynamicResource AppMutedTextBrush}" FontSize="11"
                                    VerticalAlignment="Center" HorizontalAlignment="Left"
                                    Margin="8,0,0,0" Text="0:00"/>
                     </Grid>
@@ -2959,7 +2996,7 @@
                             HorizontalAlignment="Right"
                             VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="🔊" Foreground="#6666AA" FontSize="13"
+                        <TextBlock Text="🔊" Foreground="{DynamicResource AppMutedTextBrush}" FontSize="13"
                                    VerticalAlignment="Center" Margin="0,0,10,0"/>
                         <Slider x:Name="VolumeSlider"
                                 Theme="{StaticResource DarkSliderTheme}"
@@ -2967,7 +3004,7 @@
                                 VerticalAlignment="Center"
                                 ValueChanged="VolumeSlider_OnValueChanged"/>
                         <TextBlock x:Name="VolumeValueTextBlock"
-                                   Foreground="#6666AA" FontSize="11" Width="44"
+                                   Foreground="{DynamicResource AppMutedTextBrush}" FontSize="11" Width="44"
                                    VerticalAlignment="Center" Margin="10,0,0,0"
                                    Text="100 %"/>
                     </StackPanel>

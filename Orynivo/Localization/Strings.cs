@@ -172,6 +172,14 @@ public sealed record LocalizedStrings(
     public string ScanCompleted { get; init; } = "";
     public string ScanFailed { get; init; } = "";
     public string StartupPreparingLibrary { get; init; } = "";
+    /// <summary>Gets the startup status shown while the search index is checked.</summary>
+    public string StartupCheckingSearchIndex { get; init; } = "";
+    /// <summary>Gets the status shown while the search index is rebuilt in the background.</summary>
+    public string SearchIndexRebuilding { get; init; } = "";
+    /// <summary>Gets the status shown after the search index was rebuilt.</summary>
+    public string SearchIndexReady { get; init; } = "";
+    /// <summary>Gets the status shown when rebuilding the search index failed.</summary>
+    public string SearchIndexFailed { get; init; } = "";
     public string Back { get; init; } = "";
     public string MarkAsFavorite { get; init; } = "";
     public string PlaybackThrough { get; init; } = "";

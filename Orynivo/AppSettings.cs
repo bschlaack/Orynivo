@@ -56,9 +56,9 @@ public sealed class AppSettings
         new(StringComparer.Ordinal);
     /// <summary>Gets or sets the file path of the last played track, used to restore transport metadata on restart.</summary>
     public string? LastTrackPath { get; set; }
-    /// <summary>Gets or sets the persisted playback queue in display order.</summary>
+    /// <summary>Gets or sets the legacy JSON playback queue imported into SQLite on startup.</summary>
     public List<string> PlaybackQueuePaths { get; set; } = [];
-    /// <summary>Gets or sets the zero-based current position in the persisted playback queue.</summary>
+    /// <summary>Gets or sets the legacy JSON queue position imported into SQLite on startup.</summary>
     public int PlaybackQueueIndex { get; set; } = -1;
     /// <summary>Gets or sets the application colour theme.</summary>
     public AppTheme Theme { get; set; } = AppTheme.Dark;

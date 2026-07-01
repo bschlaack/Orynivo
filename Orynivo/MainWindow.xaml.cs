@@ -21,6 +21,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
+using Avalonia.Reactive;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Avalonia.Controls.Primitives;
@@ -418,8 +419,14 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
-        InitializeComponent();
+        using var timing = StartupTimingLog.Time("MainWindow constructor");
+        using (StartupTimingLog.Time("MainWindow.InitializeComponent"))
+            InitializeComponent();
         LyricsListBox.ItemsSource = _lyricLines;
+        // Recompute the transport accent whenever the now-playing cover changes,
+        // regardless of which code path set it (local, remote, gapless, async).
+        NowPlayingArtworkImage.GetObservable(Image.SourceProperty)
+            .Subscribe(new AnonymousObserver<IImage?>(UpdateTransportAccentFromArtwork));
         Opened += OnWindowOpened;
         _transportTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         _transportTimer.Tick += (_, _) => RefreshTransport();
@@ -437,28 +444,68 @@ public partial class MainWindow : Window
                 await ShowSearchResultsAsync(SearchTextBox.Text ?? string.Empty);
             }
         };
-        LoadSettings();
-        InitMcpBridge();
+        using (StartupTimingLog.Time("MainWindow.LoadSettings"))
+            LoadSettings();
+        using (StartupTimingLog.Time("MainWindow.InitMcpBridge"))
+            InitMcpBridge();
         _mcpBridge.DisabledTools = _settings.DisabledMcpTools;
         _aiChatView = AiChatViewControl;
         _aiChatView.SetBridge(_mcpBridge);
         _aiChatView.GetSettings = () => _settings.AiChat;
         if (_settings.McpServerEnabled)
+        {
+            StartupTimingLog.Write("MainWindow starting MCP server");
             _ = _mcpServer.StartAsync(_settings.McpServerPort, _mcpBridge);
-        RestorePlaybackQueueState();
+        }
+        using (StartupTimingLog.Time("MainWindow.RestorePlaybackQueueState"))
+            RestorePlaybackQueueState();
         _libraryWatcher = new LibraryWatcherService(OnWatchedLibraryChanged);
-        _libraryWatcher.UpdatePaths(_settings.LibraryPaths);
-        RestoreFixedDataGridColumnWidths();
-        AttachDataGridColumnChoosers();
-        LoadCatalogFilterCache();
-        LoadNavPlaylists();
+        using (StartupTimingLog.Time("MainWindow.LibraryWatcher.UpdatePaths"))
+            _libraryWatcher.UpdatePaths(_settings.LibraryPaths);
+        using (StartupTimingLog.Time("MainWindow.RestoreFixedDataGridColumnWidths"))
+            RestoreFixedDataGridColumnWidths();
+        using (StartupTimingLog.Time("MainWindow.AttachDataGridColumnChoosers"))
+            AttachDataGridColumnChoosers();
+        using (StartupTimingLog.Time("MainWindow.LoadCatalogFilterCache"))
+            LoadCatalogFilterCache();
+        using (StartupTimingLog.Time("MainWindow.LoadNavPlaylists"))
+            LoadNavPlaylists();
         _showAlbumArtworkView = _settings.AlbumArtworkView;
         _showArtistArtworkView = _settings.ArtistArtworkView;
         VolumeSlider.Value = Math.Clamp(_settings.Volume, 0, 1);
         AlbumArtworkViewRadioButton.IsChecked = _showAlbumArtworkView;
         AlbumTableViewRadioButton.IsChecked = !_showAlbumArtworkView;
-        SelectInitialView();
-        RestoreLastTrackState();
+        using (StartupTimingLog.Time("MainWindow.SelectInitialView"))
+            SelectInitialView();
+        using (StartupTimingLog.Time("MainWindow.RestoreLastTrackState"))
+            RestoreLastTrackState();
+    }
+
+    /// <summary>Sets the sidebar status text from startup/background services.</summary>
+    /// <param name="status">The status text to show.</param>
+    internal void SetStatusText(string status)
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(() => SetStatusText(status));
+            return;
+        }
+
+        StatusTextBlock.Text = status;
+    }
+
+    /// <summary>Clears the sidebar status text when it still matches <paramref name="expectedStatus"/>.</summary>
+    /// <param name="expectedStatus">The status text that must still be visible before clearing.</param>
+    internal void ClearStatusText(string expectedStatus)
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(() => ClearStatusText(expectedStatus));
+            return;
+        }
+
+        if (string.Equals(StatusTextBlock.Text, expectedStatus, StringComparison.Ordinal))
+            StatusTextBlock.Text = string.Empty;
     }
 
     private void OnWindowOpened(object? sender, EventArgs e)
@@ -967,8 +1014,8 @@ public partial class MainWindow : Window
 
     private ListBoxItem CreatePlexLibraryItem(string serverId, string libraryKey, string title)
     {
-        var text = CreateSidebarEntryText($"   {title}");
-        text.Foreground = FindResource<IBrush>("AppMutedTextBrush");
+        var text = CreateSidebarEntryText(title);
+        text.Margin = new Thickness(16, 0, 0, 0);
         return new ListBoxItem
         {
             Content = text,
@@ -1119,7 +1166,7 @@ public partial class MainWindow : Window
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             Data = Geometry.Parse(isExpanded ? "M 0 5 L 4 0 L 8 5" : "M 0 0 L 4 5 L 8 0"),
-            Stroke = FindResource<IBrush>("AppNavTextBrush"),
+            Stroke = FindResource<IBrush>("AppNavHoverTextBrush"),
             StrokeThickness = 1.4,
             StrokeLineCap = PenLineCap.Round,
             StrokeJoin = PenLineJoin.Round
@@ -1159,20 +1206,39 @@ public partial class MainWindow : Window
     private void RestorePlaybackQueueState()
     {
         _queue.Clear();
-        foreach (var path in _settings.PlaybackQueuePaths.Where(CanPersistQueuePath))
+        using var db = AudioDatabase.OpenDefault();
+        var snapshot = db.GetPlaybackQueue();
+        var paths = snapshot.Paths;
+        var currentIndex = snapshot.CurrentIndex;
+
+        if (paths.Count == 0 && _settings.PlaybackQueuePaths.Count > 0)
         {
-            var isRemoteUrl = Uri.TryCreate(path, UriKind.Absolute, out var uri) &&
-                              !uri.IsFile &&
-                              !uri.Scheme.Equals("cue", StringComparison.OrdinalIgnoreCase);
-            if (isRemoteUrl || IsAvailableLocalTrack(path))
-            {
-                _queue.Add(CreatePlaylistItem(path));
-            }
+            paths = _settings.PlaybackQueuePaths.Where(CanPersistQueuePath).ToList();
+            currentIndex = paths.Count == 0
+                ? -1
+                : Math.Clamp(_settings.PlaybackQueueIndex, 0, paths.Count - 1);
+            db.SavePlaybackQueue(paths, currentIndex);
+            if (ClearLegacyPlaybackQueueSettings())
+                _settingsStore.Save(_settings);
+        }
+
+        var restoredPaths = paths.Where(CanPersistQueuePath).ToList();
+        if (restoredPaths.Count != paths.Count)
+        {
+            currentIndex = currentIndex < 0
+                ? -1
+                : Math.Min(currentIndex, restoredPaths.Count - 1);
+            db.SavePlaybackQueue(restoredPaths, currentIndex);
+        }
+
+        foreach (var path in restoredPaths)
+        {
+            _queue.Add(CreatePlaylistItem(path));
         }
 
         _queueIndex = _queue.Count == 0
             ? -1
-            : Math.Clamp(_settings.PlaybackQueueIndex, 0, _queue.Count - 1);
+            : currentIndex < 0 ? -1 : Math.Clamp(currentIndex, 0, _queue.Count - 1);
         ResetQueuePlaybackState();
         RefreshQueueNavigationButtons();
     }
@@ -1191,10 +1257,21 @@ public partial class MainWindow : Window
             persisted.Add(path);
         }
 
-        _settings.PlaybackQueuePaths = persisted;
-        _settings.PlaybackQueueIndex = persistedIndex >= 0
+        var currentIndex = persistedIndex >= 0
             ? persistedIndex
             : persisted.Count == 0 ? -1 : Math.Min(_queueIndex, persisted.Count - 1);
+        using var db = AudioDatabase.OpenDefault();
+        db.SavePlaybackQueue(persisted, currentIndex);
+        ClearLegacyPlaybackQueueSettings();
+    }
+
+    private bool ClearLegacyPlaybackQueueSettings()
+    {
+        if (_settings.PlaybackQueuePaths.Count == 0 && _settings.PlaybackQueueIndex == -1)
+            return false;
+        _settings.PlaybackQueuePaths = [];
+        _settings.PlaybackQueueIndex = -1;
+        return true;
     }
 
     private static bool CanPersistQueuePath(string path)
@@ -1241,7 +1318,8 @@ public partial class MainWindow : Window
     private void PersistPlaybackQueue()
     {
         CapturePlaybackQueueState();
-        _settingsStore.Save(_settings);
+        if (ClearLegacyPlaybackQueueSettings())
+            _settingsStore.Save(_settings);
     }
 
     private void NavListBox_OnPreviewMouseRightButtonDown(object? sender, PointerPressedEventArgs e)
@@ -5744,12 +5822,20 @@ public partial class MainWindow : Window
         if (row.EntityType == "Track" &&
             grid.ItemsSource is IEnumerable<ContentRow> rows)
         {
-            await PlayTrackFromRowsAsync(row, rows.ToList());
+            var contextRows = IsUnfilteredTopLevelTracksView() ? [row] : rows.ToList();
+            await PlayTrackFromRowsAsync(row, contextRows);
             return;
         }
 
         await HandleContentRowDoubleClickAsync(row);
     }
+
+    private bool IsUnfilteredTopLevelTracksView() =>
+        _currentTopLevelTag == "Tracks" &&
+        _activePlaylistId is null &&
+        _activeAlbumFilterId is null &&
+        _activeArtistFilterId is null &&
+        !HasActiveFilters;
 
     private async void AlbumArtworkListBox_OnMouseDoubleClick(object? sender, Avalonia.Input.TappedEventArgs e)
     {
@@ -10020,6 +10106,197 @@ public partial class MainWindow : Window
             artworkUri));
     }
 
+    private static readonly Color DefaultTransportAccent = Color.Parse("#5BE7C4");
+
+    /// <summary>
+    /// Updates the cover-derived transport accent brush (progress fill, slider
+    /// thumb, play button) from the current now-playing artwork. Falls back to the
+    /// app accent when there is no artwork or extraction fails.
+    /// </summary>
+    /// <param name="source">The current now-playing artwork image, or <see langword="null"/>.</param>
+    private void UpdateTransportAccentFromArtwork(IImage? source)
+    {
+        var fallback = GetThemeAccentColor();
+        var color = source is Bitmap bitmap
+            ? ExtractAccentColor(bitmap) ?? fallback
+            : fallback;
+
+        if (this.TryFindResource("AppTransportAccentBrush", out var resource) &&
+            resource is SolidColorBrush brush)
+        {
+            brush.Color = color;
+        }
+        if (this.TryFindResource("AppTransportAccentTextBrush", out var textResource) &&
+            textResource is SolidColorBrush textBrush)
+        {
+            textBrush.Color = GetReadableTextColor(color);
+        }
+    }
+
+    /// <summary>
+    /// Resolves the current theme accent colour used when no artwork accent is available.
+    /// </summary>
+    /// <returns>The theme accent colour, or the built-in default when the resource is unavailable.</returns>
+    private Color GetThemeAccentColor()
+    {
+        return this.TryFindResource("AppAccentBrush", out var resource) &&
+            resource is SolidColorBrush brush
+            ? brush.Color
+            : DefaultTransportAccent;
+    }
+
+    /// <summary>
+    /// Extracts a vibrant accent color from a bitmap by sampling a small scaled
+    /// copy, binning qualifying pixels by hue (weighted by saturation × value),
+    /// and normalising the dominant hue into a punchy, readable accent.
+    /// </summary>
+    /// <param name="bitmap">Source artwork bitmap.</param>
+    /// <returns>The extracted accent color, or <see langword="null"/> on failure or when the image is colourless.</returns>
+    private static Color? ExtractAccentColor(Bitmap bitmap)
+    {
+        try
+        {
+            const int dim = 24;
+            using var small = bitmap.CreateScaledBitmap(new PixelSize(dim, dim), BitmapInterpolationMode.MediumQuality);
+            var stride = dim * 4;
+            var buffer = new byte[stride * dim];
+            var handle = GCHandle.Alloc(buffer, GCHandleType.Pinned);
+            try
+            {
+                small.CopyPixels(new PixelRect(0, 0, dim, dim), handle.AddrOfPinnedObject(), buffer.Length, stride);
+            }
+            finally
+            {
+                handle.Free();
+            }
+
+            const int bins = 12;
+            var weight = new double[bins];
+            var rSum = new double[bins];
+            var gSum = new double[bins];
+            var bSum = new double[bins];
+
+            for (var i = 0; i < buffer.Length; i += 4)
+            {
+                double b = buffer[i], g = buffer[i + 1], r = buffer[i + 2], a = buffer[i + 3];
+                if (a < 32)
+                    continue;
+
+                var max = Math.Max(r, Math.Max(g, b));
+                var min = Math.Min(r, Math.Min(g, b));
+                var value = max / 255.0;
+                var sat = max <= 0 ? 0 : (max - min) / max;
+
+                // Skip near-gray, near-black, and blown-out near-white pixels.
+                if (sat < 0.18 || value < 0.18 || (value > 0.96 && sat < 0.25))
+                    continue;
+
+                var bin = (int)(RgbToHue(r, g, b) / 360.0 * bins) % bins;
+                var w = sat * value;
+                weight[bin] += w;
+                rSum[bin] += r * w;
+                gSum[bin] += g * w;
+                bSum[bin] += b * w;
+            }
+
+            var best = -1;
+            for (var i = 0; i < bins; i++)
+                if (weight[i] > 0 && (best < 0 || weight[i] > weight[best]))
+                    best = i;
+            if (best < 0)
+                return null;
+
+            return AdjustAccent(rSum[best] / weight[best], gSum[best] / weight[best], bSum[best] / weight[best]);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Returns the hue (0–360) of an 8-bit RGB triple.</summary>
+    /// <param name="r">Red component (0–255).</param>
+    /// <param name="g">Green component (0–255).</param>
+    /// <param name="b">Blue component (0–255).</param>
+    /// <returns>The hue in degrees.</returns>
+    private static double RgbToHue(double r, double g, double b)
+    {
+        r /= 255; g /= 255; b /= 255;
+        var max = Math.Max(r, Math.Max(g, b));
+        var min = Math.Min(r, Math.Min(g, b));
+        var delta = max - min;
+        if (delta <= 0)
+            return 0;
+
+        double hue;
+        if (max == r) hue = 60 * (((g - b) / delta) % 6);
+        else if (max == g) hue = 60 * (((b - r) / delta) + 2);
+        else hue = 60 * (((r - g) / delta) + 4);
+        return hue < 0 ? hue + 360 : hue;
+    }
+
+    /// <summary>Normalises an averaged RGB accent into a saturated, mid-bright colour.</summary>
+    /// <param name="r">Red component (0–255).</param>
+    /// <param name="g">Green component (0–255).</param>
+    /// <param name="b">Blue component (0–255).</param>
+    /// <returns>The adjusted accent color.</returns>
+    private static Color AdjustAccent(double r, double g, double b)
+    {
+        var max = Math.Max(r, Math.Max(g, b));
+        var min = Math.Min(r, Math.Min(g, b));
+        var value = max / 255.0;
+        var sat = max <= 0 ? 0 : (max - min) / max;
+        var hue = RgbToHue(r, g, b);
+
+        sat = Math.Clamp(sat * 1.15 + 0.1, 0.45, 1.0);
+        value = Math.Clamp(value, 0.6, 0.86);
+        return HsvToColor(hue, sat, value);
+    }
+
+    /// <summary>Converts an HSV triple to an opaque <see cref="Color"/>.</summary>
+    /// <param name="h">Hue in degrees (0–360).</param>
+    /// <param name="s">Saturation (0–1).</param>
+    /// <param name="v">Value/brightness (0–1).</param>
+    /// <returns>The resulting color.</returns>
+    private static Color HsvToColor(double h, double s, double v)
+    {
+        var c = v * s;
+        var x = c * (1 - Math.Abs((h / 60.0 % 2) - 1));
+        var m = v - c;
+        double r, g, b;
+        if (h < 60) { r = c; g = x; b = 0; }
+        else if (h < 120) { r = x; g = c; b = 0; }
+        else if (h < 180) { r = 0; g = c; b = x; }
+        else if (h < 240) { r = 0; g = x; b = c; }
+        else if (h < 300) { r = x; g = 0; b = c; }
+        else { r = c; g = 0; b = x; }
+        return Color.FromRgb(
+            (byte)Math.Clamp((r + m) * 255, 0, 255),
+            (byte)Math.Clamp((g + m) * 255, 0, 255),
+            (byte)Math.Clamp((b + m) * 255, 0, 255));
+    }
+
+    /// <summary>Returns a dark or light text colour with readable contrast over a background colour.</summary>
+    /// <param name="background">The background colour behind the text.</param>
+    /// <returns>A text colour suitable for the supplied background.</returns>
+    private static Color GetReadableTextColor(Color background)
+    {
+        static double Linear(byte channel)
+        {
+            var value = channel / 255.0;
+            return value <= 0.03928
+                ? value / 12.92
+                : Math.Pow((value + 0.055) / 1.055, 2.4);
+        }
+
+        var luminance = 0.2126 * Linear(background.R) +
+                        0.7152 * Linear(background.G) +
+                        0.0722 * Linear(background.B);
+        return luminance > 0.42
+            ? Color.Parse("#102033")
+            : Colors.White;
+    }
+
     /// <summary>
     /// Resolves the genre to store with a play-history entry for non-local tracks
     /// (remote Orynivo Server and Plex), so genre statistics include them. Local
@@ -12225,7 +12502,7 @@ public partial class MainWindow : Window
 
     private void DashboardAddSectionHeader(string title, bool calendarNav = false)
     {
-        var grid = new Grid { Margin = new Thickness(0, 24, 0, 8) };
+        var grid = new Grid { Margin = new Thickness(0, 28, 0, 10) };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         if (calendarNav)
@@ -12237,7 +12514,7 @@ public partial class MainWindow : Window
         var tb = new TextBlock
         {
             Text       = title,
-            FontSize   = 15,
+            FontSize   = 16,
             FontWeight = FontWeight.SemiBold,
             Foreground = FindResource<IBrush>("AppPrimaryTextBrush"),
             VerticalAlignment = VerticalAlignment.Center
@@ -12259,13 +12536,15 @@ public partial class MainWindow : Window
 
         DashboardPanel.Children.Add(grid);
 
-        var sep = new Border
+        DashboardPanel.Children.Add(new Border
         {
-            Height     = 1,
-            Background = FindResource<IBrush>("AppGridLineBrush"),
-            Margin     = new Thickness(0, 0, 0, 12)
-        };
-        DashboardPanel.Children.Add(sep);
+            Height = 3,
+            Width = 34,
+            Background = FindResource<IBrush>("AppAccentBrush"),
+            CornerRadius = new CornerRadius(2),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Margin = new Thickness(0, 0, 0, 14)
+        });
     }
 
     private Button CreateCalNavButton(string symbol)
@@ -12276,7 +12555,7 @@ public partial class MainWindow : Window
             FontSize   = 13,
             Padding    = new Thickness(8, 3, 8, 3),
             Margin     = new Thickness(4, 0, 0, 0),
-            Background = FindResource<IBrush>("AppContentBrush"),
+            Background = FindResource<IBrush>("AppButtonBrush"),
             Foreground = FindResource<IBrush>("AppPrimaryTextBrush"),
             BorderBrush = FindResource<IBrush>("AppGridLineBrush"),
             BorderThickness = new Thickness(1),
@@ -12375,30 +12654,30 @@ public partial class MainWindow : Window
     {
         var card = new Border
         {
-            Width           = 140,
-            Margin          = new Thickness(0, 0, 12, 0),
+            Width           = 164,
+            Margin          = new Thickness(0, 0, 14, 0),
             Background      = FindResource<IBrush>("AppSurfaceBrush"),
             BorderBrush     = FindResource<IBrush>("AppGridLineBrush"),
             BorderThickness = new Thickness(1),
-            CornerRadius    = new CornerRadius(6),
+            CornerRadius    = new CornerRadius(10),
             Cursor          = new Cursor(StandardCursorType.Hand),
             ClipToBounds    = true
         };
 
-        var stack = new StackPanel();
+        var stack = new StackPanel { Spacing = 2 };
 
         // Artwork host: a placeholder background with an image layered on top, so
         // remote artwork can be filled in asynchronously without rebuilding the card.
         var img = new Image
         {
-            Width   = 140,
-            Height  = 140,
+            Width   = 164,
+            Height  = 164,
             Stretch = Stretch.UniformToFill
         };
         var artworkHost = new Border
         {
-            Width      = 140,
-            Height     = 140,
+            Width      = 164,
+            Height     = 164,
             Background  = FindResource<IBrush>("AppArtworkPlaceholderBrush"),
             ClipToBounds = true,
             Child      = img
@@ -12427,9 +12706,9 @@ public partial class MainWindow : Window
         {
             Content     = album.Title,
             FontWeight  = FontWeight.SemiBold,
-            FontSize    = 11,
+            FontSize    = 12,
             Foreground  = FindResource<IBrush>("AppPrimaryTextBrush"),
-            Margin      = new Thickness(8, 6, 8, 2),
+            Margin      = new Thickness(10, 8, 10, 1),
             Theme = FindResource<ControlTheme>("EntityLinkButtonTheme")
         };
         albumButton.Click += (_, e) =>
@@ -12442,9 +12721,9 @@ public partial class MainWindow : Window
         var artistButton = new Button
         {
             Content    = album.Artist,
-            FontSize   = 10,
+            FontSize   = 11,
             Foreground = FindResource<IBrush>("AppSecondaryTextBrush"),
-            Margin     = new Thickness(8, 0, 8, 8),
+            Margin     = new Thickness(10, 0, 10, 10),
             Theme = FindResource<ControlTheme>("EntityLinkButtonTheme")
         };
         artistButton.Click += async (_, e) =>
@@ -12535,8 +12814,8 @@ public partial class MainWindow : Window
             Background      = FindResource<IBrush>("AppSurfaceBrush"),
             BorderBrush     = FindResource<IBrush>("AppGridLineBrush"),
             BorderThickness = new Thickness(1),
-            CornerRadius    = new CornerRadius(8),
-            Padding         = new Thickness(12),
+            CornerRadius    = new CornerRadius(12),
+            Padding         = new Thickness(14),
             Margin          = new Thickness(0, 0, 0, 4)
         };
 
@@ -12608,14 +12887,14 @@ public partial class MainWindow : Window
         var border = new Border
         {
             Margin          = new Thickness(2),
-            MinHeight       = 64,
+            MinHeight       = 72,
             Background      = isToday
-                ? new SolidColorBrush(Color.FromArgb(30, 0x54, 0xA0, 0xFF))
+                ? FindResource<IBrush>("AppAccentSoftBrush")
                 : Brushes.Transparent,
             BorderBrush     = FindResource<IBrush>("AppGridLineBrush"),
             BorderThickness = new Thickness(1),
-            CornerRadius    = new CornerRadius(4),
-            Padding         = new Thickness(4),
+            CornerRadius    = new CornerRadius(8),
+            Padding         = new Thickness(6),
             Cursor          = data is not null && data.TotalSeconds > 0
                 ? new Cursor(StandardCursorType.Hand)
                 : new Cursor(StandardCursorType.Arrow)
@@ -12644,7 +12923,7 @@ public partial class MainWindow : Window
             {
                 Text       = FormatDashboardDuration(ts),
                 FontSize   = 10,
-                Foreground = new SolidColorBrush(Color.FromRgb(0x54, 0xA0, 0xFF)),
+                Foreground = FindResource<IBrush>("AppAccentBrush"),
                 HorizontalAlignment = HorizontalAlignment.Center,
                 Margin = new Thickness(0, 2, 0, 2)
             });
@@ -12740,7 +13019,16 @@ public partial class MainWindow : Window
 
         double maxSecs = genres[0].Seconds;
 
-        var panel = new StackPanel { Margin = new Thickness(0, 0, 0, 4) };
+        var panel = new Border
+        {
+            Background = FindResource<IBrush>("AppSurfaceBrush"),
+            BorderBrush = FindResource<IBrush>("AppGridLineBrush"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(16),
+            Margin = new Thickness(0, 0, 0, 4)
+        };
+        var rows = new StackPanel();
 
         for (int i = 0; i < genres.Count; i++)
         {
@@ -12748,7 +13036,7 @@ public partial class MainWindow : Window
             var color = _genreColors[i % _genreColors.Length];
             var brush = new SolidColorBrush(color);
 
-            var row = new Grid { Margin = new Thickness(0, 0, 0, 6) };
+            var row = new Grid { Margin = new Thickness(0, 0, 0, 8) };
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(160) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -12772,9 +13060,9 @@ public partial class MainWindow : Window
             var barHost = new Grid { VerticalAlignment = VerticalAlignment.Center };
             var barBg = new Border
             {
-                Height          = 10,
+                Height          = 12,
                 Background      = FindResource<IBrush>("AppGridLineBrush"),
-                CornerRadius    = new CornerRadius(5)
+                CornerRadius    = new CornerRadius(6)
             };
             var barGrid = new Grid();
             barGrid.ColumnDefinitions.Add(new ColumnDefinition
@@ -12783,9 +13071,9 @@ public partial class MainWindow : Window
                 { Width = new GridLength(1 - fraction, GridUnitType.Star) });
             var barFill = new Border
             {
-                Height       = 10,
+                Height       = 12,
                 Background   = brush,
-                CornerRadius = new CornerRadius(5)
+                CornerRadius = new CornerRadius(6)
             };
             Grid.SetColumn(barFill, 0);
             barGrid.Children.Add(barFill);
@@ -12806,9 +13094,10 @@ public partial class MainWindow : Window
             Grid.SetColumn(durationTb, 2);
             row.Children.Add(durationTb);
 
-            panel.Children.Add(row);
+            rows.Children.Add(row);
         }
 
+        panel.Child = rows;
         DashboardPanel.Children.Add(panel);
     }
 
