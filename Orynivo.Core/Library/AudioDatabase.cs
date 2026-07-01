@@ -181,6 +181,11 @@ public sealed record ArtistNormalizationResult(int MergedArtists, int UpdatedTra
 /// <summary>Result returned after renaming or merging an artist.</summary>
 public sealed record ArtistRenameResult(long ArtistId, string ArtistName, bool Merged);
 
+/// <summary>Persisted playback queue state loaded from the library database.</summary>
+/// <param name="Paths">Queue paths in playback order.</param>
+/// <param name="CurrentIndex">Zero-based current queue index, or <c>-1</c> when no current item is stored.</param>
+public sealed record PlaybackQueueSnapshot(IReadOnlyList<string> Paths, int CurrentIndex);
+
 /// <summary>
 /// Manages the SQLite audio library database. One instance per application lifetime.
 /// The database file is stored at <c>%LOCALAPPDATA%\Orynivo\library.db</c>.
@@ -200,9 +205,12 @@ public sealed class AudioDatabase : IDisposable
     {
         Directory.CreateDirectory(System.IO.Path.GetDirectoryName(dbPath)!);
         _conn = new SqliteConnection($"Data Source={dbPath}");
-        _conn.Open();
-        ApplyPragmas();
-        EnsureSchema();
+        using (Orynivo.StartupDiagnostics.Time("AudioDatabase: SQLite open"))
+            _conn.Open();
+        using (Orynivo.StartupDiagnostics.Time("AudioDatabase: ApplyPragmas"))
+            ApplyPragmas();
+        using (Orynivo.StartupDiagnostics.Time("AudioDatabase: EnsureSchema"))
+            EnsureSchema();
     }
 
     // ------------------------------------------------------------------
@@ -2099,7 +2107,9 @@ public sealed class AudioDatabase : IDisposable
 
     private void EnsureSchema()
     {
-        Execute("""
+        using (Orynivo.StartupDiagnostics.Time("AudioDatabase.EnsureSchema: tracks table/indexes"))
+        {
+            Execute("""
             CREATE TABLE IF NOT EXISTS tracks (
                 -- Primärschlüssel
                 id                      INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2183,23 +2193,29 @@ public sealed class AudioDatabase : IDisposable
             CREATE INDEX IF NOT EXISTS idx_tracks_format         ON tracks (format);
             CREATE INDEX IF NOT EXISTS idx_tracks_modified_at    ON tracks (modified_at);
             """);
+        }
 
-        EnsureColumn("tracks", "artist_id", "INTEGER REFERENCES artists(id)");
-        EnsureColumn("tracks", "album_id", "INTEGER REFERENCES albums(id)");
-        EnsureColumn("tracks", "is_favorite", "INTEGER NOT NULL DEFAULT 0");
-        EnsureColumn("tracks", "source_path", "TEXT");
-        EnsureColumn("tracks", "cue_path", "TEXT");
-        EnsureColumn("tracks", "segment_start", "REAL");
-        EnsureColumn("tracks", "segment_end", "REAL");
-        Execute("UPDATE tracks SET source_path = path WHERE source_path IS NULL OR source_path = '';");
-        Execute("CREATE INDEX IF NOT EXISTS idx_tracks_source_path ON tracks (source_path);");
-        Execute("CREATE INDEX IF NOT EXISTS idx_tracks_cue_path ON tracks (cue_path);");
-        EnsureColumn("tracks", "downloaded_lyrics", "TEXT");
-        EnsureColumn("tracks", "synced_lyrics", "TEXT");
-        EnsureColumn("tracks", "lyrics_source", "TEXT");
-        EnsureColumn("tracks", "lyrics_fetched_at", "INTEGER");
+        using (Orynivo.StartupDiagnostics.Time("AudioDatabase.EnsureSchema: tracks compatibility columns"))
+        {
+            EnsureColumn("tracks", "artist_id", "INTEGER REFERENCES artists(id)");
+            EnsureColumn("tracks", "album_id", "INTEGER REFERENCES albums(id)");
+            EnsureColumn("tracks", "is_favorite", "INTEGER NOT NULL DEFAULT 0");
+            EnsureColumn("tracks", "source_path", "TEXT");
+            EnsureColumn("tracks", "cue_path", "TEXT");
+            EnsureColumn("tracks", "segment_start", "REAL");
+            EnsureColumn("tracks", "segment_end", "REAL");
+            Execute("UPDATE tracks SET source_path = path WHERE source_path IS NULL OR source_path = '';");
+            Execute("CREATE INDEX IF NOT EXISTS idx_tracks_source_path ON tracks (source_path);");
+            Execute("CREATE INDEX IF NOT EXISTS idx_tracks_cue_path ON tracks (cue_path);");
+            EnsureColumn("tracks", "downloaded_lyrics", "TEXT");
+            EnsureColumn("tracks", "synced_lyrics", "TEXT");
+            EnsureColumn("tracks", "lyrics_source", "TEXT");
+            EnsureColumn("tracks", "lyrics_fetched_at", "INTEGER");
+        }
 
-        Execute("""
+        using (Orynivo.StartupDiagnostics.Time("AudioDatabase.EnsureSchema: core tables/indexes"))
+        {
+            Execute("""
             CREATE TABLE IF NOT EXISTS artists (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
                 name        TEXT NOT NULL UNIQUE COLLATE NOCASE,
@@ -2272,64 +2288,81 @@ public sealed class AudioDatabase : IDisposable
                 value TEXT NOT NULL
             );
             """);
-        MigrateLegacyCachePaths();
-        EnsureColumn("artists", "is_favorite", "INTEGER NOT NULL DEFAULT 0");
-        EnsureColumn("artists", "biography", "TEXT");
-        EnsureColumn("artists", "image_path", "TEXT");
-        EnsureColumn("artists", "image_is_manual", "INTEGER NOT NULL DEFAULT 0");
-        EnsureColumn("artists", "profile_source_url", "TEXT");
-        EnsureColumn("artists", "profile_language", "TEXT");
-        EnsureColumn("artists", "profile_fetched_at", "INTEGER");
-        EnsureColumn("albums", "is_favorite", "INTEGER NOT NULL DEFAULT 0");
-        EnsureColumn("albums", "source_directory", "TEXT NOT NULL DEFAULT ''");
-        EnsureColumn("artworks", "original_path", "TEXT");
-        EnsureColumn("artworks", "thumb_96_path", "TEXT");
-        EnsureColumn("artworks", "thumb_320_path", "TEXT");
-        EnsureColumn("play_history", "media_type", "TEXT NOT NULL DEFAULT 'track'");
-        EnsureColumn("play_history", "title", "TEXT");
-        EnsureColumn("play_history", "subtitle", "TEXT");
-        EnsureColumn("play_history", "external_id", "TEXT");
-        // Genre captured at playback time so genre statistics can include tracks
-        // without a local library row (remote Orynivo Server and Plex tracks).
-        EnsureColumn("play_history", "genre", "TEXT");
+        }
+
+        using (Orynivo.StartupDiagnostics.Time("AudioDatabase.EnsureSchema: legacy cache path migration"))
+            MigrateLegacyCachePaths();
+
+        using (Orynivo.StartupDiagnostics.Time("AudioDatabase.EnsureSchema: non-track compatibility columns"))
+        {
+            EnsureColumn("artists", "is_favorite", "INTEGER NOT NULL DEFAULT 0");
+            EnsureColumn("artists", "biography", "TEXT");
+            EnsureColumn("artists", "image_path", "TEXT");
+            EnsureColumn("artists", "image_is_manual", "INTEGER NOT NULL DEFAULT 0");
+            EnsureColumn("artists", "profile_source_url", "TEXT");
+            EnsureColumn("artists", "profile_language", "TEXT");
+            EnsureColumn("artists", "profile_fetched_at", "INTEGER");
+            EnsureColumn("albums", "is_favorite", "INTEGER NOT NULL DEFAULT 0");
+            EnsureColumn("albums", "source_directory", "TEXT NOT NULL DEFAULT ''");
+            EnsureColumn("artworks", "original_path", "TEXT");
+            EnsureColumn("artworks", "thumb_96_path", "TEXT");
+            EnsureColumn("artworks", "thumb_320_path", "TEXT");
+            EnsureColumn("play_history", "media_type", "TEXT NOT NULL DEFAULT 'track'");
+            EnsureColumn("play_history", "title", "TEXT");
+            EnsureColumn("play_history", "subtitle", "TEXT");
+            EnsureColumn("play_history", "external_id", "TEXT");
+            // Genre captured at playback time so genre statistics can include tracks
+            // without a local library row (remote Orynivo Server and Plex tracks).
+            EnsureColumn("play_history", "genre", "TEXT");
+        }
 
         if (!string.Equals(GetMeta("normalized_library_v1"), "done", StringComparison.Ordinal))
         {
-            MigrateNormalizedLibrary();
+            using (Orynivo.StartupDiagnostics.Time("AudioDatabase.EnsureSchema: MigrateNormalizedLibrary"))
+                MigrateNormalizedLibrary();
             SetMeta("normalized_library_v1", "done");
         }
         if (!string.Equals(GetMeta("album_disc_directory_identity_v1"), "done", StringComparison.Ordinal))
         {
-            RebuildAlbumsByPhysicalDirectory();
+            using (Orynivo.StartupDiagnostics.Time("AudioDatabase.EnsureSchema: RebuildAlbumsByPhysicalDirectory"))
+                RebuildAlbumsByPhysicalDirectory();
             SetMeta("album_artist_rebuild_v1", "done");
             SetMeta("album_title_uniqueness_v1", "done");
             SetMeta("album_title_artist_identity_v1", "done");
             SetMeta("album_title_directory_identity_v1", "done");
             SetMeta("album_disc_directory_identity_v1", "done");
         }
-        Execute("""
+        using (Orynivo.StartupDiagnostics.Time("AudioDatabase.EnsureSchema: album identity indexes"))
+        {
+            Execute("""
             DROP INDEX IF EXISTS idx_albums_title_artist_identity;
             CREATE UNIQUE INDEX IF NOT EXISTS idx_albums_title_directory_identity
             ON albums (title COLLATE NOCASE, source_directory COLLATE NOCASE);
             """);
+        }
         if (!string.Equals(GetMeta("artwork_files_v1"), "done", StringComparison.Ordinal))
         {
-            MigrateArtworkFiles();
+            using (Orynivo.StartupDiagnostics.Time("AudioDatabase.EnsureSchema: MigrateArtworkFiles"))
+                MigrateArtworkFiles();
             SetMeta("artwork_files_v1", "done");
         }
         var artworkRoot = AppPaths.GetDataPath("artworks");
         if (!string.Equals(GetMeta("artwork_files_root_v1"), artworkRoot, StringComparison.Ordinal))
         {
-            RepairArtworkFilesForCurrentRoot();
+            using (Orynivo.StartupDiagnostics.Time("AudioDatabase.EnsureSchema: RepairArtworkFilesForCurrentRoot"))
+                RepairArtworkFilesForCurrentRoot();
             SetMeta("artwork_files_root_v1", artworkRoot);
         }
         if (!string.Equals(GetMeta("trim_track_titles_v1"), "done", StringComparison.Ordinal))
         {
-            TrimExistingTrackTitles();
+            using (Orynivo.StartupDiagnostics.Time("AudioDatabase.EnsureSchema: TrimExistingTrackTitles"))
+                TrimExistingTrackTitles();
             SetMeta("trim_track_titles_v1", "done");
         }
 
-        Execute("""
+        using (Orynivo.StartupDiagnostics.Time("AudioDatabase.EnsureSchema: playlists/radio/podcast tables"))
+        {
+            Execute("""
             CREATE TABLE IF NOT EXISTS playlists (
                 id               INTEGER PRIMARY KEY AUTOINCREMENT,
                 name             TEXT    NOT NULL,
@@ -2351,6 +2384,12 @@ public sealed class AudioDatabase : IDisposable
 
             CREATE INDEX IF NOT EXISTS idx_playlist_tracks_playlist ON playlist_tracks (playlist_id, position);
             CREATE INDEX IF NOT EXISTS idx_playlist_tracks_path     ON playlist_tracks (path);
+
+            CREATE TABLE IF NOT EXISTS playback_queue (
+                position   INTEGER PRIMARY KEY,
+                path       TEXT    NOT NULL,
+                is_current INTEGER NOT NULL DEFAULT 0
+            );
 
             CREATE TABLE IF NOT EXISTS radio_stations (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -2393,8 +2432,9 @@ public sealed class AudioDatabase : IDisposable
                 PRIMARY KEY (podcast_id, episode_key)
             );
             """);
-        EnsureColumn("playlists", "is_smart",        "INTEGER NOT NULL DEFAULT 0");
-        EnsureColumn("playlists", "filter_criteria",  "TEXT");
+            EnsureColumn("playlists", "is_smart",        "INTEGER NOT NULL DEFAULT 0");
+            EnsureColumn("playlists", "filter_criteria",  "TEXT");
+        }
     }
 
     // ------------------------------------------------------------------
@@ -2641,6 +2681,63 @@ public sealed class AudioDatabase : IDisposable
     // ------------------------------------------------------------------
     // Playlisten – CRUD
     // ------------------------------------------------------------------
+
+    /// <summary>Loads the persisted editable playback queue.</summary>
+    /// <returns>The saved queue paths and current queue index.</returns>
+    public PlaybackQueueSnapshot GetPlaybackQueue()
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT position, path, is_current
+            FROM playback_queue
+            ORDER BY position;
+            """;
+        using var reader = cmd.ExecuteReader();
+        var paths = new List<string>();
+        var currentIndex = -1;
+        while (reader.Read())
+        {
+            paths.Add(reader.GetString(1));
+            if (reader.GetInt32(2) != 0)
+                currentIndex = paths.Count - 1;
+        }
+
+        return new PlaybackQueueSnapshot(paths, currentIndex);
+    }
+
+    /// <summary>Replaces the persisted editable playback queue transactionally.</summary>
+    /// <param name="paths">Queue paths in playback order.</param>
+    /// <param name="currentIndex">Zero-based current queue index, or <c>-1</c> when no item is current.</param>
+    public void SavePlaybackQueue(IReadOnlyList<string> paths, int currentIndex)
+    {
+        using var transaction = _conn.BeginTransaction();
+        using (var deleteCommand = _conn.CreateCommand())
+        {
+            deleteCommand.Transaction = transaction;
+            deleteCommand.CommandText = "DELETE FROM playback_queue;";
+            deleteCommand.ExecuteNonQuery();
+        }
+
+        using var insertCommand = _conn.CreateCommand();
+        insertCommand.Transaction = transaction;
+        insertCommand.CommandText = """
+            INSERT INTO playback_queue (position, path, is_current)
+            VALUES ($position, $path, $current);
+            """;
+        var positionParameter = insertCommand.Parameters.Add("$position", SqliteType.Integer);
+        var pathParameter = insertCommand.Parameters.Add("$path", SqliteType.Text);
+        var currentParameter = insertCommand.Parameters.Add("$current", SqliteType.Integer);
+
+        for (var index = 0; index < paths.Count; index++)
+        {
+            positionParameter.Value = index + 1;
+            pathParameter.Value = paths[index];
+            currentParameter.Value = index == currentIndex ? 1 : 0;
+            insertCommand.ExecuteNonQuery();
+        }
+
+        transaction.Commit();
+    }
 
     public long CreateSmartPlaylist(string name, string filterCriteria)
     {

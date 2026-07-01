@@ -24,9 +24,15 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             RegisterCrashHandlers();
+            StartupTimingLog.Start();
+            StartupDiagnostics.Log = StartupTimingLog.Write;
             if (OperatingSystem.IsWindows())
+            {
+                using var appIdTiming = StartupTimingLog.Time("Set AppUserModelID");
                 SetCurrentProcessExplicitAppUserModelID(AppUserModelId);
-            AppPaths.MigrateLegacyData();
+            }
+            using (StartupTimingLog.Time("AppPaths.MigrateLegacyData"))
+                AppPaths.MigrateLegacyData();
 
             var startup = new StartupWindow();
             startup.Show();
@@ -42,26 +48,46 @@ public partial class App : Application
     {
         try
         {
-            var settings = new SettingsStore().Load();
-            ThemeManager.Apply(settings.Theme);
-            LocalizationManager.Apply(settings.Language);
+            using var totalTiming = StartupTimingLog.Time("InitializeAsync before main window");
+            AppSettings settings;
+            using (StartupTimingLog.Time("SettingsStore.Load"))
+                settings = new SettingsStore().Load();
+            using (StartupTimingLog.Time("ThemeManager.Apply"))
+                ThemeManager.Apply(settings.Theme);
+            using (StartupTimingLog.Time("LocalizationManager.Apply"))
+                LocalizationManager.Apply(settings.Language);
 
-            var ffmpegAvailable = await FfmpegLocator.EnsureAvailableAsync(
-                new Progress<string>(status => startup.Status = status));
+            bool ffmpegAvailable;
+            using (StartupTimingLog.Time("FfmpegLocator.EnsureAvailableAsync"))
+            {
+                ffmpegAvailable = await FfmpegLocator.EnsureAvailableAsync(
+                    new Progress<string>(status =>
+                    {
+                        StartupTimingLog.Write($"FFmpeg status: {status}");
+                        startup.Status = status;
+                    }));
+            }
             if (!ffmpegAvailable)
                 await AppMessageBox.ShowAsync(LocalizationManager.Current.FfmpegDownloadFailed);
 
             startup.Status = LocalizationManager.Current.StartupPreparingLibrary;
-            await Task.Run(() =>
+            using (StartupTimingLog.Time("AudioDatabase.OpenDefault startup preparation"))
             {
-                using var db = AudioDatabase.OpenDefault();
-                if (!TrackSearchIndex.IsCurrent())
-                    TrackSearchIndex.Rebuild(db.GetAll());
-            });
+                await Task.Run(() =>
+                {
+                    using var db = AudioDatabase.OpenDefault();
+                });
+            }
+            StartupDiagnostics.Log = null;
 
-            var main = new MainWindow();
-            desktop.MainWindow = main;
-            main.Show();
+            using (StartupTimingLog.Time("MainWindow constructor/show"))
+            {
+                var main = new MainWindow();
+                desktop.MainWindow = main;
+                main.Show();
+
+                _ = EnsureSearchIndexAsync(main);
+            }
         }
         catch (Exception ex)
         {
@@ -70,6 +96,56 @@ public partial class App : Application
         finally
         {
             startup.Close();
+        }
+    }
+
+    private static async Task EnsureSearchIndexAsync(MainWindow main)
+    {
+        try
+        {
+            main.SetStatusText(LocalizationManager.Current.StartupCheckingSearchIndex);
+            bool searchIndexCurrent;
+            using (StartupTimingLog.Time("TrackSearchIndex.IsCurrent background"))
+                searchIndexCurrent = await Task.Run(TrackSearchIndex.IsCurrent);
+            if (searchIndexCurrent)
+            {
+                main.ClearStatusText(LocalizationManager.Current.StartupCheckingSearchIndex);
+                return;
+            }
+
+            using (StartupTimingLog.Time("TrackSearchIndex.Rebuild background"))
+            {
+                await Task.Run(() =>
+                {
+                    using var db = AudioDatabase.OpenDefault();
+                    TrackSearchIndex.Rebuild(db.GetAll(), (current, total, _) =>
+                    {
+                        var status = string.Format(
+                            LocalizationManager.Current.SearchIndexRebuilding,
+                            current,
+                            total);
+                        Dispatcher.UIThread.Post(() => main.SetStatusText(status));
+                        if (current == total || current % 5000 == 0)
+                            StartupTimingLog.Write($"Search index rebuild progress: {current}/{total}");
+                    });
+                });
+            }
+
+            main.SetStatusText(LocalizationManager.Current.SearchIndexReady);
+            await Task.Delay(TimeSpan.FromSeconds(5));
+            main.ClearStatusText(LocalizationManager.Current.SearchIndexReady);
+        }
+        catch (Exception ex)
+        {
+            CrashLogger.Log(ex, "Search index rebuild");
+            main.SetStatusText(string.Format(
+                LocalizationManager.Current.SearchIndexFailed,
+                ex.Message));
+        }
+        finally
+        {
+            StartupTimingLog.Write("Startup diagnostics completed");
+            StartupDiagnostics.Log = null;
         }
     }
 

@@ -4,6 +4,59 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- The bottom transport bar's position-slider progress, slider thumb, and
+  play/pause button are now tinted with an accent colour extracted from the
+  current cover art (falling back to the app accent when no artwork is
+  available), and the album artwork is slightly larger (72 px, rounded). The bar
+  keeps its full-width, flush layout.
+
+### Changed
+
+- Refreshed the main Orynivo visual theme with a more neutral dark/light
+  palette, a central accent brush, softer sidebar selection pills, larger
+  transport controls, subtler table rows, and updated Dashboard album, calendar,
+  and genre-stat cards.
+- Refined the modernized shell with calmer dark-mode accent tones, pill-shaped
+  header action buttons, bordered segmented view switches, rounded search/input
+  fields, and cleaner DataGrid spacing without visible grid lines.
+- Album and artist artwork cards now use theme-aware placeholder backgrounds,
+  subtle borders, clipped covers, and a calmer asymmetric card shape.
+
+### Fixed
+
+- Startup no longer keeps the splash screen open while checking or rebuilding a
+  Lucene search index for large libraries. The main window opens after database
+  preparation, and search-index checking/rebuild continues in the background
+  with progress shown in the sidebar status line.
+- Startup no longer validates every restored playback-queue path synchronously,
+  so very large persisted queues on slow or sleeping drives no longer keep the
+  splash screen open for minutes.
+- The editable playback queue is now persisted in the SQLite library database
+  instead of `settings.json`. Existing JSON queues are imported once and then
+  cleared from settings, avoiding oversized settings files and expensive JSON
+  saves for large queues.
+- Double-clicking a track in the unfiltered top-level Tracks view now queues only
+  that track instead of persisting the entire local library as the editable
+  playback queue. Filtered, album, folder, playlist, and search-result playback
+  still keeps the visible context as the queue.
+- Startup now writes detailed timing diagnostics to
+  `%LOCALAPPDATA%\Orynivo\logs\startup-timing-latest.log`, including FFmpeg,
+  the initial database open, schema/migration substeps, main-window construction,
+  and background search-index work. The detailed database hook is disabled
+  before the main window opens so normal UI database reads do not flood the log
+  or slow the app down.
+- Sidebar accordion chevrons now share one alignment and colour across static
+  and dynamically generated navigation groups, and Plex library children use
+  the same nav text styling as the other submenu rows.
+- Accent-filled controls such as the artwork/table switch, active A-Z index
+  buttons, cover-search buttons, and the transport play button now use
+  contrast-safe foreground colours instead of assuming white text on every
+  accent background.
+
 ## [0.20.3] - 2026-06-30
 
 ### Added

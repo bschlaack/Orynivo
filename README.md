@@ -208,7 +208,8 @@ byte-range streaming without FFmpeg.
   when no output has been configured yet.
 - Seeking, volume control, pause, and an editable persistent **Up next** queue
   with play-next/append actions, removal, reordering, playlist saving, and
-  shuffle without repeating a track within the currently loaded queue
+  shuffle without repeating a track within the currently loaded queue. The queue
+  is stored in the SQLite library database instead of the JSON settings file.
 - Remote Orynivo Server tracks keep their library title, artist, album, and
   duration in transport metadata, play history, and **Up next**. Authenticated
   `?key=` stream URLs are not shown as titles and are not persisted in the
@@ -287,8 +288,8 @@ byte-range streaming without FFmpeg.
   track lists
 - Artist and album views with table and virtualized artwork modes, including
   Favorites-only filtering in both modes
-- Dashboard with recently added albums, second-precision playback calendar,
-  and linked top genres that open the matching filtered track list
+- Dashboard with larger recently added album cards, second-precision playback
+  calendar, and linked top genres that open the matching filtered track list
 - Clickable populated calendar days with a modal daily listening history;
   local title, album, and artist links open the corresponding library view,
   and title links immediately start playback
@@ -354,7 +355,8 @@ byte-range streaming without FFmpeg.
   merge flow with an explicit choice of which artist profile to retain
 - ZIP export and import for the managed library, playlists, personal radio
   stations, pinned podcasts, history, artwork, and configured library directories
-- Light and dark themes
+- Modern light and dark themes with neutral surfaces, a shared accent resource,
+  cover-derived transport accents, and refined sidebar/table/transport styling
 - German, English, French, and Spanish user interfaces
 - Multiple Plex Media Server configurations with protected access tokens and
   music-library discovery, artist/album/track browsing, folder navigation, and

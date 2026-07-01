@@ -201,6 +201,10 @@ public static class LocalizationManager
         resources["L_DeviceDsdFormats"] = Current.DeviceDsdFormats;
         resources["L_Dashboard"] = Current.Dashboard;
         resources["L_StartupPreparingLibrary"] = Current.StartupPreparingLibrary;
+        resources["L_StartupCheckingSearchIndex"] = Current.StartupCheckingSearchIndex;
+        resources["L_SearchIndexRebuilding"] = Current.SearchIndexRebuilding;
+        resources["L_SearchIndexReady"] = Current.SearchIndexReady;
+        resources["L_SearchIndexFailed"] = Current.SearchIndexFailed;
         resources["L_Streaming"] = Current.Streaming;
         resources["L_StreamingServices"] = Current.StreamingServices;
         resources["L_Qobuz"] = Current.Qobuz;
@@ -408,6 +412,10 @@ public static class LocalizationManager
         ScanCompleted = "Fertig: {0} Dateien · {1} neu · {2} aktualisiert · {3} entfernt{4}",
         ScanFailed = "Fehler: {0}",
         StartupPreparingLibrary = "Bibliothek wird vorbereitet …",
+        StartupCheckingSearchIndex = "Suchindex wird geprüft …",
+        SearchIndexRebuilding = "Suchindex wird im Hintergrund neu aufgebaut ({0}/{1}) …",
+        SearchIndexReady = "Suchindex ist aktualisiert.",
+        SearchIndexFailed = "Suchindex konnte nicht aktualisiert werden: {0}",
         Back = "Zurück",
         MarkAsFavorite = "Als Favorit markieren",
         PlaybackThrough = "Wiedergabe über {0}",
@@ -812,7 +820,12 @@ public static class LocalizationManager
         AddMusicDirectory = "Add music directory", TrackCountTooltip = "Number of tracks in the database",
         Scan = "Scan", RemoveDirectory = "Remove directory",
         ScanCompleted = "Finished: {0} files · {1} new · {2} updated · {3} removed{4}", ScanFailed = "Error: {0}",
-        StartupPreparingLibrary = "Preparing library …", Back = "Back", MarkAsFavorite = "Mark as favorite",
+        StartupPreparingLibrary = "Preparing library …",
+        StartupCheckingSearchIndex = "Checking search index …",
+        SearchIndexRebuilding = "Rebuilding search index in the background ({0}/{1}) …",
+        SearchIndexReady = "Search index is up to date.",
+        SearchIndexFailed = "Search index could not be updated: {0}",
+        Back = "Back", MarkAsFavorite = "Mark as favorite",
         PlaybackThrough = "Playback through {0}",
         PlaybackThroughWithDsdConversion = "Playback through {0} · DSD is converted to PCM ({1:N0} Hz)",
         NativeDsdOutput = "Native DSD", DsdToPcmOutput = "DSD → PCM",
@@ -1210,7 +1223,12 @@ public static class LocalizationManager
         AddMusicDirectory = "Ajouter un dossier musical", TrackCountTooltip = "Nombre de titres dans la base",
         Scan = "Analyser", RemoveDirectory = "Supprimer le dossier",
         ScanCompleted = "Terminé : {0} fichiers · {1} nouveaux · {2} actualisés · {3} supprimés{4}", ScanFailed = "Erreur : {0}",
-        StartupPreparingLibrary = "Préparation de la bibliothèque …", Back = "Retour", MarkAsFavorite = "Ajouter aux favoris",
+        StartupPreparingLibrary = "Préparation de la bibliothèque …",
+        StartupCheckingSearchIndex = "Vérification de l’index de recherche …",
+        SearchIndexRebuilding = "Reconstruction de l’index de recherche en arrière-plan ({0}/{1}) …",
+        SearchIndexReady = "L’index de recherche est à jour.",
+        SearchIndexFailed = "L’index de recherche n’a pas pu être mis à jour : {0}",
+        Back = "Retour", MarkAsFavorite = "Ajouter aux favoris",
         PlaybackThrough = "Lecture via {0}",
         PlaybackThroughWithDsdConversion = "Lecture via {0} · Le DSD est converti en PCM ({1:N0} Hz)",
         NativeDsdOutput = "DSD natif", DsdToPcmOutput = "DSD → PCM",
@@ -1605,7 +1623,12 @@ public static class LocalizationManager
         AddMusicDirectory = "Agregar directorio de música", TrackCountTooltip = "Número de pistas en la base de datos",
         Scan = "Analizar", RemoveDirectory = "Eliminar directorio",
         ScanCompleted = "Finalizado: {0} archivos · {1} nuevos · {2} actualizados · {3} eliminados{4}", ScanFailed = "Error: {0}",
-        StartupPreparingLibrary = "Preparando biblioteca …", Back = "Atrás", MarkAsFavorite = "Marcar como favorita",
+        StartupPreparingLibrary = "Preparando biblioteca …",
+        StartupCheckingSearchIndex = "Comprobando índice de búsqueda …",
+        SearchIndexRebuilding = "Reconstruyendo el índice de búsqueda en segundo plano ({0}/{1}) …",
+        SearchIndexReady = "El índice de búsqueda está actualizado.",
+        SearchIndexFailed = "No se pudo actualizar el índice de búsqueda: {0}",
+        Back = "Atrás", MarkAsFavorite = "Marcar como favorita",
         PlaybackThrough = "Reproducción mediante {0}",
         PlaybackThroughWithDsdConversion = "Reproducción mediante {0} · DSD se convierte a PCM ({1:N0} Hz)",
         NativeDsdOutput = "DSD nativo", DsdToPcmOutput = "DSD → PCM",
