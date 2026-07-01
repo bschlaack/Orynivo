@@ -1,4 +1,5 @@
 using Avalonia.Media;
+using Avalonia.Styling;
 using AvaloniaApp = Avalonia.Application;
 
 namespace Orynivo;
@@ -12,8 +13,15 @@ public static class ThemeManager
     /// <summary>Switches the global Avalonia resource dictionary to the specified theme.</summary>
     public static void Apply(AppTheme theme)
     {
-        var resources = AvaloniaApp.Current!.Resources;
+        var app = AvaloniaApp.Current!;
+        var resources = app.Resources;
         var dark = theme == AppTheme.Dark;
+
+        // Align the built-in Fluent theme variant with the selected scheme so that
+        // any control still using default Fluent resources (e.g. code-created
+        // checkboxes) resolves dark-appropriate colours instead of light-variant
+        // borders that would appear near-black on the dark background.
+        app.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
 
         resources["AppAccentBrush"]              = Brush(dark ? "#4FDDBD" : "#2563EB");
         resources["AppAccentTextBrush"]          = Brush(dark ? "#102033" : "#FFFFFF");

@@ -2610,6 +2610,7 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         <Grid Grid.Row="0">
                             <Grid.ColumnDefinitions>
@@ -2701,6 +2702,20 @@
                                 Theme="{StaticResource HeaderFilterButtonTheme}"
                                 Content="{DynamicResource L_ArtistInfoSource}"
                                 Click="ArtistInfoSourceButton_OnClick"/>
+                        <StackPanel x:Name="ArtistInfoAlbumsSection"
+                                    Grid.Row="4"
+                                    Margin="0,34,0,0"
+                                    MaxWidth="920"
+                                    HorizontalAlignment="Center"
+                                    IsVisible="False">
+                            <TextBlock Text="{DynamicResource L_Albums}"
+                                       FontSize="{DynamicResource FontSizeTitle}"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,14"
+                                       Foreground="{DynamicResource AppPrimaryTextBrush}"/>
+                            <WrapPanel x:Name="ArtistInfoAlbumsPanel"
+                                       Orientation="Horizontal"/>
+                        </StackPanel>
                     </Grid>
                 </ScrollViewer>
                 <TextBlock x:Name="ArtistInfoStatusTextBlock"

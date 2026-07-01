@@ -315,7 +315,11 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   by `Text` and a `State` (`StatusBadgeState.Ok`/`Warning`/`Off`). Settings uses
   it to surface FFmpeg, Steinberg ASIO, cwASIO, and MCP server availability;
   `SettingsView` populates the badges in `UpdateSubsystemStatusBadges()` /
-  `UpdateMcpStatusBadge()`.
+  `UpdateMcpStatusBadge()`. Each Orynivo Server and Plex server row also carries
+  a live connection badge probed asynchronously (`CheckServerStatusAsync` +
+  `ProbeOrynivoServerAsync`/`ProbePlexServerAsync`), so opening Settings never
+  blocks on network calls; pending probes are cancelled per-list on rebuild and
+  in `Deactivate()`.
 - `Orynivo/EqualizerProfileNameDialog.*`: themed unique-name dialog used when
   creating a new persisted equalizer profile
 - `Native/AsioBridge/bridge.cpp`: shared Steinberg/cwASIO initialization,
@@ -875,6 +879,16 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   content with the current artist image, biography, and source link. The source
   label ("Quelle: Wikipedia" / "Quelle: Last.fm") is set dynamically from the
   stored `SourceUrl`.
+- Below the biography, the artist-info view shows the artist's albums as a
+  wrapped strip of clickable cover cards (`ArtistInfoAlbumsSection` /
+  `ArtistInfoAlbumsPanel`, populated by `LoadArtistInfoAlbumsAsync` →
+  `PopulateArtistInfoAlbums` → `BuildArtistInfoAlbumCard`). Albums are loaded
+  through the shared `ILibraryCatalogProvider` (`GetAlbumsByArtistAsync`) so
+  local, remote-library, and now-playing remote artists all populate the same
+  way; missing covers use the `InitialsAvatar` placeholder. Clicking a card
+  closes the artist-info overlay and opens the album's tracks
+  (`OpenArtistInfoAlbumAsync`): local via `ShowAlbumTracksAsync`, remote via
+  `OpenOrynivoAlbumTracksAsync` on the album's own server.
 - Artwork A-Z navigation indexes the complete lightweight artist/album result,
   but binds rows to the virtualized wrap panels in pages. A jump must append
   through the target row and defer `ScrollIntoView` until layout has processed
@@ -1672,4 +1686,6 @@ and move those entries into a dated version section when preparing a release.
 - Interactive settings inputs (TextBox, ComboBox, NumericUpDown, buttons) share
   a consistent 30 px height.
 - Subsystem availability is surfaced with `StatusBadge` controls (FFmpeg,
-  Steinberg ASIO, cwASIO in the Output section; MCP in the MCP section).
+  Steinberg ASIO, cwASIO in the Output section; MCP in the MCP section). Each
+  configured Orynivo Server / Plex server row additionally shows a live
+  connection badge probed asynchronously so opening Settings stays instant.

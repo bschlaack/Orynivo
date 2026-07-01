@@ -353,6 +353,7 @@ public sealed record LocalizedStrings(
     public string StatusEnabled { get; init; } = "";
     public string StatusDisabled { get; init; } = "";
     public string StatusReady { get; init; } = "";
+    public string StatusChecking { get; init; } = "";
     public string LanguageGerman { get; init; } = "";
     public string LanguageEnglish { get; init; } = "";
     public string LanguageFrench { get; init; } = "";
