@@ -369,7 +369,7 @@ public static class LibraryScanner
                     {
                         if (attempt < 3)
                         {
-                            Thread.Sleep(250 * (attempt + 1));
+                            WaitBeforeRetry(attempt, cancellationToken);
                             continue;
                         }
                         break;
@@ -378,11 +378,11 @@ public static class LibraryScanner
                 }
                 catch (IOException) when (attempt < 3)
                 {
-                    Thread.Sleep(250 * (attempt + 1));
+                    WaitBeforeRetry(attempt, cancellationToken);
                 }
                 catch (UnauthorizedAccessException) when (attempt < 3)
                 {
-                    Thread.Sleep(250 * (attempt + 1));
+                    WaitBeforeRetry(attempt, cancellationToken);
                 }
             }
 
@@ -398,6 +398,13 @@ public static class LibraryScanner
         if (removedPaths.Count > 0)
             TrackSearchIndex.RemovePaths(removedPaths);
         return updatedTracks.Count > 0 || removedPaths.Count > 0;
+    }
+
+    private static void WaitBeforeRetry(int attempt, CancellationToken cancellationToken)
+    {
+        var delay = TimeSpan.FromMilliseconds(250 * (attempt + 1));
+        if (cancellationToken.WaitHandle.WaitOne(delay))
+            cancellationToken.ThrowIfCancellationRequested();
     }
 
     private static bool IsSupportedPath(string path) =>
