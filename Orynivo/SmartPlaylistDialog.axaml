@@ -88,7 +88,7 @@
                       HorizontalScrollBarVisibility="Disabled">
             <StackPanel Spacing="8">
                 <TextBlock Text="{DynamicResource L_SmartPlaylistName}"
-                           FontSize="12"
+                           FontSize="{DynamicResource FontSizeCaption}"
                            Foreground="{DynamicResource AppMutedTextBrush}"/>
                 <TextBox x:Name="NameTextBox"
                          Height="34"
@@ -100,7 +100,7 @@
                          TextChanged="NameTextBox_OnTextChanged"/>
 
                 <TextBlock Text="{DynamicResource L_SmartPlaylistBasicFilters}"
-                           FontSize="15"
+                           FontSize="{DynamicResource FontSizeBodyStrong}"
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource AppPrimaryTextBrush}"
                            Margin="0,14,0,2"/>
@@ -108,21 +108,21 @@
                           Content="{DynamicResource L_Favorites}"
                           Theme="{StaticResource SmartPlaylistCheckBoxTheme}"/>
                 <TextBlock Text="{DynamicResource L_SmartPlaylistGenres}"
-                           FontSize="12"
+                           FontSize="{DynamicResource FontSizeCaption}"
                            Foreground="{DynamicResource AppMutedTextBrush}"/>
                 <TextBox x:Name="GenresTextBox"
                          Background="{DynamicResource AppInputBrush}"
                          Foreground="{DynamicResource AppPrimaryTextBrush}"
                          BorderBrush="{DynamicResource AppInputBorderBrush}"/>
                 <TextBlock Text="{DynamicResource L_SmartPlaylistFormats}"
-                           FontSize="12"
+                           FontSize="{DynamicResource FontSizeCaption}"
                            Foreground="{DynamicResource AppMutedTextBrush}"/>
                 <TextBox x:Name="FormatsTextBox"
                          Background="{DynamicResource AppInputBrush}"
                          Foreground="{DynamicResource AppPrimaryTextBrush}"
                          BorderBrush="{DynamicResource AppInputBorderBrush}"/>
                 <TextBlock Text="{DynamicResource L_SmartPlaylistBitrates}"
-                           FontSize="12"
+                           FontSize="{DynamicResource FontSizeCaption}"
                            Foreground="{DynamicResource AppMutedTextBrush}"/>
                 <TextBox x:Name="BitratesTextBox"
                          Background="{DynamicResource AppInputBrush}"
@@ -130,14 +130,14 @@
                          BorderBrush="{DynamicResource AppInputBorderBrush}"/>
 
                 <TextBlock Text="{DynamicResource L_SmartPlaylistMetadata}"
-                           FontSize="15"
+                           FontSize="{DynamicResource FontSizeBodyStrong}"
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource AppPrimaryTextBrush}"
                            Margin="0,14,0,2"/>
                 <Grid ColumnDefinitions="*,*">
                     <StackPanel Grid.Column="0" Spacing="6">
                         <TextBlock Text="{DynamicResource L_SmartPlaylistMinimumYear}"
-                                   FontSize="12"
+                                   FontSize="{DynamicResource FontSizeCaption}"
                                    Foreground="{DynamicResource AppMutedTextBrush}"/>
                         <TextBox x:Name="MinimumYearTextBox"
                                  Background="{DynamicResource AppInputBrush}"
@@ -146,7 +146,7 @@
                     </StackPanel>
                     <StackPanel Grid.Column="1" Spacing="6" Margin="12,0,0,0">
                         <TextBlock Text="{DynamicResource L_SmartPlaylistMaximumYear}"
-                                   FontSize="12"
+                                   FontSize="{DynamicResource FontSizeCaption}"
                                    Foreground="{DynamicResource AppMutedTextBrush}"/>
                         <TextBox x:Name="MaximumYearTextBox"
                                  Background="{DynamicResource AppInputBrush}"
@@ -157,7 +157,7 @@
                 <Grid ColumnDefinitions="*,*">
                     <StackPanel Grid.Column="0" Spacing="6">
                         <TextBlock Text="{DynamicResource L_SmartPlaylistArtistContains}"
-                                   FontSize="12"
+                                   FontSize="{DynamicResource FontSizeCaption}"
                                    Foreground="{DynamicResource AppMutedTextBrush}"/>
                         <TextBox x:Name="ArtistTextBox"
                                  Background="{DynamicResource AppInputBrush}"
@@ -166,7 +166,7 @@
                     </StackPanel>
                     <StackPanel Grid.Column="1" Spacing="6" Margin="12,0,0,0">
                         <TextBlock Text="{DynamicResource L_SmartPlaylistAlbumContains}"
-                                   FontSize="12"
+                                   FontSize="{DynamicResource FontSizeCaption}"
                                    Foreground="{DynamicResource AppMutedTextBrush}"/>
                         <TextBox x:Name="AlbumTextBox"
                                  Background="{DynamicResource AppInputBrush}"
@@ -177,7 +177,7 @@
                 <Grid ColumnDefinitions="*,*">
                     <StackPanel Grid.Column="0" Spacing="6">
                         <TextBlock Text="{DynamicResource L_SmartPlaylistMinimumDuration}"
-                                   FontSize="12"
+                                   FontSize="{DynamicResource FontSizeCaption}"
                                    Foreground="{DynamicResource AppMutedTextBrush}"/>
                         <TextBox x:Name="MinimumDurationTextBox"
                                  Background="{DynamicResource AppInputBrush}"
@@ -186,7 +186,7 @@
                     </StackPanel>
                     <StackPanel Grid.Column="1" Spacing="6" Margin="12,0,0,0">
                         <TextBlock Text="{DynamicResource L_SmartPlaylistMaximumDuration}"
-                                   FontSize="12"
+                                   FontSize="{DynamicResource FontSizeCaption}"
                                    Foreground="{DynamicResource AppMutedTextBrush}"/>
                         <TextBox x:Name="MaximumDurationTextBox"
                                  Background="{DynamicResource AppInputBrush}"
@@ -196,14 +196,14 @@
                 </Grid>
 
                 <TextBlock Text="{DynamicResource L_SmartPlaylistHistory}"
-                           FontSize="15"
+                           FontSize="{DynamicResource FontSizeBodyStrong}"
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource AppPrimaryTextBrush}"
                            Margin="0,14,0,2"/>
                 <Grid ColumnDefinitions="*,*">
                     <StackPanel Grid.Column="0" Spacing="6">
                         <TextBlock Text="{DynamicResource L_SmartPlaylistAddedWithinDays}"
-                                   FontSize="12"
+                                   FontSize="{DynamicResource FontSizeCaption}"
                                    Foreground="{DynamicResource AppMutedTextBrush}"/>
                         <TextBox x:Name="AddedWithinDaysTextBox"
                                  Background="{DynamicResource AppInputBrush}"
@@ -212,7 +212,7 @@
                     </StackPanel>
                     <StackPanel Grid.Column="1" Spacing="6" Margin="12,0,0,0">
                         <TextBlock Text="{DynamicResource L_SmartPlaylistPlayedWithinDays}"
-                                   FontSize="12"
+                                   FontSize="{DynamicResource FontSizeCaption}"
                                    Foreground="{DynamicResource AppMutedTextBrush}"/>
                         <TextBox x:Name="PlayedWithinDaysTextBox"
                                  Background="{DynamicResource AppInputBrush}"
@@ -226,7 +226,7 @@
                 <Grid ColumnDefinitions="*,*">
                     <StackPanel Grid.Column="0" Spacing="6">
                         <TextBlock Text="{DynamicResource L_SmartPlaylistMinimumPlayCount}"
-                                   FontSize="12"
+                                   FontSize="{DynamicResource FontSizeCaption}"
                                    Foreground="{DynamicResource AppMutedTextBrush}"/>
                         <TextBox x:Name="MinimumPlayCountTextBox"
                                  Background="{DynamicResource AppInputBrush}"
@@ -235,7 +235,7 @@
                     </StackPanel>
                     <StackPanel Grid.Column="1" Spacing="6" Margin="12,0,0,0">
                         <TextBlock Text="{DynamicResource L_SmartPlaylistMaximumPlayCount}"
-                                   FontSize="12"
+                                   FontSize="{DynamicResource FontSizeCaption}"
                                    Foreground="{DynamicResource AppMutedTextBrush}"/>
                         <TextBox x:Name="MaximumPlayCountTextBox"
                                  Background="{DynamicResource AppInputBrush}"
@@ -245,14 +245,14 @@
                 </Grid>
 
                 <TextBlock Text="{DynamicResource L_SmartPlaylistResult}"
-                           FontSize="15"
+                           FontSize="{DynamicResource FontSizeBodyStrong}"
                            FontWeight="SemiBold"
                            Foreground="{DynamicResource AppPrimaryTextBrush}"
                            Margin="0,14,0,2"/>
                 <Grid ColumnDefinitions="*,*">
                     <StackPanel Grid.Column="0" Spacing="6">
                         <TextBlock Text="{DynamicResource L_SmartPlaylistSortOrder}"
-                                   FontSize="12"
+                                   FontSize="{DynamicResource FontSizeCaption}"
                                    Foreground="{DynamicResource AppMutedTextBrush}"/>
                         <ComboBox x:Name="SortOrderComboBox"
                                   HorizontalAlignment="Stretch"
@@ -262,7 +262,7 @@
                     </StackPanel>
                     <StackPanel Grid.Column="1" Spacing="6" Margin="12,0,0,0">
                         <TextBlock Text="{DynamicResource L_SmartPlaylistResultLimit}"
-                                   FontSize="12"
+                                   FontSize="{DynamicResource FontSizeCaption}"
                                    Foreground="{DynamicResource AppMutedTextBrush}"/>
                         <TextBox x:Name="ResultLimitTextBox"
                                  Background="{DynamicResource AppInputBrush}"

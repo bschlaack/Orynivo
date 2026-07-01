@@ -1,4 +1,4 @@
-﻿<Window x:Class="Orynivo.DailyHistoryDialog"
+<Window x:Class="Orynivo.DailyHistoryDialog"
         xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="{Binding DialogTitle}"
@@ -120,7 +120,7 @@
         </Grid.RowDefinitions>
 
         <TextBlock Text="{Binding DialogTitle}"
-                   FontSize="20"
+                   FontSize="{DynamicResource FontSizeTitle}"
                    FontWeight="SemiBold"
                    Foreground="{DynamicResource AppPrimaryTextBrush}"
                    Margin="0,0,0,16"/>
@@ -159,12 +159,12 @@
                                             IsVisible="{Binding CanOpenTrack}"
                                             Click="TrackButton_OnClick">
                                         <TextBlock Text="{Binding Title}"
-                                                   FontSize="11"
+                                                   FontSize="{DynamicResource FontSizeMeta}"
                                                    TextTrimming="CharacterEllipsis"/>
                                     </Button>
                                     <TextBlock Text="{Binding Title}"
                                                IsVisible="{Binding IsPlainTitle}"
-                                               FontSize="11"
+                                               FontSize="{DynamicResource FontSizeMeta}"
                                                TextTrimming="CharacterEllipsis"/>
                                 </Grid>
                             </DataTemplate>
@@ -178,12 +178,12 @@
                                             IsVisible="{Binding CanOpenArtist}"
                                             Click="ArtistButton_OnClick">
                                         <TextBlock Text="{Binding Artist}"
-                                                   FontSize="11"
+                                                   FontSize="{DynamicResource FontSizeMeta}"
                                                    TextTrimming="CharacterEllipsis"/>
                                     </Button>
                                     <TextBlock Text="{Binding Artist}"
                                                IsVisible="{Binding IsPlainArtist}"
-                                               FontSize="11"
+                                               FontSize="{DynamicResource FontSizeMeta}"
                                                TextTrimming="CharacterEllipsis"/>
                                 </Grid>
                             </DataTemplate>
@@ -197,12 +197,12 @@
                                             IsVisible="{Binding CanOpenAlbum}"
                                             Click="AlbumButton_OnClick">
                                         <TextBlock Text="{Binding Album}"
-                                                   FontSize="11"
+                                                   FontSize="{DynamicResource FontSizeMeta}"
                                                    TextTrimming="CharacterEllipsis"/>
                                     </Button>
                                     <TextBlock Text="{Binding Album}"
                                                IsVisible="{Binding IsPlainAlbum}"
-                                               FontSize="11"
+                                               FontSize="{DynamicResource FontSizeMeta}"
                                                TextTrimming="CharacterEllipsis"/>
                                 </Grid>
                             </DataTemplate>

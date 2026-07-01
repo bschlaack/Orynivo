@@ -1,6 +1,7 @@
 <Application x:Class="Orynivo.App"
              xmlns="https://github.com/avaloniaui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:Orynivo.Controls">
     <Application.Styles>
         <FluentTheme />
         <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
@@ -83,7 +84,77 @@
             <SolidColorBrush x:Key="TreeViewItemBackgroundSelected" Color="#343654"/>
             <SolidColorBrush x:Key="TreeViewItemBackgroundPointerOver" Color="#292B47"/>
 
+            <!-- ── Typography scale (font-size tokens) ──
+                 Shared modular scale so views stop using ad-hoc pixel sizes.
+                 Roles: Meta (muted captions), Caption (small labels), Body
+                 (tables/text), BodyStrong (emphasised body/section labels),
+                 Subtitle, Title (headers), TitleLarge, Headline (card titles),
+                 Display (immersive detail titles), DisplayLarge/Hero (decorative). -->
+            <x:Double x:Key="FontSizeMeta">11</x:Double>
+            <x:Double x:Key="FontSizeCaption">12</x:Double>
+            <x:Double x:Key="FontSizeBody">13</x:Double>
+            <x:Double x:Key="FontSizeBodyStrong">15</x:Double>
+            <x:Double x:Key="FontSizeSubtitle">17</x:Double>
+            <x:Double x:Key="FontSizeTitle">20</x:Double>
+            <x:Double x:Key="FontSizeTitleLarge">24</x:Double>
+            <x:Double x:Key="FontSizeHeadline">28</x:Double>
+            <x:Double x:Key="FontSizeDisplay">34</x:Double>
+            <x:Double x:Key="FontSizeDisplayLarge">52</x:Double>
+            <x:Double x:Key="FontSizeHero">72</x:Double>
+
             <!-- ── Global control overrides ── -->
+
+            <!-- InitialsAvatar: gradient + initials placeholder for missing artwork -->
+            <ControlTheme x:Key="{x:Type controls:InitialsAvatar}" TargetType="controls:InitialsAvatar">
+                <Setter Property="FontSize" Value="{DynamicResource FontSizeDisplay}"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Foreground" Value="#F2F5FA"/>
+                <Setter Property="Template">
+                    <ControlTemplate>
+                        <Border Background="{TemplateBinding Background}"
+                                HorizontalAlignment="Stretch"
+                                VerticalAlignment="Stretch">
+                            <TextBlock Text="{TemplateBinding Initials}"
+                                       FontSize="{TemplateBinding FontSize}"
+                                       FontWeight="{TemplateBinding FontWeight}"
+                                       Foreground="{TemplateBinding Foreground}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Opacity="0.92"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter>
+            </ControlTheme>
+
+            <!-- StatusBadge: pill with a coloured dot + short label -->
+            <ControlTheme x:Key="{x:Type controls:StatusBadge}" TargetType="controls:StatusBadge">
+                <Setter Property="FontSize" Value="{DynamicResource FontSizeMeta}"/>
+                <Setter Property="Foreground" Value="{DynamicResource AppSecondaryTextBrush}"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="Template">
+                    <ControlTemplate>
+                        <Border Background="{DynamicResource AppSurfaceHoverBrush}"
+                                BorderBrush="{DynamicResource AppInputBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="10"
+                                Padding="9,3">
+                            <StackPanel Orientation="Horizontal"
+                                        VerticalAlignment="Center">
+                                <Ellipse Width="8"
+                                         Height="8"
+                                         VerticalAlignment="Center"
+                                         Fill="{TemplateBinding DotBrush}"/>
+                                <TextBlock Text="{TemplateBinding Text}"
+                                           Margin="6,0,0,0"
+                                           VerticalAlignment="Center"
+                                           FontSize="{TemplateBinding FontSize}"
+                                           FontWeight="SemiBold"
+                                           Foreground="{TemplateBinding Foreground}"/>
+                            </StackPanel>
+                        </Border>
+                    </ControlTemplate>
+                </Setter>
+            </ControlTheme>
 
             <!-- ContextMenu -->
             <ControlTheme x:Key="{x:Type ContextMenu}" TargetType="ContextMenu">

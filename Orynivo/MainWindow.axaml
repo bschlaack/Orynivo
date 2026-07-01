@@ -1,4 +1,4 @@
-﻿<Window x:Class="Orynivo.MainWindow"
+<Window x:Class="Orynivo.MainWindow"
         xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:Orynivo.Controls"
@@ -730,7 +730,7 @@
                                Stretch="Uniform"/>
                     </Border>
                     <TextBlock x:Name="SelectedDriverTextBlock"
-                               Foreground="{DynamicResource AppMutedTextBrush}" FontSize="10" Margin="4,8,4,0"
+                               Foreground="{DynamicResource AppMutedTextBrush}" FontSize="{DynamicResource FontSizeMeta}" Margin="4,8,4,0"
                                Text="{DynamicResource L_NoDeviceSelected}"
                                TextTrimming="CharacterEllipsis"/>
                 </StackPanel>
@@ -742,7 +742,7 @@
                      Background="Transparent"
                      BorderThickness="0"
                      Padding="0,8,0,8"
-                     FontSize="13"
+                     FontSize="{DynamicResource FontSizeBody}"
                      ClipToBounds="True"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                      SelectionChanged="NavListBox_OnSelectionChanged"
@@ -758,42 +758,42 @@
 
                 <ListBoxItem Tag="Dashboard" Theme="{StaticResource NavItemTheme}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="⊞" Width="18" FontSize="13" VerticalAlignment="Center"/>
+                        <TextBlock Text="⊞" Width="18" FontSize="{DynamicResource FontSizeBody}" VerticalAlignment="Center"/>
                         <TextBlock Text="{DynamicResource L_Dashboard}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </ListBoxItem>
 
                 <ListBoxItem x:Name="InternetRadioNavItem" Tag="InternetRadio" Theme="{StaticResource NavItemTheme}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="◉" Width="18" FontSize="13" VerticalAlignment="Center"/>
+                        <TextBlock Text="◉" Width="18" FontSize="{DynamicResource FontSizeBody}" VerticalAlignment="Center"/>
                         <TextBlock Text="{DynamicResource L_InternetRadio}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </ListBoxItem>
 
                 <ListBoxItem x:Name="PodcastsNavItem" Tag="Podcasts" Theme="{StaticResource NavItemTheme}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="◍" Width="18" FontSize="13" VerticalAlignment="Center"/>
+                        <TextBlock Text="◍" Width="18" FontSize="{DynamicResource FontSizeBody}" VerticalAlignment="Center"/>
                         <TextBlock Text="{DynamicResource L_Podcasts}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </ListBoxItem>
 
                 <ListBoxItem x:Name="QueueNavItem" Tag="Queue" Theme="{StaticResource NavItemTheme}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="≡" Width="18" FontSize="15" VerticalAlignment="Center"/>
+                        <TextBlock Text="≡" Width="18" FontSize="{DynamicResource FontSizeBodyStrong}" VerticalAlignment="Center"/>
                         <TextBlock Text="{DynamicResource L_UpNext}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </ListBoxItem>
 
                 <ListBoxItem x:Name="AiChatNavItem" Tag="AiChat" Theme="{StaticResource NavItemTheme}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="✦" Width="18" FontSize="13" VerticalAlignment="Center"/>
+                        <TextBlock Text="✦" Width="18" FontSize="{DynamicResource FontSizeBody}" VerticalAlignment="Center"/>
                         <TextBlock Text="{DynamicResource L_AiChat}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </ListBoxItem>
 
                 <ListBoxItem x:Name="LocalLibraryHeaderItem"
                              Tag="Section:LocalLibrary"
-                             FontSize="10"
+                             FontSize="{DynamicResource FontSizeMeta}"
                              FontWeight="Bold"
                              Theme="{StaticResource NavSectionHeaderTheme}">
                     <Grid HorizontalAlignment="Stretch">
@@ -823,7 +823,7 @@
                              Theme="{StaticResource NavItemTheme}">
                     <TextBlock Text="{DynamicResource L_LibraryEmptyHint}"
                                TextWrapping="Wrap"
-                               FontSize="11"
+                               FontSize="{DynamicResource FontSizeMeta}"
                                Margin="16,2,4,2"
                                Foreground="{DynamicResource AppMutedTextBrush}"/>
                 </ListBoxItem>
@@ -856,7 +856,7 @@
 
                 <ListBoxItem x:Name="OwnRadiosHeaderItem"
                              Tag="Section:OwnRadios"
-                             FontSize="10"
+                             FontSize="{DynamicResource FontSizeMeta}"
                              FontWeight="Bold"
                              Theme="{StaticResource NavSectionHeaderTheme}">
                     <Grid HorizontalAlignment="Stretch">
@@ -882,7 +882,7 @@
 
                 <ListBoxItem x:Name="MyPodcastsHeaderItem"
                              Tag="Section:MyPodcasts"
-                             FontSize="10"
+                             FontSize="{DynamicResource FontSizeMeta}"
                              FontWeight="Bold"
                              Theme="{StaticResource NavSectionHeaderTheme}">
                     <Grid HorizontalAlignment="Stretch">
@@ -908,7 +908,7 @@
 
                 <ListBoxItem x:Name="PlexHeaderItem"
                              Tag="Section:Plex"
-                             FontSize="10"
+                             FontSize="{DynamicResource FontSizeMeta}"
                              FontWeight="Bold"
                              Theme="{StaticResource NavSectionHeaderTheme}">
                     <Grid HorizontalAlignment="Stretch">
@@ -934,7 +934,7 @@
 
                 <ListBoxItem x:Name="PlaylistsHeaderItem"
                              Tag="Section:Playlists"
-                             FontSize="10"
+                             FontSize="{DynamicResource FontSizeMeta}"
                              FontWeight="Bold"
                              Theme="{StaticResource NavSectionHeaderTheme}">
                     <Grid HorizontalAlignment="Stretch">
@@ -964,20 +964,20 @@
             <TextBlock x:Name="StatusTextBlock"
                        Grid.Row="2"
                        Padding="24,8"
-                       Foreground="{DynamicResource AppMutedTextBrush}" FontSize="10"
+                       Foreground="{DynamicResource AppMutedTextBrush}" FontSize="{DynamicResource FontSizeMeta}"
                        TextWrapping="Wrap"/>
 
             <!-- About -->
             <Button Grid.Row="3"
                     HorizontalAlignment="Stretch"
-                    FontSize="13"
+                    FontSize="{DynamicResource FontSizeBody}"
                     Theme="{StaticResource SidebarBtnTheme}"
                     Click="AboutButton_OnClick">
                 <StackPanel Orientation="Horizontal"
                             VerticalAlignment="Center">
                     <TextBlock Text="ⓘ"
                                Width="16"
-                               FontSize="17"
+                               FontSize="{DynamicResource FontSizeSubtitle}"
                                Margin="0,0,8,0"
                                VerticalAlignment="Center"/>
                     <TextBlock Text="{DynamicResource L_About}"
@@ -986,14 +986,14 @@
             </Button>
             <Button Grid.Row="4"
                     HorizontalAlignment="Stretch"
-                    FontSize="13"
+                    FontSize="{DynamicResource FontSizeBody}"
                     Theme="{StaticResource SidebarBtnTheme}"
                     Click="SettingsButton_OnClick">
                 <StackPanel Orientation="Horizontal"
                             VerticalAlignment="Center">
                     <TextBlock Text="⚙"
                                Width="16"
-                               FontSize="14"
+                               FontSize="{DynamicResource FontSizeBodyStrong}"
                                Margin="0,0,8,0"
                                TextAlignment="Center"
                                VerticalAlignment="Center"/>
@@ -1046,12 +1046,12 @@
                         </Button>
                         <TextBlock x:Name="ContentTitleTextBlock"
                                    Grid.Column="1"
-                                   FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                   FontSize="{DynamicResource FontSizeTitle}" FontWeight="SemiBold" Foreground="{DynamicResource AppPrimaryTextBrush}"
                                    VerticalAlignment="Top"/>
                         <TextBlock x:Name="ContentCountTextBlock"
                                 Grid.Column="2"
                                 Margin="14,0,0,0"
-                                   FontSize="12" Foreground="{DynamicResource AppMutedTextBrush}"
+                                   FontSize="{DynamicResource FontSizeCaption}" Foreground="{DynamicResource AppMutedTextBrush}"
                                    VerticalAlignment="Center"/>
                         <CheckBox x:Name="EntityFavoritesOnlyCheckBox"
                                 Grid.Column="3"
@@ -1248,7 +1248,7 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel>
                         <TextBlock x:Name="LibraryIntroTitleTextBlock"
-                                   FontSize="18"
+                                   FontSize="{DynamicResource FontSizeTitle}"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource AppPrimaryTextBrush}"/>
                         <TextBlock x:Name="LibraryIntroHintTextBlock"
@@ -1258,7 +1258,7 @@
                     </StackPanel>
                     <TextBlock x:Name="LibraryIntroIconTextBlock"
                                Grid.Column="1"
-                               FontSize="30"
+                               FontSize="{DynamicResource FontSizeHeadline}"
                                Foreground="{DynamicResource AppAccentBrush}"
                                VerticalAlignment="Center"/>
                 </Grid>
@@ -1314,7 +1314,7 @@
                                 ClipToBounds="True">
                             <Grid>
                                 <TextBlock Text="◉"
-                                           FontSize="52"
+                                           FontSize="{DynamicResource FontSizeDisplayLarge}"
                                            Foreground="{DynamicResource AppMutedTextBrush}"
                                            HorizontalAlignment="Center"
                                            VerticalAlignment="Center"/>
@@ -1324,24 +1324,24 @@
                         </Border>
                         <StackPanel Grid.Column="2" VerticalAlignment="Center">
                             <TextBlock Text="{DynamicResource L_RadioNowPlaying}"
-                                       FontSize="12"
+                                       FontSize="{DynamicResource FontSizeCaption}"
                                        FontWeight="Bold"
                                        Foreground="{DynamicResource AppAccentBrush}"/>
                             <TextBlock x:Name="RadioNowPlayingStation"
                                        Margin="0,7,0,0"
-                                       FontSize="28"
+                                       FontSize="{DynamicResource FontSizeHeadline}"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource AppPrimaryTextBrush}"
                                        TextWrapping="Wrap"/>
                             <TextBlock x:Name="RadioNowPlayingTitle"
                                        Margin="0,12,0,0"
-                                       FontSize="21"
+                                       FontSize="{DynamicResource FontSizeTitle}"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource AppPrimaryTextBrush}"
                                        TextWrapping="Wrap"/>
                             <TextBlock x:Name="RadioNowPlayingArtist"
                                        Margin="0,5,0,0"
-                                       FontSize="16"
+                                       FontSize="{DynamicResource FontSizeSubtitle}"
                                        Foreground="{DynamicResource AppSecondaryTextBrush}"
                                        TextWrapping="Wrap"/>
                             <TextBlock x:Name="RadioNowPlayingDescription"
@@ -1366,7 +1366,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel>
                             <TextBlock Text="{DynamicResource L_RadioDirectory}"
-                                       FontSize="20"
+                                       FontSize="{DynamicResource FontSizeTitle}"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource AppPrimaryTextBrush}"/>
                             <TextBlock Text="{DynamicResource L_RadioDirectoryHint}"
@@ -1376,7 +1376,7 @@
                         </StackPanel>
                         <TextBlock Grid.Column="1"
                                    Text="◉"
-                                   FontSize="38"
+                                   FontSize="{DynamicResource FontSizeDisplay}"
                                    Foreground="{DynamicResource AppAccentBrush}"
                                    VerticalAlignment="Center"/>
                     </Grid>
@@ -1582,7 +1582,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel>
                             <TextBlock Text="{DynamicResource L_PodcastDirectory}"
-                                       FontSize="20"
+                                       FontSize="{DynamicResource FontSizeTitle}"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource AppPrimaryTextBrush}"/>
                             <TextBlock Text="{DynamicResource L_PodcastDirectoryHint}"
@@ -1592,7 +1592,7 @@
                         </StackPanel>
                         <TextBlock Grid.Column="1"
                                    Text="◍"
-                                   FontSize="38"
+                                   FontSize="{DynamicResource FontSizeDisplay}"
                                    Foreground="{DynamicResource AppAccentBrush}"
                                    VerticalAlignment="Center"/>
                     </Grid>
@@ -1842,12 +1842,12 @@
                             </Border>
                             <StackPanel Grid.Column="2" Margin="16,0,0,0" VerticalAlignment="Center">
                                 <TextBlock Text="{DynamicResource L_PodcastOverview}"
-                                           FontSize="12"
+                                           FontSize="{DynamicResource FontSizeCaption}"
                                            FontWeight="Bold"
                                            Foreground="{DynamicResource AppAccentBrush}"/>
                                 <TextBlock x:Name="PodcastEpisodesTitle"
                                            Margin="0,5,0,0"
-                                           FontSize="28"
+                                           FontSize="{DynamicResource FontSizeHeadline}"
                                            FontWeight="SemiBold"
                                            Foreground="{DynamicResource AppPrimaryTextBrush}"
                                            TextWrapping="Wrap"/>
@@ -1960,23 +1960,24 @@
                                 </ContextMenu>
                             </Border.ContextMenu>
                             <Grid>
+                                <controls:InitialsAvatar DisplayName="{Binding Title}"
+                                                         FontSize="{DynamicResource FontSizeHero}"
+                                                         IsVisible="{Binding Artwork, Converter={x:Static conv:ObjectConverters.IsNull}}"/>
                                 <Image Source="{Binding Artwork}" Stretch="UniformToFill"/>
-                                <StackPanel IsVisible="{Binding Artwork, Converter={x:Static conv:ObjectConverters.IsNull}}"
-                                            HorizontalAlignment="Center"
-                                            VerticalAlignment="Center">
-                                    <TextBlock Text="{DynamicResource L_CoverNotFound}"
-                                               Foreground="{DynamicResource AppMutedTextBrush}"
-                                               HorizontalAlignment="Center"
-                                               Margin="0,0,0,10"/>
+                                <Border IsVisible="{Binding Artwork, Converter={x:Static conv:ObjectConverters.IsNull}}"
+                                        VerticalAlignment="Bottom"
+                                        Padding="0,10"
+                                        Background="#59000000">
                                     <Button Content="{DynamicResource L_SearchCover}"
                                             Tag="{Binding}"
-                                            Padding="14,7"
+                                            Padding="14,6"
+                                            HorizontalAlignment="Center"
                                             Background="{DynamicResource AppAccentBrush}"
                                             Foreground="{DynamicResource AppAccentTextBrush}"
                                             BorderThickness="0"
                                             Cursor="Hand"
                                             Click="SearchCoverButton_OnClick"/>
-                                </StackPanel>
+                                </Border>
                             </Grid>
                         </Border>
 
@@ -1991,13 +1992,13 @@
                                         Padding="0"
                                         HorizontalContentAlignment="Center"
                                         VerticalContentAlignment="Center"
-                                        FontSize="20"
+                                        FontSize="{DynamicResource FontSizeTitle}"
                                         ToolTip.Tip="{DynamicResource L_MarkAsFavorite}"
                                         Theme="{StaticResource HeaderFilterButtonTheme}"
                                         Click="AlbumDetailFavoriteButton_OnClick"/>
                                 <Button Content="{Binding Title}"
                                         Tag="{Binding}"
-                                        FontSize="28"
+                                        FontSize="{DynamicResource FontSizeDisplay}"
                                         FontWeight="SemiBold"
                                         Theme="{StaticResource EntityLinkButtonTheme}"
                                         Click="AlbumLinkButton_OnClick"/>
@@ -2005,13 +2006,13 @@
                             <Button Content="{Binding Artist}"
                                     Tag="{Binding}"
                                     Margin="0,10,0,0"
-                                    FontSize="17"
+                                    FontSize="{DynamicResource FontSizeSubtitle}"
                                     Foreground="{DynamicResource AppSecondaryTextBrush}"
                                     Theme="{StaticResource EntityLinkButtonTheme}"
                                     Click="ArtistLinkButton_OnClick"/>
                             <TextBlock Text="{Binding Year}"
                                        Margin="0,8,0,0"
-                                       FontSize="14"
+                                       FontSize="{DynamicResource FontSizeBodyStrong}"
                                        Foreground="{DynamicResource AppMutedTextBrush}"/>
                             <StackPanel Margin="0,12,0,0"
                                         Orientation="Horizontal"
@@ -2052,7 +2053,7 @@
                           CanUserResizeColumns="True"
                           IsReadOnly="True"
                           SelectionMode="Single"
-                          FontSize="12"
+                          FontSize="{DynamicResource FontSizeCaption}"
                           LoadingRow="ContentDataGrid_OnLoadingRow"
                           DoubleTapped="ContentDataGrid_OnMouseDoubleClick"/>
 
@@ -2083,7 +2084,7 @@
                             Margin="0,0,0,14">
                         <StackPanel>
                             <TextBlock Text="{DynamicResource L_Tracks}"
-                                       FontSize="16"
+                                       FontSize="{DynamicResource FontSizeSubtitle}"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource AppPrimaryTextBrush}"
                                        Margin="0,0,0,10"/>
@@ -2115,7 +2116,7 @@
                             Margin="0,0,0,14">
                         <StackPanel>
                             <TextBlock Text="{DynamicResource L_Albums}"
-                                       FontSize="16"
+                                       FontSize="{DynamicResource FontSizeSubtitle}"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource AppPrimaryTextBrush}"
                                        Margin="0,0,0,10"/>
@@ -2146,7 +2147,7 @@
                             Padding="14">
                         <StackPanel>
                             <TextBlock Text="{DynamicResource L_Artists}"
-                                       FontSize="16"
+                                       FontSize="{DynamicResource FontSizeSubtitle}"
                                        FontWeight="SemiBold"
                                        Foreground="{DynamicResource AppPrimaryTextBrush}"
                                        Margin="0,0,0,10"/>
@@ -2177,7 +2178,7 @@
                       Grid.Row="2"
                       Background="{DynamicResource AppContentBrush}"
                       BorderThickness="0"
-                      FontSize="13"
+                      FontSize="{DynamicResource FontSizeBody}"
                       IsVisible="False"
                       DoubleTapped="FolderTreeView_OnMouseDoubleClick"/>
 
@@ -2232,18 +2233,15 @@
                                         </ContextMenu>
                                     </Border.ContextMenu>
                                     <Grid>
+                                        <controls:InitialsAvatar DisplayName="{Binding Title}"
+                                                                 FontSize="{DynamicResource FontSizeDisplay}"
+                                                                 IsVisible="{Binding Artwork, Converter={x:Static conv:ObjectConverters.IsNull}}"/>
                                         <Image Source="{Binding Artwork}"
                                                Stretch="UniformToFill"/>
-                                        <StackPanel IsVisible="{Binding Artwork, Converter={x:Static conv:ObjectConverters.IsNull}}"
-                                                    Width="140"
-                                                    HorizontalAlignment="Center"
-                                                    VerticalAlignment="Center">
-                                            <TextBlock Text="{DynamicResource L_CoverNotFound}"
-                                                       Foreground="{DynamicResource AppMutedTextBrush}"
-                                                       HorizontalAlignment="Center"
-                                                       TextAlignment="Center"
-                                                       TextWrapping="Wrap"
-                                                       Margin="0,0,0,8"/>
+                                        <Border IsVisible="{Binding Artwork, Converter={x:Static conv:ObjectConverters.IsNull}}"
+                                                VerticalAlignment="Bottom"
+                                                Padding="0,7"
+                                                Background="#59000000">
                                             <Button Content="{DynamicResource L_SearchCover}"
                                                     Tag="{Binding}"
                                                     Width="110"
@@ -2257,26 +2255,26 @@
                                                     BorderThickness="0"
                                                     Cursor="Hand"
                                                     Click="SearchCoverButton_OnClick"/>
-                                        </StackPanel>
+                                        </Border>
                                     </Grid>
                                 </Border>
                                 <Button Content="{Binding Title}"
                                         Tag="{Binding}"
                                         Margin="0,10,0,0"
-                                        FontSize="12"
+                                        FontSize="{DynamicResource FontSizeCaption}"
                                         FontWeight="SemiBold"
                                         Theme="{StaticResource EntityLinkButtonTheme}"
                                         Click="AlbumLinkButton_OnClick"/>
                                 <Button Content="{Binding Artist}"
                                         Tag="{Binding}"
                                         Margin="0,3,0,0"
-                                        FontSize="11"
+                                        FontSize="{DynamicResource FontSizeMeta}"
                                         Foreground="{DynamicResource AppSecondaryTextBrush}"
                                         Theme="{StaticResource EntityLinkButtonTheme}"
                                         Click="ArtistLinkButton_OnClick"/>
                                 <TextBlock Text="{Binding Year}"
                                            Margin="0,3,0,0"
-                                           FontSize="11"
+                                           FontSize="{DynamicResource FontSizeMeta}"
                                            Foreground="{DynamicResource AppMutedTextBrush}"/>
                                 <Button Content="{Binding FavoriteGlyph}"
                                         Tag="{Binding}"
@@ -2292,7 +2290,7 @@
                                         Background="Transparent"
                                         BorderThickness="0"
                                         Foreground="{DynamicResource AppAccentBrush}"
-                                        FontSize="15"
+                                        FontSize="{DynamicResource FontSizeBodyStrong}"
                                         Cursor="Hand"
                                         Click="FavoriteButton_OnClick"/>
                             </StackPanel>
@@ -2342,20 +2340,17 @@
                                             CornerRadius="0,24,0,24"
                                             ClipToBounds="True">
                                         <Grid>
+                                            <controls:InitialsAvatar DisplayName="{Binding Title}"
+                                                                     FontSize="{DynamicResource FontSizeDisplay}"
+                                                                     IsVisible="{Binding Artwork, Converter={x:Static conv:ObjectConverters.IsNull}}"/>
                                             <Image Source="{Binding Artwork}"
                                                    Stretch="UniformToFill"/>
-                                            <TextBlock Text="♪"
-                                                       FontSize="42"
-                                                       HorizontalAlignment="Center"
-                                                       VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource AppMutedTextBrush}"
-                                                       IsVisible="{Binding Artwork, Converter={x:Static conv:ObjectConverters.IsNull}}"/>
                                         </Grid>
                                     </Border>
                                     <Button Content="{Binding Title}"
                                             Tag="{Binding}"
                                             Margin="0,10,0,0"
-                                            FontSize="12"
+                                            FontSize="{DynamicResource FontSizeCaption}"
                                             FontWeight="SemiBold"
                                             HorizontalContentAlignment="Center"
                                             Theme="{StaticResource EntityLinkButtonTheme}"
@@ -2367,7 +2362,7 @@
                                             Background="Transparent"
                                             BorderThickness="0"
                                             Foreground="{DynamicResource AppAccentBrush}"
-                                            FontSize="15"
+                                            FontSize="{DynamicResource FontSizeBodyStrong}"
                                             Cursor="Hand"
                                             Click="FavoriteButton_OnClick"/>
                                 </StackPanel>
@@ -2381,7 +2376,7 @@
                                         Background="Transparent"
                                         BorderThickness="0"
                                         Foreground="{DynamicResource AppAccentBrush}"
-                                        FontSize="13"
+                                        FontSize="{DynamicResource FontSizeBody}"
                                         Cursor="Hand"
                                         Click="ArtistInfoListButton_OnClick"/>
                             </Grid>
@@ -2435,7 +2430,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="{DynamicResource L_Lyrics}"
                                    VerticalAlignment="Center"
-                                   FontSize="24"
+                                   FontSize="{DynamicResource FontSizeTitleLarge}"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource AppPrimaryTextBrush}"/>
                         <Button Grid.Column="1"
@@ -2450,13 +2445,13 @@
                                 Margin="0,0,8,0"
                                 ToolTip.Tip="{DynamicResource L_RefreshLyrics}"
                                 Click="RefreshLyricsButton_OnClick">
-                            <TextBlock Text="↻" FontSize="18"/>
+                            <TextBlock Text="↻" FontSize="{DynamicResource FontSizeTitle}"/>
                         </Button>
                         <Button Grid.Column="3"
                                 Theme="{StaticResource TransportBtnTheme}"
                                 ToolTip.Tip="{DynamicResource L_CloseLyrics}"
                                 Click="CloseLyricsButton_OnClick">
-                            <TextBlock Text="×" FontSize="20"/>
+                            <TextBlock Text="×" FontSize="{DynamicResource FontSizeTitle}"/>
                         </Button>
                     </Grid>
                     <Grid Grid.Row="1">
@@ -2500,7 +2495,7 @@
                         </ListBox>
                         <TextBlock x:Name="LyricsStatusTextBlock"
                                    Margin="60"
-                                   FontSize="24"
+                                   FontSize="{DynamicResource FontSizeTitleLarge}"
                                    FontWeight="SemiBold"
                                    TextWrapping="Wrap"
                                    TextAlignment="Center"
@@ -2531,7 +2526,7 @@
                         </Grid.RowDefinitions>
                         <Grid Grid.Row="0">
                             <TextBlock Text="{DynamicResource L_PodcastInfo}"
-                                       FontSize="28"
+                                       FontSize="{DynamicResource FontSizeHeadline}"
                                        FontWeight="SemiBold"
                                        VerticalAlignment="Center"
                                        Foreground="{DynamicResource AppPrimaryTextBrush}"/>
@@ -2539,7 +2534,7 @@
                                     Theme="{StaticResource TransportBtnTheme}"
                                     ToolTip.Tip="{DynamicResource L_ClosePodcastInfo}"
                                     Click="ClosePodcastInfoButton_OnClick">
-                                <TextBlock Text="×" FontSize="20"/>
+                                <TextBlock Text="×" FontSize="{DynamicResource FontSizeTitle}"/>
                             </Button>
                         </Grid>
                         <Border Grid.Row="1"
@@ -2555,7 +2550,7 @@
                                        Stretch="UniformToFill"/>
                                 <TextBlock x:Name="PodcastInfoImagePlaceholder"
                                            Text="◍"
-                                           FontSize="72"
+                                           FontSize="{DynamicResource FontSizeHero}"
                                            HorizontalAlignment="Center"
                                            VerticalAlignment="Center"
                                            Foreground="{DynamicResource AppMutedTextBrush}"/>
@@ -2567,7 +2562,7 @@
                                    HorizontalAlignment="Center"
                                    TextAlignment="Center"
                                    TextWrapping="Wrap"
-                                   FontSize="24"
+                                   FontSize="{DynamicResource FontSizeDisplay}"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource AppPrimaryTextBrush}"/>
                         <TextBlock x:Name="PodcastInfoEpisodeTitle"
@@ -2577,7 +2572,7 @@
                                    HorizontalAlignment="Center"
                                    TextAlignment="Center"
                                    TextWrapping="Wrap"
-                                   FontSize="19"
+                                   FontSize="{DynamicResource FontSizeTitle}"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource AppAccentBrush}"/>
                         <TextBlock x:Name="PodcastInfoMetadata"
@@ -2586,14 +2581,14 @@
                                    HorizontalAlignment="Center"
                                    TextAlignment="Center"
                                    TextWrapping="Wrap"
-                                   FontSize="12"
+                                   FontSize="{DynamicResource FontSizeCaption}"
                                    Foreground="{DynamicResource AppMutedTextBrush}"/>
                         <TextBlock x:Name="PodcastInfoDescription"
                                    Grid.Row="5"
                                    MaxWidth="900"
                                    HorizontalAlignment="Center"
                                    TextWrapping="Wrap"
-                                   FontSize="18"
+                                   FontSize="{DynamicResource FontSizeTitle}"
                                    LineHeight="28"
                                    Foreground="{DynamicResource AppPrimaryTextBrush}"/>
                     </Grid>
@@ -2625,7 +2620,7 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <Button x:Name="ArtistInfoTitleButton"
-                                    FontSize="28"
+                                    FontSize="{DynamicResource FontSizeDisplay}"
                                     FontWeight="SemiBold"
                                     VerticalAlignment="Center"
                                     Theme="{StaticResource EntityLinkButtonTheme}"
@@ -2650,13 +2645,13 @@
                                     Margin="0,0,8,0"
                                     ToolTip.Tip="{DynamicResource L_RefreshArtistInfo}"
                                     Click="RefreshArtistInfoButton_OnClick">
-                                <TextBlock Text="↻" FontSize="18"/>
+                                <TextBlock Text="↻" FontSize="{DynamicResource FontSizeTitle}"/>
                             </Button>
                             <Button Grid.Column="4"
                                     Theme="{StaticResource TransportBtnTheme}"
                                     ToolTip.Tip="{DynamicResource L_CloseArtistInfo}"
                                     Click="CloseArtistInfoButton_OnClick">
-                                <TextBlock Text="×" FontSize="20"/>
+                                <TextBlock Text="×" FontSize="{DynamicResource FontSizeTitle}"/>
                             </Button>
                         </Grid>
                         <Border Grid.Row="1"
@@ -2668,31 +2663,30 @@
                                 CornerRadius="12"
                                 ClipToBounds="True">
                             <Grid>
+                                <controls:InitialsAvatar x:Name="ArtistInfoImagePlaceholder"
+                                                         DisplayName="{Binding Content, ElementName=ArtistInfoTitleButton}"
+                                                         FontSize="{DynamicResource FontSizeHero}"/>
                                 <Image x:Name="ArtistInfoImage"
                                        Stretch="Uniform"/>
-                                <StackPanel x:Name="ArtistInfoImagePlaceholder"
-                                            HorizontalAlignment="Center"
-                                            VerticalAlignment="Center">
-                                    <TextBlock Text="♪"
-                                               FontSize="72"
-                                               HorizontalAlignment="Center"
-                                               Foreground="{DynamicResource AppMutedTextBrush}"/>
+                                <Border VerticalAlignment="Bottom"
+                                        Padding="16,10"
+                                        Background="#66000000"
+                                        IsVisible="{Binding IsVisible, ElementName=ArtistInfoImageStatusText}">
                                     <TextBlock x:Name="ArtistInfoImageStatusText"
-                                               FontSize="12"
+                                               FontSize="{DynamicResource FontSizeCaption}"
                                                TextWrapping="Wrap"
                                                TextAlignment="Center"
-                                               MaxWidth="300"
-                                               Margin="0,8,0,0"
+                                               MaxWidth="320"
                                                HorizontalAlignment="Center"
-                                               Foreground="{DynamicResource AppMutedTextBrush}"
+                                               Foreground="#F2F5FA"
                                                IsVisible="False"/>
-                                </StackPanel>
+                                </Border>
                             </Grid>
                         </Border>
                         <TextBlock x:Name="ArtistInfoBiographyTextBlock"
                                    Grid.Row="2"
                                    MaxWidth="900"
-                                   FontSize="20"
+                                   FontSize="{DynamicResource FontSizeTitle}"
                                    LineHeight="31"
                                    TextWrapping="Wrap"
                                    TextAlignment="Left"
@@ -2711,7 +2705,7 @@
                 </ScrollViewer>
                 <TextBlock x:Name="ArtistInfoStatusTextBlock"
                            Margin="60"
-                           FontSize="22"
+                           FontSize="{DynamicResource FontSizeTitle}"
                            FontWeight="SemiBold"
                            TextWrapping="Wrap"
                            TextAlignment="Center"
@@ -2752,19 +2746,19 @@
                     </Border>
                     <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
                         <TextBlock x:Name="NowPlayingTitleBlock"
-                                   Foreground="{DynamicResource AppTransportPrimaryTextBrush}" FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource AppTransportPrimaryTextBrush}" FontSize="{DynamicResource FontSizeBody}" FontWeight="SemiBold"
                                    TextTrimming="CharacterEllipsis"/>
                         <Button x:Name="NowPlayingArtistButton"
                                 Content="{Binding Text, ElementName=NowPlayingArtistBlock}"
                                 Foreground="{DynamicResource AppSecondaryTextBrush}"
-                                FontSize="11"
+                                FontSize="{DynamicResource FontSizeMeta}"
                                 Margin="0,2,0,0"
                                 IsEnabled="False"
                                 Theme="{StaticResource EntityLinkButtonTheme}"
                                 Click="NowPlayingArtistButton_OnClick"/>
                         <TextBlock x:Name="NowPlayingArtistBlock" IsVisible="False"/>
                         <TextBlock x:Name="FileInfoTextBlock"
-                                   Foreground="{DynamicResource AppMutedTextBrush}" FontSize="10" Margin="0,2,0,0"
+                                   Foreground="{DynamicResource AppMutedTextBrush}" FontSize="{DynamicResource FontSizeMeta}" Margin="0,2,0,0"
                                    TextTrimming="CharacterEllipsis"/>
                     </StackPanel>
                 </Grid>
@@ -2848,7 +2842,7 @@
                                            FontFamily="Segoe UI"
                                            FontStyle="Italic"
                                            FontWeight="Bold"
-                                           FontSize="15"/>
+                                           FontSize="{DynamicResource FontSizeBodyStrong}"/>
                             </Button>
                             <Button x:Name="LyricsButton"
                                     Theme="{StaticResource TransportBtnTheme}"
@@ -2856,7 +2850,7 @@
                                     IsEnabled="False"
                                     ToolTip.Tip="{DynamicResource L_ShowLyrics}"
                                     Click="LyricsButton_OnClick">
-                                <TextBlock Text="♪" FontSize="16"/>
+                                <TextBlock Text="♪" FontSize="{DynamicResource FontSizeSubtitle}"/>
                             </Button>
                             <Button x:Name="NowPlayingFavoriteButton"
                                     Theme="{StaticResource TransportBtnTheme}"
@@ -2866,7 +2860,7 @@
                                     Click="NowPlayingFavoriteButton_OnClick">
                                 <TextBlock x:Name="NowPlayingFavoriteGlyph"
                                            Text="♡"
-                                           FontSize="16"/>
+                                           FontSize="{DynamicResource FontSizeSubtitle}"/>
                             </Button>
                             <Button x:Name="ShuffleButton"
                                     Theme="{StaticResource TransportBtnTheme}"
@@ -2897,7 +2891,7 @@
                             <ColumnDefinition Width="42"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock x:Name="CurrentTimeTextBlock"
-                                   Foreground="{DynamicResource AppMutedTextBrush}" FontSize="11"
+                                   Foreground="{DynamicResource AppMutedTextBrush}" FontSize="{DynamicResource FontSizeMeta}"
                                    VerticalAlignment="Center" HorizontalAlignment="Right"
                                    Margin="0,0,8,0" Text="0:00"/>
                         <Slider x:Name="PositionSlider"
@@ -2908,7 +2902,7 @@
                                 ValueChanged="PositionSlider_OnValueChanged"/>
                         <TextBlock x:Name="DurationTextBlock"
                                    Grid.Column="2"
-                                   Foreground="{DynamicResource AppMutedTextBrush}" FontSize="11"
+                                   Foreground="{DynamicResource AppMutedTextBrush}" FontSize="{DynamicResource FontSizeMeta}"
                                    VerticalAlignment="Center" HorizontalAlignment="Left"
                                    Margin="8,0,0,0" Text="0:00"/>
                     </Grid>
@@ -2944,7 +2938,7 @@
                                         Theme="{StaticResource TransportBtnTheme}"
                                         ToolTip.Tip="{DynamicResource L_Settings}"
                                         Click="EqPickerSettingsButton_OnClick">
-                                    <TextBlock Text="⚙" FontSize="14"/>
+                                    <TextBlock Text="⚙" FontSize="{DynamicResource FontSizeBodyStrong}"/>
                                 </Button>
                             </Grid>
                             <CheckBox x:Name="EqPickerEnabledCheckBox"
@@ -2985,7 +2979,7 @@
                                     Theme="{StaticResource TransportBtnTheme}"
                                     ToolTip.Tip="{DynamicResource L_Settings}"
                                     Click="OutputPickerSettingsButton_OnClick">
-                                <TextBlock Text="⚙" FontSize="14"/>
+                                <TextBlock Text="⚙" FontSize="{DynamicResource FontSizeBodyStrong}"/>
                             </Button>
                         </Grid>
                     </Border>
@@ -2996,7 +2990,7 @@
                             HorizontalAlignment="Right"
                             VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="🔊" Foreground="{DynamicResource AppMutedTextBrush}" FontSize="13"
+                        <TextBlock Text="🔊" Foreground="{DynamicResource AppMutedTextBrush}" FontSize="{DynamicResource FontSizeBody}"
                                    VerticalAlignment="Center" Margin="0,0,10,0"/>
                         <Slider x:Name="VolumeSlider"
                                 Theme="{StaticResource DarkSliderTheme}"
@@ -3004,7 +2998,7 @@
                                 VerticalAlignment="Center"
                                 ValueChanged="VolumeSlider_OnValueChanged"/>
                         <TextBlock x:Name="VolumeValueTextBlock"
-                                   Foreground="{DynamicResource AppMutedTextBrush}" FontSize="11" Width="44"
+                                   Foreground="{DynamicResource AppMutedTextBrush}" FontSize="{DynamicResource FontSizeMeta}" Width="44"
                                    VerticalAlignment="Center" Margin="10,0,0,0"
                                    Text="100 %"/>
                     </StackPanel>

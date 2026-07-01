@@ -61,7 +61,7 @@
 
         <TextBlock Grid.Row="0"
                    Text="{DynamicResource L_NewPlaylistNameLabel}"
-                   FontSize="12"
+                   FontSize="{DynamicResource FontSizeCaption}"
                    Foreground="{DynamicResource AppMutedTextBrush}"
                    Margin="0,0,0,6"/>
 
@@ -70,7 +70,7 @@
                  Height="34"
                  Padding="10,0"
                  VerticalContentAlignment="Center"
-                 FontSize="13"
+                 FontSize="{DynamicResource FontSizeBody}"
                  Background="{DynamicResource AppInputBrush}"
                  Foreground="{DynamicResource AppPrimaryTextBrush}"
                  BorderBrush="{DynamicResource AppInputBorderBrush}"

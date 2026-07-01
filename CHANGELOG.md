@@ -4,6 +4,40 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Introduced a shared typography scale as application resources
+  (`FontSizeMeta`, `FontSizeCaption`, `FontSizeBody`, `FontSizeBodyStrong`,
+  `FontSizeSubtitle`, `FontSizeTitle`, `FontSizeTitleLarge`, `FontSizeHeadline`,
+  `FontSizeDisplay`, `FontSizeDisplayLarge`, `FontSizeHero`). All views, the
+  Settings view, and every dialog/window now reference these tokens instead of
+  ad-hoc pixel sizes, giving consistent text sizing across sidebar, headers,
+  section titles, tables, and meta text.
+
+### Changed
+
+- Album, artist, and podcast detail views now use larger, more prominent
+  titles (`FontSizeDisplay`) for a more immersive header, while small meta text
+  stays compact and muted.
+- Missing album and artist artwork now shows an elegant typographic placeholder
+  (one or two initials over a deterministic accent-tinted gradient) instead of a
+  flat grey rectangle, via the new reusable `InitialsAvatar` control. It is used
+  in the album detail header, album/artist artwork cards, and the artist-info
+  image, and looks identical for local and remote (Orynivo Server) entities. The
+  cover-search action now sits on a subtle scrim at the bottom of empty album
+  covers so it stays readable over the gradient.
+- Modernized the Settings view: the left navigation items now carry section
+  icons that recolour with selection/hover; genuine on/off options (DSD-to-PCM,
+  equalizer, MCP server, AI chat, and the Appearance sidebar-visibility options)
+  use pill toggle switches instead of checkboxes; interactive inputs share a
+  consistent height; and the Output and MCP sections show small status badges
+  for FFmpeg, Steinberg ASIO, cwASIO, and the MCP server. The MCP per-tool list
+  keeps its checkboxes as a permission checklist.
+
+### Fixed
+
 ## [0.20.4] - 2026-07-01
 
 ### Changed

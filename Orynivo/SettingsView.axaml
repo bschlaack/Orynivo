@@ -124,20 +124,87 @@
                 <Setter Property="Cursor" Value="Arrow"/>
             </Style>
         </ControlTheme>
+
+        <!-- Pill toggle switch reused for genuine on/off options; still a CheckBox
+             so existing code that reads IsChecked keeps working unchanged. -->
+        <ControlTheme x:Key="SettingsToggleTheme" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeBody}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Grid Background="Transparent">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          VerticalAlignment="Center"
+                                          TextBlock.FontSize="{TemplateBinding FontSize}"
+                                          TextBlock.Foreground="{TemplateBinding Foreground}"/>
+                        <Border x:Name="Track"
+                                Grid.Column="1"
+                                Width="40"
+                                Height="22"
+                                Margin="12,0,0,0"
+                                VerticalAlignment="Center"
+                                Background="{DynamicResource AppInputBrush}"
+                                BorderBrush="{DynamicResource AppInputBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="11">
+                            <Ellipse x:Name="Knob"
+                                     Width="16"
+                                     Height="16"
+                                     Margin="2,0,0,0"
+                                     HorizontalAlignment="Left"
+                                     VerticalAlignment="Center"
+                                     Fill="{DynamicResource AppSecondaryTextBrush}"/>
+                        </Border>
+                    </Grid>
+                </ControlTemplate>
+            </Setter>
+            <Style Selector="^:pointerover /template/ Border#Track">
+                <Setter Property="BorderBrush" Value="#6C63FF"/>
+            </Style>
+            <Style Selector="^:checked /template/ Border#Track">
+                <Setter Property="Background" Value="#6C63FF"/>
+                <Setter Property="BorderBrush" Value="#6C63FF"/>
+            </Style>
+            <Style Selector="^:checked /template/ Ellipse#Knob">
+                <Setter Property="HorizontalAlignment" Value="Right"/>
+                <Setter Property="Margin" Value="0,0,2,0"/>
+                <Setter Property="Fill" Value="White"/>
+            </Style>
+            <Style Selector="^:disabled">
+                <Setter Property="Opacity" Value="0.55"/>
+                <Setter Property="Cursor" Value="Arrow"/>
+            </Style>
+        </ControlTheme>
     </UserControl.Resources>
 
     <UserControl.Styles>
         <Style Selector="ListBox#NavListBox ListBoxItem TextBlock">
             <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
         </Style>
+        <Style Selector="ListBox#NavListBox ListBoxItem Path">
+            <Setter Property="Fill" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+        </Style>
         <Style Selector="Button">
             <Setter Property="FontSize" Value="11"/>
         </Style>
         <Style Selector="ComboBox">
             <Setter Property="FontSize" Value="11"/>
+            <Setter Property="MinHeight" Value="30"/>
         </Style>
         <Style Selector="ComboBoxItem">
             <Setter Property="FontSize" Value="11"/>
+        </Style>
+        <Style Selector="TextBox">
+            <Setter Property="MinHeight" Value="30"/>
+        </Style>
+        <Style Selector="NumericUpDown">
+            <Setter Property="MinHeight" Value="30"/>
         </Style>
     </UserControl.Styles>
 
@@ -162,95 +229,127 @@
             <ListBoxItem IsHitTestVisible="False"
                          Focusable="False"
                          Padding="12,10,0,4"
-                         FontSize="10"
+                         FontSize="{DynamicResource FontSizeMeta}"
                          FontWeight="Bold"
                          Foreground="{DynamicResource AppMutedTextBrush}">
                 <TextBlock Text="{DynamicResource L_Playback}"/>
             </ListBoxItem>
             <ListBoxItem Tag="AudioDevice"
-                         FontSize="13"
+                         FontSize="{DynamicResource FontSizeBody}"
                          Theme="{StaticResource SettingsNavItemTheme}">
-                <TextBlock Text="{DynamicResource L_OutputDevice}"/>
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Path Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"
+                          Data="M3,9 L7,9 L12,4 L12,20 L7,15 L3,15 Z"/>
+                    <TextBlock Text="{DynamicResource L_OutputDevice}" VerticalAlignment="Center"/>
+                </StackPanel>
             </ListBoxItem>
 
             <ListBoxItem IsHitTestVisible="False"
                          Focusable="False"
                          Padding="12,14,0,4"
-                         FontSize="10"
+                         FontSize="{DynamicResource FontSizeMeta}"
                          FontWeight="Bold"
                          Foreground="{DynamicResource AppMutedTextBrush}">
                 <TextBlock Text="{DynamicResource L_Library}"/>
             </ListBoxItem>
             <ListBoxItem Tag="Library"
-                         FontSize="13"
+                         FontSize="{DynamicResource FontSizeBody}"
                          Theme="{StaticResource SettingsNavItemTheme}">
-                <TextBlock Text="{DynamicResource L_Directories}"/>
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Path Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"
+                          Data="M2,6 L9,6 L11,8 L22,8 L22,19 L2,19 Z"/>
+                    <TextBlock Text="{DynamicResource L_Directories}" VerticalAlignment="Center"/>
+                </StackPanel>
             </ListBoxItem>
             <ListBoxItem Tag="OrynivoServers"
-                         FontSize="13"
+                         FontSize="{DynamicResource FontSizeBody}"
                          Theme="{StaticResource SettingsNavItemTheme}">
-                <TextBlock Text="{DynamicResource L_OrynivoServersSettings}"/>
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Path Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"
+                          Data="M3,5 L21,5 L21,10 L3,10 Z M3,13 L21,13 L21,18 L3,18 Z"/>
+                    <TextBlock Text="{DynamicResource L_OrynivoServersSettings}" VerticalAlignment="Center"/>
+                </StackPanel>
             </ListBoxItem>
 
             <ListBoxItem IsHitTestVisible="False"
                          Focusable="False"
                          Padding="12,14,0,4"
-                         FontSize="10"
+                         FontSize="{DynamicResource FontSizeMeta}"
                          FontWeight="Bold"
                          Foreground="{DynamicResource AppMutedTextBrush}">
                 <TextBlock Text="{DynamicResource L_Streaming}"/>
             </ListBoxItem>
             <ListBoxItem Tag="Streaming"
-                         FontSize="13"
+                         FontSize="{DynamicResource FontSizeBody}"
                          Theme="{StaticResource SettingsNavItemTheme}">
-                <TextBlock Text="{DynamicResource L_StreamingServices}"/>
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Path Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"
+                          Data="M4,18 L7,18 L7,14 L4,14 Z M9.5,18 L12.5,18 L12.5,9 L9.5,9 Z M15,18 L18,18 L18,4 L15,4 Z"/>
+                    <TextBlock Text="{DynamicResource L_StreamingServices}" VerticalAlignment="Center"/>
+                </StackPanel>
             </ListBoxItem>
 
             <ListBoxItem IsHitTestVisible="False"
                          Focusable="False"
                          Padding="12,14,0,4"
-                         FontSize="10"
+                         FontSize="{DynamicResource FontSizeMeta}"
                          FontWeight="Bold"
                          Foreground="{DynamicResource AppMutedTextBrush}">
                 <TextBlock Text="{DynamicResource L_Appearance}"/>
             </ListBoxItem>
             <ListBoxItem Tag="Appearance"
-                         FontSize="13"
+                         FontSize="{DynamicResource FontSizeBody}"
                          Theme="{StaticResource SettingsNavItemTheme}">
-                <TextBlock Text="{DynamicResource L_AppearanceNavItem}"/>
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Path Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"
+                          Data="M4,20 L4,16 L14,6 L18,10 L8,20 Z M15,5 L17,3 L21,7 L19,9 Z"/>
+                    <TextBlock Text="{DynamicResource L_AppearanceNavItem}" VerticalAlignment="Center"/>
+                </StackPanel>
             </ListBoxItem>
 
             <ListBoxItem IsHitTestVisible="False"
                          Focusable="False"
                          Padding="12,14,0,4"
-                         FontSize="10"
+                         FontSize="{DynamicResource FontSizeMeta}"
                          FontWeight="Bold"
                          Foreground="{DynamicResource AppMutedTextBrush}">
                 <TextBlock Text="{DynamicResource L_ArtistInfo}"/>
             </ListBoxItem>
             <ListBoxItem Tag="ArtistInfo"
-                         FontSize="13"
+                         FontSize="{DynamicResource FontSizeBody}"
                          Theme="{StaticResource SettingsNavItemTheme}">
-                <TextBlock Text="{DynamicResource L_ArtistInfoNavItem}"/>
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Path Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"
+                          Data="M12,3 L15.5,7 L12,11 L8.5,7 Z M5,21 L7,14 L17,14 L19,21 Z"/>
+                    <TextBlock Text="{DynamicResource L_ArtistInfoNavItem}" VerticalAlignment="Center"/>
+                </StackPanel>
             </ListBoxItem>
 
             <ListBoxItem IsHitTestVisible="False"
                          Focusable="False"
                          Padding="12,14,0,4"
-                         FontSize="10"
+                         FontSize="{DynamicResource FontSizeMeta}"
                          FontWeight="Bold"
                          Foreground="{DynamicResource AppMutedTextBrush}">
                 <TextBlock Text="{DynamicResource L_Integration}"/>
             </ListBoxItem>
             <ListBoxItem Tag="Mcp"
-                         FontSize="13"
+                         FontSize="{DynamicResource FontSizeBody}"
                          Theme="{StaticResource SettingsNavItemTheme}">
-                <TextBlock Text="{DynamicResource L_McpServer}"/>
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Path Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"
+                          Data="M9,3 L11,3 L11,7 L9,7 Z M13,3 L15,3 L15,7 L13,7 Z M7,7 L17,7 L17,13 L7,13 Z M11,13 L13,13 L13,21 L11,21 Z"/>
+                    <TextBlock Text="{DynamicResource L_McpServer}" VerticalAlignment="Center"/>
+                </StackPanel>
             </ListBoxItem>
             <ListBoxItem Tag="AiChat"
-                         FontSize="13"
+                         FontSize="{DynamicResource FontSizeBody}"
                          Theme="{StaticResource SettingsNavItemTheme}">
-                <TextBlock Text="{DynamicResource L_AiChat}"/>
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Path Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"
+                          Data="M4,5 L20,5 L20,15 L11,15 L7,19 L7,15 L4,15 Z"/>
+                    <TextBlock Text="{DynamicResource L_AiChat}" VerticalAlignment="Center"/>
+                </StackPanel>
             </ListBoxItem>
         </ListBox>
 
@@ -267,12 +366,33 @@
                 <StackPanel x:Name="AudioDevicePanel"
                             IsVisible="False">
                     <TextBlock Text="{DynamicResource L_OutputDevice}"
-                               FontSize="15"
+                               FontSize="{DynamicResource FontSizeBodyStrong}"
                                FontWeight="SemiBold"
-                               Margin="0,0,0,20"/>
+                               Margin="0,0,0,14"/>
+
+                    <WrapPanel Margin="0,0,0,20">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,20,8" VerticalAlignment="Center">
+                            <TextBlock Text="FFmpeg" VerticalAlignment="Center" Margin="0,0,8,0"
+                                       FontSize="{DynamicResource FontSizeMeta}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppMutedTextBrush}"/>
+                            <controls:StatusBadge x:Name="FfmpegStatusBadge"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,20,8" VerticalAlignment="Center">
+                            <TextBlock Text="Steinberg ASIO" VerticalAlignment="Center" Margin="0,0,8,0"
+                                       FontSize="{DynamicResource FontSizeMeta}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppMutedTextBrush}"/>
+                            <controls:StatusBadge x:Name="AsioStatusBadge"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8" VerticalAlignment="Center">
+                            <TextBlock Text="cwASIO" VerticalAlignment="Center" Margin="0,0,8,0"
+                                       FontSize="{DynamicResource FontSizeMeta}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AppMutedTextBrush}"/>
+                            <controls:StatusBadge x:Name="CwAsioStatusBadge"/>
+                        </StackPanel>
+                    </WrapPanel>
 
                     <TextBlock Text="{DynamicResource L_OutputProfile}"
-                               FontSize="12"
+                               FontSize="{DynamicResource FontSizeCaption}"
                                FontWeight="SemiBold"
                                Margin="0,0,0,6"/>
                     <Grid Margin="0,0,0,10">
@@ -317,29 +437,29 @@
                     </Grid>
                     <TextBlock x:Name="OutputProfileSummaryTextBlock"
                                Margin="0,6,0,0"
-                               FontSize="11"
+                               FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"/>
 
                     <Separator Margin="0,18,0,14"/>
 
                     <TextBlock Text="{DynamicResource L_DsdPlayback}"
-                               FontSize="12"
+                               FontSize="{DynamicResource FontSizeCaption}"
                                FontWeight="SemiBold"
                                Margin="0,0,0,8"/>
                     <CheckBox x:Name="AlwaysConvertDsdToPcmCheckBox"
-                              Theme="{StaticResource SettingsCheckBoxTheme}"
+                              Theme="{StaticResource SettingsToggleTheme}"
                               Content="{DynamicResource L_AlwaysConvertDsdToPcm}"
                               Margin="0,0,0,6"/>
                     <TextBlock Text="{DynamicResource L_AlwaysConvertDsdToPcmHint}"
-                               FontSize="11"
+                               FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"/>
 
                     <Separator Margin="0,18,0,14"/>
 
                     <TextBlock Text="{DynamicResource L_ReplayGain}"
-                               FontSize="12"
+                               FontSize="{DynamicResource FontSizeCaption}"
                                FontWeight="SemiBold"
                                Margin="0,0,0,6"/>
                     <ComboBox x:Name="ReplayGainModeComboBox"
@@ -348,14 +468,14 @@
                               HorizontalAlignment="Stretch"
                               Margin="0,0,0,8"/>
                     <TextBlock Text="{DynamicResource L_ReplayGainHint}"
-                               FontSize="11"
+                               FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"/>
 
                     <Separator Margin="0,18,0,14"/>
 
                     <TextBlock Text="{DynamicResource L_Equalizer}"
-                               FontSize="12"
+                               FontSize="{DynamicResource FontSizeCaption}"
                                FontWeight="SemiBold"
                                Margin="0,0,0,8"/>
                     <Grid Margin="0,0,0,10">
@@ -390,20 +510,20 @@
                     <StackPanel x:Name="EqualizerEditorPanel"
                                 IsVisible="False">
                         <CheckBox x:Name="EqualizerEnabledCheckBox"
-                                  Theme="{StaticResource SettingsCheckBoxTheme}"
+                                  Theme="{StaticResource SettingsToggleTheme}"
                                   Content="{DynamicResource L_EqualizerEnabled}"
                                   IsCheckedChanged="EqualizerEnabledCheckBox_OnIsCheckedChanged"
                                   Margin="0,0,0,10"/>
                         <Button x:Name="ImportEqualizerProfileButton"
                                 Width="220"
-                                Height="28"
+                                Height="30"
                                 HorizontalAlignment="Left"
                                 Theme="{StaticResource SettingsButtonTheme}"
                                 Content="{DynamicResource L_EqualizerImport}"
                                 Click="ImportEqualizerProfileButton_OnClick"/>
                         <TextBlock x:Name="EqualizerProfileTextBlock"
                                    Margin="0,8,0,0"
-                                   FontSize="11"
+                                   FontSize="{DynamicResource FontSizeMeta}"
                                    Foreground="{DynamicResource AppSecondaryTextBrush}"
                                    TextWrapping="Wrap"/>
                         <controls:EqualizerResponseControl x:Name="EqualizerResponseGraph"
@@ -417,11 +537,11 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="{DynamicResource L_EqualizerPreamp}"
                                        VerticalAlignment="Center"
-                                       FontSize="11"
+                                       FontSize="{DynamicResource FontSizeMeta}"
                                        Margin="0,0,10,0"/>
                             <NumericUpDown x:Name="EqualizerPreampNumericUpDown"
                                            Grid.Column="1"
-                                           Height="28"
+                                           Height="30"
                                            Minimum="-100"
                                            Maximum="100"
                                            Increment="0.5"
@@ -440,23 +560,23 @@
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="#"
-                                       FontSize="10"
+                                       FontSize="{DynamicResource FontSizeMeta}"
                                        Foreground="{DynamicResource AppMutedTextBrush}"/>
                             <TextBlock Grid.Column="1"
                                        Text="{DynamicResource L_EqualizerFilterType}"
-                                       FontSize="10"
+                                       FontSize="{DynamicResource FontSizeMeta}"
                                        Foreground="{DynamicResource AppMutedTextBrush}"/>
                             <TextBlock Grid.Column="2"
                                        Text="{DynamicResource L_EqualizerFrequency}"
-                                       FontSize="10"
+                                       FontSize="{DynamicResource FontSizeMeta}"
                                        Foreground="{DynamicResource AppMutedTextBrush}"/>
                             <TextBlock Grid.Column="3"
                                        Text="{DynamicResource L_EqualizerGain}"
-                                       FontSize="10"
+                                       FontSize="{DynamicResource FontSizeMeta}"
                                        Foreground="{DynamicResource AppMutedTextBrush}"/>
                             <TextBlock Grid.Column="4"
                                        Text="{DynamicResource L_EqualizerQ}"
-                                       FontSize="10"
+                                       FontSize="{DynamicResource FontSizeMeta}"
                                        Foreground="{DynamicResource AppMutedTextBrush}"/>
                         </Grid>
                         <Border MaxHeight="260"
@@ -471,7 +591,7 @@
                         </Border>
                         <Button x:Name="AddEqualizerFilterButton"
                                 Width="150"
-                                Height="28"
+                                Height="30"
                                 HorizontalAlignment="Left"
                                 Margin="0,8,0,0"
                                 Theme="{StaticResource SettingsButtonTheme}"
@@ -479,7 +599,7 @@
                                 Click="AddEqualizerFilterButton_OnClick"/>
                         <TextBlock Text="{DynamicResource L_EqualizerHint}"
                                    Margin="0,6,0,0"
-                                   FontSize="11"
+                                   FontSize="{DynamicResource FontSizeMeta}"
                                    Foreground="{DynamicResource AppMutedTextBrush}"
                                    TextWrapping="Wrap"/>
                     </StackPanel>
@@ -488,7 +608,7 @@
                 <StackPanel x:Name="LibraryPanel"
                             IsVisible="False">
                     <TextBlock Text="{DynamicResource L_Directories}"
-                               FontSize="15"
+                               FontSize="{DynamicResource FontSizeBodyStrong}"
                                FontWeight="SemiBold"
                                Margin="0,0,0,20"/>
 
@@ -500,7 +620,7 @@
 
                     <Button x:Name="AddDirectoryButton"
                             Width="180"
-                            Height="28"
+                            Height="30"
                             HorizontalAlignment="Left"
                             Margin="0,10,0,0"
                             Theme="{StaticResource SettingsButtonTheme}"
@@ -510,24 +630,24 @@
                     <Separator Margin="0,18,0,14"/>
 
                     <TextBlock Text="{DynamicResource L_LibraryBackup}"
-                               FontSize="12"
+                               FontSize="{DynamicResource FontSizeCaption}"
                                FontWeight="SemiBold"
                                Margin="0,0,0,6"/>
                     <TextBlock Text="{DynamicResource L_LibraryBackupHint}"
-                               FontSize="11"
+                               FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"
                                Margin="0,0,0,8"/>
                     <StackPanel Orientation="Horizontal">
                         <Button x:Name="ExportLibraryButton"
                                 Width="180"
-                                Height="28"
+                                Height="30"
                                 Theme="{StaticResource SettingsButtonTheme}"
                                 Content="{DynamicResource L_ExportLibrary}"
                                 Click="ExportLibraryButton_OnClick"/>
                         <Button x:Name="ImportLibraryButton"
                                 Width="180"
-                                Height="28"
+                                Height="30"
                                 Margin="8,0,0,0"
                                 Theme="{StaticResource SettingsButtonTheme}"
                                 Content="{DynamicResource L_ImportLibrary}"
@@ -535,7 +655,7 @@
                     </StackPanel>
                     <TextBlock x:Name="LibraryBackupStatusTextBlock"
                                Margin="0,8,0,0"
-                               FontSize="11"
+                               FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppSecondaryTextBrush}"
                                TextWrapping="Wrap"/>
                     <ProgressBar x:Name="LibraryExportProgressBar"
@@ -550,24 +670,24 @@
                     <Separator Margin="0,18,0,14"/>
 
                     <TextBlock Text="{DynamicResource L_DatabaseMaintenance}"
-                               FontSize="12"
+                               FontSize="{DynamicResource FontSizeCaption}"
                                FontWeight="SemiBold"
                                Margin="0,0,0,6"/>
                     <TextBlock Text="{DynamicResource L_DatabaseOptimizeHint}"
-                               FontSize="11"
+                               FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"
                                Margin="0,0,0,8"/>
                     <Button x:Name="OptimizeDatabaseButton"
                             Width="180"
-                            Height="28"
+                            Height="30"
                             HorizontalAlignment="Left"
                             Theme="{StaticResource SettingsButtonTheme}"
                             Content="{DynamicResource L_OptimizeDatabase}"
                             Click="OptimizeDatabaseButton_OnClick"/>
                     <Button x:Name="RepairAlbumArtworkButton"
                             Width="180"
-                            Height="28"
+                            Height="30"
                             HorizontalAlignment="Left"
                             Margin="0,8,0,0"
                             Theme="{StaticResource SettingsButtonTheme}"
@@ -575,33 +695,33 @@
                             Click="RepairAlbumArtworkButton_OnClick"/>
                     <Button x:Name="NormalizeArtistsButton"
                             Width="220"
-                            Height="28"
+                            Height="30"
                             HorizontalAlignment="Left"
                             Margin="0,8,0,0"
                             Theme="{StaticResource SettingsButtonTheme}"
                             Content="{DynamicResource L_NormalizeArtists}"
                             Click="NormalizeArtistsButton_OnClick"/>
                     <TextBlock Text="{DynamicResource L_NormalizeArtistsHint}"
-                               FontSize="11"
+                               FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"
                                Margin="0,6,0,0"/>
                     <Button x:Name="DownloadMissingArtworkButton"
                             Width="260"
-                            Height="28"
+                            Height="30"
                             HorizontalAlignment="Left"
                             Margin="0,8,0,0"
                             Theme="{StaticResource SettingsButtonTheme}"
                             Content="{DynamicResource L_DownloadMissingArtwork}"
                             Click="DownloadMissingArtworkButton_OnClick"/>
                     <TextBlock Text="{DynamicResource L_DownloadMissingArtworkHint}"
-                               FontSize="11"
+                               FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"
                                Margin="0,6,0,0"/>
                     <TextBlock x:Name="DatabaseMaintenanceStatusTextBlock"
                                Margin="0,8,0,0"
-                               FontSize="11"
+                               FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppSecondaryTextBrush}"
                                TextWrapping="Wrap"/>
                 </StackPanel>
@@ -609,11 +729,11 @@
                 <StackPanel x:Name="OrynivoServersSettingsPanel"
                             IsVisible="False">
                     <TextBlock Text="{DynamicResource L_OrynivoServersSettings}"
-                               FontSize="15"
+                               FontSize="{DynamicResource FontSizeBodyStrong}"
                                FontWeight="SemiBold"
                                Margin="0,0,0,8"/>
                     <TextBlock Text="{DynamicResource L_OrynivoServersHint}"
-                               FontSize="11"
+                               FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"
                                Margin="0,0,0,12"/>
@@ -630,22 +750,22 @@
                 <StackPanel x:Name="StreamingPanel"
                             IsVisible="False">
                     <TextBlock Text="{DynamicResource L_StreamingServices}"
-                               FontSize="15"
+                               FontSize="{DynamicResource FontSizeBodyStrong}"
                                FontWeight="SemiBold"
                                Margin="0,0,0,20"/>
 
                     <TextBlock Text="{DynamicResource L_Qobuz}"
-                               FontSize="13"
+                               FontSize="{DynamicResource FontSizeBody}"
                                FontWeight="SemiBold"
                                Margin="0,0,0,8"/>
                     <TextBlock Text="{DynamicResource L_QobuzIntegrationHint}"
-                               FontSize="11"
+                               FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"
                                Margin="0,0,0,16"/>
 
                     <TextBlock Text="{DynamicResource L_QobuzApplicationId}"
-                               FontSize="12"
+                               FontSize="{DynamicResource FontSizeCaption}"
                                FontWeight="SemiBold"
                                Margin="0,0,0,6"/>
                     <TextBox x:Name="QobuzApplicationIdTextBox"
@@ -655,17 +775,17 @@
                              VerticalContentAlignment="Center"
                              Margin="0,0,0,8"/>
                     <TextBlock Text="{DynamicResource L_QobuzCredentialsHint}"
-                               FontSize="11"
+                               FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"
                                Margin="0,0,0,24"/>
 
                     <TextBlock Text="{DynamicResource L_PlexServersSettings}"
-                               FontSize="13"
+                               FontSize="{DynamicResource FontSizeBody}"
                                FontWeight="SemiBold"
                                Margin="0,0,0,8"/>
                     <TextBlock Text="{DynamicResource L_PlexServersHint}"
-                               FontSize="11"
+                               FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"
                                Margin="0,0,0,12"/>
@@ -682,12 +802,12 @@
                 <StackPanel x:Name="ArtistInfoPanel"
                             IsVisible="False">
                     <TextBlock Text="{DynamicResource L_ArtistInfo}"
-                               FontSize="15"
+                               FontSize="{DynamicResource FontSizeBodyStrong}"
                                FontWeight="SemiBold"
                                Margin="0,0,0,20"/>
 
                     <TextBlock Text="{DynamicResource L_ArtistInfoSourceSetting}"
-                               FontSize="12"
+                               FontSize="{DynamicResource FontSizeCaption}"
                                FontWeight="SemiBold"
                                Margin="0,0,0,6"/>
                     <ComboBox x:Name="ArtistInfoSourceComboBox"
@@ -699,7 +819,7 @@
                     <StackPanel x:Name="LastFmPanel"
                                 IsVisible="False">
                         <TextBlock Text="{DynamicResource L_LastFmApiKey}"
-                                   FontSize="12"
+                                   FontSize="{DynamicResource FontSizeCaption}"
                                    FontWeight="SemiBold"
                                    Margin="0,0,0,6"/>
                         <TextBox x:Name="LastFmApiKeyTextBox"
@@ -709,7 +829,7 @@
                                  VerticalContentAlignment="Center"
                                  Margin="0,0,0,8"/>
                         <TextBlock Text="{DynamicResource L_LastFmApiKeyHint}"
-                                   FontSize="11"
+                                   FontSize="{DynamicResource FontSizeMeta}"
                                    Foreground="{DynamicResource AppMutedTextBrush}"
                                    TextWrapping="Wrap"/>
                     </StackPanel>
@@ -718,11 +838,11 @@
                 <StackPanel x:Name="AppearancePanel"
                             IsVisible="False">
                     <TextBlock Text="{DynamicResource L_Appearance}"
-                               FontSize="15"
+                               FontSize="{DynamicResource FontSizeBodyStrong}"
                                FontWeight="SemiBold"
                                Margin="0,0,0,20"/>
                     <TextBlock Text="{DynamicResource L_ColorScheme}"
-                               FontSize="12"
+                               FontSize="{DynamicResource FontSizeCaption}"
                                FontWeight="SemiBold"
                                Margin="0,0,0,6"/>
                     <ComboBox x:Name="ThemeComboBox"
@@ -731,7 +851,7 @@
                               Margin="0,0,0,12"/>
 
                     <TextBlock Text="{DynamicResource L_Language}"
-                               FontSize="12"
+                               FontSize="{DynamicResource FontSizeCaption}"
                                FontWeight="SemiBold"
                                Margin="0,0,0,6"/>
                     <ComboBox x:Name="LanguageComboBox"
@@ -740,61 +860,66 @@
                               Margin="0,0,0,20"/>
 
                     <TextBlock Text="{DynamicResource L_SidebarSections}"
-                               FontSize="12"
+                               FontSize="{DynamicResource FontSizeCaption}"
                                FontWeight="SemiBold"
                                Margin="0,0,0,6"/>
                     <TextBlock Text="{DynamicResource L_SidebarSectionsHint}"
-                               FontSize="11"
+                               FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"
                                Margin="0,0,0,8"/>
                     <CheckBox x:Name="ShowInternetRadioItemCheckBox"
                               Content="{DynamicResource L_InternetRadio}"
-                              Theme="{StaticResource SettingsCheckBoxTheme}"
+                              Theme="{StaticResource SettingsToggleTheme}"
                               Margin="0,4"/>
                     <CheckBox x:Name="ShowPodcastsItemCheckBox"
                               Content="{DynamicResource L_Podcasts}"
-                              Theme="{StaticResource SettingsCheckBoxTheme}"
+                              Theme="{StaticResource SettingsToggleTheme}"
                               Margin="0,4"/>
                     <CheckBox x:Name="ShowQueueItemCheckBox"
                               Content="{DynamicResource L_UpNext}"
-                              Theme="{StaticResource SettingsCheckBoxTheme}"
+                              Theme="{StaticResource SettingsToggleTheme}"
                               Margin="0,4"/>
                     <CheckBox x:Name="ShowLocalLibrarySectionCheckBox"
                               Content="{DynamicResource L_LocalLibrary}"
-                              Theme="{StaticResource SettingsCheckBoxTheme}"
+                              Theme="{StaticResource SettingsToggleTheme}"
                               Margin="0,4"/>
                     <CheckBox x:Name="ShowOwnRadiosSectionCheckBox"
                               Content="{DynamicResource L_OwnRadios}"
-                              Theme="{StaticResource SettingsCheckBoxTheme}"
+                              Theme="{StaticResource SettingsToggleTheme}"
                               Margin="0,4"/>
                     <CheckBox x:Name="ShowMyPodcastsSectionCheckBox"
                               Content="{DynamicResource L_MyPodcasts}"
-                              Theme="{StaticResource SettingsCheckBoxTheme}"
+                              Theme="{StaticResource SettingsToggleTheme}"
                               Margin="0,4"/>
                     <CheckBox x:Name="ShowPlexSectionCheckBox"
                               Content="{DynamicResource L_PlexServers}"
-                              Theme="{StaticResource SettingsCheckBoxTheme}"
+                              Theme="{StaticResource SettingsToggleTheme}"
                               Margin="0,4"/>
                 </StackPanel>
 
                 <StackPanel x:Name="McpPanel"
                             IsVisible="False">
-                    <TextBlock Text="{DynamicResource L_McpServer}"
-                               FontSize="15"
-                               FontWeight="SemiBold"
-                               Margin="0,0,0,20"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,20" VerticalAlignment="Center">
+                        <TextBlock Text="{DynamicResource L_McpServer}"
+                                   FontSize="{DynamicResource FontSizeBodyStrong}"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"/>
+                        <controls:StatusBadge x:Name="McpStatusBadge"
+                                              Margin="12,0,0,0"
+                                              VerticalAlignment="Center"/>
+                    </StackPanel>
                     <TextBlock Text="{DynamicResource L_McpServerHint}"
-                               FontSize="11"
+                               FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"
                                Margin="0,0,0,12"/>
                     <CheckBox x:Name="McpServerEnabledCheckBox"
                               Content="{DynamicResource L_McpServerEnabled}"
-                              Theme="{StaticResource SettingsCheckBoxTheme}"
+                              Theme="{StaticResource SettingsToggleTheme}"
                               Margin="0,0,0,16"/>
                     <TextBlock Text="{DynamicResource L_McpServerPort}"
-                               FontSize="12"
+                               FontSize="{DynamicResource FontSizeCaption}"
                                FontWeight="SemiBold"
                                Margin="0,0,0,6"/>
                     <NumericUpDown x:Name="McpServerPortNumericUpDown"
@@ -807,7 +932,7 @@
                                    HorizontalAlignment="Stretch"
                                    Margin="0,0,0,12"/>
                     <TextBlock x:Name="McpServerStatusTextBlock"
-                               FontSize="11"
+                               FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"
                                Margin="0,0,0,20"/>
@@ -817,11 +942,11 @@
                             Margin="0,0,0,16"/>
 
                     <TextBlock Text="{DynamicResource L_McpToolsHeader}"
-                               FontSize="13"
+                               FontSize="{DynamicResource FontSizeBody}"
                                FontWeight="SemiBold"
                                Margin="0,0,0,6"/>
                     <TextBlock Text="{DynamicResource L_McpToolsHint}"
-                               FontSize="11"
+                               FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"
                                Margin="0,0,0,12"/>
@@ -909,21 +1034,21 @@
                 <StackPanel x:Name="AiChatPanel"
                             IsVisible="False">
                     <TextBlock Text="{DynamicResource L_AiChatSettings}"
-                               FontSize="15"
+                               FontSize="{DynamicResource FontSizeBodyStrong}"
                                FontWeight="SemiBold"
                                Margin="0,0,0,20"/>
                     <TextBlock Text="{DynamicResource L_AiChatHint}"
-                               FontSize="11"
+                               FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"
                                Margin="0,0,0,14"/>
                     <CheckBox x:Name="AiChatEnabledCheckBox"
                               Content="{DynamicResource L_AiChatEnabled}"
-                              Theme="{StaticResource SettingsCheckBoxTheme}"
+                              Theme="{StaticResource SettingsToggleTheme}"
                               Margin="0,0,0,18"/>
 
                     <TextBlock Text="{DynamicResource L_AiChatEndpointUrl}"
-                               FontSize="12"
+                               FontSize="{DynamicResource FontSizeCaption}"
                                FontWeight="SemiBold"
                                Margin="0,0,0,6"/>
                     <TextBox x:Name="AiChatEndpointUrlTextBox"
@@ -932,7 +1057,7 @@
                              Margin="0,0,0,14"/>
 
                     <TextBlock Text="{DynamicResource L_AiChatApiKey}"
-                               FontSize="12"
+                               FontSize="{DynamicResource FontSizeCaption}"
                                FontWeight="SemiBold"
                                Margin="0,0,0,6"/>
                     <TextBox x:Name="AiChatApiKeyTextBox"
@@ -941,12 +1066,12 @@
                              HorizontalAlignment="Stretch"
                              Margin="0,0,0,4"/>
                     <TextBlock Text="{DynamicResource L_AiChatLocalNote}"
-                               FontSize="10"
+                               FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                Margin="0,0,0,14"/>
 
                     <TextBlock Text="{DynamicResource L_AiChatModel}"
-                               FontSize="12"
+                               FontSize="{DynamicResource FontSizeCaption}"
                                FontWeight="SemiBold"
                                Margin="0,0,0,6"/>
                     <TextBox x:Name="AiChatModelTextBox"
@@ -955,7 +1080,7 @@
                              Margin="0,0,0,14"/>
 
                     <TextBlock Text="{DynamicResource L_AiChatMaxTokens}"
-                               FontSize="12"
+                               FontSize="{DynamicResource FontSizeCaption}"
                                FontWeight="SemiBold"
                                Margin="0,0,0,6"/>
                     <NumericUpDown x:Name="AiChatMaxTokensNumericUpDown"

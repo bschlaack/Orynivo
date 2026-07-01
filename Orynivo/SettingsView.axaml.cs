@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using Avalonia;
 using Avalonia.Threading;
@@ -9,6 +10,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Orynivo.Audio;
+using Orynivo.Controls;
 using Orynivo.Library;
 using Orynivo.Localization;
 using Orynivo.Streaming;
@@ -125,6 +127,8 @@ internal partial class SettingsView : UserControl
         McpServerEnabledCheckBox.IsChecked        = settings.McpServerEnabled;
         McpServerPortNumericUpDown.Value          = settings.McpServerPort;
         InitMcpToolCheckBoxes(settings.DisabledMcpTools);
+        UpdateSubsystemStatusBadges();
+        McpServerEnabledCheckBox.IsCheckedChanged += (_, _) => UpdateMcpStatusBadge();
         AiChatEnabledCheckBox.IsChecked         = settings.AiChat.Enabled;
         AiChatEndpointUrlTextBox.Text           = settings.AiChat.EndpointUrl;
         AiChatApiKeyTextBox.Text                = settings.AiChat.ApiKey;
@@ -157,6 +161,63 @@ internal partial class SettingsView : UserControl
         _initializing = false;
         RefreshOutputProfileButtons();
         NavListBox.SelectedIndex = 1;
+    }
+
+    /// <summary>Updates the FFmpeg, Steinberg ASIO, cwASIO, and MCP subsystem status badges.</summary>
+    private void UpdateSubsystemStatusBadges()
+    {
+        var loc = LocalizationManager.Current;
+
+        bool ffmpeg = IsFfmpegAvailable();
+        FfmpegStatusBadge.State = ffmpeg ? StatusBadgeState.Ok : StatusBadgeState.Warning;
+        FfmpegStatusBadge.Text = ffmpeg ? loc.StatusReady : loc.StatusUnavailable;
+
+        bool asio = SteinbergAsioStream.IsAvailable;
+        AsioStatusBadge.State = asio ? StatusBadgeState.Ok : StatusBadgeState.Off;
+        AsioStatusBadge.Text = asio ? loc.StatusAvailable : loc.StatusUnavailable;
+
+        bool cwAsio = SteinbergAsioStream.IsCwAsioAvailable;
+        CwAsioStatusBadge.State = cwAsio ? StatusBadgeState.Ok : StatusBadgeState.Off;
+        CwAsioStatusBadge.Text = cwAsio ? loc.StatusAvailable : loc.StatusUnavailable;
+
+        UpdateMcpStatusBadge();
+    }
+
+    /// <summary>Updates the MCP server badge to reflect the current enable toggle state.</summary>
+    private void UpdateMcpStatusBadge()
+    {
+        var loc = LocalizationManager.Current;
+        bool enabled = McpServerEnabledCheckBox.IsChecked == true;
+        McpStatusBadge.State = enabled ? StatusBadgeState.Ok : StatusBadgeState.Off;
+        McpStatusBadge.Text = enabled ? loc.StatusEnabled : loc.StatusDisabled;
+    }
+
+    /// <summary>Checks whether an ffmpeg executable is resolvable in the known locations.</summary>
+    /// <returns><see langword="true"/> when ffmpeg is found in the app, per-user, or PATH directories.</returns>
+    private static bool IsFfmpegAvailable()
+    {
+        static bool HasFfmpeg(string? directory) =>
+            !string.IsNullOrWhiteSpace(directory) &&
+            File.Exists(Path.Combine(directory, "ffmpeg.exe"));
+
+        if (HasFfmpeg(AppContext.BaseDirectory))
+            return true;
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        if (HasFfmpeg(Path.Combine(localAppData, "Orynivo", "ffmpeg")))
+            return true;
+        foreach (var directory in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
+                     .Split(Path.PathSeparator))
+        {
+            try
+            {
+                if (HasFfmpeg(directory.Trim()))
+                    return true;
+            }
+            catch
+            {
+            }
+        }
+        return false;
     }
 
     /// <summary>Raised when the embedded settings view requests save or cancel.</summary>
