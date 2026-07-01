@@ -4,15 +4,7 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
-
-### Added
-
-- The bottom transport bar's position-slider progress, slider thumb, and
-  play/pause button are now tinted with an accent colour extracted from the
-  current cover art (falling back to the app accent when no artwork is
-  available), and the album artwork is slightly larger (72 px, rounded). The bar
-  keeps its full-width, flush layout.
+## [0.20.4] - 2026-07-01
 
 ### Changed
 
@@ -28,6 +20,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Library watcher rescans now honour cancellation while waiting between locked
+  file retry attempts instead of blocking through fixed sleeps.
+- The bottom transport bar's position-slider progress, slider thumb, and
+  play/pause button are now tinted with an accent colour extracted from the
+  current cover art (falling back to the app accent when no artwork is
+  available), and the album artwork is slightly larger (72 px, rounded). The bar
+  keeps its full-width, flush layout.
 - Startup no longer keeps the splash screen open while checking or rebuilding a
   Lucene search index for large libraries. The main window opens after database
   preparation, and search-index checking/rebuild continues in the background
