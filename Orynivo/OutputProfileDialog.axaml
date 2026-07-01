@@ -68,7 +68,7 @@
         </Grid.RowDefinitions>
 
         <TextBlock Text="{DynamicResource L_OutputProfileName}"
-                   FontSize="12"
+                   FontSize="{DynamicResource FontSizeCaption}"
                    Foreground="{DynamicResource AppMutedTextBrush}"
                    Margin="0,0,0,6"/>
         <TextBox x:Name="NameTextBox"
@@ -85,13 +85,13 @@
                    Grid.Row="2"
                    MinHeight="18"
                    Margin="0,5,0,14"
-                   FontSize="11"
+                   FontSize="{DynamicResource FontSizeMeta}"
                    Foreground="{DynamicResource AppMutedTextBrush}"
                    TextWrapping="Wrap"/>
 
         <TextBlock Grid.Row="3"
                    Text="{DynamicResource L_OutputType}"
-                   FontSize="12"
+                   FontSize="{DynamicResource FontSizeCaption}"
                    Foreground="{DynamicResource AppMutedTextBrush}"
                    Margin="0,0,0,6"/>
         <ComboBox x:Name="BackendComboBox"
@@ -104,7 +104,7 @@
         <TextBlock x:Name="DeviceLabelTextBlock"
                    Grid.Row="5"
                    Text="{DynamicResource L_AsioOutputDevice}"
-                   FontSize="12"
+                   FontSize="{DynamicResource FontSizeCaption}"
                    Foreground="{DynamicResource AppMutedTextBrush}"
                    Margin="0,0,0,6"/>
         <ComboBox x:Name="DeviceComboBox"
@@ -130,7 +130,7 @@
                        Grid.Column="1"
                        Margin="12,0,0,0"
                        VerticalAlignment="Center"
-                       FontSize="11"
+                       FontSize="{DynamicResource FontSizeMeta}"
                        TextWrapping="Wrap"
                        Foreground="{DynamicResource AppMutedTextBrush}"/>
         </Grid>

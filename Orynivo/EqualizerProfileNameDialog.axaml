@@ -62,7 +62,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <TextBlock Text="{DynamicResource L_EqualizerName}"
-                   FontSize="12"
+                   FontSize="{DynamicResource FontSizeCaption}"
                    Foreground="{DynamicResource AppMutedTextBrush}"
                    Margin="0,0,0,6"/>
         <TextBox x:Name="NameTextBox"
@@ -79,7 +79,7 @@
                    Grid.Row="2"
                    MinHeight="18"
                    Margin="0,5,0,12"
-                   FontSize="11"
+                   FontSize="{DynamicResource FontSizeMeta}"
                    Foreground="{DynamicResource AppMutedTextBrush}"
                    TextWrapping="Wrap"/>
         <StackPanel Grid.Row="3"

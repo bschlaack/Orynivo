@@ -15,7 +15,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <TextBlock x:Name="MessageTextBlock"
-                   FontSize="14"
+                   FontSize="{DynamicResource FontSizeBodyStrong}"
                    LineHeight="21"
                    TextWrapping="Wrap"
                    Foreground="{DynamicResource AppPrimaryTextBrush}"/>

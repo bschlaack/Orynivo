@@ -348,6 +348,12 @@ public sealed record LocalizedStrings(
     public string FoldersIntroHint { get; init; } = "";
     public string ThemeLight { get; init; } = "";
     public string ThemeDark { get; init; } = "";
+    public string StatusAvailable { get; init; } = "";
+    public string StatusUnavailable { get; init; } = "";
+    public string StatusEnabled { get; init; } = "";
+    public string StatusDisabled { get; init; } = "";
+    public string StatusReady { get; init; } = "";
+    public string StatusChecking { get; init; } = "";
     public string LanguageGerman { get; init; } = "";
     public string LanguageEnglish { get; init; } = "";
     public string LanguageFrench { get; init; } = "";

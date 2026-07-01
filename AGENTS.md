@@ -301,6 +301,25 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   to dynamic editor rows. Marker bubbles sit below the scale; colliding numbers
   remain bottom-aligned and shift horizontally with a short leader instead of
   moving upward.
+- `Orynivo/Controls/InitialsAvatar.cs`: reusable `TemplatedControl` placeholder
+  for missing album/artist artwork. It derives one or two initials plus a
+  deterministic diagonal gradient (seeded from the display name) so empty cover
+  slots look intentional instead of flat grey. Its default template lives in
+  `App.axaml` (`{x:Type controls:InitialsAvatar}`). Used in the album detail
+  header, album/artist artwork cards, and the artist-info image; because remote
+  entities reuse the same `ContentRow`-bound masks, local and remote share it.
+  Set `DisplayName` (bound to the row `Title` or an element reference) and
+  `FontSize` to scale the initials to the slot size.
+- `Orynivo/Controls/StatusBadge.cs`: small pill indicator (`TemplatedControl`,
+  default template in `App.axaml`) with a coloured dot and short label, driven
+  by `Text` and a `State` (`StatusBadgeState.Ok`/`Warning`/`Off`). Settings uses
+  it to surface FFmpeg, Steinberg ASIO, cwASIO, and MCP server availability;
+  `SettingsView` populates the badges in `UpdateSubsystemStatusBadges()` /
+  `UpdateMcpStatusBadge()`. Each Orynivo Server and Plex server row also carries
+  a live connection badge probed asynchronously (`CheckServerStatusAsync` +
+  `ProbeOrynivoServerAsync`/`ProbePlexServerAsync`), so opening Settings never
+  blocks on network calls; pending probes are cancelled per-list on rebuild and
+  in `Deactivate()`.
 - `Orynivo/EqualizerProfileNameDialog.*`: themed unique-name dialog used when
   creating a new persisted equalizer profile
 - `Native/AsioBridge/bridge.cpp`: shared Steinberg/cwASIO initialization,
@@ -860,6 +879,16 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   content with the current artist image, biography, and source link. The source
   label ("Quelle: Wikipedia" / "Quelle: Last.fm") is set dynamically from the
   stored `SourceUrl`.
+- Below the biography, the artist-info view shows the artist's albums as a
+  wrapped strip of clickable cover cards (`ArtistInfoAlbumsSection` /
+  `ArtistInfoAlbumsPanel`, populated by `LoadArtistInfoAlbumsAsync` →
+  `PopulateArtistInfoAlbums` → `BuildArtistInfoAlbumCard`). Albums are loaded
+  through the shared `ILibraryCatalogProvider` (`GetAlbumsByArtistAsync`) so
+  local, remote-library, and now-playing remote artists all populate the same
+  way; missing covers use the `InitialsAvatar` placeholder. Clicking a card
+  closes the artist-info overlay and opens the album's tracks
+  (`OpenArtistInfoAlbumAsync`): local via `ShowAlbumTracksAsync`, remote via
+  `OpenOrynivoAlbumTracksAsync` on the album's own server.
 - Artwork A-Z navigation indexes the complete lightweight artist/album result,
   but binds rows to the virtualized wrap panels in pages. A jump must append
   through the target row and defer `ScrollIntoView` until layout has processed
@@ -1189,6 +1218,15 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
 
 ## UI Guidelines
 
+- Text sizing uses the shared typography scale defined as `x:Double` resources
+  in `App.axaml` (`FontSizeMeta` 11, `FontSizeCaption` 12, `FontSizeBody` 13,
+  `FontSizeBodyStrong` 15, `FontSizeSubtitle` 17, `FontSizeTitle` 20,
+  `FontSizeTitleLarge` 24, `FontSizeHeadline` 28, `FontSizeDisplay` 34,
+  `FontSizeDisplayLarge` 52, `FontSizeHero` 72). New visible text must reference
+  these tokens via `{DynamicResource FontSize…}` instead of hard-coded pixel
+  sizes. Immersive detail titles (album, artist, podcast headers) use
+  `FontSizeDisplay`; tables use `FontSizeCaption`/`FontSizeBody`; small meta text
+  uses `FontSizeMeta` with a muted foreground.
 - The main window uses a modern sidebar, content area, and full-width transport
   bar
 - The full Orynivo logo appears on a light logo surface in the startup window
@@ -1637,3 +1675,17 @@ and move those entries into a dated version section when preparing a release.
   unless there is a clear functional reason
 - Settings checkbox labels should use the compact settings typography and must
   not inherit oversized default control text.
+- The Settings left navigation items carry a small vector `Path` icon before the
+  label; the icon `Fill` follows the nav item foreground (selected/hover) via a
+  `ListBox#NavListBox ListBoxItem Path` style so icons recolour with the row.
+- Genuine on/off options use the pill toggle `SettingsToggleTheme` (still a
+  `CheckBox`, so code that reads `IsChecked` is unchanged): DSD-to-PCM, equalizer
+  enable, MCP server enable, AI chat enable, and the Appearance sidebar-visibility
+  options. The 19 MCP per-tool entries stay on `SettingsCheckBoxTheme` because
+  they form a permission checklist, not a single on/off switch.
+- Interactive settings inputs (TextBox, ComboBox, NumericUpDown, buttons) share
+  a consistent 30 px height.
+- Subsystem availability is surfaced with `StatusBadge` controls (FFmpeg,
+  Steinberg ASIO, cwASIO in the Output section; MCP in the MCP section). Each
+  configured Orynivo Server / Plex server row additionally shows a live
+  connection badge probed asynchronously so opening Settings stays instant.

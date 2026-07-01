@@ -8387,9 +8387,9 @@ public partial class MainWindow : Window
                 Tag = option.Value,
                 IsChecked = _selectedRadioGenres.Contains(option.Value),
                 Margin = new Thickness(2, 4, 2, 4),
-                Foreground = FindResource<IBrush>("AppPrimaryTextBrush")
+                Foreground = FindResource<IBrush>("AppPrimaryTextBrush"),
+                Theme = FindResource<ControlTheme>("HeaderCheckBoxTheme")
             };
-            checkBox.IsCheckedChanged += RadioGenreCheckBox_OnChanged;
             checkBox.IsCheckedChanged += RadioGenreCheckBox_OnChanged;
             RadioGenreFilterPanel.Children.Add(checkBox);
         }
@@ -9031,9 +9031,9 @@ public partial class MainWindow : Window
                 Tag = option.Value,
                 IsChecked = selected.Contains(option.Value),
                 Margin = new Thickness(2, 4, 2, 4),
-                Foreground = FindResource<IBrush>("AppPrimaryTextBrush")
+                Foreground = FindResource<IBrush>("AppPrimaryTextBrush"),
+                Theme = FindResource<ControlTheme>("HeaderCheckBoxTheme")
             };
-            checkBox.IsCheckedChanged += changedHandler;
             checkBox.IsCheckedChanged += changedHandler;
             panel.Children.Add(checkBox);
         }
@@ -11249,11 +11249,182 @@ public partial class MainWindow : Window
         Process.Start(new ProcessStartInfo(_artistInfoSourceUrl) { UseShellExecute = true });
     }
 
+    /// <summary>Clears and hides the album strip shown under the artist biography.</summary>
+    private void ResetArtistInfoAlbums()
+    {
+        ArtistInfoAlbumsPanel.Children.Clear();
+        ArtistInfoAlbumsSection.IsVisible = false;
+    }
+
+    /// <summary>
+    /// Loads the displayed artist's albums through a catalog provider and renders them as a wrapped
+    /// strip of clickable cards under the biography. Used for local, remote-library, and now-playing
+    /// remote artist-info views so all three look and navigate identically.
+    /// </summary>
+    /// <param name="provider">Local or remote catalog provider that owns the artist.</param>
+    /// <param name="artistId">Provider-local artist identifier.</param>
+    /// <param name="server">Owning remote server, or <see langword="null"/> for the local library.</param>
+    /// <param name="cancellationToken">Token cancelling a superseded load.</param>
+    /// <returns>A task representing the asynchronous load.</returns>
+    private async Task LoadArtistInfoAlbumsAsync(
+        ILibraryCatalogProvider provider,
+        long artistId,
+        OrynivoServerSettings? server,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var albums = await provider.GetAlbumsByArtistAsync(artistId, includeArtwork: true, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            PopulateArtistInfoAlbums(albums, server);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch
+        {
+            ResetArtistInfoAlbums();
+        }
+    }
+
+    /// <summary>Renders the artist album cards, or hides the section when there are none.</summary>
+    /// <param name="albums">Albums to render.</param>
+    /// <param name="server">Owning remote server, or <see langword="null"/> for local albums.</param>
+    private void PopulateArtistInfoAlbums(IReadOnlyList<LibraryCatalogAlbum> albums, OrynivoServerSettings? server)
+    {
+        ArtistInfoAlbumsPanel.Children.Clear();
+        if (albums.Count == 0)
+        {
+            ArtistInfoAlbumsSection.IsVisible = false;
+            return;
+        }
+
+        foreach (var album in albums)
+            ArtistInfoAlbumsPanel.Children.Add(BuildArtistInfoAlbumCard(album, server));
+        ArtistInfoAlbumsSection.IsVisible = true;
+    }
+
+    /// <summary>Builds one clickable album card for the artist-info album strip.</summary>
+    /// <param name="album">The album to render.</param>
+    /// <param name="server">Owning remote server, or <see langword="null"/> for a local album.</param>
+    /// <returns>The card control.</returns>
+    private Control BuildArtistInfoAlbumCard(LibraryCatalogAlbum album, OrynivoServerSettings? server)
+    {
+        var card = new Border
+        {
+            Width           = 150,
+            Margin          = new Thickness(0, 0, 12, 12),
+            Background      = FindResource<IBrush>("AppSurfaceBrush"),
+            BorderBrush     = FindResource<IBrush>("AppGridLineBrush"),
+            BorderThickness = new Thickness(1),
+            CornerRadius    = new CornerRadius(10),
+            Cursor          = new Cursor(StandardCursorType.Hand),
+            ClipToBounds    = true
+        };
+
+        var stack = new StackPanel { Spacing = 2 };
+
+        var avatar = new InitialsAvatar
+        {
+            DisplayName = album.Title,
+            FontSize    = 30,
+            Width       = 150,
+            Height      = 150
+        };
+        var image = new Image
+        {
+            Width   = 150,
+            Height  = 150,
+            Stretch = Stretch.UniformToFill
+        };
+        var artworkHost = new Panel { Width = 150, Height = 150, ClipToBounds = true };
+        artworkHost.Children.Add(avatar);
+        artworkHost.Children.Add(image);
+        stack.Children.Add(artworkHost);
+
+        if (server is null)
+        {
+            var localPath = !string.IsNullOrEmpty(album.ThumbnailPath) && File.Exists(album.ThumbnailPath)
+                ? album.ThumbnailPath
+                : !string.IsNullOrEmpty(album.ArtworkPath) && File.Exists(album.ArtworkPath)
+                    ? album.ArtworkPath
+                    : null;
+            if (localPath is not null)
+            {
+                try
+                {
+                    using var bmpStream = File.OpenRead(localPath);
+                    image.Source = new Bitmap(bmpStream);
+                }
+                catch { image.Source = null; }
+            }
+        }
+        else
+        {
+            var artUrl = album.ArtworkPath ?? album.ThumbnailPath;
+            if (!string.IsNullOrEmpty(artUrl))
+                _ = LoadDashboardRemoteArtworkAsync(image, artUrl);
+        }
+
+        var titleButton = new Button
+        {
+            Content    = album.Title,
+            FontWeight = FontWeight.SemiBold,
+            FontSize   = 12,
+            Foreground = FindResource<IBrush>("AppPrimaryTextBrush"),
+            Margin     = new Thickness(10, 8, 10, 1),
+            Theme      = FindResource<ControlTheme>("EntityLinkButtonTheme")
+        };
+        titleButton.Click += (_, e) =>
+        {
+            e.Handled = true;
+            _ = OpenArtistInfoAlbumAsync(album, server);
+        };
+        stack.Children.Add(titleButton);
+
+        stack.Children.Add(new TextBlock
+        {
+            Text       = album.Year is int year && year > 0 ? year.ToString(CultureInfo.CurrentCulture) : string.Empty,
+            FontSize   = 11,
+            Foreground = FindResource<IBrush>("AppMutedTextBrush"),
+            Margin     = new Thickness(10, 0, 10, 10)
+        });
+
+        card.Child = stack;
+        card.PointerReleased += (_, e) =>
+        {
+            if (FindAncestor<Button>(e.Source as Visual) is not null)
+                return;
+            _ = OpenArtistInfoAlbumAsync(album, server);
+        };
+        return card;
+    }
+
+    /// <summary>Closes the artist-info overlay and opens the album's tracks (local or remote).</summary>
+    /// <param name="album">The album to open.</param>
+    /// <param name="server">Owning remote server, or <see langword="null"/> for a local album.</param>
+    /// <returns>A task representing the asynchronous navigation.</returns>
+    private async Task OpenArtistInfoAlbumAsync(LibraryCatalogAlbum album, OrynivoServerSettings? server)
+    {
+        CloseNowPlayingDetailViews();
+        if (server is null)
+        {
+            await ShowAlbumTracksAsync(album.Id, album.Title);
+            return;
+        }
+
+        _activeArtistFilterId = null;
+        _activeArtistFilterName = null;
+        _activeOrynivoServer = server;
+        await OpenOrynivoAlbumTracksAsync(album.Id, album.Title, album.DisplayArtist);
+    }
+
     private async Task ShowArtistInfoAsync(long artistId, bool forceRefresh)
     {
         _artistInfoDisplayedRemoteRow = null;
         _nowPlayingRemoteArtistInfo = false;
         _artistInfoDisplayedId = artistId;
+        ResetArtistInfoAlbums();
         CancelArtistProfileLoad();
         var cts = new CancellationTokenSource();
         _artistProfileCts = cts;
@@ -11347,6 +11518,7 @@ public partial class MainWindow : Window
             ArtistInfoStatusTextBlock.Text = LocalizationManager.Current.ArtistInfoNotFound;
             ArtistInfoStatusTextBlock.IsVisible = string.IsNullOrWhiteSpace(artist.Biography) && ArtistInfoImage.Source is null;
             await RefreshVisibleArtistRowAsync(artist);
+            await LoadArtistInfoAlbumsAsync(_localCatalogProvider, artistId, null, cts.Token);
         }
         catch (OperationCanceledException)
         {
@@ -11378,6 +11550,7 @@ public partial class MainWindow : Window
         _artistInfoDisplayedRemoteRow = row;
         _nowPlayingRemoteArtistInfo = false;
         _artistInfoDisplayedId = null;
+        ResetArtistInfoAlbums();
         CancelArtistProfileLoad();
         var cts = new CancellationTokenSource();
         _artistProfileCts = cts;
@@ -11476,6 +11649,12 @@ public partial class MainWindow : Window
             ArtistInfoStatusTextBlock.Text = LocalizationManager.Current.ArtistInfoNotFound;
             ArtistInfoStatusTextBlock.IsVisible =
                 string.IsNullOrWhiteSpace(row.Biography) && ArtistInfoImage.Source is null;
+            if (_activeOrynivoServer is { } albumServer)
+                await LoadArtistInfoAlbumsAsync(
+                    CreateOrynivoCatalogProvider(albumServer),
+                    artistId,
+                    albumServer,
+                    cts.Token);
         }
         catch (OperationCanceledException)
         {
@@ -11512,6 +11691,7 @@ public partial class MainWindow : Window
         _nowPlayingRemoteArtistInfo = true;
         _artistInfoDisplayedRemoteRow = null;
         _artistInfoDisplayedId = null;
+        ResetArtistInfoAlbums();
         CancelArtistProfileLoad();
         var cts = new CancellationTokenSource();
         _artistProfileCts = cts;
@@ -11565,6 +11745,12 @@ public partial class MainWindow : Window
             ArtistInfoStatusTextBlock.Text = LocalizationManager.Current.ArtistInfoNotFound;
             ArtistInfoStatusTextBlock.IsVisible =
                 string.IsNullOrWhiteSpace(profile?.Biography) && ArtistInfoImage.Source is null;
+            if (row.OrynivoServer is { } npServer)
+                await LoadArtistInfoAlbumsAsync(
+                    CreateOrynivoCatalogProvider(npServer),
+                    artistId,
+                    npServer,
+                    cts.Token);
         }
         catch (OperationCanceledException)
         {

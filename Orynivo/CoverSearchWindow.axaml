@@ -1,4 +1,4 @@
-﻿<Window x:Class="Orynivo.CoverSearchWindow"
+<Window x:Class="Orynivo.CoverSearchWindow"
         xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="{DynamicResource L_CoverSearchTitle}"
@@ -27,7 +27,7 @@
         <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
             <TextBlock x:Name="BusyIndicatorTextBlock"
                        Text="⠋"
-                       FontSize="16"
+                       FontSize="{DynamicResource FontSizeSubtitle}"
                        Margin="0,0,8,0"/>
             <TextBlock x:Name="StatusTextBlock"
                        Text="{DynamicResource L_CoverSearchRunning}"/>

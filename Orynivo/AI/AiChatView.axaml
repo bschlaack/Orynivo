@@ -28,7 +28,7 @@
                                 <TextBlock Text="{Binding Content}"
                                            TextWrapping="Wrap"
                                            Foreground="White"
-                                           FontSize="13"
+                                           FontSize="{DynamicResource FontSizeBody}"
                                            LineHeight="20"/>
                             </Border>
 
@@ -44,7 +44,7 @@
                                 <TextBlock Text="{Binding Content}"
                                            TextWrapping="Wrap"
                                            Foreground="{DynamicResource AppPrimaryTextBrush}"
-                                           FontSize="13"
+                                           FontSize="{DynamicResource FontSizeBody}"
                                            LineHeight="20"/>
                             </Border>
 
@@ -55,11 +55,11 @@
                                         Spacing="6"
                                         Opacity="0.7">
                                 <TextBlock Text="⚙"
-                                           FontSize="11"
+                                           FontSize="{DynamicResource FontSizeMeta}"
                                            Foreground="{DynamicResource AppMutedTextBrush}"
                                            VerticalAlignment="Center"/>
                                 <TextBlock Text="{Binding Content}"
-                                           FontSize="11"
+                                           FontSize="{DynamicResource FontSizeMeta}"
                                            FontStyle="Italic"
                                            Foreground="{DynamicResource AppMutedTextBrush}"
                                            VerticalAlignment="Center"/>
@@ -77,7 +77,7 @@
                                 <TextBlock Text="{Binding Content}"
                                            TextWrapping="Wrap"
                                            Foreground="#E53935"
-                                           FontSize="12"/>
+                                           FontSize="{DynamicResource FontSizeCaption}"/>
                             </Border>
 
                         </Grid>
@@ -99,7 +99,7 @@
                          AcceptsReturn="False"
                          MinHeight="36"
                          MaxHeight="120"
-                         FontSize="13"
+                         FontSize="{DynamicResource FontSizeBody}"
                          VerticalContentAlignment="Center"
                          Watermark="{DynamicResource L_AiChatInputPlaceholder}"
                          KeyDown="ChatInputBox_OnKeyDown"/>
@@ -110,7 +110,7 @@
                         MinWidth="80"
                         Height="36"
                         Padding="14,0"
-                        FontSize="12"
+                        FontSize="{DynamicResource FontSizeCaption}"
                         HorizontalContentAlignment="Center"
                         VerticalContentAlignment="Center"
                         Content="{DynamicResource L_AiChatSend}"
@@ -141,7 +141,7 @@
                         MinWidth="70"
                         Height="36"
                         Padding="12,0"
-                        FontSize="12"
+                        FontSize="{DynamicResource FontSizeCaption}"
                         HorizontalContentAlignment="Center"
                         VerticalContentAlignment="Center"
                         Content="{DynamicResource L_AiChatClear}"

@@ -27,7 +27,7 @@
             <TextBlock x:Name="StatusTextBlock"
                        Margin="0,16,0,12"
                        Foreground="#CCCCEE"
-                       FontSize="13"
+                       FontSize="{DynamicResource FontSizeBody}"
                        Text="{DynamicResource L_StartupPreparingLibrary}"/>
             <ProgressBar IsIndeterminate="True"
                          Height="6"

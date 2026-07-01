@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using Avalonia;
 using Avalonia.Threading;
@@ -9,6 +10,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Orynivo.Audio;
+using Orynivo.Controls;
 using Orynivo.Library;
 using Orynivo.Localization;
 using Orynivo.Streaming;
@@ -125,6 +127,8 @@ internal partial class SettingsView : UserControl
         McpServerEnabledCheckBox.IsChecked        = settings.McpServerEnabled;
         McpServerPortNumericUpDown.Value          = settings.McpServerPort;
         InitMcpToolCheckBoxes(settings.DisabledMcpTools);
+        UpdateSubsystemStatusBadges();
+        McpServerEnabledCheckBox.IsCheckedChanged += (_, _) => UpdateMcpStatusBadge();
         AiChatEnabledCheckBox.IsChecked         = settings.AiChat.Enabled;
         AiChatEndpointUrlTextBox.Text           = settings.AiChat.EndpointUrl;
         AiChatApiKeyTextBox.Text                = settings.AiChat.ApiKey;
@@ -157,6 +161,63 @@ internal partial class SettingsView : UserControl
         _initializing = false;
         RefreshOutputProfileButtons();
         NavListBox.SelectedIndex = 1;
+    }
+
+    /// <summary>Updates the FFmpeg, Steinberg ASIO, cwASIO, and MCP subsystem status badges.</summary>
+    private void UpdateSubsystemStatusBadges()
+    {
+        var loc = LocalizationManager.Current;
+
+        bool ffmpeg = IsFfmpegAvailable();
+        FfmpegStatusBadge.State = ffmpeg ? StatusBadgeState.Ok : StatusBadgeState.Warning;
+        FfmpegStatusBadge.Text = ffmpeg ? loc.StatusReady : loc.StatusUnavailable;
+
+        bool asio = SteinbergAsioStream.IsAvailable;
+        AsioStatusBadge.State = asio ? StatusBadgeState.Ok : StatusBadgeState.Off;
+        AsioStatusBadge.Text = asio ? loc.StatusAvailable : loc.StatusUnavailable;
+
+        bool cwAsio = SteinbergAsioStream.IsCwAsioAvailable;
+        CwAsioStatusBadge.State = cwAsio ? StatusBadgeState.Ok : StatusBadgeState.Off;
+        CwAsioStatusBadge.Text = cwAsio ? loc.StatusAvailable : loc.StatusUnavailable;
+
+        UpdateMcpStatusBadge();
+    }
+
+    /// <summary>Updates the MCP server badge to reflect the current enable toggle state.</summary>
+    private void UpdateMcpStatusBadge()
+    {
+        var loc = LocalizationManager.Current;
+        bool enabled = McpServerEnabledCheckBox.IsChecked == true;
+        McpStatusBadge.State = enabled ? StatusBadgeState.Ok : StatusBadgeState.Off;
+        McpStatusBadge.Text = enabled ? loc.StatusEnabled : loc.StatusDisabled;
+    }
+
+    /// <summary>Checks whether an ffmpeg executable is resolvable in the known locations.</summary>
+    /// <returns><see langword="true"/> when ffmpeg is found in the app, per-user, or PATH directories.</returns>
+    private static bool IsFfmpegAvailable()
+    {
+        static bool HasFfmpeg(string? directory) =>
+            !string.IsNullOrWhiteSpace(directory) &&
+            File.Exists(Path.Combine(directory, "ffmpeg.exe"));
+
+        if (HasFfmpeg(AppContext.BaseDirectory))
+            return true;
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        if (HasFfmpeg(Path.Combine(localAppData, "Orynivo", "ffmpeg")))
+            return true;
+        foreach (var directory in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
+                     .Split(Path.PathSeparator))
+        {
+            try
+            {
+                if (HasFfmpeg(directory.Trim()))
+                    return true;
+            }
+            catch
+            {
+            }
+        }
+        return false;
     }
 
     /// <summary>Raised when the embedded settings view requests save or cancel.</summary>
@@ -277,15 +338,76 @@ internal partial class SettingsView : UserControl
         return btn;
     }
 
+    private CancellationTokenSource? _orynivoStatusCts;
+    private CancellationTokenSource? _plexStatusCts;
+
+    /// <summary>
+    /// Probes a server's reachability off the UI thread and updates its badge, so opening Settings
+    /// never blocks on network calls. Stale results are ignored once the list is rebuilt or closed.
+    /// </summary>
+    /// <param name="badge">The badge to update with the outcome.</param>
+    /// <param name="probe">The asynchronous connectivity probe returning success.</param>
+    /// <param name="cancellationToken">Token cancelling a superseded or closed check.</param>
+    private async void CheckServerStatusAsync(
+        StatusBadge badge,
+        Func<CancellationToken, Task<bool>> probe,
+        CancellationToken cancellationToken)
+    {
+        bool ok;
+        try { ok = await probe(cancellationToken); }
+        catch { ok = false; }
+        if (cancellationToken.IsCancellationRequested)
+            return;
+        var loc = LocalizationManager.Current;
+        badge.State = ok ? StatusBadgeState.Ok : StatusBadgeState.Warning;
+        badge.Text = ok ? loc.StatusAvailable : loc.StatusUnavailable;
+    }
+
+    /// <summary>Tests whether a remote Orynivo Server responds on its info endpoint.</summary>
+    /// <param name="server">The server to probe.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when the server responds successfully.</returns>
+    private static async Task<bool> ProbeOrynivoServerAsync(OrynivoServerSettings server, CancellationToken cancellationToken)
+    {
+        using var client = new OrynivoServerClient();
+        return await client.TestConnectionAsync(server, cancellationToken) is not null;
+    }
+
+    /// <summary>Tests whether a Plex server responds to a music-library listing.</summary>
+    /// <param name="server">The server to probe.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when the server responds successfully.</returns>
+    private async Task<bool> ProbePlexServerAsync(PlexServerSettings server, CancellationToken cancellationToken)
+    {
+        var token = _plexTokens.GetValueOrDefault(server.Id);
+        await new PlexServerClient().GetAudioLibrariesAsync(server, token, cancellationToken);
+        return true;
+    }
+
+    /// <summary>Creates a live connection-status badge for a server row.</summary>
+    /// <returns>A badge in the pending "checking" state.</returns>
+    private static StatusBadge CreateServerStatusBadge() => new()
+    {
+        State = StatusBadgeState.Off,
+        Text = LocalizationManager.Current.StatusChecking,
+        Margin = new Thickness(8, 0, 0, 0),
+        VerticalAlignment = VerticalAlignment.Center
+    };
+
     private void RebuildPlexServerList()
     {
         PlexServersPanel.Children.Clear();
+        _plexStatusCts?.Cancel();
+        _plexStatusCts?.Dispose();
+        _plexStatusCts = new CancellationTokenSource();
+        var statusToken = _plexStatusCts.Token;
         var primaryBrush = AvaloniaApp.Current!.Resources["AppPrimaryTextBrush"] as IBrush;
         var mutedBrush = AvaloniaApp.Current!.Resources["AppMutedTextBrush"] as IBrush;
         foreach (var server in _plexServers)
         {
             var row = new Grid { Margin = new Thickness(0, 0, 0, 8) };
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
@@ -306,19 +428,26 @@ internal partial class SettingsView : UserControl
             });
             row.Children.Add(description);
 
+            var statusBadge = CreateServerStatusBadge();
+            Grid.SetColumn(statusBadge, 1);
+            row.Children.Add(statusBadge);
+
             var editButton = CreateStyledButton(LocalizationManager.Current.PlexEditServer, 80, 28, new Thickness(8, 0, 0, 0));
             editButton.Tag = server.Id;
             editButton.Click += EditPlexServerButton_OnClick;
-            Grid.SetColumn(editButton, 1);
+            Grid.SetColumn(editButton, 2);
             row.Children.Add(editButton);
 
             var removeButton = CreateStyledButton(LocalizationManager.Current.PlexRemoveServer, 80, 28, new Thickness(8, 0, 0, 0));
             removeButton.Tag = server.Id;
             removeButton.Click += RemovePlexServerButton_OnClick;
-            Grid.SetColumn(removeButton, 2);
+            Grid.SetColumn(removeButton, 3);
             row.Children.Add(removeButton);
 
             PlexServersPanel.Children.Add(row);
+
+            var plexServer = server;
+            CheckServerStatusAsync(statusBadge, ct => ProbePlexServerAsync(plexServer, ct), statusToken);
         }
     }
 
@@ -362,12 +491,17 @@ internal partial class SettingsView : UserControl
     private void RebuildOrynivoServerList()
     {
         OrynivoServersPanel.Children.Clear();
+        _orynivoStatusCts?.Cancel();
+        _orynivoStatusCts?.Dispose();
+        _orynivoStatusCts = new CancellationTokenSource();
+        var statusToken = _orynivoStatusCts.Token;
         var primaryBrush = AvaloniaApp.Current!.Resources["AppPrimaryTextBrush"] as IBrush;
         var mutedBrush   = AvaloniaApp.Current!.Resources["AppMutedTextBrush"]   as IBrush;
         foreach (var server in _orynivoServers)
         {
             var row = new Grid { Margin = new Thickness(0, 0, 0, 8) };
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
@@ -388,19 +522,26 @@ internal partial class SettingsView : UserControl
             });
             row.Children.Add(description);
 
+            var statusBadge = CreateServerStatusBadge();
+            Grid.SetColumn(statusBadge, 1);
+            row.Children.Add(statusBadge);
+
             var editButton = CreateStyledButton(LocalizationManager.Current.OrynivoEditServer, 80, 28, new Thickness(8, 0, 0, 0));
             editButton.Tag    = server.Id;
             editButton.Click += EditOrynivoServerButton_OnClick;
-            Grid.SetColumn(editButton, 1);
+            Grid.SetColumn(editButton, 2);
             row.Children.Add(editButton);
 
             var removeButton = CreateStyledButton(LocalizationManager.Current.OrynivoRemoveServer, 80, 28, new Thickness(8, 0, 0, 0));
             removeButton.Tag    = server.Id;
             removeButton.Click += RemoveOrynivoServerButton_OnClick;
-            Grid.SetColumn(removeButton, 2);
+            Grid.SetColumn(removeButton, 3);
             row.Children.Add(removeButton);
 
             OrynivoServersPanel.Children.Add(row);
+
+            var orynivoServer = server;
+            CheckServerStatusAsync(statusBadge, ct => ProbeOrynivoServerAsync(orynivoServer, ct), statusToken);
         }
     }
 
@@ -440,6 +581,8 @@ internal partial class SettingsView : UserControl
     {
         foreach (var cts in _activeScans.Values)
             cts.Cancel();
+        _orynivoStatusCts?.Cancel();
+        _plexStatusCts?.Cancel();
         Interlocked.Increment(ref _equalizerPreviewVersion);
         if (!_settingsAccepted)
         {
