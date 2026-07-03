@@ -2017,6 +2017,36 @@ public sealed class AudioDatabase : IDisposable
         return result;
     }
 
+    /// <summary>Returns minimal track records required for library-root cleanup.</summary>
+    /// <returns>Track records containing path, source path, duration, file size, modified time, and CUE segment fields.</returns>
+    public List<TrackRecord> GetTrackCleanupRecords()
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, path, COALESCE(source_path, path) AS source_path, duration,
+                   file_size, modified_at, segment_start, segment_end
+            FROM tracks;
+            """;
+        using var reader = cmd.ExecuteReader();
+        var result = new List<TrackRecord>();
+        while (reader.Read())
+        {
+            result.Add(new TrackRecord
+            {
+                Id = reader.GetInt64(reader.GetOrdinal("id")),
+                Path = reader.GetString(reader.GetOrdinal("path")),
+                SourcePath = reader.GetString(reader.GetOrdinal("source_path")),
+                Duration = NullableDouble(reader, "duration"),
+                FileSize = NullableLong(reader, "file_size"),
+                ModifiedAt = reader.GetInt64(reader.GetOrdinal("modified_at")),
+                SegmentStart = NullableDouble(reader, "segment_start"),
+                SegmentEnd = NullableDouble(reader, "segment_end")
+            });
+        }
+
+        return result;
+    }
+
     public int CountByDirectory(string rootPath)
     {
         var prefix = rootPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)

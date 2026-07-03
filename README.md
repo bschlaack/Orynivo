@@ -119,6 +119,7 @@ works directly in FFmpeg and browser URLs.
 | `GET /api/albums/{id}/tracks` | Track list for one album |
 | `GET /api/tracks` | Paginated track list (`?page=0&pageSize=500`) |
 | `GET /api/tracks/{id}` | Full metadata for one track |
+| `GET /api/tracks/{id}/waveform` | Cached compact waveform peak data for the transport progress view |
 | `GET /api/tracks/{id}/lyrics` | Cached plain/synced lyrics for one track |
 | `PUT /api/tracks/{id}/lyrics` | Store client-downloaded lyrics on the server |
 | `GET /api/tracks/facets` | Lightweight facet rows (genre, format, bitrate) for the Tracks filter |
@@ -217,6 +218,9 @@ byte-range streaming without FFmpeg.
   with play-next/append actions, removal, reordering, playlist saving, and
   shuffle without repeating a track within the currently loaded queue. The queue
   is stored in the SQLite library database instead of the JSON settings file.
+- The transport progress control shows a waveform-style peak view for local
+  audio files and remote Orynivo Server tracks, caches compact peak data, and
+  keeps click/drag seeking on the same timeline.
 - Remote Orynivo Server tracks keep their library title, artist, album, and
   duration in transport metadata, play history, and **Up next**. Authenticated
   `?key=` stream URLs are not shown as titles and are not persisted in the

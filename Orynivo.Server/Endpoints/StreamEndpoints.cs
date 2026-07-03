@@ -186,7 +186,12 @@ public static class StreamEndpoints
         // offset is far faster than the client binary-searching a seektable-less file
         // over HTTP. The client then decodes the offset stream from position 0.
         if (seekSeconds is > 0)
+        {
+            SeekDiagnostics.Log(
+                "server-stream",
+                $"seek-request source={trackPath} ss={seekSeconds.Value:F3}s");
             return await TranscodeFromOffsetAsync(trackPath, seekSeconds.Value, ctx, logger);
+        }
 
         // Regular file: serve with byte-range support
         var mime = GuessMimeType(trackPath);
@@ -239,9 +244,18 @@ public static class StreamEndpoints
 
         ctx.Response.StatusCode = 200;
         ctx.Response.ContentType = "audio/flac";
+        await ctx.Response.StartAsync(ctx.RequestAborted);
 
         var args = BuildFfmpegArgs(sourcePath, startSeconds, endSeconds);
         logger.LogDebug("FFmpeg transcode: {Args}", args);
+        var stopwatch = Stopwatch.StartNew();
+        var logSeekTranscode = startSeconds > 0;
+        if (logSeekTranscode)
+        {
+            SeekDiagnostics.Log(
+                "server-transcode",
+                $"start source={sourcePath} start={startSeconds:F3}s end={(endSeconds.HasValue ? endSeconds.Value.ToString("F3", CultureInfo.InvariantCulture) : "none")} args={args}");
+        }
 
         using var ffmpeg = new Process
         {
@@ -262,13 +276,44 @@ public static class StreamEndpoints
             ffmpeg.Start();
             await ffmpeg.StandardOutput.BaseStream.CopyToAsync(ctx.Response.Body, ctx.RequestAborted);
             await ffmpeg.WaitForExitAsync(ctx.RequestAborted);
+            if (logSeekTranscode)
+            {
+                var stderr = await TryReadStandardErrorAsync(ffmpeg).ConfigureAwait(false);
+                SeekDiagnostics.Log(
+                    "server-transcode",
+                    $"complete elapsedMs={stopwatch.ElapsedMilliseconds} exitCode={ffmpeg.ExitCode} stderr={stderr}");
+            }
         }
         catch (OperationCanceledException)
         {
             // Client disconnected (e.g. seeked again); stop transcoding promptly.
+            try
+            {
+                if (!ffmpeg.HasExited)
+                    ffmpeg.Kill(entireProcessTree: true);
+            }
+            catch
+            {
+                // Process already gone.
+            }
+
+            if (logSeekTranscode)
+            {
+                var stderr = await TryReadStandardErrorAsync(ffmpeg).ConfigureAwait(false);
+                SeekDiagnostics.Log(
+                    "server-transcode",
+                    $"canceled elapsedMs={stopwatch.ElapsedMilliseconds} stderr={stderr}");
+            }
         }
         catch (Exception ex)
         {
+            if (logSeekTranscode)
+            {
+                SeekDiagnostics.Log(
+                    "server-transcode",
+                    $"failed elapsedMs={stopwatch.ElapsedMilliseconds}",
+                    ex);
+            }
             logger.LogError(ex, "FFmpeg transcode failed for {Source}", sourcePath);
         }
         finally
@@ -310,7 +355,26 @@ public static class StreamEndpoints
             durationArg = $"-t {duration.ToString("F6", CultureInfo.InvariantCulture)} ";
         }
 
-        return $"{startArg}-i \"{source}\" {durationArg}-c:a flac -f flac pipe:1";
+        return $"-nostdin -hide_banner -loglevel error {startArg}-i \"{source}\" {durationArg}-map 0:a:0 -vn -sn -dn -c:a flac -f flac pipe:1";
+    }
+
+    private static async Task<string> TryReadStandardErrorAsync(Process process)
+    {
+        try
+        {
+            if (!process.HasExited && !process.WaitForExit(500))
+                return string.Empty;
+
+            var stderr = await process.StandardError.ReadToEndAsync()
+                .WaitAsync(TimeSpan.FromMilliseconds(500))
+                .ConfigureAwait(false);
+            stderr = stderr.ReplaceLineEndings(" ").Trim();
+            return stderr.Length > 1000 ? stderr[..1000] : stderr;
+        }
+        catch
+        {
+            return string.Empty;
+        }
     }
 
     private static string GuessMimeType(string path) =>

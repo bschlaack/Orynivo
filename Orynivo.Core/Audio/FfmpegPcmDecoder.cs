@@ -79,10 +79,23 @@ public sealed class FfmpegPcmDecoder : IDisposable
             ? "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 2 -analyzeduration 500000 -probesize 500000 "
             : string.Empty;
 
+        var arguments = $"-v error {httpInputOptions}-ss {localSeek.TotalSeconds.ToString(CultureInfo.InvariantCulture)} {inputArgument} {durationArgument}-vn -f {sampleFormat} -acodec {codec} -ac 2 -ar {outputSampleRate} pipe:1";
+        var logDecoderStart = absolutePosition > TimeSpan.Zero || useServerSideSeek;
+        var stopwatch = Stopwatch.StartNew();
+        if (logDecoderStart)
+        {
+            var inputForLog = usesConcatInput
+                ? $"{filePaths.Count} concat inputs"
+                : SeekDiagnostics.SanitizeUrl(singleInputUrl);
+            SeekDiagnostics.Log(
+                "ffmpeg-decoder",
+                $"start input={inputForLog} absolute={absolutePosition.TotalSeconds:F3}s local={localSeek.TotalSeconds:F3}s serverSeek={useServerSideSeek} sampleRate={outputSampleRate} format={sampleFormat}");
+        }
+
         var process = Process.Start(new ProcessStartInfo
         {
             FileName = "ffmpeg",
-            Arguments = $"-v error {httpInputOptions}-ss {localSeek.TotalSeconds.ToString(CultureInfo.InvariantCulture)} {inputArgument} {durationArgument}-vn -f {sampleFormat} -acodec {codec} -ac 2 -ar {outputSampleRate} pipe:1",
+            Arguments = arguments,
             WorkingDirectory = FfmpegLocator.GetSafeWorkingDirectory(),
             RedirectStandardInput = usesConcatInput,
             RedirectStandardOutput = true,
@@ -103,12 +116,30 @@ public sealed class FfmpegPcmDecoder : IDisposable
             var bytesRead = await process.StandardOutput.BaseStream
                 .ReadAsync(buffer, cancellationToken)
                 .ConfigureAwait(false);
+            if (logDecoderStart)
+            {
+                var exited = process.HasExited;
+                var stderr = bytesRead == 0 || exited
+                    ? await TryReadStandardErrorAsync(process).ConfigureAwait(false)
+                    : string.Empty;
+                SeekDiagnostics.Log(
+                    "ffmpeg-decoder",
+                    $"first-read bytes={bytesRead} elapsedMs={stopwatch.ElapsedMilliseconds} exited={exited} exitCode={(exited ? process.ExitCode.ToString(CultureInfo.InvariantCulture) : "running")} stderr={stderr}");
+            }
             return new FfmpegPcmDecoder(process, buffer.AsSpan(0, bytesRead).ToArray());
         }
-        catch
+        catch (Exception ex)
         {
             if (!process.HasExited)
                 process.Kill(entireProcessTree: true);
+            var stderr = await TryReadStandardErrorAsync(process).ConfigureAwait(false);
+            if (logDecoderStart)
+            {
+                SeekDiagnostics.Log(
+                    "ffmpeg-decoder",
+                    $"failed elapsedMs={stopwatch.ElapsedMilliseconds} stderr={stderr}",
+                    ex);
+            }
             process.Dispose();
             throw;
         }
@@ -116,6 +147,28 @@ public sealed class FfmpegPcmDecoder : IDisposable
 
     private static string EscapeConcatPath(string path) =>
         path.Replace("'", "'\\''", StringComparison.Ordinal);
+
+    /// <summary>Attempts to read a short FFmpeg stderr snapshot without blocking playback.</summary>
+    /// <param name="process">FFmpeg process whose stderr stream should be read.</param>
+    /// <returns>A trimmed stderr snapshot, or an empty string when unavailable.</returns>
+    private static async Task<string> TryReadStandardErrorAsync(Process process)
+    {
+        try
+        {
+            if (!process.HasExited && !process.WaitForExit(500))
+                return string.Empty;
+
+            var stderr = await process.StandardError.ReadToEndAsync()
+                .WaitAsync(TimeSpan.FromMilliseconds(500))
+                .ConfigureAwait(false);
+            stderr = stderr.ReplaceLineEndings(" ").Trim();
+            return stderr.Length > 1000 ? stderr[..1000] : stderr;
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
 
     /// <summary>Appends a server-side seek (<c>ss</c>) query parameter to a stream URL.</summary>
     /// <param name="url">Base stream URL, which may already carry a query string.</param>

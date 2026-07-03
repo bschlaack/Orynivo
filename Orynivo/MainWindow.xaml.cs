@@ -93,6 +93,10 @@ public partial class MainWindow : Window
     private int _libraryWatcherRefreshPending;
     private readonly DispatcherTimer _transportTimer;
     private bool _isSeekingWithSlider;
+    private DateTimeOffset _positionSliderSeekStartedAt;
+    private TimeSpan? _pendingTransportSeekPosition;
+    private int _transportSeekVersion;
+    private CancellationTokenSource? _waveformCts;
     private bool _showAlbumArtworkView;
     private bool _showArtistArtworkView;
     private long? _currentPlayHistoryId;
@@ -171,6 +175,8 @@ public partial class MainWindow : Window
     private PodcastRecord? _activePodcast;
     private DateTimeOffset _lastPodcastProgressSave = DateTimeOffset.MinValue;
     private TimeSpan _currentPlaybackDuration;
+    private long? _currentAlbumId;
+    private string? _currentAlbumTitle;
     private CancellationTokenSource? _lyricsCts;
     private CancellationTokenSource? _artistProfileCts;
     private WindowsEndpointVolumeSynchronizer? _endpointVolumeSynchronizer;
@@ -539,12 +545,17 @@ public partial class MainWindow : Window
             PointerPressedEvent,
             new EventHandler<PointerPressedEventArgs>(NavListBox_OnPreviewMouseLeftButtonDown),
             handledEventsToo: true);
-        PositionSlider.AddHandler(Slider.PointerPressedEvent,
+        PositionSlider.AddHandler(WaveformProgressControl.PointerPressedEvent,
             new EventHandler<PointerPressedEventArgs>(PositionSlider_OnPreviewMouseLeftButtonDown),
             handledEventsToo: true);
-        PositionSlider.AddHandler(Slider.PointerReleasedEvent,
+        PositionSlider.AddHandler(WaveformProgressControl.PointerMovedEvent,
+            new EventHandler<PointerEventArgs>(PositionSlider_OnPointerMoved),
+            handledEventsToo: true);
+        PositionSlider.AddHandler(WaveformProgressControl.PointerReleasedEvent,
             new EventHandler<PointerReleasedEventArgs>(PositionSlider_OnPreviewMouseLeftButtonUp),
             handledEventsToo: true);
+        PositionSlider.PointerCaptureLost += PositionSlider_OnPointerCaptureLost;
+        PositionSlider.ValueChanged += PositionSlider_OnValueChanged;
         _ = ConfigureEndpointVolumeSynchronizationAsync();
         ConfigureWindowsMediaTransport();
         QueueHydrateVisibleArtworkRows(AlbumArtworkListBox);
@@ -831,6 +842,8 @@ public partial class MainWindow : Window
             _currentFilePath = path;
             NowPlayingTitleBlock.Text = track.Title ?? Path.GetFileNameWithoutExtension(path);
             NowPlayingArtistBlock.Text = track.Artist ?? string.Empty;
+            var navigationIds = db.GetTrackNavigationIds(path);
+            SetNowPlayingAlbum(track.Album, navigationIds.AlbumId, navigationIds.AlbumId is not null);
             var artworkPaths = db.GetArtworkPathsByTrackPath(path);
             NowPlayingArtworkImage.Source = CreateArtworkImage(artworkPaths?.Thumb96Path, 96);
             LyricsBackgroundImage.Source = CreateArtworkImage(
@@ -842,6 +855,8 @@ public partial class MainWindow : Window
             _currentTrackIsFavorite = trackInfo?.IsFavorite ?? false;
             _currentArtistId = artist?.Id;
             _currentArtistName = artist?.Artist;
+            _currentAlbumId = navigationIds.AlbumId;
+            NowPlayingArtistButton.IsEnabled = artist is not null;
             ArtistInfoButton.IsEnabled = artist is not null;
             UpdateNowPlayingFavoriteButton();
             LyricsButton.IsEnabled = true;
@@ -854,6 +869,7 @@ public partial class MainWindow : Window
             _currentFilePath = string.Empty;
             NowPlayingTitleBlock.Text = string.Empty;
             NowPlayingArtistBlock.Text = string.Empty;
+            ClearNowPlayingAlbum();
             NowPlayingArtworkImage.Source = null;
             LyricsBackgroundImage.Source = null;
             _currentTrackId = null;
@@ -1699,10 +1715,23 @@ public partial class MainWindow : Window
                 _activeAlbumFilterTitle);
 
         if (_activeAlbumFilterId is null &&
+            _activeArtistFilterId is long remoteArtistId &&
+            _currentTopLevelTag?.StartsWith("OrynivoServer:", StringComparison.Ordinal) == true)
+        {
+            return new NavigationState(
+                "OrynivoArtistAlbums",
+                GetSelectedContentRowId(),
+                remoteArtistId,
+                _activeArtistFilterName,
+                _activeArtistFilterName,
+                CaptureCurrentVerticalOffset(),
+                _currentTopLevelTag);
+        }
+
+        if (_activeAlbumFilterId is null &&
             _activeArtistFilterId is long artistId &&
-            ContentTitleTextBlock.Text?.StartsWith(
-                $"{LocalizationManager.Current.Albums} · ",
-                StringComparison.Ordinal) == true)
+            _activeAlbumCatalogProvider is null &&
+            !(_currentTopLevelTag?.StartsWith("OrynivoServer:", StringComparison.Ordinal) == true))
         {
             return new NavigationState(
                 "ArtistAlbums",
@@ -6031,6 +6060,37 @@ public partial class MainWindow : Window
                 _currentArtistName ?? LocalizationManager.Current.Unknown);
     }
 
+    private async void NowPlayingAlbumButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+
+        if (_currentOrynivoTrackRow is { OrynivoServer: { } server, AlbumId: long remoteAlbumId })
+        {
+            _activeOrynivoServer = server;
+            await OpenOrynivoAlbumTracksAsync(
+                remoteAlbumId,
+                _currentOrynivoTrackRow.Album ?? _currentAlbumTitle,
+                _currentOrynivoTrackRow.Artist);
+            return;
+        }
+
+        if (_currentAlbumId is long albumId)
+            await ShowAlbumTracksAsync(
+                albumId,
+                _currentAlbumTitle ?? LocalizationManager.Current.Unknown);
+    }
+
+    private void SetNowPlayingAlbum(string? albumTitle, long? albumId, bool canNavigate)
+    {
+        _currentAlbumId = albumId;
+        _currentAlbumTitle = string.IsNullOrWhiteSpace(albumTitle) ? null : albumTitle;
+        NowPlayingAlbumBlock.Text = _currentAlbumTitle ?? string.Empty;
+        NowPlayingAlbumButton.IsVisible = !string.IsNullOrWhiteSpace(_currentAlbumTitle);
+        NowPlayingAlbumButton.IsEnabled = canNavigate && albumId is not null;
+    }
+
+    private void ClearNowPlayingAlbum() => SetNowPlayingAlbum(null, null, false);
+
     private async Task HandleContentRowDoubleClickAsync(ContentRow row)
     {
         if (row.EntityType == "Queue" && row.QueueItem is not null)
@@ -6094,6 +6154,12 @@ public partial class MainWindow : Window
     {
         PushCurrentNavigationState();
         _orynivoNavigationStack.Push((_activeOrynivoView, null, null));
+        if (_activeOrynivoServer is { } server)
+        {
+            _currentTopLevelTag = $"OrynivoServer:{server.Id}:Albums";
+            _activeOrynivoView = "Albums";
+        }
+
         _activeArtistFilterId = artistId;
         _activeArtistFilterName = title;
         ContentTitleTextBlock.Text = $"{_activeOrynivoServer?.Name} · {title}";
@@ -6182,6 +6248,36 @@ public partial class MainWindow : Window
                         IsOrynivoFavorite(_activeOrynivoServer, "Album", albumId));
         await ShowProviderAlbumTracksAsync(provider, album, artistFilterId, artistFilterName);
         RestoreSelectionFromCurrentItems(null, verticalOffset);
+    }
+
+    /// <summary>Restores the filtered album list for a remote server artist.</summary>
+    /// <param name="navigationTag">Remote server navigation tag to restore.</param>
+    /// <param name="artistId">Remote server artist identifier.</param>
+    /// <param name="artistName">Artist display name for the header.</param>
+    /// <param name="selectedAlbumId">Album identifier to reselect.</param>
+    /// <param name="verticalOffset">Optional vertical scroll offset to restore.</param>
+    private async Task RestoreOrynivoArtistAlbumsAsync(
+        string? navigationTag,
+        long artistId,
+        string? artistName,
+        long? selectedAlbumId,
+        double? verticalOffset)
+    {
+        if (string.IsNullOrWhiteSpace(navigationTag))
+            return;
+
+        SelectNavigationItem(navigationTag);
+        await ShowTopLevelViewAsync(navigationTag);
+        if (_activeOrynivoServer is null)
+            return;
+
+        _currentTopLevelTag = navigationTag;
+        _activeOrynivoView = "Albums";
+        _activeArtistFilterId = artistId;
+        _activeArtistFilterName = artistName;
+        ContentTitleTextBlock.Text = $"{_activeOrynivoServer.Name} · {artistName}";
+        await LoadOrynivoViewAsync(filterArtistId: artistId);
+        RestoreSelectionFromCurrentItems(selectedAlbumId, verticalOffset);
     }
 
     private async Task PlayTrackFromRowsAsync(ContentRow row, List<ContentRow> allRows)
@@ -6725,6 +6821,7 @@ public partial class MainWindow : Window
     private async Task ShowArtistAlbumsAsync(long artistId, string artistName)
     {
         PushCurrentNavigationState();
+        _currentTopLevelTag = "Albums";
         _activeArtistFilterId = artistId;
         _activeArtistFilterName = artistName;
         _activeAlbumFilterId = null;
@@ -7066,6 +7163,15 @@ public partial class MainWindow : Window
                     state.SearchQuery,
                     state.ArtistFilterId,
                     state.ArtistFilterName,
+                    state.VerticalOffset);
+                return;
+
+            case "OrynivoArtistAlbums" when state.ArtistFilterId is long artistId:
+                await RestoreOrynivoArtistAlbumsAsync(
+                    state.NavigationTag,
+                    artistId,
+                    state.SearchQuery,
+                    state.SelectedId,
                     state.VerticalOffset);
                 return;
 
@@ -9620,6 +9726,7 @@ public partial class MainWindow : Window
         RefreshQueueNavigationButtons();
         PositionSlider.IsEnabled = player.CanSeek;
         DurationTextBlock.Text = FormatTime(player.Duration);
+        _ = LoadTransportWaveformAsync(filePath, player.Duration);
         _transportTimer.Start();
 
         // Now-playing anzeigen
@@ -9633,6 +9740,7 @@ public partial class MainWindow : Window
                                      (radioStation is null
                                          ? SelectedDriverTextBlock.Text
                                          : LocalizationManager.Current.InternetRadio);
+        ClearNowPlayingAlbum();
         var usesNativeDsd = info.IsDsd &&
                             !_settings.AlwaysConvertDsdToPcm &&
                             _settings.OutputBackend is OutputBackend.Asio or OutputBackend.CwAsio;
@@ -9655,10 +9763,12 @@ public partial class MainWindow : Window
                 var track = db.GetByPath(filePath);
                 var artist = db.GetArtistByTrackPath(filePath);
                 var trackInfo = db.GetTrackIdAndFavorite(filePath);
+                var navigationIds = db.GetTrackNavigationIds(filePath);
                 _currentTrackId = trackInfo?.Id;
                 _currentTrackIsFavorite = trackInfo?.IsFavorite ?? false;
                 _currentArtistId = artist?.Id;
                 _currentArtistName = artist?.Artist;
+                _currentAlbumId = navigationIds.AlbumId;
                 NowPlayingArtistButton.IsEnabled = artist is not null;
                 LyricsButton.IsEnabled = track is not null;
                 ArtistInfoButton.IsEnabled = artist is not null;
@@ -9667,6 +9777,7 @@ public partial class MainWindow : Window
                 {
                     NowPlayingTitleBlock.Text = track.Title ?? filename;
                     NowPlayingArtistBlock.Text = track.Artist ?? string.Empty;
+                    SetNowPlayingAlbum(track.Album, navigationIds.AlbumId, navigationIds.AlbumId is not null);
                 }
             }
             catch
@@ -9676,6 +9787,7 @@ public partial class MainWindow : Window
                 _currentTrackId = null;
                 _currentArtistId = null;
                 _currentArtistName = null;
+                ClearNowPlayingAlbum();
                 NowPlayingArtistButton.IsEnabled = false;
                 _currentTrackIsFavorite = false;
                 LyricsButton.IsEnabled = false;
@@ -9690,6 +9802,7 @@ public partial class MainWindow : Window
                 _currentTrackId = null;
                 _currentArtistId = null;
                 _currentArtistName = plexTrack.Artist;
+                ClearNowPlayingAlbum();
                 _currentTrackIsFavorite = false;
                 NowPlayingArtistButton.IsEnabled = false;
                 LyricsButton.IsEnabled = false;
@@ -9706,6 +9819,10 @@ public partial class MainWindow : Window
                 _currentTrackId = null;
                 _currentArtistId = null;
                 _currentArtistName = orynivoTrack.Artist;
+                SetNowPlayingAlbum(
+                    orynivoTrack.Album,
+                    orynivoTrack.AlbumId,
+                    orynivoTrack.OrynivoServer is not null && orynivoTrack.AlbumId is not null);
                 _currentTrackIsFavorite = false;
                 _currentOrynivoTrackRow = orynivoTrack;
                 if (orynivoTrack.OrynivoServer is { } trackServer)
@@ -9742,6 +9859,7 @@ public partial class MainWindow : Window
             _currentTrackId = null;
             _currentArtistId = null;
             _currentArtistName = null;
+            ClearNowPlayingAlbum();
             _currentTrackIsFavorite = false;
             NowPlayingArtistButton.IsEnabled = false;
             LyricsButton.IsEnabled = false;
@@ -9758,6 +9876,7 @@ public partial class MainWindow : Window
             _currentTrackId = null;
             _currentArtistId = null;
             _currentArtistName = null;
+            ClearNowPlayingAlbum();
             NowPlayingArtistButton.IsEnabled = false;
             _currentTrackIsFavorite = false;
             LyricsButton.IsEnabled = false;
@@ -9965,6 +10084,7 @@ public partial class MainWindow : Window
         var filename = metadata?.DisplayTitle ?? Path.GetFileNameWithoutExtension(filePath);
         NowPlayingTitleBlock.Text = filename;
         NowPlayingArtistBlock.Text = metadata?.Artist ?? SelectedDriverTextBlock.Text;
+        ClearNowPlayingAlbum();
         FileInfoTextBlock.Text = info.IsDsd
             ? $"{info.ContainerName.ToUpperInvariant()}  ·  {LocalizationManager.Current.DsdToPcmOutput}  ·  {info.OutputSampleRate:N0} Hz"
             : info.SourceSampleRate != info.OutputSampleRate
@@ -9981,10 +10101,12 @@ public partial class MainWindow : Window
             var track = db.GetByPath(filePath);
             var artist = db.GetArtistByTrackPath(filePath);
             var trackInfo = db.GetTrackIdAndFavorite(filePath);
+            var navigationIds = db.GetTrackNavigationIds(filePath);
             _currentTrackId = trackInfo?.Id;
             _currentTrackIsFavorite = trackInfo?.IsFavorite ?? false;
             _currentArtistId = artist?.Id;
             _currentArtistName = artist?.Artist;
+            _currentAlbumId = navigationIds.AlbumId;
             NowPlayingArtistButton.IsEnabled = artist is not null;
             LyricsButton.IsEnabled = track is not null;
             ArtistInfoButton.IsEnabled = artist is not null;
@@ -9992,6 +10114,7 @@ public partial class MainWindow : Window
             {
                 NowPlayingTitleBlock.Text = track.Title ?? filename;
                 NowPlayingArtistBlock.Text = track.Artist ?? string.Empty;
+                SetNowPlayingAlbum(track.Album, navigationIds.AlbumId, navigationIds.AlbumId is not null);
             }
         }
         catch
@@ -10001,6 +10124,7 @@ public partial class MainWindow : Window
             _currentTrackId = null;
             _currentArtistId = null;
             _currentArtistName = null;
+            ClearNowPlayingAlbum();
             _currentTrackIsFavorite = false;
             NowPlayingArtistButton.IsEnabled = false;
             LyricsButton.IsEnabled = false;
@@ -10016,6 +10140,7 @@ public partial class MainWindow : Window
             _currentTrackId = null;
             _currentArtistId = null;
             _currentArtistName = plexTrack.Artist;
+            ClearNowPlayingAlbum();
             _currentTrackIsFavorite = false;
             NowPlayingArtistButton.IsEnabled = false;
             LyricsButton.IsEnabled = false;
@@ -10030,6 +10155,10 @@ public partial class MainWindow : Window
             _currentTrackId = null;
             _currentArtistId = null;
             _currentArtistName = orynivoTrack.Artist;
+            SetNowPlayingAlbum(
+                orynivoTrack.Album,
+                orynivoTrack.AlbumId,
+                orynivoTrack.OrynivoServer is not null && orynivoTrack.AlbumId is not null);
             _currentTrackIsFavorite = false;
             _currentOrynivoTrackRow = orynivoTrack;
             if (orynivoTrack.OrynivoServer is { } trackServer)
@@ -10448,7 +10577,9 @@ public partial class MainWindow : Window
         PlayButton.IsEnabled   = true;
         SetPlayPauseIcon(isPlaying: false);
         RefreshQueueNavigationButtons();
+        _isSeekingWithSlider = false;
         PositionSlider.IsEnabled = false;
+        ClearTransportWaveform();
         _transportTimer.Stop();
         CancelLyricsLoad();
         CancelArtistProfileLoad();
@@ -10456,6 +10587,7 @@ public partial class MainWindow : Window
 
         NowPlayingTitleBlock.Text  = "";
         NowPlayingArtistBlock.Text = "";
+        ClearNowPlayingAlbum();
         FileInfoTextBlock.Text     = "";
         NowPlayingArtworkImage.Source = null;
         LyricsBackgroundImage.Source = null;
@@ -10760,18 +10892,139 @@ public partial class MainWindow : Window
     // Pause / Seek / Volume
     // ------------------------------------------------------------------
 
-    private async void PositionSlider_OnPreviewMouseLeftButtonUp(object? sender, PointerReleasedEventArgs e)
+    private async void PositionSlider_OnPreviewMouseLeftButtonUp(object? sender, PointerReleasedEventArgs e) =>
+        await CommitPositionSliderSeekAsync(e.Pointer);
+
+    private void PositionSlider_OnPreviewMouseLeftButtonDown(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(null).Properties.IsLeftButtonPressed) return;
+        if (_player?.CanSeek != true || PositionSlider.Bounds.Width <= 0)
+            return;
+
+        _isSeekingWithSlider = true;
+        _positionSliderSeekStartedAt = DateTimeOffset.UtcNow;
+        e.Pointer.Capture(PositionSlider);
+        PositionSlider.SetValueFromPoint(e.GetPosition(PositionSlider));
+        e.Handled = true;
+    }
+
+    private async void PositionSlider_OnPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (!_isSeekingWithSlider || _player?.CanSeek != true)
+        {
+            return;
+        }
+        if (!e.GetCurrentPoint(PositionSlider).Properties.IsLeftButtonPressed)
+        {
+            await CommitPositionSliderSeekAsync(e.Pointer);
+            return;
+        }
+
+        PositionSlider.SetValueFromPoint(e.GetPosition(PositionSlider));
+        e.Handled = true;
+    }
+
+    private void PositionSlider_OnPointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
     {
         if (!_isSeekingWithSlider)
             return;
+
+        _isSeekingWithSlider = false;
+        RefreshTransport();
+    }
+
+    private void PositionSlider_OnValueChanged(object? sender, EventArgs e)
+    {
+        if (_isSeekingWithSlider)
+            CurrentTimeTextBlock.Text = FormatTime(TimeSpan.FromSeconds(PositionSlider.Value));
+    }
+
+    private void RefreshTransport()
+    {
+        if (_player is null) return;
+        if (_isSeekingWithSlider &&
+            DateTimeOffset.UtcNow - _positionSliderSeekStartedAt > TimeSpan.FromSeconds(5))
+        {
+            _isSeekingWithSlider = false;
+        }
+
+        var visiblePosition = _pendingTransportSeekPosition ?? _player.Position;
+        CurrentTimeTextBlock.Text = FormatTime(visiblePosition);
+        DurationTextBlock.Text    = FormatTime(_player.Duration);
+        PositionSlider.Maximum    = Math.Max(1, _player.Duration.TotalSeconds);
+        if (!_isSeekingWithSlider)
+            PositionSlider.Value = Math.Min(PositionSlider.Maximum, visiblePosition.TotalSeconds);
+        _windowsMediaTransport?.UpdateTimeline(visiblePosition, _player.Duration);
+        if (_currentPodcastPlayback is not null &&
+            DateTimeOffset.UtcNow - _lastPodcastProgressSave >= TimeSpan.FromSeconds(5))
+        {
+            SavePodcastProgress(completed: false);
+        }
+        UpdateActiveLyric(_player.Position);
+    }
+
+    /// <summary>Commits the pending waveform-progress seek and leaves preview mode.</summary>
+    /// <param name="pointer">Pointer that owns capture, or <see langword="null"/>.</param>
+    private async Task CommitPositionSliderSeekAsync(IPointer? pointer)
+    {
+        if (!_isSeekingWithSlider)
+            return;
+
+        var target = TimeSpan.FromSeconds(PositionSlider.Value);
+        var seekVersion = Interlocked.Increment(ref _transportSeekVersion);
+        var stopwatch = Stopwatch.StartNew();
+        _pendingTransportSeekPosition = target;
+        _isSeekingWithSlider = false;
+        pointer?.Capture(null);
+        CurrentTimeTextBlock.Text = FormatTime(target);
+        PositionSlider.Value = Math.Min(PositionSlider.Maximum, target.TotalSeconds);
+        var durationForLog = _player?.Duration.TotalSeconds.ToString("F3", CultureInfo.InvariantCulture) ?? "none";
+        SeekDiagnostics.Log(
+            "transport-ui",
+            $"seek-request version={seekVersion} target={target.TotalSeconds:F3}s duration={durationForLog}s canSeek={_player?.CanSeek} path={SeekDiagnostics.SanitizeUrl(_currentFilePath)}");
         try
         {
+            if (seekVersion != Volatile.Read(ref _transportSeekVersion))
+            {
+                SeekDiagnostics.Log(
+                    "transport-ui",
+                    $"seek-skipped-stale version={seekVersion} elapsedMs={stopwatch.ElapsedMilliseconds}");
+                return;
+            }
             if (_player is not null && _player.CanSeek)
-                await _player.SeekAsync(TimeSpan.FromSeconds(PositionSlider.Value));
+            {
+                await _player.SeekAsync(target);
+                SeekDiagnostics.Log(
+                    "transport-ui",
+                    $"seek-complete version={seekVersion} elapsedMs={stopwatch.ElapsedMilliseconds} playerPosition={_player.Position.TotalSeconds:F3}s");
+            }
+            else
+            {
+                SeekDiagnostics.Log(
+                    "transport-ui",
+                    $"seek-skipped-unavailable version={seekVersion} elapsedMs={stopwatch.ElapsedMilliseconds}");
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Track changes and stop requests can cancel an in-flight seek.
+            SeekDiagnostics.Log(
+                "transport-ui",
+                $"seek-canceled version={seekVersion} elapsedMs={stopwatch.ElapsedMilliseconds}");
+        }
+        catch (Exception ex)
+        {
+            SeekDiagnostics.Log(
+                "transport-ui",
+                $"seek-failed version={seekVersion} elapsedMs={stopwatch.ElapsedMilliseconds}",
+                ex);
+            CrashLogger.Log(ex, "Transport seek");
+            StatusTextBlock.Text = ex.Message;
         }
         finally
         {
-            _isSeekingWithSlider = false;
+            if (seekVersion == Volatile.Read(ref _transportSeekVersion))
+                _pendingTransportSeekPosition = null;
             RefreshTransport();
             if (_player is not null)
             {
@@ -10783,41 +11036,104 @@ public partial class MainWindow : Window
         }
     }
 
-    private void PositionSlider_OnPreviewMouseLeftButtonDown(object? sender, PointerPressedEventArgs e)
+    /// <summary>Loads compact waveform data for the current transport item.</summary>
+    /// <param name="filePath">Playback path for the current item.</param>
+    /// <param name="duration">Known playback duration.</param>
+    private async Task LoadTransportWaveformAsync(string filePath, TimeSpan duration)
     {
-        if (!e.GetCurrentPoint(null).Properties.IsLeftButtonPressed) return;
-        if (_player?.CanSeek != true || PositionSlider.Bounds.Width <= 0)
-            return;
-
-        _isSeekingWithSlider = true;
-        var position = e.GetPosition(PositionSlider);
-        var ratio = Math.Clamp(position.X / PositionSlider.Bounds.Width, 0, 1);
-        PositionSlider.Value =
-            PositionSlider.Minimum +
-            ratio * (PositionSlider.Maximum - PositionSlider.Minimum);
-    }
-
-    private void PositionSlider_OnValueChanged(object sender, RangeBaseValueChangedEventArgs e)
-    {
-        if (_isSeekingWithSlider)
-            CurrentTimeTextBlock.Text = FormatTime(TimeSpan.FromSeconds(PositionSlider.Value));
-    }
-
-    private void RefreshTransport()
-    {
-        if (_player is null) return;
-        CurrentTimeTextBlock.Text = FormatTime(_player.Position);
-        DurationTextBlock.Text    = FormatTime(_player.Duration);
-        PositionSlider.Maximum    = Math.Max(1, _player.Duration.TotalSeconds);
-        if (!_isSeekingWithSlider)
-            PositionSlider.Value = Math.Min(PositionSlider.Maximum, _player.Position.TotalSeconds);
-        _windowsMediaTransport?.UpdateTimeline(_player.Position, _player.Duration);
-        if (_currentPodcastPlayback is not null &&
-            DateTimeOffset.UtcNow - _lastPodcastProgressSave >= TimeSpan.FromSeconds(5))
+        CancelAndDispose(ref _waveformCts);
+        PositionSlider.SetWaveform(null);
+        if (duration <= TimeSpan.Zero)
         {
-            SavePodcastProgress(completed: false);
+            return;
         }
-        UpdateActiveLyric(_player.Position);
+
+        var source = new CancellationTokenSource();
+        _waveformCts = source;
+        try
+        {
+            var samples = await LoadWaveformPeaksAsync(filePath, duration, source.Token);
+            if (!source.IsCancellationRequested &&
+                string.Equals(filePath, _currentFilePath, StringComparison.OrdinalIgnoreCase) &&
+                samples.Count > 0)
+            {
+                PositionSlider.SetWaveform(samples);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            CrashLogger.Log(ex, "Transport waveform analysis");
+        }
+    }
+
+    /// <summary>Loads waveform peak data for a local or remote Orynivo track.</summary>
+    /// <param name="filePath">Playback path for the current item.</param>
+    /// <param name="duration">Known playback duration.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Normalized waveform peaks, or an empty list when unavailable.</returns>
+    private async Task<IReadOnlyList<float>> LoadWaveformPeaksAsync(
+        string filePath,
+        TimeSpan duration,
+        CancellationToken cancellationToken)
+    {
+        if (_orynivoTracksByUrl.TryGetValue(filePath, out var remoteTrack) &&
+            remoteTrack.OrynivoServer is { } server &&
+            remoteTrack.Id is long trackId)
+        {
+            var waveform = await _orynivoClient.GetTrackWaveformAsync(
+                server,
+                trackId,
+                cancellationToken);
+            return waveform?.Peaks ?? [];
+        }
+
+        if (CueSheetParser.IsVirtualPath(filePath))
+        {
+            try
+            {
+                using var db = AudioDatabase.OpenDefault();
+                var track = db.GetByPath(filePath);
+                if (track is { Duration: > 0 })
+                {
+                    var cueData = await WaveformCache.GetOrCreateAsync(
+                        track.Path,
+                        track.SourcePath,
+                        TimeSpan.FromSeconds(track.Duration.Value),
+                        900,
+                        track.SegmentStart is double start ? TimeSpan.FromSeconds(start) : null,
+                        track.SegmentEnd is double end ? TimeSpan.FromSeconds(end) : null,
+                        cancellationToken);
+                    return cueData?.Peaks ?? [];
+                }
+            }
+            catch
+            {
+                return [];
+            }
+        }
+
+        if (!File.Exists(filePath))
+        {
+            return [];
+        }
+
+        var data = await WaveformCache.GetOrCreateAsync(
+            filePath,
+            null,
+            duration,
+            900,
+            cancellationToken: cancellationToken);
+        return data?.Peaks ?? [];
+    }
+
+    /// <summary>Cancels pending waveform analysis and clears the transport waveform.</summary>
+    private void ClearTransportWaveform()
+    {
+        CancelAndDispose(ref _waveformCts);
+        PositionSlider.SetWaveform(null);
     }
 
     private void LyricsButton_OnClick(object? sender, RoutedEventArgs e)
@@ -12325,6 +12641,12 @@ public partial class MainWindow : Window
             _settings.LibraryPaths = paths;
             _settingsStore.Save(_settings);
             _libraryWatcher?.UpdatePaths(paths);
+            var cleanupPaths = paths.ToList();
+            _ = Task.Run(() =>
+            {
+                try { LibraryScanner.RemoveTracksOutsideRoots(cleanupPaths); }
+                catch (Exception ex) { CrashLogger.Log(ex, "Library root cleanup"); }
+            });
             // Show/hide the Local section and the empty-library hint immediately
             // when directories are added or removed while Settings is open.
             ApplySidebarNavigationSettings();
@@ -12556,6 +12878,21 @@ public partial class MainWindow : Window
             _settings.SelectedEqualizerProfileName = window.SelectedEqualizerProfileName;
             _settings.LibraryPaths           = window.SelectedLibraryPaths.ToList();
             _libraryWatcher?.UpdatePaths(_settings.LibraryPaths);
+            if (libraryPathsChanged)
+            {
+                var cleanupPaths = _settings.LibraryPaths.ToList();
+                _ = Task.Run(() =>
+                {
+                    try
+                    {
+                        LibraryScanner.RemoveTracksOutsideRoots(cleanupPaths);
+                    }
+                    catch (Exception ex)
+                    {
+                        CrashLogger.Log(ex, "Library root cleanup");
+                    }
+                });
+            }
             _settings.Theme                  = window.SelectedTheme;
             _settings.Language               = window.SelectedLanguage;
             _settings.ArtistInfoSource       = window.SelectedArtistInfoSource;

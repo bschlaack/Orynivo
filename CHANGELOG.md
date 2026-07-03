@@ -8,6 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Added a waveform-style transport progress view that keeps the existing seek
+  behaviour while showing local-file peak data with the active transport accent
+  as the played overlay.
+- Added cached waveform peak generation for local Orynivo tracks and remote
+  Orynivo Server tracks. The server now exposes per-track waveform data through
+  `GET /api/tracks/{id}/waveform` and stores generated peaks in its data
+  directory.
+- Added sanitized seek diagnostics in `logs/seek.log` for transport clicks,
+  PCM decoder replacement, FFmpeg decoder startup, and Orynivo Server
+  server-side seek transcodes so intermittent remote seek failures can be
+  diagnosed without writing API keys or Plex tokens to the log.
+- Added an album link to the now-playing transport metadata between title and
+  artist. Local and Orynivo Server tracks open their normal album track detail
+  view from that link.
 - Added controlled web-browsing tools for the AI chat and external MCP clients:
   `search_web` (via a configurable SearXNG instance), `fetch_page` (readable
   plain text), and `fetch_page_as_markdown`. The MCP server — not the model —
@@ -29,6 +43,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Fixed waveform transport seeking so pointer release is captured reliably, the
+  full progress-control height is clickable for remote tracks without waveform
+  data, and a cancelled seek during track changes no longer crashes the UI
+  thread.
+- Fixed the waveform progress indicator getting stuck at an old preview
+  position when Avalonia missed the pointer-release path; capture loss, released
+  buttons during move, and a short timeout now leave preview mode.
+- Fixed remote waveform seeking visually jumping back to the old position while
+  the server-side seek starts. The transport now keeps the clicked target
+  position visible while the seek is pending, and PCM players discard the old
+  decoder/output buffer immediately instead of playing stale buffered audio
+  until the new decoder is ready.
+- Fixed intermittent remote seeks falling back to the old playback position
+  after the new FFmpeg/server-side decoder failed to start quickly. PCM players
+  now close the old decoder and clear queued output immediately so the server
+  releases the previous stream and playback never silently resumes from the old
+  position.
+- Fixed repeated remote seeks being blocked behind a hung earlier seek. New PCM
+  seeks now cancel any still-starting replacement decoder, and the Orynivo
+  Server seek transcode maps only the first audio stream so embedded artwork or
+  other non-audio streams cannot stall the FLAC pipe startup.
+- Fixed Back navigation after opening an artist from the now-playing transport
+  and then drilling into an album. The history now captures local and remote
+  artist-album drill-down states explicitly instead of inferring them from the
+  visible title text, so Back returns to the artist's album list.
+- Fixed the same Back path for remote Orynivo Server tracks by marking
+  now-playing remote artist drill-downs as server album views before capturing
+  history, preventing remote artist IDs from being restored through the local
+  album query path.
+- Removed tracks from SQLite, Lucene, and cached waveform data when a local or
+  server library root is removed from configuration.
 - Fixed embedded AI chat answers rendering Markdown syntax literally. Assistant
   messages now display common Markdown structure such as headings, lists, quotes,
   dividers, and fenced code blocks in the chat bubble.

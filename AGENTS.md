@@ -30,7 +30,10 @@ It holds everything needed to scan, store, index, and serve the music library:
 **Orynivo.Core/Audio/**: `ReplayGain`, `ReplayGainMode`, `EqualizerApoParser`,
 `ParametricEqualizer`, `FfmpegPcmDecoder`, `FfmpegLocator` (cross-platform:
 auto-downloads FFmpeg on Windows; expects system-installed FFmpeg on Linux/macOS),
-`EqualizerProfile`, `EqualizerFilter`, `EqualizerFilterType`.
+`WaveformCache` (cached compact FFmpeg-generated peak data for the transport
+waveform), `SeekDiagnostics` (sanitized transport seek, FFmpeg decoder, and
+server-side transcode diagnostics under `logs/seek.log`), `EqualizerProfile`,
+`EqualizerFilter`, `EqualizerFilterType`.
 
 **Orynivo.Core/Web/**: `WebBrowsingService` (SSRF-guarded page fetch + SearXNG
 search), `WebBrowsingOptions` (persisted config), `HtmlContentExtractor`
@@ -147,9 +150,12 @@ runtime dependency.
   server; `GET`
   `/api/tracks/{id}/lyrics` returns cached plain/synced lyrics with the last
   fetch timestamp and `PUT /api/tracks/{id}/lyrics` stores client-downloaded
-  LRCLIB lyrics (the LRCLIB request runs on the client); the track DTO includes
-  the primary `ArtistId` and `AlbumId`, and the album DTO includes `ArtistId`,
-  for in-library navigation; `GET` `/api/tracks/facets` returns lightweight
+  LRCLIB lyrics (the LRCLIB request runs on the client); `GET`
+  `/api/tracks/{id}/waveform` returns cached compact waveform peaks generated
+  server-side through `WaveformCache` and stored under the server data
+  directory; the track DTO includes the primary `ArtistId` and `AlbumId`, and
+  the album DTO includes `ArtistId`, for in-library navigation; `GET`
+  `/api/tracks/facets` returns lightweight
   facet rows (`TrackFacetInfo`) and `POST` `/api/tracks/by-ids` returns track
   rows for a posted ID list, together powering the remote Tracks facet filters;
   `GET /api/playlists` (including `FilterCriteria` for smart playlists),
@@ -474,6 +480,8 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   roots; `TriggerScanAsync` starts a remote scan; `UploadAlbumArtworkAsync` and
   `UploadArtistImageAsync` send client-selected image bytes to the server so the
   server does not perform external artwork searches itself;
+  `GetTrackWaveformAsync` downloads cached compact waveform peak data from the
+  server for the transport progress view;
   `UpdateArtistProfileAsync` sends client-refreshed biography/source fields and
   optional image bytes for server-side caching, without sending the Last.fm API
   key; `GetStreamUrl`, `GetAlbumArtworkUrl`, `GetArtistArtworkUrl`, and
@@ -805,6 +813,9 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
 - Full scans are the authoritative fallback: they upsert new/changed files and
   remove missing paths from both SQLite and Lucene, covering lost or overflowed
   file-system events.
+- Removing a configured library root removes tracks outside the remaining roots
+  from SQLite, Lucene, and the waveform cache through
+  `LibraryScanner.RemoveTracksOutsideRoots`.
 - Metadata extraction supports ID3v1/v2, Vorbis Comments, APE tags, and embedded
   artwork
 - Library scans include `.cue` files. CUE `FILE`, `TRACK`, `INDEX 01`, `TITLE`,

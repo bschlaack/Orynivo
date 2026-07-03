@@ -178,6 +178,17 @@ public sealed record OrynivoFullSearchResult(
 /// <param name="FetchedAt">Unix-seconds timestamp of the last lyrics lookup, or <see langword="null"/>.</param>
 public sealed record OrynivoLyrics(string? PlainLyrics, string? SyncedLyrics, long? FetchedAt = null);
 
+/// <summary>Compact waveform peak data returned by a remote Orynivo Server.</summary>
+/// <param name="Version">Cache format version.</param>
+/// <param name="DurationSeconds">Logical track duration in seconds.</param>
+/// <param name="SampleCount">Number of peak buckets.</param>
+/// <param name="Peaks">Normalized peak amplitudes in the range 0..1.</param>
+public sealed record OrynivoTrackWaveform(
+    int Version,
+    double DurationSeconds,
+    int SampleCount,
+    float[] Peaks);
+
 /// <summary>Playlist entry returned by a remote Orynivo Server.</summary>
 /// <param name="Id">Playlist database ID.</param>
 /// <param name="Name">Playlist display name.</param>
@@ -896,6 +907,26 @@ public sealed class OrynivoServerClient : IDisposable
         {
             return await GetJsonAsync<OrynivoLyrics>(
                 server, $"/api/tracks/{trackId}/lyrics", cancellationToken);
+        }
+        catch { return null; }
+    }
+
+    /// <summary>Gets cached or newly generated waveform data for a remote server track.</summary>
+    /// <param name="server">Remote server settings.</param>
+    /// <param name="trackId">Server-side track ID.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Waveform peak data, or <see langword="null"/> when unavailable.</returns>
+    public async Task<OrynivoTrackWaveform?> GetTrackWaveformAsync(
+        OrynivoServerSettings server,
+        long trackId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await GetJsonAsync<OrynivoTrackWaveform>(
+                server,
+                $"/api/tracks/{trackId}/waveform",
+                cancellationToken);
         }
         catch { return null; }
     }

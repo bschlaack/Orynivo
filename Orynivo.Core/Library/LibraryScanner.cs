@@ -1,6 +1,7 @@
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using Orynivo.Audio;
 using TagLib;
 
 namespace Orynivo.Library;
@@ -254,7 +255,7 @@ public static class LibraryScanner
                 var staleCuePaths = db.GetTrackPathsByCue(cueGroup.Key)
                     .Except(records.Select(record => record.Path), StringComparer.OrdinalIgnoreCase)
                     .ToList();
-                db.DeleteCueTracks(cueGroup.Key, records.Select(record => record.Path).ToList());
+                DeleteCueTracksAndWaveforms(db, cueGroup.Key, records.Select(record => record.Path).ToList());
                 if (staleCuePaths.Count > 0)
                     TrackSearchIndex.RemovePaths(staleCuePaths);
             }
@@ -273,7 +274,7 @@ public static class LibraryScanner
             .Where(path => !existing.Contains(path))
             .ToList();
         foreach (var missingPath in missingPaths)
-            db.Delete(missingPath);
+            DeleteTrackAndWaveform(db, missingPath);
         if (missingPaths.Count > 0)
             TrackSearchIndex.RemovePaths(missingPaths);
         TrackSearchIndex.RemoveMissingUnderRoot(rootPath, existing);
@@ -281,6 +282,40 @@ public static class LibraryScanner
             db.MarkReplayGainMetadataScanned(rootPath);
 
         return new ScanResult(total, added, updated, missingPaths.Count, failed);
+    }
+
+    /// <summary>Removes database and index entries that no longer belong to any configured library root.</summary>
+    /// <param name="rootPaths">Currently configured library roots.</param>
+    /// <returns>Number of removed track records.</returns>
+    public static int RemoveTracksOutsideRoots(IReadOnlyCollection<string> rootPaths)
+    {
+        var roots = rootPaths
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(path =>
+            {
+                try { return Path.GetFullPath(path); }
+                catch { return null; }
+            })
+            .Where(path => path is not null)
+            .Cast<string>()
+            .ToList();
+
+        using var db = AudioDatabase.OpenDefault();
+        var removedPaths = new List<string>();
+        foreach (var track in db.GetTrackCleanupRecords())
+        {
+            var sourcePath = string.IsNullOrWhiteSpace(track.SourcePath) ? track.Path : track.SourcePath;
+            if (roots.Count > 0 && roots.Any(root => IsUnderRoot(sourcePath, root)))
+                continue;
+
+            DeleteWaveformForTrack(track);
+            if (db.Delete(track.Path))
+                removedPaths.Add(track.Path);
+        }
+
+        if (removedPaths.Count > 0)
+            TrackSearchIndex.RemovePaths(removedPaths);
+        return removedPaths.Count;
     }
 
     private static bool ApplyFileChanges(
@@ -300,7 +335,7 @@ public static class LibraryScanner
                 if (!System.IO.File.Exists(path))
                 {
                     var removedCuePaths = db.GetTrackPathsByCue(path);
-                    db.DeleteCueTracks(path);
+                    DeleteCueTracksAndWaveforms(db, path);
                     removedPaths.AddRange(removedCuePaths);
                     continue;
                 }
@@ -317,7 +352,7 @@ public static class LibraryScanner
                 var staleCuePaths = db.GetTrackPathsByCue(path)
                     .Except(records.Select(record => record.Path), StringComparer.OrdinalIgnoreCase)
                     .ToList();
-                db.DeleteCueTracks(path, records.Select(record => record.Path).ToList());
+                DeleteCueTracksAndWaveforms(db, path, records.Select(record => record.Path).ToList());
                 removedPaths.AddRange(staleCuePaths);
                 continue;
             }
@@ -341,7 +376,7 @@ public static class LibraryScanner
                     var staleCuePaths = db.GetTrackPathsByCue(cuePath)
                         .Except(records.Select(record => record.Path), StringComparer.OrdinalIgnoreCase)
                         .ToList();
-                    db.DeleteCueTracks(cuePath, records.Select(record => record.Path).ToList());
+                    DeleteCueTracksAndWaveforms(db, cuePath, records.Select(record => record.Path).ToList());
                     removedPaths.AddRange(staleCuePaths);
                 }
                 continue;
@@ -349,7 +384,7 @@ public static class LibraryScanner
 
             if (!System.IO.File.Exists(path))
             {
-                if (db.Delete(path))
+                if (DeleteTrackAndWaveform(db, path))
                     removedPaths.Add(path);
                 continue;
             }
@@ -398,6 +433,55 @@ public static class LibraryScanner
         if (removedPaths.Count > 0)
             TrackSearchIndex.RemovePaths(removedPaths);
         return updatedTracks.Count > 0 || removedPaths.Count > 0;
+    }
+
+    private static bool DeleteTrackAndWaveform(AudioDatabase db, string path)
+    {
+        var track = db.GetByPath(path);
+        if (track is not null)
+            DeleteWaveformForTrack(track);
+        return db.Delete(path);
+    }
+
+    private static int DeleteCueTracksAndWaveforms(
+        AudioDatabase db,
+        string cuePath,
+        IReadOnlyCollection<string>? exceptPaths = null)
+    {
+        var paths = db.GetTrackPathsByCue(cuePath);
+        if (exceptPaths is { Count: > 0 })
+            paths = paths.Except(exceptPaths, StringComparer.OrdinalIgnoreCase).ToList();
+        foreach (var path in paths)
+        {
+            if (db.GetByPath(path) is { } track)
+                DeleteWaveformForTrack(track);
+        }
+
+        return db.DeleteCueTracks(cuePath, exceptPaths);
+    }
+
+    private static void DeleteWaveformForTrack(TrackRecord track)
+    {
+        if (track.Duration is not > 0)
+            return;
+
+        WaveformCache.DeleteCached(
+            track.Path,
+            string.IsNullOrWhiteSpace(track.SourcePath) ? null : track.SourcePath,
+            TimeSpan.FromSeconds(track.Duration.Value),
+            900,
+            track.FileSize,
+            track.ModifiedAt,
+            track.SegmentStart is double start ? TimeSpan.FromSeconds(start) : null,
+            track.SegmentEnd is double end ? TimeSpan.FromSeconds(end) : null);
+    }
+
+    private static bool IsUnderRoot(string path, string rootPath)
+    {
+        var relative = Path.GetRelativePath(rootPath, path);
+        return relative != ".." &&
+               !relative.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal) &&
+               !Path.IsPathRooted(relative);
     }
 
     private static void WaitBeforeRetry(int attempt, CancellationToken cancellationToken)
