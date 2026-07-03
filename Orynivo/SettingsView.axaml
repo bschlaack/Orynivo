@@ -951,7 +951,7 @@
                                TextWrapping="Wrap"
                                Margin="0,0,0,12"/>
 
-                    <UniformGrid Columns="2" Rows="10">
+                    <UniformGrid Columns="2" Rows="12">
                         <CheckBox x:Name="McpToolGetNowPlaying"
                                   Content="get_now_playing"
                                   Theme="{StaticResource SettingsCheckBoxTheme}"
@@ -1028,7 +1028,98 @@
                                   Content="replace_queue"
                                   Theme="{StaticResource SettingsCheckBoxTheme}"
                                   Margin="0,0,8,6"/>
+                        <CheckBox x:Name="McpToolGetCurrentTime"
+                                  Content="get_current_time"
+                                  Theme="{StaticResource SettingsCheckBoxTheme}"
+                                  Margin="0,0,0,6"/>
+                        <CheckBox x:Name="McpToolSearchWeb"
+                                  Content="search_web"
+                                  Theme="{StaticResource SettingsCheckBoxTheme}"
+                                  Margin="0,0,8,6"/>
+                        <CheckBox x:Name="McpToolFetchPage"
+                                  Content="fetch_page"
+                                  Theme="{StaticResource SettingsCheckBoxTheme}"
+                                  Margin="0,0,0,6"/>
+                        <CheckBox x:Name="McpToolFetchPageMarkdown"
+                                  Content="fetch_page_as_markdown"
+                                  Theme="{StaticResource SettingsCheckBoxTheme}"
+                                  Margin="0,0,8,6"/>
                     </UniformGrid>
+
+                    <Border Height="1"
+                            Background="{DynamicResource AppGridLineBrush}"
+                            Margin="0,16,0,16"/>
+
+                    <TextBlock Text="{DynamicResource L_WebBrowsing}"
+                               FontSize="{DynamicResource FontSizeBody}"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+                    <TextBlock Text="{DynamicResource L_WebBrowsingHint}"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,12"/>
+                    <CheckBox x:Name="WebBrowsingEnabledCheckBox"
+                              Content="{DynamicResource L_WebBrowsingEnabled}"
+                              Theme="{StaticResource SettingsToggleTheme}"
+                              Margin="0,0,0,14"/>
+
+                    <TextBlock Text="{DynamicResource L_SearxngUrl}"
+                               FontSize="{DynamicResource FontSizeCaption}"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+                    <TextBox x:Name="SearxngUrlTextBox"
+                             Height="30"
+                             HorizontalAlignment="Stretch"
+                             Padding="8,0"
+                             VerticalContentAlignment="Center"
+                             Margin="0,0,0,14"/>
+
+                    <CheckBox x:Name="WebBlockPrivateCheckBox"
+                              Content="{DynamicResource L_WebBlockPrivate}"
+                              Theme="{StaticResource SettingsToggleTheme}"
+                              Margin="0,0,0,14"/>
+
+                    <TextBlock Text="{DynamicResource L_WebMaxResults}"
+                               FontSize="{DynamicResource FontSizeCaption}"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+                    <NumericUpDown x:Name="WebMaxResultsNumericUpDown"
+                                   Height="30"
+                                   Minimum="1"
+                                   Maximum="25"
+                                   Increment="1"
+                                   FormatString="0"
+                                   ClipValueToMinMax="True"
+                                   HorizontalAlignment="Stretch"
+                                   Margin="0,0,0,14"/>
+
+                    <TextBlock Text="{DynamicResource L_WebTimeoutSeconds}"
+                               FontSize="{DynamicResource FontSizeCaption}"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+                    <NumericUpDown x:Name="WebTimeoutNumericUpDown"
+                                   Height="30"
+                                   Minimum="1"
+                                   Maximum="120"
+                                   Increment="1"
+                                   FormatString="0"
+                                   ClipValueToMinMax="True"
+                                   HorizontalAlignment="Stretch"
+                                   Margin="0,0,0,14"/>
+
+                    <TextBlock Text="{DynamicResource L_WebMaxResponseKb}"
+                               FontSize="{DynamicResource FontSizeCaption}"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+                    <NumericUpDown x:Name="WebMaxResponseKbNumericUpDown"
+                                   Height="30"
+                                   Minimum="16"
+                                   Maximum="20480"
+                                   Increment="256"
+                                   FormatString="0"
+                                   ClipValueToMinMax="True"
+                                   HorizontalAlignment="Stretch"/>
                 </StackPanel>
 
                 <StackPanel x:Name="AiChatPanel"

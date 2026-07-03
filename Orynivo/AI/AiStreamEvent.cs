@@ -15,6 +15,12 @@ public abstract record AiStreamEvent
     /// <returns>A <see cref="ToolCallEvent"/>.</returns>
     public static AiStreamEvent ToolCall(string name) => new ToolCallEvent(name);
 
+    /// <summary>Creates a tool-result notification event.</summary>
+    /// <param name="name">The tool that was invoked.</param>
+    /// <param name="result">The textual result returned by the tool.</param>
+    /// <returns>A <see cref="ToolResultEvent"/>.</returns>
+    public static AiStreamEvent ToolResult(string name, string result) => new ToolResultEvent(name, result);
+
     /// <summary>Creates an error event.</summary>
     /// <param name="message">Human-readable error description.</param>
     /// <returns>An <see cref="ErrorEvent"/>.</returns>
@@ -31,6 +37,11 @@ public abstract record AiStreamEvent
     /// <summary>The model is calling a tool.</summary>
     /// <param name="ToolName">Name of the tool being called.</param>
     public sealed record ToolCallEvent(string ToolName) : AiStreamEvent;
+
+    /// <summary>The result returned by a completed tool call.</summary>
+    /// <param name="ToolName">Name of the tool that was called.</param>
+    /// <param name="Result">Textual result returned by the tool.</param>
+    public sealed record ToolResultEvent(string ToolName, string Result) : AiStreamEvent;
 
     /// <summary>A transport or API error occurred.</summary>
     /// <param name="Message">Human-readable error description.</param>

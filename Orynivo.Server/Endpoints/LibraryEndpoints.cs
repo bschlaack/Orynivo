@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Orynivo.Audio;
 using Orynivo.Library;
 
 namespace Orynivo.Server.Endpoints;
@@ -156,6 +157,24 @@ public static class LibraryEndpoints
             using var db = AudioDatabase.OpenDefault();
             var track = db.GetTrackById(trackId);
             return track is null ? Results.NotFound() : Results.Ok(TrackRecordDto(track));
+        });
+
+        api.MapGet("/tracks/{trackId:long}/waveform", async (long trackId, HttpContext ctx) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            var track = db.GetTrackById(trackId);
+            if (track is null || track.Duration is not > 0)
+                return Results.NotFound();
+
+            var data = await WaveformCache.GetOrCreateAsync(
+                track.Path,
+                string.IsNullOrWhiteSpace(track.SourcePath) ? null : track.SourcePath,
+                TimeSpan.FromSeconds(track.Duration.Value),
+                900,
+                track.SegmentStart is double start ? TimeSpan.FromSeconds(start) : null,
+                track.SegmentEnd is double end ? TimeSpan.FromSeconds(end) : null,
+                ctx.RequestAborted);
+            return data is null ? Results.NotFound() : Results.Ok(data);
         });
 
         api.MapGet("/tracks/{trackId:long}/lyrics", (long trackId) =>

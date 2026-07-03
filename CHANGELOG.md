@@ -4,6 +4,101 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.21.0] - 2026-07-04
+
+### Added
+
+- Added a waveform-style transport progress view that keeps the existing seek
+  behaviour while showing local-file peak data with the active transport accent
+  as the played overlay.
+- Added cached waveform peak generation for local Orynivo tracks and remote
+  Orynivo Server tracks. The server now exposes per-track waveform data through
+  `GET /api/tracks/{id}/waveform` and stores generated peaks in its data
+  directory.
+- Added sanitized seek diagnostics in `logs/seek.log` for transport clicks,
+  PCM decoder replacement, FFmpeg decoder startup, and Orynivo Server
+  server-side seek transcodes so intermittent remote seek failures can be
+  diagnosed without writing API keys or Plex tokens to the log.
+- Added an album link to the now-playing transport metadata between title and
+  artist. Local and Orynivo Server tracks open their normal album track detail
+  view from that link.
+- Added controlled web-browsing tools for the AI chat and external MCP clients:
+  `search_web` (via a configurable SearXNG instance), `fetch_page` (readable
+  plain text), and `fetch_page_as_markdown`. The MCP server — not the model —
+  performs the network access through a new `WebBrowsingService` with a strong
+  safety model: http/https only, private/loopback/link-local/reserved addresses
+  are refused at connect time (SSRF protection, closing the DNS-rebinding
+  window), redirects are limited and followed manually, responses are size- and
+  timeout-capped, non-text content is refused (no arbitrary downloads), an
+  optional domain allowlist is supported, and every request is logged to
+  `%LOCALAPPDATA%\Orynivo\logs\web-browsing.log`. The trusted SearXNG endpoint
+  is exempt from the private-network guard so a LAN/Docker instance works. The
+  SearXNG URL and limits are configurable under Settings → Integration → MCP
+  Server → Web browsing, and each web tool has its own enable/disable toggle
+  (bringing the tool count to 23).
+- Added a `get_current_time` tool that returns the current local and UTC date,
+  time, day of week, and time-zone name. It is available both to the embedded AI
+  chat and to external MCP clients, and has its own enable/disable toggle in
+  Settings → Integration → MCP Server (bringing the tool count to 20).
+
+### Fixed
+
+- Fixed waveform transport seeking so pointer release is captured reliably, the
+  full progress-control height is clickable for remote tracks without waveform
+  data, and a cancelled seek during track changes no longer crashes the UI
+  thread.
+- Fixed the waveform progress indicator getting stuck at an old preview
+  position when Avalonia missed the pointer-release path; capture loss, released
+  buttons during move, and a short timeout now leave preview mode.
+- Fixed remote waveform seeking visually jumping back to the old position while
+  the server-side seek starts. The transport now keeps the clicked target
+  position visible while the seek is pending, and PCM players discard the old
+  decoder/output buffer immediately instead of playing stale buffered audio
+  until the new decoder is ready.
+- Fixed intermittent remote seeks falling back to the old playback position
+  after the new FFmpeg/server-side decoder failed to start quickly. PCM players
+  now close the old decoder and clear queued output immediately so the server
+  releases the previous stream and playback never silently resumes from the old
+  position.
+- Fixed repeated remote seeks being blocked behind a hung earlier seek. New PCM
+  seeks now cancel any still-starting replacement decoder, and the Orynivo
+  Server seek transcode maps only the first audio stream so embedded artwork or
+  other non-audio streams cannot stall the FLAC pipe startup.
+- Fixed Back navigation after opening an artist from the now-playing transport
+  and then drilling into an album. The history now captures local and remote
+  artist-album drill-down states explicitly instead of inferring them from the
+  visible title text, so Back returns to the artist's album list.
+- Fixed the same Back path for remote Orynivo Server tracks by marking
+  now-playing remote artist drill-downs as server album views before capturing
+  history, preventing remote artist IDs from being restored through the local
+  album query path.
+- Removed tracks from SQLite, Lucene, and cached waveform data when a local or
+  server library root is removed from configuration.
+- Fixed embedded AI chat answers rendering Markdown syntax literally. Assistant
+  messages now display common Markdown structure such as headings, lists, quotes,
+  dividers, and fenced code blocks in the chat bubble.
+- Fixed Markdown-rendered AI chat answers becoming invisible when the renderer
+  could not resolve theme brushes inside the chat message template.
+- Fixed the embedded AI chat showing an empty assistant bubble when a model
+  streamed only whitespace before a tool call or returned no final answer after
+  executing a tool. Empty leading tokens are ignored, and the chat now shows the
+  tool result as a fallback when the model does not produce answer text.
+- Removed the bundled default SearXNG URL from the web-browsing settings so new
+  installations start with an empty endpoint and require the user to enter their
+  own instance.
+- Fixed Back navigation opening the wrong album after viewing a remote Orynivo
+  Server album that was opened from the dashboard and then drilling into its
+  artist. Such a remote album was captured as a local album-tracks state and
+  restored through the local path, reopening a local album that merely shared
+  the numeric id. Remote albums are now detected by their catalog source and
+  restored through the remote path regardless of how they were opened.
+- Fixed the manual lyrics search/download dialog not appearing while a remote
+  Orynivo Server track is playing. The handler required a local database row
+  (looked up by file path), which never matches a remote stream URL, so it
+  returned before showing the dialog. It now seeds the search from the current
+  track's metadata and stores the chosen lyrics on the remote server for remote
+  tracks (and in the local database for local tracks).
+
 ## [0.20.5] - 2026-07-01
 
 ### Added

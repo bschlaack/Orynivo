@@ -53,6 +53,74 @@ public sealed class McpTools(McpPlayerBridge bridge)
         return sb.ToString().TrimEnd();
     }
 
+    /// <summary>Returns the current date and time in local and UTC form.</summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A multi-line string with the local time, day of week, ISO 8601 form, UTC time, and time-zone name.</returns>
+    [McpServerTool(Name = "get_current_time", ReadOnly = true, Idempotent = true)]
+    [Description("Returns the current date and time: local time, day of week, ISO 8601 form, UTC time, and the local time-zone name.")]
+    public Task<string> GetCurrentTimeAsync(CancellationToken ct = default)
+    {
+        if (!bridge.IsToolEnabled("get_current_time")) return Task.FromResult("Tool is disabled.");
+        var now = DateTimeOffset.Now;
+        var result = string.Join('\n',
+            $"Local time: {now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)} ({now.ToString("dddd", CultureInfo.InvariantCulture)})",
+            $"ISO 8601: {now.ToString("yyyy-MM-ddTHH:mm:sszzz", CultureInfo.InvariantCulture)}",
+            $"UTC: {now.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)}Z",
+            $"Time zone: {TimeZoneInfo.Local.DisplayName}");
+        return Task.FromResult(result);
+    }
+
+    // ------------------------------------------------------------------
+    // Web tools (search + safe page fetch through the MCP server)
+    // ------------------------------------------------------------------
+
+    /// <summary>Searches the web through the configured SearXNG instance.</summary>
+    /// <param name="query">The search query.</param>
+    /// <param name="maxResults">Maximum number of results (1–25).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A formatted list of results, or a readable error message.</returns>
+    [McpServerTool(Name = "search_web", ReadOnly = true, Idempotent = true)]
+    [Description("Searches the web through the configured SearXNG instance and returns the top results (title, URL, snippet). Follow up with fetch_page to read a result.")]
+    public async Task<string> SearchWebAsync(
+        [Description("The search query.")] string query,
+        [Description("Maximum number of results (1–25, default 5).")] int maxResults = 5,
+        CancellationToken ct = default)
+    {
+        if (!bridge.IsToolEnabled("search_web")) return "Tool is disabled.";
+        if (bridge.WebBrowsing is not { } web) return "Web browsing is not available.";
+        return await web.SearchAsync(query, maxResults, ct);
+    }
+
+    /// <summary>Fetches a web page and returns its readable plain text.</summary>
+    /// <param name="url">Absolute http/https URL.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The page text, or a readable error message.</returns>
+    [McpServerTool(Name = "fetch_page", ReadOnly = true, Idempotent = true)]
+    [Description("Fetches an http/https page and returns its readable plain text. Private/loopback addresses, non-HTTP schemes, and non-text content are blocked for safety.")]
+    public async Task<string> FetchPageAsync(
+        [Description("Absolute http or https URL of the page to fetch.")] string url,
+        CancellationToken ct = default)
+    {
+        if (!bridge.IsToolEnabled("fetch_page")) return "Tool is disabled.";
+        if (bridge.WebBrowsing is not { } web) return "Web browsing is not available.";
+        return await web.FetchTextAsync(url, ct);
+    }
+
+    /// <summary>Fetches a web page and returns a compact Markdown rendering.</summary>
+    /// <param name="url">Absolute http/https URL.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The page as Markdown, or a readable error message.</returns>
+    [McpServerTool(Name = "fetch_page_as_markdown", ReadOnly = true, Idempotent = true)]
+    [Description("Fetches an http/https page and returns a compact Markdown rendering that preserves headings, links, and lists. Uses the same safety limits as fetch_page.")]
+    public async Task<string> FetchPageAsMarkdownAsync(
+        [Description("Absolute http or https URL of the page to fetch.")] string url,
+        CancellationToken ct = default)
+    {
+        if (!bridge.IsToolEnabled("fetch_page_as_markdown")) return "Tool is disabled.";
+        if (bridge.WebBrowsing is not { } web) return "Web browsing is not available.";
+        return await web.FetchMarkdownAsync(url, ct);
+    }
+
     // ------------------------------------------------------------------
     // Playback control
     // ------------------------------------------------------------------

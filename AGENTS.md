@@ -30,7 +30,15 @@ It holds everything needed to scan, store, index, and serve the music library:
 **Orynivo.Core/Audio/**: `ReplayGain`, `ReplayGainMode`, `EqualizerApoParser`,
 `ParametricEqualizer`, `FfmpegPcmDecoder`, `FfmpegLocator` (cross-platform:
 auto-downloads FFmpeg on Windows; expects system-installed FFmpeg on Linux/macOS),
-`EqualizerProfile`, `EqualizerFilter`, `EqualizerFilterType`.
+`WaveformCache` (cached compact FFmpeg-generated peak data for the transport
+waveform), `SeekDiagnostics` (sanitized transport seek, FFmpeg decoder, and
+server-side transcode diagnostics under `logs/seek.log`), `EqualizerProfile`,
+`EqualizerFilter`, `EqualizerFilterType`.
+
+**Orynivo.Core/Web/**: `WebBrowsingService` (SSRF-guarded page fetch + SearXNG
+search), `WebBrowsingOptions` (persisted config), `HtmlContentExtractor`
+(HTML→text/Markdown). Backs the `search_web`, `fetch_page`, and
+`fetch_page_as_markdown` tools for MCP and the AI chat.
 
 **Orynivo.Core/Streaming/**: `IStreamingCatalog`, `IStreamingPlaybackProvider`,
 `IStreamingCredentialStore`, `StreamingModels` (all streaming model records,
@@ -142,9 +150,12 @@ runtime dependency.
   server; `GET`
   `/api/tracks/{id}/lyrics` returns cached plain/synced lyrics with the last
   fetch timestamp and `PUT /api/tracks/{id}/lyrics` stores client-downloaded
-  LRCLIB lyrics (the LRCLIB request runs on the client); the track DTO includes
-  the primary `ArtistId` and `AlbumId`, and the album DTO includes `ArtistId`,
-  for in-library navigation; `GET` `/api/tracks/facets` returns lightweight
+  LRCLIB lyrics (the LRCLIB request runs on the client); `GET`
+  `/api/tracks/{id}/waveform` returns cached compact waveform peaks generated
+  server-side through `WaveformCache` and stored under the server data
+  directory; the track DTO includes the primary `ArtistId` and `AlbumId`, and
+  the album DTO includes `ArtistId`, for in-library navigation; `GET`
+  `/api/tracks/facets` returns lightweight
   facet rows (`TrackFacetInfo`) and `POST` `/api/tracks/by-ids` returns track
   rows for a posted ID list, together powering the remote Tracks facet filters;
   `GET /api/playlists` (including `FilterCriteria` for smart playlists),
@@ -335,9 +346,12 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   the transport quick-pick buttons to jump directly into a settings section;
   the **Integration** navigation group contains the **MCP SERVER** section
   (`Tag="Mcp"`) with an enable checkbox, configurable port field, and per-tool
-  enable/disable checkboxes for all 19 tools (stored in
+  enable/disable checkboxes for all 23 tools (stored in
   `AppSettings.DisabledMcpTools`); `NavigateToSection("Mcp")` jumps there;
-  the tool `UniformGrid` has `Rows="10"` for 19 tools (2 columns)
+  the tool `UniformGrid` has `Rows="12"` for 23 tools (2 columns). The MCP
+  section also holds the **Web browsing** configuration (enable toggle, SearXNG
+  URL, block-private-networks toggle, and timeout/response-size/result limits)
+  edited via `WebBrowsingValue`
   Remote Orynivo Server connection management belongs under its own
   **Orynivo Server** navigation item in the **BIBLIOTHEK** settings group, not
   under local directories or Streaming.
@@ -347,11 +361,29 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   `DispatcherPriority.Normal`; records `PlayerState` and `QueueEntry` are
   returned by the state and queue delegates; `DisabledTools` (`HashSet<string>?`)
   and `IsToolEnabled(name)` control per-tool gating; `RefreshPlaylistsFunc`
-  triggers `LoadNavPlaylists` after MCP creates a playlist
-- `Orynivo/Mcp/McpTools.cs`: 19 MCP tools annotated with `[McpServerToolType]`
+  triggers `LoadNavPlaylists` after MCP creates a playlist; `WebBrowsing`
+  (`Orynivo.Web.WebBrowsingService`) backs the web tools
+- `Orynivo.Core/Web/WebBrowsingService.cs` (+ `WebBrowsingOptions`,
+  `HtmlContentExtractor`): the controlled internet layer used by both MCP and the
+  AI chat. `SearchAsync` queries the configured SearXNG JSON API (trusted
+  endpoint, not SSRF-guarded, so a LAN/Docker instance works after the user
+  configures its URL); `FetchTextAsync`/`FetchMarkdownAsync` fetch arbitrary pages behind a
+  strong SSRF guard: http/https only, a `SocketsHttpHandler.ConnectCallback`
+  refuses private/loopback/link-local/reserved IPs at connect time (closing the
+  DNS-rebinding window), manual redirect following with a limit, response
+  size-cap, non-text content refused (no arbitrary downloads), per-request
+  timeout, optional domain allowlist, and per-request audit logging to
+  `%LOCALAPPDATA%\Orynivo\logs\web-browsing.log`. Configured through
+  `AppSettings.WebBrowsing` (`WebBrowsingOptions`); `MainWindow` creates the
+  service, wires the logger, and updates `Options` on settings save.
+- `Orynivo/Mcp/McpTools.cs`: 23 MCP tools annotated with `[McpServerToolType]`
   and `[McpServerTool]`; read-only tools are marked `ReadOnly = true,
   Idempotent = true`; every tool guards with `bridge.IsToolEnabled(name)` and
-  returns `"Tool is disabled."` when off; `search_library` calls
+  returns `"Tool is disabled."` when off; `get_current_time` returns the current
+  local/UTC date, time, day of week, and time-zone name; the web tools
+  `search_web`, `fetch_page`, and `fetch_page_as_markdown` delegate to
+  `bridge.WebBrowsing` (a `Orynivo.Web.WebBrowsingService`); `search_library`
+  calls
   `TrackSearchIndex.SearchByCategory` then `AudioDatabase.OpenDefault()` for id
   resolution; property access uses `AlbumInfo.Album`, `AlbumInfo.DisplayArtist`,
   and `ArtistInfo.Artist`; playlist tools use `GetAllPlaylists`,
@@ -378,7 +410,7 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   conversation history is maintained across turns; `AiChatSettings` is read on
   every send so settings changes take effect without restarting the view
 - `Orynivo/AI/AiToolDefinitions.cs`: builds the OpenAI function-calling schema
-  (`JsonObject` list) for all 19 Orynivo tools; definitions match the method
+  (`JsonObject` list) for all 23 Orynivo tools; definitions match the method
   signatures in `McpTools.cs`
 - `Orynivo/AI/AiToolExecutor.cs`: dispatches tool calls received from the LLM
   to `McpTools` methods by name; parses JSON arguments from the model; no MCP
@@ -448,6 +480,8 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   roots; `TriggerScanAsync` starts a remote scan; `UploadAlbumArtworkAsync` and
   `UploadArtistImageAsync` send client-selected image bytes to the server so the
   server does not perform external artwork searches itself;
+  `GetTrackWaveformAsync` downloads cached compact waveform peak data from the
+  server for the transport progress view;
   `UpdateArtistProfileAsync` sends client-refreshed biography/source fields and
   optional image bytes for server-side caching, without sending the Last.fm API
   key; `GetStreamUrl`, `GetAlbumArtworkUrl`, `GetArtistArtworkUrl`, and
@@ -779,6 +813,9 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
 - Full scans are the authoritative fallback: they upsert new/changed files and
   remove missing paths from both SQLite and Lucene, covering lost or overflowed
   file-system events.
+- Removing a configured library root removes tracks outside the remaining roots
+  from SQLite, Lucene, and the waveform cache through
+  `LibraryScanner.RemoveTracksOutsideRoots`.
 - Metadata extraction supports ID3v1/v2, Vorbis Comments, APE tags, and embedded
   artwork
 - Library scans include `.cue` files. CUE `FILE`, `TRACK`, `INDEX 01`, `TITLE`,

@@ -26,6 +26,10 @@ internal sealed class AiToolExecutor(McpTools tools)
         {
             "get_now_playing"       => tools.GetNowPlayingAsync(ct),
             "get_queue"             => tools.GetQueueAsync(ct),
+            "get_current_time"      => tools.GetCurrentTimeAsync(ct),
+            "search_web"            => tools.SearchWebAsync(Str(args, "query") ?? "", Int(args, "maxResults", 5), ct),
+            "fetch_page"            => tools.FetchPageAsync(Str(args, "url") ?? "", ct),
+            "fetch_page_as_markdown" => tools.FetchPageAsMarkdownAsync(Str(args, "url") ?? "", ct),
             "play"                  => tools.PlayAsync(Str(args, "path"), ct),
             "pause_resume"          => tools.PauseResumeAsync(ct),
             "next_track"            => tools.NextTrackAsync(ct),

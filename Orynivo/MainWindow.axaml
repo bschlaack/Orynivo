@@ -2763,6 +2763,16 @@
                         <TextBlock x:Name="NowPlayingTitleBlock"
                                    Foreground="{DynamicResource AppTransportPrimaryTextBrush}" FontSize="{DynamicResource FontSizeBody}" FontWeight="SemiBold"
                                    TextTrimming="CharacterEllipsis"/>
+                        <Button x:Name="NowPlayingAlbumButton"
+                                Content="{Binding Text, ElementName=NowPlayingAlbumBlock}"
+                                Foreground="{DynamicResource AppSecondaryTextBrush}"
+                                FontSize="{DynamicResource FontSizeMeta}"
+                                Margin="0,2,0,0"
+                                IsEnabled="False"
+                                IsVisible="False"
+                                Theme="{StaticResource EntityLinkButtonTheme}"
+                                Click="NowPlayingAlbumButton_OnClick"/>
+                        <TextBlock x:Name="NowPlayingAlbumBlock" IsVisible="False"/>
                         <Button x:Name="NowPlayingArtistButton"
                                 Content="{Binding Text, ElementName=NowPlayingArtistBlock}"
                                 Foreground="{DynamicResource AppSecondaryTextBrush}"
@@ -2909,12 +2919,10 @@
                                    Foreground="{DynamicResource AppMutedTextBrush}" FontSize="{DynamicResource FontSizeMeta}"
                                    VerticalAlignment="Center" HorizontalAlignment="Right"
                                    Margin="0,0,8,0" Text="0:00"/>
-                        <Slider x:Name="PositionSlider"
-                                Grid.Column="1"
-                                Theme="{StaticResource DarkSliderTheme}"
-                                Height="30"
-                                Minimum="0" Maximum="1" IsEnabled="False"
-                                ValueChanged="PositionSlider_OnValueChanged"/>
+                        <controls:WaveformProgressControl x:Name="PositionSlider"
+                                                          Grid.Column="1"
+                                                          Height="42"
+                                                          Minimum="0" Maximum="1" IsEnabled="False"/>
                         <TextBlock x:Name="DurationTextBlock"
                                    Grid.Column="2"
                                    Foreground="{DynamicResource AppMutedTextBrush}" FontSize="{DynamicResource FontSizeMeta}"

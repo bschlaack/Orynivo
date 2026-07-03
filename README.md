@@ -59,12 +59,13 @@ without an API key.
 
 | Category | Tools |
 | --- | --- |
-| State | `get_now_playing`, `get_queue` |
+| State | `get_now_playing`, `get_queue`, `get_current_time` |
 | Playback | `play`, `pause_resume`, `next_track`, `previous_track`, `stop`, `seek`, `set_volume` |
 | Queue | `queue_append`, `queue_play_next`, `clear_queue`, `replace_queue` |
 | Library | `search_library` |
 | Playlists | `list_playlists`, `get_playlist_tracks`, `create_playlist`, `create_smart_playlist` |
 | History | `get_play_history` |
+| Web | `search_web`, `fetch_page`, `fetch_page_as_markdown` |
 
 The model picks the right queue tool automatically: `replace_queue` clears the
 old list and starts playing immediately when the user asks for new content;
@@ -73,13 +74,19 @@ old list and starts playing immediately when the user asks for new content;
 
 ### MCP Server
 
-The same 19 tools are available as an embedded **Model Context Protocol (MCP)**
+The same 23 tools are available as an embedded **Model Context Protocol (MCP)**
 HTTP/SSE server for external AI assistants such as
 [Claude Desktop](https://claude.ai/download). Enable it under
 **Settings → Integration → MCP Server**, choose a port (default **49200**),
 and point your assistant at `http://localhost:49200/mcp`. The server binds to
-`localhost` only. Each of the 19 tools has an individual enable/disable toggle
-in Settings so you can limit what an external assistant is allowed to do.
+`localhost` only. Each of the 23 tools has an individual enable/disable toggle
+in Settings so you can limit what an external assistant is allowed to do. The
+web tools (`search_web`, `fetch_page`, `fetch_page_as_markdown`) route through
+the MCP server, not the model directly: searches use a configurable SearXNG
+instance and page fetches are hardened against SSRF (http/https only, private/
+loopback addresses blocked, response size/redirect/timeout limits, no arbitrary
+downloads, request logging). Configure the SearXNG URL and limits under
+**Settings → Integration → MCP Server → Web browsing**.
 
 ## Orynivo Server
 
@@ -112,6 +119,7 @@ works directly in FFmpeg and browser URLs.
 | `GET /api/albums/{id}/tracks` | Track list for one album |
 | `GET /api/tracks` | Paginated track list (`?page=0&pageSize=500`) |
 | `GET /api/tracks/{id}` | Full metadata for one track |
+| `GET /api/tracks/{id}/waveform` | Cached compact waveform peak data for the transport progress view |
 | `GET /api/tracks/{id}/lyrics` | Cached plain/synced lyrics for one track |
 | `PUT /api/tracks/{id}/lyrics` | Store client-downloaded lyrics on the server |
 | `GET /api/tracks/facets` | Lightweight facet rows (genre, format, bitrate) for the Tracks filter |
@@ -210,6 +218,9 @@ byte-range streaming without FFmpeg.
   with play-next/append actions, removal, reordering, playlist saving, and
   shuffle without repeating a track within the currently loaded queue. The queue
   is stored in the SQLite library database instead of the JSON settings file.
+- The transport progress control shows a waveform-style peak view for local
+  audio files and remote Orynivo Server tracks, caches compact peak data, and
+  keeps click/drag seeking on the same timeline.
 - Remote Orynivo Server tracks keep their library title, artist, album, and
   duration in transport metadata, play history, and **Up next**. Authenticated
   `?key=` stream URLs are not shown as titles and are not persisted in the

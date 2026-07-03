@@ -36,6 +36,9 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
     private FfmpegPcmDecoder? _activeDecoder;
     private int _restartPreparedFromIndex = -1;
     private int _decoderGeneration;
+    private int _decoderReadPaused;
+    private int _seekRequestGeneration;
+    private CancellationTokenSource? _seekStartupCts;
     private EqualizerUpdateRequest? _pendingEqualizerUpdate;
     private int _equalizerResetRequested;
     private float _volume = 1.0f;
@@ -211,22 +214,25 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
         position = position < TimeSpan.Zero
             ? TimeSpan.Zero
             : position > Duration ? Duration : position;
-        var replacement = await FfmpegPcmDecoder.CreateAsync(
-            _items[Volatile.Read(ref _audibleTrackIndex)].PlaybackPaths,
-            CurrentInfo.OutputSampleRate,
-            _selectedFormat.FfmpegSampleFormat,
-            _selectedFormat.FfmpegCodec,
-            position,
-            _items[Volatile.Read(ref _audibleTrackIndex)].SegmentStart,
-            _items[Volatile.Read(ref _audibleTrackIndex)].SegmentEnd,
-            _cts.Token).ConfigureAwait(false);
+        var audibleIndex = Volatile.Read(ref _audibleTrackIndex);
+        var seekRequest = Interlocked.Increment(ref _seekRequestGeneration);
+        var stopwatch = Stopwatch.StartNew();
+        SeekDiagnostics.Log(
+            "wasapi-player",
+            $"seek-begin request={seekRequest} index={audibleIndex} target={position.TotalSeconds:F3}s input={SeekDiagnostics.SanitizeUrl(_items[audibleIndex].PlaybackPaths.FirstOrDefault() ?? string.Empty)}");
+        var installedReplacement = false;
+        CancellationTokenSource? seekStartupCts = null;
         await _decoderGate.WaitAsync(_cts.Token).ConfigureAwait(false);
         try
         {
+            _seekStartupCts?.Cancel();
+            _seekStartupCts = null;
+            seekStartupCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
+            _seekStartupCts = seekStartupCts;
+            Interlocked.Exchange(ref _decoderReadPaused, 1);
             _activeDecoder?.Dispose();
-            _activeDecoder = replacement;
+            _activeDecoder = null;
             Interlocked.Increment(ref _decoderGeneration);
-            var audibleIndex = Volatile.Read(ref _audibleTrackIndex);
             _writeTrackIndex = audibleIndex;
             _prematurePlexEofRetryCounts[audibleIndex] = 0;
             Volatile.Write(ref _trackStartFrames[audibleIndex], 0);
@@ -237,10 +243,71 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
             Volatile.Write(
                 ref _trackPositionOffsetFrames[audibleIndex],
                 (long)(position.TotalSeconds * CurrentInfo.OutputSampleRate));
+            SeekDiagnostics.Log(
+                "wasapi-player",
+                $"old-decoder-discarded request={seekRequest} index={audibleIndex} elapsedMs={stopwatch.ElapsedMilliseconds}");
         }
         finally
         {
             _decoderGate.Release();
+        }
+
+        FfmpegPcmDecoder? replacement = null;
+        try
+        {
+            replacement = await FfmpegPcmDecoder.CreateAsync(
+                _items[audibleIndex].PlaybackPaths,
+                CurrentInfo.OutputSampleRate,
+                _selectedFormat.FfmpegSampleFormat,
+                _selectedFormat.FfmpegCodec,
+                position,
+                _items[audibleIndex].SegmentStart,
+                _items[audibleIndex].SegmentEnd,
+                seekStartupCts.Token).ConfigureAwait(false);
+            await _decoderGate.WaitAsync(_cts.Token).ConfigureAwait(false);
+            try
+            {
+                if (seekRequest == Volatile.Read(ref _seekRequestGeneration) &&
+                    !seekStartupCts.IsCancellationRequested)
+                {
+                    _activeDecoder = replacement;
+                    Interlocked.Increment(ref _decoderGeneration);
+                    installedReplacement = true;
+                    SeekDiagnostics.Log(
+                        "wasapi-player",
+                        $"replacement-installed request={seekRequest} index={audibleIndex} elapsedMs={stopwatch.ElapsedMilliseconds}");
+                }
+                else
+                {
+                    SeekDiagnostics.Log(
+                        "wasapi-player",
+                        $"replacement-stale request={seekRequest} index={audibleIndex} elapsedMs={stopwatch.ElapsedMilliseconds}");
+                }
+            }
+            finally
+            {
+                if (seekRequest == Volatile.Read(ref _seekRequestGeneration))
+                {
+                    _seekStartupCts = null;
+                    Interlocked.Exchange(ref _decoderReadPaused, 0);
+                }
+
+                _decoderGate.Release();
+            }
+        }
+        finally
+        {
+            if (!installedReplacement)
+            {
+                replacement?.Dispose();
+                if (seekRequest == Volatile.Read(ref _seekRequestGeneration))
+                    Interlocked.Exchange(ref _decoderReadPaused, 0);
+                SeekDiagnostics.Log(
+                    "wasapi-player",
+                    $"seek-aborted request={seekRequest} index={audibleIndex} elapsedMs={stopwatch.ElapsedMilliseconds}");
+            }
+
+            seekStartupCts?.Dispose();
         }
     }
     /// <inheritdoc/>
@@ -285,13 +352,26 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
                 var decoderGeneration = Volatile.Read(ref _decoderGeneration);
                 try
                 {
-                    bytesRead = await _activeDecoder!.ReadAsync(
+                    if (Volatile.Read(ref _decoderReadPaused) != 0 ||
+                        _activeDecoder is null)
+                    {
+                        bytesRead = -1;
+                    }
+                    else
+                    {
+                        bytesRead = await _activeDecoder.ReadAsync(
                         buffer.AsMemory(remainderBytes),
                         _cts.Token).ConfigureAwait(false);
+                    }
                 }
                 finally
                 {
                     _decoderGate.Release();
+                }
+                if (bytesRead < 0)
+                {
+                    await Task.Delay(2, _cts.Token).ConfigureAwait(false);
+                    continue;
                 }
                 if (decoderGeneration != Volatile.Read(ref _decoderGeneration))
                 {

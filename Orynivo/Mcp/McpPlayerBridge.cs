@@ -89,6 +89,9 @@ public sealed class McpPlayerBridge
     /// <summary>Gets or sets the set of tool names that are individually disabled; <see langword="null"/> means all tools are enabled.</summary>
     public HashSet<string>? DisabledTools { get; set; }
 
+    /// <summary>Gets or sets the shared web-browsing service used by the web tools (search and page fetch), or <see langword="null"/> when unavailable.</summary>
+    public Orynivo.Web.WebBrowsingService? WebBrowsing { get; set; }
+
     /// <summary>Returns <see langword="true"/> when the named tool is not in <see cref="DisabledTools"/>.</summary>
     /// <param name="toolName">The MCP tool name to check.</param>
     /// <returns><see langword="true"/> when the tool is enabled.</returns>

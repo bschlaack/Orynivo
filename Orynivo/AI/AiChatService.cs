@@ -201,6 +201,7 @@ internal sealed class AiChatService : IDisposable
                         result = $"Tool error: {ex.Message}";
                     }
                     _history.Add(new ApiMessage("tool", result, ToolCallId: acc.Id, Name: acc.Name));
+                    yield return AiStreamEvent.ToolResult(acc.Name, result);
                 }
 
                 continue; // Send next request with tool results

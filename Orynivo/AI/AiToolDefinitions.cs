@@ -3,7 +3,7 @@ using System.Text.Json.Nodes;
 namespace Orynivo.AI;
 
 /// <summary>
-/// Builds OpenAI function-calling tool definitions for all 19 Orynivo player tools.
+/// Builds OpenAI function-calling tool definitions for all 23 Orynivo player tools.
 /// Each definition matches a method in <see cref="Orynivo.Mcp.McpTools"/> and is
 /// forwarded to the chat-completions API so the model can invoke tools.
 /// </summary>
@@ -20,6 +20,35 @@ internal static class AiToolDefinitions
         Make("get_queue",
             "Returns all entries in the current playback queue with their file names and paths.",
             new JsonObject()),
+
+        Make("get_current_time",
+            "Returns the current date and time: local time, day of week, ISO 8601 form, UTC time, and the local time-zone name.",
+            new JsonObject()),
+
+        Make("search_web",
+            "Searches the web through the configured SearXNG instance and returns the top results (title, URL, snippet). Follow up with fetch_page to read a result.",
+            new JsonObject
+            {
+                ["query"]      = Str("The search query."),
+                ["maxResults"] = Int("Maximum number of results (1–25, default 5).")
+            },
+            ["query"]),
+
+        Make("fetch_page",
+            "Fetches an http/https page and returns its readable plain text. Private/loopback addresses, non-HTTP schemes, and non-text content are blocked for safety.",
+            new JsonObject
+            {
+                ["url"] = Str("Absolute http or https URL of the page to fetch.")
+            },
+            ["url"]),
+
+        Make("fetch_page_as_markdown",
+            "Fetches an http/https page and returns a compact Markdown rendering that preserves headings, links, and lists. Same safety limits as fetch_page.",
+            new JsonObject
+            {
+                ["url"] = Str("Absolute http or https URL of the page to fetch.")
+            },
+            ["url"]),
 
         Make("play",
             "Plays a local audio file by its absolute path. Omit the path to resume the current paused track.",

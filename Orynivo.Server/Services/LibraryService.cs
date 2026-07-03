@@ -65,6 +65,9 @@ public sealed class LibraryService : IHostedService, IDisposable
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
         _watcher.UpdatePaths(_settings.LibraryPaths);
+        var removed = LibraryScanner.RemoveTracksOutsideRoots(_settings.LibraryPaths);
+        if (removed > 0)
+            _libraryChangeTracker.Touch();
     }
 
     /// <inheritdoc/>
