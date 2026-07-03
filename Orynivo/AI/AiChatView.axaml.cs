@@ -91,6 +91,9 @@ internal partial class AiChatView : UserControl
         AddMessage(new AiChatMessageVm { Role = "user", Content = text });
 
         AiChatMessageVm? assistantMsg = null;
+        var assistantHasVisibleContent = false;
+        var sawToolCall = false;
+        string? lastToolResult = null;
 
         try
         {
@@ -101,24 +104,36 @@ internal partial class AiChatView : UserControl
                 switch (ev)
                 {
                     case AiStreamEvent.TokenEvent tok:
+                        if (assistantMsg is null && string.IsNullOrWhiteSpace(tok.Text))
+                            break;
                         if (assistantMsg is null)
                         {
                             assistantMsg = new AiChatMessageVm { Role = "assistant", IsStreaming = true };
                             AddMessage(assistantMsg);
                         }
                         assistantMsg.Content += tok.Text;
+                        if (!string.IsNullOrWhiteSpace(tok.Text))
+                            assistantHasVisibleContent = true;
                         ScrollToBottom();
                         break;
 
                     case AiStreamEvent.ToolCallEvent toolEv:
+                        if (assistantMsg is not null && string.IsNullOrWhiteSpace(assistantMsg.Content))
+                            _messages.Remove(assistantMsg);
                         var toolMsg = new AiChatMessageVm
                         {
                             Role = "tool",
                             Content = toolEv.ToolName
                         };
                         AddMessage(toolMsg);
+                        sawToolCall = true;
+                        assistantHasVisibleContent = false;
                         // The next token stream replaces assistantMsg
                         assistantMsg = null;
+                        break;
+
+                    case AiStreamEvent.ToolResultEvent toolResultEv:
+                        lastToolResult = toolResultEv.Result;
                         break;
 
                     case AiStreamEvent.ErrorEvent errEv:
@@ -128,6 +143,8 @@ internal partial class AiChatView : UserControl
                     case AiStreamEvent.DoneEvent:
                         if (assistantMsg is not null)
                             assistantMsg.IsStreaming = false;
+                        if (!assistantHasVisibleContent)
+                            AddEmptyResponseFallback(sawToolCall, lastToolResult);
                         ScrollToBottom();
                         break;
                 }
@@ -162,6 +179,34 @@ internal partial class AiChatView : UserControl
     {
         SendButton.IsEnabled = !busy;
         ChatInputBox.IsEnabled = !busy;
+    }
+
+    /// <summary>Adds a visible fallback when the model finishes without answer text.</summary>
+    /// <param name="sawToolCall">Whether at least one tool was executed during the turn.</param>
+    /// <param name="lastToolResult">The most recent tool result, if one was received.</param>
+    private void AddEmptyResponseFallback(bool sawToolCall, string? lastToolResult)
+    {
+        var s = Localization.LocalizationManager.Current;
+        if (sawToolCall && !string.IsNullOrWhiteSpace(lastToolResult))
+        {
+            var prefix = string.IsNullOrWhiteSpace(s.AiChatToolResultFallback)
+                ? "The model did not return a final answer. Tool result:"
+                : s.AiChatToolResultFallback;
+            AddMessage(new AiChatMessageVm
+            {
+                Role = "assistant",
+                Content = $"{prefix}\n\n{lastToolResult.Trim()}",
+            });
+            return;
+        }
+
+        AddMessage(new AiChatMessageVm
+        {
+            Role = "error",
+            Content = string.IsNullOrWhiteSpace(s.AiChatEmptyResponse)
+                ? "The model returned an empty answer."
+                : s.AiChatEmptyResponse,
+        });
     }
 
     private static string GetDisabledMessage()

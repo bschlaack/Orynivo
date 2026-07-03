@@ -678,6 +678,22 @@ public sealed record LocalizedStrings(
     public string McpToolsHeader { get; init; } = "";
     /// <summary>Gets the hint text for the MCP tool enable/disable list.</summary>
     public string McpToolsHint { get; init; } = "";
+    /// <summary>Gets the web-browsing settings sub-section title.</summary>
+    public string WebBrowsing { get; init; } = "";
+    /// <summary>Gets the hint text explaining the web-browsing tools and safety limits.</summary>
+    public string WebBrowsingHint { get; init; } = "";
+    /// <summary>Gets the label for the web-browsing enable toggle.</summary>
+    public string WebBrowsingEnabled { get; init; } = "";
+    /// <summary>Gets the label for the SearXNG base-URL input.</summary>
+    public string SearxngUrl { get; init; } = "";
+    /// <summary>Gets the label for the block-private-networks toggle.</summary>
+    public string WebBlockPrivate { get; init; } = "";
+    /// <summary>Gets the label for the maximum search-results input.</summary>
+    public string WebMaxResults { get; init; } = "";
+    /// <summary>Gets the label for the request-timeout input.</summary>
+    public string WebTimeoutSeconds { get; init; } = "";
+    /// <summary>Gets the label for the maximum response-size input.</summary>
+    public string WebMaxResponseKb { get; init; } = "";
     /// <summary>Gets the sidebar navigation label for the AI chat view.</summary>
     public string AiChat { get; init; } = "";
     /// <summary>Gets the AI chat settings section title.</summary>
@@ -704,4 +720,8 @@ public sealed record LocalizedStrings(
     public string AiChatClear { get; init; } = "";
     /// <summary>Gets the message shown when AI chat is not enabled in settings.</summary>
     public string AiChatNotEnabled { get; init; } = "";
+    /// <summary>Gets the message shown when the model returns no answer text.</summary>
+    public string AiChatEmptyResponse { get; init; } = "";
+    /// <summary>Gets the prefix shown before a tool result when the model returns no final answer.</summary>
+    public string AiChatToolResultFallback { get; init; } = "";
 }

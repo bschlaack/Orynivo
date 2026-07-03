@@ -307,6 +307,14 @@ public static class LocalizationManager
         resources["L_McpServerPort"]    = Current.McpServerPort;
         resources["L_McpToolsHeader"]          = Current.McpToolsHeader;
         resources["L_McpToolsHint"]            = Current.McpToolsHint;
+        resources["L_WebBrowsing"]             = Current.WebBrowsing;
+        resources["L_WebBrowsingHint"]         = Current.WebBrowsingHint;
+        resources["L_WebBrowsingEnabled"]      = Current.WebBrowsingEnabled;
+        resources["L_SearxngUrl"]              = Current.SearxngUrl;
+        resources["L_WebBlockPrivate"]         = Current.WebBlockPrivate;
+        resources["L_WebMaxResults"]           = Current.WebMaxResults;
+        resources["L_WebTimeoutSeconds"]       = Current.WebTimeoutSeconds;
+        resources["L_WebMaxResponseKb"]        = Current.WebMaxResponseKb;
         resources["L_AiChat"]                  = Current.AiChat;
         resources["L_AiChatSettings"]          = Current.AiChatSettings;
         resources["L_AiChatHint"]              = Current.AiChatHint;
@@ -320,6 +328,8 @@ public static class LocalizationManager
         resources["L_AiChatSend"]              = Current.AiChatSend;
         resources["L_AiChatClear"]             = Current.AiChatClear;
         resources["L_AiChatNotEnabled"]        = Current.AiChatNotEnabled;
+        resources["L_AiChatEmptyResponse"]     = Current.AiChatEmptyResponse;
+        resources["L_AiChatToolResultFallback"] = Current.AiChatToolResultFallback;
     }
 
     private static readonly LocalizedStrings German = new(
@@ -728,9 +738,17 @@ public static class LocalizationManager
         , McpServerPort    = "Port"
         , McpToolsHeader   = "Tools"
         , McpToolsHint     = "Einzelne Tools aktivieren oder deaktivieren."
+        , WebBrowsing        = "Web-Browsing"
+        , WebBrowsingHint    = "Stellt der KI kontrollierte Web-Werkzeuge bereit: SearXNG-Suche und sicheres Laden von Seiten. Private und lokale Adressen werden blockiert (SSRF-Schutz)."
+        , WebBrowsingEnabled = "Web-Tools aktivieren"
+        , SearxngUrl         = "SearXNG-Adresse"
+        , WebBlockPrivate    = "Private/lokale Adressen blockieren (SSRF-Schutz)"
+        , WebMaxResults      = "Maximale Suchergebnisse"
+        , WebTimeoutSeconds  = "Timeout (Sekunden)"
+        , WebMaxResponseKb   = "Maximale Antwortgröße (KB)"
         , AiChat                = "KI-Chat"
         , AiChatSettings        = "KI-Chat"
-        , AiChatHint            = "Verbindet sich mit einem lokalen oder cloudbasierten KI-Modell über eine OpenAI-kompatible API (z. B. LM Studio, Ollama, OpenAI). Dem Modell stehen alle 17 Orynivo-Tools zur Verfügung, um die Bibliothek zu durchsuchen, Playlisten zu verwalten und die Wiedergabe zu steuern."
+        , AiChatHint            = "Verbindet sich mit einem lokalen oder cloudbasierten KI-Modell über eine OpenAI-kompatible API (z. B. LM Studio, Ollama, OpenAI). Dem Modell stehen alle 23 Orynivo-Tools zur Verfügung, um die Bibliothek zu durchsuchen, Playlisten zu verwalten und die Wiedergabe zu steuern."
         , AiChatEnabled         = "KI-Chat aktivieren"
         , AiChatEndpointUrl     = "Endpunkt-URL"
         , AiChatApiKey          = "API-Schlüssel (optional)"
@@ -741,6 +759,8 @@ public static class LocalizationManager
         , AiChatSend            = "Senden"
         , AiChatClear           = "Löschen"
         , AiChatNotEnabled      = "KI-Chat ist nicht aktiviert. Bitte unter Einstellungen › KI-Chat aktivieren."
+        , AiChatEmptyResponse   = "Das Modell hat eine leere Antwort zurückgegeben."
+        , AiChatToolResultFallback = "Das Modell hat nach dem Tool-Aufruf keine finale Antwort erzeugt. Tool-Ergebnis:"
     };
 
     private static readonly LocalizedStrings English = new(
@@ -1131,9 +1151,17 @@ public static class LocalizationManager
         , McpServerPort    = "Port"
         , McpToolsHeader   = "Tools"
         , McpToolsHint     = "Enable or disable individual tools."
+        , WebBrowsing        = "Web browsing"
+        , WebBrowsingHint    = "Gives the AI a controlled set of web tools: SearXNG search and safe page fetching. Private and local addresses are blocked (SSRF protection)."
+        , WebBrowsingEnabled = "Enable web tools"
+        , SearxngUrl         = "SearXNG URL"
+        , WebBlockPrivate    = "Block private/local addresses (SSRF protection)"
+        , WebMaxResults      = "Maximum search results"
+        , WebTimeoutSeconds  = "Timeout (seconds)"
+        , WebMaxResponseKb   = "Maximum response size (KB)"
         , AiChat                = "AI Chat"
         , AiChatSettings        = "AI Chat"
-        , AiChatHint            = "Connects to a local or cloud-based AI model via an OpenAI-compatible API (e.g. LM Studio, Ollama, OpenAI). The model has access to all 17 Orynivo tools to search the library, manage playlists, and control playback."
+        , AiChatHint            = "Connects to a local or cloud-based AI model via an OpenAI-compatible API (e.g. LM Studio, Ollama, OpenAI). The model has access to all 23 Orynivo tools to search the library, manage playlists, and control playback."
         , AiChatEnabled         = "Enable AI Chat"
         , AiChatEndpointUrl     = "Endpoint URL"
         , AiChatApiKey          = "API key (optional)"
@@ -1144,6 +1172,8 @@ public static class LocalizationManager
         , AiChatSend            = "Send"
         , AiChatClear           = "Clear"
         , AiChatNotEnabled      = "AI Chat is not enabled. Enable it in Settings › AI Chat."
+        , AiChatEmptyResponse   = "The model returned an empty answer."
+        , AiChatToolResultFallback = "The model did not return a final answer after the tool call. Tool result:"
     };
 
     private static readonly LocalizedStrings French = new(
@@ -1537,9 +1567,17 @@ public static class LocalizationManager
         , McpServerPort    = "Port"
         , McpToolsHeader   = "Outils"
         , McpToolsHint     = "Activer ou désactiver des outils individuels."
+        , WebBrowsing        = "Navigation web"
+        , WebBrowsingHint    = "Fournit à l'IA un ensemble contrôlé d'outils web : recherche SearXNG et récupération sécurisée de pages. Les adresses privées et locales sont bloquées (protection SSRF)."
+        , WebBrowsingEnabled = "Activer les outils web"
+        , SearxngUrl         = "Adresse SearXNG"
+        , WebBlockPrivate    = "Bloquer les adresses privées/locales (protection SSRF)"
+        , WebMaxResults      = "Nombre maximal de résultats"
+        , WebTimeoutSeconds  = "Délai d'attente (secondes)"
+        , WebMaxResponseKb   = "Taille de réponse maximale (Ko)"
         , AiChat                = "Chat IA"
         , AiChatSettings        = "Chat IA"
-        , AiChatHint            = "Se connecte à un modèle IA local ou en nuage via une API compatible OpenAI (p. ex. LM Studio, Ollama, OpenAI). Le modèle dispose des 17 outils Orynivo pour rechercher la bibliothèque, gérer les listes de lecture et contrôler la lecture."
+        , AiChatHint            = "Se connecte à un modèle IA local ou en nuage via une API compatible OpenAI (p. ex. LM Studio, Ollama, OpenAI). Le modèle dispose des 23 outils Orynivo pour rechercher la bibliothèque, gérer les listes de lecture et contrôler la lecture."
         , AiChatEnabled         = "Activer le Chat IA"
         , AiChatEndpointUrl     = "URL de l'endpoint"
         , AiChatApiKey          = "Clé API (optionnel)"
@@ -1550,6 +1588,8 @@ public static class LocalizationManager
         , AiChatSend            = "Envoyer"
         , AiChatClear           = "Effacer"
         , AiChatNotEnabled      = "Le Chat IA n'est pas activé. Activez-le dans Paramètres › Chat IA."
+        , AiChatEmptyResponse   = "Le modèle a renvoyé une réponse vide."
+        , AiChatToolResultFallback = "Le modèle n'a pas renvoyé de réponse finale après l'appel d'outil. Résultat de l'outil :"
     };
 
     private static readonly LocalizedStrings Spanish = new(
@@ -1940,9 +1980,17 @@ public static class LocalizationManager
         , McpServerPort    = "Puerto"
         , McpToolsHeader   = "Herramientas"
         , McpToolsHint     = "Activar o desactivar herramientas individuales."
+        , WebBrowsing        = "Navegación web"
+        , WebBrowsingHint    = "Ofrece a la IA un conjunto controlado de herramientas web: búsqueda con SearXNG y obtención segura de páginas. Se bloquean las direcciones privadas y locales (protección SSRF)."
+        , WebBrowsingEnabled = "Activar herramientas web"
+        , SearxngUrl         = "Dirección de SearXNG"
+        , WebBlockPrivate    = "Bloquear direcciones privadas/locales (protección SSRF)"
+        , WebMaxResults      = "Máximo de resultados de búsqueda"
+        , WebTimeoutSeconds  = "Tiempo de espera (segundos)"
+        , WebMaxResponseKb   = "Tamaño máximo de respuesta (KB)"
         , AiChat                = "Chat IA"
         , AiChatSettings        = "Chat IA"
-        , AiChatHint            = "Se conecta a un modelo de IA local o en la nube a través de una API compatible con OpenAI (p. ej. LM Studio, Ollama, OpenAI). El modelo tiene acceso a las 17 herramientas de Orynivo para buscar la biblioteca, gestionar listas de reproducción y controlar la reproducción."
+        , AiChatHint            = "Se conecta a un modelo de IA local o en la nube a través de una API compatible con OpenAI (p. ej. LM Studio, Ollama, OpenAI). El modelo tiene acceso a las 23 herramientas de Orynivo para buscar la biblioteca, gestionar listas de reproducción y controlar la reproducción."
         , AiChatEnabled         = "Activar Chat IA"
         , AiChatEndpointUrl     = "URL del endpoint"
         , AiChatApiKey          = "Clave API (opcional)"
@@ -1953,6 +2001,8 @@ public static class LocalizationManager
         , AiChatSend            = "Enviar"
         , AiChatClear           = "Borrar"
         , AiChatNotEnabled      = "El Chat IA no está activado. Actívalo en Ajustes › Chat IA."
+        , AiChatEmptyResponse   = "El modelo devolvió una respuesta vacía."
+        , AiChatToolResultFallback = "El modelo no devolvió una respuesta final después de llamar a la herramienta. Resultado de la herramienta:"
     };
 
     /// <summary>Gets the currently active <see cref="LocalizedStrings"/> instance.</summary>

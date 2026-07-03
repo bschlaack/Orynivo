@@ -178,6 +178,8 @@ public partial class MainWindow : Window
     private WindowsMediaTransportService? _windowsMediaTransport;
     private readonly Mcp.McpPlayerBridge _mcpBridge = new();
     private readonly Mcp.McpServerService _mcpServer = new();
+    private Orynivo.Web.WebBrowsingService? _webBrowsing;
+    private static readonly object _webBrowsingLogLock = new();
     private AI.AiChatView _aiChatView = null!;
     private bool _updatingVolumeFromSystem;
     private CancellationTokenSource _backgroundArtistLoadCts = new();
@@ -449,6 +451,11 @@ public partial class MainWindow : Window
         using (StartupTimingLog.Time("MainWindow.InitMcpBridge"))
             InitMcpBridge();
         _mcpBridge.DisabledTools = _settings.DisabledMcpTools;
+        _webBrowsing = new Orynivo.Web.WebBrowsingService(_settings.WebBrowsing)
+        {
+            RequestLog = AppendWebBrowsingLog,
+        };
+        _mcpBridge.WebBrowsing = _webBrowsing;
         _aiChatView = AiChatViewControl;
         _aiChatView.SetBridge(_mcpBridge);
         _aiChatView.GetSettings = () => _settings.AiChat;
@@ -625,6 +632,25 @@ public partial class MainWindow : Window
                 await StartPlaybackAsync(paths[0]);
         };
         _mcpBridge.RefreshPlaylistsFunc = LoadNavPlaylists;
+    }
+
+    /// <summary>Appends one audit line to the web-browsing request log.</summary>
+    /// <param name="line">The already-formatted log line.</param>
+    private void AppendWebBrowsingLog(string line)
+    {
+        try
+        {
+            var path = AppPaths.GetDataPath("logs", "web-browsing.log");
+            lock (_webBrowsingLogLock)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                File.AppendAllText(path, line + Environment.NewLine);
+            }
+        }
+        catch
+        {
+            // Logging failures must never affect tool execution.
+        }
     }
 
     protected override void OnClosed(EventArgs e)
@@ -1640,9 +1666,20 @@ public partial class MainWindow : Window
                 SearchTextBox.Text ?? string.Empty,
                 CaptureCurrentVerticalOffset());
 
-        if (_currentTopLevelTag?.StartsWith("OrynivoServer:", StringComparison.Ordinal) == true &&
-            _activeAlbumFilterId is long orynivoAlbumId)
+        if (_activeAlbumFilterId is long orynivoAlbumId &&
+            _activeCatalogAlbum is { Source: LibraryCatalogSource.OrynivoServer } &&
+            _activeOrynivoServer is { } orynivoAlbumServer)
         {
+            // A provider-backed remote album must be restored through the remote
+            // path. Detecting it only via the top-level tag failed when the album
+            // was opened from the dashboard (tag "Dashboard"), so it was captured
+            // as a local "AlbumTracks" state and Back reopened a local album that
+            // merely shared the numeric id. Detect it by the catalog album source
+            // instead and rebuild a server navigation tag when needed.
+            var albumNavigationTag =
+                _currentTopLevelTag?.StartsWith("OrynivoServer:", StringComparison.Ordinal) == true
+                    ? _currentTopLevelTag
+                    : $"OrynivoServer:{orynivoAlbumServer.Id}:Albums";
             return new NavigationState(
                 "OrynivoAlbumTracks",
                 orynivoAlbumId,
@@ -1650,7 +1687,7 @@ public partial class MainWindow : Window
                 _activeArtistFilterName,
                 _activeAlbumFilterTitle,
                 CaptureCurrentVerticalOffset(),
-                _currentTopLevelTag);
+                albumNavigationTag);
         }
 
         if (_activeAlbumFilterId is long albumId)
@@ -10809,33 +10846,73 @@ public partial class MainWindow : Window
 
     private async void SearchLyricsButton_OnClick(object? sender, RoutedEventArgs e)
     {
-        if (string.IsNullOrWhiteSpace(_currentFilePath))
+        var filePath = _currentFilePath;
+        if (string.IsNullOrWhiteSpace(filePath))
             return;
 
-        TrackRecord? track;
-        using (var db = AudioDatabase.OpenDefault())
-            track = db.GetByPath(_currentFilePath);
-        if (track is null)
-            return;
+        // Seed the search from the current track's metadata. Remote tracks have
+        // no local database row, so read the title/artist from the remote row
+        // instead of GetByPath (which fails on a stream URL and previously
+        // suppressed the dialog entirely for remote tracks).
+        var remoteRow = _currentOrynivoTrackRow;
+        string? seedTitle;
+        string? seedArtist;
+        TrackRecord? localTrack = null;
+        if (remoteRow is not null)
+        {
+            seedTitle = remoteRow.Title;
+            seedArtist = remoteRow.Artist;
+        }
+        else
+        {
+            using (var db = AudioDatabase.OpenDefault())
+                localTrack = db.GetByPath(filePath);
+            if (localTrack is null)
+                return;
+            seedTitle = localTrack.Title;
+            seedArtist = localTrack.Artist;
+        }
 
-        var dialog = new LyricsSearchWindow(track.Title, track.Artist) ;
+        var dialog = new LyricsSearchWindow(seedTitle, seedArtist);
         if (await dialog.ShowDialog<bool>(this) == false || dialog.SelectedResult is not { } selected)
             return;
 
-        using (var db = AudioDatabase.OpenDefault())
+        // Persist the chosen lyrics on the owning store: the remote server for
+        // remote tracks, the local database otherwise.
+        if (remoteRow is { OrynivoServer: { } server, Id: long trackId })
         {
+            await _orynivoClient.UploadTrackLyricsAsync(
+                server,
+                trackId,
+                selected.PlainLyrics,
+                selected.SyncedLyrics);
+        }
+        else
+        {
+            using var db = AudioDatabase.OpenDefault();
             db.UpdateDownloadedLyrics(
-                _currentFilePath,
+                filePath,
                 selected.PlainLyrics,
                 selected.SyncedLyrics,
                 "LRCLIB manual");
         }
 
-        track.DownloadedLyrics = selected.PlainLyrics;
-        track.SyncedLyrics = selected.SyncedLyrics;
-        track.LyricsSource = "LRCLIB manual";
-        track.LyricsFetchedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        ApplyLyrics(track);
+        // Only reflect the change in the view if the same track is still shown.
+        if (!string.Equals(filePath, _currentFilePath, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        if (localTrack is not null)
+        {
+            localTrack.DownloadedLyrics = selected.PlainLyrics;
+            localTrack.SyncedLyrics = selected.SyncedLyrics;
+            localTrack.LyricsSource = "LRCLIB manual";
+            localTrack.LyricsFetchedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            ApplyLyrics(localTrack);
+        }
+        else
+        {
+            ApplyLyricsContent(selected.PlainLyrics, selected.SyncedLyrics);
+        }
     }
 
     private async void ArtistInfoButton_OnClick(object? sender, RoutedEventArgs e)
@@ -12494,6 +12571,9 @@ public partial class MainWindow : Window
             _mcpBridge.DisabledTools          = _settings.DisabledMcpTools;
             _settings.AiChat                  = window.AiChatSettingsValue;
             _aiChatView.GetSettings           = () => _settings.AiChat;
+            _settings.WebBrowsing             = window.WebBrowsingValue;
+            if (_webBrowsing is not null)
+                _webBrowsing.Options          = _settings.WebBrowsing;
             _settings.ShowInternetRadioItem   = window.ShowInternetRadioItem;
             _settings.ShowPodcastsItem        = window.ShowPodcastsItem;
             _settings.ShowQueueItem           = window.ShowQueueItem;

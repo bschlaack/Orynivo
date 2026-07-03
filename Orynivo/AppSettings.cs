@@ -2,6 +2,7 @@ using Orynivo.AI;
 using Orynivo.Audio;
 using Orynivo.Library;
 using Orynivo.Streaming;
+using Orynivo.Web;
 
 namespace Orynivo;
 
@@ -120,6 +121,8 @@ public sealed class AppSettings
     public bool IsPlaylistsSectionExpanded { get; set; }
     /// <summary>Gets or sets the embedded AI chat configuration.</summary>
     public AiChatSettings AiChat { get; set; } = new();
+    /// <summary>Gets or sets the web-browsing tool configuration (SearXNG endpoint and fetch safety limits).</summary>
+    public WebBrowsingOptions WebBrowsing { get; set; } = new();
 }
 
 /// <summary>Application colour theme.</summary>

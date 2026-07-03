@@ -41,11 +41,8 @@
                                     BorderThickness="1"
                                     CornerRadius="14,14,14,2"
                                     Padding="14,9">
-                                <TextBlock Text="{Binding Content}"
-                                           TextWrapping="Wrap"
-                                           Foreground="{DynamicResource AppPrimaryTextBrush}"
-                                           FontSize="{DynamicResource FontSizeBody}"
-                                           LineHeight="20"/>
+                                <ai:MarkdownTextBlock Text="{Binding Content}"
+                                                      Foreground="{DynamicResource AppPrimaryTextBrush}"/>
                             </Border>
 
                             <!-- Tool status / error (centered, muted) -->

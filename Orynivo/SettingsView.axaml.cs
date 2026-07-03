@@ -14,6 +14,7 @@ using Orynivo.Controls;
 using Orynivo.Library;
 using Orynivo.Localization;
 using Orynivo.Streaming;
+using Orynivo.Web;
 using AvaloniaApp = Avalonia.Application;
 using UiLanguage = Orynivo.Localization.Language;
 
@@ -134,6 +135,12 @@ internal partial class SettingsView : UserControl
         AiChatApiKeyTextBox.Text                = settings.AiChat.ApiKey;
         AiChatModelTextBox.Text                 = settings.AiChat.ModelName;
         AiChatMaxTokensNumericUpDown.Value      = settings.AiChat.MaxTokens;
+        WebBrowsingEnabledCheckBox.IsChecked    = settings.WebBrowsing.Enabled;
+        SearxngUrlTextBox.Text                  = settings.WebBrowsing.SearxngUrl;
+        WebBlockPrivateCheckBox.IsChecked       = settings.WebBrowsing.BlockPrivateNetworks;
+        WebMaxResultsNumericUpDown.Value        = settings.WebBrowsing.MaxResults;
+        WebTimeoutNumericUpDown.Value           = settings.WebBrowsing.TimeoutSeconds;
+        WebMaxResponseKbNumericUpDown.Value     = settings.WebBrowsing.MaxResponseKilobytes;
         ShowInternetRadioItemCheckBox.IsChecked = settings.ShowInternetRadioItem;
         ShowPodcastsItemCheckBox.IsChecked      = settings.ShowPodcastsItem;
         ShowQueueItemCheckBox.IsChecked         = settings.ShowQueueItem;
@@ -284,6 +291,18 @@ internal partial class SettingsView : UserControl
         ApiKey       = AiChatApiKeyTextBox.Text?.Trim() ?? string.Empty,
         ModelName    = AiChatModelTextBox.Text?.Trim() ?? string.Empty,
         MaxTokens    = (int)(AiChatMaxTokensNumericUpDown.Value ?? 2048)
+    };
+    /// <summary>Gets the web-browsing options from the UI, preserving the non-UI domain allowlist and redirect limit.</summary>
+    public WebBrowsingOptions WebBrowsingValue => new()
+    {
+        Enabled              = WebBrowsingEnabledCheckBox.IsChecked == true,
+        SearxngUrl           = SearxngUrlTextBox.Text?.Trim() ?? string.Empty,
+        BlockPrivateNetworks = WebBlockPrivateCheckBox.IsChecked == true,
+        MaxResults           = (int)(WebMaxResultsNumericUpDown.Value ?? 5),
+        TimeoutSeconds       = (int)(WebTimeoutNumericUpDown.Value ?? 15),
+        MaxResponseKilobytes = (int)(WebMaxResponseKbNumericUpDown.Value ?? 2048),
+        MaxRedirects         = _settings.WebBrowsing.MaxRedirects,
+        DomainAllowlist      = _settings.WebBrowsing.DomainAllowlist,
     };
     /// <summary>Gets a value indicating whether the Internet Radio sidebar item should be visible.</summary>
     public bool ShowInternetRadioItem => ShowInternetRadioItemCheckBox.IsChecked == true;
@@ -1563,6 +1582,7 @@ internal partial class SettingsView : UserControl
     [
         ("get_now_playing",       nameof(McpToolGetNowPlaying)),
         ("get_queue",             nameof(McpToolGetQueue)),
+        ("get_current_time",      nameof(McpToolGetCurrentTime)),
         ("play",                  nameof(McpToolPlay)),
         ("pause_resume",          nameof(McpToolPauseResume)),
         ("next_track",            nameof(McpToolNextTrack)),
@@ -1580,6 +1600,9 @@ internal partial class SettingsView : UserControl
         ("get_play_history",      nameof(McpToolGetPlayHistory)),
         ("clear_queue",           nameof(McpToolClearQueue)),
         ("replace_queue",         nameof(McpToolReplaceQueue)),
+        ("search_web",            nameof(McpToolSearchWeb)),
+        ("fetch_page",            nameof(McpToolFetchPage)),
+        ("fetch_page_as_markdown", nameof(McpToolFetchPageMarkdown)),
     ];
 
     /// <summary>Initialises each tool checkbox from the persisted disabled-tool set.</summary>
@@ -1588,6 +1611,7 @@ internal partial class SettingsView : UserControl
     {
         McpToolGetNowPlaying.IsChecked       = !disabled.Contains("get_now_playing");
         McpToolGetQueue.IsChecked            = !disabled.Contains("get_queue");
+        McpToolGetCurrentTime.IsChecked      = !disabled.Contains("get_current_time");
         McpToolPlay.IsChecked                = !disabled.Contains("play");
         McpToolPauseResume.IsChecked         = !disabled.Contains("pause_resume");
         McpToolNextTrack.IsChecked           = !disabled.Contains("next_track");
@@ -1605,6 +1629,9 @@ internal partial class SettingsView : UserControl
         McpToolGetPlayHistory.IsChecked      = !disabled.Contains("get_play_history");
         McpToolClearQueue.IsChecked          = !disabled.Contains("clear_queue");
         McpToolReplaceQueue.IsChecked        = !disabled.Contains("replace_queue");
+        McpToolSearchWeb.IsChecked           = !disabled.Contains("search_web");
+        McpToolFetchPage.IsChecked           = !disabled.Contains("fetch_page");
+        McpToolFetchPageMarkdown.IsChecked   = !disabled.Contains("fetch_page_as_markdown");
     }
 
     /// <summary>Reads the checkbox states and returns the set of tool names that are disabled.</summary>
@@ -1614,6 +1641,7 @@ internal partial class SettingsView : UserControl
         var disabled = new HashSet<string>();
         if (McpToolGetNowPlaying.IsChecked       != true) disabled.Add("get_now_playing");
         if (McpToolGetQueue.IsChecked            != true) disabled.Add("get_queue");
+        if (McpToolGetCurrentTime.IsChecked      != true) disabled.Add("get_current_time");
         if (McpToolPlay.IsChecked                != true) disabled.Add("play");
         if (McpToolPauseResume.IsChecked         != true) disabled.Add("pause_resume");
         if (McpToolNextTrack.IsChecked           != true) disabled.Add("next_track");
@@ -1631,6 +1659,9 @@ internal partial class SettingsView : UserControl
         if (McpToolGetPlayHistory.IsChecked      != true) disabled.Add("get_play_history");
         if (McpToolClearQueue.IsChecked          != true) disabled.Add("clear_queue");
         if (McpToolReplaceQueue.IsChecked        != true) disabled.Add("replace_queue");
+        if (McpToolSearchWeb.IsChecked           != true) disabled.Add("search_web");
+        if (McpToolFetchPage.IsChecked           != true) disabled.Add("fetch_page");
+        if (McpToolFetchPageMarkdown.IsChecked   != true) disabled.Add("fetch_page_as_markdown");
         return disabled;
     }
 }

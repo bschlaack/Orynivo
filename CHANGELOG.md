@@ -4,6 +4,56 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Added controlled web-browsing tools for the AI chat and external MCP clients:
+  `search_web` (via a configurable SearXNG instance), `fetch_page` (readable
+  plain text), and `fetch_page_as_markdown`. The MCP server — not the model —
+  performs the network access through a new `WebBrowsingService` with a strong
+  safety model: http/https only, private/loopback/link-local/reserved addresses
+  are refused at connect time (SSRF protection, closing the DNS-rebinding
+  window), redirects are limited and followed manually, responses are size- and
+  timeout-capped, non-text content is refused (no arbitrary downloads), an
+  optional domain allowlist is supported, and every request is logged to
+  `%LOCALAPPDATA%\Orynivo\logs\web-browsing.log`. The trusted SearXNG endpoint
+  is exempt from the private-network guard so a LAN/Docker instance works. The
+  SearXNG URL and limits are configurable under Settings → Integration → MCP
+  Server → Web browsing, and each web tool has its own enable/disable toggle
+  (bringing the tool count to 23).
+- Added a `get_current_time` tool that returns the current local and UTC date,
+  time, day of week, and time-zone name. It is available both to the embedded AI
+  chat and to external MCP clients, and has its own enable/disable toggle in
+  Settings → Integration → MCP Server (bringing the tool count to 20).
+
+### Fixed
+
+- Fixed embedded AI chat answers rendering Markdown syntax literally. Assistant
+  messages now display common Markdown structure such as headings, lists, quotes,
+  dividers, and fenced code blocks in the chat bubble.
+- Fixed Markdown-rendered AI chat answers becoming invisible when the renderer
+  could not resolve theme brushes inside the chat message template.
+- Fixed the embedded AI chat showing an empty assistant bubble when a model
+  streamed only whitespace before a tool call or returned no final answer after
+  executing a tool. Empty leading tokens are ignored, and the chat now shows the
+  tool result as a fallback when the model does not produce answer text.
+- Removed the bundled default SearXNG URL from the web-browsing settings so new
+  installations start with an empty endpoint and require the user to enter their
+  own instance.
+- Fixed Back navigation opening the wrong album after viewing a remote Orynivo
+  Server album that was opened from the dashboard and then drilling into its
+  artist. Such a remote album was captured as a local album-tracks state and
+  restored through the local path, reopening a local album that merely shared
+  the numeric id. Remote albums are now detected by their catalog source and
+  restored through the remote path regardless of how they were opened.
+- Fixed the manual lyrics search/download dialog not appearing while a remote
+  Orynivo Server track is playing. The handler required a local database row
+  (looked up by file path), which never matches a remote stream URL, so it
+  returned before showing the dialog. It now seeds the search from the current
+  track's metadata and stores the chosen lyrics on the remote server for remote
+  tracks (and in the local database for local tracks).
+
 ## [0.20.5] - 2026-07-01
 
 ### Added
