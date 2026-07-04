@@ -4,7 +4,7 @@
         Title="Orynivo"
         Icon="avares://Orynivo/Assets/Orynivo.ico"
         Width="420"
-        Height="220"
+        Height="340"
         CanResize="False"
         WindowStartupLocation="CenterScreen"
         SystemDecorations="None"
@@ -12,18 +12,9 @@
         Background="#13142A">
     <Border Padding="28" CornerRadius="12" Background="#13142A">
         <StackPanel VerticalAlignment="Center">
-            <Border Padding="14,10"
-                    CornerRadius="0,22,0,22">
-                <Border.Background>
-                    <LinearGradientBrush StartPoint="0%,50%" EndPoint="100%,50%">
-                        <GradientStop Color="#FFFFFF" Offset="0"/>
-                        <GradientStop Color="#7268A7" Offset="1"/>
-                    </LinearGradientBrush>
-                </Border.Background>
-                <Image Height="66"
-                       Source="avares://Orynivo/Assets/Orynivo_Logo.png"
-                       Stretch="Uniform"/>
-            </Border>
+            <Image HorizontalAlignment="Stretch"
+                   Source="{DynamicResource AppAboutLogoSource}"
+                   Stretch="Uniform"/>
             <TextBlock x:Name="StatusTextBlock"
                        Margin="0,16,0,12"
                        Foreground="#CCCCEE"

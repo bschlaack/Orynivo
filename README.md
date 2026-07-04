@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="Logo/logo_about.png" alt="Orynivo" width="720">
+</p>
+
 # Orynivo
 
 A native Windows music player and cross-platform music server for local Hi-Fi libraries.
@@ -28,8 +32,9 @@ A native Windows audio player with an Avalonia UI interface, local music
 library, ASIO and WASAPI playback, and built-in AI control via an embedded
 chat and an MCP server.
 
-The application uses the Orynivo wordmark in the startup screen and sidebar,
-plus a multi-resolution Windows application icon based on the standalone logo.
+The application uses the Orynivo wordmark in the startup screen, sidebar, and
+About dialog, plus a multi-resolution Windows application icon based on the
+standalone logo.
 
 > This project is under active development. The database schema, user
 > interface, and available features may still change.
