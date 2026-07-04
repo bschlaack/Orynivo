@@ -200,6 +200,8 @@ public partial class MainWindow : Window
     private int _dashboardYear;
     private int _dashboardMonth;
     private StackPanel? _calendarInner;
+    private bool _dashboardResizeHooked;
+    private bool? _dashboardTwoColumnLayout;
     private bool _suppressNavSelectionChanged;
     private string? _currentTopLevelTag;
 
@@ -1863,6 +1865,8 @@ public partial class MainWindow : Window
             "AiChat" => LocalizationManager.Current.AiChat,
             "InternetRadio" => LocalizationManager.Current.InternetRadio,
             "Podcasts" => LocalizationManager.Current.Podcasts,
+            "RecentAlbumsAll" => LocalizationManager.Current.RecentAlbums,
+            "RecentlyPlayedAll" => LocalizationManager.Current.RecentlyPlayed,
             _ when tag.StartsWith("PlexLibrary:", StringComparison.Ordinal) =>
                 _activePlexSectionTitle ?? LocalizationManager.Current.PlexServers,
             _ when tag.StartsWith("OrynivoServer:", StringComparison.Ordinal) =>
@@ -1894,7 +1898,8 @@ public partial class MainWindow : Window
         var isOrynivoTracksTag = TryParseOrynivoServerTag(tag, out _, out var orynivoViewForHeader) &&
                                  orynivoViewForHeader == "Tracks";
         SearchTextBox.IsVisible = isOrynivoTracksTag ||
-                                   !(tag is "InternetRadio" or "Podcasts" or "Queue" or "AiChat" ||
+                                   !(tag is "InternetRadio" or "Podcasts" or "Queue" or "AiChat"
+                                        or "RecentAlbumsAll" or "RecentlyPlayedAll" ||
                                     tag.StartsWith("Radio:", StringComparison.Ordinal) ||
                                     tag.StartsWith("Podcast:", StringComparison.Ordinal) ||
                                     tag.StartsWith("PlexLibrary:", StringComparison.Ordinal) ||
@@ -1923,6 +1928,24 @@ public partial class MainWindow : Window
                 ArtistArtworkListBox.IsVisible = false;
                 DashboardScrollViewer.IsVisible = true;
                 await ShowDashboardAsync();
+            }
+            else if (tag == "RecentAlbumsAll")
+            {
+                ContentDataGrid.IsVisible = false;
+                FolderTreeView.IsVisible = false;
+                AlbumArtworkListBox.IsVisible = false;
+                ArtistArtworkListBox.IsVisible = false;
+                DashboardScrollViewer.IsVisible = true;
+                await BuildAllRecentAlbumsViewAsync();
+            }
+            else if (tag == "RecentlyPlayedAll")
+            {
+                ContentDataGrid.IsVisible = false;
+                FolderTreeView.IsVisible = false;
+                AlbumArtworkListBox.IsVisible = false;
+                ArtistArtworkListBox.IsVisible = false;
+                DashboardScrollViewer.IsVisible = true;
+                await BuildAllRecentlyPlayedViewAsync();
             }
             else if (tag == "AiChat")
             {
@@ -3495,6 +3518,18 @@ public partial class MainWindow : Window
         if (Avalonia.Application.Current?.TryGetResource(key, Avalonia.Styling.ThemeVariant.Default, out value) == true && value is T t2)
             return t2;
         return null;
+    }
+
+    /// <summary>Resolves one of the shared <c>FontSize…</c> typography tokens for code-built controls.</summary>
+    /// <param name="key">The typography resource key (e.g. <c>FontSizeBody</c>).</param>
+    /// <returns>The token's pixel size, or a body-text fallback when it is missing.</returns>
+    private double ResolveFontSize(string key)
+    {
+        if (TryGetResource(key, Avalonia.Styling.ThemeVariant.Default, out var value) && value is double d)
+            return d;
+        if (Avalonia.Application.Current?.TryGetResource(key, Avalonia.Styling.ThemeVariant.Default, out value) == true && value is double d2)
+            return d2;
+        return 13;
     }
 
     private static T? FindAncestor<T>(Visual? current) where T : Visual
@@ -6128,6 +6163,20 @@ public partial class MainWindow : Window
         return false;
     }
 
+    /// <summary>
+    /// Activates the remote server carried by a self-describing row so the shared
+    /// album/artist/favorite/cover handlers operate on the row's own server even
+    /// when opened outside a server view (e.g. the dashboard's mixed recent list).
+    /// Rows without a server (local, or normal server-view rows) leave the ambient
+    /// server unchanged.
+    /// </summary>
+    /// <param name="row">The row whose server context should be activated.</param>
+    private void ActivateRowOrynivoServer(ContentRow row)
+    {
+        if (row.OrynivoServer is { } server)
+            _activeOrynivoServer = server;
+    }
+
     private async void ArtistLinkButton_OnClick(object? sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: ContentRow row })
@@ -6137,6 +6186,7 @@ public partial class MainWindow : Window
 
         if (row.EntityType.StartsWith("Orynivo", StringComparison.Ordinal))
         {
+            ActivateRowOrynivoServer(row);
             var remoteArtistId = row.EntityType == "OrynivoArtist" ? row.Id : row.ArtistId;
             if (remoteArtistId is long remoteId)
                 await OpenOrynivoArtistAlbumsAsync(remoteId, row.EntityType == "OrynivoArtist" ? row.Title : row.Artist);
@@ -6172,6 +6222,7 @@ public partial class MainWindow : Window
 
         if (row.EntityType.StartsWith("Orynivo", StringComparison.Ordinal))
         {
+            ActivateRowOrynivoServer(row);
             var remoteAlbumId = row.EntityType == "OrynivoAlbum" ? row.Id : row.AlbumId;
             if (remoteAlbumId is long remoteId)
             {
@@ -7028,6 +7079,7 @@ public partial class MainWindow : Window
         if (sender is not Button { Tag: ContentRow row })
             return;
 
+        ActivateRowOrynivoServer(row);
         if (row.EntityType == "OrynivoAlbum" &&
             _activeOrynivoServer is not null &&
             long.TryParse(row.ExternalId, out var remoteAlbumId))
@@ -7051,6 +7103,15 @@ public partial class MainWindow : Window
         using (var db = AudioDatabase.OpenDefault())
             db.ClearArtworkFromAlbum(albumId);
 
+        // On the dashboard, clear the bound card in place instead of rebuilding
+        // the hidden Albums list.
+        if (DashboardScrollViewer.IsVisible)
+        {
+            row.ArtworkPath = null;
+            row.ThumbnailPath = null;
+            UpdateRowArtworkFromBytes(row, null);
+            return;
+        }
         if (_activeAlbumFilterId == albumId)
             await ReloadAlbumDetailHeaderAsync(albumId);
         else
@@ -7062,6 +7123,7 @@ public partial class MainWindow : Window
         if (sender is not MenuItem { Tag: ContentRow row })
             return;
 
+        ActivateRowOrynivoServer(row);
         if (row.EntityType == "OrynivoAlbum" &&
             _activeOrynivoServer is not null &&
             long.TryParse(row.ExternalId, out var remoteAlbumId))
@@ -7172,10 +7234,44 @@ public partial class MainWindow : Window
 
         await _localCatalogProvider.SetAlbumArtworkAsync(albumId, selected.ImageData, selected.MimeType);
 
+        // Refresh the bound row directly so a card outside the Albums list (e.g. a
+        // dashboard recent-album card) updates immediately.
+        UpdateRowArtworkFromBytes(row, selected.ImageData);
+
+        // On the dashboard surface the card is already refreshed above; do not
+        // rebuild the (hidden) Albums list, which would also overwrite the count.
+        if (DashboardScrollViewer.IsVisible)
+            return;
         if (_activeAlbumFilterId == albumId)
             await ReloadAlbumDetailHeaderAsync(albumId);
         else
             await ReloadAlbumRowsAsync(albumId, verticalOffset);
+    }
+
+    /// <summary>Decodes image bytes and assigns them to a row's artwork/thumbnail in place.</summary>
+    /// <param name="row">The row whose artwork should be updated.</param>
+    /// <param name="imageData">The new image bytes, or <see langword="null"/> to clear.</param>
+    private static void UpdateRowArtworkFromBytes(ContentRow row, byte[]? imageData)
+    {
+        if (imageData is not { Length: > 0 })
+        {
+            row.Artwork = null;
+            row.Thumbnail = null;
+            return;
+        }
+
+        try
+        {
+            using var stream = new MemoryStream(imageData);
+            var bitmap = new Bitmap(stream);
+            row.Artwork = bitmap;
+            row.Thumbnail = bitmap;
+            row.ArtworkLoadQueued = false;
+            row.ArtworkLoadCompleted = true;
+            row.ThumbnailLoadQueued = false;
+            row.ThumbnailLoadCompleted = true;
+        }
+        catch { /* leave the existing artwork on decode failure */ }
     }
 
     private async Task OpenOrynivoAlbumCoverSearchAsync(
@@ -7628,6 +7724,7 @@ public partial class MainWindow : Window
             return;
 
         row.IsFavorite = !row.IsFavorite;
+        ActivateRowOrynivoServer(row);
         if (row.EntityType.StartsWith("Orynivo", StringComparison.Ordinal) &&
             _activeOrynivoServer is not null)
         {
@@ -13416,15 +13513,48 @@ public partial class MainWindow : Window
             _dashboardYear  = now.Year;
             _dashboardMonth = now.Month;
         }
+
+        // Re-flow the calendar/genre columns when the window crosses the
+        // two-column width threshold; only rebuilds on an actual layout change.
+        if (!_dashboardResizeHooked)
+        {
+            _dashboardResizeHooked = true;
+            DashboardScrollViewer.SizeChanged += DashboardScrollViewer_OnSizeChanged;
+        }
+
         await BuildDashboardAsync();
+    }
+
+    private async void DashboardScrollViewer_OnSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        // Only the main dashboard re-flows its two-column stats layout; the
+        // full-page "show all" views share this surface but must not be replaced.
+        if (!DashboardScrollViewer.IsVisible || _currentTopLevelTag != "Dashboard")
+            return;
+        if (ComputeDashboardTwoColumn() == _dashboardTwoColumnLayout)
+            return;
+        await BuildDashboardAsync();
+    }
+
+    /// <summary>Decides whether the calendar and top-genre blocks fit side by side.</summary>
+    /// <returns><see langword="true"/> when the dashboard is wide enough for two columns.</returns>
+    private bool ComputeDashboardTwoColumn()
+    {
+        var width = DashboardScrollViewer.Bounds.Width;
+        if (width < 1)
+            width = Bounds.Width - 260; // sidebar + margins fallback before first layout
+        return width >= 980;
     }
 
     private async Task BuildDashboardAsync()
     {
         DashboardPanel.Children.Clear();
         _calendarInner = null;
+        _dashboardTwoColumnLayout = ComputeDashboardTwoColumn();
 
         var recentAlbums = await LoadRecentAlbumsAsync();
+
+        var (recentlyPlayed, recentThumbs) = await LoadRecentlyPlayedAsync(12);
 
         var calendarData = await Task.Run(() =>
         {
@@ -13438,22 +13568,157 @@ public partial class MainWindow : Window
             return db.GetTopGenres(10);
         });
 
-        DashboardAddSectionHeader(LocalizationManager.Current.RecentAlbums);
+        DashboardBuildGreeting();
+
+        if (recentlyPlayed.Count > 0)
+        {
+            DashboardPanel.Children.Add(DashboardCreateSectionHeader(
+                LocalizationManager.Current.RecentlyPlayed,
+                showAllAction: () => _ = ShowAllRecentlyPlayedAsync()));
+            DashboardBuildRecentlyPlayed(recentlyPlayed, recentThumbs);
+        }
+
+        DashboardPanel.Children.Add(DashboardCreateSectionHeader(
+            LocalizationManager.Current.RecentAlbums,
+            showAllAction: () => _ = ShowAllRecentAlbumsAsync()));
         DashboardBuildRecentAlbums(recentAlbums);
 
-        DashboardAddSectionHeader(string.Format(
-                LocalizationManager.Current.Calendar,
-                new DateTime(_dashboardYear, _dashboardMonth, 1).ToString("MMMM yyyy")),
-            calendarNav: true);
-        DashboardBuildCalendar(calendarData);
-
-        DashboardAddSectionHeader(LocalizationManager.Current.TopGenres);
-        DashboardBuildTopGenres(topGenres);
+        DashboardBuildStatsSection(calendarData, topGenres);
     }
 
-    private void DashboardAddSectionHeader(string title, bool calendarNav = false)
+    /// <summary>
+    /// Loads the most recent, path-de-duplicated playback-history entries together
+    /// with local album thumbnail paths, shared by the dashboard strip and the
+    /// full "recently played" view.
+    /// </summary>
+    /// <param name="count">Maximum number of distinct entries to return.</param>
+    /// <returns>The de-duplicated entries and their album thumbnail paths.</returns>
+    private static Task<(List<DailyHistoryEntry> Entries, Dictionary<long, string> Thumbs)> LoadRecentlyPlayedAsync(int count) =>
+        Task.Run(() =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            // Over-fetch so de-duplication by path can still fill the requested count.
+            var history = db.GetRecentHistory(count * 4);
+            var deduped = new List<DailyHistoryEntry>();
+            var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var entry in history)
+            {
+                if (seenPaths.Add(entry.Path))
+                    deduped.Add(entry);
+                if (deduped.Count >= count)
+                    break;
+            }
+
+            var localTrackIds = deduped
+                .Where(entry => entry.TrackId is long)
+                .Select(entry => entry.TrackId!.Value)
+                .Distinct()
+                .ToList();
+            var thumbs = db.GetAlbumsByTrackIds(localTrackIds)
+                .Where(album => !string.IsNullOrEmpty(album.ThumbnailPath))
+                .GroupBy(album => album.Id)
+                .ToDictionary(group => group.Key, group => group.First().ThumbnailPath!);
+            return (deduped, thumbs);
+        });
+
+    /// <summary>Opens the full-page "recently added" view, preserving Back navigation.</summary>
+    /// <returns>A task representing the asynchronous navigation.</returns>
+    private async Task ShowAllRecentAlbumsAsync()
     {
-        var grid = new Grid { Margin = new Thickness(0, 28, 0, 10) };
+        PushCurrentNavigationState();
+        ResetDrilldownState(clearNavigationHistory: false);
+        await ShowTopLevelViewAsync("RecentAlbumsAll");
+    }
+
+    /// <summary>Opens the full-page "recently played" view, preserving Back navigation.</summary>
+    /// <returns>A task representing the asynchronous navigation.</returns>
+    private async Task ShowAllRecentlyPlayedAsync()
+    {
+        PushCurrentNavigationState();
+        ResetDrilldownState(clearNavigationHistory: false);
+        await ShowTopLevelViewAsync("RecentlyPlayedAll");
+    }
+
+    /// <summary>Builds the full-page grid of up to 200 recently added albums.</summary>
+    /// <returns>A task representing the asynchronous build.</returns>
+    private async Task BuildAllRecentAlbumsViewAsync()
+    {
+        DashboardPanel.Children.Clear();
+        _calendarInner = null;
+        SearchTextBox.IsVisible = false;
+
+        var albums = await LoadRecentAlbumsAsync(200);
+        DashboardPanel.Children.Add(DashboardCreateSectionHeader(LocalizationManager.Current.RecentAlbums));
+        var wrap = new WrapPanel { Orientation = Orientation.Horizontal };
+        var template = FindResource<IDataTemplate>("AlbumArtworkCardTemplate");
+        if (template is not null)
+            foreach (var album in albums)
+                wrap.Children.Add(BuildRecentAlbumCard(album, template));
+        DashboardPanel.Children.Add(wrap);
+        ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(albums.Count);
+    }
+
+    /// <summary>Builds the full-page grid of up to 200 recently played entries.</summary>
+    /// <returns>A task representing the asynchronous build.</returns>
+    private async Task BuildAllRecentlyPlayedViewAsync()
+    {
+        DashboardPanel.Children.Clear();
+        _calendarInner = null;
+        SearchTextBox.IsVisible = false;
+
+        var (entries, thumbs) = await LoadRecentlyPlayedAsync(200);
+        DashboardPanel.Children.Add(DashboardCreateSectionHeader(LocalizationManager.Current.RecentlyPlayed));
+        var wrap = new WrapPanel { Orientation = Orientation.Horizontal };
+        foreach (var entry in entries)
+            wrap.Children.Add(BuildRecentlyPlayedCard(entry, thumbs));
+        DashboardPanel.Children.Add(wrap);
+        ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(entries.Count);
+    }
+
+    /// <summary>Builds the personal greeting hero shown at the top of the dashboard.</summary>
+    private void DashboardBuildGreeting()
+    {
+        var hour = DateTime.Now.Hour;
+        var greeting = hour switch
+        {
+            >= 5 and < 12 => LocalizationManager.Current.GreetingMorning,
+            >= 12 and < 18 => LocalizationManager.Current.GreetingAfternoon,
+            _ => LocalizationManager.Current.GreetingEvening
+        };
+
+        var stack = new StackPanel { Spacing = 2, Margin = new Thickness(0, 0, 0, 4) };
+        stack.Children.Add(new TextBlock
+        {
+            Text = greeting,
+            FontSize = ResolveFontSize("FontSizeHeadline"),
+            FontWeight = FontWeight.Bold,
+            Foreground = FindResource<IBrush>("AppPrimaryTextBrush")
+        });
+        stack.Children.Add(new TextBlock
+        {
+            Text = LocalizationManager.Current.DashboardTagline,
+            FontSize = ResolveFontSize("FontSizeBody"),
+            Foreground = FindResource<IBrush>("AppSecondaryTextBrush")
+        });
+        DashboardPanel.Children.Add(stack);
+    }
+
+    private void DashboardAddSectionHeader(string title, bool calendarNav = false) =>
+        DashboardPanel.Children.Add(DashboardCreateSectionHeader(title, calendarNav));
+
+    /// <summary>Builds a dashboard section header with an accent underline and optional month navigation.</summary>
+    /// <param name="title">Section title text.</param>
+    /// <param name="calendarNav">Whether to include the previous/next month buttons.</param>
+    /// <param name="showAllAction">Optional "show all" action rendered as a right-aligned link.</param>
+    /// <returns>The header control, ready to be inserted into a dashboard column.</returns>
+    private Control DashboardCreateSectionHeader(
+        string title,
+        bool calendarNav = false,
+        Action? showAllAction = null)
+    {
+        var container = new StackPanel();
+
+        var grid = new Grid { Margin = new Thickness(0, 24, 0, 10) };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         if (calendarNav)
@@ -13465,13 +13730,34 @@ public partial class MainWindow : Window
         var tb = new TextBlock
         {
             Text       = title,
-            FontSize   = 16,
+            FontSize   = ResolveFontSize("FontSizeSubtitle"),
             FontWeight = FontWeight.SemiBold,
             Foreground = FindResource<IBrush>("AppPrimaryTextBrush"),
             VerticalAlignment = VerticalAlignment.Center
         };
         Grid.SetColumn(tb, 0);
         grid.Children.Add(tb);
+
+        if (showAllAction is not null)
+        {
+            var showAll = new Button
+            {
+                Content = $"{LocalizationManager.Current.ShowAll} →",
+                FontSize = ResolveFontSize("FontSizeCaption"),
+                FontWeight = FontWeight.SemiBold,
+                Foreground = FindResource<IBrush>("AppAccentBrush"),
+                Theme = FindResource<ControlTheme>("EntityLinkButtonTheme"),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            showAll.Click += (_, e) =>
+            {
+                e.Handled = true;
+                showAllAction();
+            };
+            Grid.SetColumn(showAll, 1);
+            grid.Children.Add(showAll);
+        }
 
         if (calendarNav)
         {
@@ -13485,9 +13771,8 @@ public partial class MainWindow : Window
             grid.Children.Add(next);
         }
 
-        DashboardPanel.Children.Add(grid);
-
-        DashboardPanel.Children.Add(new Border
+        container.Children.Add(grid);
+        container.Children.Add(new Border
         {
             Height = 3,
             Width = 34,
@@ -13496,6 +13781,7 @@ public partial class MainWindow : Window
             HorizontalAlignment = HorizontalAlignment.Left,
             Margin = new Thickness(0, 0, 0, 14)
         });
+        return container;
     }
 
     private Button CreateCalNavButton(string symbol)
@@ -13522,8 +13808,9 @@ public partial class MainWindow : Window
     /// <param name="ArtistId">Album-artist identifier, or <see langword="null"/>.</param>
     /// <param name="AddedAt">Unix timestamp of the most recently added track in the album.</param>
     /// <param name="Server">The owning remote server, or <see langword="null"/> for the local library.</param>
-    /// <param name="LocalThumbPath">Local 96-px thumbnail path for local albums, or <see langword="null"/>.</param>
+    /// <param name="ArtworkPath">Local artwork file path or authenticated remote artwork URL, or <see langword="null"/>.</param>
     /// <param name="HasArtwork">Whether artwork is available for the album.</param>
+    /// <param name="IsFavorite">Whether the album is flagged as a favorite (local flag or client-side remote favorite).</param>
     private sealed record DashboardAlbum(
         long Id,
         string Title,
@@ -13531,18 +13818,18 @@ public partial class MainWindow : Window
         long? ArtistId,
         long AddedAt,
         OrynivoServerSettings? Server,
-        string? LocalThumbPath,
-        bool HasArtwork);
+        string? ArtworkPath,
+        bool HasArtwork,
+        bool IsFavorite);
 
     /// <summary>
     /// Loads the recently added albums for the dashboard, merging the local library with every
     /// configured remote Orynivo Server and keeping the globally most recent entries.
     /// </summary>
+    /// <param name="perSource">Maximum entries to fetch per source and to return overall.</param>
     /// <returns>The merged, recency-sorted recently added albums.</returns>
-    private async Task<List<DashboardAlbum>> LoadRecentAlbumsAsync()
+    private async Task<List<DashboardAlbum>> LoadRecentAlbumsAsync(int perSource = 12)
     {
-        const int perSource = 12;
-
         var local = await Task.Run(() =>
         {
             using var db = AudioDatabase.OpenDefault();
@@ -13552,7 +13839,8 @@ public partial class MainWindow : Window
         var combined = local
             .Select(a => new DashboardAlbum(
                 a.Id, a.Title, a.Artist, a.ArtistId, a.AddedAt,
-                null, a.ThumbPath, !string.IsNullOrEmpty(a.ThumbPath)))
+                null, a.ArtworkPath ?? a.ThumbPath, !string.IsNullOrEmpty(a.ArtworkPath ?? a.ThumbPath),
+                a.IsFavorite))
             .ToList();
 
         var servers = _settings.OrynivoServers ?? [];
@@ -13570,7 +13858,10 @@ public partial class MainWindow : Window
                     continue;
                 combined.AddRange(task.Result.Select(a => new DashboardAlbum(
                     a.Id, a.Title, a.Artist, a.ArtistId, a.AddedAt,
-                    server, null, a.HasArtwork)));
+                    server,
+                    a.HasArtwork ? OrynivoServerClient.GetAlbumArtworkUrl(server, a.Id, 320) : null,
+                    a.HasArtwork,
+                    IsOrynivoFavorite(server, "Album", a.Id))));
             }
         }
 
@@ -13589,125 +13880,277 @@ public partial class MainWindow : Window
             Margin = new Thickness(0, 0, 0, 4)
         };
 
-        var panel = new StackPanel
-        {
-            Orientation = Orientation.Horizontal
-        };
-
-        foreach (var album in albums)
-            panel.Children.Add(BuildAlbumCard(album));
+        var panel = new StackPanel { Orientation = Orientation.Horizontal };
+        var template = FindResource<IDataTemplate>("AlbumArtworkCardTemplate");
+        if (template is not null)
+            foreach (var album in albums)
+                panel.Children.Add(BuildRecentAlbumCard(album, template));
 
         scroll.Content = panel;
         DashboardPanel.Children.Add(scroll);
     }
 
-    private Control BuildAlbumCard(DashboardAlbum album)
+    /// <summary>
+    /// Builds one recently added album card from the shared album artwork template,
+    /// so it looks and behaves exactly like the normal Albums artwork view
+    /// (cover change, favorite toggle, and in-library navigation).
+    /// </summary>
+    /// <param name="album">The recently added album to render.</param>
+    /// <param name="template">The shared album artwork card template.</param>
+    /// <returns>The realised card control bound to a backing <see cref="ContentRow"/>.</returns>
+    private Control BuildRecentAlbumCard(DashboardAlbum album, IDataTemplate template)
     {
+        var row = BuildRecentAlbumRow(album);
+        var control = template.Build(row) ?? new Border();
+        control.DataContext = row;
+        control.DoubleTapped += RecentAlbumCard_OnDoubleTapped;
+        return control;
+    }
+
+    /// <summary>Maps a dashboard album to a <see cref="ContentRow"/> for the shared artwork card.</summary>
+    /// <param name="album">The dashboard album.</param>
+    /// <returns>A hydrated content row (local <c>Album</c> or remote <c>OrynivoAlbum</c>).</returns>
+    private ContentRow BuildRecentAlbumRow(DashboardAlbum album)
+    {
+        var isRemote = album.Server is not null;
+        var row = new ContentRow
+        {
+            Id = album.Id,
+            AlbumId = album.Id,
+            ArtistId = album.ArtistId,
+            Title = string.IsNullOrWhiteSpace(album.Title) ? LocalizationManager.Current.Unknown : album.Title,
+            Artist = string.IsNullOrWhiteSpace(album.Artist) ? null : album.Artist,
+            ArtworkPath = album.ArtworkPath,
+            IsFavorite = album.IsFavorite,
+            EntityType = isRemote ? "OrynivoAlbum" : "Album",
+            ExternalId = isRemote ? album.Id.ToString(CultureInfo.InvariantCulture) : null,
+            OrynivoServer = album.Server,
+            FilePath = ""
+        };
+        EnsureArtworkHydrated(row);
+        return row;
+    }
+
+    /// <summary>Opens a recently added album card on double-click, staying in its own library.</summary>
+    /// <param name="sender">The tapped card control.</param>
+    /// <param name="e">The tap event data.</param>
+    private async void RecentAlbumCard_OnDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        // Buttons inside the card (title/artist links, favorite, cover) handle
+        // their own clicks; ignore double-taps that land on them.
+        if (FindAncestor<Button>(e.Source as Visual) is not null)
+            return;
+        if (sender is not Control { DataContext: ContentRow { Id: long albumId } row })
+            return;
+
+        if (row.EntityType == "OrynivoAlbum")
+        {
+            _activeArtistFilterId = null;
+            _activeArtistFilterName = null;
+            _activeOrynivoServer = row.OrynivoServer;
+            await OpenOrynivoAlbumTracksAsync(albumId, row.Title, row.Artist);
+        }
+        else
+        {
+            await ShowAlbumTracksAsync(albumId, row.Title ?? LocalizationManager.Current.Unknown);
+        }
+    }
+
+    /// <summary>Builds the horizontal "recently played" strip of compact history cards.</summary>
+    /// <param name="entries">Recent, de-duplicated playback-history entries.</param>
+    /// <param name="thumbs">Local album thumbnail paths keyed by album identifier.</param>
+    private void DashboardBuildRecentlyPlayed(
+        List<DailyHistoryEntry> entries,
+        Dictionary<long, string> thumbs)
+    {
+        var scroll = new ScrollViewer
+        {
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            VerticalScrollBarVisibility   = ScrollBarVisibility.Disabled,
+            Margin = new Thickness(0, 0, 0, 4)
+        };
+        var panel = new StackPanel { Orientation = Orientation.Horizontal };
+        foreach (var entry in entries)
+            panel.Children.Add(BuildRecentlyPlayedCard(entry, thumbs));
+        scroll.Content = panel;
+        DashboardPanel.Children.Add(scroll);
+    }
+
+    private Control BuildRecentlyPlayedCard(DailyHistoryEntry entry, Dictionary<long, string> thumbs)
+    {
+        const double artSize = 116;
+        var playable = IsPlayableHistoryEntry(entry);
+
         var card = new Border
         {
-            Width           = 164,
-            Margin          = new Thickness(0, 0, 14, 0),
-            Background      = FindResource<IBrush>("AppSurfaceBrush"),
-            BorderBrush     = FindResource<IBrush>("AppGridLineBrush"),
-            BorderThickness = new Thickness(1),
-            CornerRadius    = new CornerRadius(10),
-            Cursor          = new Cursor(StandardCursorType.Hand),
-            Padding         = new Thickness(1),
-            ClipToBounds    = true
+            Width           = artSize,
+            Margin          = new Thickness(0, 0, 12, 0),
+            Background      = Brushes.Transparent,
+            Cursor          = new Cursor(playable ? StandardCursorType.Hand : StandardCursorType.Arrow)
         };
 
-        var stack = new StackPanel { Spacing = 2 };
+        var stack = new StackPanel { Spacing = 4 };
 
-        // Artwork host: a placeholder background with an image layered on top, so
-        // remote artwork can be filled in asynchronously without rebuilding the card.
-        var img = new Image
+        var artHost = new Border
         {
-            Width   = 162,
-            Height  = 162,
-            Stretch = Stretch.UniformToFill
+            Width        = artSize,
+            Height       = artSize,
+            Background   = FindResource<IBrush>("AppArtworkPlaceholderBrush"),
+            CornerRadius = new CornerRadius(12),
+            ClipToBounds = true
         };
-        var artworkHost = new Border
-        {
-            Width      = 162,
-            Height     = 162,
-            Background  = FindResource<IBrush>("AppArtworkPlaceholderBrush"),
-            CornerRadius = new CornerRadius(9, 9, 0, 0),
-            ClipToBounds = true,
-            Child      = img
-        };
-        stack.Children.Add(artworkHost);
+        var artContent = new Grid();
 
-        if (album.Server is null)
+        // Initials placeholder as the base layer; a thumbnail (decoded off the UI
+        // thread) is layered on top when available so 200 cards build without a hitch.
+        artContent.Children.Add(new Orynivo.Controls.InitialsAvatar
         {
-            if (!string.IsNullOrEmpty(album.LocalThumbPath) && File.Exists(album.LocalThumbPath))
+            DisplayName = string.IsNullOrWhiteSpace(entry.Title) ? entry.Artist : entry.Title,
+            FontSize    = 30,
+            IsHitTestVisible = false
+        });
+
+        string? thumbPath = entry.AlbumId is long albumId && thumbs.TryGetValue(albumId, out var path) ? path : null;
+        if (!string.IsNullOrEmpty(thumbPath))
+        {
+            var thumbImage = new Image
             {
-                try
-                {
-                    using var bmpStream = File.OpenRead(album.LocalThumbPath);
-                    img.Source = new Bitmap(bmpStream);
-                }
-                catch { img.Source = null; }
+                Width   = artSize,
+                Height  = artSize,
+                Stretch = Stretch.UniformToFill,
+                IsHitTestVisible = false
+            };
+            artContent.Children.Add(thumbImage);
+            _ = LoadDashboardLocalArtworkAsync(thumbImage, thumbPath);
+        }
+
+        // A play affordance that fades in on hover for playable local entries.
+        // The overlay needs an explicit size and a high ZIndex: without a fixed-size
+        // sibling (e.g. an avatar-only card with no cover) a stretch-only overlay was
+        // arranged to just the glyph size, so the play symbol did not appear on hover.
+        var playOverlay = new Border
+        {
+            Width              = artSize,
+            Height             = artSize,
+            ZIndex             = 10,
+            Background         = new SolidColorBrush(Color.FromArgb(0x66, 0, 0, 0)),
+            CornerRadius       = new CornerRadius(12),
+            IsHitTestVisible   = false,
+            IsVisible          = false,
+            Child = new TextBlock
+            {
+                Text = "▶",
+                FontSize = 26,
+                Foreground = Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
             }
-        }
-        else if (album.HasArtwork)
-        {
-            var artUrl = OrynivoServerClient.GetAlbumArtworkUrl(album.Server, album.Id, 320);
-            _ = LoadDashboardRemoteArtworkAsync(img, artUrl);
-        }
+        };
+        if (playable)
+            artContent.Children.Add(playOverlay);
 
-        var albumButton = new Button
-        {
-            Content     = album.Title,
-            FontWeight  = FontWeight.SemiBold,
-            FontSize    = 12,
-            Foreground  = FindResource<IBrush>("AppPrimaryTextBrush"),
-            Margin      = new Thickness(10, 8, 10, 1),
-            Theme = FindResource<ControlTheme>("EntityLinkButtonTheme")
-        };
-        albumButton.Click += (_, e) =>
-        {
-            e.Handled = true;
-            _ = OpenDashboardAlbumAsync(album);
-        };
-        stack.Children.Add(albumButton);
+        artHost.Child = artContent;
+        stack.Children.Add(artHost);
 
-        var artistButton = new Button
+        stack.Children.Add(new TextBlock
         {
-            Content    = album.Artist,
-            FontSize   = 11,
-            Foreground = FindResource<IBrush>("AppSecondaryTextBrush"),
-            Margin     = new Thickness(10, 0, 10, 10),
-            Theme = FindResource<ControlTheme>("EntityLinkButtonTheme")
-        };
-        artistButton.Click += async (_, e) =>
-        {
-            e.Handled = true;
-            await OpenDashboardArtistAsync(album);
-        };
-        stack.Children.Add(artistButton);
+            Text              = entry.Title,
+            FontSize          = ResolveFontSize("FontSizeCaption"),
+            FontWeight        = FontWeight.SemiBold,
+            Foreground        = FindResource<IBrush>("AppPrimaryTextBrush"),
+            TextTrimming      = TextTrimming.CharacterEllipsis,
+            MaxLines          = 1,
+            Margin            = new Thickness(2, 2, 2, 0)
+        });
+        if (!string.IsNullOrWhiteSpace(entry.Artist))
+            stack.Children.Add(new TextBlock
+            {
+                Text         = entry.Artist,
+                FontSize     = ResolveFontSize("FontSizeMeta"),
+                Foreground   = FindResource<IBrush>("AppSecondaryTextBrush"),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxLines     = 1,
+                Margin       = new Thickness(2, 0, 2, 0)
+            });
 
         card.Child = stack;
 
-        card.PointerEntered += (_, _) =>
+        if (playable)
         {
-            card.BorderBrush = FindResource<IBrush>("AppAccentBrush");
-            card.Background = FindResource<IBrush>("AppSurfaceHoverBrush");
-        };
-        card.PointerExited += (_, _) =>
-        {
-            card.BorderBrush = FindResource<IBrush>("AppGridLineBrush");
-            card.Background = FindResource<IBrush>("AppSurfaceBrush");
-        };
-        card.PointerReleased += (_, e) =>
-        {
-            // Ignore releases on the album/artist link buttons so clicking the artist
-            // navigates to the artist instead of also opening the album.
-            if (FindAncestor<Button>(e.Source as Visual) is not null)
-                return;
-            _ = OpenDashboardAlbumAsync(album);
-        };
+            card.PointerEntered += (_, _) => playOverlay.IsVisible = true;
+            card.PointerExited  += (_, _) => playOverlay.IsVisible = false;
+            card.PointerReleased += async (_, e) =>
+            {
+                e.Handled = true;
+                await PlayHistoryEntryInPlaceAsync(entry);
+            };
+        }
 
         return card;
+    }
+
+    /// <summary>
+    /// Determines whether a recently played entry can be replayed in place: only
+    /// music tracks (not radio/podcast, which have their own views) that are either
+    /// a locally available file or a playable stream URL (remote server / Plex).
+    /// </summary>
+    /// <param name="entry">The history entry to test.</param>
+    /// <returns><see langword="true"/> when the entry can be played from its card.</returns>
+    private static bool IsPlayableHistoryEntry(DailyHistoryEntry entry) =>
+        string.Equals(entry.MediaType, "track", StringComparison.OrdinalIgnoreCase) &&
+        (IsAvailableLocalTrack(entry.Path) || IsHttpUrl(entry.Path));
+
+    /// <summary>
+    /// Plays a recently played entry without leaving the current view: it replaces
+    /// the queue with just this track and starts playback, so the dashboard or the
+    /// full "recently played" view stays open.
+    /// </summary>
+    /// <param name="entry">The history entry to play.</param>
+    /// <returns>A task representing the asynchronous playback start.</returns>
+    private async Task PlayHistoryEntryInPlaceAsync(DailyHistoryEntry entry)
+    {
+        if (!IsPlayableHistoryEntry(entry))
+            return;
+
+        _queue.Clear();
+        _queue.Add(new PlaylistItem(
+            entry.Path,
+            string.IsNullOrWhiteSpace(entry.Title) ? null : entry.Title,
+            string.IsNullOrWhiteSpace(entry.Artist) ? null : entry.Artist,
+            string.IsNullOrWhiteSpace(entry.Album) ? null : entry.Album,
+            null,
+            null,
+            entry.DurationSeconds is > 0 ? TimeSpan.FromSeconds(entry.DurationSeconds.Value) : null));
+        _queueIndex = 0;
+        ResetQueuePlaybackState();
+        PersistPlaybackQueue();
+        RefreshQueueNavigationButtons();
+
+        try { await StartPlaybackAsync(entry.Path); }
+        catch (OperationCanceledException) { StatusTextBlock.Text = LocalizationManager.Current.PlaybackStopped; }
+        catch (Exception ex) { StopPlayback(); StatusTextBlock.Text = ex.Message; }
+        UpdateNowPlayingRowHighlights();
+    }
+
+    /// <summary>Fills a card image with a local thumbnail, decoding off the UI thread.</summary>
+    /// <param name="image">The card image control to populate.</param>
+    /// <param name="thumbnailPath">The local thumbnail file path.</param>
+    /// <returns>A task representing the asynchronous load.</returns>
+    private static async Task LoadDashboardLocalArtworkAsync(Image image, string thumbnailPath)
+    {
+        try
+        {
+            var bitmap = await Task.Run(() =>
+            {
+                if (!File.Exists(thumbnailPath))
+                    return null;
+                using var stream = File.OpenRead(thumbnailPath);
+                return new Bitmap(stream);
+            });
+            if (bitmap is not null)
+                image.Source = bitmap;
+        }
+        catch { /* a missing or invalid thumbnail leaves the placeholder visible */ }
     }
 
     /// <summary>Fills a dashboard album card's image with remote server artwork (cached locally).</summary>
@@ -13725,47 +14168,10 @@ public partial class MainWindow : Window
         catch { }
     }
 
-    /// <summary>Opens a dashboard album's tracks, in the local or the owning remote server library.</summary>
-    /// <param name="album">The dashboard album to open.</param>
-    /// <returns>A task representing the asynchronous navigation.</returns>
-    private async Task OpenDashboardAlbumAsync(DashboardAlbum album)
-    {
-        if (album.Server is null)
-        {
-            await ShowAlbumTracksAsync(album.Id, album.Title);
-            return;
-        }
-
-        // The dashboard has no artist context, so clear any stale artist filter
-        // left from earlier browsing; otherwise the album would be scoped to that
-        // artist's tracks and appear empty.
-        _activeArtistFilterId = null;
-        _activeArtistFilterName = null;
-        _activeOrynivoServer = album.Server;
-        await OpenOrynivoAlbumTracksAsync(album.Id, album.Title, album.Artist);
-    }
-
-    /// <summary>Opens a dashboard album artist, in the local or the owning remote server library.</summary>
-    /// <param name="album">The dashboard album whose artist to open.</param>
-    /// <returns>A task representing the asynchronous navigation.</returns>
-    private async Task OpenDashboardArtistAsync(DashboardAlbum album)
-    {
-        if (album.Server is null)
-        {
-            using var db = AudioDatabase.OpenDefault();
-            if (db.GetAlbumArtistId(album.Id) is long artistId)
-                await ShowArtistAlbumsAsync(artistId, album.Artist);
-            return;
-        }
-
-        if (album.ArtistId is long remoteArtistId)
-        {
-            _activeOrynivoServer = album.Server;
-            await OpenOrynivoArtistAlbumsAsync(remoteArtistId, album.Artist);
-        }
-    }
-
-    private void DashboardBuildCalendar(List<CalendarDayData> data)
+    /// <summary>Builds the calendar card control for the dashboard stats section.</summary>
+    /// <param name="data">Per-day playback aggregates for the current month.</param>
+    /// <returns>The bordered calendar card.</returns>
+    private Control DashboardBuildCalendarCard(List<CalendarDayData> data)
     {
         var dayMap = data.ToDictionary(d => d.Day);
         int daysInMonth = DateTime.DaysInMonth(_dashboardYear, _dashboardMonth);
@@ -13777,7 +14183,7 @@ public partial class MainWindow : Window
             Background      = FindResource<IBrush>("AppSurfaceBrush"),
             BorderBrush     = FindResource<IBrush>("AppGridLineBrush"),
             BorderThickness = new Thickness(1),
-            CornerRadius    = new CornerRadius(12),
+            CornerRadius    = new CornerRadius(14),
             Padding         = new Thickness(14),
             Margin          = new Thickness(0, 0, 0, 4)
         };
@@ -13809,7 +14215,7 @@ public partial class MainWindow : Window
         DashboardRefreshCalendarContent(inner, dayMap, daysInMonth, startDow);
 
         outer.Child = inner;
-        DashboardPanel.Children.Add(outer);
+        return outer;
     }
 
     private void DashboardRefreshCalendarContent(StackPanel inner, Dictionary<int, CalendarDayData> dayMap,
@@ -13967,18 +14373,65 @@ public partial class MainWindow : Window
         PodcastInfoImagePlaceholder.IsVisible = false;
     }
 
-    private void DashboardBuildTopGenres(List<(string Genre, double Seconds)> genres)
+    /// <summary>
+    /// Arranges the calendar and top-genre analytics blocks, placing them side by
+    /// side on wide dashboards and stacking them on narrow ones.
+    /// </summary>
+    /// <param name="calendarData">Per-day playback aggregates for the current month.</param>
+    /// <param name="topGenres">Ranked genres by play time.</param>
+    private void DashboardBuildStatsSection(
+        List<CalendarDayData> calendarData,
+        List<(string Genre, double Seconds)> topGenres)
+    {
+        var calendarHeader = DashboardCreateSectionHeader(
+            string.Format(
+                LocalizationManager.Current.Calendar,
+                new DateTime(_dashboardYear, _dashboardMonth, 1).ToString("MMMM yyyy")),
+            calendarNav: true);
+        var calendarCard = DashboardBuildCalendarCard(calendarData);
+
+        var genresHeader = DashboardCreateSectionHeader(LocalizationManager.Current.TopGenres);
+        var genresCard = DashboardBuildTopGenresCard(topGenres);
+
+        var calendarColumn = new StackPanel();
+        calendarColumn.Children.Add(calendarHeader);
+        calendarColumn.Children.Add(calendarCard);
+
+        var genresColumn = new StackPanel();
+        genresColumn.Children.Add(genresHeader);
+        genresColumn.Children.Add(genresCard);
+
+        if (_dashboardTwoColumnLayout == true)
+        {
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.15, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(28) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            Grid.SetColumn(calendarColumn, 0);
+            Grid.SetColumn(genresColumn, 2);
+            grid.Children.Add(calendarColumn);
+            grid.Children.Add(genresColumn);
+            DashboardPanel.Children.Add(grid);
+        }
+        else
+        {
+            DashboardPanel.Children.Add(calendarColumn);
+            DashboardPanel.Children.Add(genresColumn);
+        }
+    }
+
+    /// <summary>Builds the modern top-genres analytics card for the dashboard.</summary>
+    /// <param name="genres">Ranked genres with total play seconds.</param>
+    /// <returns>The analytics card control.</returns>
+    private Control DashboardBuildTopGenresCard(List<(string Genre, double Seconds)> genres)
     {
         if (genres.Count == 0)
-        {
-            DashboardPanel.Children.Add(new TextBlock
+            return new TextBlock
             {
                 Text       = LocalizationManager.Current.NoData,
                 Foreground = FindResource<IBrush>("AppSecondaryTextBrush"),
                 Margin     = new Thickness(0, 4, 0, 0)
-            });
-            return;
-        }
+            };
 
         double maxSecs = genres[0].Seconds;
 
@@ -13987,11 +14440,11 @@ public partial class MainWindow : Window
             Background = FindResource<IBrush>("AppSurfaceBrush"),
             BorderBrush = FindResource<IBrush>("AppGridLineBrush"),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(12),
-            Padding = new Thickness(16),
+            CornerRadius = new CornerRadius(14),
+            Padding = new Thickness(16, 14, 16, 8),
             Margin = new Thickness(0, 0, 0, 4)
         };
-        var rows = new StackPanel();
+        var rows = new StackPanel { Spacing = 12 };
 
         for (int i = 0; i < genres.Count; i++)
         {
@@ -13999,69 +14452,105 @@ public partial class MainWindow : Window
             var color = _genreColors[i % _genreColors.Length];
             var brush = new SolidColorBrush(color);
 
-            var row = new Grid { Margin = new Thickness(0, 0, 0, 8) };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(160) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var row = new StackPanel { Spacing = 6 };
+
+            // Top line: rank chip + genre name (link) on the left, duration on the right.
+            var topLine = new Grid();
+            topLine.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            topLine.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            topLine.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var rankChip = new Border
+            {
+                Width = 22,
+                Height = 22,
+                CornerRadius = new CornerRadius(7),
+                Background = brush,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 10, 0),
+                Child = new TextBlock
+                {
+                    Text = (i + 1).ToString(CultureInfo.CurrentCulture),
+                    FontSize = ResolveFontSize("FontSizeMeta"),
+                    FontWeight = FontWeight.Bold,
+                    Foreground = PickContrastBrush(color),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                }
+            };
+            Grid.SetColumn(rankChip, 0);
+            topLine.Children.Add(rankChip);
 
             var labelButton = new Button
             {
-                Content = $"{i + 1}. {genre}",
-                FontSize = 12,
+                Content = genre,
+                FontSize = ResolveFontSize("FontSizeBody"),
+                FontWeight = FontWeight.SemiBold,
                 Foreground = FindResource<IBrush>("AppPrimaryTextBrush"),
                 Theme = FindResource<ControlTheme>("EntityLinkButtonTheme"),
                 VerticalAlignment = VerticalAlignment.Center,
                 HorizontalContentAlignment = HorizontalAlignment.Left,
-                Margin = new Thickness(0, 0, 12, 0),
                 Tag = genre
             };
             labelButton.Click += DashboardGenreButton_OnClick;
-            Grid.SetColumn(labelButton, 0);
-            row.Children.Add(labelButton);
+            Grid.SetColumn(labelButton, 1);
+            topLine.Children.Add(labelButton);
 
+            var durationTb = new TextBlock
+            {
+                Text = FormatDashboardDuration(TimeSpan.FromSeconds(secs)),
+                FontSize = ResolveFontSize("FontSizeCaption"),
+                FontWeight = FontWeight.Medium,
+                Foreground = FindResource<IBrush>("AppSecondaryTextBrush"),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(12, 0, 0, 0)
+            };
+            Grid.SetColumn(durationTb, 2);
+            topLine.Children.Add(durationTb);
+            row.Children.Add(topLine);
+
+            // Thin proportional bar over a muted track.
             double fraction = maxSecs > 0 ? secs / maxSecs : 0;
-            var barHost = new Grid { VerticalAlignment = VerticalAlignment.Center };
             var barBg = new Border
             {
-                Height          = 12,
-                Background      = FindResource<IBrush>("AppGridLineBrush"),
-                CornerRadius    = new CornerRadius(6)
+                Height       = 8,
+                Background   = FindResource<IBrush>("AppGridLineBrush"),
+                CornerRadius = new CornerRadius(4)
             };
             var barGrid = new Grid();
-            barGrid.ColumnDefinitions.Add(new ColumnDefinition
-                { Width = new GridLength(fraction, GridUnitType.Star) });
-            barGrid.ColumnDefinitions.Add(new ColumnDefinition
-                { Width = new GridLength(1 - fraction, GridUnitType.Star) });
+            barGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(fraction, GridUnitType.Star) });
+            barGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1 - fraction, GridUnitType.Star) });
             var barFill = new Border
             {
-                Height       = 12,
+                Height       = 8,
                 Background   = brush,
-                CornerRadius = new CornerRadius(6)
+                CornerRadius = new CornerRadius(4)
             };
             Grid.SetColumn(barFill, 0);
             barGrid.Children.Add(barFill);
+
+            var barHost = new Grid();
             barHost.Children.Add(barBg);
             barHost.Children.Add(barGrid);
-            Grid.SetColumn(barHost, 1);
             row.Children.Add(barHost);
-
-            var ts = TimeSpan.FromSeconds(secs);
-            var durationTb = new TextBlock
-            {
-                Text      = FormatDashboardDuration(ts),
-                FontSize  = 11,
-                Foreground = FindResource<IBrush>("AppSecondaryTextBrush"),
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin    = new Thickness(12, 0, 0, 0)
-            };
-            Grid.SetColumn(durationTb, 2);
-            row.Children.Add(durationTb);
 
             rows.Children.Add(row);
         }
 
         panel.Child = rows;
-        DashboardPanel.Children.Add(panel);
+        return panel;
+    }
+
+    /// <summary>Chooses black or white text for readable contrast on a colored background.</summary>
+    /// <param name="background">The background color.</param>
+    /// <returns>A near-black or white brush, whichever contrasts better.</returns>
+    private static IBrush PickContrastBrush(Color background)
+    {
+        // Relative luminance (sRGB approximation); bright backgrounds get dark text.
+        var luminance = (0.299 * background.R + 0.587 * background.G + 0.114 * background.B) / 255.0;
+        return luminance > 0.6
+            ? new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1A))
+            : Brushes.White;
     }
 
     private async void DashboardGenreButton_OnClick(object? sender, RoutedEventArgs e)

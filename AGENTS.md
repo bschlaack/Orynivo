@@ -1545,20 +1545,67 @@ asynchronous file I/O from the UI thread
 - Radio search results expose a multi-select genre popup derived from normalized
   Radio Browser tags. Selected genres use OR semantics, technical tags are
   excluded, and unavailable selections are removed after a new search.
-- The page contains:
-  1. **Recently added albums**: horizontal artwork strip of up to 12 albums,
+- The dashboard is laid out as a personal "music hub" and is built entirely in
+  code in `BuildDashboardAsync`. Section headers are created by the reusable
+  `DashboardCreateSectionHeader` (accent underline, optional month navigation).
+  The page contains, top to bottom:
+  0. **Greeting hero** (`DashboardBuildGreeting`): a time-of-day greeting
+  (`GreetingMorning`/`GreetingAfternoon`/`GreetingEvening`) plus the
+  `DashboardTagline`; no heavy card, just headline + subtitle text.
+  1. **Recently played** (`DashboardBuildRecentlyPlayed`, when history exists):
+  a horizontal strip of up to 12 compact cards from `GetRecentHistory` (deduped
+  by path). Each card shows the local album thumbnail (resolved via
+  `GetAlbumsByTrackIds`) or an `InitialsAvatar` placeholder, with a hover play
+  overlay. A card is playable (`IsPlayableHistoryEntry`) when the entry is a
+  music track (media type `track`, not radio/podcast) that is either a locally
+  available file or a playable stream URL (remote server / Plex), independent of
+  the history track id or artist tag. Clicking it plays the track **in place**
+  through `PlayHistoryEntryInPlaceAsync` (replaces the queue with just that track
+  and starts playback) without leaving the dashboard.
+  2. **Recently added albums**: horizontal artwork strip of up to 12 albums,
   merging the local library with every configured remote Orynivo Server
-  (`LoadRecentAlbumsAsync`, sorted by each album's last-added timestamp).
-  Local cards open the local album/artist; remote cards (`DashboardAlbum.Server`
-  set) load artwork from the server via `LoadRemoteArtworkImageAsync` and open
-  within that remote library (`OpenOrynivoAlbumTracksAsync` /
-  `OpenOrynivoArtistAlbumsAsync`). Backed by the server endpoint
-  `GET /api/albums/recent` (`OrynivoServerClient.GetRecentAlbumsAsync`); servers
-  without it are skipped. Selecting a card supports Back navigation
-  2. **Calendar**: Monday-first month grid with day number, `HH:mm:ss` playback
-  time, top three linked genres, today highlight, and month navigation
-  3. **Top 10 genres**: descending proportional bars with `HH:mm:ss` duration,
-  linked genre labels, and `_genreColors`
+  (`LoadRecentAlbumsAsync`, sorted by each album's last-added timestamp). Cards
+  are the **same** artwork cards as the Albums view: each `DashboardAlbum` is
+  mapped to a `ContentRow` (`BuildRecentAlbumRow`, local `Album` / remote
+  `OrynivoAlbum` carrying `OrynivoServer`) rendered from the shared
+  `AlbumArtworkCardTemplate` resource (`BuildRecentAlbumCard`), so covers can be
+  changed and favorites toggled directly, and album/artist links navigate in
+  library. Because those shared handlers are location-independent via
+  `ActivateRowOrynivoServer` (activates `row.OrynivoServer`), they work for the
+  dashboard's mixed local/remote list. Double-clicking a card opens the album
+  (`RecentAlbumCard_OnDoubleTapped`). Local artwork uses the album's 320-px
+  path (`RecentAlbumInfo.ArtworkPath`); remote uses the authenticated server URL.
+  Backed by the server endpoint `GET /api/albums/recent`
+  (`OrynivoServerClient.GetRecentAlbumsAsync`); servers without it are skipped.
+  Selecting a card supports Back navigation. Cover/favorite handlers refresh the
+  bound card in place on the dashboard surface (`UpdateRowArtworkFromBytes`)
+  instead of rebuilding the hidden Albums list.
+  3. **Stats section** (`DashboardBuildStatsSection`): the calendar and top-genre
+  blocks, each with its own section header. They sit side by side in a two-column
+  grid on wide dashboards and stack on narrow ones; the layout switches at a
+  980-px threshold (`ComputeDashboardTwoColumn`) and re-flows on the
+  `DashboardScrollViewer.SizeChanged` boundary crossing only.
+     - **Calendar** (`DashboardBuildCalendarCard`): Monday-first month grid with
+     day number, `HH:mm:ss` playback time, top three linked genres, today
+     highlight, and month navigation.
+     - **Top 10 genres** (`DashboardBuildTopGenresCard`): a modern analytics card
+     with a colored numbered rank chip (contrast-safe text via
+     `PickContrastBrush`), a linked genre label, `HH:mm:ss` duration, and a thin
+     proportional bar per genre, colored from `_genreColors`.
+- The **Recently played** and **Recently added** section headers carry a
+  right-aligned **Show all** link (`DashboardCreateSectionHeader`'s
+  `showAllAction`). It opens a full-page view (`ShowAllRecentlyPlayedAsync` /
+  `ShowAllRecentAlbumsAsync`) that reuses the dashboard scroll surface and shows
+  up to 200 entries in a `WrapPanel` of the same cards (identical double-click /
+  click behaviour). These views are pseudo-top-level tags `RecentlyPlayedAll` /
+  `RecentAlbumsAll` handled in `ShowTopLevelViewAsync`
+  (`BuildAllRecentlyPlayedViewAsync` / `BuildAllRecentAlbumsViewAsync`); opening
+  one pushes the current state onto `_navigationStack`, so Back returns to the
+  dashboard, and opening an album from a full-page view returns to that full-page
+  view. `DashboardScrollViewer.SizeChanged` only re-flows the real dashboard
+  (`_currentTopLevelTag == "Dashboard"`), never the full-page views. Dashboard
+  album and recently-played thumbnails decode off the UI thread
+  (`LoadDashboardLocalArtworkAsync`) so the 200-item views build without a hitch.
 - Clicking a calendar day with playback opens a modal history table with playback
   time, media type, title, artist, album, listened duration, and total duration
 - Local-track title links in daily history open Tracks, select the title, and

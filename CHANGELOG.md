@@ -8,6 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Reworked the Dashboard into a more personal "music hub": a time-of-day
+  greeting with a short tagline now opens the page, followed by a new **Recently
+  played** strip of compact cards (local album artwork or an initials
+  placeholder, with a hover play affordance) that play the track in place
+  without leaving the view. **Recently added** albums now use the same artwork
+  cards as the normal Albums view, so their covers can be changed (search /
+  reassign / delete) and albums can be toggled as favorites directly from the
+  dashboard — for local and remote Orynivo Server albums alike. The **Calendar**
+  and **Top genres** blocks are now visually separated and shown side by side on
+  wide windows (stacking on narrow ones), and Top genres is a modern analytics
+  card with numbered colour-coded rank chips and thin proportional bars.
+- Added a **Show all** link to the Dashboard's **Recently played** and **Recently
+  added** sections. It opens a full-page view of up to 200 entries with the same
+  cards and actions as the dashboard strips, and integrates with the Back button:
+  returning from an opened album lands back on the full-page view, and Back again
+  returns to the dashboard.
 - Added subtle UI motion for main navigation: album/artist artwork cards now
   show a lightweight hover overlay, Dashboard album cards react on hover,
   sidebar accordion rows fade/collapse instead of disappearing abruptly, and
@@ -20,6 +36,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Fixed the Dashboard **Recently played** hover play button not appearing on
+  many cards (typically the cover-less ones): those were remote server / Plex
+  tracks that were treated as not playable. Music-track history entries are now
+  playable whenever they are a locally available file **or** a playable stream
+  URL, so their cards show the hover play button and play the track in place
+  (replacing the queue with just that track) instead of switching to the Tracks
+  view. Radio and podcast history entries keep their dedicated views. The play
+  overlay also now has an explicit size so it fills avatar-only cards.
+- Fixed the Dashboard **Recently added** album cards having no hover effect: the
+  card hover/cover-reveal styles were scoped to `ListBoxItem` and now also react
+  to the card border being hovered, so the shared artwork card animates in the
+  dashboard strip and full view too.
 - Fixed the **Up next** queue order when starting a remote Orynivo Server album
   whose tracks span two directories (for example a multi-disc release without
   disc-number tags). Double-clicking a remote track now builds the queue from

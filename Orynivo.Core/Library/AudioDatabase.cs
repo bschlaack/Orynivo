@@ -155,7 +155,9 @@ public sealed record TrackLite(
 /// <param name="ThumbPath">Local 96-px thumbnail path, or <see langword="null"/> when no artwork exists.</param>
 /// <param name="ArtistId">Database album-artist identifier, or <see langword="null"/>.</param>
 /// <param name="AddedAt">Unix timestamp of the most recently added track in the album.</param>
-public sealed record RecentAlbumInfo(long Id, string Title, string Artist, string? ThumbPath, long? ArtistId = null, long AddedAt = 0);
+/// <param name="IsFavorite">Whether the album is flagged as a favorite.</param>
+/// <param name="ArtworkPath">Local 320-px thumbnail path for a crisp artwork card, or <see langword="null"/>.</param>
+public sealed record RecentAlbumInfo(long Id, string Title, string Artist, string? ThumbPath, long? ArtistId = null, long AddedAt = 0, bool IsFavorite = false, string? ArtworkPath = null);
 
 /// <summary>Aggregated listening data for a single calendar day.</summary>
 public sealed record CalendarDayData(int Day, double TotalSeconds, IReadOnlyList<string> TopGenres);
@@ -3704,7 +3706,9 @@ public sealed class AudioDatabase : IDisposable
                    COALESCE(ar.name, '')  AS artist,
                    art.thumb_96_path,
                    a.artist_id,
-                   MAX(COALESCE(t.added_at, 0)) AS last_added
+                   MAX(COALESCE(t.added_at, 0)) AS last_added,
+                   COALESCE(a.is_favorite, 0) AS is_favorite,
+                   COALESCE(art.thumb_320_path, art.original_path) AS artwork_path
             FROM albums a
             LEFT JOIN artists  ar  ON ar.id  = a.artist_id
             LEFT JOIN artworks art ON art.id  = a.artwork_id
@@ -3721,7 +3725,9 @@ public sealed class AudioDatabase : IDisposable
                 r.GetInt64(0), r.GetString(1), r.GetString(2),
                 r.IsDBNull(3) ? null : r.GetString(3),
                 r.IsDBNull(4) ? null : r.GetInt64(4),
-                r.IsDBNull(5) ? 0 : r.GetInt64(5)));
+                r.IsDBNull(5) ? 0 : r.GetInt64(5),
+                !r.IsDBNull(6) && r.GetInt64(6) != 0,
+                r.IsDBNull(7) ? null : r.GetString(7)));
         return result;
     }
 
