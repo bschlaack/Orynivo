@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
@@ -9,6 +10,7 @@ using Orynivo.Localization;
 
 namespace Orynivo;
 
+/// <summary>Dialog for manually searching and selecting album cover artwork.</summary>
 public partial class CoverSearchWindow : Window
 {
     private sealed record CoverResultViewModel(CoverSearchResult Result, Bitmap Image)
@@ -28,14 +30,18 @@ public partial class CoverSearchWindow : Window
     /// Initializes a runtime-loader instance with an empty album query.
     /// </summary>
     public CoverSearchWindow()
-        : this(string.Empty)
+        : this(string.Empty, null)
     {
     }
 
-    public CoverSearchWindow(string albumTitle)
+    /// <summary>Initializes a new cover-search dialog with editable album and artist queries.</summary>
+    /// <param name="albumTitle">Initial album title query.</param>
+    /// <param name="artistName">Initial artist query, or <see langword="null"/>.</param>
+    public CoverSearchWindow(string albumTitle, string? artistName = null)
     {
         InitializeComponent();
         QueryTextBox.Text = albumTitle;
+        ArtistQueryTextBox.Text = artistName;
         ResultsListBox.ItemsSource = _results;
         _busyTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(90) };
         _busyTimer.Tick += (_, _) =>
@@ -44,13 +50,29 @@ public partial class CoverSearchWindow : Window
             BusyIndicatorTextBlock.Text = _busyFrames[_busyFrameIndex];
         };
         Opened += (_, _) => WindowChrome.ApplyTheme(this);
-        Loaded += async (_, _) => await SearchAsync(QueryTextBox.Text ?? string.Empty);
+        Loaded += async (_, _) =>
+        {
+            QueryTextBox.Focus();
+            QueryTextBox.SelectAll();
+            await SearchAsync();
+        };
+        QueryTextBox.KeyDown += SearchTextBox_OnKeyDown;
+        ArtistQueryTextBox.KeyDown += SearchTextBox_OnKeyDown;
     }
 
     private async void SearchAgainButton_OnClick(object? sender, RoutedEventArgs e) =>
-        await SearchAsync(QueryTextBox.Text ?? string.Empty);
+        await SearchAsync();
 
-    private async Task SearchAsync(string query)
+    private async void SearchTextBox_OnKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+            return;
+
+        e.Handled = true;
+        await SearchAsync();
+    }
+
+    private async Task SearchAsync()
     {
         _results.Clear();
         BusyIndicatorTextBlock.IsVisible = true;
@@ -58,7 +80,9 @@ public partial class CoverSearchWindow : Window
         _busyTimer.Start();
         try
         {
-            var results = await MusicBrainzCoverSearch.SearchByAlbumTitleAsync(query);
+            var results = await MusicBrainzCoverSearch.SearchByAlbumTitleAsync(
+                QueryTextBox.Text ?? string.Empty,
+                ArtistQueryTextBox.Text);
             foreach (var result in results)
                 _results.Add(new CoverResultViewModel(result, CreateBitmap(result.ImageData)));
 

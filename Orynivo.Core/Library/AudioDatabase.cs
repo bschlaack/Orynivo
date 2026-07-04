@@ -175,7 +175,8 @@ public sealed record DailyHistoryEntry(
     string? Artist,
     string? Album,
     long? ArtistId,
-    long? AlbumId);
+    long? AlbumId,
+    string? ExternalId);
 
 /// <summary>Result returned after an artist-name normalisation run.</summary>
 public sealed record ArtistNormalizationResult(int MergedArtists, int UpdatedTracks);
@@ -3817,7 +3818,8 @@ public sealed class AudioDatabase : IDisposable
                    COALESCE(ar.name, t.artist, ph.subtitle),
                    COALESCE(a.title, t.album),
                    t.artist_id,
-                   t.album_id
+                   t.album_id,
+                   ph.external_id
             FROM play_history ph
             LEFT JOIN tracks t ON t.id = ph.track_id
             LEFT JOIN artists ar ON ar.id = t.artist_id
@@ -3846,7 +3848,8 @@ public sealed class AudioDatabase : IDisposable
                 r.IsDBNull(8) ? null : r.GetString(8),
                 r.IsDBNull(9) ? null : r.GetString(9),
                 r.IsDBNull(10) ? null : r.GetInt64(10),
-                r.IsDBNull(11) ? null : r.GetInt64(11)));
+                r.IsDBNull(11) ? null : r.GetInt64(11),
+                r.IsDBNull(12) ? null : r.GetString(12)));
         }
         return result;
     }
@@ -3869,7 +3872,8 @@ public sealed class AudioDatabase : IDisposable
                    COALESCE(ar.name, t.artist, ph.subtitle),
                    COALESCE(a.title, t.album),
                    t.artist_id,
-                   t.album_id
+                   t.album_id,
+                   ph.external_id
             FROM play_history ph
             LEFT JOIN tracks t ON t.id = ph.track_id
             LEFT JOIN artists ar ON ar.id = t.artist_id
@@ -3895,7 +3899,8 @@ public sealed class AudioDatabase : IDisposable
                 r.IsDBNull(8) ? null : r.GetString(8),
                 r.IsDBNull(9) ? null : r.GetString(9),
                 r.IsDBNull(10) ? null : r.GetInt64(10),
-                r.IsDBNull(11) ? null : r.GetInt64(11)));
+                r.IsDBNull(11) ? null : r.GetInt64(11),
+                r.IsDBNull(12) ? null : r.GetString(12)));
         }
         return result;
     }

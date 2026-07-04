@@ -4,7 +4,7 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.22.0] - 2026-07-04
 
 ### Added
 
@@ -36,6 +36,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Fixed the Dashboard being rendered twice below itself when Orynivo started
+  with Dashboard as the restored last view. Dashboard rebuilds are now versioned
+  and applied atomically, so a startup layout reflow cannot append stale content
+  from an earlier asynchronous build.
+- Added roomier row and column spacing to the Dashboard's full-page **Recently
+  played** view so the 200-card grid no longer feels vertically cramped.
+- Restyled Dashboard **Recently played** cards to match the shared artwork-card
+  language: they now use the app surface background, a separating gridline
+  border, asymmetric card/cover corners, and the same accent border on hover as
+  the Recently added album cards.
+- Fixed old remote **Recently played** entries showing the selected output
+  device (for example "Topping USB Audio") as the artist. Remote history cards
+  now refresh their title/artist from the configured Orynivo Server metadata,
+  and their hover border explicitly uses the current theme accent brush.
+- Added manual artist-image search to the artist-info view opened from a
+  currently playing remote Orynivo Server track. The shared artist-image search
+  dialog now focuses and selects its editable query on open and starts a new
+  search with Enter, making it easier to change the search text and retry from
+  both track and artist artist-info views.
+- Added an editable artist field to manual album-cover search. Album cover
+  lookups now prefill the known album/display artist and send both
+  `release:"album"` and `artist:"artist"` to MusicBrainz when the field is set,
+  improving broad titles such as "Greatest Hits"; clearing the artist field
+  keeps the previous album-only search behaviour.
+- Aligned the manual cover-search and artist-image-search dialogs by placing
+  the **Search again** action beside the active query field and adding a search
+  icon to the button in both dialogs.
+- Fixed Dashboard **Recently played** cards for Orynivo Server tracks not showing
+  cover art and replaying with only a bare stream URL. Remote history entries
+  now resolve back to their configured server track, load the server-side track
+  artwork, and register the full remote row before playback so the transport
+  shows cover/title/artist and keeps remote artist info, lyrics, favourites, and
+  waveform behaviour available. New remote history entries also store a stable
+  server/track identifier while older entries still resolve from their stream
+  URL.
 - Fixed the Dashboard **Recently played** hover play button not appearing on
   many cards (typically the cover-less ones): those were remote server / Plex
   tracks that were treated as not playable. Music-track history entries are now

@@ -93,6 +93,7 @@ public static class LocalizationManager
         resources["L_CoverSearchRunning"] = Current.CoverSearchRunning;
         resources["L_CoverSearchNoResults"] = Current.CoverSearchNoResults;
         resources["L_CoverSearchQuery"] = Current.CoverSearchQuery;
+        resources["L_CoverSearchArtistQuery"] = Current.CoverSearchArtistQuery;
         resources["L_SearchAgain"] = Current.SearchAgain;
         resources["L_UseSelectedCover"] = Current.UseSelectedCover;
         resources["L_DeleteCover"] = Current.DeleteCover;
@@ -342,7 +343,7 @@ public static class LocalizationManager
         "Datenbank optimieren", "Album-Cover reparieren", "Fehlende Cover-Artworks herunterladen",
         "Automatischer Download findet nur Cover, wenn eine MusicBrainz-ID gesetzt ist. Für freiere Suchen nutze die Schaltfläche direkt in der Albumansicht.",
         "Cover nicht gefunden", "Cover suchen", "Cover suchen", "Suche nach passenden Covern …",
-        "Keine Cover gefunden.", "Suchbegriff", "Erneut suchen", "Ausgewähltes Cover übernehmen",
+        "Keine Cover gefunden.", "Album-Suchbegriff", "Künstler (optional)", "Erneut suchen", "Ausgewähltes Cover übernehmen",
         "Cover löschen", "Cover neu zuordnen", "Autor", "Lizenzen", "Speichern", "Abbrechen", "Tabelle", "Artwork",
         "(Unbekannt)", "Album-Künstler", "Jahr", "Titel", "Künstler", "Album", "Genre", "Dauer", "Format",
         "Suchbegriff {0} wurde nicht in Tracks gefunden.",
@@ -781,7 +782,7 @@ public static class LocalizationManager
         "Optimize database", "Repair album artwork", "Download missing artwork",
         "Automatic download only finds covers when a MusicBrainz ID is present. For freer searches, use the button directly in the album view.",
         "Cover not found", "Search cover", "Search cover", "Searching for matching covers …",
-        "No covers found.", "Search term", "Search again", "Use selected cover",
+        "No covers found.", "Album search term", "Artist (optional)", "Search again", "Use selected cover",
         "Delete cover", "Reassign cover", "Author", "Licenses", "Save", "Cancel", "Table", "Artwork",
         "(Unknown)", "Album artist", "Year", "Title", "Artist", "Album", "Genre", "Duration", "Format",
         "Search term {0} was not found in tracks.",
@@ -1200,7 +1201,7 @@ public static class LocalizationManager
         "Optimiser la base", "Réparer les pochettes", "Télécharger les pochettes manquantes",
         "Le téléchargement automatique ne trouve des pochettes que si un identifiant MusicBrainz est présent. Pour une recherche plus libre, utilisez le bouton directement dans la vue des albums.",
         "Pochette introuvable", "Rechercher une pochette", "Rechercher une pochette", "Recherche de pochettes correspondantes …",
-        "Aucune pochette trouvée.", "Terme de recherche", "Relancer la recherche", "Utiliser la pochette sélectionnée",
+        "Aucune pochette trouvée.", "Recherche d’album", "Artiste (facultatif)", "Relancer la recherche", "Utiliser la pochette sélectionnée",
         "Supprimer la pochette", "Réattribuer la pochette", "Auteur", "Licences", "Enregistrer", "Annuler", "Tableau", "Pochettes",
         "(Inconnu)", "Artiste de l’album", "Année", "Titre", "Artiste", "Album", "Genre", "Durée", "Format",
         "Le terme de recherche {0} est introuvable dans les titres.",
@@ -1622,7 +1623,7 @@ public static class LocalizationManager
         "Optimizar base de datos", "Reparar portadas de álbum", "Descargar portadas faltantes",
         "La descarga automática solo encuentra portadas cuando hay un ID de MusicBrainz presente. Para búsquedas más libres, usa el botón directamente en la vista del álbum.",
         "Portada no encontrada", "Buscar portada", "Buscar portada", "Buscando portadas coincidentes …",
-        "No se encontraron portadas.", "Término de búsqueda", "Buscar de nuevo", "Usar portada seleccionada",
+        "No se encontraron portadas.", "Búsqueda de álbum", "Artista (opcional)", "Buscar de nuevo", "Usar portada seleccionada",
         "Eliminar portada", "Reasignar portada", "Autor", "Licencias", "Guardar", "Cancelar", "Tabla", "Portada",
         "(Desconocido)", "Artista del álbum", "Año", "Título", "Artista", "Álbum", "Género", "Duración", "Formato",
         "El término de búsqueda {0} no se encontró en las pistas.",

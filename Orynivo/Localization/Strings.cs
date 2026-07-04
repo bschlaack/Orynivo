@@ -38,6 +38,7 @@ public sealed record LocalizedStrings(
     string CoverSearchRunning,
     string CoverSearchNoResults,
     string CoverSearchQuery,
+    string CoverSearchArtistQuery,
     string SearchAgain,
     string UseSelectedCover,
     string DeleteCover,

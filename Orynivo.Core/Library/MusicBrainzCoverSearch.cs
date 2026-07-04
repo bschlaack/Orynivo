@@ -14,7 +14,7 @@ namespace Orynivo.Library;
 public sealed record CoverSearchResult(string ReleaseId, string Title, string? Artist, byte[] ImageData, string? MimeType);
 
 /// <summary>
-/// Searches MusicBrainz by album title and downloads front-cover images from the Cover Art Archive.
+/// Searches MusicBrainz by album title and optional artist, then downloads front-cover images from the Cover Art Archive.
 /// </summary>
 public static class MusicBrainzCoverSearch
 {
@@ -23,25 +23,32 @@ public static class MusicBrainzCoverSearch
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     /// <summary>
-    /// Queries MusicBrainz for releases matching <paramref name="albumTitle"/> and fetches up to
-    /// 12 front-cover images from the Cover Art Archive. Characters other than Unicode letters
-    /// and numbers are replaced with spaces before the query is submitted.
+    /// Queries MusicBrainz for releases matching <paramref name="albumTitle"/> and, when provided,
+    /// <paramref name="artistName"/>, then fetches up to 12 front-cover images from the Cover Art
+    /// Archive. Characters other than Unicode letters and numbers are replaced with spaces before
+    /// the query is submitted.
     /// </summary>
     /// <param name="albumTitle">Album title to search for.</param>
+    /// <param name="artistName">Optional artist name to narrow broad album titles.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Matched releases for which a front cover was available.</returns>
     public static async Task<List<CoverSearchResult>> SearchByAlbumTitleAsync(
         string albumTitle,
+        string? artistName = null,
         CancellationToken cancellationToken = default)
     {
-        var sanitizedAlbumTitle = SanitizeAlbumTitle(albumTitle);
+        var sanitizedAlbumTitle = SanitizeSearchTerm(albumTitle);
         if (sanitizedAlbumTitle.Length == 0)
             return [];
+        var sanitizedArtistName = SanitizeSearchTerm(artistName ?? string.Empty);
 
         using var client = new HttpClient();
         client.DefaultRequestHeaders.UserAgent.ParseAdd("Orynivo/1.0 (album-artwork-search)");
 
-        var query = Uri.EscapeDataString($"release:\"{sanitizedAlbumTitle}\"");
+        var queryText = string.IsNullOrWhiteSpace(sanitizedArtistName)
+            ? $"release:\"{sanitizedAlbumTitle}\""
+            : $"release:\"{sanitizedAlbumTitle}\" AND artist:\"{sanitizedArtistName}\"";
+        var query = Uri.EscapeDataString(queryText);
         using var response = await client.GetAsync(
             $"https://musicbrainz.org/ws/2/release/?query={query}&fmt=json&limit=12",
             cancellationToken);
@@ -90,6 +97,6 @@ public static class MusicBrainzCoverSearch
         return results;
     }
 
-    private static string SanitizeAlbumTitle(string albumTitle) =>
-        NonAlphanumericCharacters.Replace(albumTitle, " ").Trim();
+    private static string SanitizeSearchTerm(string value) =>
+        NonAlphanumericCharacters.Replace(value, " ").Trim();
 }

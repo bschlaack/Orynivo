@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Orynivo.Library;
@@ -8,6 +9,7 @@ using Orynivo.Localization;
 
 namespace Orynivo;
 
+/// <summary>Dialog for manually searching and selecting a Wikimedia artist image.</summary>
 public partial class ArtistImageSearchWindow : Window
 {
     private sealed record ResultViewModel(ArtistImageSearchResult Result, Bitmap Image)
@@ -32,6 +34,8 @@ public partial class ArtistImageSearchWindow : Window
     {
     }
 
+    /// <summary>Initializes a new artist-image search dialog with an editable initial query.</summary>
+    /// <param name="artistName">Initial artist-image search query.</param>
     public ArtistImageSearchWindow(string artistName)
     {
         InitializeComponent();
@@ -44,11 +48,26 @@ public partial class ArtistImageSearchWindow : Window
             BusyIndicatorTextBlock.Text = _busyFrames[_busyFrameIndex];
         };
         Opened += (_, _) => WindowChrome.ApplyTheme(this);
-        Loaded += async (_, _) => await SearchAsync();
+        Loaded += async (_, _) =>
+        {
+            QueryTextBox.Focus();
+            QueryTextBox.SelectAll();
+            await SearchAsync();
+        };
+        QueryTextBox.KeyDown += QueryTextBox_OnKeyDown;
     }
 
     private async void SearchAgainButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) =>
         await SearchAsync();
+
+    private async void QueryTextBox_OnKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+            return;
+
+        e.Handled = true;
+        await SearchAsync();
+    }
 
     private async Task SearchAsync()
     {
