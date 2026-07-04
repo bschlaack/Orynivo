@@ -20,6 +20,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Fixed the **Up next** queue order when starting a remote Orynivo Server album
+  whose tracks span two directories (for example a multi-disc release without
+  disc-number tags). Double-clicking a remote track now builds the queue from
+  the actually clicked directory group in its displayed order, matching local
+  albums, instead of rebuilding it from the raw, ungrouped album track list.
+- Improved remote Orynivo Server playback start latency on ASIO/cwASIO. A remote
+  PCM track (FLAC, MP3, etc.) is no longer treated as a possible native DSD
+  stream when the server metadata already identifies its format, so it skips the
+  two native DSF/DFF header probes (each a wasted HTTP round-trip) and starts
+  through the FFmpeg PCM path directly. This also restores gapless playback for
+  consecutive remote PCM tracks on ASIO/cwASIO, which previously played
+  track-by-track. Tracks with no usable format metadata still fall back to the
+  conservative native-DSD probe.
+- Further reduced remote Orynivo Server playback start latency on all backends
+  by skipping the separate FFmpeg probe when the server already reports the
+  track's sample rate. The player now builds its technical info from the cached
+  server metadata and only starts the decoder, removing one HTTP round-trip per
+  track (initial start and gapless prefetch); DSD sources and tracks without a
+  reported sample rate still probe as before.
 - Fixed remote Orynivo Server DSF playback using the FFmpeg PCM path while the
   transport claimed native DSD output. Remote DSF files now stream natively over
   HTTP byte ranges to ASIO/cwASIO, and the transport shows **DSD nativ** only

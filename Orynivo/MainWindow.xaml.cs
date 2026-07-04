@@ -328,8 +328,10 @@ public partial class MainWindow : Window
         public string? Genre       { get; init; }
         public string? Bitrate     { get; init; }
         public string? SampleRate  { get; init; }
+        public int?    SampleRateHz { get; init; }
         public string? BitDepth    { get; init; }
         public string? Channels    { get; init; }
+        public int?    ChannelCount { get; init; }
         public string? Composer    { get; init; }
         public string? Bpm         { get; init; }
         public string? FileName    { get; init; }
@@ -3648,8 +3650,10 @@ public partial class MainWindow : Window
             Format = track.Format?.ToUpperInvariant(),
             Bitrate = track.Bitrate is > 0 ? $"{track.Bitrate:N0} kbps" : null,
             SampleRate = track.SampleRate is > 0 ? $"{track.SampleRate:N0} Hz" : null,
+            SampleRateHz = track.SampleRate,
             BitDepth = track.BitDepth is > 0 ? $"{track.BitDepth:N0} Bit" : null,
             Channels = track.Channels?.ToString(CultureInfo.CurrentCulture),
+            ChannelCount = track.Channels,
             Composer = track.Composer,
             Bpm = track.Bpm?.ToString(CultureInfo.CurrentCulture),
             FileName = track.FileName,
@@ -3846,8 +3850,10 @@ public partial class MainWindow : Window
             Format = track.Format?.ToUpperInvariant(),
             Bitrate = track.Bitrate is > 0 ? $"{track.Bitrate:N0} kbps" : null,
             SampleRate = track.SampleRate is > 0 ? $"{track.SampleRate:N0} Hz" : null,
+            SampleRateHz = track.SampleRate,
             BitDepth = track.BitDepth is > 0 ? $"{track.BitDepth:N0} Bit" : null,
             Channels = track.Channels?.ToString(CultureInfo.CurrentCulture),
+            ChannelCount = track.Channels,
             Composer = track.Composer,
             Bpm = track.Bpm?.ToString(CultureInfo.CurrentCulture),
             FileName = track.FileName,
@@ -6008,9 +6014,16 @@ public partial class MainWindow : Window
             !TryGetDoubleTappedRow<ContentRow>(grid, e, out var row))
             return;
 
-        if (row.EntityType == "Track" &&
+        if (row.EntityType is "Track" or "OrynivoTrack" &&
             grid.ItemsSource is IEnumerable<ContentRow> rows)
         {
+            // Build the queue from the grid that was actually double-clicked so
+            // an album directory group ("CD1"/"CD2") queues exactly its own,
+            // correctly ordered rows. Remote ("OrynivoTrack") rows must take
+            // this path too; otherwise the queue would be rebuilt from the
+            // hidden ContentDataGrid, whose source is the raw, ungrouped album
+            // track list (interleaved across directories when disc numbers are
+            // missing).
             var contextRows = IsUnfilteredTopLevelTracksView() ? [row] : rows.ToList();
             await PlayTrackFromRowsAsync(row, contextRows);
             return;
@@ -10161,6 +10174,41 @@ public partial class MainWindow : Window
             : items;
     }
 
+    /// <summary>
+    /// Builds pre-known stream characteristics for a remote server track so the
+    /// player can skip the FFmpeg probe. Returns <see langword="null"/> for DSD
+    /// sources (which take the native remote players) and when the server did not
+    /// report a usable sample rate, so those tracks probe as before.
+    /// </summary>
+    /// <param name="row">Cached remote track row carrying server metadata.</param>
+    /// <returns>The pre-known audio info, or <see langword="null"/> to probe.</returns>
+    private static KnownAudioInfo? BuildRemotePcmKnownInfo(ContentRow row)
+    {
+        if (row.SampleRateHz is not > 0)
+            return null;
+
+        var format = row.Format?.Trim();
+        var sourceExtension = Path.GetExtension(row.SourcePath);
+        var fileNameExtension = Path.GetExtension(row.FileName);
+        var isDsd =
+            string.Equals(format, "DSF", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(format, "DFF", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(format, "DSDIFF", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(sourceExtension, ".dsf", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(sourceExtension, ".dff", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(fileNameExtension, ".dsf", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(fileNameExtension, ".dff", StringComparison.OrdinalIgnoreCase);
+        if (isDsd)
+            return null;
+
+        return new KnownAudioInfo(
+            row.SampleRateHz.Value,
+            row.ChannelCount ?? 2,
+            string.IsNullOrWhiteSpace(format) ? "pcm" : format.ToLowerInvariant(),
+            IsDsd: false,
+            format?.ToLowerInvariant());
+    }
+
     private GaplessPlaybackItem ResolveGaplessPlaybackItem(string path)
     {
         if (_plexTracksByUrl.TryGetValue(path, out var plexTrack))
@@ -10173,7 +10221,11 @@ public partial class MainWindow : Window
         }
 
         if (_orynivoTracksByUrl.TryGetValue(path, out var orynivoTrack))
-            return new GaplessPlaybackItem(path, GetPcmOutputGainFactor(), KnownDuration: orynivoTrack.KnownDuration);
+            return new GaplessPlaybackItem(
+                path,
+                GetPcmOutputGainFactor(),
+                KnownDuration: orynivoTrack.KnownDuration,
+                KnownInfo: BuildRemotePcmKnownInfo(orynivoTrack));
 
         if (!CueSheetParser.IsVirtualPath(path))
             return new GaplessPlaybackItem(path, GetReplayGainFactor(path));
@@ -10244,26 +10296,50 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// Determines whether a remote Orynivo Server stream should be routed through
+    /// the native DSD players. When the cached server metadata identifies a
+    /// concrete non-DSD format it is treated as authoritative so PCM tracks skip
+    /// the native DSF/DFF probes and go straight to the gapless FFmpeg PCM path;
+    /// only tracks with no usable format metadata fall back to the conservative
+    /// stream-URL check.
+    /// </summary>
+    /// <param name="path">Remote stream URL of the track.</param>
+    /// <returns>
+    /// <see langword="true"/> when the track may be native DSD; otherwise
+    /// <see langword="false"/>.
+    /// </returns>
     private bool IsRemoteOrynivoDsdCandidate(string path)
     {
         if (!_orynivoTracksByUrl.TryGetValue(path, out var row))
             return IsConfiguredOrynivoStreamUrl(path);
 
         var format = row.Format?.Trim();
+        var sourceExtension = Path.GetExtension(row.SourcePath);
+        var fileNameExtension = Path.GetExtension(row.FileName);
+
         if (string.Equals(format, "DSF", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(format, "DFF", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(format, "DSDIFF", StringComparison.OrdinalIgnoreCase))
+            string.Equals(format, "DSDIFF", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(sourceExtension, ".dsf", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(sourceExtension, ".dff", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(fileNameExtension, ".dsf", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(fileNameExtension, ".dff", StringComparison.OrdinalIgnoreCase))
             return true;
 
-        var sourceExtension = Path.GetExtension(row.SourcePath);
-        if (string.Equals(sourceExtension, ".dsf", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(sourceExtension, ".dff", StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        var fileNameExtension = Path.GetExtension(row.FileName);
-        return string.Equals(fileNameExtension, ".dsf", StringComparison.OrdinalIgnoreCase) ||
-               string.Equals(fileNameExtension, ".dff", StringComparison.OrdinalIgnoreCase) ||
-               IsConfiguredOrynivoStreamUrl(path);
+        // Any concrete server-supplied format/extension identifies the track as
+        // PCM here, so it must not probe the native DSD players. Each of those
+        // probes reads remote header byte ranges, adding two wasted HTTP
+        // round-trips before the FFmpeg fallback — the main reason remote
+        // playback took several seconds to start on ASIO/cwASIO. Routing PCM
+        // tracks through the normal FFmpeg branch also restores gapless playback
+        // for them, because that branch uses the full gapless item list instead
+        // of a single item. Only genuinely unknown tracks stay conservative.
+        var hasKnownFormat =
+            !string.IsNullOrWhiteSpace(format) ||
+            !string.IsNullOrWhiteSpace(sourceExtension) ||
+            !string.IsNullOrWhiteSpace(fileNameExtension);
+        return !hasKnownFormat && IsConfiguredOrynivoStreamUrl(path);
     }
 
     private bool IsConfiguredOrynivoStreamUrl(string path)

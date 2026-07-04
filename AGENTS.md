@@ -247,7 +247,15 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   reconnect options so the first decode of a remote/HTTP track does not block on
   FFmpeg's default 5 s probe window. The PCM probe paths
   (`FfmpegAudioPlayer.ProbeAsync`, `WasapiAudioPlayer.ProbeAsync`) apply the same
-  capped `ffprobe` settings for HTTP inputs. Seeking a remote Orynivo Server
+  capped `ffprobe` settings for HTTP inputs. When a caller already knows the
+  stream characteristics it can skip the probe entirely: a
+  `GaplessPlaybackItem.KnownInfo` (`KnownAudioInfo`) lets both players build the
+  `AudioFileInfo` from cached metadata instead of running `ffprobe`. `MainWindow`
+  supplies it for remote Orynivo Server PCM tracks from the server-reported
+  sample rate/channels/format (via `BuildRemotePcmKnownInfo`), removing one HTTP
+  round-trip on the initial start and on gapless prefetch; DSD sources and tracks
+  without a reported sample rate leave `KnownInfo` unset and probe as before.
+  Seeking a remote Orynivo Server
   stream (URL contains `/api/stream/`) uses **server-side seek**: the decoder
   appends `?ss=<seconds>` and decodes the offset stream from position 0 instead
   of seeking the HTTP stream itself (which binary-searches seektable-less files

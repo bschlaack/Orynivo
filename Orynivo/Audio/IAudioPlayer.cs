@@ -65,6 +65,11 @@ public interface IGaplessAudioPlayer : IAudioPlayer
 /// <param name="SegmentEnd">Optional exclusive end offset within the physical source.</param>
 /// <param name="SourcePaths">Ordered physical media parts forming one logical track.</param>
 /// <param name="KnownDuration">Optional authoritative duration for the logical track.</param>
+/// <param name="KnownInfo">
+/// Optional pre-known stream characteristics that let the player skip the FFmpeg
+/// probe. Supplied for remote tracks whose format is already reported by the
+/// server, avoiding one HTTP round-trip on playback start.
+/// </param>
 public sealed record GaplessPlaybackItem(
     string FilePath,
     float ReplayGainFactor,
@@ -72,7 +77,8 @@ public sealed record GaplessPlaybackItem(
     TimeSpan? SegmentStart = null,
     TimeSpan? SegmentEnd = null,
     IReadOnlyList<string>? SourcePaths = null,
-    TimeSpan? KnownDuration = null)
+    TimeSpan? KnownDuration = null,
+    KnownAudioInfo? KnownInfo = null)
 {
     /// <summary>Physical path passed to FFmpeg.</summary>
     public string PlaybackPath => SourcePath ?? FilePath;
@@ -86,7 +92,53 @@ public sealed record GaplessPlaybackItem(
         SegmentStart is { } start && SegmentEnd is { } end && end > start
             ? end - start
             : null;
+
+    /// <summary>
+    /// Builds an <see cref="AudioFileInfo"/> from the pre-known stream
+    /// characteristics so the player can avoid probing. The duration is left at
+    /// <see cref="TimeSpan.Zero"/> because callers override it from
+    /// <see cref="SegmentDuration"/> or <see cref="KnownDuration"/>.
+    /// </summary>
+    /// <returns>
+    /// The technical information, or <see langword="null"/> when no usable
+    /// pre-known sample rate is available and probing is required.
+    /// </returns>
+    public AudioFileInfo? TryCreateKnownAudioInfo()
+    {
+        if (KnownInfo is not { SourceSampleRate: > 0 } known)
+            return null;
+
+        var outputSampleRate = known.IsDsd
+            ? 176_400
+            : known.SourceSampleRate is >= 8_000 and <= 768_000
+                ? known.SourceSampleRate
+                : 192_000;
+        return new AudioFileInfo(
+            string.IsNullOrWhiteSpace(known.CodecName) ? "unknown" : known.CodecName,
+            known.SourceSampleRate,
+            known.Channels > 0 ? known.Channels : 2,
+            outputSampleRate,
+            known.IsDsd,
+            known.ContainerName ?? string.Empty,
+            TimeSpan.Zero);
+    }
 }
+
+/// <summary>
+/// Pre-known technical characteristics of a stream, used to skip the FFmpeg
+/// probe when a remote server already reports them.
+/// </summary>
+/// <param name="SourceSampleRate">Source sample rate in hertz.</param>
+/// <param name="Channels">Channel count of the source stream.</param>
+/// <param name="CodecName">Codec or format identifier for display.</param>
+/// <param name="IsDsd">Whether the source is a DSD stream.</param>
+/// <param name="ContainerName">Container/format name for display.</param>
+public sealed record KnownAudioInfo(
+    int SourceSampleRate,
+    int Channels,
+    string CodecName,
+    bool IsDsd,
+    string? ContainerName);
 
 /// <summary>
 /// Provides information about a newly audible track in a gapless session.
