@@ -18,21 +18,10 @@
     </Window.Styles>
     <Grid Margin="22"
           RowDefinitions="Auto,Auto,Auto,*">
-        <Border Grid.Row="0"
-                Width="320"
-                Padding="18,12"
-                HorizontalAlignment="Center"
-                CornerRadius="0,24,0,24">
-            <Border.Background>
-                <LinearGradientBrush StartPoint="0%,50%" EndPoint="100%,50%">
-                    <GradientStop Color="#FFFFFF" Offset="0"/>
-                    <GradientStop Color="#7268A7" Offset="1"/>
-                </LinearGradientBrush>
-            </Border.Background>
-            <Image Height="64"
-                   Source="avares://Orynivo/Assets/Orynivo_Logo.png"
-                   Stretch="Uniform"/>
-        </Border>
+        <Image Grid.Row="0"
+               HorizontalAlignment="Stretch"
+               Source="{DynamicResource AppAboutLogoSource}"
+               Stretch="Uniform"/>
 
         <StackPanel Grid.Row="1"
                     Margin="0,18,0,0">

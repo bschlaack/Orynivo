@@ -4,6 +4,20 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.22.1] - 2026-07-04
+
+### Changed
+
+- Updated the Windows application icon with a transparent background and updated
+  the logo shown in the splash screen and About dialog.
+- Updated the program wordmark shown at the top of the main sidebar.
+- Removed the gradient logo containers and let the sidebar, splash screen, and
+  About logos use the available width directly.
+- Widened the main sidebar and reserved scrollbar space in the navigation list
+  so selected-item highlights remain fully visible when the menu scrolls.
+- Added light-theme variants for the splash/About logo and the main-sidebar
+  program wordmark.
+
 ## [0.22.0] - 2026-07-04
 
 ### Added

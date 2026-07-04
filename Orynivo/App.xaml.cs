@@ -34,6 +34,7 @@ public partial class App : Application
             using (StartupTimingLog.Time("AppPaths.MigrateLegacyData"))
                 AppPaths.MigrateLegacyData();
 
+            ThemeManager.Apply(AppTheme.Dark);
             var startup = new StartupWindow();
             startup.Show();
 

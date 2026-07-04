@@ -127,7 +127,7 @@
             <Setter Property="Padding" Value="0"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="MaxWidth" Value="220"/>
+            <Setter Property="MaxWidth" Value="230"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Transitions">
                 <Transitions>
@@ -174,7 +174,7 @@
             <Setter Property="Padding" Value="0"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-            <Setter Property="MaxWidth" Value="220"/>
+            <Setter Property="MaxWidth" Value="230"/>
             <Setter Property="Focusable" Value="False"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Transitions">
@@ -845,13 +845,13 @@
         <Style Selector="TextBlock.navItemText">
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
             <Setter Property="TextWrapping" Value="NoWrap"/>
-            <Setter Property="MaxWidth" Value="170"/>
+            <Setter Property="MaxWidth" Value="198"/>
         </Style>
     </Window.Styles>
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="220"/>
+            <ColumnDefinition Width="248"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
@@ -872,18 +872,9 @@
             <!-- App title -->
             <Border Padding="18,16,18,14" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource AppHeaderBorderBrush}">
                 <StackPanel>
-                    <Border Padding="9,7"
-                            CornerRadius="0,18,0,18">
-                        <Border.Background>
-                            <LinearGradientBrush StartPoint="0%,50%" EndPoint="100%,50%">
-                                <GradientStop Color="#FFFFFF" Offset="0"/>
-                                <GradientStop Color="#7268A7" Offset="1"/>
-                            </LinearGradientBrush>
-                        </Border.Background>
-                        <Image Height="38"
-                               Source="avares://Orynivo/Assets/Orynivo_Logo.png"
-                               Stretch="Uniform"/>
-                    </Border>
+                    <Image HorizontalAlignment="Stretch"
+                           Source="{DynamicResource AppProgramLogoSource}"
+                           Stretch="Uniform"/>
                     <TextBlock x:Name="SelectedDriverTextBlock"
                                Foreground="{DynamicResource AppMutedTextBrush}" FontSize="{DynamicResource FontSizeMeta}" Margin="4,8,4,0"
                                Text="{DynamicResource L_NoDeviceSelected}"
@@ -896,7 +887,7 @@
                      Grid.Row="1"
                      Background="Transparent"
                      BorderThickness="0"
-                     Padding="0,8,0,8"
+                     Padding="0,8,18,8"
                      FontSize="{DynamicResource FontSizeBody}"
                      ClipToBounds="True"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"

@@ -1,4 +1,6 @@
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using Avalonia.Styling;
 using AvaloniaApp = Avalonia.Application;
 
@@ -11,6 +13,7 @@ namespace Orynivo;
 public static class ThemeManager
 {
     /// <summary>Switches the global Avalonia resource dictionary to the specified theme.</summary>
+    /// <param name="theme">The theme whose brushes and image assets should be applied.</param>
     public static void Apply(AppTheme theme)
     {
         var app = AvaloniaApp.Current!;
@@ -88,7 +91,16 @@ public static class ThemeManager
         resources["TreeViewItemForegroundSelected"] = Brush(dark ? "#FFFFFF" : "#111827");
         resources["TreeViewItemBackgroundSelected"] = Brush(dark ? "#293442" : "#E4EDFF");
         resources["TreeViewItemBackgroundPointerOver"] = Brush(dark ? "#222A35" : "#EEF4FF");
+
+        resources["AppAboutLogoSource"] = AssetImage(dark
+            ? "avares://Orynivo/Assets/Orynivo_Logo.png"
+            : "avares://Orynivo/Assets/logo_about_light.png");
+        resources["AppProgramLogoSource"] = AssetImage(dark
+            ? "avares://Orynivo/Assets/logo_prog.png"
+            : "avares://Orynivo/Assets/logo_prog_light.png");
     }
 
     private static SolidColorBrush Brush(string hex) => new(Color.Parse(hex));
+
+    private static Bitmap AssetImage(string uri) => new(AssetLoader.Open(new Uri(uri)));
 }

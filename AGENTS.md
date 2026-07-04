@@ -452,9 +452,15 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
 - `Orynivo/StartupWindow.*`: lightweight splash screen shown during initial
   database preparation and migration
 - `Orynivo/Assets/Orynivo_Logo.png`: embedded full logo used by the splash
-  screen and main sidebar
+  screen and About dialog in the dark theme
+- `Orynivo/Assets/logo_about_light.png`: embedded full logo used by the splash
+  screen and About dialog in the light theme
+- `Orynivo/Assets/logo_prog.png`: embedded program wordmark used at the top of
+  the main sidebar in the dark theme
+- `Orynivo/Assets/logo_prog_light.png`: embedded program wordmark used at the
+  top of the main sidebar in the light theme
 - `Orynivo/Assets/Orynivo.ico`: multi-resolution application and window icon
-  generated from `Logo/only_logo_300.png`
+  generated from `Logo/icon.png`
 - The process uses the explicit Windows AppUserModelID `Orynivo.AudioPlayer`;
   the startup window is excluded from the taskbar so the main window owns the
   taskbar identity
@@ -1297,9 +1303,10 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   uses `FontSizeMeta` with a muted foreground.
 - The main window uses a modern sidebar, content area, and full-width transport
   bar
-- The full Orynivo logo appears on a light logo surface in the startup window
-  and at the top of the main sidebar
-- The 220 px sidebar contains Dashboard, library navigation with local and
+- The full Orynivo logo appears directly, without a surrounding logo surface, in
+  the startup window and About dialog; the program wordmark appears directly at
+  the top of the main sidebar
+- The 248 px sidebar contains Dashboard, library navigation with local and
   Orynivo Server playlists, device information, About, and Settings
 - Library, personal radio, pinned podcast, and Plex server sidebar groups use
   independently expandable accordion headers; local playlists are a nested
