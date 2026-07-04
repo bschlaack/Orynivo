@@ -81,6 +81,57 @@ public static class WaveformCache
         return data;
     }
 
+    /// <summary>Returns cached waveform data for a stream URL, generating it through FFmpeg when needed.</summary>
+    /// <param name="cacheKey">Stable logical cache key for the stream.</param>
+    /// <param name="streamUrl">HTTP or HTTPS stream URL passed to FFmpeg.</param>
+    /// <param name="duration">Logical track duration.</param>
+    /// <param name="bucketCount">Number of peak buckets to return.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Waveform peak data, or <see langword="null"/> when analysis is unavailable.</returns>
+    public static async Task<WaveformData?> GetOrCreateStreamAsync(
+        string cacheKey,
+        string streamUrl,
+        TimeSpan duration,
+        int bucketCount,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(cacheKey) ||
+            string.IsNullOrWhiteSpace(streamUrl) ||
+            duration <= TimeSpan.Zero ||
+            bucketCount <= 0)
+        {
+            return null;
+        }
+
+        var cachePath = GetCachePath(
+            cacheKey,
+            streamUrl,
+            0,
+            0,
+            duration,
+            bucketCount,
+            null,
+            null);
+
+        var cached = await TryReadCacheAsync(cachePath, cancellationToken).ConfigureAwait(false);
+        if (cached is not null)
+            return cached;
+
+        var peaks = await AnalyzeAsync(
+            streamUrl,
+            duration,
+            bucketCount,
+            null,
+            null,
+            cancellationToken).ConfigureAwait(false);
+        if (peaks.Length == 0)
+            return null;
+
+        var data = new WaveformData(CacheVersion, duration.TotalSeconds, peaks.Length, peaks);
+        await WriteCacheAsync(cachePath, data, cancellationToken).ConfigureAwait(false);
+        return data;
+    }
+
     /// <summary>Deletes cached waveform data for a known track record when the track leaves the library.</summary>
     /// <param name="trackPath">Stable logical track path.</param>
     /// <param name="sourcePath">Physical source file path, or <see langword="null"/> to use <paramref name="trackPath"/>.</param>

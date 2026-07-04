@@ -265,7 +265,17 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   `ProcessStartInfo.WorkingDirectory`; stale installer shortcuts can otherwise
   leave the process current directory pointing to a deleted install path.
 - `Orynivo/Audio/DsfAudioPlayer.cs`: native DSF-to-DSD path
+- `Orynivo/Audio/RemoteDsfAudioPlayer.cs`: native DSF-to-DSD path for
+  authenticated Orynivo Server streams. It reads DSF headers and audio blocks
+  through HTTP byte ranges and feeds the existing ASIO/cwASIO DSD stream without
+  downloading the complete file first. Transport text may claim native DSD only
+  when this player or the local native DSD players are actually active.
 - `Orynivo/Audio/DffAudioPlayer.cs`: native DFF/DSDIFF-to-DSD path
+- `Orynivo/Audio/RemoteDffAudioPlayer.cs`: native uncompressed DFF/DSDIFF-to-DSD
+  path for authenticated Orynivo Server streams. It parses the remote `FRM8`,
+  `PROP`, and `DSD ` chunks through HTTP byte ranges, rejects DST-compressed DFF,
+  bit-reverses the DSD payload like the local DFF player, and feeds ASIO/cwASIO
+  without downloading the complete file first.
 - `Orynivo/Audio/WasapiAudioPlayer.cs`: exclusive-mode WASAPI PCM path; converts
   DSD sources to PCM in real time and selects the highest supported output
   sample rate up to the source rate plus the highest supported output precision
@@ -606,6 +616,10 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   `ContentRow` (`OrynivoServer`, `ArtistId`); the now-playing artist button is
   enabled for a remote track and navigates within that track's server library
   (`OpenOrynivoArtistAlbumsAsync`) rather than the local album view.
+  Remote transport waveform loading first asks the server for cached peaks and
+  falls back to client-side FFmpeg analysis of the authenticated stream URL when
+  the server cannot analyse the format; this keeps DFF waveforms available
+  without requiring the server's FFmpeg build to support every source format.
   The transport favourite (heart) button is enabled for a playing remote track
   and toggles the client-side favourite (`OrynivoServerFavorites`) for that
   track via `CurrentOrynivoFavoriteTarget`; the change is written to
@@ -985,6 +999,9 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   menu-building layer and mutation handlers should call the provider interface.
 - Selecting a playlist immediately adds the track or all album tracks and
   updates the status bar
+- Track-row playlist `ContextFlyout` instances are rebuilt directly before they
+  open so playlists created from a context menu appear immediately in the next
+  add-to-playlist menu without rebinding the complete table.
 - The album-detail header includes **Save as playlist**. It reads the current
   `ContentDataGrid.ItemsSource`, so it saves exactly the album tracks currently
   displayed after the artist-scope checkbox is applied, and opens the shared
@@ -1615,6 +1632,9 @@ asynchronous file I/O from the UI thread
 - **Tracks**: title-sorted list with combinable Favorites, Genre, Audio Type,
   and Bitrate facets; counts reflect the other active filters and unavailable
   unselected values are hidden
+- DataGrid double-click handlers resolve the clicked `DataGridRow` from the
+  event source before falling back to `SelectedItem`, so playback and navigation
+  work across the whole row, not just the visible text.
 - Alphabetically sorted artist, album, and track views show an A-Z/# index
   immediately left of the right-aligned scrollbar; unavailable letters are
   disabled, dragging across letters scrolls live, and the highlighted letter

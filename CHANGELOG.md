@@ -4,6 +4,37 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+### Fixed
+
+- Fixed remote Orynivo Server DSF playback using the FFmpeg PCM path while the
+  transport claimed native DSD output. Remote DSF files now stream natively over
+  HTTP byte ranges to ASIO/cwASIO, and the transport shows **DSD nativ** only
+  after the native DSF player has actually started; malformed or unsupported
+  remote DSF streams fall back to DSD-to-PCM and are labelled accordingly. The
+  remote native path now validates the actual DSF header instead of trusting
+  server metadata, retries transient ASIO driver-load failures while switching
+  from PCM playback, and accepts DSF headers that report 8-bit stored DSD bytes.
+- Added native DFF/DSDIFF playback for remote Orynivo Server streams. The client
+  now parses the remote DFF chunk structure through HTTP byte-range reads and
+  streams uncompressed DSD data directly to ASIO/cwASIO without downloading the
+  complete file first; DST-compressed DFF remains unsupported and falls back to
+  DSD-to-PCM.
+- Fixed missing transport waveforms for remote Orynivo Server tracks when the
+  server cannot generate waveform peaks for a format such as DFF. The client now
+  falls back to locally analysing the authenticated stream URL with FFmpeg and
+  caches the resulting compact peaks.
+- Fixed track context menus staying stale after creating a new playlist from a
+  track. Data-grid row playlist flyouts are now rebuilt immediately before they
+  open, so the new playlist is available for the next add action without leaving
+  the current list.
+- Fixed table double-click actions requiring the pointer to land on visible text
+  in some views. Track, search, radio, and podcast tables now resolve the
+  clicked data-grid row before starting playback or opening the row target.
+
 ## [0.21.0] - 2026-07-04
 
 ### Added

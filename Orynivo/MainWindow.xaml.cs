@@ -5882,7 +5882,7 @@ public partial class MainWindow : Window
         if (FindAncestor<Button>(e.Source as Visual) is not null)
             return;
         if (sender is not DataGrid grid ||
-            grid.SelectedItem is not ContentRow row)
+            !TryGetDoubleTappedRow<ContentRow>(grid, e, out var row))
             return;
 
         if (row.EntityType == "Track" &&
@@ -5924,7 +5924,7 @@ public partial class MainWindow : Window
     {
         if (FindAncestor<Button>(e.Source as Visual) is not null)
             return;
-        if (SearchTracksDataGrid.SelectedItem is not ContentRow row)
+        if (!TryGetDoubleTappedRow<ContentRow>(SearchTracksDataGrid, e, out var row))
             return;
 
         var allRows = (SearchTracksDataGrid.ItemsSource as IEnumerable<ContentRow>)?.ToList() ?? [];
@@ -5935,7 +5935,8 @@ public partial class MainWindow : Window
     {
         if (FindAncestor<Button>(e.Source as Visual) is not null)
             return;
-        if (SearchAlbumsDataGrid.SelectedItem is not ContentRow { Id: long albumId } row)
+        if (!TryGetDoubleTappedRow<ContentRow>(SearchAlbumsDataGrid, e, out var row) ||
+            row.Id is not long albumId)
             return;
 
         // Remote albums must open within the remote library; their IDs can collide
@@ -5957,7 +5958,8 @@ public partial class MainWindow : Window
     {
         if (FindAncestor<Button>(e.Source as Visual) is not null)
             return;
-        if (SearchArtistsDataGrid.SelectedItem is not ContentRow { Id: long artistId } row)
+        if (!TryGetDoubleTappedRow<ContentRow>(SearchArtistsDataGrid, e, out var row) ||
+            row.Id is not long artistId)
             return;
 
         // Remote artists must open within the remote library (IDs can collide).
@@ -5968,6 +5970,26 @@ public partial class MainWindow : Window
         }
 
         await ShowArtistAlbumsAsync(artistId, row.Title ?? LocalizationManager.Current.Unknown);
+    }
+
+    private static bool TryGetDoubleTappedRow<T>(DataGrid grid, Avalonia.Input.TappedEventArgs e, out T row)
+        where T : class
+    {
+        row = null!;
+        if (FindAncestor<DataGridRow>(e.Source as Visual) is { DataContext: T sourceRow })
+        {
+            grid.SelectedItem = sourceRow;
+            row = sourceRow;
+            return true;
+        }
+
+        if (grid.SelectedItem is T selectedRow)
+        {
+            row = selectedRow;
+            return true;
+        }
+
+        return false;
     }
 
     private async void ArtistLinkButton_OnClick(object? sender, RoutedEventArgs e)
@@ -7504,6 +7526,7 @@ public partial class MainWindow : Window
 
         if (target is DataGridRow dataRow)
         {
+            SetPlaylistContextFlyout(dataRow);
             if (dataRow.ContextFlyout is not PopupFlyoutBase)
                 return;
             if (FindAncestor<DataGrid>(dataRow) is { } dataGrid)
@@ -8627,7 +8650,7 @@ public partial class MainWindow : Window
     private async void RadioStationsDataGrid_OnMouseDoubleClick(object? sender, Avalonia.Input.TappedEventArgs e)
     {
         if (FindAncestor<Button>(e.Source as Visual) is not null ||
-            RadioStationsDataGrid.SelectedItem is not RadioStationViewModel station)
+            !TryGetDoubleTappedRow<RadioStationViewModel>(RadioStationsDataGrid, e, out var station))
             return;
         await PlayRadioAsync(station.ToRecord());
     }
@@ -9252,7 +9275,7 @@ public partial class MainWindow : Window
     private async void PodcastsDataGrid_OnMouseDoubleClick(object? sender, Avalonia.Input.TappedEventArgs e)
     {
         if (FindAncestor<Button>(e.Source as Visual) is not null ||
-            PodcastsDataGrid.SelectedItem is not PodcastViewModel podcast)
+            !TryGetDoubleTappedRow<PodcastViewModel>(PodcastsDataGrid, e, out var podcast))
             return;
         await ShowPodcastEpisodesAsync(podcast.ToRecord());
     }
@@ -9435,7 +9458,7 @@ public partial class MainWindow : Window
     private async void PodcastEpisodesDataGrid_OnMouseDoubleClick(object? sender, Avalonia.Input.TappedEventArgs e)
     {
         if (_activePodcast is null ||
-            PodcastEpisodesDataGrid.SelectedItem is not PodcastEpisodeViewModel row)
+            !TryGetDoubleTappedRow<PodcastEpisodeViewModel>(PodcastEpisodesDataGrid, e, out var row))
             return;
         await PlayPodcastEpisodeAsync(_activePodcast, row.Episode);
     }
@@ -9612,7 +9635,7 @@ public partial class MainWindow : Window
         PodcastPlayback? podcastPlayback = null,
         TimeSpan initialPosition = default)
     {
-        StopPlayback();
+        await StopPlaybackAsync();
         _currentFilePath = filePath;
         _currentRadioStation = radioStation;
         _currentPodcastPlayback = podcastPlayback;
@@ -9647,6 +9670,9 @@ public partial class MainWindow : Window
                     _settings.OutputBackend,
                     _settings.SelectedDriverName,
                     _playbackCts.Token);
+            else if (!_settings.AlwaysConvertDsdToPcm &&
+                     IsRemoteOrynivoDsdCandidate(filePath))
+                (player, info) = await CreateRemoteOrynivoDsdOrPcmPlayerAsync(filePath, playbackTrack);
             else if (!_settings.AlwaysConvertDsdToPcm &&
                      ext.Equals(".dff", StringComparison.OrdinalIgnoreCase))
                 (player, info) = await DffAudioPlayer.CreateAsync(
@@ -9741,9 +9767,7 @@ public partial class MainWindow : Window
                                          ? SelectedDriverTextBlock.Text
                                          : LocalizationManager.Current.InternetRadio);
         ClearNowPlayingAlbum();
-        var usesNativeDsd = info.IsDsd &&
-                            !_settings.AlwaysConvertDsdToPcm &&
-                            _settings.OutputBackend is OutputBackend.Asio or OutputBackend.CwAsio;
+        var usesNativeDsd = player is DsfAudioPlayer or DffAudioPlayer or RemoteDsfAudioPlayer or RemoteDffAudioPlayer;
         FileInfoTextBlock.Text = usesNativeDsd
             ? $"{info.ContainerName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz  ·  {LocalizationManager.Current.NativeDsdOutput}"
             : info.IsDsd
@@ -10032,6 +10056,101 @@ public partial class MainWindow : Window
         }
 
         return new GaplessPlaybackItem(path, GetReplayGainFactor(path));
+    }
+
+    private async Task<(IAudioPlayer Player, AudioFileInfo Info)> CreateRemoteOrynivoDsdOrPcmPlayerAsync(
+        string filePath,
+        GaplessPlaybackItem playbackTrack)
+    {
+        var driverName = _settings.SelectedDriverName ?? string.Empty;
+        try
+        {
+            var (dsfPlayer, dsfInfo) = await RemoteDsfAudioPlayer.CreateAsync(
+                filePath,
+                _settings.OutputBackend,
+                driverName,
+                _playbackCts?.Token ?? CancellationToken.None);
+            return (dsfPlayer, dsfInfo);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException)
+        {
+            SeekDiagnostics.Log(
+                "remote-dsf-player",
+                $"native-skip reason={ex.GetType().Name} message={ex.Message}");
+        }
+
+        try
+        {
+            var (dffPlayer, dffInfo) = await RemoteDffAudioPlayer.CreateAsync(
+                filePath,
+                _settings.OutputBackend,
+                driverName,
+                _playbackCts?.Token ?? CancellationToken.None);
+            return (dffPlayer, dffInfo);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException)
+        {
+            SeekDiagnostics.Log(
+                "remote-dff-player",
+                $"native-fallback reason={ex.GetType().Name} message={ex.Message}");
+            return await FfmpegAudioPlayer.CreateAsync(
+                [playbackTrack],
+                _settings.OutputBackend,
+                driverName,
+                _settings.EqualizerEnabled,
+                _settings.EqualizerProfile,
+                _playbackCts?.Token ?? CancellationToken.None);
+        }
+    }
+
+    private bool IsRemoteOrynivoDsdCandidate(string path)
+    {
+        if (!_orynivoTracksByUrl.TryGetValue(path, out var row))
+            return IsConfiguredOrynivoStreamUrl(path);
+
+        var format = row.Format?.Trim();
+        if (string.Equals(format, "DSF", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(format, "DFF", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(format, "DSDIFF", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        var sourceExtension = Path.GetExtension(row.SourcePath);
+        if (string.Equals(sourceExtension, ".dsf", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(sourceExtension, ".dff", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        var fileNameExtension = Path.GetExtension(row.FileName);
+        return string.Equals(fileNameExtension, ".dsf", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(fileNameExtension, ".dff", StringComparison.OrdinalIgnoreCase) ||
+               IsConfiguredOrynivoStreamUrl(path);
+    }
+
+    private bool IsConfiguredOrynivoStreamUrl(string path)
+    {
+        if (!Uri.TryCreate(path, UriKind.Absolute, out var uri))
+            return false;
+
+        foreach (var server in _settings.OrynivoServers ?? [])
+        {
+            if (!Uri.TryCreate(server.BaseUrl, UriKind.Absolute, out var baseUri))
+                continue;
+
+            if (!string.Equals(uri.Scheme, baseUri.Scheme, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(uri.Host, baseUri.Host, StringComparison.OrdinalIgnoreCase) ||
+                uri.Port != baseUri.Port)
+            {
+                continue;
+            }
+
+            var basePath = baseUri.AbsolutePath.TrimEnd('/');
+            var expectedPrefix = string.IsNullOrEmpty(basePath)
+                ? "/api/stream/"
+                : $"{basePath}/api/stream/";
+            if (uri.AbsolutePath.StartsWith(expectedPrefix, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
     }
 
     private void GaplessPlayer_OnTrackChanged(object? sender, GaplessTrackChangedEventArgs e)
@@ -11087,7 +11206,16 @@ public partial class MainWindow : Window
                 server,
                 trackId,
                 cancellationToken);
-            return waveform?.Peaks ?? [];
+            if (waveform?.Peaks is { Length: > 0 } peaks)
+                return peaks;
+
+            var fallback = await WaveformCache.GetOrCreateStreamAsync(
+                $"orynivo-server:{server.Id}:{trackId}",
+                filePath,
+                duration,
+                900,
+                cancellationToken);
+            return fallback?.Peaks ?? [];
         }
 
         if (CueSheetParser.IsVirtualPath(filePath))
