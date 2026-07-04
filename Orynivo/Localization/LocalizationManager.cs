@@ -171,6 +171,8 @@ public static class LocalizationManager
         resources["L_DsdPlayback"] = Current.DsdPlayback;
         resources["L_AlwaysConvertDsdToPcm"] = Current.AlwaysConvertDsdToPcm;
         resources["L_AlwaysConvertDsdToPcmHint"] = Current.AlwaysConvertDsdToPcmHint;
+        resources["L_PcmOutputBoost"] = Current.PcmOutputBoost;
+        resources["L_PcmOutputBoostHint"] = Current.PcmOutputBoostHint;
         resources["L_Equalizer"] = Current.Equalizer;
         resources["L_EqualizerHint"] = Current.EqualizerHint;
         resources["L_EqualizerEnabled"] = Current.EqualizerEnabled;
@@ -440,6 +442,8 @@ public static class LocalizationManager
         DsdPlayback = "DSD-Wiedergabe",
         AlwaysConvertDsdToPcm = "DSD-Dateien immer in PCM umwandeln",
         AlwaysConvertDsdToPcmHint = "Verwendet auch mit ASIO/cwASIO den PCM-Pfad, damit Lautstärke, ReplayGain und Equalizer wirken. Bei deaktivierter Option bleibt native DSD-Ausgabe bitgenau.",
+        PcmOutputBoost = "PCM-Ausgabe um +6 dB anheben",
+        PcmOutputBoostHint = "Hebt alle PCM-Wiedergabewege an, um sie näher an die Lautheit nativer DSD-Ausgabe anzugleichen. Native DSD-Ausgabe bleibt bitgenau und unverändert.",
         OutputDevicesLoading = "Ausgabegeräte werden geladen …",
         Equalizer = "Parametrischer Equalizer",
         EqualizerHint = "Importiert Equalizer-APO- und AutoEQ-Profile für PCM sowie DSD-zu-PCM. Native DSD-Ausgabe bleibt bitgenau.",
@@ -858,6 +862,8 @@ public static class LocalizationManager
         DsdPlayback = "DSD playback",
         AlwaysConvertDsdToPcm = "Always convert DSD files to PCM",
         AlwaysConvertDsdToPcmHint = "Uses the PCM path with ASIO/cwASIO as well, allowing volume, ReplayGain, and the equalizer to apply. With this option disabled, native DSD output remains bit-perfect.",
+        PcmOutputBoost = "Boost PCM output by +6 dB",
+        PcmOutputBoostHint = "Raises all PCM playback paths so they are closer to native DSD output loudness. Native DSD output remains bit-perfect and unchanged.",
         OutputDevicesLoading = "Loading output devices …",
         Equalizer = "Parametric equalizer",
         EqualizerHint = "Imports Equalizer APO and AutoEQ profiles for PCM and DSD-to-PCM playback. Native DSD output remains bit-perfect.",
@@ -1274,6 +1280,8 @@ public static class LocalizationManager
         DsdPlayback = "Lecture DSD",
         AlwaysConvertDsdToPcm = "Toujours convertir les fichiers DSD en PCM",
         AlwaysConvertDsdToPcmHint = "Utilise également le chemin PCM avec ASIO/cwASIO afin d’appliquer le volume, ReplayGain et l’égaliseur. Lorsque cette option est désactivée, la sortie DSD native reste bit-perfect.",
+        PcmOutputBoost = "Augmenter la sortie PCM de +6 dB",
+        PcmOutputBoostHint = "Augmente tous les chemins de lecture PCM pour les rapprocher du niveau perçu de la sortie DSD native. La sortie DSD native reste bit-perfect et inchangée.",
         OutputDevicesLoading = "Chargement des périphériques de sortie …",
         Equalizer = "Égaliseur paramétrique",
         EqualizerHint = "Importe les profils Equalizer APO et AutoEQ pour la lecture PCM et DSD vers PCM. La sortie DSD native reste bit-perfect.",
@@ -1687,6 +1695,8 @@ public static class LocalizationManager
         DsdPlayback = "Reproducción DSD",
         AlwaysConvertDsdToPcm = "Convertir siempre los archivos DSD a PCM",
         AlwaysConvertDsdToPcmHint = "También usa la ruta PCM con ASIO/cwASIO para aplicar volumen, ReplayGain y ecualizador. Con esta opción desactivada, la salida DSD nativa sigue siendo bit-perfect.",
+        PcmOutputBoost = "Aumentar la salida PCM +6 dB",
+        PcmOutputBoostHint = "Eleva todas las rutas de reproducción PCM para acercarlas al volumen percibido de la salida DSD nativa. La salida DSD nativa sigue siendo bit-perfect y no cambia.",
         OutputDevicesLoading = "Cargando dispositivos de salida …",
         Equalizer = "Ecualizador paramétrico",
         EqualizerHint = "Importa perfiles de Equalizer APO y AutoEQ para PCM y DSD convertido a PCM. La salida DSD nativa sigue siendo bit-perfect.",

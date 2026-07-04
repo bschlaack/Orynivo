@@ -19,11 +19,19 @@
         <ControlTheme x:Key="NavItemTheme" TargetType="ListBoxItem">
             <Setter Property="Foreground" Value="{DynamicResource AppNavTextBrush}"/>
             <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Opacity" Value="1"/>
+            <Setter Property="MaxHeight" Value="96"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="MaxWidth" Value="220"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.14"/>
+                    <DoubleTransition Property="MaxHeight" Duration="0:0:0.16"/>
+                </Transitions>
+            </Setter>
             <Setter Property="Template">
                 <ControlTemplate>
                     <Border x:Name="Bd"
@@ -58,12 +66,20 @@
         <ControlTheme x:Key="NavSectionHeaderTheme" TargetType="ListBoxItem">
             <Setter Property="Foreground" Value="{DynamicResource AppMutedTextBrush}"/>
             <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Opacity" Value="1"/>
+            <Setter Property="MaxHeight" Value="96"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="MaxWidth" Value="220"/>
             <Setter Property="Focusable" Value="False"/>
             <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.14"/>
+                    <DoubleTransition Property="MaxHeight" Duration="0:0:0.16"/>
+                </Transitions>
+            </Setter>
             <Setter Property="Template">
                 <ControlTemplate>
                     <Border x:Name="Bd"
@@ -635,6 +651,34 @@
         </Style>
         <Style Selector="DataGridCell Button">
             <Setter Property="FontSize" Value="12"/>
+        </Style>
+        <Style Selector="Border.motionCard">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.14"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="ListBoxItem:pointerover Border.motionCard">
+            <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}"/>
+        </Style>
+        <Style Selector="Border.coverOverlay">
+            <Setter Property="Opacity" Value="0"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.14"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="ListBoxItem:pointerover Border.coverOverlay">
+            <Setter Property="Opacity" Value="1"/>
+        </Style>
+        <Style Selector="ScrollViewer.viewSurface, Grid.viewSurface, DataGrid.viewSurface, ListBox.viewSurface, TreeView.viewSurface">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.16"/>
+                </Transitions>
+            </Setter>
         </Style>
         <Style Selector="ListBox#NavListBox ListBoxItem TextBlock">
             <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
@@ -1266,6 +1310,7 @@
 
             <!-- Dashboard -->
             <ScrollViewer x:Name="DashboardScrollViewer"
+                          Classes="viewSurface"
                           Grid.Row="2"
                           IsVisible="False"
                           Background="{DynamicResource AppContentBrush}"
@@ -1281,6 +1326,7 @@
                            ZIndex="15"/>
 
             <Grid x:Name="InternetRadioView"
+                  Classes="viewSurface"
                   Grid.Row="1"
                   Grid.RowSpan="2"
                   IsVisible="False"
@@ -1558,6 +1604,7 @@
             </Grid>
 
             <Grid x:Name="PodcastView"
+                  Classes="viewSurface"
                   Grid.Row="1"
                   Grid.RowSpan="2"
                   IsVisible="False"
@@ -1803,6 +1850,7 @@
                 </Grid>
 
                 <Grid x:Name="PodcastEpisodesView"
+                      Classes="viewSurface"
                       Grid.Row="0"
                       Grid.RowSpan="3"
                       IsVisible="False"
@@ -2042,6 +2090,7 @@
 
                 <!-- Content DataGrid -->
                 <DataGrid x:Name="ContentDataGrid"
+                          Classes="viewSurface"
                           Grid.Row="1"
                           Background="{DynamicResource AppContentBrush}"
                           BorderThickness="0"
@@ -2058,6 +2107,7 @@
                           DoubleTapped="ContentDataGrid_OnMouseDoubleClick"/>
 
                 <ScrollViewer x:Name="AlbumFolderGroupsScrollViewer"
+                              Classes="viewSurface"
                               Grid.Row="1"
                               IsVisible="False"
                               Background="{DynamicResource AppContentBrush}"
@@ -2071,6 +2121,7 @@
             </Grid>
 
             <ScrollViewer x:Name="SearchResultsScrollViewer"
+                          Classes="viewSurface"
                           Grid.Row="2"
                           IsVisible="False"
                           Background="{DynamicResource AppContentBrush}"
@@ -2175,6 +2226,7 @@
 
             <!-- Folder TreeView -->
             <TreeView x:Name="FolderTreeView"
+                      Classes="viewSurface"
                       Grid.Row="2"
                       Background="{DynamicResource AppContentBrush}"
                       BorderThickness="0"
@@ -2184,6 +2236,7 @@
 
             <!-- Album artwork view -->
             <ListBox x:Name="AlbumArtworkListBox"
+                     Classes="viewSurface"
                      Grid.Row="2"
                      IsVisible="False"
                      Background="{DynamicResource AppContentBrush}"
@@ -2208,7 +2261,8 @@
                 </ListBox.ItemContainerTheme>
                 <ListBox.ItemTemplate>
                     <DataTemplate>
-                        <Border Width="180"
+                        <Border Classes="motionCard"
+                                Width="180"
                                 MinHeight="276"
                                 Margin="8"
                                 Padding="10"
@@ -2238,6 +2292,15 @@
                                                                  IsVisible="{Binding Artwork, Converter={x:Static conv:ObjectConverters.IsNull}}"/>
                                         <Image Source="{Binding Artwork}"
                                                Stretch="UniformToFill"/>
+                                        <Border Classes="coverOverlay"
+                                                Background="#5F000000">
+                                            <TextBlock Text="↗"
+                                                       HorizontalAlignment="Right"
+                                                       VerticalAlignment="Top"
+                                                       Margin="0,8,8,0"
+                                                       FontSize="{DynamicResource FontSizeSubtitle}"
+                                                       Foreground="{DynamicResource AppAccentTextBrush}"/>
+                                        </Border>
                                         <Border IsVisible="{Binding Artwork, Converter={x:Static conv:ObjectConverters.IsNull}}"
                                                 VerticalAlignment="Bottom"
                                                 Padding="0,7"
@@ -2301,6 +2364,7 @@
 
             <!-- Artist artwork view -->
             <ListBox x:Name="ArtistArtworkListBox"
+                     Classes="viewSurface"
                      Grid.Row="2"
                      IsVisible="False"
                      Background="{DynamicResource AppContentBrush}"
@@ -2325,7 +2389,8 @@
                 </ListBox.ItemContainerTheme>
                 <ListBox.ItemTemplate>
                     <DataTemplate>
-                        <Border Width="200"
+                        <Border Classes="motionCard"
+                                Width="200"
                                 Margin="8"
                                 Padding="12"
                                 Background="{DynamicResource AppSurfaceBrush}"
@@ -2345,6 +2410,15 @@
                                                                      IsVisible="{Binding Artwork, Converter={x:Static conv:ObjectConverters.IsNull}}"/>
                                             <Image Source="{Binding Artwork}"
                                                    Stretch="UniformToFill"/>
+                                            <Border Classes="coverOverlay"
+                                                    Background="#52000000">
+                                                <TextBlock Text="↗"
+                                                           HorizontalAlignment="Right"
+                                                           VerticalAlignment="Top"
+                                                           Margin="0,8,8,0"
+                                                           FontSize="{DynamicResource FontSizeSubtitle}"
+                                                           Foreground="{DynamicResource AppAccentTextBrush}"/>
+                                            </Border>
                                         </Grid>
                                     </Border>
                                     <Button Content="{Binding Title}"
@@ -2402,6 +2476,74 @@
                              Rows="27"
                              Columns="1"
                              Margin="0,4"/>
+            </Border>
+
+            <Border x:Name="ContentLoadingOverlay"
+                    Grid.Row="2"
+                    Margin="28,22,28,28"
+                    Padding="18"
+                    IsVisible="False"
+                    Background="{DynamicResource AppContentBrush}"
+                    ZIndex="40">
+                <Border.Transitions>
+                    <Transitions>
+                        <DoubleTransition Property="Opacity" Duration="0:0:0.16"/>
+                    </Transitions>
+                </Border.Transitions>
+                <StackPanel Spacing="12">
+                    <ProgressBar Height="3"
+                                 IsIndeterminate="True"
+                                 Background="{DynamicResource AppGridLineBrush}"
+                                 Foreground="{DynamicResource AppAccentBrush}"/>
+                    <Border Height="18"
+                            Width="220"
+                            HorizontalAlignment="Left"
+                            Background="{DynamicResource AppSurfaceHoverBrush}"
+                            CornerRadius="4"
+                            Opacity="0.7"/>
+                    <UniformGrid Columns="4"
+                                 Rows="2">
+                        <Border Height="92"
+                                Margin="0,0,12,12"
+                                Background="{DynamicResource AppSurfaceBrush}"
+                                CornerRadius="8"
+                                Opacity="0.8"/>
+                        <Border Height="92"
+                                Margin="0,0,12,12"
+                                Background="{DynamicResource AppSurfaceBrush}"
+                                CornerRadius="8"
+                                Opacity="0.64"/>
+                        <Border Height="92"
+                                Margin="0,0,12,12"
+                                Background="{DynamicResource AppSurfaceBrush}"
+                                CornerRadius="8"
+                                Opacity="0.72"/>
+                        <Border Height="92"
+                                Margin="0,0,0,12"
+                                Background="{DynamicResource AppSurfaceBrush}"
+                                CornerRadius="8"
+                                Opacity="0.58"/>
+                        <Border Height="92"
+                                Margin="0,0,12,0"
+                                Background="{DynamicResource AppSurfaceBrush}"
+                                CornerRadius="8"
+                                Opacity="0.5"/>
+                        <Border Height="92"
+                                Margin="0,0,12,0"
+                                Background="{DynamicResource AppSurfaceBrush}"
+                                CornerRadius="8"
+                                Opacity="0.66"/>
+                        <Border Height="92"
+                                Margin="0,0,12,0"
+                                Background="{DynamicResource AppSurfaceBrush}"
+                                CornerRadius="8"
+                                Opacity="0.56"/>
+                        <Border Height="92"
+                                Background="{DynamicResource AppSurfaceBrush}"
+                                CornerRadius="8"
+                                Opacity="0.7"/>
+                    </UniformGrid>
+                </StackPanel>
             </Border>
 
             <!-- Lyrics view -->

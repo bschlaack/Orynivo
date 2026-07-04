@@ -37,6 +37,7 @@ namespace Orynivo;
 
 public partial class MainWindow : Window
 {
+    private const float PcmOutputBoostFactor = 1.9952623f;
     private int _plexNavigationLoadVersion;
     private int _plexViewLoadVersion;
     private const int PlexPageSize = 500;
@@ -79,6 +80,9 @@ public partial class MainWindow : Window
     private List<ContentRow> _artistArtworkRows = [];
     private readonly ObservableCollection<ContentRow> _visibleAlbumArtworkRows = [];
     private readonly ObservableCollection<ContentRow> _visibleArtistArtworkRows = [];
+    private readonly Control[] _animatedViewSurfaces = [];
+    private int _contentLoadingDepth;
+    private int _contentLoadingGeneration;
     private int _artworkBindingVersion;
 
     // ------------------------------------------------------------------
@@ -430,6 +434,19 @@ public partial class MainWindow : Window
         using var timing = StartupTimingLog.Time("MainWindow constructor");
         using (StartupTimingLog.Time("MainWindow.InitializeComponent"))
             InitializeComponent();
+        _animatedViewSurfaces =
+        [
+            DashboardScrollViewer,
+            InternetRadioView,
+            PodcastView,
+            PodcastEpisodesView,
+            ContentDataGrid,
+            AlbumFolderGroupsScrollViewer,
+            SearchResultsScrollViewer,
+            FolderTreeView,
+            AlbumArtworkListBox,
+            ArtistArtworkListBox
+        ];
         LyricsListBox.ItemsSource = _lyricLines;
         // Recompute the transport accent whenever the now-playing cover changes,
         // regardless of which code path set it (local, remote, gapless, async).
@@ -1380,9 +1397,9 @@ public partial class MainWindow : Window
 
     private void ApplySidebarNavigationSettings()
     {
-        InternetRadioNavItem.IsVisible = _settings.ShowInternetRadioItem;
-        PodcastsNavItem.IsVisible      = _settings.ShowPodcastsItem;
-        QueueNavItem.IsVisible         = _settings.ShowQueueItem;
+        SetSidebarItemVisibility(InternetRadioNavItem, _settings.ShowInternetRadioItem);
+        SetSidebarItemVisibility(PodcastsNavItem, _settings.ShowPodcastsItem);
+        SetSidebarItemVisibility(QueueNavItem, _settings.ShowQueueItem);
         ApplyLibrarySectionVisibility();
         SetSidebarSectionVisibility(
             OwnRadiosHeaderItem,
@@ -1399,7 +1416,7 @@ public partial class MainWindow : Window
             "Plex",
             _settings.ShowPlexSection,
             dynamicPrefix: "Plex");
-        PlaylistsHeaderItem.IsVisible = false;
+        SetSidebarItemVisibility(PlaylistsHeaderItem, false);
     }
 
     private void SetSidebarSectionVisibility(
@@ -1409,7 +1426,7 @@ public partial class MainWindow : Window
         IReadOnlyList<ListBoxItem>? staticItems = null,
         string? dynamicPrefix = null)
     {
-        header.IsVisible = isVisible;
+        SetSidebarItemVisibility(header, isVisible);
         var showItems = isVisible && IsSidebarSectionExpanded(section);
         var arrow = section switch
         {
@@ -1426,7 +1443,7 @@ public partial class MainWindow : Window
         if (staticItems is not null)
         {
             foreach (var item in staticItems)
-                item.IsVisible = showItems;
+                SetSidebarItemVisibility(item, showItems);
         }
 
         if (dynamicPrefix is null)
@@ -1435,13 +1452,13 @@ public partial class MainWindow : Window
         foreach (var item in NavListBox.Items.OfType<ListBoxItem>())
         {
             if (item.Tag is string tag && tag.StartsWith(dynamicPrefix, StringComparison.Ordinal))
-                item.IsVisible = showItems;
+                SetSidebarItemVisibility(item, showItems);
         }
     }
 
     private void ApplyLibrarySectionVisibility()
     {
-        LocalLibraryHeaderItem.IsVisible = _settings.ShowLocalLibrarySection;
+        SetSidebarItemVisibility(LocalLibraryHeaderItem, _settings.ShowLocalLibrarySection);
         var showLibraryItems = _settings.ShowLocalLibrarySection && IsSidebarSectionExpanded("LocalLibrary");
         SetArrowData(LocalLibraryHeaderArrow, showLibraryItems);
 
@@ -1452,16 +1469,16 @@ public partial class MainWindow : Window
         // directories nor any Orynivo Server is configured. It disappears as soon
         // as a directory or server is added (this method re-runs on every settings
         // save and navigation rebuild).
-        LibraryEmptyHintItem.IsVisible = showLibraryItems && !hasLocalMedia && !hasOrynivoServers;
+        SetSidebarItemVisibility(LibraryEmptyHintItem, showLibraryItems && !hasLocalMedia && !hasOrynivoServers);
 
         // The complete Local node is hidden until at least one library directory exists.
-        LocalLibraryRootItem.IsVisible = showLibraryItems && hasLocalMedia;
+        SetSidebarItemVisibility(LocalLibraryRootItem, showLibraryItems && hasLocalMedia);
         var showLocalItems = showLibraryItems && hasLocalMedia && _settings.IsLocalMediaLibraryGroupExpanded;
         SetArrowData(LocalMediaGroupArrow, _settings.IsLocalMediaLibraryGroupExpanded);
-        ArtistsNavItem.IsVisible = showLocalItems;
-        AlbumsNavItem.IsVisible = showLocalItems;
-        TracksNavItem.IsVisible = showLocalItems;
-        FoldersNavItem.IsVisible = showLocalItems;
+        SetSidebarItemVisibility(ArtistsNavItem, showLocalItems);
+        SetSidebarItemVisibility(AlbumsNavItem, showLocalItems);
+        SetSidebarItemVisibility(TracksNavItem, showLocalItems);
+        SetSidebarItemVisibility(FoldersNavItem, showLocalItems);
 
         foreach (var item in NavListBox.Items.OfType<ListBoxItem>())
         {
@@ -1471,7 +1488,7 @@ public partial class MainWindow : Window
             if (tag.StartsWith("LibraryGroup:OrynivoServerPlaylists:", StringComparison.Ordinal))
             {
                 var serverId = tag["LibraryGroup:OrynivoServerPlaylists:".Length..];
-                item.IsVisible = showLibraryItems && IsOrynivoServerLibraryGroupExpanded(serverId);
+                SetSidebarItemVisibility(item, showLibraryItems && IsOrynivoServerLibraryGroupExpanded(serverId));
                 UpdateLibraryGroupHeaderArrow(item, IsOrynivoServerPlaylistGroupExpanded(serverId));
                 continue;
             }
@@ -1479,21 +1496,21 @@ public partial class MainWindow : Window
             if (tag.StartsWith("LibraryGroup:OrynivoServer:", StringComparison.Ordinal))
             {
                 var serverId = tag["LibraryGroup:OrynivoServer:".Length..];
-                item.IsVisible = showLibraryItems;
+                SetSidebarItemVisibility(item, showLibraryItems);
                 UpdateLibraryGroupHeaderArrow(item, IsOrynivoServerLibraryGroupExpanded(serverId));
                 continue;
             }
 
             if (tag == "LibraryGroup:LocalPlaylists")
             {
-                item.IsVisible = showLocalItems;
+                SetSidebarItemVisibility(item, showLocalItems);
                 UpdateLibraryGroupHeaderArrow(item, _settings.IsPlaylistsSectionExpanded);
                 continue;
             }
 
             if (tag.StartsWith("Playlist:", StringComparison.Ordinal))
             {
-                item.IsVisible = showLocalItems && _settings.IsPlaylistsSectionExpanded;
+                SetSidebarItemVisibility(item, showLocalItems && _settings.IsPlaylistsSectionExpanded);
                 continue;
             }
 
@@ -1501,7 +1518,7 @@ public partial class MainWindow : Window
             {
                 var parts = tag.Split(':');
                 var serverId = parts.Length > 1 ? parts[1] : string.Empty;
-                item.IsVisible = showLibraryItems && IsOrynivoServerLibraryGroupExpanded(serverId);
+                SetSidebarItemVisibility(item, showLibraryItems && IsOrynivoServerLibraryGroupExpanded(serverId));
                 continue;
             }
 
@@ -1509,15 +1526,42 @@ public partial class MainWindow : Window
             {
                 var parts = tag.Split(':');
                 var serverId = parts.Length > 1 ? parts[1] : string.Empty;
-                item.IsVisible = showLibraryItems
+                SetSidebarItemVisibility(
+                    item,
+                    showLibraryItems
                     && IsOrynivoServerLibraryGroupExpanded(serverId)
-                    && IsOrynivoServerPlaylistGroupExpanded(serverId);
+                    && IsOrynivoServerPlaylistGroupExpanded(serverId));
             }
         }
     }
 
     private static void SetArrowData(Avalonia.Controls.Shapes.Path arrow, bool isExpanded) =>
         arrow.Data = Geometry.Parse(isExpanded ? "M 0 5 L 4 0 L 8 5" : "M 0 0 L 4 5 L 8 0");
+
+    private static void SetSidebarItemVisibility(ListBoxItem item, bool isVisible)
+    {
+        if (isVisible)
+        {
+            item.IsVisible = true;
+            item.MaxHeight = 96;
+            item.Opacity = 1;
+            return;
+        }
+
+        item.Opacity = 0;
+        item.MaxHeight = 0;
+        _ = HideCollapsedSidebarItemAsync(item);
+    }
+
+    private static async Task HideCollapsedSidebarItemAsync(ListBoxItem item)
+    {
+        await Task.Delay(180);
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            if (item.Opacity <= 0.05 && item.MaxHeight <= 0.5)
+                item.IsVisible = false;
+        });
+    }
 
     private static void UpdateLibraryGroupHeaderArrow(ListBoxItem item, bool isExpanded)
     {
@@ -1790,6 +1834,7 @@ public partial class MainWindow : Window
 
     private async Task ShowTopLevelViewAsync(string tag)
     {
+        ShowContentLoadingSkeleton();
         _currentTopLevelTag = tag;
         _orynivoTrackFacets = null;
         LyricsView.IsVisible = false;
@@ -1866,125 +1911,197 @@ public partial class MainWindow : Window
             _queue.Any(item => CanPersistQueuePath(item.FilePath));
         if (tag == "Tracks") UpdateSaveSmartPlaylistButtonState();
         TrackFilterPopup.IsOpen = false;
-        if (tag == "Dashboard")
+        try
         {
-            ContentDataGrid.IsVisible = false;
-            FolderTreeView.IsVisible = false;
-            AlbumArtworkListBox.IsVisible = false;
-            ArtistArtworkListBox.IsVisible = false;
-            DashboardScrollViewer.IsVisible = true;
-            await ShowDashboardAsync();
-        }
-        else if (tag == "AiChat")
-        {
-            ContentDataGrid.IsVisible = false;
-            FolderTreeView.IsVisible = false;
-            AlbumArtworkListBox.IsVisible = false;
-            ArtistArtworkListBox.IsVisible = false;
-            AiChatViewControl.IsVisible = true;
-        }
-        else if (tag == "InternetRadio")
-        {
-            ContentDataGrid.IsVisible = false;
-            FolderTreeView.IsVisible = false;
-            AlbumArtworkListBox.IsVisible = false;
-            ArtistArtworkListBox.IsVisible = false;
-            InternetRadioView.IsVisible = true;
-            await EnsureRadioFilterCatalogAsync();
-            if (RadioStationsDataGrid.ItemsSource is null)
-                await SearchRadioStationsAsync();
-        }
-        else if (tag == "Podcasts")
-        {
-            ContentDataGrid.IsVisible = false;
-            FolderTreeView.IsVisible = false;
-            AlbumArtworkListBox.IsVisible = false;
-            ArtistArtworkListBox.IsVisible = false;
-            PodcastView.IsVisible = true;
-            PodcastEpisodesView.IsVisible = false;
-            await EnsurePodcastFilterCatalogAsync();
-        }
-        else if (tag == "Queue")
-        {
-            ContentDataGrid.IsVisible = true;
-            FolderTreeView.IsVisible = false;
-            AlbumArtworkListBox.IsVisible = false;
-            ArtistArtworkListBox.IsVisible = false;
-            ApplyColumns("Queue");
-            RefreshQueueRows();
-        }
-        else if (tag.StartsWith("Podcast:", StringComparison.Ordinal) &&
-                 long.TryParse(tag.AsSpan("Podcast:".Length), out var podcastId))
-        {
-            ContentDataGrid.IsVisible = false;
-            FolderTreeView.IsVisible = false;
-            AlbumArtworkListBox.IsVisible = false;
-            ArtistArtworkListBox.IsVisible = false;
-            PodcastView.IsVisible = true;
-            await ShowSavedPodcastAsync(podcastId);
-        }
-        else if (tag.StartsWith("Radio:", StringComparison.Ordinal) &&
-                 long.TryParse(tag.AsSpan("Radio:".Length), out var radioId))
-        {
-            ContentDataGrid.IsVisible = false;
-            FolderTreeView.IsVisible = false;
-            AlbumArtworkListBox.IsVisible = false;
-            ArtistArtworkListBox.IsVisible = false;
-            InternetRadioView.IsVisible = true;
-            await PlaySavedRadioAsync(radioId);
-        }
-        else if (tag.StartsWith("PlexLibrary:", StringComparison.Ordinal))
-        {
-            await ShowPlexLibraryAsync(tag);
-        }
-        else if (isOrynivoServerTag)
-        {
-            await ShowOrynivoServerAsync(tag);
-        }
-        else if (tag.StartsWith("OrynivoServerPlaylist:", StringComparison.Ordinal))
-        {
-            await ShowOrynivoPlaylistAsync(tag);
-        }
-        else if (tag == "Folders")
-        {
-            ContentDataGrid.IsVisible = false;
-            FolderTreeView.IsVisible = true;
-            AlbumArtworkListBox.IsVisible = false;
-            ArtistArtworkListBox.IsVisible = false;
-
-            var tracks = await Task.Run(() =>
+            if (tag == "Dashboard")
             {
-                try { using var db = AudioDatabase.OpenDefault(); return db.GetTracksLite(); }
-                catch { return new List<TrackLite>(); }
-            });
+                ContentDataGrid.IsVisible = false;
+                FolderTreeView.IsVisible = false;
+                AlbumArtworkListBox.IsVisible = false;
+                ArtistArtworkListBox.IsVisible = false;
+                DashboardScrollViewer.IsVisible = true;
+                await ShowDashboardAsync();
+            }
+            else if (tag == "AiChat")
+            {
+                ContentDataGrid.IsVisible = false;
+                FolderTreeView.IsVisible = false;
+                AlbumArtworkListBox.IsVisible = false;
+                ArtistArtworkListBox.IsVisible = false;
+                AiChatViewControl.IsVisible = true;
+            }
+            else if (tag == "InternetRadio")
+            {
+                ContentDataGrid.IsVisible = false;
+                FolderTreeView.IsVisible = false;
+                AlbumArtworkListBox.IsVisible = false;
+                ArtistArtworkListBox.IsVisible = false;
+                InternetRadioView.IsVisible = true;
+                await EnsureRadioFilterCatalogAsync();
+                if (RadioStationsDataGrid.ItemsSource is null)
+                    await SearchRadioStationsAsync();
+            }
+            else if (tag == "Podcasts")
+            {
+                ContentDataGrid.IsVisible = false;
+                FolderTreeView.IsVisible = false;
+                AlbumArtworkListBox.IsVisible = false;
+                ArtistArtworkListBox.IsVisible = false;
+                PodcastView.IsVisible = true;
+                PodcastEpisodesView.IsVisible = false;
+                await EnsurePodcastFilterCatalogAsync();
+            }
+            else if (tag == "Queue")
+            {
+                ContentDataGrid.IsVisible = true;
+                FolderTreeView.IsVisible = false;
+                AlbumArtworkListBox.IsVisible = false;
+                ArtistArtworkListBox.IsVisible = false;
+                ApplyColumns("Queue");
+                RefreshQueueRows();
+            }
+            else if (tag.StartsWith("Podcast:", StringComparison.Ordinal) &&
+                     long.TryParse(tag.AsSpan("Podcast:".Length), out var podcastId))
+            {
+                ContentDataGrid.IsVisible = false;
+                FolderTreeView.IsVisible = false;
+                AlbumArtworkListBox.IsVisible = false;
+                ArtistArtworkListBox.IsVisible = false;
+                PodcastView.IsVisible = true;
+                await ShowSavedPodcastAsync(podcastId);
+            }
+            else if (tag.StartsWith("Radio:", StringComparison.Ordinal) &&
+                     long.TryParse(tag.AsSpan("Radio:".Length), out var radioId))
+            {
+                ContentDataGrid.IsVisible = false;
+                FolderTreeView.IsVisible = false;
+                AlbumArtworkListBox.IsVisible = false;
+                ArtistArtworkListBox.IsVisible = false;
+                InternetRadioView.IsVisible = true;
+                await PlaySavedRadioAsync(radioId);
+            }
+            else if (tag.StartsWith("PlexLibrary:", StringComparison.Ordinal))
+            {
+                await ShowPlexLibraryAsync(tag);
+            }
+            else if (isOrynivoServerTag)
+            {
+                await ShowOrynivoServerAsync(tag);
+            }
+            else if (tag.StartsWith("OrynivoServerPlaylist:", StringComparison.Ordinal))
+            {
+                await ShowOrynivoPlaylistAsync(tag);
+            }
+            else if (tag == "Folders")
+            {
+                ContentDataGrid.IsVisible = false;
+                FolderTreeView.IsVisible = true;
+                AlbumArtworkListBox.IsVisible = false;
+                ArtistArtworkListBox.IsVisible = false;
 
-            BuildFolderTree(tracks);
-            ContentCountTextBlock.Text = LocalizationManager.FormatTrackCount(tracks.Count);
+                var tracks = await Task.Run(() =>
+                {
+                    try { using var db = AudioDatabase.OpenDefault(); return db.GetTracksLite(); }
+                    catch { return new List<TrackLite>(); }
+                });
+
+                BuildFolderTree(tracks);
+                ContentCountTextBlock.Text = LocalizationManager.FormatTrackCount(tracks.Count);
+            }
+            else
+            {
+                var showArtwork = tag == "Albums"
+                    ? _showAlbumArtworkView
+                    : tag == "Artists" && _showArtistArtworkView;
+                ContentDataGrid.IsVisible = !(showArtwork);
+                FolderTreeView.IsVisible = false;
+                AlbumArtworkListBox.IsVisible = tag == "Albums" && _showAlbumArtworkView
+                    ? true : false;
+                ArtistArtworkListBox.IsVisible = tag == "Artists" && _showArtistArtworkView
+                    ? true : false;
+
+                var rows = tag == "Tracks"
+                    ? await Task.Run(GetFilteredTrackRows)
+                    : await Task.Run(() => QueryRows(tag));
+                ApplyColumns(tag);
+                ContentDataGrid.ItemsSource = rows;
+                if (tag == "Albums")
+                    BindArtworkRows(tag, rows);
+                else if (tag == "Artists")
+                    BindArtworkRows(tag, rows);
+                UpdateAlphabetIndex(rows, tag is "Artists" or "Albums" or "Tracks");
+                ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(rows.Count);
+            }
         }
-        else
+        finally
         {
-            var showArtwork = tag == "Albums"
-                ? _showAlbumArtworkView
-                : tag == "Artists" && _showArtistArtworkView;
-            ContentDataGrid.IsVisible = !(showArtwork);
-            FolderTreeView.IsVisible = false;
-            AlbumArtworkListBox.IsVisible = tag == "Albums" && _showAlbumArtworkView
-                ? true : false;
-            ArtistArtworkListBox.IsVisible = tag == "Artists" && _showArtistArtworkView
-                ? true : false;
-
-            var rows = tag == "Tracks"
-                ? await Task.Run(GetFilteredTrackRows)
-                : await Task.Run(() => QueryRows(tag));
-            ApplyColumns(tag);
-            ContentDataGrid.ItemsSource = rows;
-            if (tag == "Albums")
-                BindArtworkRows(tag, rows);
-            else if (tag == "Artists")
-                BindArtworkRows(tag, rows);
-            UpdateAlphabetIndex(rows, tag is "Artists" or "Albums" or "Tracks");
-            ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(rows.Count);
+            HideContentLoadingSkeleton();
+            FadeInVisibleContentSurface();
         }
+    }
+
+    private void ShowContentLoadingSkeleton()
+    {
+        _contentLoadingDepth++;
+        var generation = ++_contentLoadingGeneration;
+        if (_contentLoadingDepth > 1)
+            return;
+
+        ContentLoadingOverlay.Opacity = 0;
+        ContentLoadingOverlay.IsVisible = true;
+        Dispatcher.UIThread.Post(
+            () =>
+            {
+                if (_contentLoadingGeneration == generation && _contentLoadingDepth > 0)
+                    ContentLoadingOverlay.Opacity = 1;
+            },
+            DispatcherPriority.Render);
+    }
+
+    private void HideContentLoadingSkeleton()
+    {
+        if (_contentLoadingDepth > 0)
+            _contentLoadingDepth--;
+        var generation = ++_contentLoadingGeneration;
+        if (_contentLoadingDepth > 0)
+            return;
+
+        ContentLoadingOverlay.Opacity = 0;
+        _ = HideContentLoadingSkeletonAsync(generation);
+    }
+
+    private async Task HideContentLoadingSkeletonAsync(int generation)
+    {
+        await Task.Delay(170);
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            if (_contentLoadingGeneration == generation &&
+                _contentLoadingDepth == 0 &&
+                ContentLoadingOverlay.Opacity <= 0.05)
+            {
+                ContentLoadingOverlay.IsVisible = false;
+            }
+        });
+    }
+
+    private void FadeInVisibleContentSurface()
+    {
+        foreach (var surface in _animatedViewSurfaces)
+        {
+            if (surface.IsVisible)
+                surface.Opacity = 0;
+            else
+                surface.Opacity = 1;
+        }
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            foreach (var surface in _animatedViewSurfaces)
+            {
+                if (surface.IsVisible)
+                    surface.Opacity = 1;
+            }
+        }, DispatcherPriority.Render);
     }
 
     private void UpdateAlphabetIndex(IEnumerable<ContentRow>? source, bool visible)
@@ -2226,6 +2343,7 @@ public partial class MainWindow : Window
         if (_activeOrynivoServer is null)
             return;
 
+        ShowContentLoadingSkeleton();
         CancelAndDispose(ref _orynivoViewCts);
         _orynivoViewCts = new CancellationTokenSource();
         var ct = _orynivoViewCts.Token;
@@ -2381,6 +2499,11 @@ public partial class MainWindow : Window
         {
             StatusTextBlock.Text = LocalizationManager.Current.OrynivoConnectionFailed;
             return;
+        }
+        finally
+        {
+            HideContentLoadingSkeleton();
+            FadeInVisibleContentSurface();
         }
 
         StatusTextBlock.Text = string.Empty;
@@ -6394,67 +6517,76 @@ public partial class MainWindow : Window
         if (_activeAlbumFilterId is not long albumId)
             return;
 
-        var artistId = _showAllAlbumTracks ? null : _activeArtistFilterId;
-        var result = await Task.Run(() =>
+        ShowContentLoadingSkeleton();
+        try
         {
-            using var db = AudioDatabase.OpenDefault();
-            var tracks = db.GetTrackListByAlbum(albumId, artistId);
-            return (
-                Album: db.GetAlbumById(albumId),
-                Tracks: tracks,
-                Directories: db.GetAlbumTrackDirectories(albumId, artistId));
-        });
-        var groupedRows = result.Tracks
-            .GroupBy(
-                track => (
-                    Directory: NormalizeAlbumGroupValue(
-                        result.Directories.TryGetValue(track.Id, out var directory)
-                            ? directory
-                            : Path.GetDirectoryName(track.Path)),
-                    Album: NormalizeAlbumGroupValue(track.Album)))
-            .Select(group =>
+            var artistId = _showAllAlbumTracks ? null : _activeArtistFilterId;
+            var result = await Task.Run(() =>
             {
-                var first = group.First();
-                var albumArtists = group
-                    .Select(track => ArtistNameNormalizer.NormalizeDisplayName(
-                        track.AlbumArtist))
-                    .Where(artist => artist.Length > 0)
-                    .Distinct(StringComparer.CurrentCultureIgnoreCase)
-                    .ToList();
-                var primaryArtists = group
-                    .Select(track => ArtistNameNormalizer.NormalizeDisplayName(track.Artist))
-                    .Where(artist => artist.Length > 0)
-                    .Distinct(StringComparer.CurrentCultureIgnoreCase)
-                    .ToList();
-                return new AlbumTrackGroup(
-                    result.Directories.TryGetValue(first.Id, out var directory)
-                        ? directory
-                        : Path.GetDirectoryName(first.Path) ?? string.Empty,
-                    string.IsNullOrWhiteSpace(first.Album)
-                        ? LocalizationManager.Current.Unknown
-                        : first.Album.Trim(),
-                    albumArtists.Count == 1
-                        ? albumArtists[0]
-                        : albumArtists.Count == 0 && primaryArtists.Count == 1
-                            ? primaryArtists[0]
-                            : null,
-                    first.Year?.ToString(CultureInfo.CurrentCulture),
-                    group.Select(ToTrackContentRow).ToList());
-            })
-            .OrderBy(group => group.Directory, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(group => group.Album, StringComparer.CurrentCultureIgnoreCase)
-            .ThenBy(group => group.Artist, StringComparer.CurrentCultureIgnoreCase)
-            .ToList();
-        var rows = groupedRows.SelectMany(group => group.Rows).ToList();
-        HideAlbumFolderGroups();
-        ContentDataGrid.IsVisible = true;
-        ApplyColumns("Tracks");
-        ContentDataGrid.ItemsSource = rows;
-        ContentCountTextBlock.Text = LocalizationManager.FormatTrackCount(rows.Count);
-        UpdateAlphabetIndex(null, false);
-        ApplyAlbumDetailHeader(result.Album);
-        if (result.Album is not null && groupedRows.Count > 1)
-            ShowAlbumFolderGroups(groupedRows);
+                using var db = AudioDatabase.OpenDefault();
+                var tracks = db.GetTrackListByAlbum(albumId, artistId);
+                return (
+                    Album: db.GetAlbumById(albumId),
+                    Tracks: tracks,
+                    Directories: db.GetAlbumTrackDirectories(albumId, artistId));
+            });
+            var groupedRows = result.Tracks
+                .GroupBy(
+                    track => (
+                        Directory: NormalizeAlbumGroupValue(
+                            result.Directories.TryGetValue(track.Id, out var directory)
+                                ? directory
+                                : Path.GetDirectoryName(track.Path)),
+                        Album: NormalizeAlbumGroupValue(track.Album)))
+                .Select(group =>
+                {
+                    var first = group.First();
+                    var albumArtists = group
+                        .Select(track => ArtistNameNormalizer.NormalizeDisplayName(
+                            track.AlbumArtist))
+                        .Where(artist => artist.Length > 0)
+                        .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                        .ToList();
+                    var primaryArtists = group
+                        .Select(track => ArtistNameNormalizer.NormalizeDisplayName(track.Artist))
+                        .Where(artist => artist.Length > 0)
+                        .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                        .ToList();
+                    return new AlbumTrackGroup(
+                        result.Directories.TryGetValue(first.Id, out var directory)
+                            ? directory
+                            : Path.GetDirectoryName(first.Path) ?? string.Empty,
+                        string.IsNullOrWhiteSpace(first.Album)
+                            ? LocalizationManager.Current.Unknown
+                            : first.Album.Trim(),
+                        albumArtists.Count == 1
+                            ? albumArtists[0]
+                            : albumArtists.Count == 0 && primaryArtists.Count == 1
+                                ? primaryArtists[0]
+                                : null,
+                        first.Year?.ToString(CultureInfo.CurrentCulture),
+                        group.Select(ToTrackContentRow).ToList());
+                })
+                .OrderBy(group => group.Directory, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(group => group.Album, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(group => group.Artist, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+            var rows = groupedRows.SelectMany(group => group.Rows).ToList();
+            HideAlbumFolderGroups();
+            ContentDataGrid.IsVisible = true;
+            ApplyColumns("Tracks");
+            ContentDataGrid.ItemsSource = rows;
+            ContentCountTextBlock.Text = LocalizationManager.FormatTrackCount(rows.Count);
+            UpdateAlphabetIndex(null, false);
+            ApplyAlbumDetailHeader(result.Album);
+            if (result.Album is not null && groupedRows.Count > 1)
+                ShowAlbumFolderGroups(groupedRows);
+        }
+        finally
+        {
+            HideContentLoadingSkeleton();
+            FadeInVisibleContentSurface();
+        }
     }
 
     private async Task ShowProviderAlbumTracksAsync(
@@ -6499,54 +6631,63 @@ public partial class MainWindow : Window
             return;
         }
 
-        var artistId = _showAllAlbumTracks ? null : _activeArtistFilterId;
-        var catalogTracks = await provider.GetTracksByAlbumAsync(album.Id, artistId);
-        var rows = catalogTracks.Select(ToCatalogTrackContentRow).ToList();
-        var groupedRows = rows
-            .GroupBy(row => (
-                Directory: NormalizeAlbumGroupValue(
-                    Path.GetDirectoryName(row.SourcePath ?? row.FilePath)),
-                Album: NormalizeAlbumGroupValue(row.Album)))
-            .Select(group =>
-            {
-                var first = group.First();
-                var albumArtists = group
-                    .Select(track => ArtistNameNormalizer.NormalizeDisplayName(track.AlbumArtist))
-                    .Where(artist => artist.Length > 0)
-                    .Distinct(StringComparer.CurrentCultureIgnoreCase)
-                    .ToList();
-                var primaryArtists = group
-                    .Select(track => ArtistNameNormalizer.NormalizeDisplayName(track.Artist))
-                    .Where(artist => artist.Length > 0)
-                    .Distinct(StringComparer.CurrentCultureIgnoreCase)
-                    .ToList();
-                return new AlbumTrackGroup(
-                    Path.GetDirectoryName(first.SourcePath ?? first.FilePath) ?? string.Empty,
-                    string.IsNullOrWhiteSpace(first.Album)
-                        ? album.Title
-                        : first.Album.Trim(),
-                    albumArtists.Count == 1
-                        ? albumArtists[0]
-                        : albumArtists.Count == 0 && primaryArtists.Count == 1
-                            ? primaryArtists[0]
-                            : null,
-                    first.Year,
-                    group.ToList());
-            })
-            .OrderBy(group => group.Directory, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(group => group.Album, StringComparer.CurrentCultureIgnoreCase)
-            .ThenBy(group => group.Artist, StringComparer.CurrentCultureIgnoreCase)
-            .ToList();
+        ShowContentLoadingSkeleton();
+        try
+        {
+            var artistId = _showAllAlbumTracks ? null : _activeArtistFilterId;
+            var catalogTracks = await provider.GetTracksByAlbumAsync(album.Id, artistId);
+            var rows = catalogTracks.Select(ToCatalogTrackContentRow).ToList();
+            var groupedRows = rows
+                .GroupBy(row => (
+                    Directory: NormalizeAlbumGroupValue(
+                        Path.GetDirectoryName(row.SourcePath ?? row.FilePath)),
+                    Album: NormalizeAlbumGroupValue(row.Album)))
+                .Select(group =>
+                {
+                    var first = group.First();
+                    var albumArtists = group
+                        .Select(track => ArtistNameNormalizer.NormalizeDisplayName(track.AlbumArtist))
+                        .Where(artist => artist.Length > 0)
+                        .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                        .ToList();
+                    var primaryArtists = group
+                        .Select(track => ArtistNameNormalizer.NormalizeDisplayName(track.Artist))
+                        .Where(artist => artist.Length > 0)
+                        .Distinct(StringComparer.CurrentCultureIgnoreCase)
+                        .ToList();
+                    return new AlbumTrackGroup(
+                        Path.GetDirectoryName(first.SourcePath ?? first.FilePath) ?? string.Empty,
+                        string.IsNullOrWhiteSpace(first.Album)
+                            ? album.Title
+                            : first.Album.Trim(),
+                        albumArtists.Count == 1
+                            ? albumArtists[0]
+                            : albumArtists.Count == 0 && primaryArtists.Count == 1
+                                ? primaryArtists[0]
+                                : null,
+                        first.Year,
+                        group.ToList());
+                })
+                .OrderBy(group => group.Directory, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(group => group.Album, StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(group => group.Artist, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
 
-        HideAlbumFolderGroups();
-        ContentDataGrid.IsVisible = true;
-        ApplyColumns("Tracks");
-        ContentDataGrid.ItemsSource = rows;
-        ContentCountTextBlock.Text = LocalizationManager.FormatTrackCount(rows.Count);
-        UpdateAlphabetIndex(null, false);
-        ApplyAlbumDetailHeader(album);
-        if (groupedRows.Count > 1)
-            ShowAlbumFolderGroups(groupedRows);
+            HideAlbumFolderGroups();
+            ContentDataGrid.IsVisible = true;
+            ApplyColumns("Tracks");
+            ContentDataGrid.ItemsSource = rows;
+            ContentCountTextBlock.Text = LocalizationManager.FormatTrackCount(rows.Count);
+            UpdateAlphabetIndex(null, false);
+            ApplyAlbumDetailHeader(album);
+            if (groupedRows.Count > 1)
+                ShowAlbumFolderGroups(groupedRows);
+        }
+        finally
+        {
+            HideContentLoadingSkeleton();
+            FadeInVisibleContentSurface();
+        }
     }
 
     private static string NormalizeAlbumGroupValue(string? value) =>
@@ -10026,13 +10167,13 @@ public partial class MainWindow : Window
         {
             return new GaplessPlaybackItem(
                 path,
-                1.0f,
+                GetPcmOutputGainFactor(),
                 SourcePaths: plexTrack.PlexPartUrls,
                 KnownDuration: plexTrack.KnownDuration);
         }
 
         if (_orynivoTracksByUrl.TryGetValue(path, out var orynivoTrack))
-            return new GaplessPlaybackItem(path, 1.0f, KnownDuration: orynivoTrack.KnownDuration);
+            return new GaplessPlaybackItem(path, GetPcmOutputGainFactor(), KnownDuration: orynivoTrack.KnownDuration);
 
         if (!CueSheetParser.IsVirtualPath(path))
             return new GaplessPlaybackItem(path, GetReplayGainFactor(path));
@@ -12726,26 +12867,29 @@ public partial class MainWindow : Window
 
     private float GetReplayGainFactor(string filePath)
     {
-        if (_settings.ReplayGainMode == ReplayGainMode.Off ||
-            _player is DsfAudioPlayer or DffAudioPlayer)
-            return 1.0f;
+        var pcmGain = GetPcmOutputGainFactor();
+        if (_settings.ReplayGainMode == ReplayGainMode.Off)
+            return pcmGain;
 
         try
         {
             using var db = AudioDatabase.OpenDefault();
             var track = db.GetByPath(filePath);
             return track is null
-                ? 1.0f
-                : ReplayGain.GetLinearFactor(
+                ? pcmGain
+                : pcmGain * ReplayGain.GetLinearFactor(
                     _settings.ReplayGainMode,
                     track.ReplayGainTrack,
                     track.ReplayGainAlbum);
         }
         catch
         {
-            return 1.0f;
+            return pcmGain;
         }
     }
+
+    private float GetPcmOutputGainFactor() =>
+        _settings.PcmOutputBoostEnabled ? PcmOutputBoostFactor : 1.0f;
 
     private static string GetContentColumnWidthKey(string view) =>
         view.StartsWith("Playlist:", StringComparison.Ordinal)
@@ -12953,7 +13097,8 @@ public partial class MainWindow : Window
             var themeChanged = _settings.Theme != window.SelectedTheme;
             var languageChanged = _settings.Language != window.SelectedLanguage;
             var replayGainChanged =
-                _settings.ReplayGainMode != window.SelectedReplayGainMode;
+                _settings.ReplayGainMode != window.SelectedReplayGainMode ||
+                _settings.PcmOutputBoostEnabled != window.PcmOutputBoostEnabled;
             var artistInfoChanged =
                 _settings.ArtistInfoSource != window.SelectedArtistInfoSource ||
                 !string.Equals(
@@ -13000,6 +13145,7 @@ public partial class MainWindow : Window
             _settings.SelectedWasapiDeviceName   = window.SelectedWasapiDeviceName;
             _settings.ReplayGainMode        = window.SelectedReplayGainMode;
             _settings.AlwaysConvertDsdToPcm = window.AlwaysConvertDsdToPcm;
+            _settings.PcmOutputBoostEnabled = window.PcmOutputBoostEnabled;
             _settings.EqualizerEnabled      = window.EqualizerEnabled;
             _settings.EqualizerProfile      = window.SelectedEqualizerProfile;
             _settings.EqualizerProfiles     = window.SelectedEqualizerProfiles.ToList();
@@ -13119,26 +13265,24 @@ public partial class MainWindow : Window
 
     private float GetReplayGainFactorFromDatabase(string filePath)
     {
-        if (_settings.ReplayGainMode == ReplayGainMode.Off ||
-            _player is DsfAudioPlayer or DffAudioPlayer)
-        {
-            return 1.0f;
-        }
+        var pcmGain = GetPcmOutputGainFactor();
+        if (_settings.ReplayGainMode == ReplayGainMode.Off)
+            return pcmGain;
 
         try
         {
             using var db = AudioDatabase.OpenDefault();
             var track = db.GetByPath(filePath);
             return track is null
-                ? 1.0f
-                : ReplayGain.GetLinearFactor(
+                ? pcmGain
+                : pcmGain * ReplayGain.GetLinearFactor(
                     _settings.ReplayGainMode,
                     track.ReplayGainTrack,
                     track.ReplayGainAlbum);
         }
         catch
         {
-            return 1.0f;
+            return pcmGain;
         }
     }
 
@@ -13392,6 +13536,7 @@ public partial class MainWindow : Window
             BorderThickness = new Thickness(1),
             CornerRadius    = new CornerRadius(10),
             Cursor          = new Cursor(StandardCursorType.Hand),
+            Padding         = new Thickness(1),
             ClipToBounds    = true
         };
 
@@ -13401,15 +13546,16 @@ public partial class MainWindow : Window
         // remote artwork can be filled in asynchronously without rebuilding the card.
         var img = new Image
         {
-            Width   = 164,
-            Height  = 164,
+            Width   = 162,
+            Height  = 162,
             Stretch = Stretch.UniformToFill
         };
         var artworkHost = new Border
         {
-            Width      = 164,
-            Height     = 164,
+            Width      = 162,
+            Height     = 162,
             Background  = FindResource<IBrush>("AppArtworkPlaceholderBrush"),
+            CornerRadius = new CornerRadius(9, 9, 0, 0),
             ClipToBounds = true,
             Child      = img
         };
@@ -13466,6 +13612,16 @@ public partial class MainWindow : Window
 
         card.Child = stack;
 
+        card.PointerEntered += (_, _) =>
+        {
+            card.BorderBrush = FindResource<IBrush>("AppAccentBrush");
+            card.Background = FindResource<IBrush>("AppSurfaceHoverBrush");
+        };
+        card.PointerExited += (_, _) =>
+        {
+            card.BorderBrush = FindResource<IBrush>("AppGridLineBrush");
+            card.Background = FindResource<IBrush>("AppSurfaceBrush");
+        };
         card.PointerReleased += (_, e) =>
         {
             // Ignore releases on the album/artist link buttons so clicking the artist

@@ -676,6 +676,9 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
 - `AppSettings.AlwaysConvertDsdToPcm` forces DSF/DFF sources through FFmpeg and
   the PCM output path even when ASIO/cwASIO native DSD is available, allowing
   volume, ReplayGain, and equalizer processing
+- `AppSettings.PcmOutputBoostEnabled` applies an additional +6 dB linear gain to
+  every PCM playback path (local, remote, Plex, radio, podcasts, and converted
+  DSD). Native ASIO/cwASIO DSD remains bit-perfect and ignores the boost.
 - `AppSettings.EqualizerProfiles` persists all named imported or manually
   edited Equalizer APO/AutoEQ profiles, while
   `SelectedEqualizerProfileName`, `EqualizerProfile`, and `EqualizerEnabled`
@@ -1291,10 +1294,11 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   independently expandable accordion headers; local playlists are a nested
   Library child group and their expansion state is persisted
 - `NavListBox` must keep its non-virtualizing `StackPanel` `ItemsPanel`. The
-  sidebar collapse/expand logic toggles `ListBoxItem.IsVisible` directly; a
-  virtualizing panel recycles containers and drops those values, which breaks
-  the accordion groups (and is worsened by variable-height rows such as the
-  empty-library hint). Do not reintroduce virtualization here.
+  sidebar collapse/expand logic animates `ListBoxItem` opacity and `MaxHeight`
+  before changing `IsVisible`; a virtualizing panel recycles containers and
+  drops those values, which breaks the accordion groups (and is worsened by
+  variable-height rows such as the empty-library hint). Do not reintroduce
+  virtualization here.
 - `AppSettings.ShowInternetRadioItem`, `ShowPodcastsItem`, and `ShowQueueItem`
   control visibility of the Internet Radio, Podcasts, and Up Next sidebar items
   from Settings > Appearance and default to visible
@@ -1323,6 +1327,11 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   with a short view-specific headline and explanatory text. Search and filter
   controls stay outside and above that card in the plain header layout; A-Z
   indexes stay aligned with the content/table area, not the intro card.
+- Main content view switches use short opacity fade-ins and longer library,
+  remote-library, Dashboard, and album-detail loads show the shared
+  `ContentLoadingOverlay` skeleton/progress state. Keep this motion subtle and
+  centralized through the existing helpers instead of adding per-view ad-hoc
+  animations.
 - The album-detail card above its track table stretches across the available
   content width. Its favorite button appears immediately before the album title;
   cover search and **Save as playlist** remain adjacent themed actions.

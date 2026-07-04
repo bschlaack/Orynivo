@@ -202,6 +202,10 @@ public sealed record LocalizedStrings(
     public string AlwaysConvertDsdToPcm { get; init; } = "";
     /// <summary>Gets the explanatory text for forced DSD-to-PCM conversion.</summary>
     public string AlwaysConvertDsdToPcmHint { get; init; } = "";
+    /// <summary>Gets the option label for applying an additional PCM output boost.</summary>
+    public string PcmOutputBoost { get; init; } = "";
+    /// <summary>Gets the explanatory text for the additional PCM output boost.</summary>
+    public string PcmOutputBoostHint { get; init; } = "";
     /// <summary>Gets the output-device loading status message.</summary>
     public string OutputDevicesLoading { get; init; } = "";
     /// <summary>Gets the parametric equalizer settings label.</summary>

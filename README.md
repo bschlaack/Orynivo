@@ -212,6 +212,9 @@ byte-range streaming without FFmpeg.
   active conversion and PCM sample rate shown in the transport and status bar
 - Optional forced DSF/DFF-to-PCM conversion with ASIO/cwASIO, allowing volume,
   ReplayGain, and the parametric equalizer to affect DSD sources
+- Optional +6 dB PCM output boost for users whose DAC plays native DSD
+  noticeably louder than PCM. The boost applies only to PCM playback paths;
+  native DSD remains bit-perfect.
 - PCM playback through `ffmpeg`
 - Multiple named output profiles for quickly switching between configured
   output devices; a quick-pick popup in the transport bar selects the active
@@ -293,6 +296,10 @@ byte-range streaming without FFmpeg.
   visibility and persisted independent expansion for library, personal radio,
   podcast, and playlist sections; the Internet Radio, Podcasts, and
   **Up Next** sidebar items can each be hidden independently in Settings
+- Subtle interface motion for navigation and browsing: sidebar accordion rows
+  fade/collapse, Dashboard and library view changes fade in briefly, artwork
+  cards expose a lightweight hover overlay, and longer content loads use a
+  compact skeleton/progress state instead of a static blank/loading view.
 - Linked artist and album names for direct navigation to artist albums and
   album tracks
 - Session-wide Back navigation across sidebar views, search results, dashboard

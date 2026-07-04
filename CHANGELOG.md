@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Added subtle UI motion for main navigation: album/artist artwork cards now
+  show a lightweight hover overlay, Dashboard album cards react on hover,
+  sidebar accordion rows fade/collapse instead of disappearing abruptly, and
+  Dashboard, library, remote-library, and album-detail view changes use short
+  fade-ins with a compact skeleton/progress loading overlay.
+- Added an optional +6 dB PCM output boost in Settings > Playback. It applies
+  to every PCM playback path, including local files, remote/Plex streams,
+  radio, podcasts, and DSD sources when they are converted to PCM; native DSD
+  output remains bit-perfect and unchanged.
+
 ### Fixed
 
 - Fixed remote Orynivo Server DSF playback using the FFmpeg PCM path while the
@@ -34,6 +44,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Fixed table double-click actions requiring the pointer to land on visible text
   in some views. Track, search, radio, and podcast tables now resolve the
   clicked data-grid row before starting playback or opening the row target.
+- Fixed the new content loading skeleton occasionally remaining over already
+  loaded album detail views when a fast load completed before the deferred
+  fade-in callback ran.
+- Fixed the Dashboard album hover effect drawing only around the text area or
+  getting clipped. Dashboard cards now keep the accent outline inside the card
+  bounds and use a subtle surface change instead of scaling.
 
 ## [0.21.0] - 2026-07-04
 
