@@ -36,6 +36,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Fixed manual MusicBrainz cover search failing on stylized album titles with
+  punctuation such as `M!ssundaztood`. The primary release/artist query now
+  preserves punctuation and URL-encodes the complete query, with compacted and
+  spaced punctuation fallbacks when the exact query finds no cover results.
 - Fixed the Dashboard being rendered twice below itself when Orynivo started
   with Dashboard as the restored last view. Dashboard rebuilds are now versioned
   and applied atomically, so a startup layout reflow cannot append stale content

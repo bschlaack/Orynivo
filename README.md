@@ -367,7 +367,8 @@ byte-range streaming without FFmpeg.
 - Playback history for local tracks, podcast episodes, and internet-radio
   sessions, including position and completion state
 - Artwork downloads through the Cover Art Archive and manual MusicBrainz
-  search, with punctuation removed from album-title queries
+  search, preserving stylized punctuation in the primary query and falling back
+  to punctuation-normalized variants
 - Embedded or downloaded lyrics with synchronized LRC highlighting during playback
 - Manual LRCLIB lyrics search with editable title and artist, result preview,
   and explicit replacement of the cached lyrics

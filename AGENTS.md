@@ -876,8 +876,11 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   albums with a `musicbrainz_release_id`
 - Missing covers show a placeholder and manual MusicBrainz search by editable
   album title
-- Manual MusicBrainz cover searches replace every character other than Unicode
-  letters and numbers with a separating space before submitting the album title.
+- Manual MusicBrainz cover searches preserve punctuation inside the primary
+  quoted release/artist query and URL-encode the complete query, so stylized
+  titles such as `M!ssundaztood` remain searchable. If the exact query finds no
+  cover results, the search falls back to punctuation-compacted and
+  punctuation-spaced query variants.
 - The manual cover-search dialog uses the themed native title bar, shows search
   activity and explicit empty results, and can be run repeatedly
 - Album artwork has a context menu for deletion or reassignment through manual
