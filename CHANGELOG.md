@@ -4,6 +4,139 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.22.0] - 2026-07-04
+
+### Added
+
+- Reworked the Dashboard into a more personal "music hub": a time-of-day
+  greeting with a short tagline now opens the page, followed by a new **Recently
+  played** strip of compact cards (local album artwork or an initials
+  placeholder, with a hover play affordance) that play the track in place
+  without leaving the view. **Recently added** albums now use the same artwork
+  cards as the normal Albums view, so their covers can be changed (search /
+  reassign / delete) and albums can be toggled as favorites directly from the
+  dashboard — for local and remote Orynivo Server albums alike. The **Calendar**
+  and **Top genres** blocks are now visually separated and shown side by side on
+  wide windows (stacking on narrow ones), and Top genres is a modern analytics
+  card with numbered colour-coded rank chips and thin proportional bars.
+- Added a **Show all** link to the Dashboard's **Recently played** and **Recently
+  added** sections. It opens a full-page view of up to 200 entries with the same
+  cards and actions as the dashboard strips, and integrates with the Back button:
+  returning from an opened album lands back on the full-page view, and Back again
+  returns to the dashboard.
+- Added subtle UI motion for main navigation: album/artist artwork cards now
+  show a lightweight hover overlay, Dashboard album cards react on hover,
+  sidebar accordion rows fade/collapse instead of disappearing abruptly, and
+  Dashboard, library, remote-library, and album-detail view changes use short
+  fade-ins with a compact skeleton/progress loading overlay.
+- Added an optional +6 dB PCM output boost in Settings > Playback. It applies
+  to every PCM playback path, including local files, remote/Plex streams,
+  radio, podcasts, and DSD sources when they are converted to PCM; native DSD
+  output remains bit-perfect and unchanged.
+
+### Fixed
+
+- Fixed manual MusicBrainz cover search failing on stylized album titles with
+  punctuation such as `M!ssundaztood`. The primary release/artist query now
+  preserves punctuation and URL-encodes the complete query, with compacted and
+  spaced punctuation fallbacks when the exact query finds no cover results.
+- Fixed the Dashboard being rendered twice below itself when Orynivo started
+  with Dashboard as the restored last view. Dashboard rebuilds are now versioned
+  and applied atomically, so a startup layout reflow cannot append stale content
+  from an earlier asynchronous build.
+- Added roomier row and column spacing to the Dashboard's full-page **Recently
+  played** view so the 200-card grid no longer feels vertically cramped.
+- Restyled Dashboard **Recently played** cards to match the shared artwork-card
+  language: they now use the app surface background, a separating gridline
+  border, asymmetric card/cover corners, and the same accent border on hover as
+  the Recently added album cards.
+- Fixed old remote **Recently played** entries showing the selected output
+  device (for example "Topping USB Audio") as the artist. Remote history cards
+  now refresh their title/artist from the configured Orynivo Server metadata,
+  and their hover border explicitly uses the current theme accent brush.
+- Added manual artist-image search to the artist-info view opened from a
+  currently playing remote Orynivo Server track. The shared artist-image search
+  dialog now focuses and selects its editable query on open and starts a new
+  search with Enter, making it easier to change the search text and retry from
+  both track and artist artist-info views.
+- Added an editable artist field to manual album-cover search. Album cover
+  lookups now prefill the known album/display artist and send both
+  `release:"album"` and `artist:"artist"` to MusicBrainz when the field is set,
+  improving broad titles such as "Greatest Hits"; clearing the artist field
+  keeps the previous album-only search behaviour.
+- Aligned the manual cover-search and artist-image-search dialogs by placing
+  the **Search again** action beside the active query field and adding a search
+  icon to the button in both dialogs.
+- Fixed Dashboard **Recently played** cards for Orynivo Server tracks not showing
+  cover art and replaying with only a bare stream URL. Remote history entries
+  now resolve back to their configured server track, load the server-side track
+  artwork, and register the full remote row before playback so the transport
+  shows cover/title/artist and keeps remote artist info, lyrics, favourites, and
+  waveform behaviour available. New remote history entries also store a stable
+  server/track identifier while older entries still resolve from their stream
+  URL.
+- Fixed the Dashboard **Recently played** hover play button not appearing on
+  many cards (typically the cover-less ones): those were remote server / Plex
+  tracks that were treated as not playable. Music-track history entries are now
+  playable whenever they are a locally available file **or** a playable stream
+  URL, so their cards show the hover play button and play the track in place
+  (replacing the queue with just that track) instead of switching to the Tracks
+  view. Radio and podcast history entries keep their dedicated views. The play
+  overlay also now has an explicit size so it fills avatar-only cards.
+- Fixed the Dashboard **Recently added** album cards having no hover effect: the
+  card hover/cover-reveal styles were scoped to `ListBoxItem` and now also react
+  to the card border being hovered, so the shared artwork card animates in the
+  dashboard strip and full view too.
+- Fixed the **Up next** queue order when starting a remote Orynivo Server album
+  whose tracks span two directories (for example a multi-disc release without
+  disc-number tags). Double-clicking a remote track now builds the queue from
+  the actually clicked directory group in its displayed order, matching local
+  albums, instead of rebuilding it from the raw, ungrouped album track list.
+- Improved remote Orynivo Server playback start latency on ASIO/cwASIO. A remote
+  PCM track (FLAC, MP3, etc.) is no longer treated as a possible native DSD
+  stream when the server metadata already identifies its format, so it skips the
+  two native DSF/DFF header probes (each a wasted HTTP round-trip) and starts
+  through the FFmpeg PCM path directly. This also restores gapless playback for
+  consecutive remote PCM tracks on ASIO/cwASIO, which previously played
+  track-by-track. Tracks with no usable format metadata still fall back to the
+  conservative native-DSD probe.
+- Further reduced remote Orynivo Server playback start latency on all backends
+  by skipping the separate FFmpeg probe when the server already reports the
+  track's sample rate. The player now builds its technical info from the cached
+  server metadata and only starts the decoder, removing one HTTP round-trip per
+  track (initial start and gapless prefetch); DSD sources and tracks without a
+  reported sample rate still probe as before.
+- Fixed remote Orynivo Server DSF playback using the FFmpeg PCM path while the
+  transport claimed native DSD output. Remote DSF files now stream natively over
+  HTTP byte ranges to ASIO/cwASIO, and the transport shows **DSD nativ** only
+  after the native DSF player has actually started; malformed or unsupported
+  remote DSF streams fall back to DSD-to-PCM and are labelled accordingly. The
+  remote native path now validates the actual DSF header instead of trusting
+  server metadata, retries transient ASIO driver-load failures while switching
+  from PCM playback, and accepts DSF headers that report 8-bit stored DSD bytes.
+- Added native DFF/DSDIFF playback for remote Orynivo Server streams. The client
+  now parses the remote DFF chunk structure through HTTP byte-range reads and
+  streams uncompressed DSD data directly to ASIO/cwASIO without downloading the
+  complete file first; DST-compressed DFF remains unsupported and falls back to
+  DSD-to-PCM.
+- Fixed missing transport waveforms for remote Orynivo Server tracks when the
+  server cannot generate waveform peaks for a format such as DFF. The client now
+  falls back to locally analysing the authenticated stream URL with FFmpeg and
+  caches the resulting compact peaks.
+- Fixed track context menus staying stale after creating a new playlist from a
+  track. Data-grid row playlist flyouts are now rebuilt immediately before they
+  open, so the new playlist is available for the next add action without leaving
+  the current list.
+- Fixed table double-click actions requiring the pointer to land on visible text
+  in some views. Track, search, radio, and podcast tables now resolve the
+  clicked data-grid row before starting playback or opening the row target.
+- Fixed the new content loading skeleton occasionally remaining over already
+  loaded album detail views when a fast load completed before the deferred
+  fade-in callback ran.
+- Fixed the Dashboard album hover effect drawing only around the text area or
+  getting clipped. Dashboard cards now keep the accent outline inside the card
+  bounds and use a subtle surface change instead of scaling.
+
 ## [0.21.0] - 2026-07-04
 
 ### Added

@@ -455,6 +455,14 @@
                                FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"/>
+                    <CheckBox x:Name="PcmOutputBoostCheckBox"
+                              Theme="{StaticResource SettingsToggleTheme}"
+                              Content="{DynamicResource L_PcmOutputBoost}"
+                              Margin="0,14,0,6"/>
+                    <TextBlock Text="{DynamicResource L_PcmOutputBoostHint}"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"/>
 
                     <Separator Margin="0,18,0,14"/>
 

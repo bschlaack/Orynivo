@@ -93,6 +93,7 @@ public static class LocalizationManager
         resources["L_CoverSearchRunning"] = Current.CoverSearchRunning;
         resources["L_CoverSearchNoResults"] = Current.CoverSearchNoResults;
         resources["L_CoverSearchQuery"] = Current.CoverSearchQuery;
+        resources["L_CoverSearchArtistQuery"] = Current.CoverSearchArtistQuery;
         resources["L_SearchAgain"] = Current.SearchAgain;
         resources["L_UseSelectedCover"] = Current.UseSelectedCover;
         resources["L_DeleteCover"] = Current.DeleteCover;
@@ -171,6 +172,8 @@ public static class LocalizationManager
         resources["L_DsdPlayback"] = Current.DsdPlayback;
         resources["L_AlwaysConvertDsdToPcm"] = Current.AlwaysConvertDsdToPcm;
         resources["L_AlwaysConvertDsdToPcmHint"] = Current.AlwaysConvertDsdToPcmHint;
+        resources["L_PcmOutputBoost"] = Current.PcmOutputBoost;
+        resources["L_PcmOutputBoostHint"] = Current.PcmOutputBoostHint;
         resources["L_Equalizer"] = Current.Equalizer;
         resources["L_EqualizerHint"] = Current.EqualizerHint;
         resources["L_EqualizerEnabled"] = Current.EqualizerEnabled;
@@ -340,7 +343,7 @@ public static class LocalizationManager
         "Datenbank optimieren", "Album-Cover reparieren", "Fehlende Cover-Artworks herunterladen",
         "Automatischer Download findet nur Cover, wenn eine MusicBrainz-ID gesetzt ist. Für freiere Suchen nutze die Schaltfläche direkt in der Albumansicht.",
         "Cover nicht gefunden", "Cover suchen", "Cover suchen", "Suche nach passenden Covern …",
-        "Keine Cover gefunden.", "Suchbegriff", "Erneut suchen", "Ausgewähltes Cover übernehmen",
+        "Keine Cover gefunden.", "Album-Suchbegriff", "Künstler (optional)", "Erneut suchen", "Ausgewähltes Cover übernehmen",
         "Cover löschen", "Cover neu zuordnen", "Autor", "Lizenzen", "Speichern", "Abbrechen", "Tabelle", "Artwork",
         "(Unbekannt)", "Album-Künstler", "Jahr", "Titel", "Künstler", "Album", "Genre", "Dauer", "Format",
         "Suchbegriff {0} wurde nicht in Tracks gefunden.",
@@ -440,6 +443,8 @@ public static class LocalizationManager
         DsdPlayback = "DSD-Wiedergabe",
         AlwaysConvertDsdToPcm = "DSD-Dateien immer in PCM umwandeln",
         AlwaysConvertDsdToPcmHint = "Verwendet auch mit ASIO/cwASIO den PCM-Pfad, damit Lautstärke, ReplayGain und Equalizer wirken. Bei deaktivierter Option bleibt native DSD-Ausgabe bitgenau.",
+        PcmOutputBoost = "PCM-Ausgabe um +6 dB anheben",
+        PcmOutputBoostHint = "Hebt alle PCM-Wiedergabewege an, um sie näher an die Lautheit nativer DSD-Ausgabe anzugleichen. Native DSD-Ausgabe bleibt bitgenau und unverändert.",
         OutputDevicesLoading = "Ausgabegeräte werden geladen …",
         Equalizer = "Parametrischer Equalizer",
         EqualizerHint = "Importiert Equalizer-APO- und AutoEQ-Profile für PCM sowie DSD-zu-PCM. Native DSD-Ausgabe bleibt bitgenau.",
@@ -482,6 +487,12 @@ public static class LocalizationManager
         Calendar = "Kalender – {0}",
         TopGenres = "Top 10 Genres nach Spielzeit",
         NoData = "Keine Daten vorhanden.",
+        RecentlyPlayed = "Zuletzt gespielt",
+        GreetingMorning = "Guten Morgen",
+        GreetingAfternoon = "Guten Tag",
+        GreetingEvening = "Guten Abend",
+        DashboardTagline = "Deine persönliche Musikzentrale",
+        ShowAll = "Alle anzeigen",
         DevicePcmSampleRates = "Unterstützte PCM-Sampleraten",
         DeviceDsdRates = "DSD-Stufen",
         DevicePcmFormats = "PCM-Ausgabeformate",
@@ -771,7 +782,7 @@ public static class LocalizationManager
         "Optimize database", "Repair album artwork", "Download missing artwork",
         "Automatic download only finds covers when a MusicBrainz ID is present. For freer searches, use the button directly in the album view.",
         "Cover not found", "Search cover", "Search cover", "Searching for matching covers …",
-        "No covers found.", "Search term", "Search again", "Use selected cover",
+        "No covers found.", "Album search term", "Artist (optional)", "Search again", "Use selected cover",
         "Delete cover", "Reassign cover", "Author", "Licenses", "Save", "Cancel", "Table", "Artwork",
         "(Unknown)", "Album artist", "Year", "Title", "Artist", "Album", "Genre", "Duration", "Format",
         "Search term {0} was not found in tracks.",
@@ -858,6 +869,8 @@ public static class LocalizationManager
         DsdPlayback = "DSD playback",
         AlwaysConvertDsdToPcm = "Always convert DSD files to PCM",
         AlwaysConvertDsdToPcmHint = "Uses the PCM path with ASIO/cwASIO as well, allowing volume, ReplayGain, and the equalizer to apply. With this option disabled, native DSD output remains bit-perfect.",
+        PcmOutputBoost = "Boost PCM output by +6 dB",
+        PcmOutputBoostHint = "Raises all PCM playback paths so they are closer to native DSD output loudness. Native DSD output remains bit-perfect and unchanged.",
         OutputDevicesLoading = "Loading output devices …",
         Equalizer = "Parametric equalizer",
         EqualizerHint = "Imports Equalizer APO and AutoEQ profiles for PCM and DSD-to-PCM playback. Native DSD output remains bit-perfect.",
@@ -897,7 +910,11 @@ public static class LocalizationManager
         Homepage = "Homepage", FeedUrl = "Feed address",
         SearchResultSummary = "{0:N0} tracks · {1:N0} albums · {2:N0} artists",
         RecentAlbums = "Recently added albums", Calendar = "Calendar – {0}", TopGenres = "Top 10 genres by play time",
-        NoData = "No data available.", DevicePcmSampleRates = "Supported PCM sample rates", DeviceDsdRates = "DSD rates",
+        NoData = "No data available.",
+        RecentlyPlayed = "Recently played",
+        GreetingMorning = "Good morning", GreetingAfternoon = "Good afternoon", GreetingEvening = "Good evening",
+        DashboardTagline = "Your personal music hub", ShowAll = "Show all",
+        DevicePcmSampleRates = "Supported PCM sample rates", DeviceDsdRates = "DSD rates",
         DevicePcmFormats = "PCM output formats", DeviceDsdFormats = "DSD output formats",
         DeviceChannelSummary = "{0} output channels · {1} input channels",
         DeviceBufferSummary = "Buffer: min {0}, preferred {1}, max {2}, granularity {3}",
@@ -1184,7 +1201,7 @@ public static class LocalizationManager
         "Optimiser la base", "Réparer les pochettes", "Télécharger les pochettes manquantes",
         "Le téléchargement automatique ne trouve des pochettes que si un identifiant MusicBrainz est présent. Pour une recherche plus libre, utilisez le bouton directement dans la vue des albums.",
         "Pochette introuvable", "Rechercher une pochette", "Rechercher une pochette", "Recherche de pochettes correspondantes …",
-        "Aucune pochette trouvée.", "Terme de recherche", "Relancer la recherche", "Utiliser la pochette sélectionnée",
+        "Aucune pochette trouvée.", "Recherche d’album", "Artiste (facultatif)", "Relancer la recherche", "Utiliser la pochette sélectionnée",
         "Supprimer la pochette", "Réattribuer la pochette", "Auteur", "Licences", "Enregistrer", "Annuler", "Tableau", "Pochettes",
         "(Inconnu)", "Artiste de l’album", "Année", "Titre", "Artiste", "Album", "Genre", "Durée", "Format",
         "Le terme de recherche {0} est introuvable dans les titres.",
@@ -1274,6 +1291,8 @@ public static class LocalizationManager
         DsdPlayback = "Lecture DSD",
         AlwaysConvertDsdToPcm = "Toujours convertir les fichiers DSD en PCM",
         AlwaysConvertDsdToPcmHint = "Utilise également le chemin PCM avec ASIO/cwASIO afin d’appliquer le volume, ReplayGain et l’égaliseur. Lorsque cette option est désactivée, la sortie DSD native reste bit-perfect.",
+        PcmOutputBoost = "Augmenter la sortie PCM de +6 dB",
+        PcmOutputBoostHint = "Augmente tous les chemins de lecture PCM pour les rapprocher du niveau perçu de la sortie DSD native. La sortie DSD native reste bit-perfect et inchangée.",
         OutputDevicesLoading = "Chargement des périphériques de sortie …",
         Equalizer = "Égaliseur paramétrique",
         EqualizerHint = "Importe les profils Equalizer APO et AutoEQ pour la lecture PCM et DSD vers PCM. La sortie DSD native reste bit-perfect.",
@@ -1313,7 +1332,11 @@ public static class LocalizationManager
         Homepage = "Page d’accueil", FeedUrl = "Adresse du flux",
         SearchResultSummary = "{0:N0} titres · {1:N0} albums · {2:N0} artistes",
         RecentAlbums = "Albums ajoutés récemment", Calendar = "Calendrier – {0}", TopGenres = "Top 10 des genres par durée d’écoute",
-        NoData = "Aucune donnée disponible.", DevicePcmSampleRates = "Fréquences PCM prises en charge", DeviceDsdRates = "Niveaux DSD",
+        NoData = "Aucune donnée disponible.",
+        RecentlyPlayed = "Écoutés récemment",
+        GreetingMorning = "Bonjour", GreetingAfternoon = "Bon après-midi", GreetingEvening = "Bonsoir",
+        DashboardTagline = "Votre centre musical personnel", ShowAll = "Tout afficher",
+        DevicePcmSampleRates = "Fréquences PCM prises en charge", DeviceDsdRates = "Niveaux DSD",
         DevicePcmFormats = "Formats de sortie PCM", DeviceDsdFormats = "Formats de sortie DSD",
         DeviceChannelSummary = "{0} canaux de sortie · {1} canaux d’entrée",
         DeviceBufferSummary = "Tampon : min. {0}, préféré {1}, max. {2}, granularité {3}",
@@ -1600,7 +1623,7 @@ public static class LocalizationManager
         "Optimizar base de datos", "Reparar portadas de álbum", "Descargar portadas faltantes",
         "La descarga automática solo encuentra portadas cuando hay un ID de MusicBrainz presente. Para búsquedas más libres, usa el botón directamente en la vista del álbum.",
         "Portada no encontrada", "Buscar portada", "Buscar portada", "Buscando portadas coincidentes …",
-        "No se encontraron portadas.", "Término de búsqueda", "Buscar de nuevo", "Usar portada seleccionada",
+        "No se encontraron portadas.", "Búsqueda de álbum", "Artista (opcional)", "Buscar de nuevo", "Usar portada seleccionada",
         "Eliminar portada", "Reasignar portada", "Autor", "Licencias", "Guardar", "Cancelar", "Tabla", "Portada",
         "(Desconocido)", "Artista del álbum", "Año", "Título", "Artista", "Álbum", "Género", "Duración", "Formato",
         "El término de búsqueda {0} no se encontró en las pistas.",
@@ -1687,6 +1710,8 @@ public static class LocalizationManager
         DsdPlayback = "Reproducción DSD",
         AlwaysConvertDsdToPcm = "Convertir siempre los archivos DSD a PCM",
         AlwaysConvertDsdToPcmHint = "También usa la ruta PCM con ASIO/cwASIO para aplicar volumen, ReplayGain y ecualizador. Con esta opción desactivada, la salida DSD nativa sigue siendo bit-perfect.",
+        PcmOutputBoost = "Aumentar la salida PCM +6 dB",
+        PcmOutputBoostHint = "Eleva todas las rutas de reproducción PCM para acercarlas al volumen percibido de la salida DSD nativa. La salida DSD nativa sigue siendo bit-perfect y no cambia.",
         OutputDevicesLoading = "Cargando dispositivos de salida …",
         Equalizer = "Ecualizador paramétrico",
         EqualizerHint = "Importa perfiles de Equalizer APO y AutoEQ para PCM y DSD convertido a PCM. La salida DSD nativa sigue siendo bit-perfect.",
@@ -1726,7 +1751,11 @@ public static class LocalizationManager
         Homepage = "Página principal", FeedUrl = "Dirección del feed",
         SearchResultSummary = "{0:N0} pistas · {1:N0} álbumes · {2:N0} artistas",
         RecentAlbums = "Álbumes añadidos recientemente", Calendar = "Calendario – {0}", TopGenres = "10 géneros principales por tiempo de reproducción",
-        NoData = "No hay datos disponibles.", DevicePcmSampleRates = "Frecuencias PCM compatibles", DeviceDsdRates = "Niveles DSD",
+        NoData = "No hay datos disponibles.",
+        RecentlyPlayed = "Reproducidos recientemente",
+        GreetingMorning = "Buenos días", GreetingAfternoon = "Buenas tardes", GreetingEvening = "Buenas noches",
+        DashboardTagline = "Tu centro musical personal", ShowAll = "Ver todo",
+        DevicePcmSampleRates = "Frecuencias PCM compatibles", DeviceDsdRates = "Niveles DSD",
         DevicePcmFormats = "Formatos de salida PCM", DeviceDsdFormats = "Formatos de salida DSD",
         DeviceChannelSummary = "{0} canales de salida · {1} canales de entrada",
         DeviceBufferSummary = "Búfer: mín. {0}, preferido {1}, máx. {2}, granularidad {3}",

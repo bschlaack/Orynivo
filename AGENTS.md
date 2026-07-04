@@ -247,7 +247,15 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   reconnect options so the first decode of a remote/HTTP track does not block on
   FFmpeg's default 5 s probe window. The PCM probe paths
   (`FfmpegAudioPlayer.ProbeAsync`, `WasapiAudioPlayer.ProbeAsync`) apply the same
-  capped `ffprobe` settings for HTTP inputs. Seeking a remote Orynivo Server
+  capped `ffprobe` settings for HTTP inputs. When a caller already knows the
+  stream characteristics it can skip the probe entirely: a
+  `GaplessPlaybackItem.KnownInfo` (`KnownAudioInfo`) lets both players build the
+  `AudioFileInfo` from cached metadata instead of running `ffprobe`. `MainWindow`
+  supplies it for remote Orynivo Server PCM tracks from the server-reported
+  sample rate/channels/format (via `BuildRemotePcmKnownInfo`), removing one HTTP
+  round-trip on the initial start and on gapless prefetch; DSD sources and tracks
+  without a reported sample rate leave `KnownInfo` unset and probe as before.
+  Seeking a remote Orynivo Server
   stream (URL contains `/api/stream/`) uses **server-side seek**: the decoder
   appends `?ss=<seconds>` and decodes the offset stream from position 0 instead
   of seeking the HTTP stream itself (which binary-searches seektable-less files
@@ -265,7 +273,17 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   `ProcessStartInfo.WorkingDirectory`; stale installer shortcuts can otherwise
   leave the process current directory pointing to a deleted install path.
 - `Orynivo/Audio/DsfAudioPlayer.cs`: native DSF-to-DSD path
+- `Orynivo/Audio/RemoteDsfAudioPlayer.cs`: native DSF-to-DSD path for
+  authenticated Orynivo Server streams. It reads DSF headers and audio blocks
+  through HTTP byte ranges and feeds the existing ASIO/cwASIO DSD stream without
+  downloading the complete file first. Transport text may claim native DSD only
+  when this player or the local native DSD players are actually active.
 - `Orynivo/Audio/DffAudioPlayer.cs`: native DFF/DSDIFF-to-DSD path
+- `Orynivo/Audio/RemoteDffAudioPlayer.cs`: native uncompressed DFF/DSDIFF-to-DSD
+  path for authenticated Orynivo Server streams. It parses the remote `FRM8`,
+  `PROP`, and `DSD ` chunks through HTTP byte ranges, rejects DST-compressed DFF,
+  bit-reverses the DSD payload like the local DFF player, and feeds ASIO/cwASIO
+  without downloading the complete file first.
 - `Orynivo/Audio/WasapiAudioPlayer.cs`: exclusive-mode WASAPI PCM path; converts
   DSD sources to PCM in real time and selects the highest supported output
   sample rate up to the source rate plus the highest supported output precision
@@ -606,6 +624,10 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   `ContentRow` (`OrynivoServer`, `ArtistId`); the now-playing artist button is
   enabled for a remote track and navigates within that track's server library
   (`OpenOrynivoArtistAlbumsAsync`) rather than the local album view.
+  Remote transport waveform loading first asks the server for cached peaks and
+  falls back to client-side FFmpeg analysis of the authenticated stream URL when
+  the server cannot analyse the format; this keeps DFF waveforms available
+  without requiring the server's FFmpeg build to support every source format.
   The transport favourite (heart) button is enabled for a playing remote track
   and toggles the client-side favourite (`OrynivoServerFavorites`) for that
   track via `CurrentOrynivoFavoriteTarget`; the change is written to
@@ -662,6 +684,9 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
 - `AppSettings.AlwaysConvertDsdToPcm` forces DSF/DFF sources through FFmpeg and
   the PCM output path even when ASIO/cwASIO native DSD is available, allowing
   volume, ReplayGain, and equalizer processing
+- `AppSettings.PcmOutputBoostEnabled` applies an additional +6 dB linear gain to
+  every PCM playback path (local, remote, Plex, radio, podcasts, and converted
+  DSD). Native ASIO/cwASIO DSD remains bit-perfect and ignores the boost.
 - `AppSettings.EqualizerProfiles` persists all named imported or manually
   edited Equalizer APO/AutoEQ profiles, while
   `SelectedEqualizerProfileName`, `EqualizerProfile`, and `EqualizerEnabled`
@@ -851,8 +876,11 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   albums with a `musicbrainz_release_id`
 - Missing covers show a placeholder and manual MusicBrainz search by editable
   album title
-- Manual MusicBrainz cover searches replace every character other than Unicode
-  letters and numbers with a separating space before submitting the album title.
+- Manual MusicBrainz cover searches preserve punctuation inside the primary
+  quoted release/artist query and URL-encode the complete query, so stylized
+  titles such as `M!ssundaztood` remain searchable. If the exact query finds no
+  cover results, the search falls back to punctuation-compacted and
+  punctuation-spaced query variants.
 - The manual cover-search dialog uses the themed native title bar, shows search
   activity and explicit empty results, and can be run repeatedly
 - Album artwork has a context menu for deletion or reassignment through manual
@@ -985,6 +1013,9 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   menu-building layer and mutation handlers should call the provider interface.
 - Selecting a playlist immediately adds the track or all album tracks and
   updates the status bar
+- Track-row playlist `ContextFlyout` instances are rebuilt directly before they
+  open so playlists created from a context menu appear immediately in the next
+  add-to-playlist menu without rebinding the complete table.
 - The album-detail header includes **Save as playlist**. It reads the current
   `ContentDataGrid.ItemsSource`, so it saves exactly the album tracks currently
   displayed after the artist-scope checkbox is applied, and opens the shared
@@ -1274,10 +1305,11 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   independently expandable accordion headers; local playlists are a nested
   Library child group and their expansion state is persisted
 - `NavListBox` must keep its non-virtualizing `StackPanel` `ItemsPanel`. The
-  sidebar collapse/expand logic toggles `ListBoxItem.IsVisible` directly; a
-  virtualizing panel recycles containers and drops those values, which breaks
-  the accordion groups (and is worsened by variable-height rows such as the
-  empty-library hint). Do not reintroduce virtualization here.
+  sidebar collapse/expand logic animates `ListBoxItem` opacity and `MaxHeight`
+  before changing `IsVisible`; a virtualizing panel recycles containers and
+  drops those values, which breaks the accordion groups (and is worsened by
+  variable-height rows such as the empty-library hint). Do not reintroduce
+  virtualization here.
 - `AppSettings.ShowInternetRadioItem`, `ShowPodcastsItem`, and `ShowQueueItem`
   control visibility of the Internet Radio, Podcasts, and Up Next sidebar items
   from Settings > Appearance and default to visible
@@ -1306,6 +1338,11 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   with a short view-specific headline and explanatory text. Search and filter
   controls stay outside and above that card in the plain header layout; A-Z
   indexes stay aligned with the content/table area, not the intro card.
+- Main content view switches use short opacity fade-ins and longer library,
+  remote-library, Dashboard, and album-detail loads show the shared
+  `ContentLoadingOverlay` skeleton/progress state. Keep this motion subtle and
+  centralized through the existing helpers instead of adding per-view ad-hoc
+  animations.
 - The album-detail card above its track table stretches across the available
   content width. Its favorite button appears immediately before the album title;
   cover search and **Save as playlist** remain adjacent themed actions.
@@ -1511,20 +1548,67 @@ asynchronous file I/O from the UI thread
 - Radio search results expose a multi-select genre popup derived from normalized
   Radio Browser tags. Selected genres use OR semantics, technical tags are
   excluded, and unavailable selections are removed after a new search.
-- The page contains:
-  1. **Recently added albums**: horizontal artwork strip of up to 12 albums,
+- The dashboard is laid out as a personal "music hub" and is built entirely in
+  code in `BuildDashboardAsync`. Section headers are created by the reusable
+  `DashboardCreateSectionHeader` (accent underline, optional month navigation).
+  The page contains, top to bottom:
+  0. **Greeting hero** (`DashboardBuildGreeting`): a time-of-day greeting
+  (`GreetingMorning`/`GreetingAfternoon`/`GreetingEvening`) plus the
+  `DashboardTagline`; no heavy card, just headline + subtitle text.
+  1. **Recently played** (`DashboardBuildRecentlyPlayed`, when history exists):
+  a horizontal strip of up to 12 compact cards from `GetRecentHistory` (deduped
+  by path). Each card shows the local album thumbnail (resolved via
+  `GetAlbumsByTrackIds`) or an `InitialsAvatar` placeholder, with a hover play
+  overlay. A card is playable (`IsPlayableHistoryEntry`) when the entry is a
+  music track (media type `track`, not radio/podcast) that is either a locally
+  available file or a playable stream URL (remote server / Plex), independent of
+  the history track id or artist tag. Clicking it plays the track **in place**
+  through `PlayHistoryEntryInPlaceAsync` (replaces the queue with just that track
+  and starts playback) without leaving the dashboard.
+  2. **Recently added albums**: horizontal artwork strip of up to 12 albums,
   merging the local library with every configured remote Orynivo Server
-  (`LoadRecentAlbumsAsync`, sorted by each album's last-added timestamp).
-  Local cards open the local album/artist; remote cards (`DashboardAlbum.Server`
-  set) load artwork from the server via `LoadRemoteArtworkImageAsync` and open
-  within that remote library (`OpenOrynivoAlbumTracksAsync` /
-  `OpenOrynivoArtistAlbumsAsync`). Backed by the server endpoint
-  `GET /api/albums/recent` (`OrynivoServerClient.GetRecentAlbumsAsync`); servers
-  without it are skipped. Selecting a card supports Back navigation
-  2. **Calendar**: Monday-first month grid with day number, `HH:mm:ss` playback
-  time, top three linked genres, today highlight, and month navigation
-  3. **Top 10 genres**: descending proportional bars with `HH:mm:ss` duration,
-  linked genre labels, and `_genreColors`
+  (`LoadRecentAlbumsAsync`, sorted by each album's last-added timestamp). Cards
+  are the **same** artwork cards as the Albums view: each `DashboardAlbum` is
+  mapped to a `ContentRow` (`BuildRecentAlbumRow`, local `Album` / remote
+  `OrynivoAlbum` carrying `OrynivoServer`) rendered from the shared
+  `AlbumArtworkCardTemplate` resource (`BuildRecentAlbumCard`), so covers can be
+  changed and favorites toggled directly, and album/artist links navigate in
+  library. Because those shared handlers are location-independent via
+  `ActivateRowOrynivoServer` (activates `row.OrynivoServer`), they work for the
+  dashboard's mixed local/remote list. Double-clicking a card opens the album
+  (`RecentAlbumCard_OnDoubleTapped`). Local artwork uses the album's 320-px
+  path (`RecentAlbumInfo.ArtworkPath`); remote uses the authenticated server URL.
+  Backed by the server endpoint `GET /api/albums/recent`
+  (`OrynivoServerClient.GetRecentAlbumsAsync`); servers without it are skipped.
+  Selecting a card supports Back navigation. Cover/favorite handlers refresh the
+  bound card in place on the dashboard surface (`UpdateRowArtworkFromBytes`)
+  instead of rebuilding the hidden Albums list.
+  3. **Stats section** (`DashboardBuildStatsSection`): the calendar and top-genre
+  blocks, each with its own section header. They sit side by side in a two-column
+  grid on wide dashboards and stack on narrow ones; the layout switches at a
+  980-px threshold (`ComputeDashboardTwoColumn`) and re-flows on the
+  `DashboardScrollViewer.SizeChanged` boundary crossing only.
+     - **Calendar** (`DashboardBuildCalendarCard`): Monday-first month grid with
+     day number, `HH:mm:ss` playback time, top three linked genres, today
+     highlight, and month navigation.
+     - **Top 10 genres** (`DashboardBuildTopGenresCard`): a modern analytics card
+     with a colored numbered rank chip (contrast-safe text via
+     `PickContrastBrush`), a linked genre label, `HH:mm:ss` duration, and a thin
+     proportional bar per genre, colored from `_genreColors`.
+- The **Recently played** and **Recently added** section headers carry a
+  right-aligned **Show all** link (`DashboardCreateSectionHeader`'s
+  `showAllAction`). It opens a full-page view (`ShowAllRecentlyPlayedAsync` /
+  `ShowAllRecentAlbumsAsync`) that reuses the dashboard scroll surface and shows
+  up to 200 entries in a `WrapPanel` of the same cards (identical double-click /
+  click behaviour). These views are pseudo-top-level tags `RecentlyPlayedAll` /
+  `RecentAlbumsAll` handled in `ShowTopLevelViewAsync`
+  (`BuildAllRecentlyPlayedViewAsync` / `BuildAllRecentAlbumsViewAsync`); opening
+  one pushes the current state onto `_navigationStack`, so Back returns to the
+  dashboard, and opening an album from a full-page view returns to that full-page
+  view. `DashboardScrollViewer.SizeChanged` only re-flows the real dashboard
+  (`_currentTopLevelTag == "Dashboard"`), never the full-page views. Dashboard
+  album and recently-played thumbnails decode off the UI thread
+  (`LoadDashboardLocalArtworkAsync`) so the 200-item views build without a hitch.
 - Clicking a calendar day with playback opens a modal history table with playback
   time, media type, title, artist, album, listened duration, and total duration
 - Local-track title links in daily history open Tracks, select the title, and
@@ -1615,6 +1699,9 @@ asynchronous file I/O from the UI thread
 - **Tracks**: title-sorted list with combinable Favorites, Genre, Audio Type,
   and Bitrate facets; counts reflect the other active filters and unavailable
   unselected values are hidden
+- DataGrid double-click handlers resolve the clicked `DataGridRow` from the
+  event source before falling back to `SelectedItem`, so playback and navigation
+  work across the whole row, not just the visible text.
 - Alphabetically sorted artist, album, and track views show an A-Z/# index
   immediately left of the right-aligned scrollbar; unavailable letters are
   disabled, dragging across letters scrolls live, and the highlighted letter

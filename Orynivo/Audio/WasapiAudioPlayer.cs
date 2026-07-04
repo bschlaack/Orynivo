@@ -131,7 +131,8 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
         if (items.Count == 0)
             throw new ArgumentException("At least one playback item is required.", nameof(items));
 
-        var info = await ProbeAsync(items[0].PlaybackPath, cancellationToken);
+        var info = items[0].TryCreateKnownAudioInfo()
+                   ?? await ProbeAsync(items[0].PlaybackPath, cancellationToken);
         if (items[0].SegmentDuration is { } firstDuration)
             info = info with { Duration = firstDuration };
         else if (items[0].KnownDuration is { } knownDuration)
@@ -459,7 +460,8 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
 
     private async Task<(FfmpegPcmDecoder Decoder, AudioFileInfo Info)> PrepareAsync(int index)
     {
-        var info = await ProbeAsync(_items[index].PlaybackPath, _cts.Token).ConfigureAwait(false);
+        var info = _items[index].TryCreateKnownAudioInfo()
+                   ?? await ProbeAsync(_items[index].PlaybackPath, _cts.Token).ConfigureAwait(false);
         if (_items[index].SegmentDuration is { } segmentDuration)
             info = info with { Duration = segmentDuration };
         else if (_items[index].KnownDuration is { } knownDuration)

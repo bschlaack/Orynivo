@@ -109,6 +109,7 @@ internal partial class SettingsView : UserControl
             replayGainChoices.FirstOrDefault(choice => choice.Value == settings.ReplayGainMode)
             ?? replayGainChoices[0];
         AlwaysConvertDsdToPcmCheckBox.IsChecked = settings.AlwaysConvertDsdToPcm;
+        PcmOutputBoostCheckBox.IsChecked = settings.PcmOutputBoostEnabled;
         _equalizerProfiles.AddRange((settings.EqualizerProfiles ?? [])
             .Select(static profile => profile.Clone()));
         if (_equalizerProfiles.Count == 0 && settings.EqualizerProfile is not null)
@@ -250,6 +251,8 @@ internal partial class SettingsView : UserControl
             : ReplayGainMode.Off;
     /// <summary>Gets a value indicating whether DSF and DFF sources should always be converted to PCM.</summary>
     public bool AlwaysConvertDsdToPcm => AlwaysConvertDsdToPcmCheckBox.IsChecked == true;
+    /// <summary>Gets a value indicating whether PCM playback should receive the additional output boost.</summary>
+    public bool PcmOutputBoostEnabled => PcmOutputBoostCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether the imported equalizer profile is enabled.</summary>
     public bool EqualizerEnabled =>
         _equalizerProfile is not null && EqualizerEnabledCheckBox.IsChecked == true;

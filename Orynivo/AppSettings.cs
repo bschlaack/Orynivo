@@ -38,6 +38,8 @@ public sealed class AppSettings
     public ReplayGainMode ReplayGainMode { get; set; } = ReplayGainMode.Off;
     /// <summary>Gets or sets a value indicating whether DSF and DFF sources always use the PCM playback path.</summary>
     public bool AlwaysConvertDsdToPcm { get; set; }
+    /// <summary>Gets or sets a value indicating whether PCM playback receives an additional +6 dB output boost.</summary>
+    public bool PcmOutputBoostEnabled { get; set; }
     /// <summary>Gets or sets a value indicating whether the imported PCM equalizer profile is active.</summary>
     public bool EqualizerEnabled { get; set; }
     /// <summary>Gets or sets the selected Equalizer APO or AutoEQ profile compatibility snapshot.</summary>

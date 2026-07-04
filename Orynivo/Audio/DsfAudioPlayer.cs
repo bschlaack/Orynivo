@@ -231,7 +231,7 @@ public sealed class DsfAudioPlayer : IAudioPlayer
         var sampleRate = BinaryPrimitives.ReadInt32LittleEndian(fmt.AsSpan(28, 4));
         var bitsPerSample = BinaryPrimitives.ReadInt32LittleEndian(fmt.AsSpan(32, 4));
         var blockSizePerChannel = BinaryPrimitives.ReadInt32LittleEndian(fmt.AsSpan(44, 4));
-        if (bitsPerSample != 1)
+        if (bitsPerSample is not 1 and not 8)
         {
             throw new NotSupportedException($"DSF-Bittiefe {bitsPerSample} wird nicht unterstützt.");
         }

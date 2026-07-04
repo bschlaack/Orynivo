@@ -38,6 +38,7 @@ public sealed record LocalizedStrings(
     string CoverSearchRunning,
     string CoverSearchNoResults,
     string CoverSearchQuery,
+    string CoverSearchArtistQuery,
     string SearchAgain,
     string UseSelectedCover,
     string DeleteCover,
@@ -202,6 +203,10 @@ public sealed record LocalizedStrings(
     public string AlwaysConvertDsdToPcm { get; init; } = "";
     /// <summary>Gets the explanatory text for forced DSD-to-PCM conversion.</summary>
     public string AlwaysConvertDsdToPcmHint { get; init; } = "";
+    /// <summary>Gets the option label for applying an additional PCM output boost.</summary>
+    public string PcmOutputBoost { get; init; } = "";
+    /// <summary>Gets the explanatory text for the additional PCM output boost.</summary>
+    public string PcmOutputBoostHint { get; init; } = "";
     /// <summary>Gets the output-device loading status message.</summary>
     public string OutputDevicesLoading { get; init; } = "";
     /// <summary>Gets the parametric equalizer settings label.</summary>
@@ -321,6 +326,18 @@ public sealed record LocalizedStrings(
     public string Calendar { get; init; } = "";
     public string TopGenres { get; init; } = "";
     public string NoData { get; init; } = "";
+    /// <summary>Gets the dashboard "recently played" section title.</summary>
+    public string RecentlyPlayed { get; init; } = "";
+    /// <summary>Gets the dashboard morning greeting.</summary>
+    public string GreetingMorning { get; init; } = "";
+    /// <summary>Gets the dashboard afternoon greeting.</summary>
+    public string GreetingAfternoon { get; init; } = "";
+    /// <summary>Gets the dashboard evening greeting.</summary>
+    public string GreetingEvening { get; init; } = "";
+    /// <summary>Gets the dashboard personal-hub tagline shown under the greeting.</summary>
+    public string DashboardTagline { get; init; } = "";
+    /// <summary>Gets the "show all" action shown on dashboard section headers.</summary>
+    public string ShowAll { get; init; } = "";
     public string DevicePcmSampleRates { get; init; } = "";
     public string DeviceDsdRates { get; init; } = "";
     public string DevicePcmFormats { get; init; } = "";

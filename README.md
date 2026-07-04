@@ -203,11 +203,18 @@ byte-range streaming without FFmpeg.
 - Automatic PCM down-conversion through `ffmpeg` when the source sample rate
   exceeds the selected ASIO or WASAPI device's capabilities; WASAPI uses the
   highest supported 32-bit float, 24-bit PCM, or 16-bit PCM output format
-- Native stereo DSD playback for DSF and uncompressed DFF files through ASIO
+- Native stereo DSD playback for local DSF and uncompressed DFF files through
+  ASIO, plus native DSF and uncompressed DFF streaming from an Orynivo Server
+  through HTTP byte ranges. The remote path validates the file header before
+  claiming native DSD output and falls back to DSD-to-PCM when native playback
+  cannot be opened.
 - Real-time DSF/DFF-to-PCM conversion for playback through WASAPI, with the
   active conversion and PCM sample rate shown in the transport and status bar
 - Optional forced DSF/DFF-to-PCM conversion with ASIO/cwASIO, allowing volume,
   ReplayGain, and the parametric equalizer to affect DSD sources
+- Optional +6 dB PCM output boost for users whose DAC plays native DSD
+  noticeably louder than PCM. The boost applies only to PCM playback paths;
+  native DSD remains bit-perfect.
 - PCM playback through `ffmpeg`
 - Multiple named output profiles for quickly switching between configured
   output devices; a quick-pick popup in the transport bar selects the active
@@ -220,7 +227,9 @@ byte-range streaming without FFmpeg.
   is stored in the SQLite library database instead of the JSON settings file.
 - The transport progress control shows a waveform-style peak view for local
   audio files and remote Orynivo Server tracks, caches compact peak data, and
-  keeps click/drag seeking on the same timeline.
+  keeps click/drag seeking on the same timeline. Remote tracks first use the
+  server waveform endpoint and fall back to local FFmpeg analysis of the
+  authenticated stream URL when the server cannot analyse the source format.
 - Remote Orynivo Server tracks keep their library title, artist, album, and
   duration in transport metadata, play history, and **Up next**. Authenticated
   `?key=` stream URLs are not shown as titles and are not persisted in the
@@ -287,6 +296,10 @@ byte-range streaming without FFmpeg.
   visibility and persisted independent expansion for library, personal radio,
   podcast, and playlist sections; the Internet Radio, Podcasts, and
   **Up Next** sidebar items can each be hidden independently in Settings
+- Subtle interface motion for navigation and browsing: sidebar accordion rows
+  fade/collapse, Dashboard and library view changes fade in briefly, artwork
+  cards expose a lightweight hover overlay, and longer content loads use a
+  compact skeleton/progress state instead of a static blank/loading view.
 - Linked artist and album names for direct navigation to artist albums and
   album tracks
 - Session-wide Back navigation across sidebar views, search results, dashboard
@@ -354,7 +367,8 @@ byte-range streaming without FFmpeg.
 - Playback history for local tracks, podcast episodes, and internet-radio
   sessions, including position and completion state
 - Artwork downloads through the Cover Art Archive and manual MusicBrainz
-  search, with punctuation removed from album-title queries
+  search, preserving stylized punctuation in the primary query and falling back
+  to punctuation-normalized variants
 - Embedded or downloaded lyrics with synchronized LRC highlighting during playback
 - Manual LRCLIB lyrics search with editable title and artist, result preview,
   and explicit replacement of the cached lyrics
