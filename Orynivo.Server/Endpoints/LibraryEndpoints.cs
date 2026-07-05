@@ -399,10 +399,11 @@ public static class LibraryEndpoints
 
             var results = TrackSearchIndex.SearchByCategory(q, limit);
             var trackIds = results.Tracks.Ids;
-            var albumIds = results.Albums.Ids;
-            var artistIds = results.Artists.Ids;
+            var albumTrackIds = results.Albums.Ids;
+            var artistTrackIds = results.Artists.Ids;
+            var albumArtistTrackIds = results.AlbumArtists.Ids;
 
-            if (trackIds.Count == 0 && albumIds.Count == 0 && artistIds.Count == 0)
+            if (trackIds.Count == 0 && albumTrackIds.Count == 0 && artistTrackIds.Count == 0 && albumArtistTrackIds.Count == 0)
                 return Results.Ok(new
                 {
                     tracks  = Array.Empty<object>(),
@@ -411,11 +412,16 @@ public static class LibraryEndpoints
                 });
 
             using var db = AudioDatabase.OpenDefault();
+            var artistIds = db.GetArtistIdsByTrackIds(artistTrackIds)
+                .Values
+                .Concat(db.GetAlbumArtistIdsByTrackIds(albumArtistTrackIds).Values)
+                .Distinct()
+                .ToHashSet();
 
-            var tracks  = trackIds.Count  > 0 ? db.GetTrackListByIds(trackIds).Select(TrackDto).ToList()  : [];
-            var albums  = albumIds.Count  > 0 ? db.GetAlbumsLite(includeArtwork: true).Where(a => albumIds.Contains(a.Id)).Select(AlbumDto).ToList() : [];
+            var tracks  = trackIds.Count > 0 ? db.GetTrackListByIds(trackIds).Select(TrackDto).ToList() : [];
+            var albums  = albumTrackIds.Count > 0 ? db.GetAlbumsByTrackIds(albumTrackIds).Select(AlbumDto).ToList() : [];
             var artists = artistIds.Count > 0
-                ? db.GetArtistsLite().Where(a => artistIds.Contains(a.Id)).Select(a => new { a.Id, Name = a.Artist, a.IsFavorite }).ToList()
+                ? db.GetArtistsByIds(artistIds).Select(a => new { a.Id, Name = a.Artist, a.IsFavorite }).ToList()
                 : [];
 
             return Results.Ok(new { tracks, albums, artists });

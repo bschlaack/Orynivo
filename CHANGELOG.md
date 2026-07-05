@@ -4,6 +4,22 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.23.1] - 2026-07-05
+
+### Added
+
+### Fixed
+
+- Reduced the Artist artwork-card height after adding the source badge so the
+  grid no longer leaves oversized vertical gaps between rows.
+- Prevented the content loading overlay from intercepting mouse wheel and card
+  clicks after artwork views finish loading, and synchronized the Artist artwork
+  scroll calculations with the updated card height.
+- Fixed full-library search so artist-name queries also populate the Albums and
+  Artists result sections when the match comes from album-artist metadata; the
+  Orynivo Server full-search endpoint now correctly maps Lucene track hits to
+  album and artist rows instead of treating track IDs as entity IDs.
+
 ## [0.23.0] - 2026-07-05
 
 ### Added
