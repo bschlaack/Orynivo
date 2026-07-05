@@ -66,7 +66,10 @@ internal static class DataGridColumnChooser
             {
                 var tag = (string)column.Tag!;
                 column.IsVisible = visible.Contains(tag) ||
-                                   (tag == "source" && !visible.Contains("__sourceHidden"));
+                                   (tag == "source" && !visible.Contains("__sourceHidden")) ||
+                                   (tag == "thumbnail" &&
+                                    IsDefaultVisibleThumbnail(tableKey) &&
+                                    !visible.Contains("__thumbnailHidden"));
             }
 
             if (!grid.Columns.Any(column => column.Tag is string && column.IsVisible))
@@ -167,12 +170,15 @@ internal static class DataGridColumnChooser
                 DataGridColumnWidthStore.Capture(settings.DataGridColumnWidths, tableKey, grid);
                 var keepSourceHidden = settings.VisibleDataGridColumns.TryGetValue(tableKey, out var existingVisible) &&
                                        existingVisible.Contains("__sourceHidden", StringComparer.Ordinal);
+                var keepThumbnailHidden = settings.VisibleDataGridColumns.TryGetValue(tableKey, out existingVisible) &&
+                                          existingVisible.Contains("__thumbnailHidden", StringComparer.Ordinal);
                 column.IsVisible = !column.IsVisible;
                 settings.VisibleDataGridColumns[tableKey] = selectable
                     .Where(candidate => candidate.IsVisible)
                     .Select(candidate => (string)candidate.Tag!)
                     .ToList();
-                if (column.Tag is string changedTag && changedTag == "source")
+                var changedTag = column.Tag as string;
+                if (changedTag == "source")
                 {
                     if (column.IsVisible)
                         settings.VisibleDataGridColumns[tableKey].Remove("__sourceHidden");
@@ -182,6 +188,18 @@ internal static class DataGridColumnChooser
                 else if (keepSourceHidden)
                 {
                     settings.VisibleDataGridColumns[tableKey].Add("__sourceHidden");
+                }
+
+                if (changedTag == "thumbnail" && IsDefaultVisibleThumbnail(tableKey))
+                {
+                    if (column.IsVisible)
+                        settings.VisibleDataGridColumns[tableKey].Remove("__thumbnailHidden");
+                    else
+                        settings.VisibleDataGridColumns[tableKey].Add("__thumbnailHidden");
+                }
+                else if (keepThumbnailHidden && IsDefaultVisibleThumbnail(tableKey))
+                {
+                    settings.VisibleDataGridColumns[tableKey].Add("__thumbnailHidden");
                 }
 
                 UpdateEntries();
@@ -204,6 +222,9 @@ internal static class DataGridColumnChooser
             }
         }
     }
+
+    private static bool IsDefaultVisibleThumbnail(string tableKey) =>
+        tableKey is "Artists" or "Albums";
 
     private static IBrush? FindBrush(string key)
     {

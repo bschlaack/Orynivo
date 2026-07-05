@@ -4,9 +4,26 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.23.1] - 2026-07-05
+## [Unreleased]
 
 ### Added
+
+### Fixed
+
+- Fixed remote Orynivo Server artist information from the shared Artists view so
+  the info, refresh, rename, and image actions use the clicked row's server
+  instead of the previously active server context.
+- Fixed manually selected remote Orynivo Server artist images disappearing when
+  reopening artist information by assigning stable artist-artwork URLs to the
+  updated row before caching the uploaded image bytes.
+- Restored the small thumbnail column in the Artists and Albums table views,
+  including for existing saved column masks unless the thumbnail is hidden again
+  through the column chooser.
+- Invalidated the client-side remote artist-list cache after remote artist
+  profile or image updates, and hydrated remote artist information from the
+  server's cached profile before falling back to a fresh external lookup.
+
+## [0.23.1] - 2026-07-05
 
 ### Fixed
 
