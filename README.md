@@ -174,8 +174,9 @@ while Windows servers expose their drive roots. The same dialog can start a
 server scan and shows live progress while large directories are being scanned.
 Inaccessible subdirectories such as Linux `lost+found` folders are skipped
 instead of aborting the complete scan.
-Configured Orynivo Server connections appear in the main sidebar inside the
-Library section, below the Local media node.
+Configured Orynivo Server connections are merged into the main Artists, Albums,
+Tracks, and search-result library views. Rows from a server are marked with an
+optional `OS` source badge that shows the server name as a tooltip.
 
 ### Running the server
 
@@ -239,28 +240,30 @@ byte-range streaming without FFmpeg.
   duration in transport metadata, play history, and **Up next**. Authenticated
   `?key=` stream URLs are not shown as titles and are not persisted in the
   playback queue.
-- Remote Orynivo Server sidebar entries now appear in the main Library section,
-  below the Local media node, and expose Artists, Albums, Tracks, and Folder
-  structure below each server. The Local media node and each server node are
-  individually collapsible. Remote Artists and Albums reuse the local
-  table/artwork masks, while remote artwork is loaded lazily from authenticated
-  server artwork endpoints and cached in the Windows client's local data
-  directory. Track search uses the normal header search box and runs through
-  the server's Lucene index. The remote folder tree shows a loading placeholder
-  while server data is being fetched and caches the folder-track list until the
-  server reports a newer `LibraryChangedAt` timestamp.
+- Configured Orynivo Server libraries are included in the same Artists, Albums,
+  Tracks, and search-result infrastructure as the local library. Server rows
+  reuse the local table/artwork masks and show an optional `OS` source badge
+  with the server name as tooltip. To avoid Avalonia DataGrid stalls, mixed
+  local/server rows are loaded into the combined row set before the first table
+  bind instead of replacing an already-visible table while the user scrolls.
+  Remote artwork is loaded lazily from authenticated server artwork endpoints
+  and cached in the Windows client's local data directory.
+- The Tracks filter includes a **Source** section with Local and every
+  configured Orynivo Server. Saved smart playlists can store the same source
+  restriction through stable source keys (`local`, `server:<id>`).
 - Remote Orynivo Server artist-info pages support renaming/merging artists and
   assigning Wikimedia artist images. The Windows client performs the image
   search and uploads the selected image to the server.
 - Opening a remote server album from a selected artist initially scopes the
   album tracks to that artist, with the same checkbox used by local albums to
   show every track on the album.
-- Playlists live under the Library sidebar: local playlists are grouped below
-  Local, and each Orynivo Server exposes its own Playlists node populated from
-  that server. Adding/removing tracks and creating/deleting regular playlists
-  for remote server tracks writes to the selected server. Local and remote
-  track, album, and folder context menus use the same playlist-provider action
-  path and route persistence to the correct local database or server.
+- Playlists live under the Library sidebar and can contain mixed local and
+  Orynivo Server tracks. Server tracks are stored in local playlists as stable
+  `orynivo://` references and resolved to authenticated stream URLs only when
+  they are opened or queued, so `?key=` stream URLs are not persisted.
+  Playlist tables show the favorite heart first and the source column next to
+  it. Smart playlists resolve against the combined local and configured
+  Orynivo Server track set.
 - Remote Orynivo Server artists, albums, and tracks can be marked as favorites;
   those favorite flags are stored only in the Windows client's settings.
 - Remote Orynivo Server album covers and artist images can be searched from the

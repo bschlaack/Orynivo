@@ -4,6 +4,100 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- The Tracks search now honours the active facet filters. The **source** facet
+  restricts which sources are searched at all (e.g. with only an Orynivo Server
+  selected, typing in the search box searches just that server and hides local
+  results), while the favourite, genre, format, and bitrate facets additionally
+  filter the track results. Saving the search as a smart playlist now also stores
+  the search text (new `SearchText` criterion, matched case-insensitively against
+  title, artist, and album), and the smart-playlist editor exposes it as a
+  **Search text contains** field. The **Save smart playlist** action is available
+  whenever a search query or a facet filter is active.
+- The Folder structure view now groups its content by source: a top-level
+  **Local** node (shown only when a local library directory is configured) and
+  one node per configured Orynivo Server (shown only when the server reports
+  folder tracks), each expanding into its own folder tree. With a single source
+  the group expands automatically; with several sources the groups stay
+  collapsed so every source stays visible at the top. Remote folder file nodes
+  play through the authenticated stream URL and carry the same transport
+  metadata as remote track rows.
+- Prepared shared local/Orynivo Server row metadata for common Artists, Albums,
+  Tracks, and search-result library views, including an optional `OS` source
+  column with the server name as tooltip when remote rows are shown.
+- Local playlists can now contain mixed local and Orynivo Server tracks. Server
+  tracks are persisted as `orynivo://` references so authenticated `?key=`
+  stream URLs are still not stored in SQLite.
+- Search result rows for tracks, albums, and artists now expose the same leading
+  favorite heart action as the main library tables.
+- Smart playlists opened from the local playlist group now resolve against the
+  combined local and configured Orynivo Server track set.
+- Shared Artists, Albums, and Tracks views now load configured Orynivo Server
+  rows into the combined row set before the first table bind, avoiding a
+  post-startup table replacement while preserving mixed local/server results.
+- Added a source facet to the Tracks filter with **Local** and configured
+  Orynivo Server entries. Smart playlists can persist the same source
+  restriction through stable source keys.
+- Playlist tables now expose the favorite heart as the first column and the
+  source column directly beside it. Source tooltips use theme-aware foreground
+  and background colors.
+
+### Fixed
+
+- The content loading skeleton now fully covers the content area (it spans the
+  intro-card and table rows edge to edge) instead of leaving a margin band where
+  part of the table stayed visible during loading, most noticeable when opening
+  playlists.
+- Opening the Folder structure view is dramatically faster on large merged
+  libraries. The folder tree now materializes lazily — only the expanded nodes
+  are built — instead of eagerly creating a tree node for every one of ~150k
+  tracks, which froze the UI thread for ~9 seconds. Children are populated before
+  the node expands (the proven Plex lazy-folder pattern) so they render reliably.
+  The already-cached server folder-track list (keyed by the server's
+  `LibraryChangedAt`, re-downloaded only when it changes) is now read and
+  deserialized off the UI thread, and a remote directory's descendant paths are
+  collected from the in-memory folder tree so context-menu actions still see
+  not-yet-expanded folders.
+- The source-badge tooltip in the shared tables now renders its text in the
+  theme foreground instead of black on the dark surface. The tooltip content is
+  an explicit `TextBlock` with a local theme foreground, because a string tooltip
+  does not inherit `ToolTip.Foreground` under the default tooltip theme.
+- The Albums table no longer freezes on startup once a remote Orynivo Server is
+  merged into the library. Building a remote album row's right-click playlist
+  menu resolved the album's track list through a **synchronous** server request
+  on the UI thread while the row was being realized inside the `DataGrid` layout
+  pass, blocking the whole table (thread dump: `GetPathsForRow` →
+  `TaskAwaiter.GetResult` under `DataGrid.MeasureOverride`). The remote album
+  playlist targets are now resolved off the UI thread and only when the flyout is
+  actually opened. Local-only libraries were unaffected because local album rows
+  never triggered that server round-trip.
+- The Artists table no longer risks a UI-thread stall with a large merged
+  library. Lazy per-row artist profile lookups now open the SQLite database,
+  write the cached profile, and decode the artist image on a background thread
+  instead of on the UI thread, and each visible row is marked as fetched for the
+  session so a failed download (offline, or a concurrent library scan holding the
+  write lock) no longer re-triggers a network request and database open on every
+  scroll pass.
+- Artist and album table thumbnail columns are now optional and hidden by
+  default in large mixed local/server tables to avoid the album-table UI stall
+  seen when many remote artwork-capable rows were bound at once.
+- Removed the obsolete Local child node from the Library sidebar now that local
+  and Orynivo Server sources share one library.
+- Existing saved table column masks now show the new `OS` source column by
+  default while still allowing it to be hidden from the column chooser.
+- Added per-server background timeouts while loading the shared Artists, Albums,
+  Tracks, and smart-playlist views so an unavailable server cannot leave the UI
+  stuck on startup.
+- Removed the post-bind Orynivo Server row append from the active Artists,
+  Albums, and Tracks tables after diagnostics showed that replacing a large
+  already-visible DataGrid could freeze the UI shortly after startup.
+- Reduced scroll-time work in the shared Artists, Albums, and Tracks tables so
+  the A-Z index follows the visible row without walking the complete visual
+  tree on every scroll event.
+
 ## [0.22.1] - 2026-07-04
 
 ### Changed

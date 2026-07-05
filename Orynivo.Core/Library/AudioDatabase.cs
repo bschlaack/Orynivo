@@ -96,12 +96,14 @@ public sealed record TrackListInfo(
 /// <param name="Genre">Stored genre text.</param>
 /// <param name="Format">Lowercase container format.</param>
 /// <param name="Bitrate">Encoded bitrate in kbps.</param>
+/// <param name="SourceKey">Stable source key, currently <c>local</c> for database rows.</param>
 public sealed record TrackFacetInfo(
     long Id,
     bool IsFavorite,
     string? Genre,
     string? Format,
-    int? Bitrate);
+    int? Bitrate,
+    string SourceKey = "local");
 
 /// <summary>Compact metadata and playback-history values used to resolve smart playlists.</summary>
 /// <param name="Id">Track database identifier.</param>
@@ -117,6 +119,7 @@ public sealed record TrackFacetInfo(
 /// <param name="PlayCount">Number of recorded local-track playback sessions.</param>
 /// <param name="LastPlayedAt">Most recent playback timestamp in Unix seconds.</param>
 /// <param name="SortTitle">Resolved title used for alphabetical ordering.</param>
+/// <param name="SourceKey">Stable source key used by source-aware smart playlists.</param>
 public sealed record SmartPlaylistTrackInfo(
     long Id,
     bool IsFavorite,
@@ -130,7 +133,8 @@ public sealed record SmartPlaylistTrackInfo(
     long AddedAt,
     int PlayCount,
     long? LastPlayedAt,
-    string SortTitle);
+    string SortTitle,
+    string SourceKey = "local");
 
 /// <summary>File-system paths for the three artwork variants stored per album (original, 96-px thumb, 320-px thumb).</summary>
 public sealed record ArtworkPaths(string? OriginalPath, string? Thumb96Path, string? Thumb320Path);

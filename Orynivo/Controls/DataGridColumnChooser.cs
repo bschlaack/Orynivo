@@ -63,7 +63,11 @@ internal static class DataGridColumnChooser
         {
             var visible = visibleKeys.ToHashSet(StringComparer.Ordinal);
             foreach (var column in grid.Columns.Where(column => column.Tag is string))
-                column.IsVisible = visible.Contains((string)column.Tag!);
+            {
+                var tag = (string)column.Tag!;
+                column.IsVisible = visible.Contains(tag) ||
+                                   (tag == "source" && !visible.Contains("__sourceHidden"));
+            }
 
             if (!grid.Columns.Any(column => column.Tag is string && column.IsVisible))
             {
@@ -161,11 +165,24 @@ internal static class DataGridColumnChooser
                     return;
 
                 DataGridColumnWidthStore.Capture(settings.DataGridColumnWidths, tableKey, grid);
+                var keepSourceHidden = settings.VisibleDataGridColumns.TryGetValue(tableKey, out var existingVisible) &&
+                                       existingVisible.Contains("__sourceHidden", StringComparer.Ordinal);
                 column.IsVisible = !column.IsVisible;
                 settings.VisibleDataGridColumns[tableKey] = selectable
                     .Where(candidate => candidate.IsVisible)
                     .Select(candidate => (string)candidate.Tag!)
                     .ToList();
+                if (column.Tag is string changedTag && changedTag == "source")
+                {
+                    if (column.IsVisible)
+                        settings.VisibleDataGridColumns[tableKey].Remove("__sourceHidden");
+                    else
+                        settings.VisibleDataGridColumns[tableKey].Add("__sourceHidden");
+                }
+                else if (keepSourceHidden)
+                {
+                    settings.VisibleDataGridColumns[tableKey].Add("__sourceHidden");
+                }
 
                 UpdateEntries();
             };

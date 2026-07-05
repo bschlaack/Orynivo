@@ -281,7 +281,7 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
 - `Orynivo/Audio/DffAudioPlayer.cs`: native DFF/DSDIFF-to-DSD path
 - `Orynivo/Audio/RemoteDffAudioPlayer.cs`: native uncompressed DFF/DSDIFF-to-DSD
   path for authenticated Orynivo Server streams. It parses the remote `FRM8`,
-  `PROP`, and `DSD ` chunks through HTTP byte ranges, rejects DST-compressed DFF,
+  `PROP`, and `DSD` chunks through HTTP byte ranges, rejects DST-compressed DFF,
   bit-reverses the DSD payload like the local DFF player, and feeds ASIO/cwASIO
   without downloading the complete file first.
 - `Orynivo/Audio/WasapiAudioPlayer.cs`: exclusive-mode WASAPI PCM path; converts
@@ -385,9 +385,10 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   `HtmlContentExtractor`): the controlled internet layer used by both MCP and the
   AI chat. `SearchAsync` queries the configured SearXNG JSON API (trusted
   endpoint, not SSRF-guarded, so a LAN/Docker instance works after the user
-  configures its URL); `FetchTextAsync`/`FetchMarkdownAsync` fetch arbitrary pages behind a
-  strong SSRF guard: http/https only, a `SocketsHttpHandler.ConnectCallback`
-  refuses private/loopback/link-local/reserved IPs at connect time (closing the
+  configures its URL); `FetchTextAsync`/`FetchMarkdownAsync` fetch arbitrary
+  pages behind a strong SSRF guard: http/https only, a
+  `SocketsHttpHandler.ConnectCallback` refuses
+  private/loopback/link-local/reserved IPs at connect time (closing the
   DNS-rebinding window), manual redirect following with a limit, response
   size-cap, non-text content refused (no arbitrary downloads), per-request
   timeout, optional domain allowlist, and per-request audit logging to
@@ -548,6 +549,15 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   artwork hydrates lazily as rows or artwork cards become visible; downloaded
   remote artwork is cached client-side under
   `%LOCALAPPDATA%\Orynivo\remote-artworks\`.
+  Mixed local/server rows expose stable source keys (`local` and `server:<id>`)
+  for the source column, the Tracks source facet, and source-aware smart
+  playlists. The visible source column belongs directly after the favorite
+  column in shared tables and playlist tables. Source tooltips must use
+  theme-aware foreground and surface brushes.
+  Large mixed local/server row sets must be composed before the first visible
+  `DataGrid` bind, or through a proven virtualized/paged binding strategy:
+  diagnostics showed that replacing an already-visible large mixed table's
+  `ItemsSource` can stall Avalonia's UI thread during scrolling.
   Artist/album entity links and double-click navigate **within** the remote
   library via `OpenOrynivoArtistAlbumsAsync`/`OpenOrynivoAlbumTracksAsync`
   (the link handlers `ArtistLinkButton_OnClick`/`AlbumLinkButton_OnClick`
@@ -615,6 +625,28 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   remote request is in flight. Cache remote folder-track lists under
   `%LOCALAPPDATA%\Orynivo\remote-folder-cache\` and reuse them only while the
   server's `LibraryChangedAt` scan status timestamp matches the cached value.
+  The top-level **Folder structure** view (`ShowUnifiedFolderTreeAsync`) merges
+  sources into one tree: a top-level **Local** group (only when a local library
+  directory is configured and has tracks) plus one group per configured Orynivo
+  Server (only when it reports folder tracks), each built through
+  `AddFolderRootsInto`/`BuildUnifiedFolderTree`. `FolderTag` carries an optional
+  `OrynivoServerSettings? Server` so remote directory nodes are resolved through
+  the in-memory `FolderTree` (`_folderTreesBySource[sourceKey].AllFilePathsUnder`)
+  instead of the local database — this is required because folder child nodes are
+  built lazily and may not be materialized. `_folderViewCts` cancels an in-flight
+  load when the user navigates away. Folder nodes are materialized lazily: each
+  directory node gets a placeholder child, and its real children are populated the
+  first time it is expanded. Because Avalonia does not reliably re-render children
+  swapped in during a node's own `Expanded` pass, the expand gesture is
+  intercepted (tunnel-phase `PointerPressed` on the chevron/header + a
+  `DoubleTapped` guard) so the children are inserted *before* `IsExpanded` is
+  set — the same pattern the Plex lazy folders use. Eagerly building the whole
+  tree froze the UI for ~9 s on a ~150k-track merged library. The server
+  folder-track cache file is read/deserialized and written off the UI thread
+  (`LoadOrynivoFolderTracksAsync` wraps the cache I/O in `Task.Run`). The
+  per-server sidebar Folders view still uses `BuildOrynivoFolderTree`, which
+  shares the `MapOrynivoFolderTrackLites` mapping so remote folder file nodes
+  register the same transport metadata.
   The unfiltered remote Tracks list is loaded with a large page size (one or two
   requests instead of one per 500 rows) and is likewise cached under
   `%LOCALAPPDATA%\Orynivo\remote-track-cache\`, reused while the server's
@@ -731,8 +763,10 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
 - `Orynivo/Library/PlaylistRecord.cs`: playlist model including denormalized
   `TrackCount`, `IsSmartPlaylist`, and `FilterCriteria`
 - `Orynivo/Library/SmartPlaylistCriteria.cs`: backward-compatible serialized
-  smart-playlist criteria covering favourites, genres, formats, bitrates,
-  metadata ranges, library/play-history rules, ordering, and result limits
+  smart-playlist criteria covering favourites, a free-text `SearchText`
+  (matched case-insensitively against title, artist, and album), genres,
+  formats, bitrates, source keys, metadata ranges, library/play-history rules,
+  ordering, and result limits
 - `Orynivo/SmartPlaylistDialog.*`: localized editor for the name and advanced
   criteria of an existing smart playlist
 - `Orynivo/Library/PlaylistTrackRecord.cs`: playlist entry model with position,
@@ -1031,7 +1065,14 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   DWM-colored native title bar
 - `AppendPlaylistItems()` builds context-menu items dynamically
 - Album artwork cards extend their existing cover menu through `ContextMenu.Opened`
-- `GetPathsForRow()` returns one track path or all album tracks through `GetTrackListByAlbum`
+- `GetPathsForRow()` returns one track path or all album tracks through
+  `GetTrackListByAlbum`. For a remote Orynivo Server album row it resolves the
+  album's track list through a server request, so it must never be called
+  synchronously while a row is being realized (during `LoadingRow` /
+  `DataGrid.MeasureOverride`): `BuildOrynivoArtworkContextFlyout` populates the
+  remote album's playlist targets off the UI thread only when the flyout is
+  opened. Resolving remote rows synchronously on the UI thread froze the whole
+  Albums table once a server was merged into the unified library.
 - `PlaylistMenuTag(long PlaylistId, IReadOnlyList<string> Paths)` stores paths directly
 - Folder nodes recursively collect tracks through `GetTrackPathsUnderDirectory`;
   empty folders have no menu
@@ -1123,8 +1164,10 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
 - `GetTracksByDirectory(dirPath)` uses an SQL prefix query plus a direct-child filter
 - `GetTrackPathsUnderDirectory(rootPath)` returns all recursive track paths
   below a root
-- Folder-tree lazy loading uses an in-memory parent-to-children map and creates
-  items only when expanded
+- Folder-tree lazy loading uses an in-memory parent-to-children map
+  (`FolderTree`) and materializes tree nodes only when a directory is expanded,
+  for both local and remote sources (`CreateDirItemLazy` adds a placeholder and
+  populates on the intercepted expand gesture)
 - `TrackLite`, `TrackListInfo`, `ArtistInfo`, and `AlbumInfo` remain
   intentionally small; `TrackRecord` is reserved for complete metadata operations
 - `GetTrackFacets()` remains a lightweight interactive-filter query;
@@ -1715,7 +1758,11 @@ asynchronous file I/O from the UI thread
   follows the top visible entry
 - The A-Z/# index uses trimmed `sort_title` where available and otherwise the
   displayed title; programmatic jumps use `DataGrid.ScrollIntoView`, while
-  manual DataGrid scrolling updates the active letter from the top visible row
+  manual DataGrid scrolling updates the active letter from the top visible row.
+  For `DataGrid` views this update must use the DataGrid scrollbar's pixel
+  offset plus the measured row height; do not walk the visual tree on every
+  scroll event, because large unified local/server tables can otherwise stall
+  input while scrolling.
 - **Search**: delayed Lucene search returns separate themed Track, Album, and
   Artist sections, supports partial words and German normalization variants,
   sorts by score then display name, and preserves the original query across
@@ -1724,7 +1771,8 @@ asynchronous file I/O from the UI thread
   load lazily; double-clicking a track queues its direct folder sorted by disc,
   track number, and file name
 - **Playlists**: display position, title, artist, album, and duration; sidebar
-  entries open their live track list
+  entries open their live track list. Playlist tables include a first-column
+  favorite heart and a source column immediately beside it.
 - **Smart playlists**: store JSON criteria instead of track rows, show a gold
   lightning icon, resolve live when opened, and do not permit manual entry
   removal. Criteria can include favourites, genre, format, bitrate, year,
@@ -1732,12 +1780,20 @@ asynchronous file I/O from the UI thread
   playback-count ranges, alphabetical/random/recent/least-recent ordering, and
   a result limit.
 - **Save smart playlist**: available in the local and remote Orynivo Server
-  Tracks views only when facet filters are active; opens the compact
-  `NewPlaylistDialog` and serializes the active favourite, genre, format, and
-  bitrate facets through the shared `BuildCurrentTrackFilterCriteria` helper. In
+  Tracks views when facet filters are active **or** the search box holds a
+  query; opens the compact `NewPlaylistDialog` and serializes the active
+  favourite, search text, genre, format, bitrate, and source facets through the
+  shared `BuildCurrentTrackFilterCriteria` helper. In
   the local Tracks view it calls `AudioDatabase.CreateSmartPlaylist`; in a remote
   Tracks view it calls `OrynivoServerClient.CreateSmartPlaylistAsync` so the
   smart playlist is persisted on that server.
+- Tracks **search** honours the active facets: the source facet gates which
+  sources contribute results (`ShowSearchResultsAsync` skips local when the
+  source facet excludes it and `AddRemoteSearchResultsAsync` skips servers not
+  in the source set), while favourite/genre/format/bitrate filter the track
+  section through the shared `MatchesTrackFilters`
+  (`RemoteSearchTrackMatchesFilters` re-applies client-side favourites for remote
+  hits). The same applies to the per-server `ShowOrynivoSearchResultsAsync`.
 - Right-clicking a smart playlist in the sidebar exposes **Edit smart
   playlist**, which opens the shared `SmartPlaylistDialog` with the stored name
   and full criteria. Local smart playlists update `filter_criteria` through

@@ -500,6 +500,12 @@ public sealed record LocalizedStrings(
     public string PlexLoading { get; init; } = "";
     /// <summary>Gets the Orynivo Server sidebar section header label.</summary>
     public string OrynivoServers { get; init; } = "";
+    /// <summary>Gets the source column header used for local and Orynivo Server library rows.</summary>
+    public string SourceColumn { get; init; } = "";
+    /// <summary>Gets the display label for local library rows in source filters and tooltips.</summary>
+    public string LocalSource { get; init; } = "";
+    /// <summary>Gets the short badge text for local library rows in source columns.</summary>
+    public string LocalSourceShort { get; init; } = "";
     /// <summary>Gets the Settings label for configured Orynivo Server connections.</summary>
     public string OrynivoServersSettings { get; init; } = "";
     /// <summary>Gets the hint text below the Orynivo Server section header in Settings.</summary>
@@ -595,12 +601,16 @@ public sealed record LocalizedStrings(
     public string SmartPlaylistFormats { get; init; } = "";
     /// <summary>Gets the comma-separated bitrate filter label.</summary>
     public string SmartPlaylistBitrates { get; init; } = "";
+    /// <summary>Gets the comma-separated source-key filter label.</summary>
+    public string SmartPlaylistSources { get; init; } = "";
     /// <summary>Gets the metadata filter section title.</summary>
     public string SmartPlaylistMetadata { get; init; } = "";
     /// <summary>Gets the minimum release-year label.</summary>
     public string SmartPlaylistMinimumYear { get; init; } = "";
     /// <summary>Gets the maximum release-year label.</summary>
     public string SmartPlaylistMaximumYear { get; init; } = "";
+    /// <summary>Gets the free-text search-filter label.</summary>
+    public string SmartPlaylistSearchText { get; init; } = "";
     /// <summary>Gets the artist text-filter label.</summary>
     public string SmartPlaylistArtistContains { get; init; } = "";
     /// <summary>Gets the album text-filter label.</summary>
