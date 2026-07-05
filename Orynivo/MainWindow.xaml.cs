@@ -2885,6 +2885,21 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>Deletes the cached remote artist list for a server after profile or image metadata changes.</summary>
+    /// <param name="server">Server whose artist list cache should be removed.</param>
+    private static void DeleteOrynivoArtistListCache(OrynivoServerSettings server)
+    {
+        try
+        {
+            var path = GetOrynivoArtistListCachePath(server);
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch
+        {
+        }
+    }
+
     private static void SaveOrynivoAlbumListCache(
         OrynivoServerSettings server,
         long libraryChangedAt,
@@ -6374,14 +6389,14 @@ public partial class MainWindow : Window
             case "Artists":
                 AddFavorite();
                 AddSourceBadge();
-                AddThumbnail(defaultVisible: false);
+                AddThumbnail();
                 AddArtistInfo();
                 AddEntityLink(LocalizationManager.Current.Artist, nameof(ContentRow.Title), 0, "artist", true, "Artist");
                 break;
             case "Albums":
                 AddFavorite();
                 AddSourceBadge();
-                AddThumbnail(defaultVisible: false);
+                AddThumbnail();
                 AddEntityLink(LocalizationManager.Current.Album, nameof(ContentRow.Title), 0, "album", true, "Album");
                 AddEntityLink(LocalizationManager.Current.AlbumArtist, nameof(ContentRow.Artist), 220, "artist", false, "Artist");
                 Add(LocalizationManager.Current.Year, nameof(ContentRow.Year), 60, "year", right: true);
@@ -7371,6 +7386,20 @@ public partial class MainWindow : Window
     {
         if (row.OrynivoServer is { } server)
             _activeOrynivoServer = server;
+    }
+
+    /// <summary>Resolves the Orynivo Server context for a remote row and activates it.</summary>
+    /// <param name="row">Remote row carrying the server context when it came from a mixed view.</param>
+    /// <returns>The row server, or the current ambient server as a fallback.</returns>
+    private OrynivoServerSettings? ResolveRowOrynivoServer(ContentRow row)
+    {
+        if (row.OrynivoServer is { } server)
+        {
+            _activeOrynivoServer = server;
+            return server;
+        }
+
+        return _activeOrynivoServer;
     }
 
     private async void ArtistLinkButton_OnClick(object? sender, RoutedEventArgs e)
@@ -8372,7 +8401,7 @@ public partial class MainWindow : Window
     private async void OrynivoArtworkMenuItem_OnClick(object? sender, RoutedEventArgs e)
     {
         if (sender is not MenuItem { Tag: ContentRow row } ||
-            _activeOrynivoServer is null ||
+            ResolveRowOrynivoServer(row) is not { } server ||
             !long.TryParse(row.ExternalId, out var entityId))
         {
             return;
@@ -8380,19 +8409,19 @@ public partial class MainWindow : Window
 
         if (row.EntityType == "OrynivoAlbum")
         {
-            await OpenOrynivoAlbumCoverSearchAsync(_activeOrynivoServer, entityId, row);
+            await OpenOrynivoAlbumCoverSearchAsync(server, entityId, row);
             return;
         }
 
         if (row.EntityType == "OrynivoArtist")
-            await OpenOrynivoArtistImageSearchAsync(_activeOrynivoServer, entityId, row);
+            await OpenOrynivoArtistImageSearchAsync(server, entityId, row);
     }
 
     private async void OrynivoArtistInfoRefreshMenuItem_OnClick(object? sender, RoutedEventArgs e)
     {
         if (sender is not MenuItem { Tag: ContentRow row } ||
             row.EntityType != "OrynivoArtist" ||
-            _activeOrynivoServer is null ||
+            ResolveRowOrynivoServer(row) is not { } server ||
             !long.TryParse(row.ExternalId, out var artistId))
         {
             return;
@@ -8414,7 +8443,7 @@ public partial class MainWindow : Window
         }
 
         var refreshed = await _orynivoClient.UpdateArtistProfileAsync(
-            _activeOrynivoServer,
+            server,
             artistId,
             profile?.Biography,
             profile?.SourceUrl,
@@ -8434,6 +8463,7 @@ public partial class MainWindow : Window
         row.ImageIsManual = refreshed.ImageIsManual;
         if (imageData is not null)
         {
+            EnsureOrynivoArtistArtworkPaths(server, artistId, row);
             ApplyRemoteArtwork(row, imageData);
         }
         else
@@ -8441,8 +8471,9 @@ public partial class MainWindow : Window
             InvalidateRemoteArtworkCache(row.ArtworkPath);
             _ = LoadOrynivoArtworkAsync(
                 row,
-                OrynivoServerClient.GetArtistArtworkUrl(_activeOrynivoServer, artistId));
+                OrynivoServerClient.GetArtistArtworkUrl(server, artistId));
         }
+        DeleteOrynivoArtistListCache(server);
         StatusTextBlock.Text = string.IsNullOrWhiteSpace(refreshed.Biography)
             ? LocalizationManager.Current.ArtistInfoNotFound
             : string.Empty;
@@ -8561,8 +8592,56 @@ public partial class MainWindow : Window
             return;
         }
 
+        EnsureOrynivoArtistArtworkPaths(server, artistId, row);
         ApplyRemoteArtwork(row, selected.ImageData);
+        DeleteOrynivoArtistListCache(server);
         StatusTextBlock.Text = string.Empty;
+    }
+
+    /// <summary>Ensures a remote artist row has stable artwork URLs after an upload.</summary>
+    /// <param name="server">Server that owns the artist.</param>
+    /// <param name="artistId">Server-side artist identifier.</param>
+    /// <param name="row">Artist row to update.</param>
+    private static void EnsureOrynivoArtistArtworkPaths(
+        OrynivoServerSettings server,
+        long artistId,
+        ContentRow row)
+    {
+        var imageUrl = OrynivoServerClient.GetArtistArtworkUrl(server, artistId);
+        row.ArtworkPath = imageUrl;
+        row.ThumbnailPath = imageUrl;
+    }
+
+    /// <summary>Copies server-cached artist profile metadata into a remote artist row.</summary>
+    /// <param name="server">Server that owns the artist.</param>
+    /// <param name="row">Row to update.</param>
+    /// <param name="artist">Server artist profile response.</param>
+    private static void ApplyOrynivoArtistProfile(
+        OrynivoServerSettings server,
+        ContentRow row,
+        OrynivoArtistInfo artist)
+    {
+        row.ArtistId = artist.Id;
+        row.Biography = artist.Biography;
+        row.SourceUrl = artist.SourceUrl;
+        row.ProfileLanguage = artist.ProfileLanguage;
+        row.ProfileFetchedAt = artist.ProfileFetchedAt;
+        row.ImageIsManual = artist.ImageIsManual;
+        if (artist.HasImage)
+        {
+            EnsureOrynivoArtistArtworkPaths(server, artist.Id, row);
+            row.ArtworkLoadCompleted = false;
+            row.ThumbnailLoadCompleted = false;
+        }
+        else
+        {
+            row.ArtworkPath = null;
+            row.ThumbnailPath = null;
+            row.Artwork = null;
+            row.Thumbnail = null;
+            row.ArtworkLoadCompleted = true;
+            row.ThumbnailLoadCompleted = true;
+        }
     }
 
     private static void ApplyRemoteArtwork(ContentRow row, byte[] imageData)
@@ -13214,14 +13293,15 @@ public partial class MainWindow : Window
 
         if (_artistInfoDisplayedRemoteRow is { } remoteRow)
         {
-            if (_activeOrynivoServer is null ||
+            var server = ResolveRowOrynivoServer(remoteRow);
+            if (server is null ||
                 remoteRow.Id is not long remoteArtistId ||
                 remoteRow.EntityType != "OrynivoArtist")
             {
                 return;
             }
 
-            await OpenOrynivoArtistImageSearchAsync(_activeOrynivoServer, remoteArtistId, remoteRow);
+            await OpenOrynivoArtistImageSearchAsync(server, remoteArtistId, remoteRow);
             ArtistInfoImage.Source = remoteRow.Artwork;
             ArtistInfoImagePlaceholder.IsVisible = ArtistInfoImage.Source is null;
             ArtistInfoImageStatusText.IsVisible = false;
@@ -13382,7 +13462,7 @@ public partial class MainWindow : Window
 
     private async Task EditOrynivoArtistNameAsync(ContentRow row)
     {
-        if (_activeOrynivoServer is not { } server ||
+        if (ResolveRowOrynivoServer(row) is not { } server ||
             row.Id is not long artistId ||
             row.EntityType != "OrynivoArtist")
         {
@@ -13832,7 +13912,7 @@ public partial class MainWindow : Window
 
     private async Task ShowOrynivoArtistInfoAsync(ContentRow row, bool forceRefresh)
     {
-        if (_activeOrynivoServer is null ||
+        if (ResolveRowOrynivoServer(row) is not { } server ||
             row.Id is not long artistId ||
             row.EntityType != "OrynivoArtist")
         {
@@ -13862,6 +13942,20 @@ public partial class MainWindow : Window
         {
             ArtistInfoTitleButton.Content = row.Title ?? LocalizationManager.Current.Unknown;
             var language = GetProfileLanguageCode();
+            if (!forceRefresh &&
+                (string.IsNullOrWhiteSpace(row.Biography) ||
+                 string.IsNullOrWhiteSpace(row.ArtworkPath) ||
+                 row.ProfileFetchedAt is null))
+            {
+                var cached = await _orynivoClient.GetArtistAsync(server, artistId, cts.Token);
+                cts.Token.ThrowIfCancellationRequested();
+                if (cached is not null)
+                {
+                    ApplyOrynivoArtistProfile(server, row, cached);
+                    ArtistInfoTitleButton.Content = row.Title ?? LocalizationManager.Current.Unknown;
+                }
+            }
+
             var fetchedAt = row.ProfileFetchedAt is long timestamp
                 ? DateTimeOffset.FromUnixTimeSeconds(timestamp)
                 : (DateTimeOffset?)null;
@@ -13891,7 +13985,7 @@ public partial class MainWindow : Window
                 }
 
                 var refreshed = await _orynivoClient.UpdateArtistProfileAsync(
-                    _activeOrynivoServer,
+                    server,
                     artistId,
                     profile?.Biography,
                     profile?.SourceUrl,
@@ -13912,9 +14006,15 @@ public partial class MainWindow : Window
                 row.ProfileFetchedAt = refreshed.ProfileFetchedAt;
                 row.ImageIsManual = refreshed.ImageIsManual;
                 if (imageData is not null)
+                {
+                    EnsureOrynivoArtistArtworkPaths(server, artistId, row);
                     ApplyRemoteArtwork(row, imageData);
+                }
                 else
+                {
                     InvalidateRemoteArtworkCache(row.ArtworkPath);
+                }
+                DeleteOrynivoArtistListCache(server);
             }
 
             ArtistInfoBiographyTextBlock.Text = row.Biography ?? string.Empty;
@@ -13941,12 +14041,11 @@ public partial class MainWindow : Window
             ArtistInfoStatusTextBlock.Text = LocalizationManager.Current.ArtistInfoNotFound;
             ArtistInfoStatusTextBlock.IsVisible =
                 string.IsNullOrWhiteSpace(row.Biography) && ArtistInfoImage.Source is null;
-            if (_activeOrynivoServer is { } albumServer)
-                await LoadArtistInfoAlbumsAsync(
-                    CreateOrynivoCatalogProvider(albumServer),
-                    artistId,
-                    albumServer,
-                    cts.Token);
+            await LoadArtistInfoAlbumsAsync(
+                CreateOrynivoCatalogProvider(server),
+                artistId,
+                server,
+                cts.Token);
         }
         catch (OperationCanceledException)
         {
@@ -15618,6 +15717,22 @@ public partial class MainWindow : Window
         };
         stack.Children.Add(titleBlock);
 
+        var artistButton = new Button
+        {
+            Content = entry.Artist,
+            FontSize = ResolveFontSize("FontSizeMeta"),
+            Foreground = FindResource<IBrush>("AppSecondaryTextBrush"),
+            Theme = FindResource<ControlTheme>("EntityLinkButtonTheme"),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            MaxWidth = artSize,
+            Margin = new Thickness(2, 0, 2, 0),
+            IsVisible = CanOpenHistoryArtist(entry)
+        };
+        artistButton.Click += async (_, e) =>
+        {
+            e.Handled = true;
+            await OpenHistoryArtistAsync(entry);
+        };
         var artistBlock = new TextBlock
         {
             Text         = entry.Artist,
@@ -15626,14 +15741,15 @@ public partial class MainWindow : Window
             TextTrimming = TextTrimming.CharacterEllipsis,
             MaxLines     = 1,
             Margin       = new Thickness(2, 0, 2, 0),
-            IsVisible    = !string.IsNullOrWhiteSpace(entry.Artist)
+            IsVisible    = !string.IsNullOrWhiteSpace(entry.Artist) && !artistButton.IsVisible
         };
+        stack.Children.Add(artistButton);
         stack.Children.Add(artistBlock);
 
         card.Child = stack;
 
         if (TryGetOrynivoHistoryTarget(entry, out _, out _))
-            _ = HydrateRecentlyPlayedRemoteCardAsync(entry, titleBlock, artistBlock, initialsAvatar);
+            _ = HydrateRecentlyPlayedRemoteCardAsync(entry, titleBlock, artistButton, artistBlock, initialsAvatar);
 
         card.PointerEntered += (_, _) =>
         {
@@ -15663,12 +15779,14 @@ public partial class MainWindow : Window
     /// <summary>Refreshes a remote recently played card with authoritative server metadata.</summary>
     /// <param name="entry">Playback-history entry to resolve.</param>
     /// <param name="titleBlock">Title text block to update.</param>
+    /// <param name="artistButton">Artist link button to update.</param>
     /// <param name="artistBlock">Artist text block to update.</param>
     /// <param name="initialsAvatar">Artwork placeholder to retitle.</param>
     /// <returns>A task representing the asynchronous metadata refresh.</returns>
     private async Task HydrateRecentlyPlayedRemoteCardAsync(
         DailyHistoryEntry entry,
         TextBlock titleBlock,
+        Button artistButton,
         TextBlock artistBlock,
         Orynivo.Controls.InitialsAvatar initialsAvatar)
     {
@@ -15680,8 +15798,11 @@ public partial class MainWindow : Window
 
             if (!string.IsNullOrWhiteSpace(row.Title))
                 titleBlock.Text = row.Title;
+            var canOpenArtist = row.ArtistId.HasValue && !string.IsNullOrWhiteSpace(row.Artist);
+            artistButton.Content = row.Artist;
+            artistButton.IsVisible = canOpenArtist;
             artistBlock.Text = row.Artist;
-            artistBlock.IsVisible = !string.IsNullOrWhiteSpace(row.Artist);
+            artistBlock.IsVisible = !canOpenArtist && !string.IsNullOrWhiteSpace(row.Artist);
             initialsAvatar.DisplayName = string.IsNullOrWhiteSpace(row.Title) ? row.Artist : row.Title;
         }
         catch
@@ -15700,6 +15821,36 @@ public partial class MainWindow : Window
     private static bool IsPlayableHistoryEntry(DailyHistoryEntry entry) =>
         string.Equals(entry.MediaType, "track", StringComparison.OrdinalIgnoreCase) &&
         (IsAvailableLocalTrack(entry.Path) || IsHttpUrl(entry.Path));
+
+    /// <summary>Determines whether a playback-history artist can be opened from local or remote metadata.</summary>
+    /// <param name="entry">The history entry to test.</param>
+    /// <returns><see langword="true"/> when the artist has a local ID or a resolvable Orynivo Server track target.</returns>
+    private bool CanOpenHistoryArtist(DailyHistoryEntry entry) =>
+        !string.IsNullOrWhiteSpace(entry.Artist) &&
+        (entry.ArtistId.HasValue || TryGetOrynivoHistoryTarget(entry, out _, out _));
+
+    /// <summary>Opens the artist album list for a local or Orynivo Server playback-history entry.</summary>
+    /// <param name="entry">The history entry whose artist should be opened.</param>
+    /// <returns>A task representing the asynchronous navigation.</returns>
+    private async Task OpenHistoryArtistAsync(DailyHistoryEntry entry)
+    {
+        if (entry.ArtistId is long localArtistId)
+        {
+            await ShowArtistAlbumsAsync(
+                localArtistId,
+                entry.Artist ?? LocalizationManager.Current.Unknown);
+            return;
+        }
+
+        var remoteRow = await ResolveOrynivoHistoryTrackRowAsync(entry);
+        if (remoteRow is not { OrynivoServer: { } server, ArtistId: long remoteArtistId })
+            return;
+
+        _activeOrynivoServer = server;
+        await OpenOrynivoArtistAlbumsAsync(
+            remoteArtistId,
+            remoteRow.Artist ?? entry.Artist ?? LocalizationManager.Current.Unknown);
+    }
 
     /// <summary>
     /// Plays a recently played entry without leaving the current view: it replaces
@@ -16238,6 +16389,9 @@ public partial class MainWindow : Window
                 await ShowArtistAlbumsAsync(
                     artistId,
                     entry.Artist ?? LocalizationManager.Current.Unknown);
+                break;
+            case DailyHistoryAction.Artist:
+                await OpenHistoryArtistAsync(entry);
                 break;
         }
     }
