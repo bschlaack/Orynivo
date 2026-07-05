@@ -15717,6 +15717,22 @@ public partial class MainWindow : Window
         };
         stack.Children.Add(titleBlock);
 
+        var artistButton = new Button
+        {
+            Content = entry.Artist,
+            FontSize = ResolveFontSize("FontSizeMeta"),
+            Foreground = FindResource<IBrush>("AppSecondaryTextBrush"),
+            Theme = FindResource<ControlTheme>("EntityLinkButtonTheme"),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            MaxWidth = artSize,
+            Margin = new Thickness(2, 0, 2, 0),
+            IsVisible = CanOpenHistoryArtist(entry)
+        };
+        artistButton.Click += async (_, e) =>
+        {
+            e.Handled = true;
+            await OpenHistoryArtistAsync(entry);
+        };
         var artistBlock = new TextBlock
         {
             Text         = entry.Artist,
@@ -15725,14 +15741,15 @@ public partial class MainWindow : Window
             TextTrimming = TextTrimming.CharacterEllipsis,
             MaxLines     = 1,
             Margin       = new Thickness(2, 0, 2, 0),
-            IsVisible    = !string.IsNullOrWhiteSpace(entry.Artist)
+            IsVisible    = !string.IsNullOrWhiteSpace(entry.Artist) && !artistButton.IsVisible
         };
+        stack.Children.Add(artistButton);
         stack.Children.Add(artistBlock);
 
         card.Child = stack;
 
         if (TryGetOrynivoHistoryTarget(entry, out _, out _))
-            _ = HydrateRecentlyPlayedRemoteCardAsync(entry, titleBlock, artistBlock, initialsAvatar);
+            _ = HydrateRecentlyPlayedRemoteCardAsync(entry, titleBlock, artistButton, artistBlock, initialsAvatar);
 
         card.PointerEntered += (_, _) =>
         {
@@ -15762,12 +15779,14 @@ public partial class MainWindow : Window
     /// <summary>Refreshes a remote recently played card with authoritative server metadata.</summary>
     /// <param name="entry">Playback-history entry to resolve.</param>
     /// <param name="titleBlock">Title text block to update.</param>
+    /// <param name="artistButton">Artist link button to update.</param>
     /// <param name="artistBlock">Artist text block to update.</param>
     /// <param name="initialsAvatar">Artwork placeholder to retitle.</param>
     /// <returns>A task representing the asynchronous metadata refresh.</returns>
     private async Task HydrateRecentlyPlayedRemoteCardAsync(
         DailyHistoryEntry entry,
         TextBlock titleBlock,
+        Button artistButton,
         TextBlock artistBlock,
         Orynivo.Controls.InitialsAvatar initialsAvatar)
     {
@@ -15779,8 +15798,11 @@ public partial class MainWindow : Window
 
             if (!string.IsNullOrWhiteSpace(row.Title))
                 titleBlock.Text = row.Title;
+            var canOpenArtist = row.ArtistId.HasValue && !string.IsNullOrWhiteSpace(row.Artist);
+            artistButton.Content = row.Artist;
+            artistButton.IsVisible = canOpenArtist;
             artistBlock.Text = row.Artist;
-            artistBlock.IsVisible = !string.IsNullOrWhiteSpace(row.Artist);
+            artistBlock.IsVisible = !canOpenArtist && !string.IsNullOrWhiteSpace(row.Artist);
             initialsAvatar.DisplayName = string.IsNullOrWhiteSpace(row.Title) ? row.Artist : row.Title;
         }
         catch
@@ -15799,6 +15821,36 @@ public partial class MainWindow : Window
     private static bool IsPlayableHistoryEntry(DailyHistoryEntry entry) =>
         string.Equals(entry.MediaType, "track", StringComparison.OrdinalIgnoreCase) &&
         (IsAvailableLocalTrack(entry.Path) || IsHttpUrl(entry.Path));
+
+    /// <summary>Determines whether a playback-history artist can be opened from local or remote metadata.</summary>
+    /// <param name="entry">The history entry to test.</param>
+    /// <returns><see langword="true"/> when the artist has a local ID or a resolvable Orynivo Server track target.</returns>
+    private bool CanOpenHistoryArtist(DailyHistoryEntry entry) =>
+        !string.IsNullOrWhiteSpace(entry.Artist) &&
+        (entry.ArtistId.HasValue || TryGetOrynivoHistoryTarget(entry, out _, out _));
+
+    /// <summary>Opens the artist album list for a local or Orynivo Server playback-history entry.</summary>
+    /// <param name="entry">The history entry whose artist should be opened.</param>
+    /// <returns>A task representing the asynchronous navigation.</returns>
+    private async Task OpenHistoryArtistAsync(DailyHistoryEntry entry)
+    {
+        if (entry.ArtistId is long localArtistId)
+        {
+            await ShowArtistAlbumsAsync(
+                localArtistId,
+                entry.Artist ?? LocalizationManager.Current.Unknown);
+            return;
+        }
+
+        var remoteRow = await ResolveOrynivoHistoryTrackRowAsync(entry);
+        if (remoteRow is not { OrynivoServer: { } server, ArtistId: long remoteArtistId })
+            return;
+
+        _activeOrynivoServer = server;
+        await OpenOrynivoArtistAlbumsAsync(
+            remoteArtistId,
+            remoteRow.Artist ?? entry.Artist ?? LocalizationManager.Current.Unknown);
+    }
 
     /// <summary>
     /// Plays a recently played entry without leaving the current view: it replaces
@@ -16337,6 +16389,9 @@ public partial class MainWindow : Window
                 await ShowArtistAlbumsAsync(
                     artistId,
                     entry.Artist ?? LocalizationManager.Current.Unknown);
+                break;
+            case DailyHistoryAction.Artist:
+                await OpenHistoryArtistAsync(entry);
                 break;
         }
     }

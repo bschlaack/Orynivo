@@ -22,6 +22,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Invalidated the client-side remote artist-list cache after remote artist
   profile or image updates, and hydrated remote artist information from the
   server's cached profile before falling back to a fresh external lookup.
+- Made playback-history artists clickable for both local and Orynivo Server
+  entries, including the calendar day dialog and the Dashboard's recently
+  played cards/full view.
 
 ## [0.23.1] - 2026-07-05
 

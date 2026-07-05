@@ -35,7 +35,9 @@ public partial class DailyHistoryDialog : Window
             Entry.TrackId.HasValue &&
             (File.Exists(Entry.Path) ||
              Entry.Path.StartsWith("cue://", StringComparison.OrdinalIgnoreCase));
-        public bool CanOpenArtist => Entry.ArtistId.HasValue;
+        public bool CanOpenArtist =>
+            Entry.ArtistId.HasValue ||
+            (IsPotentialOrynivoTrack(Entry) && !string.IsNullOrWhiteSpace(Entry.Artist));
         public bool CanOpenAlbum => Entry.AlbumId.HasValue;
         public bool IsPlainTitle => !CanOpenTrack;
         public bool IsPlainArtist => !CanOpenArtist;
@@ -115,6 +117,18 @@ public partial class DailyHistoryDialog : Window
             ? FormatDuration(entry.DurationSeconds.Value)
             : string.Empty
     };
+
+    private static bool IsPotentialOrynivoTrack(DailyHistoryEntry entry)
+    {
+        if (!string.Equals(entry.MediaType, "track", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        if (entry.ExternalId?.StartsWith("orynivo:", StringComparison.OrdinalIgnoreCase) == true)
+            return true;
+
+        return Uri.TryCreate(entry.Path, UriKind.Absolute, out var uri) &&
+               uri.AbsolutePath.Contains("/api/stream/", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static string FormatDuration(double seconds)
     {
