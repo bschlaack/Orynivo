@@ -55,9 +55,11 @@ public partial class SmartPlaylistDialog : Window
     private void PopulateFields()
     {
         FavoritesOnlyCheckBox.IsChecked = _initialCriteria.FavoritesOnly;
+        SearchTextTextBox.Text = _initialCriteria.SearchText;
         GenresTextBox.Text = string.Join(", ", _initialCriteria.Genres);
         FormatsTextBox.Text = string.Join(", ", _initialCriteria.Formats);
         BitratesTextBox.Text = string.Join(", ", _initialCriteria.Bitrates);
+        SourcesTextBox.Text = string.Join(", ", _initialCriteria.SourceKeys);
         MinimumYearTextBox.Text = FormatNumber(_initialCriteria.MinimumYear);
         MaximumYearTextBox.Text = FormatNumber(_initialCriteria.MaximumYear);
         ArtistTextBox.Text = _initialCriteria.ArtistContains;
@@ -134,11 +136,15 @@ public partial class SmartPlaylistDialog : Window
         criteria = new SmartPlaylistCriteria
         {
             FavoritesOnly = FavoritesOnlyCheckBox.IsChecked == true,
+            SearchText = NullIfWhiteSpace(SearchTextTextBox.Text),
             Genres = ParseStringList(GenresTextBox.Text),
             Formats = ParseStringList(FormatsTextBox.Text)
                 .Select(value => value.ToLowerInvariant())
                 .ToList(),
             Bitrates = bitrates,
+            SourceKeys = ParseStringList(SourcesTextBox.Text)
+                .Select(value => value.ToLowerInvariant())
+                .ToList(),
             MinimumYear = minimumYear,
             MaximumYear = maximumYear,
             ArtistContains = NullIfWhiteSpace(ArtistTextBox.Text),

@@ -18,11 +18,22 @@ public sealed class SmartPlaylistCriteria
     /// <summary>Gets the allowed bitrate values in kbps; an empty list means no restriction.</summary>
     public List<int> Bitrates { get; init; } = [];
 
+    /// <summary>
+    /// Gets stable source keys included in the result; an empty list means no source restriction.
+    /// </summary>
+    public List<string> SourceKeys { get; init; } = [];
+
     /// <summary>Gets the inclusive minimum release year, or <see langword="null"/> when unrestricted.</summary>
     public int? MinimumYear { get; init; }
 
     /// <summary>Gets the inclusive maximum release year, or <see langword="null"/> when unrestricted.</summary>
     public int? MaximumYear { get; init; }
+
+    /// <summary>
+    /// Gets the case-insensitive free-text filter matched against a track's title, artist,
+    /// and album. Captured from the Tracks search box when the smart playlist is created.
+    /// </summary>
+    public string? SearchText { get; init; }
 
     /// <summary>Gets the case-insensitive artist text filter.</summary>
     public string? ArtistContains { get; init; }
@@ -99,6 +110,19 @@ public sealed class SmartPlaylistCriteria
         if (Bitrates is { Count: > 0 } &&
             (!facet.Bitrate.HasValue || !Bitrates.Contains(facet.Bitrate.Value)))
             return false;
+        if (SourceKeys is { Count: > 0 } &&
+            !SourceKeys.Contains(facet.SourceKey, StringComparer.OrdinalIgnoreCase))
+            return false;
+        if (!string.IsNullOrWhiteSpace(SearchText))
+        {
+            var needle = SearchText.Trim();
+            var matchesText =
+                (facet.SortTitle?.Contains(needle, StringComparison.CurrentCultureIgnoreCase) ?? false) ||
+                (facet.Artist?.Contains(needle, StringComparison.CurrentCultureIgnoreCase) ?? false) ||
+                (facet.Album?.Contains(needle, StringComparison.CurrentCultureIgnoreCase) ?? false);
+            if (!matchesText)
+                return false;
+        }
         if (MinimumYear is int minYear && (!facet.Year.HasValue || facet.Year.Value < minYear)) return false;
         if (MaximumYear is int maxYear && (!facet.Year.HasValue || facet.Year.Value > maxYear)) return false;
         if (!string.IsNullOrWhiteSpace(ArtistContains) &&

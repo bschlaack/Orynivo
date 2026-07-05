@@ -118,9 +118,11 @@ public static class LocalizationManager
         resources["L_SmartPlaylistGenres"] = Current.SmartPlaylistGenres;
         resources["L_SmartPlaylistFormats"] = Current.SmartPlaylistFormats;
         resources["L_SmartPlaylistBitrates"] = Current.SmartPlaylistBitrates;
+        resources["L_SmartPlaylistSources"] = Current.SmartPlaylistSources;
         resources["L_SmartPlaylistMetadata"] = Current.SmartPlaylistMetadata;
         resources["L_SmartPlaylistMinimumYear"] = Current.SmartPlaylistMinimumYear;
         resources["L_SmartPlaylistMaximumYear"] = Current.SmartPlaylistMaximumYear;
+        resources["L_SmartPlaylistSearchText"] = Current.SmartPlaylistSearchText;
         resources["L_SmartPlaylistArtistContains"] = Current.SmartPlaylistArtistContains;
         resources["L_SmartPlaylistAlbumContains"] = Current.SmartPlaylistAlbumContains;
         resources["L_SmartPlaylistMinimumDuration"] = Current.SmartPlaylistMinimumDuration;
@@ -261,6 +263,7 @@ public static class LocalizationManager
         resources["L_PlexToken"] = Current.PlexToken;
         resources["L_PlexTestConnection"] = Current.PlexTestConnection;
         resources["L_OrynivoServers"] = Current.OrynivoServers;
+        resources["L_SourceColumn"] = Current.SourceColumn;
         resources["L_OrynivoServersSettings"] = Current.OrynivoServersSettings;
         resources["L_OrynivoServersHint"] = Current.OrynivoServersHint;
         resources["L_AddOrynivoServer"] = Current.AddOrynivoServer;
@@ -650,6 +653,9 @@ public static class LocalizationManager
         , PlexNoAudioLibraries = "Keine Audio-Bibliotheken gefunden."
         , PlexLoading = "Plex-Inhalte werden geladen …"
         , OrynivoServers = "ORYNIVO-SERVER"
+        , SourceColumn = "Quelle"
+        , LocalSource = "Lokal"
+        , LocalSourceShort = "L"
         , OrynivoServersSettings = "Orynivo-Server"
         , OrynivoServersHint = "Verbinde den Player mit einem oder mehreren Orynivo-Server-Instanzen im lokalen Netzwerk. Der API-Key wird in der settings.json gespeichert."
         , AddOrynivoServer = "Server hinzufügen"
@@ -699,9 +705,11 @@ public static class LocalizationManager
         , SmartPlaylistGenres = "Genres (durch Komma getrennt)"
         , SmartPlaylistFormats = "Formate (z. B. FLAC, MP3; durch Komma getrennt)"
         , SmartPlaylistBitrates = "Bitraten in kbps (durch Komma getrennt)"
+        , SmartPlaylistSources = "Quellen (local oder server:<id>; durch Komma getrennt)"
         , SmartPlaylistMetadata = "Metadaten"
         , SmartPlaylistMinimumYear = "Jahr von"
         , SmartPlaylistMaximumYear = "Jahr bis"
+        , SmartPlaylistSearchText = "Suchtext enthält"
         , SmartPlaylistArtistContains = "Künstler enthält"
         , SmartPlaylistAlbumContains = "Album enthält"
         , SmartPlaylistMinimumDuration = "Mindestdauer in Minuten"
@@ -1069,6 +1077,9 @@ public static class LocalizationManager
         , PlexNoAudioLibraries = "No audio libraries found."
         , PlexLoading = "Loading Plex content…"
         , OrynivoServers = "ORYNIVO SERVER"
+        , SourceColumn = "Source"
+        , LocalSource = "Local"
+        , LocalSourceShort = "L"
         , OrynivoServersSettings = "Orynivo servers"
         , OrynivoServersHint = "Connect the player to one or more Orynivo Server instances on your local network. The API key is stored in settings.json."
         , AddOrynivoServer = "Add server"
@@ -1118,9 +1129,11 @@ public static class LocalizationManager
         , SmartPlaylistGenres = "Genres (comma-separated)"
         , SmartPlaylistFormats = "Formats (for example FLAC, MP3; comma-separated)"
         , SmartPlaylistBitrates = "Bitrates in kbps (comma-separated)"
+        , SmartPlaylistSources = "Sources (local or server:<id>; comma-separated)"
         , SmartPlaylistMetadata = "Metadata"
         , SmartPlaylistMinimumYear = "Year from"
         , SmartPlaylistMaximumYear = "Year to"
+        , SmartPlaylistSearchText = "Search text contains"
         , SmartPlaylistArtistContains = "Artist contains"
         , SmartPlaylistAlbumContains = "Album contains"
         , SmartPlaylistMinimumDuration = "Minimum duration in minutes"
@@ -1491,6 +1504,9 @@ public static class LocalizationManager
         , PlexNoAudioLibraries = "Aucune bibliothèque audio trouvée."
         , PlexLoading = "Chargement du contenu Plex…"
         , OrynivoServers = "SERVEURS ORYNIVO"
+        , SourceColumn = "Source"
+        , LocalSource = "Local"
+        , LocalSourceShort = "L"
         , OrynivoServersSettings = "Serveurs Orynivo"
         , OrynivoServersHint = "Connectez le lecteur à une ou plusieurs instances Orynivo Server sur votre réseau local. La clé API est stockée dans settings.json."
         , AddOrynivoServer = "Ajouter un serveur"
@@ -1540,9 +1556,11 @@ public static class LocalizationManager
         , SmartPlaylistGenres = "Genres (séparés par des virgules)"
         , SmartPlaylistFormats = "Formats (par ex. FLAC, MP3 ; séparés par des virgules)"
         , SmartPlaylistBitrates = "Débits en kbps (séparés par des virgules)"
+        , SmartPlaylistSources = "Sources (local ou server:<id> ; séparées par des virgules)"
         , SmartPlaylistMetadata = "Métadonnées"
         , SmartPlaylistMinimumYear = "Année de début"
         , SmartPlaylistMaximumYear = "Année de fin"
+        , SmartPlaylistSearchText = "Le texte de recherche contient"
         , SmartPlaylistArtistContains = "L’artiste contient"
         , SmartPlaylistAlbumContains = "L’album contient"
         , SmartPlaylistMinimumDuration = "Durée minimale en minutes"
@@ -1910,6 +1928,9 @@ public static class LocalizationManager
         , PlexNoAudioLibraries = "No se encontraron bibliotecas de audio."
         , PlexLoading = "Cargando contenido de Plex…"
         , OrynivoServers = "SERVIDORES ORYNIVO"
+        , SourceColumn = "Origen"
+        , LocalSource = "Local"
+        , LocalSourceShort = "L"
         , OrynivoServersSettings = "Servidores Orynivo"
         , OrynivoServersHint = "Conecta el reproductor a una o varias instancias de Orynivo Server en tu red local. La clave API se almacena en settings.json."
         , AddOrynivoServer = "Agregar servidor"
@@ -1959,9 +1980,11 @@ public static class LocalizationManager
         , SmartPlaylistGenres = "Géneros (separados por comas)"
         , SmartPlaylistFormats = "Formatos (por ejemplo FLAC, MP3; separados por comas)"
         , SmartPlaylistBitrates = "Bitrates en kbps (separados por comas)"
+        , SmartPlaylistSources = "Orígenes (local o server:<id>; separados por comas)"
         , SmartPlaylistMetadata = "Metadatos"
         , SmartPlaylistMinimumYear = "Año desde"
         , SmartPlaylistMaximumYear = "Año hasta"
+        , SmartPlaylistSearchText = "El texto de búsqueda contiene"
         , SmartPlaylistArtistContains = "El artista contiene"
         , SmartPlaylistAlbumContains = "El álbum contiene"
         , SmartPlaylistMinimumDuration = "Duración mínima en minutos"

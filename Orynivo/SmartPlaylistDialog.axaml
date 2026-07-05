@@ -107,6 +107,13 @@
                 <CheckBox x:Name="FavoritesOnlyCheckBox"
                           Content="{DynamicResource L_Favorites}"
                           Theme="{StaticResource SmartPlaylistCheckBoxTheme}"/>
+                <TextBlock Text="{DynamicResource L_SmartPlaylistSearchText}"
+                           FontSize="{DynamicResource FontSizeCaption}"
+                           Foreground="{DynamicResource AppMutedTextBrush}"/>
+                <TextBox x:Name="SearchTextTextBox"
+                         Background="{DynamicResource AppInputBrush}"
+                         Foreground="{DynamicResource AppPrimaryTextBrush}"
+                         BorderBrush="{DynamicResource AppInputBorderBrush}"/>
                 <TextBlock Text="{DynamicResource L_SmartPlaylistGenres}"
                            FontSize="{DynamicResource FontSizeCaption}"
                            Foreground="{DynamicResource AppMutedTextBrush}"/>
@@ -125,6 +132,13 @@
                            FontSize="{DynamicResource FontSizeCaption}"
                            Foreground="{DynamicResource AppMutedTextBrush}"/>
                 <TextBox x:Name="BitratesTextBox"
+                         Background="{DynamicResource AppInputBrush}"
+                         Foreground="{DynamicResource AppPrimaryTextBrush}"
+                         BorderBrush="{DynamicResource AppInputBorderBrush}"/>
+                <TextBlock Text="{DynamicResource L_SmartPlaylistSources}"
+                           FontSize="{DynamicResource FontSizeCaption}"
+                           Foreground="{DynamicResource AppMutedTextBrush}"/>
+                <TextBox x:Name="SourcesTextBox"
                          Background="{DynamicResource AppInputBrush}"
                          Foreground="{DynamicResource AppPrimaryTextBrush}"
                          BorderBrush="{DynamicResource AppInputBorderBrush}"/>

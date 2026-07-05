@@ -995,10 +995,10 @@
                               StrokeJoin="Round"/>
                     </Grid>
                 </ListBoxItem>
-                <ListBoxItem x:Name="ArtistsNavItem" Tag="Artists" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_Artists}" Margin="16,0,0,0" Classes="navItemText"/></ListBoxItem>
-                <ListBoxItem x:Name="AlbumsNavItem" Tag="Albums" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_Albums}" Margin="16,0,0,0" Classes="navItemText"/></ListBoxItem>
-                <ListBoxItem x:Name="TracksNavItem" Tag="Tracks" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_Tracks}" Margin="16,0,0,0" Classes="navItemText"/></ListBoxItem>
-                <ListBoxItem x:Name="FoldersNavItem" Tag="Folders" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_FolderStructure}" Margin="16,0,0,0" Classes="navItemText"/></ListBoxItem>
+                <ListBoxItem x:Name="ArtistsNavItem" Tag="Artists" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_Artists}" Classes="navItemText"/></ListBoxItem>
+                <ListBoxItem x:Name="AlbumsNavItem" Tag="Albums" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_Albums}" Classes="navItemText"/></ListBoxItem>
+                <ListBoxItem x:Name="TracksNavItem" Tag="Tracks" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_Tracks}" Classes="navItemText"/></ListBoxItem>
+                <ListBoxItem x:Name="FoldersNavItem" Tag="Folders" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_FolderStructure}" Classes="navItemText"/></ListBoxItem>
 
                 <ListBoxItem x:Name="OwnRadiosHeaderItem"
                              Tag="Section:OwnRadios"
@@ -2481,9 +2481,8 @@
             </Border>
 
             <Border x:Name="ContentLoadingOverlay"
-                    Grid.Row="2"
-                    Margin="28,22,28,28"
-                    Padding="18"
+                    Grid.Row="1"
+                    Grid.RowSpan="2"
                     IsVisible="False"
                     Background="{DynamicResource AppContentBrush}"
                     ZIndex="40">
@@ -2492,7 +2491,9 @@
                         <DoubleTransition Property="Opacity" Duration="0:0:0.16"/>
                     </Transitions>
                 </Border.Transitions>
-                <StackPanel Spacing="12">
+                <StackPanel Spacing="12"
+                            Margin="28,22,28,28"
+                            VerticalAlignment="Top">
                     <ProgressBar Height="3"
                                  IsIndeterminate="True"
                                  Background="{DynamicResource AppGridLineBrush}"
