@@ -97,23 +97,41 @@
                                Margin="0,3,0,0"
                                FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppMutedTextBrush}"/>
-                    <Button Content="{Binding FavoriteGlyph}"
-                            Tag="{Binding}"
-                            Width="28"
-                            Height="24"
-                            MinWidth="0"
-                            MinHeight="0"
-                            Margin="0,2,0,0"
-                            Padding="0"
-                            HorizontalAlignment="Left"
-                            HorizontalContentAlignment="Center"
-                            VerticalContentAlignment="Center"
-                            Background="Transparent"
-                            BorderThickness="0"
-                            Foreground="{DynamicResource AppAccentBrush}"
-                            FontSize="{DynamicResource FontSizeBodyStrong}"
-                            Cursor="Hand"
-                            Click="FavoriteButton_OnClick"/>
+                    <Grid Margin="0,2,0,0" VerticalAlignment="Center">
+                        <Button Content="{Binding FavoriteGlyph}"
+                                Tag="{Binding}"
+                                Width="28"
+                                Height="24"
+                                MinWidth="0"
+                                MinHeight="0"
+                                Padding="0"
+                                HorizontalAlignment="Left"
+                                HorizontalContentAlignment="Center"
+                                VerticalContentAlignment="Center"
+                                Background="Transparent"
+                                BorderThickness="0"
+                                Foreground="{DynamicResource AppAccentBrush}"
+                                FontSize="{DynamicResource FontSizeBodyStrong}"
+                                Cursor="Hand"
+                                Click="FavoriteButton_OnClick"/>
+                        <Border HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Height="20"
+                                MinWidth="26"
+                                Padding="6,0"
+                                CornerRadius="10"
+                                Background="{DynamicResource AppSurfaceHoverBrush}"
+                                BorderBrush="{DynamicResource AppAccentBrush}"
+                                BorderThickness="1"
+                                ToolTip.Tip="{Binding SourceName}">
+                            <TextBlock Text="{Binding SourceBadge}"
+                                       FontSize="10"
+                                       FontWeight="SemiBold"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource AppAccentBrush}"/>
+                        </Border>
+                    </Grid>
                 </StackPanel>
             </Border>
         </DataTemplate>
@@ -754,6 +772,18 @@
         </Style>
         <Style Selector="DataGridCell Button">
             <Setter Property="FontSize" Value="12"/>
+        </Style>
+        <!-- Theme-aware tooltips: the default Fluent tooltip renders string content in a
+             TextBlock that does not inherit ToolTip.Foreground, leaving black text on the
+             dark surface. Style the tooltip surface and its inner text explicitly. -->
+        <Style Selector="ToolTip">
+            <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppGridLineBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+        </Style>
+        <Style Selector="ToolTip TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
         </Style>
         <Style Selector="Border.motionCard">
             <Setter Property="Transitions">
@@ -2378,7 +2408,7 @@
                                                         HorizontalAlignment="Left"
                                                         VerticalAlignment="Top"
                                                         ItemWidth="216"
-                                                        ItemHeight="260"/>
+                                                        ItemHeight="272"/>
                     </ItemsPanelTemplate>
                 </ListBox.ItemsPanel>
                 <ListBox.ItemContainerTheme>
@@ -2393,6 +2423,7 @@
                     <DataTemplate>
                         <Border Classes="motionCard"
                                 Width="200"
+                                Height="256"
                                 Margin="8"
                                 Padding="12"
                                 Background="{DynamicResource AppSurfaceBrush}"
@@ -2431,16 +2462,41 @@
                                             HorizontalContentAlignment="Center"
                                             Theme="{StaticResource EntityLinkButtonTheme}"
                                             Click="ArtistLinkButton_OnClick"/>
-                                    <Button Content="{Binding FavoriteGlyph}"
-                                            Tag="{Binding}"
-                                            Margin="0,6,0,0"
-                                            HorizontalAlignment="Center"
-                                            Background="Transparent"
-                                            BorderThickness="0"
-                                            Foreground="{DynamicResource AppAccentBrush}"
-                                            FontSize="{DynamicResource FontSizeBodyStrong}"
-                                            Cursor="Hand"
-                                            Click="FavoriteButton_OnClick"/>
+                                    <Grid Margin="0,4,0,0" VerticalAlignment="Center">
+                                        <Button Content="{Binding FavoriteGlyph}"
+                                                Tag="{Binding}"
+                                                Width="28"
+                                                Height="24"
+                                                MinWidth="0"
+                                                MinHeight="0"
+                                                Padding="0"
+                                                HorizontalAlignment="Left"
+                                                HorizontalContentAlignment="Center"
+                                                VerticalContentAlignment="Center"
+                                                Background="Transparent"
+                                                BorderThickness="0"
+                                                Foreground="{DynamicResource AppAccentBrush}"
+                                                FontSize="{DynamicResource FontSizeBodyStrong}"
+                                                Cursor="Hand"
+                                                Click="FavoriteButton_OnClick"/>
+                                        <Border HorizontalAlignment="Right"
+                                                VerticalAlignment="Center"
+                                                Height="20"
+                                                MinWidth="26"
+                                                Padding="6,0"
+                                                CornerRadius="10"
+                                                Background="{DynamicResource AppSurfaceHoverBrush}"
+                                                BorderBrush="{DynamicResource AppAccentBrush}"
+                                                BorderThickness="1"
+                                                ToolTip.Tip="{Binding SourceName}">
+                                            <TextBlock Text="{Binding SourceBadge}"
+                                                       FontSize="10"
+                                                       FontWeight="SemiBold"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource AppAccentBrush}"/>
+                                        </Border>
+                                    </Grid>
                                 </StackPanel>
                                 <!-- Info button overlay top-left -->
                                 <Button Content="ℹ"
@@ -2484,6 +2540,7 @@
                     Grid.Row="1"
                     Grid.RowSpan="2"
                     IsVisible="False"
+                    IsHitTestVisible="False"
                     Background="{DynamicResource AppContentBrush}"
                     ZIndex="40">
                 <Border.Transitions>

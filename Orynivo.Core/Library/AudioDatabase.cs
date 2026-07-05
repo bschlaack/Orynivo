@@ -594,6 +594,33 @@ public sealed class AudioDatabase : IDisposable
         return reader.Read() ? MapArtistInfo(reader) : null;
     }
 
+    /// <summary>Loads artist rows for the specified artist identifiers.</summary>
+    /// <param name="ids">Artist identifiers.</param>
+    /// <returns>Matching artists ordered by display name.</returns>
+    public List<ArtistInfo> GetArtistsByIds(IEnumerable<long> ids)
+    {
+        var idList = ids.Distinct().ToList();
+        if (idList.Count == 0)
+            return [];
+
+        using var cmd = _conn.CreateCommand();
+        var parameters = idList.Select((id, i) => { var name = $"$id{i}"; Add(cmd, name, id); return name; }).ToList();
+        cmd.CommandText = $"""
+            SELECT id, name, is_favorite, biography, image_path,
+                   profile_source_url, profile_language, profile_fetched_at,
+                   image_is_manual
+            FROM artists
+            WHERE id IN ({string.Join(", ", parameters)})
+            ORDER BY CASE WHEN name = '' THEN 1 ELSE 0 END,
+                     name COLLATE NOCASE;
+            """;
+        using var reader = cmd.ExecuteReader();
+        var result = new List<ArtistInfo>();
+        while (reader.Read())
+            result.Add(MapArtistInfo(reader));
+        return result;
+    }
+
     public ArtistInfo? GetArtistByTrackPath(string path)
     {
         using var cmd = _conn.CreateCommand();
@@ -1799,6 +1826,31 @@ public sealed class AudioDatabase : IDisposable
             FROM tracks t
             JOIN artists ar ON ar.id = t.artist_id
             WHERE t.id IN ({string.Join(", ", parameters)});
+            """;
+        using var reader = cmd.ExecuteReader();
+        var result = new Dictionary<long, long>();
+        while (reader.Read())
+            result[reader.GetInt64(0)] = reader.GetInt64(1);
+        return result;
+    }
+
+    /// <summary>Maps each specified track identifier to its album artist identifier.</summary>
+    /// <param name="ids">Track identifiers.</param>
+    /// <returns>A mapping for tracks whose album currently references an artist.</returns>
+    public Dictionary<long, long> GetAlbumArtistIdsByTrackIds(IEnumerable<long> ids)
+    {
+        var idList = ids.ToList();
+        if (idList.Count == 0)
+            return [];
+
+        using var cmd = _conn.CreateCommand();
+        var parameters = idList.Select((id, i) => { var name = $"$id{i}"; Add(cmd, name, id); return name; }).ToList();
+        cmd.CommandText = $"""
+            SELECT t.id, al.artist_id
+            FROM tracks t
+            JOIN albums al ON al.id = t.album_id
+            WHERE t.id IN ({string.Join(", ", parameters)})
+              AND al.artist_id IS NOT NULL;
             """;
         using var reader = cmd.ExecuteReader();
         var result = new Dictionary<long, long>();

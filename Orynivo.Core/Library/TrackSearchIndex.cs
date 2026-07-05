@@ -15,8 +15,13 @@ namespace Orynivo.Library;
 /// <summary>Category-split search results returned by <see cref="TrackSearchIndex.SearchByCategory"/>.</summary>
 /// <param name="Tracks">Track-field hits.</param>
 /// <param name="Albums">Album-field hits.</param>
-/// <param name="Artists">Artist-field hits.</param>
-public sealed record SearchResultIds(SearchHitIds Tracks, SearchHitIds Albums, SearchHitIds Artists);
+/// <param name="Artists">Track-artist-field hits.</param>
+/// <param name="AlbumArtists">Album-artist-field hits.</param>
+public sealed record SearchResultIds(
+    SearchHitIds Tracks,
+    SearchHitIds Albums,
+    SearchHitIds Artists,
+    SearchHitIds AlbumArtists);
 
 /// <summary>Ordered list of database IDs and their Lucene relevance scores from a single-category search.</summary>
 /// <param name="Ids">Database IDs in score-descending order.</param>
@@ -201,7 +206,7 @@ public static class TrackSearchIndex
     public static SearchResultIds SearchByCategory(string queryText, int maxResults = 500)
     {
         if (string.IsNullOrWhiteSpace(queryText) || !Exists())
-            return new SearchResultIds(EmptyHits(), EmptyHits(), EmptyHits());
+            return new SearchResultIds(EmptyHits(), EmptyHits(), EmptyHits(), EmptyHits());
 
         using var directory = FSDirectory.Open(Root);
         using var reader = DirectoryReader.Open(directory);
@@ -211,7 +216,8 @@ public static class TrackSearchIndex
         return new SearchResultIds(
             SearchInFields(searcher, analyzer, ["title", "artist", "album"], queryText, maxResults),
             SearchInFields(searcher, analyzer, ["album", "album_artist"], queryText, maxResults),
-            SearchInFields(searcher, analyzer, ["artist"], queryText, maxResults));
+            SearchInFields(searcher, analyzer, ["artist"], queryText, maxResults),
+            SearchInFields(searcher, analyzer, ["album_artist"], queryText, maxResults));
     }
 
     private static Document ToDocument(TrackRecord t)

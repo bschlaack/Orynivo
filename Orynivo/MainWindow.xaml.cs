@@ -86,6 +86,10 @@ public partial class MainWindow : Window
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Stack<PlexNavigationState> _plexNavigationStack = [];
     private const int ArtworkPageSize = 120;
+    private const double AlbumArtworkItemWidth = 196d;
+    private const double AlbumArtworkItemHeight = 292d;
+    private const double ArtistArtworkItemWidth = 216d;
+    private const double ArtistArtworkItemHeight = 272d;
     private List<ContentRow> _albumArtworkRows = [];
     private List<ContentRow> _artistArtworkRows = [];
     private readonly ObservableCollection<ContentRow> _visibleAlbumArtworkRows = [];
@@ -2155,6 +2159,7 @@ public partial class MainWindow : Window
 
         ContentLoadingOverlay.Opacity = 0;
         ContentLoadingOverlay.IsVisible = true;
+        ContentLoadingOverlay.IsHitTestVisible = true;
         Dispatcher.UIThread.Post(
             () =>
             {
@@ -2173,6 +2178,7 @@ public partial class MainWindow : Window
             return;
 
         ContentLoadingOverlay.Opacity = 0;
+        ContentLoadingOverlay.IsHitTestVisible = false;
         _ = HideContentLoadingSkeletonAsync(generation);
     }
 
@@ -2182,9 +2188,10 @@ public partial class MainWindow : Window
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
             if (_contentLoadingGeneration == generation &&
-                _contentLoadingDepth == 0 &&
-                ContentLoadingOverlay.Opacity <= 0.05)
+                _contentLoadingDepth == 0)
             {
+                ContentLoadingOverlay.Opacity = 0;
+                ContentLoadingOverlay.IsHitTestVisible = false;
                 ContentLoadingOverlay.IsVisible = false;
             }
         });
@@ -5289,7 +5296,9 @@ public partial class MainWindow : Window
             }
 
             var albumScores = BuildEntityScores(db.GetAlbumIdsByTrackIds(ids.Albums.Ids), ids.Albums.Scores);
-            var artistScores = BuildEntityScores(db.GetArtistIdsByTrackIds(ids.Artists.Ids), ids.Artists.Scores);
+            var artistScores = MergeSearchScores(
+                BuildEntityScores(db.GetArtistIdsByTrackIds(ids.Artists.Ids), ids.Artists.Scores),
+                BuildEntityScores(db.GetAlbumArtistIdsByTrackIds(ids.AlbumArtists.Ids), ids.AlbumArtists.Scores));
             return (
                 Tracks: SortBySearchScore(
                     db.GetTrackListByIds(trackIds).Select(ToTrackContentRow),
@@ -5298,7 +5307,7 @@ public partial class MainWindow : Window
                     db.GetAlbumsByTrackIds(ids.Albums.Ids).Select(ToAlbumContentRow),
                     albumScores),
                 Artists: SortBySearchScore(
-                    db.GetArtistsByTrackIds(ids.Artists.Ids).Select(ToArtistContentRow),
+                    db.GetArtistsByIds(artistScores.Keys).Select(ToArtistContentRow),
                     artistScores));
         });
         await AddRemoteSearchResultsAsync(query, result.Tracks, result.Albums, result.Artists);
@@ -5459,6 +5468,20 @@ public partial class MainWindow : Window
                 continue;
             if (!result.TryGetValue(entityId, out var existing) || score > existing)
                 result[entityId] = score;
+        }
+        return result;
+    }
+
+    private static Dictionary<long, float> MergeSearchScores(params IReadOnlyDictionary<long, float>[] sources)
+    {
+        var result = new Dictionary<long, float>();
+        foreach (var source in sources)
+        {
+            foreach (var (id, score) in source)
+            {
+                if (!result.TryGetValue(id, out var existing) || score > existing)
+                    result[id] = score;
+            }
         }
         return result;
     }
@@ -5857,13 +5880,23 @@ public partial class MainWindow : Window
             visibleRows.Add(allRows[i]);
     }
 
+    private double GetArtworkItemWidth(ListBox listBox) =>
+        ReferenceEquals(listBox, AlbumArtworkListBox)
+            ? AlbumArtworkItemWidth
+            : ArtistArtworkItemWidth;
+
+    private double GetArtworkItemHeight(ListBox listBox) =>
+        ReferenceEquals(listBox, AlbumArtworkListBox)
+            ? AlbumArtworkItemHeight
+            : ArtistArtworkItemHeight;
+
     private void AppendArtworkRowsIfNeeded(ListBox listBox)
     {
         var scrollViewer = listBox.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
         if (scrollViewer is null)
             return;
 
-        var itemHeight = ReferenceEquals(listBox, AlbumArtworkListBox) ? 292d : 260d;
+        var itemHeight = GetArtworkItemHeight(listBox);
         if (scrollViewer.Offset.Y + scrollViewer.Viewport.Height < scrollViewer.Extent.Height - itemHeight * 3)
             return;
 
@@ -5948,8 +5981,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        var itemWidth = ReferenceEquals(listBox, AlbumArtworkListBox) ? 196d : 216d;
-        var itemHeight = ReferenceEquals(listBox, AlbumArtworkListBox) ? 292d : 260d;
+        var itemWidth = GetArtworkItemWidth(listBox);
+        var itemHeight = GetArtworkItemHeight(listBox);
         if (scrollViewer.Viewport.Width <= 0 || scrollViewer.Viewport.Height <= 0)
         {
             HydrateInitialArtworkRows(rows);
@@ -7279,6 +7312,7 @@ public partial class MainWindow : Window
             // album shows all of its tracks.
             _activeArtistFilterId = null;
             _activeArtistFilterName = null;
+            ActivateRowOrynivoServer(row);
             await OpenOrynivoAlbumTracksAsync(row);
             return;
         }
@@ -7297,6 +7331,7 @@ public partial class MainWindow : Window
         // Remote artists must open within the remote library (IDs can collide).
         if (row.EntityType == "OrynivoArtist")
         {
+            ActivateRowOrynivoServer(row);
             await OpenOrynivoArtistAlbumsAsync(artistId, row.Title);
             return;
         }
@@ -7486,12 +7521,16 @@ public partial class MainWindow : Window
 
         if (row.EntityType == "OrynivoArtist" && row.Id is long orynivoArtistId)
         {
+            // In the unified Artists view no server is "active"; navigate within the
+            // row's own server (IDs can collide between local and remote libraries).
+            ActivateRowOrynivoServer(row);
             await OpenOrynivoArtistAlbumsAsync(orynivoArtistId, row.Title);
             return;
         }
 
         if (row.EntityType == "OrynivoAlbum" && row.Id is long orynivoAlbumId)
         {
+            ActivateRowOrynivoServer(row);
             await OpenOrynivoAlbumTracksAsync(row);
             return;
         }
@@ -8047,7 +8086,11 @@ public partial class MainWindow : Window
             var grid = new DataGrid
             {
                 ItemsSource = group.Rows,
-                Height = 44 + (group.Rows.Count * 40),
+                // The horizontal grid line adds 1px to each row's pitch (40 -> 41), so the
+                // table must be sized with the real pitch plus a small buffer; otherwise the
+                // grid is a few pixels too short, shows an internal scrollbar, and the mouse
+                // wheel scrolls the table content instead of the whole album page.
+                Height = 46 + (group.Rows.Count * 41),
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 Background = FindResource<IBrush>("AppContentBrush"),
                 BorderThickness = new Thickness(0),
@@ -8801,8 +8844,8 @@ public partial class MainWindow : Window
 
             if (verticalOffset is double offset)
             {
-                var itemWidth = ReferenceEquals(listBox, AlbumArtworkListBox) ? 196d : 216d;
-                var itemHeight = ReferenceEquals(listBox, AlbumArtworkListBox) ? 292d : 260d;
+                var itemWidth = GetArtworkItemWidth(listBox);
+                var itemHeight = GetArtworkItemHeight(listBox);
                 var perRow = Math.Max(1, (int)Math.Floor(scrollViewer.Viewport.Width / itemWidth));
                 var requiredItems = Math.Max(
                     ArtworkPageSize,
