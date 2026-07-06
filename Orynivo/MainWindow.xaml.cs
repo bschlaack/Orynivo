@@ -950,10 +950,10 @@ public partial class MainWindow : Window
                         // search results with local ones.
                         await ShowSearchResultsAsync(SearchTextBox.Text);
                     }
-                    else if (_currentTopLevelTag is "Dashboard" or "Artists" or "Albums" or "Tracks" or "Folders" ||
-                             _currentTopLevelTag?.StartsWith("Playlist:", StringComparison.Ordinal) == true)
+                    else if (_currentTopLevelTag is { } currentTag &&
+                             CanReloadCurrentViewAfterLibraryChange())
                     {
-                        await ShowTopLevelViewAsync(_currentTopLevelTag);
+                        await ShowTopLevelViewAsync(currentTag);
                     }
                 }
                 catch
@@ -964,6 +964,27 @@ public partial class MainWindow : Window
                     break;
             }
         }, DispatcherPriority.Background);
+    }
+
+    private bool CanReloadCurrentViewAfterLibraryChange()
+    {
+        if (_currentTopLevelTag is not ("Artists" or "Albums" or "Tracks" or "Folders"))
+            return false;
+        if (_activeAlbumFilterId is not null ||
+            _activeArtistFilterId is not null ||
+            _activePlaylistId is not null ||
+            _activeOrynivoPlaylistId is not null ||
+            _activeAlbumCatalogProvider is not null ||
+            _activeCatalogAlbum is not null ||
+            LyricsView.IsVisible ||
+            ArtistInfoView.IsVisible ||
+            PodcastInfoView.IsVisible ||
+            SearchResultsScrollViewer.IsVisible)
+        {
+            return false;
+        }
+
+        return true;
     }
 
     private void RestoreLastTrackState()
@@ -1043,6 +1064,10 @@ public partial class MainWindow : Window
 
     private void LoadNavPlaylists()
     {
+        var selectedTag = (NavListBox.SelectedItem as ListBoxItem)?.Tag as string;
+        _suppressNavSelectionChanged = true;
+        try
+        {
         PlaylistsHeaderItem.ContextFlyout = BuildPlaylistsHeaderContextFlyout();
         foreach (var dynamicItem in NavListBox.Items
                      .OfType<ListBoxItem>()
@@ -1138,6 +1163,25 @@ public partial class MainWindow : Window
         catch { /* DB noch nicht angelegt */ }
 
         ApplySidebarNavigationSettings();
+        RestoreSelectedNavigationTag(selectedTag);
+        }
+        finally
+        {
+            _suppressNavSelectionChanged = false;
+        }
+    }
+
+    private void RestoreSelectedNavigationTag(string? selectedTag)
+    {
+        if (string.IsNullOrWhiteSpace(selectedTag))
+            return;
+
+        var item = NavListBox.Items
+            .OfType<ListBoxItem>()
+            .FirstOrDefault(candidate =>
+                string.Equals(candidate.Tag as string, selectedTag, StringComparison.Ordinal));
+        if (item is not null)
+            NavListBox.SelectedItem = item;
     }
 
     private async void LoadPlexNavigationAsync()
@@ -1928,7 +1972,9 @@ public partial class MainWindow : Window
     {
         var diagnosticStopwatch = Stopwatch.StartNew();
         LogUiDiagnostics($"ShowTopLevelViewAsync start tag={tag}");
-        ShowContentLoadingSkeleton();
+        var showLoadingSkeleton = !tag.StartsWith("Radio:", StringComparison.Ordinal);
+        if (showLoadingSkeleton)
+            ShowContentLoadingSkeleton();
         _currentTopLevelTag = tag;
         _orynivoTrackFacets = null;
         LyricsView.IsVisible = false;
@@ -2096,7 +2142,7 @@ public partial class MainWindow : Window
                 AlbumArtworkListBox.IsVisible = false;
                 ArtistArtworkListBox.IsVisible = false;
                 InternetRadioView.IsVisible = true;
-                await PlaySavedRadioAsync(radioId);
+                _ = PlaySavedRadioAsync(radioId);
             }
             else if (tag.StartsWith("PlexLibrary:", StringComparison.Ordinal))
             {
@@ -11493,7 +11539,7 @@ public partial class MainWindow : Window
                 _currentTrackId = null;
                 _currentArtistId = null;
                 _currentArtistName = plexTrack.Artist;
-                ClearNowPlayingAlbum();
+                SetNowPlayingAlbum(plexTrack.Album, null, canNavigate: false);
                 _currentTrackIsFavorite = false;
                 NowPlayingArtistButton.IsEnabled = false;
                 LyricsButton.IsEnabled = false;
@@ -11618,6 +11664,7 @@ public partial class MainWindow : Window
                     mediaType: "podcast",
                     title: podcastPlayback.Episode.Title,
                     subtitle: podcastPlayback.Podcast.Name,
+                    album: podcastPlayback.Podcast.Name,
                     externalId: podcastPlayback.Episode.EpisodeKey);
             }
             else
@@ -11628,6 +11675,7 @@ public partial class MainWindow : Window
                     player.Duration.TotalSeconds > 0 ? player.Duration.TotalSeconds : null,
                     title: NowPlayingTitleBlock.Text,
                     subtitle: NowPlayingArtistBlock.Text,
+                    album: _currentAlbumTitle,
                     externalId: ResolveNowPlayingExternalId(filePath),
                     genre: ResolveNowPlayingGenre(filePath));
             }
@@ -12090,7 +12138,7 @@ public partial class MainWindow : Window
             _currentTrackId = null;
             _currentArtistId = null;
             _currentArtistName = plexTrack.Artist;
-            ClearNowPlayingAlbum();
+            SetNowPlayingAlbum(plexTrack.Album, null, canNavigate: false);
             _currentTrackIsFavorite = false;
             NowPlayingArtistButton.IsEnabled = false;
             LyricsButton.IsEnabled = false;
@@ -12473,6 +12521,7 @@ public partial class MainWindow : Window
                     : null,
                 title: NowPlayingTitleBlock.Text,
                 subtitle: NowPlayingArtistBlock.Text,
+                album: _currentAlbumTitle,
                 externalId: ResolveNowPlayingExternalId(filePath),
                 genre: ResolveNowPlayingGenre(filePath));
         }
@@ -16471,10 +16520,8 @@ public partial class MainWindow : Window
             case DailyHistoryAction.Track:
                 await OpenHistoryTrackAsync(entry);
                 break;
-            case DailyHistoryAction.Album when entry.AlbumId is long albumId:
-                await ShowAlbumTracksAsync(
-                    albumId,
-                    entry.Album ?? LocalizationManager.Current.Unknown);
+            case DailyHistoryAction.Album:
+                await OpenHistoryAlbumAsync(entry);
                 break;
             case DailyHistoryAction.Artist when entry.ArtistId is long artistId:
                 await ShowArtistAlbumsAsync(
@@ -16485,6 +16532,32 @@ public partial class MainWindow : Window
                 await OpenHistoryArtistAsync(entry);
                 break;
         }
+    }
+
+    /// <summary>Opens the album track list for a local or Orynivo Server playback-history entry.</summary>
+    /// <param name="entry">The history entry whose album should be opened.</param>
+    /// <returns>A task representing the asynchronous navigation.</returns>
+    private async Task OpenHistoryAlbumAsync(DailyHistoryEntry entry)
+    {
+        if (entry.AlbumId is long localAlbumId)
+        {
+            await ShowAlbumTracksAsync(
+                localAlbumId,
+                entry.Album ?? LocalizationManager.Current.Unknown);
+            return;
+        }
+
+        var remoteRow = await ResolveOrynivoHistoryTrackRowAsync(entry);
+        if (remoteRow is not { OrynivoServer: { } server, AlbumId: long remoteAlbumId })
+            return;
+
+        _activeArtistFilterId = null;
+        _activeArtistFilterName = null;
+        _activeOrynivoServer = server;
+        await OpenOrynivoAlbumTracksAsync(
+            remoteAlbumId,
+            remoteRow.Album ?? entry.Album ?? LocalizationManager.Current.Unknown,
+            remoteRow.AlbumArtist ?? remoteRow.Artist ?? entry.Artist);
     }
 
     private async Task OpenHistoryTrackAsync(DailyHistoryEntry entry)

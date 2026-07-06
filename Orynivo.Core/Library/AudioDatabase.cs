@@ -1343,6 +1343,17 @@ public sealed class AudioDatabase : IDisposable
         return value is null || value is DBNull ? null : Convert.ToInt64(value);
     }
 
+    /// <summary>Records the start of a playback-history entry.</summary>
+    /// <param name="path">Played local path, stream URL, or source identifier.</param>
+    /// <param name="trackId">Local track identifier, or <see langword="null"/> for remote and non-library playback.</param>
+    /// <param name="durationSeconds">Known total duration in seconds, or <see langword="null"/>.</param>
+    /// <param name="mediaType">Media type stored with the history entry.</param>
+    /// <param name="title">Display title captured at playback start.</param>
+    /// <param name="subtitle">Display subtitle or artist captured at playback start.</param>
+    /// <param name="album">Album or collection title captured at playback start.</param>
+    /// <param name="externalId">Optional source-specific identifier for remote history actions.</param>
+    /// <param name="genre">Genre captured at playback start for non-local tracks.</param>
+    /// <returns>The new playback-history row identifier.</returns>
     public long RecordPlaybackStart(
         string path,
         long? trackId,
@@ -1350,6 +1361,7 @@ public sealed class AudioDatabase : IDisposable
         string mediaType = "track",
         string? title = null,
         string? subtitle = null,
+        string? album = null,
         string? externalId = null,
         string? genre = null)
     {
@@ -1357,10 +1369,10 @@ public sealed class AudioDatabase : IDisposable
         cmd.CommandText = """
             INSERT INTO play_history (
                 track_id, path, started_at, duration_seconds,
-                media_type, title, subtitle, external_id, genre)
+                media_type, title, subtitle, album, external_id, genre)
             VALUES (
                 $track_id, $path, $started_at, $duration_seconds,
-                $media_type, $title, $subtitle, $external_id, $genre)
+                $media_type, $title, $subtitle, $album, $external_id, $genre)
             RETURNING id;
             """;
         Add(cmd, "$track_id", trackId);
@@ -1370,6 +1382,7 @@ public sealed class AudioDatabase : IDisposable
         Add(cmd, "$media_type", mediaType);
         Add(cmd, "$title", title);
         Add(cmd, "$subtitle", subtitle);
+        Add(cmd, "$album", string.IsNullOrWhiteSpace(album) ? null : album);
         Add(cmd, "$external_id", externalId);
         Add(cmd, "$genre", string.IsNullOrWhiteSpace(genre) ? null : genre);
         return (long)cmd.ExecuteScalar()!;
@@ -2386,6 +2399,7 @@ public sealed class AudioDatabase : IDisposable
                 media_type       TEXT NOT NULL DEFAULT 'track',
                 title            TEXT,
                 subtitle         TEXT,
+                album            TEXT,
                 external_id      TEXT
             );
 
@@ -2423,6 +2437,7 @@ public sealed class AudioDatabase : IDisposable
             EnsureColumn("play_history", "media_type", "TEXT NOT NULL DEFAULT 'track'");
             EnsureColumn("play_history", "title", "TEXT");
             EnsureColumn("play_history", "subtitle", "TEXT");
+            EnsureColumn("play_history", "album", "TEXT");
             EnsureColumn("play_history", "external_id", "TEXT");
             // Genre captured at playback time so genre statistics can include tracks
             // without a local library row (remote Orynivo Server and Plex tracks).
@@ -3896,7 +3911,7 @@ public sealed class AudioDatabase : IDisposable
                    ph.media_type,
                    COALESCE(t.title, ph.title, t.file_name, ph.path),
                    COALESCE(ar.name, t.artist, ph.subtitle),
-                   COALESCE(a.title, t.album),
+                   COALESCE(a.title, t.album, ph.album),
                    t.artist_id,
                    t.album_id,
                    ph.external_id
@@ -3950,7 +3965,7 @@ public sealed class AudioDatabase : IDisposable
                    ph.media_type,
                    COALESCE(t.title, ph.title, t.file_name, ph.path),
                    COALESCE(ar.name, t.artist, ph.subtitle),
-                   COALESCE(a.title, t.album),
+                   COALESCE(a.title, t.album, ph.album),
                    t.artist_id,
                    t.album_id,
                    ph.external_id
