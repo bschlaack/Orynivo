@@ -110,7 +110,8 @@
                                 VerticalContentAlignment="Center"
                                 Background="Transparent"
                                 BorderThickness="0"
-                                Foreground="{DynamicResource AppAccentBrush}"
+                                Foreground="{DynamicResource AppFavoriteBrush}"
+                                FontFamily="Segoe UI Symbol"
                                 FontSize="{DynamicResource FontSizeBodyStrong}"
                                 Cursor="Hand"
                                 Click="FavoriteButton_OnClick"/>
@@ -2172,6 +2173,8 @@
                                         Padding="0"
                                         HorizontalContentAlignment="Center"
                                         VerticalContentAlignment="Center"
+                                        Foreground="{DynamicResource AppFavoriteBrush}"
+                                        FontFamily="Segoe UI Symbol"
                                         FontSize="{DynamicResource FontSizeTitle}"
                                         ToolTip.Tip="{DynamicResource L_MarkAsFavorite}"
                                         Theme="{StaticResource HeaderFilterButtonTheme}"
@@ -2183,13 +2186,52 @@
                                         Theme="{StaticResource EntityLinkButtonTheme}"
                                         Click="AlbumLinkButton_OnClick"/>
                             </StackPanel>
-                            <Button Content="{Binding Artist}"
-                                    Tag="{Binding}"
-                                    Margin="0,10,0,0"
-                                    FontSize="{DynamicResource FontSizeSubtitle}"
-                                    Foreground="{DynamicResource AppSecondaryTextBrush}"
-                                    Theme="{StaticResource EntityLinkButtonTheme}"
-                                    Click="ArtistLinkButton_OnClick"/>
+                            <StackPanel Margin="0,10,0,0"
+                                        Orientation="Horizontal"
+                                        VerticalAlignment="Center"
+                                        Spacing="8"
+                                        IsVisible="{Binding HasArtist}">
+                                <Button Content="{Binding Artist}"
+                                        Tag="{Binding}"
+                                        FontSize="{DynamicResource FontSizeSubtitle}"
+                                        Foreground="{DynamicResource AppSecondaryTextBrush}"
+                                        Theme="{StaticResource EntityLinkButtonTheme}"
+                                        Click="ArtistLinkButton_OnClick"/>
+                                <Button Tag="{Binding}"
+                                        Width="26"
+                                        Height="26"
+                                        Padding="0"
+                                        VerticalAlignment="Center"
+                                        Margin="0,-3,0,0"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Foreground="{DynamicResource AppAccentBrush}"
+                                        Cursor="Hand"
+                                        ToolTip.Tip="{DynamicResource L_ShowArtistInfo}"
+                                        Click="ArtistInfoListButton_OnClick">
+                                    <Viewbox Width="17" Height="17">
+                                        <Canvas Width="18" Height="18">
+                                            <Ellipse Width="16"
+                                                     Height="16"
+                                                     Canvas.Left="1"
+                                                     Canvas.Top="1"
+                                                     Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                     StrokeThickness="1.8"/>
+                                            <Ellipse Width="2"
+                                                     Height="2"
+                                                     Canvas.Left="8"
+                                                     Canvas.Top="4.4"
+                                                     Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                            <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                  StrokeThickness="1.8"
+                                                  StrokeLineCap="Round"
+                                                  Data="M 9 8 L 9 13"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                </Button>
+                            </StackPanel>
                             <TextBlock Text="{Binding Year}"
                                        Margin="0,8,0,0"
                                        FontSize="{DynamicResource FontSizeBodyStrong}"
@@ -2475,7 +2517,8 @@
                                                 VerticalContentAlignment="Center"
                                                 Background="Transparent"
                                                 BorderThickness="0"
-                                                Foreground="{DynamicResource AppAccentBrush}"
+                                                Foreground="{DynamicResource AppFavoriteBrush}"
+                                                FontFamily="Segoe UI Symbol"
                                                 FontSize="{DynamicResource FontSizeBodyStrong}"
                                                 Cursor="Hand"
                                                 Click="FavoriteButton_OnClick"/>
@@ -2499,18 +2542,41 @@
                                     </Grid>
                                 </StackPanel>
                                 <!-- Info button overlay top-left -->
-                                <Button Content="ℹ"
-                                        Tag="{Binding}"
+                                <Button Tag="{Binding}"
+                                        Width="28"
+                                        Height="28"
                                         HorizontalAlignment="Left"
                                         VerticalAlignment="Top"
                                         Margin="2,2,0,0"
-                                        Padding="4,2"
+                                        Padding="0"
+                                        HorizontalContentAlignment="Center"
+                                        VerticalContentAlignment="Center"
                                         Background="Transparent"
                                         BorderThickness="0"
                                         Foreground="{DynamicResource AppAccentBrush}"
-                                        FontSize="{DynamicResource FontSizeBody}"
                                         Cursor="Hand"
-                                        Click="ArtistInfoListButton_OnClick"/>
+                                        ToolTip.Tip="{DynamicResource L_ShowArtistInfo}"
+                                        Click="ArtistInfoListButton_OnClick">
+                                    <Viewbox Width="16" Height="16">
+                                        <Canvas Width="18" Height="18">
+                                            <Ellipse Width="16"
+                                                     Height="16"
+                                                     Canvas.Left="1"
+                                                     Canvas.Top="1"
+                                                     Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                     StrokeThickness="1.8"/>
+                                            <Ellipse Width="2"
+                                                     Height="2"
+                                                     Canvas.Left="8"
+                                                     Canvas.Top="4.4"
+                                                     Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                            <Path Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                                  StrokeThickness="1.8"
+                                                  StrokeLineCap="Round"
+                                                  Data="M 9 8 L 9 13"/>
+                                        </Canvas>
+                                    </Viewbox>
+                                </Button>
                             </Grid>
                         </Border>
                     </DataTemplate>
@@ -3087,6 +3153,8 @@
                                     Click="NowPlayingFavoriteButton_OnClick">
                                 <TextBlock x:Name="NowPlayingFavoriteGlyph"
                                            Text="♡"
+                                           FontFamily="Segoe UI Symbol"
+                                           Foreground="{DynamicResource AppFavoriteBrush}"
                                            FontSize="{DynamicResource FontSizeSubtitle}"/>
                             </Button>
                             <Button x:Name="ShuffleButton"

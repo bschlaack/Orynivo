@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Orynivo.Audio;
 using Orynivo.Library;
+using Orynivo.Server.Services;
 
 namespace Orynivo.Server.Endpoints;
 
@@ -64,7 +65,10 @@ public static class LibraryEndpoints
             return artist is null ? Results.NotFound() : Results.Ok(ArtistDto(artist));
         });
 
-        api.MapPost("/artists/{artistId:long}/rename", (long artistId, ArtistRenameRequest request) =>
+        api.MapPost("/artists/{artistId:long}/rename", (
+            long artistId,
+            ArtistRenameRequest request,
+            ServerLibraryChangeTracker libraryChangeTracker) =>
         {
             using var db = AudioDatabase.OpenDefault();
             var artist = db.GetArtistById(artistId);
@@ -91,7 +95,8 @@ public static class LibraryEndpoints
                 result = db.RenameArtist(artistId, artistName);
             }
 
-            TrackSearchIndex.Rebuild(db.GetAll());
+            TrackSearchIndex.UpdateMany(db.GetTracksForArtistSearchIndex(result.ArtistId));
+            libraryChangeTracker.Touch();
             return Results.Ok(new ArtistRenameResponse(result, null));
         });
 

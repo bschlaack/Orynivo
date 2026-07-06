@@ -27,6 +27,8 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Avalonia.Controls.Primitives;
 using Avalonia.Styling;
+using AvaloniaEllipse = Avalonia.Controls.Shapes.Ellipse;
+using AvaloniaPath = Avalonia.Controls.Shapes.Path;
 using Orynivo.Audio;
 using Orynivo.Controls;
 using Orynivo.Library;
@@ -357,6 +359,7 @@ public partial class MainWindow : Window
         public string? Title       { get; init; }
         public string? AlphabetIndexText { get; init; }
         public string? Artist      { get; init; }
+        public bool HasArtist => !string.IsNullOrWhiteSpace(Artist);
         public string? Album       { get; init; }
         public string? AlbumArtist { get; init; }
         public string? Year        { get; init; }
@@ -419,7 +422,7 @@ public partial class MainWindow : Window
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(FavoriteGlyph)));
             }
         }
-        public string FavoriteGlyph => IsFavorite ? "♥" : "♡";
+        public string FavoriteGlyph => IsFavorite ? "❤" : "♡";
         public string  Duration    { get; init; } = "";
         public string? Format      { get; init; }
         public string  FilePath    { get; init; } = "";
@@ -5625,7 +5628,7 @@ public partial class MainWindow : Window
                     VerticalContentAlignment = VerticalAlignment.Center,
                     HorizontalAlignment = HorizontalAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Center,
-                    Foreground = new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF)),
+                    Foreground = FindResource<IBrush>("AppFavoriteBrush"),
                     Cursor = new Cursor(StandardCursorType.Hand),
                     FontFamily = new FontFamily("Segoe UI Symbol"),
                     FontSize = 17
@@ -6356,6 +6359,66 @@ public partial class MainWindow : Window
             UpdateNowPlayingTreeHighlights(child);
     }
 
+    private Button CreateArtistInfoIconButton()
+    {
+        var foreground = FindResource<IBrush>("AppAccentBrush");
+        var canvas = new Canvas
+        {
+            Width = 18,
+            Height = 18
+        };
+
+        var ring = new AvaloniaEllipse
+        {
+            Width = 16,
+            Height = 16,
+            Stroke = foreground,
+            StrokeThickness = 1.8
+        };
+        Canvas.SetLeft(ring, 1);
+        Canvas.SetTop(ring, 1);
+        canvas.Children.Add(ring);
+
+        var dot = new AvaloniaEllipse
+        {
+            Width = 2,
+            Height = 2,
+            Fill = foreground
+        };
+        Canvas.SetLeft(dot, 8);
+        Canvas.SetTop(dot, 4.4);
+        canvas.Children.Add(dot);
+
+        canvas.Children.Add(new AvaloniaPath
+        {
+            Stroke = foreground,
+            StrokeThickness = 1.8,
+            StrokeLineCap = PenLineCap.Round,
+            Data = Geometry.Parse("M 9 8 L 9 13")
+        });
+
+        var button = new Button
+        {
+            Width = 28,
+            Height = 28,
+            Padding = new Thickness(0),
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Background = Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            Foreground = foreground,
+            Cursor = new Cursor(StandardCursorType.Hand),
+            Content = new Viewbox
+            {
+                Width = 16,
+                Height = 16,
+                Child = canvas
+            }
+        };
+        ToolTip.SetTip(button, LocalizationManager.Current.ShowArtistInfo);
+        return button;
+    }
+
     private void ApplyColumns(
         string view,
         DataGrid? targetGrid = null,
@@ -6557,17 +6620,8 @@ public partial class MainWindow : Window
                 Width = new DataGridLength(44),
                 CellTemplate = new FuncDataTemplate<ContentRow>((_, _) =>
                 {
-                    var button = new Button
-                    {
-                        Content = "ℹ",
-                        Background = Brushes.Transparent,
-                        BorderThickness = new Thickness(0),
-                        Padding = new Thickness(0),
-                        Foreground = new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF)),
-                        Cursor = new Cursor(StandardCursorType.Hand),
-                        FontSize = 16,
-                        HorizontalAlignment = HorizontalAlignment.Center
-                    };
+                    var button = CreateArtistInfoIconButton();
+                    button.HorizontalAlignment = HorizontalAlignment.Center;
                     button.Bind(Button.TagProperty, new Binding("."));
                     button.Click += ArtistInfoListButton_OnClick;
                     return button;
@@ -8060,6 +8114,7 @@ public partial class MainWindow : Window
             Title = string.IsNullOrWhiteSpace(album.Album)
                 ? LocalizationManager.Current.Unknown
                 : album.Album,
+            ArtistId = album.ArtistId,
             Artist = string.IsNullOrWhiteSpace(album.DisplayArtist)
                 ? null
                 : album.DisplayArtist,
@@ -8971,7 +9026,7 @@ public partial class MainWindow : Window
     private void UpdateNowPlayingFavoriteButton()
     {
         NowPlayingFavoriteButton.IsEnabled = _currentTrackId.HasValue || CurrentOrynivoFavoriteTarget is not null;
-        NowPlayingFavoriteGlyph.Text = _currentTrackIsFavorite ? "♥" : "♡";
+        NowPlayingFavoriteGlyph.Text = _currentTrackIsFavorite ? "❤" : "♡";
     }
 
     private void NowPlayingFavoriteButton_OnClick(object? sender, RoutedEventArgs e)
@@ -13230,21 +13285,57 @@ public partial class MainWindow : Window
 
     private async void ArtistInfoListButton_OnClick(object? sender, RoutedEventArgs e)
     {
-        if (sender is Button { Tag: ContentRow row } && row.Id is long artistId)
-        {
-            e.Handled = true;
-            LyricsView.IsVisible = false;
-            PodcastInfoView.IsVisible = false;
-            ArtistInfoView.IsVisible = true;
-            UpdateBackButtonForDetailView();
-            if (row.EntityType == "OrynivoArtist")
-            {
-                await ShowOrynivoArtistInfoAsync(row, forceRefresh: false);
-                return;
-            }
+        if (sender is not Button { Tag: ContentRow row })
+            return;
 
-            await ShowArtistInfoAsync(artistId, forceRefresh: false);
+        var artistId = row.EntityType switch
+        {
+            "Artist" or "OrynivoArtist" => row.Id,
+            _ => row.ArtistId
+        };
+
+        if (artistId is null)
+        {
+            if (row.EntityType == "Album" && (row.AlbumId ?? row.Id) is long albumId)
+            {
+                using var db = AudioDatabase.OpenDefault();
+                artistId = db.GetAlbumArtistId(albumId);
+            }
+            else if (!string.IsNullOrWhiteSpace(row.FilePath))
+            {
+                using var db = AudioDatabase.OpenDefault();
+                artistId = db.GetTrackNavigationIds(row.FilePath).ArtistId;
+            }
+            row.ArtistId = artistId;
         }
+
+        if (artistId is not long id)
+            return;
+
+        e.Handled = true;
+        LyricsView.IsVisible = false;
+        PodcastInfoView.IsVisible = false;
+        ArtistInfoView.IsVisible = true;
+        UpdateBackButtonForDetailView();
+        if (row.EntityType.StartsWith("Orynivo", StringComparison.Ordinal))
+        {
+            var artistRow = row.EntityType == "OrynivoArtist"
+                ? row
+                : new ContentRow
+                {
+                    Id = id,
+                    ArtistId = id,
+                    Title = string.IsNullOrWhiteSpace(row.Artist) ? LocalizationManager.Current.Unknown : row.Artist,
+                    EntityType = "OrynivoArtist",
+                    ExternalId = id.ToString(CultureInfo.InvariantCulture),
+                    OrynivoServer = row.OrynivoServer ?? _activeOrynivoServer,
+                    FilePath = string.Empty
+                };
+            await ShowOrynivoArtistInfoAsync(artistRow, forceRefresh: false);
+            return;
+        }
+
+        await ShowArtistInfoAsync(id, forceRefresh: false);
     }
 
     private void UpdateBackButtonForDetailView()
@@ -13457,7 +13548,7 @@ public partial class MainWindow : Window
         ArtistInfoStatusTextBlock.IsVisible = false;
         await ReloadVisibleArtistListAsync(result.ArtistId);
         await ShowArtistInfoAsync(result.ArtistId, forceRefresh: false);
-        _ = RebuildSearchIndexAfterArtistRenameAsync();
+        _ = UpdateSearchIndexAfterArtistRenameAsync(result.ArtistId);
     }
 
     private async Task EditOrynivoArtistNameAsync(ContentRow row)
@@ -14557,19 +14648,19 @@ public partial class MainWindow : Window
         }
     }
 
-    private static async Task RebuildSearchIndexAfterArtistRenameAsync()
+    private static async Task UpdateSearchIndexAfterArtistRenameAsync(long artistId)
     {
         try
         {
             await Task.Run(() =>
             {
                 using var db = AudioDatabase.OpenDefault();
-                TrackSearchIndex.Rebuild(db.GetAll().ToList());
+                TrackSearchIndex.UpdateMany(db.GetTracksForArtistSearchIndex(artistId));
             });
         }
         catch (Exception ex)
         {
-            CrashLogger.Log(ex, "Artist rename search-index rebuild");
+            CrashLogger.Log(ex, "Artist rename search-index update");
         }
     }
 

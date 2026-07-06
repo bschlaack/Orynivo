@@ -4,6 +4,23 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Added an artist-info button beside the artist name in album/track detail
+  headers, opening the same biography, image, and rename/merge view used by the
+  artist list.
+- Restyled the favorite heart with a warmer Orynivo-specific color and adjusted
+  glyph across tables, artwork cards, album headers, and the transport bar.
+
+### Fixed
+
+- Reduced local and Orynivo Server artist rename work by updating only the
+  affected Lucene search-index documents instead of rebuilding the whole index;
+  remote renames now also advance the server library-change timestamp so client
+  caches do not keep stale artist metadata.
+
 ## [0.23.2] - 2026-07-05
 
 ### Fixed

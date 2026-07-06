@@ -521,6 +521,28 @@ public sealed class AudioDatabase : IDisposable
             yield return MapRow(reader);
     }
 
+    /// <summary>Loads tracks whose primary artist or album artist matches the specified artist.</summary>
+    /// <param name="artistId">Artist identifier to match against track and album ownership.</param>
+    /// <returns>Tracks affected by a rename or merge of the specified artist.</returns>
+    public List<TrackRecord> GetTracksForArtistSearchIndex(long artistId)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT t.*
+            FROM tracks t
+            LEFT JOIN albums al ON al.id = t.album_id
+            WHERE t.artist_id = $artist_id
+               OR al.artist_id = $artist_id
+            ORDER BY t.album_artist, t.album, t.disc_number, t.track_number;
+            """;
+        Add(cmd, "$artist_id", artistId);
+        using var reader = cmd.ExecuteReader();
+        var result = new List<TrackRecord>();
+        while (reader.Read())
+            result.Add(MapRow(reader));
+        return result;
+    }
+
     /// <summary>Nur distinct artist – ohne Trackzeilen, BLOBs oder weitere Metadaten.</summary>
     public List<ArtistInfo> GetArtistsLite()
     {
@@ -944,7 +966,8 @@ public sealed class AudioDatabase : IDisposable
                 CASE WHEN al.year = 0 THEN NULL ELSE al.year END,
                 aw.thumb_320_path,
                 aw.thumb_96_path,
-                al.is_favorite
+                al.is_favorite,
+                al.artist_id
             FROM albums al
             LEFT JOIN artists ar ON ar.id = al.artist_id
             LEFT JOIN artworks aw ON aw.id = al.artwork_id
@@ -961,7 +984,8 @@ public sealed class AudioDatabase : IDisposable
                 reader.IsDBNull(3) ? null : reader.GetInt32(3),
                 reader.IsDBNull(4) ? null : reader.GetString(4),
                 reader.IsDBNull(5) ? null : reader.GetString(5),
-                reader.GetInt32(6) != 0)
+                reader.GetInt32(6) != 0,
+                reader.IsDBNull(7) ? null : reader.GetInt64(7))
             : null;
     }
 
