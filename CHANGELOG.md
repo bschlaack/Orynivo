@@ -4,6 +4,33 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.23.3] - 2026-07-05
+
+### Added
+
+- Added an artist-info button beside the artist name in album/track detail
+  headers, opening the same biography, image, and rename/merge view used by the
+  artist list.
+- Restyled the favorite heart with a warmer Orynivo-specific color and adjusted
+  glyph across tables, artwork cards, album headers, and the transport bar.
+
+### Fixed
+
+- Reduced local and Orynivo Server artist rename work by updating only the
+  affected Lucene search-index documents instead of rebuilding the whole index;
+  remote renames now also advance the server library-change timestamp so client
+  caches do not keep stale artist metadata.
+- Fixed saved internet-radio sidebar entries leaving the main content loading
+  skeleton visible while the stream was already playing.
+- Fixed the daily listening-history dialog so album titles are captured and
+  shown for playback-history rows even when they cannot be recovered through the
+  local track join, including remote and Plex tracks.
+- Made daily listening-history album cells open the corresponding album track
+  view for local and Orynivo Server history entries.
+- Prevented background library watcher refreshes from replacing playlist,
+  dashboard, drill-down, search, or detail views; sidebar rebuilds now preserve
+  the selected navigation item without firing an unintended navigation change.
+
 ## [0.23.2] - 2026-07-05
 
 ### Fixed

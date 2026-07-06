@@ -19,6 +19,7 @@
         <ResourceDictionary>
             <!-- ── Theme brushes (overwritten at runtime by ThemeManager) ── -->
             <SolidColorBrush x:Key="AppAccentBrush"              Color="#4FDDBD"/>
+            <SolidColorBrush x:Key="AppFavoriteBrush"            Color="#FF5D7A"/>
             <SolidColorBrush x:Key="AppAccentTextBrush"          Color="#102033"/>
             <SolidColorBrush x:Key="AppAccentSoftBrush"          Color="#163E3C"/>
             <SolidColorBrush x:Key="AppSidebarBrush"             Color="#0E1116"/>

@@ -38,7 +38,9 @@ public partial class DailyHistoryDialog : Window
         public bool CanOpenArtist =>
             Entry.ArtistId.HasValue ||
             (IsPotentialOrynivoTrack(Entry) && !string.IsNullOrWhiteSpace(Entry.Artist));
-        public bool CanOpenAlbum => Entry.AlbumId.HasValue;
+        public bool CanOpenAlbum =>
+            Entry.AlbumId.HasValue ||
+            (IsPotentialOrynivoTrack(Entry) && !string.IsNullOrWhiteSpace(Entry.Album));
         public bool IsPlainTitle => !CanOpenTrack;
         public bool IsPlainArtist => !CanOpenArtist;
         public bool IsPlainAlbum => !CanOpenAlbum;

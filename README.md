@@ -361,8 +361,8 @@ byte-range streaming without FFmpeg.
   and artist table or artwork views after returning from a drill-down
 - Album cover changes and artist metadata/image updates retain the current
   selection and list position
-- Album track details provide an in-place favorite button alongside the album
-  metadata. Album identity uses album title plus physical album root, so equal
+- Album track details provide an in-place favorite button and artist-info action
+  alongside the album metadata. Album identity uses album title plus physical album root, so equal
   titles stored in different album folders have independent list entries,
   covers, and favorites. Compilations remain together, and conventional
   `CD1`/`CD2` or `Disc 1`/`Disc 2` subfolders appear as separate groups inside

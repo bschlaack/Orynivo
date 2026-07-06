@@ -27,6 +27,7 @@ public static class ThemeManager
         app.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
 
         resources["AppAccentBrush"]              = Brush(dark ? "#4FDDBD" : "#2563EB");
+        resources["AppFavoriteBrush"]            = Brush(dark ? "#FF5D7A" : "#D92D5C");
         resources["AppAccentTextBrush"]          = Brush(dark ? "#102033" : "#FFFFFF");
         resources["AppAccentSoftBrush"]          = Brush(dark ? "#163E3C" : "#DDEBFF");
         resources["AppSidebarBrush"]             = Brush(dark ? "#0E1116" : "#F5F7FA");
