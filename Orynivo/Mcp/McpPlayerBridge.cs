@@ -1,4 +1,5 @@
 using Avalonia.Threading;
+using Orynivo.Streaming;
 
 namespace Orynivo.Mcp;
 
@@ -85,6 +86,19 @@ public sealed class McpPlayerBridge
 
     /// <summary>Gets or sets an action that triggers a sidebar playlist refresh after a playlist is created via MCP.</summary>
     public Action? RefreshPlaylistsFunc { get; set; }
+
+    /// <summary>Gets or sets a function that returns the configured remote Orynivo Server connections.</summary>
+    public Func<IReadOnlyList<OrynivoServerSettings>>? GetOrynivoServersFunc { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that turns a tool-supplied path into a playable path.
+    /// A remote Orynivo Server reference (<c>orynivo://serverId/track/trackId</c>) is
+    /// resolved to the real authenticated stream URL and its track metadata is
+    /// registered so playback shows full transport/history/lyrics info; any other path
+    /// (local file or already-real URL) is returned unchanged. Returns <see langword="null"/>
+    /// when a remote reference cannot be resolved.
+    /// </summary>
+    public Func<string, Task<string?>>? ResolveRemoteTrackFunc { get; set; }
 
     /// <summary>Gets or sets the set of tool names that are individually disabled; <see langword="null"/> means all tools are enabled.</summary>
     public HashSet<string>? DisabledTools { get; set; }

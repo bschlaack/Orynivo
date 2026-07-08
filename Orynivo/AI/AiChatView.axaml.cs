@@ -172,8 +172,11 @@ internal partial class AiChatView : UserControl
     }
 
     private void ScrollToBottom() =>
+        // Post at Background priority so the scroll runs *after* the newly added or
+        // streamed message has been measured and laid out; otherwise ScrollToEnd can
+        // land short and leave the last lines hidden behind the input box.
         Dispatcher.UIThread.Post(() => MessagesScrollViewer.ScrollToEnd(),
-            DispatcherPriority.Loaded);
+            DispatcherPriority.Background);
 
     private void SetBusy(bool busy)
     {

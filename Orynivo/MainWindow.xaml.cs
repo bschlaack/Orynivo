@@ -729,6 +729,49 @@ public partial class MainWindow : Window
                 await StartPlaybackAsync(paths[0]);
         };
         _mcpBridge.RefreshPlaylistsFunc = LoadNavPlaylists;
+        _mcpBridge.GetOrynivoServersFunc = () => _settings.OrynivoServers ?? [];
+        _mcpBridge.ResolveRemoteTrackFunc = ResolveRemoteMcpTrackAsync;
+    }
+
+    /// <summary>
+    /// Resolves a path supplied by an MCP/AI tool into a playable path. A remote Orynivo
+    /// Server reference (<c>orynivo://serverId/track/trackId</c>) is resolved to the real
+    /// authenticated stream URL, and the track's metadata is registered in
+    /// <see cref="_orynivoTracksByUrl"/> so the transport, history, lyrics, and favorite
+    /// button work exactly like a track opened from the UI. Any other path is returned
+    /// unchanged so local files and already-real URLs pass straight through.
+    /// </summary>
+    /// <param name="path">The tool-supplied path or remote reference.</param>
+    /// <returns>The playable path, or <see langword="null"/> when a remote reference cannot be resolved.</returns>
+    private async Task<string?> ResolveRemoteMcpTrackAsync(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return path;
+        if (!path.StartsWith("orynivo://", StringComparison.OrdinalIgnoreCase))
+            return path;
+        if (!TryResolveOrynivoPlaylistReference(path, out var server, out var trackId))
+            return null;
+
+        try
+        {
+            var tracks = await _orynivoClient.GetTracksByIdsAsync(server, [trackId], CancellationToken.None);
+            var track = tracks.FirstOrDefault(t => t.Id == trackId);
+            if (track is null)
+                return null;
+            // ToOrynivoTrackContentRow registers the row in _orynivoTracksByUrl keyed by the
+            // real stream URL, which is what CreatePlaylistItem/StartPlaybackAsync consume.
+            // Build/register on the UI thread because that cache and the transport are UI-affine.
+            return await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                var row = ToOrynivoTrackContentRow(server, track);
+                EnsureArtworkHydrated(row);
+                return row.FilePath;
+            });
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>Appends one audit line to the web-browsing request log.</summary>

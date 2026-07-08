@@ -390,7 +390,11 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   returned by the state and queue delegates; `DisabledTools` (`HashSet<string>?`)
   and `IsToolEnabled(name)` control per-tool gating; `RefreshPlaylistsFunc`
   triggers `LoadNavPlaylists` after MCP creates a playlist; `WebBrowsing`
-  (`Orynivo.Web.WebBrowsingService`) backs the web tools
+  (`Orynivo.Web.WebBrowsingService`) backs the web tools; `GetOrynivoServersFunc`
+  returns the configured remote Orynivo Servers and `ResolveRemoteTrackFunc`
+  turns an `orynivo://serverId/track/trackId` reference into the real playable
+  stream URL (registering the track's metadata in `_orynivoTracksByUrl`), so MCP
+  and AI-chat playback of remote tracks work without exposing the server API key
 - `Orynivo.Core/Web/WebBrowsingService.cs` (+ `WebBrowsingOptions`,
   `HtmlContentExtractor`): the controlled internet layer used by both MCP and the
   AI chat. `SearchAsync` queries the configured SearXNG JSON API (trusted
@@ -414,7 +418,16 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   `bridge.WebBrowsing` (a `Orynivo.Web.WebBrowsingService`); `search_library`
   calls
   `TrackSearchIndex.SearchByCategory` then `AudioDatabase.OpenDefault()` for id
-  resolution; property access uses `AlbumInfo.Album`, `AlbumInfo.DisplayArtist`,
+  resolution, and additionally queries every configured remote Orynivo Server
+  through `OrynivoServerClient.SearchFullAsync` (`AppendRemoteSearchResultsAsync`),
+  emitting remote tracks as opaque `orynivo://serverId/track/trackId` references
+  (`BuildOrynivoTrackReference`) rather than credential-bearing stream URLs;
+  `play`/`queue_append`/`queue_play_next`/`replace_queue` first pass each path
+  through `ResolvePlayablePathAsync` (→ `bridge.ResolveRemoteTrackFunc`) so a
+  remote reference resolves to a real registered stream URL while local paths and
+  real URLs pass through unchanged; `RedactKey` masks any `key=` query value in
+  tool output (`get_queue`, `get_now_playing`) so API keys never reach the model;
+  property access uses `AlbumInfo.Album`, `AlbumInfo.DisplayArtist`,
   and `ArtistInfo.Artist`; playlist tools use `GetAllPlaylists`,
   `GetPlaylistById`, `GetPlaylistTracks`, `CreatePlaylist`, and
   `CreateSmartPlaylist`; `get_play_history` uses `GetHistoryForDay` for a
@@ -449,7 +462,16 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   tool-call status centered and muted; streams tokens into the last assistant
   message; Enter sends, Shift+Enter inserts a newline; Clear button wipes
   history and resets `AiChatService`; `SetBridge(McpPlayerBridge)` wires the
-  executor; `GetSettings` delegate is read on each send
+  executor; `GetSettings` delegate is read on each send. Auto-scroll posts
+  `ScrollToEnd` at `DispatcherPriority.Background` so it runs after the streamed
+  message is laid out and the last lines are never hidden behind the input box.
+- `Orynivo/AI/MarkdownTextBlock.cs`: lightweight Markdown renderer for assistant
+  messages. Block level: headings, bullet/numbered lists, block quotes, dividers,
+  and fenced code blocks (rendered verbatim). Inline level (`AppendInlines`):
+  `**bold**`/`__bold__`, `*italic*`/`_italic_`, `` `code` ``, and `[label](url)`
+  become styled `Run`s — applied to paragraphs, list items, and quotes alike, so
+  no raw `**markers**` leak through. Code blocks use `CreateLiteralText` so inline
+  Markdown is not interpreted inside them.
 - `Orynivo/ThemeManager.cs`: sets global Avalonia resources for light and dark themes
 - `Orynivo/Controls/DataGridColumnWidthStore.cs`: validates, captures, and
   restores per-table pixel widths

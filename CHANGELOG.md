@@ -8,6 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- MCP tools and the built-in AI chat can now reach remote Orynivo Server tracks:
+  `search_library` returns results from the local library **and** every configured
+  Orynivo Server, and the `play`, `queue_append`, `queue_play_next`, and
+  `replace_queue` tools accept the `orynivo://serverId/track/trackId` references
+  those results provide. References resolve to the real stream and register full
+  track metadata, so remote playback shows correct transport/history/lyrics. API
+  keys are never exposed to the model (opaque references; keys redacted in output).
+
 - Added "Most listened albums" and "Most listened artists" analytics cards to the
   dashboard alongside Top Genres, merging local, remote Orynivo Server, and Plex
   playback. A shared period selector (All time / This year / This month / Last 30
@@ -32,6 +40,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   history, playlists, internet radio, and Orynivo Server navigation code.
 
 ### Fixed
+
+- AI chat: assistant messages now render inline Markdown (bold, italic, inline
+  code, and links) as styled text instead of showing raw `**markers**`, including
+  inside numbered and bulleted lists and block quotes.
+- AI chat: the message list now reliably scrolls to the very bottom while a
+  response streams in, so the newest lines are no longer left hidden behind the
+  input box.
 
 ## [0.23.3] - 2026-07-05
 

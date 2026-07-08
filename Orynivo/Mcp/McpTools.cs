@@ -1,8 +1,10 @@
 using System.ComponentModel;
 using System.Globalization;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using ModelContextProtocol.Server;
 using Orynivo.Library;
+using Orynivo.Streaming;
 
 namespace Orynivo.Mcp;
 
@@ -49,7 +51,7 @@ public sealed class McpTools(McpPlayerBridge bridge)
         var sb = new System.Text.StringBuilder();
         foreach (var e in entries)
             sb.AppendLine(CultureInfo.InvariantCulture,
-                $"{(e.IsCurrent ? "▶" : " ")} [{e.Index + 1}] {e.FileName}  ({e.Path})");
+                $"{(e.IsCurrent ? "▶" : " ")} [{e.Index + 1}] {e.FileName}  ({RedactKey(e.Path)})");
         return sb.ToString().TrimEnd();
     }
 
@@ -130,9 +132,9 @@ public sealed class McpTools(McpPlayerBridge bridge)
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Confirmation message.</returns>
     [McpServerTool(Name = "play")]
-    [Description("Plays a local audio file by its absolute path. Omit the path to resume the current paused track.")]
+    [Description("Plays an audio track by its path. Accepts a local absolute file path or an orynivo:// remote reference from search_library. Omit the path to resume the current paused track.")]
     public async Task<string> PlayAsync(
-        [Description("Absolute path of the audio file to play. Leave empty to resume.")] string? path,
+        [Description("Local absolute file path or orynivo:// remote reference to play. Leave empty to resume.")] string? path,
         CancellationToken ct = default)
     {
         if (!bridge.IsToolEnabled("play")) return "Tool is disabled.";
@@ -142,9 +144,12 @@ public sealed class McpTools(McpPlayerBridge bridge)
                 await bridge.OnUiAsync(async () => await bridge.TogglePauseFunc(), ct);
             return "Resumed playback.";
         }
+        var resolved = await ResolvePlayablePathAsync(path);
+        if (resolved is null)
+            return $"Could not resolve remote track reference: {path}";
         if (bridge.PlayFileFunc is not null)
-            await bridge.OnUiAsync(async () => await bridge.PlayFileFunc(path), ct);
-        return $"Playing: {System.IO.Path.GetFileName(path)}";
+            await bridge.OnUiAsync(async () => await bridge.PlayFileFunc(resolved), ct);
+        return $"Playing: {DisplayNameForPath(path, resolved)}";
     }
 
     /// <summary>Toggles between paused and playing states.</summary>
@@ -239,15 +244,18 @@ public sealed class McpTools(McpPlayerBridge bridge)
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Confirmation message.</returns>
     [McpServerTool(Name = "queue_append")]
-    [Description("Appends a local audio file to the end of the playback queue.")]
+    [Description("Appends an audio track to the end of the playback queue. Accepts a local absolute file path or an orynivo:// remote reference from search_library.")]
     public async Task<string> QueueAppendAsync(
-        [Description("Absolute path of the audio file to append.")] string path,
+        [Description("Local absolute file path or orynivo:// remote reference to append.")] string path,
         CancellationToken ct = default)
     {
         if (!bridge.IsToolEnabled("queue_append")) return "Tool is disabled.";
+        var resolved = await ResolvePlayablePathAsync(path);
+        if (resolved is null)
+            return $"Could not resolve remote track reference: {path}";
         if (bridge.AppendToQueueFunc is not null)
-            await bridge.OnUiAsync(async () => await bridge.AppendToQueueFunc(path), ct);
-        return $"Appended to queue: {System.IO.Path.GetFileName(path)}";
+            await bridge.OnUiAsync(async () => await bridge.AppendToQueueFunc(resolved), ct);
+        return $"Appended to queue: {DisplayNameForPath(path, resolved)}";
     }
 
     /// <summary>Inserts a file as the next entry after the current queue position.</summary>
@@ -255,15 +263,18 @@ public sealed class McpTools(McpPlayerBridge bridge)
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Confirmation message.</returns>
     [McpServerTool(Name = "queue_play_next")]
-    [Description("Inserts a local audio file immediately after the current queue position so it plays next.")]
+    [Description("Inserts an audio track immediately after the current queue position so it plays next. Accepts a local absolute file path or an orynivo:// remote reference from search_library.")]
     public async Task<string> QueuePlayNextAsync(
-        [Description("Absolute path of the audio file to play next.")] string path,
+        [Description("Local absolute file path or orynivo:// remote reference to play next.")] string path,
         CancellationToken ct = default)
     {
         if (!bridge.IsToolEnabled("queue_play_next")) return "Tool is disabled.";
+        var resolved = await ResolvePlayablePathAsync(path);
+        if (resolved is null)
+            return $"Could not resolve remote track reference: {path}";
         if (bridge.PlayNextFunc is not null)
-            await bridge.OnUiAsync(async () => await bridge.PlayNextFunc(path), ct);
-        return $"Inserted as next: {System.IO.Path.GetFileName(path)}";
+            await bridge.OnUiAsync(async () => await bridge.PlayNextFunc(resolved), ct);
+        return $"Inserted as next: {DisplayNameForPath(path, resolved)}";
     }
 
     /// <summary>Clears all items from the playback queue without stopping the current track.</summary>
@@ -284,15 +295,27 @@ public sealed class McpTools(McpPlayerBridge bridge)
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Confirmation message.</returns>
     [McpServerTool(Name = "replace_queue")]
-    [Description("Replaces the entire playback queue with the given list of audio file paths and immediately starts playing the first track. Use this when you want to set the queue to specific content — prefer this over clearing then appending individually. Use queue_append to add to the existing queue instead.")]
+    [Description("Replaces the entire playback queue with the given list of tracks and immediately starts playing the first one. Each entry may be a local absolute file path or an orynivo:// remote reference from search_library. Prefer this over clearing then appending individually. Use queue_append to add to the existing queue instead.")]
     public async Task<string> ReplaceQueueAsync(
-        [Description("Ordered list of absolute audio file paths to set as the new queue.")] string[] paths,
+        [Description("Ordered list of local absolute file paths and/or orynivo:// remote references to set as the new queue.")] string[] paths,
         CancellationToken ct = default)
     {
         if (!bridge.IsToolEnabled("replace_queue")) return "Tool is disabled.";
+        var resolved = new List<string>(paths.Length);
+        foreach (var p in paths)
+        {
+            var r = await ResolvePlayablePathAsync(p);
+            if (r is not null)
+                resolved.Add(r);
+        }
+        if (resolved.Count == 0)
+            return "No playable tracks: could not resolve any of the supplied paths.";
         if (bridge.ReplaceQueueFunc is not null)
-            await bridge.OnUiAsync(async () => await bridge.ReplaceQueueFunc(paths), ct);
-        return $"Queue replaced with {paths.Length} track(s).";
+            await bridge.OnUiAsync(async () => await bridge.ReplaceQueueFunc(resolved), ct);
+        var skipped = paths.Length - resolved.Count;
+        return skipped > 0
+            ? $"Queue replaced with {resolved.Count} track(s); {skipped} could not be resolved."
+            : $"Queue replaced with {resolved.Count} track(s).";
     }
 
     // ------------------------------------------------------------------
@@ -305,7 +328,7 @@ public sealed class McpTools(McpPlayerBridge bridge)
     /// <param name="ct">Cancellation token.</param>
     /// <returns>A formatted Markdown list of matching tracks, albums, and artists.</returns>
     [McpServerTool(Name = "search_library", ReadOnly = true, Idempotent = true)]
-    [Description("Searches the local music library for tracks, albums, and artists. Returns file paths that can be passed to play or queue tools.")]
+    [Description("Searches the music library for tracks, albums, and artists across the local library and every configured remote Orynivo Server. Local tracks return a file path; remote tracks return an orynivo:// reference. Both can be passed directly to the play and queue tools.")]
     public async Task<string> SearchLibraryAsync(
         [Description("Free-text search query, e.g. an artist name, album title, or track title.")] string query,
         [Description("Maximum number of results per category (1–50, default 10).")] int limit = 10,
@@ -319,50 +342,153 @@ public sealed class McpTools(McpPlayerBridge bridge)
         var ids = await Task.Run(() => TrackSearchIndex.SearchByCategory(query, limit * 3), ct);
         var sb = new System.Text.StringBuilder();
 
-        using var db = AudioDatabase.OpenDefault();
-
-        if (ids.Tracks.Ids.Count > 0)
+        using (var db = AudioDatabase.OpenDefault())
         {
-            var trackIds = ids.Tracks.Ids.Take(limit).ToList();
-            var tracks = await Task.Run(() => db.GetTrackListByIds(trackIds), ct);
-            if (tracks.Count > 0)
+            var localSection = new System.Text.StringBuilder();
+            if (ids.Tracks.Ids.Count > 0)
             {
-                sb.AppendLine("## Tracks");
-                foreach (var t in tracks)
-                    sb.AppendLine(CultureInfo.InvariantCulture,
-                        $"- {t.Title ?? t.FileName}  —  {t.Artist ?? "?"}  ({t.Path})");
+                var trackIds = ids.Tracks.Ids.Take(limit).ToList();
+                var tracks = await Task.Run(() => db.GetTrackListByIds(trackIds), ct);
+                if (tracks.Count > 0)
+                {
+                    localSection.AppendLine("## Tracks");
+                    foreach (var t in tracks)
+                        localSection.AppendLine(CultureInfo.InvariantCulture,
+                            $"- {t.Title ?? t.FileName}  —  {t.Artist ?? "?"}  ({t.Path})");
+                }
+            }
+
+            if (ids.Albums.Ids.Count > 0)
+            {
+                var albums = await Task.Run(() => db.GetAlbumsLite(includeArtwork: false), ct);
+                var albumIdSet = ids.Albums.Ids.Take(limit).ToHashSet();
+                var matched = albums.Where(a => albumIdSet.Contains(a.Id)).Take(limit).ToList();
+                if (matched.Count > 0)
+                {
+                    localSection.AppendLine("## Albums");
+                    foreach (var a in matched)
+                        localSection.AppendLine(CultureInfo.InvariantCulture,
+                            $"- {a.Album}  —  {a.DisplayArtist ?? "?"}");
+                }
+            }
+
+            if (ids.Artists.Ids.Count > 0)
+            {
+                var artists = await Task.Run(() => db.GetArtistsLite(), ct);
+                var artistIdSet = ids.Artists.Ids.Take(limit).ToHashSet();
+                var matched = artists.Where(a => artistIdSet.Contains(a.Id)).Take(limit).ToList();
+                if (matched.Count > 0)
+                {
+                    localSection.AppendLine("## Artists");
+                    foreach (var a in matched)
+                        localSection.AppendLine(CultureInfo.InvariantCulture, $"- {a.Artist}");
+                }
+            }
+
+            if (localSection.Length > 0)
+            {
+                sb.AppendLine("# Local library");
+                sb.Append(localSection);
             }
         }
 
-        if (ids.Albums.Ids.Count > 0)
-        {
-            var albums = await Task.Run(() => db.GetAlbumsLite(includeArtwork: false), ct);
-            var albumIdSet = ids.Albums.Ids.Take(limit).ToHashSet();
-            var matched = albums.Where(a => albumIdSet.Contains(a.Id)).Take(limit).ToList();
-            if (matched.Count > 0)
-            {
-                sb.AppendLine("## Albums");
-                foreach (var a in matched)
-                    sb.AppendLine(CultureInfo.InvariantCulture,
-                        $"- {a.Album}  —  {a.DisplayArtist ?? "?"}");
-            }
-        }
-
-        if (ids.Artists.Ids.Count > 0)
-        {
-            var artists = await Task.Run(() => db.GetArtistsLite(), ct);
-            var artistIdSet = ids.Artists.Ids.Take(limit).ToHashSet();
-            var matched = artists.Where(a => artistIdSet.Contains(a.Id)).Take(limit).ToList();
-            if (matched.Count > 0)
-            {
-                sb.AppendLine("## Artists");
-                foreach (var a in matched)
-                    sb.AppendLine(CultureInfo.InvariantCulture, $"- {a.Artist}");
-            }
-        }
+        await AppendRemoteSearchResultsAsync(sb, query, limit, ct);
 
         return sb.Length == 0 ? "No results found." : sb.ToString().TrimEnd();
     }
+
+    /// <summary>
+    /// Appends search results from every configured remote Orynivo Server to the search output.
+    /// Remote tracks are emitted as <c>orynivo://serverId/track/trackId</c> references so no
+    /// credential-bearing stream URL is exposed to the model; the references resolve to playable
+    /// URLs when passed to the play/queue tools.
+    /// </summary>
+    /// <param name="sb">The output builder to append to.</param>
+    /// <param name="query">The search query.</param>
+    /// <param name="limit">Maximum results per category and server.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A task representing the asynchronous search.</returns>
+    private async Task AppendRemoteSearchResultsAsync(
+        System.Text.StringBuilder sb,
+        string query,
+        int limit,
+        CancellationToken ct)
+    {
+        var servers = bridge.GetOrynivoServersFunc?.Invoke() ?? [];
+        if (servers.Count == 0)
+            return;
+
+        using var client = new OrynivoServerClient();
+        foreach (var server in servers)
+        {
+            OrynivoFullSearchResult result;
+            try { result = await client.SearchFullAsync(server, query, limit, ct); }
+            catch { continue; }
+            if (result.Tracks.Count == 0 && result.Albums.Count == 0 && result.Artists.Count == 0)
+                continue;
+
+            sb.AppendLine();
+            sb.AppendLine(CultureInfo.InvariantCulture, $"# Orynivo Server: {server.Name}");
+
+            if (result.Tracks.Count > 0)
+            {
+                sb.AppendLine("## Tracks");
+                foreach (var t in result.Tracks.Take(limit))
+                    sb.AppendLine(CultureInfo.InvariantCulture,
+                        $"- {t.Title ?? t.FileName}  —  {t.Artist ?? "?"}  ({BuildOrynivoTrackReference(server, t.Id)})");
+            }
+
+            if (result.Albums.Count > 0)
+            {
+                sb.AppendLine("## Albums");
+                foreach (var a in result.Albums.Take(limit))
+                    sb.AppendLine(CultureInfo.InvariantCulture,
+                        $"- {a.Album}  —  {a.DisplayArtist ?? "?"}");
+            }
+
+            if (result.Artists.Count > 0)
+            {
+                sb.AppendLine("## Artists");
+                foreach (var a in result.Artists.Take(limit))
+                    sb.AppendLine(CultureInfo.InvariantCulture, $"- {a.Name}");
+            }
+        }
+    }
+
+    /// <summary>Builds the opaque remote-track reference used as a playable path for MCP/AI tools.</summary>
+    /// <param name="server">The remote server owning the track.</param>
+    /// <param name="trackId">The server-side track identifier.</param>
+    /// <returns>An <c>orynivo://serverId/track/trackId</c> reference.</returns>
+    private static string BuildOrynivoTrackReference(OrynivoServerSettings server, long trackId) =>
+        $"orynivo://{Uri.EscapeDataString(server.Id)}/track/{trackId.ToString(CultureInfo.InvariantCulture)}";
+
+    /// <summary>
+    /// Resolves a tool-supplied path (local file, real URL, or <c>orynivo://</c> remote reference)
+    /// into a playable path, registering remote track metadata as a side effect.
+    /// </summary>
+    /// <param name="path">The path or reference to resolve.</param>
+    /// <returns>The playable path, or <see langword="null"/> when a remote reference cannot be resolved.</returns>
+    private async Task<string?> ResolvePlayablePathAsync(string path)
+    {
+        if (bridge.ResolveRemoteTrackFunc is null || string.IsNullOrWhiteSpace(path))
+            return path;
+        return await bridge.ResolveRemoteTrackFunc(path);
+    }
+
+    /// <summary>Masks the API key in a remote stream URL so it is never shown to the model.</summary>
+    /// <param name="path">A path or URL that may contain a <c>key=</c> query parameter.</param>
+    /// <returns>The path with any API-key value redacted.</returns>
+    private static string RedactKey(string path) =>
+        Regex.Replace(path, "([?&]key=)[^&]*", "$1***", RegexOptions.IgnoreCase);
+
+    /// <summary>Builds a human-readable, credential-free display name for a resolved playback path.</summary>
+    /// <param name="original">The original tool-supplied path or reference.</param>
+    /// <param name="resolved">The resolved playable path.</param>
+    /// <returns>The original opaque reference, or the resolved path's file name with the key redacted.</returns>
+    private static string DisplayNameForPath(string original, string resolved) =>
+        original.StartsWith("orynivo://", StringComparison.OrdinalIgnoreCase)
+            ? original
+            : System.IO.Path.GetFileName(RedactKey(resolved));
 
     // ------------------------------------------------------------------
     // Playlist tools
@@ -615,7 +741,7 @@ public sealed class McpTools(McpPlayerBridge bridge)
         if (s.Album is not null)
             sb.AppendLine(CultureInfo.InvariantCulture, $"Album: {s.Album}");
         if (s.FilePath is not null)
-            sb.AppendLine(CultureInfo.InvariantCulture, $"Path: {s.FilePath}");
+            sb.AppendLine(CultureInfo.InvariantCulture, $"Path: {RedactKey(s.FilePath)}");
         if (s.DurationSeconds > 0)
             sb.AppendLine(CultureInfo.InvariantCulture,
                 $"Position: {TimeSpan.FromSeconds(s.PositionSeconds):hh\\:mm\\:ss} / {TimeSpan.FromSeconds(s.DurationSeconds):hh\\:mm\\:ss}");
