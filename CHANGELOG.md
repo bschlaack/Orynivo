@@ -4,6 +4,17 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+### Changed
+
+- Split several `MainWindow` domains into dedicated partial files for dashboard,
+  history, playlists, internet radio, and Orynivo Server navigation code.
+
+### Fixed
+
 ## [0.23.3] - 2026-07-05
 
 ### Added

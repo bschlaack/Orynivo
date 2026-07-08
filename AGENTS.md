@@ -313,6 +313,10 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   local and remote tracks. For a remote track the now-playing artist button
   navigates within that track's server library (`OpenOrynivoArtistAlbumsAsync`
   using the row's `OrynivoServer` and `ArtistId`), not the local album view.
+- `Orynivo/MainWindow.*.cs`: `MainWindow` remains one Avalonia partial class;
+  domain-sized partials keep dashboard, daily history, internet radio,
+  Orynivo Server navigation, and playlist/context-menu code out of
+  `MainWindow.xaml.cs` without changing ownership or runtime behavior.
 - `Orynivo/Audio/WindowsEndpointVolumeSynchronizer.cs`: bidirectional
   synchronization between the transport volume slider and the selected
   Windows render endpoint's master volume
