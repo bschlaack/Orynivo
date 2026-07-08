@@ -114,6 +114,10 @@ public partial class MainWindow : Window
     private bool _libraryScanActive;
     private DateTime _lastLibraryActivityUiUpdate;
     private bool _libraryRefreshAvailable;
+    private string? _localScanText;
+    private string? _remoteScanText;
+    private bool _remoteScanPollInProgress;
+    private DispatcherTimer? _remoteScanPollTimer;
     private readonly DispatcherTimer _transportTimer;
     private bool _isSeekingWithSlider;
     private DateTimeOffset _positionSliderSeekStartedAt;
@@ -554,6 +558,12 @@ public partial class MainWindow : Window
         using (StartupTimingLog.Time("MainWindow.LibraryWatcher.UpdatePaths"))
             _libraryWatcher.UpdatePaths(_settings.LibraryPaths ?? []);
         LogUiDiagnostics("MainWindow LibraryWatcher.UpdatePaths completed");
+
+        // Poll configured remote servers for in-progress scans so their progress shows in the
+        // sidebar activity line without blocking or reloading the current view.
+        _remoteScanPollTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(12) };
+        _remoteScanPollTimer.Tick += (_, _) => _ = PollRemoteServerScansAsync();
+        _remoteScanPollTimer.Start();
         using (StartupTimingLog.Time("MainWindow.RestoreFixedDataGridColumnWidths"))
             RestoreFixedDataGridColumnWidths();
         using (StartupTimingLog.Time("MainWindow.AttachDataGridColumnChoosers"))
@@ -1029,17 +1039,82 @@ public partial class MainWindow : Window
 
             _libraryScanActive = activity.Active;
             _lastLibraryActivityUiUpdate = DateTime.UtcNow;
-            LibraryActivityPanel.IsVisible = activity.Active;
-            if (activity.Active)
-            {
-                LibraryActivityTextBlock.Text = activity.Total > 0 && activity.Current > 0
+            _localScanText = activity.Active
+                ? (activity.Total > 0 && activity.Current > 0
                     ? string.Format(
                         LocalizationManager.Current.LibraryUpdatingWithCount,
                         activity.Current,
                         activity.Total)
-                    : LocalizationManager.Current.LibraryUpdating;
-            }
+                    : LocalizationManager.Current.LibraryUpdating)
+                : null;
+            UpdateLibraryActivityIndicator();
         }, DispatcherPriority.Background);
+    }
+
+    /// <summary>
+    /// Shows the subtle sidebar activity line. The local scan takes priority; when no local
+    /// scan is running the most recent remote server scan status (if any) is shown instead.
+    /// </summary>
+    private void UpdateLibraryActivityIndicator()
+    {
+        var text = _localScanText ?? _remoteScanText;
+        LibraryActivityPanel.IsVisible = text is not null;
+        if (text is not null)
+            LibraryActivityTextBlock.Text = text;
+    }
+
+    /// <summary>
+    /// Polls every configured remote Orynivo Server for an in-progress scan and surfaces its
+    /// progress in the sidebar activity line, without reloading or blocking the current view.
+    /// </summary>
+    /// <returns>A task representing the asynchronous poll.</returns>
+    private async Task PollRemoteServerScansAsync()
+    {
+        if (_remoteScanPollInProgress)
+            return;
+        var servers = _settings.OrynivoServers;
+        if (servers is null || servers.Count == 0)
+        {
+            if (_remoteScanText is not null)
+            {
+                _remoteScanText = null;
+                UpdateLibraryActivityIndicator();
+            }
+            return;
+        }
+
+        _remoteScanPollInProgress = true;
+        try
+        {
+            string? scanning = null;
+            foreach (var server in servers)
+            {
+                try
+                {
+                    var status = await _orynivoClient.GetScanStatusAsync(server, CancellationToken.None);
+                    if (status is { IsRunning: true })
+                    {
+                        scanning = status is { Total: > 0, Current: > 0 }
+                            ? string.Format(
+                                LocalizationManager.Current.RemoteScanningWithCount,
+                                server.Name, status.Current, status.Total)
+                            : string.Format(LocalizationManager.Current.RemoteScanning, server.Name);
+                        break;
+                    }
+                }
+                catch
+                {
+                    // Unreachable or older servers are skipped silently.
+                }
+            }
+
+            _remoteScanText = scanning;
+            UpdateLibraryActivityIndicator();
+        }
+        finally
+        {
+            _remoteScanPollInProgress = false;
+        }
     }
 
     /// <summary>Shows or hides the per-view "new library data available" refresh action.</summary>
@@ -2854,13 +2929,7 @@ public partial class MainWindow : Window
     }
 
     private static string GetOrynivoTrackListCachePath(OrynivoServerSettings server)
-    {
-        // Include the API key in the cache key: cached playback paths embed the
-        // key, so a key change must invalidate the cache to avoid stale URLs.
-        var key = Convert.ToHexString(
-            SHA256.HashData(Encoding.UTF8.GetBytes($"{server.Id}|{server.BaseUrl}|{server.ApiKey}")));
-        return AppPaths.GetDataPath("remote-track-cache", $"{key}.json");
-    }
+        => RemoteServerCache.TrackListCachePath(server);
 
     private async Task<List<LibraryCatalogArtist>> LoadAllOrynivoArtistsAsync(
         OrynivoServerSettings server,
@@ -3172,10 +3241,7 @@ public partial class MainWindow : Window
     }
 
     private static string GetOrynivoFolderTrackCachePath(OrynivoServerSettings server)
-    {
-        var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{server.Id}|{server.BaseUrl}")));
-        return AppPaths.GetDataPath("remote-folder-cache", $"{key}.json");
-    }
+        => RemoteServerCache.FolderTrackCachePath(server);
 
     private async Task<Dictionary<long, OrynivoTrackInfo>> LoadOrynivoFolderTrackMetadataAsync(
         OrynivoServerSettings server,

@@ -239,6 +239,16 @@ public sealed record OrynivoServerInfo(
     string Version,
     int ApiVersion);
 
+/// <summary>
+/// Feature-support flags probed on a remote Orynivo Server so the client can warn when an
+/// older server lacks specific endpoints. Each value is <see langword="true"/> (supported),
+/// <see langword="false"/> (missing), or <see langword="null"/> (probe inconclusive).
+/// </summary>
+/// <param name="TrackFacets">Whether the <c>/api/tracks/facets</c> endpoint exists.</param>
+/// <param name="RecentAlbums">Whether the <c>/api/albums/recent</c> endpoint exists.</param>
+/// <param name="Waveforms">Whether the <c>/api/tracks/{id}/waveform</c> endpoint exists.</param>
+public sealed record OrynivoServerCapabilities(bool? TrackFacets, bool? RecentAlbums, bool? Waveforms);
+
 /// <summary>Library path configuration returned by the Orynivo Server API.</summary>
 public sealed record OrynivoLibraryPaths(IReadOnlyList<string> Paths);
 
@@ -347,6 +357,60 @@ public sealed class OrynivoServerClient : IDisposable
             return await response.Content.ReadFromJsonAsync<OrynivoServerInfo>(JsonOptions, cancellationToken);
         }
         catch { return null; }
+    }
+
+    /// <summary>
+    /// Probes whether the server supports the newer feature endpoints (track facets, recent
+    /// albums, and per-track waveforms) so the client can concretely report what an older
+    /// server is missing. Because every server currently reports the same API version, this
+    /// tests the routes directly instead of relying on a version number.
+    /// </summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The probed capability flags.</returns>
+    public async Task<OrynivoServerCapabilities> GetCapabilitiesAsync(
+        OrynivoServerSettings server,
+        CancellationToken cancellationToken = default)
+    {
+        var facets = ProbeRouteExistsAsync(server, "/api/tracks/facets", cancellationToken);
+        var recent = ProbeRouteExistsAsync(server, "/api/albums/recent", cancellationToken);
+        var waveform = ProbeRouteExistsAsync(server, "/api/tracks/0/waveform", cancellationToken);
+        await Task.WhenAll(facets, recent, waveform).ConfigureAwait(false);
+        return new OrynivoServerCapabilities(facets.Result, recent.Result, waveform.Result);
+    }
+
+    /// <summary>
+    /// Tests whether a route exists by sending a method it does not implement: an existing
+    /// route replies <c>405 Method Not Allowed</c>, a missing route replies <c>404</c>. This
+    /// distinguishes "endpoint present" from "older server without the endpoint" without
+    /// downloading any payload.
+    /// </summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="path">API path to probe.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when the route exists, <see langword="false"/> when it is missing, or <see langword="null"/> when inconclusive.</returns>
+    private async Task<bool?> ProbeRouteExistsAsync(
+        OrynivoServerSettings server,
+        string path,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Delete, BuildUrl(server, path));
+            request.Headers.Add("X-Api-Key", server.ApiKey);
+            using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            return response.StatusCode switch
+            {
+                System.Net.HttpStatusCode.MethodNotAllowed => true,
+                System.Net.HttpStatusCode.NotFound => false,
+                System.Net.HttpStatusCode.Unauthorized => (bool?)null,
+                _ => true
+            };
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     // ------------------------------------------------------------------

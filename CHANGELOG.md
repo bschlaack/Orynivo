@@ -8,6 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Remote Orynivo Server compatibility display: each server row in Settings now
+  probes the newer feature endpoints and concretely reports what an older server
+  is missing ("Server does not support: Track facets, Recent albums, Waveforms").
+- Remote cache management in Settings: shows the combined remote-cache size and
+  offers clearing per server or the entire cache (artwork, track, and folder-tree
+  caches).
+- Server-side scan progress is shown in the sidebar activity line: configured
+  servers are polled and an in-progress scan appears as an "Updating … N / M
+  files" status without reloading or blocking the current view.
 - MCP tools and the built-in AI chat can now reach remote Orynivo Server tracks:
   `search_library` returns results from the local library **and** every configured
   Orynivo Server, and the `play`, `queue_append`, `queue_play_next`, and

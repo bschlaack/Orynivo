@@ -753,6 +753,22 @@
                             Theme="{StaticResource SettingsButtonTheme}"
                             Content="{DynamicResource L_AddOrynivoServer}"
                             Click="AddOrynivoServerButton_OnClick"/>
+
+                    <TextBlock Text="{DynamicResource L_RemoteCache}"
+                               FontSize="{DynamicResource FontSizeBodyStrong}"
+                               FontWeight="SemiBold"
+                               Margin="0,28,0,8"/>
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <TextBlock x:Name="RemoteCacheSizeText"
+                                   VerticalAlignment="Center"
+                                   FontSize="{DynamicResource FontSizeMeta}"
+                                   Foreground="{DynamicResource AppMutedTextBrush}"/>
+                        <Button x:Name="ClearAllRemoteCacheButton"
+                                Height="28"
+                                Theme="{StaticResource SettingsButtonTheme}"
+                                Content="{DynamicResource L_ClearRemoteCacheAll}"
+                                Click="ClearAllRemoteCacheButton_OnClick"/>
+                    </StackPanel>
                 </StackPanel>
 
                 <StackPanel x:Name="StreamingPanel"

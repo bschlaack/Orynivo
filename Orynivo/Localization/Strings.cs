@@ -366,6 +366,26 @@ public sealed record LocalizedStrings(
     public string ServerLastConnected { get; init; } = "";
     /// <summary>Gets the status line shown when a server has never successfully connected.</summary>
     public string ServerNeverConnected { get; init; } = "";
+    /// <summary>Gets the per-server compatibility line listing unsupported features ({0} = comma-separated list).</summary>
+    public string ServerMissingFeatures { get; init; } = "";
+    /// <summary>Gets the label for the track-facets server feature.</summary>
+    public string CapabilityTrackFacets { get; init; } = "";
+    /// <summary>Gets the label for the recent-albums server feature.</summary>
+    public string CapabilityRecentAlbums { get; init; } = "";
+    /// <summary>Gets the label for the waveforms server feature.</summary>
+    public string CapabilityWaveforms { get; init; } = "";
+    /// <summary>Gets the remote-cache settings section heading.</summary>
+    public string RemoteCache { get; init; } = "";
+    /// <summary>Gets the remote-cache size line ({0} = formatted size).</summary>
+    public string RemoteCacheSize { get; init; } = "";
+    /// <summary>Gets the button label for clearing all remote-server caches.</summary>
+    public string ClearRemoteCacheAll { get; init; } = "";
+    /// <summary>Gets the per-server "clear cache" button label.</summary>
+    public string ClearCache { get; init; } = "";
+    /// <summary>Gets the sidebar status shown while a remote server is scanning ({0} = server name).</summary>
+    public string RemoteScanning { get; init; } = "";
+    /// <summary>Gets the sidebar status with file progress while a remote server scans ({0} = server, {1} = current, {2} = total).</summary>
+    public string RemoteScanningWithCount { get; init; } = "";
     /// <summary>Gets the dashboard "recently played" section title.</summary>
     public string RecentlyPlayed { get; init; } = "";
     /// <summary>Gets the dashboard morning greeting.</summary>

@@ -359,6 +359,25 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   (`%LOCALAPPDATA%\Orynivo\server-status.json`) mapping a server ID to the Unix
   timestamp of its last successful connection. Kept separate from `settings.json`
   so recording a connection never contends with the settings-save flow.
+- `Orynivo/RemoteServerCache.cs`: single source of truth for the remote-server
+  caches (`remote-artworks`, `remote-track-cache`, `remote-folder-cache`). Exposes
+  the per-server track-list/folder-track cache file paths (used by `MainWindow`),
+  `GetTotalSizeBytes()`, `ClearAll()`, and `ClearServer(server)` (clears the
+  server's hashed track/folder caches plus its `track-art-<id>-*` /
+  `artist-info-<id>-*` artwork). Settings shows the total size and offers a
+  per-server "Clear cache" button and a clear-all button.
+- Remote server compatibility: `OrynivoServerClient.GetCapabilitiesAsync` probes
+  whether the newer endpoints exist (`/api/tracks/facets`, `/api/albums/recent`,
+  `/api/tracks/{id}/waveform`) by sending an unsupported method and reading
+  `405` (route exists) vs `404` (missing) — every server reports the same
+  `ApiVersion`, so routes are probed directly. `SettingsView`
+  (`CheckServerCapabilitiesAsync`) shows a per-row "Server does not support: …"
+  line for missing features.
+- Remote scan progress: `MainWindow` polls each configured server's `/api/scan`
+  (`_remoteScanPollTimer`, `PollRemoteServerScansAsync`) and shows an in-progress
+  scan in the shared sidebar activity line (`UpdateLibraryActivityIndicator`,
+  which prefers the local `_localScanText` over the remote `_remoteScanText`),
+  never reloading or blocking the current view.
 - `Orynivo/EqualizerProfileNameDialog.*`: themed unique-name dialog used when
   creating a new persisted equalizer profile
 - `Native/AsioBridge/bridge.cpp`: shared Steinberg/cwASIO initialization,
