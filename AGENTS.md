@@ -166,6 +166,9 @@ runtime dependency.
   because remote favourites live client-side; this is what the Windows client
   uses to open remote smart playlists so a `FavoritesOnly` criterion matches the
   client's favourites instead of the server's unset flags),
+  `POST /api/playlists/resolve-count` (resolves ad-hoc client-supplied criteria
+  and returns only the match count, backing the smart-playlist editor's live
+  preview for remote playlists),
   `POST /api/playlists`,
   `POST /api/playlists/smart` and `PUT /api/playlists/{id}/smart` (create and
   update a smart playlist from client-supplied criteria, which the server
@@ -787,6 +790,12 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   but must not be edited independently of their profile.
 - `AppSettings.ReplayGainMode` selects disabled, track, or album ReplayGain for
   PCM playback; native ASIO DSD remains bit-perfect
+- `AppSettings.NonGaplessCrossfadeSeconds` controls the optional fade transition
+  used for queue advances that are not already covered by the continuous gapless
+  PCM session. A value of `0` disables it; the UI caps it to 10 seconds. The
+  transition fades the current player out shortly before track end, starts the
+  next queue item, and fades the new player in without trying to open a second
+  exclusive ASIO/WASAPI session concurrently.
 - `AppSettings.AlwaysConvertDsdToPcm` forces DSF/DFF sources through FFmpeg and
   the PCM output path even when ASIO/cwASIO native DSD is available, allowing
   volume, ReplayGain, and equalizer processing
@@ -836,7 +845,19 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   formats, bitrates, source keys, metadata ranges, library/play-history rules,
   ordering, and result limits
 - `Orynivo/SmartPlaylistDialog.*`: localized editor for the name and advanced
-  criteria of an existing smart playlist
+  criteria of an existing smart playlist. An optional `CountResolver`
+  (`Func<SmartPlaylistCriteria, CancellationToken, Task<int?>>`) drives a debounced
+  live preview ("N tracks match") that re-evaluates on every criteria change. The
+  preview resolves the criteria exactly how the playlist opens: a locally stored
+  smart playlist uses `ResolveUnifiedSmartPlaylistCountAsync`
+  (`BuildUnifiedSmartPlaylistCandidates` = local library + every configured server,
+  the same candidate set as `ResolveUnifiedSmartPlaylistRows`), so smart playlists
+  do not distinguish local vs server sources; the server-stored edit path uses a
+  resolver backed by `OrynivoServerClient.ResolveSmartPlaylistCountAsync`
+  (`POST /api/playlists/resolve-count`, server-side `criteria.Resolve` with the
+  client's favourite IDs; older servers without the endpoint return no count → no
+  preview). `TryBuildCriteriaCore` builds criteria without touching the validation
+  UI so the preview can reuse it.
 - `Orynivo/Library/PlaylistTrackRecord.cs`: playlist entry model with position,
   optional TrackId reference, and required path
 - `Orynivo/Library/M3u8PlaylistService.cs`: UTF-8 M3U8 import/export with
@@ -1218,11 +1239,33 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   `_queueIndex` by reference, not by path equality.
 - Queue rows can move up/down or be removed, and the complete queue can be
   saved as a regular playlist through `NewPlaylistDialog`.
+- The Up Next header exposes a localized **Clear queue** action that clears the
+  editable queue without stopping the currently playing track; MCP `clear_queue`
+  uses the same `ClearPlaybackQueue` path.
 - Queue mutations update navigation buttons, the visible queue table, shuffle
   history, and persisted settings together.
 - The gapless PCM players receive an immutable item list at startup. Mutating
   an active gapless queue therefore restarts the current stream and seeks back
   to its audible position so the revised order takes effect immediately.
+- **Restore last queue**: `CapturePlaybackQueueState` detects a wholesale queue
+  replacement (the new queue shares no path with the outgoing one) and stores the
+  outgoing queue via `AudioDatabase.SavePreviousPlaybackQueue` (kept in `app_meta`
+  as `previous_playback_queue`). The Up Next header shows `RestoreQueueButton`
+  when `GetPreviousPlaybackQueue()` is non-empty; `RestorePreviousQueueAsync`
+  swaps it back in and re-captures the outgoing queue, so restore is reversible.
+- **Drag & drop into the queue**: `SetupQueueDragAndDrop` makes the `ContentDataGrid`,
+  `AlbumArtworkListBox`, and `FolderTreeView` drag sources (tunnel pointer
+  handlers start a `DragDrop` operation carrying `orynivo/queue-paths`) and the
+  always-visible `QueueNavItem` the drop target. Dropping on **Up Next** appends
+  the resolved paths to the queue end and must not restart the active playback
+  session. Track rows (local, remote, Plex) use their
+  `FilePath`; local album rows and album cards resolve via `GetTrackListByAlbum`;
+  local folders via `GetTrackPathsUnderDirectory`; remote folders via the in-memory
+  `FolderTree` (`_folderTreesBySource`). Remote album rows/cards carry an
+  `orynivo-album:server:id` reference that
+  `ResolveDroppedQueuePathsAsync` expands to registered track stream URLs on drop
+  (`QueueNavItem_OnDrop` is async). The queue and the source lists are never
+  co-visible, so the sidebar item is the drop target.
 
 ## Playlist Database Structure
 
@@ -1325,6 +1368,10 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   the highest available rate that does not exceed the source.
 - The transport file-information line and status bar explicitly identify
   DSD-to-PCM conversion and show the selected PCM output sample rate.
+- The transport file-information line shows a compact localized `RG` badge when
+  ReplayGain is enabled and the current PCM track has a usable track or album
+  ReplayGain value. Native DSD, radio, podcasts, and tracks without ReplayGain
+  metadata keep the badge hidden.
 - WASAPI pause keeps the exclusive AudioClient running and supplies silence so
   drivers do not loop the final endpoint buffer; buffered audio remains
   available for resume
@@ -1692,7 +1739,10 @@ asynchronous file I/O from the UI thread
   metadata, duration, genre, and the episode RSS summary
 - During radio playback, the Internet Radio page shows a large station logo and
   live ICY title/artist metadata when supplied by the stream; the transport
-  summary is updated at the same time.
+  summary and Windows media overlay are updated at the same time. Downloaded
+  station logos are cached under `%LOCALAPPDATA%\Orynivo\radio-logos\` and the
+  cached local file is passed to SMTC so Windows does not have to refetch the
+  remote favicon URL itself.
 - Radio search results expose a multi-select genre popup derived from normalized
   Radio Browser tags. Selected genres use OR semantics, technical tags are
   excluded, and unavailable selections are removed after a new search.

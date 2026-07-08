@@ -202,10 +202,12 @@ public partial class MainWindow : Window
     private int _shuffleHistoryPosition = -1;
     private string _currentFilePath = string.Empty;
     private RadioStationRecord? _currentRadioStation;
+    private string? _currentRadioArtworkPath;
     private PodcastPlayback? _currentPodcastPlayback;
     private PodcastRecord? _activePodcast;
     private DateTimeOffset _lastPodcastProgressSave = DateTimeOffset.MinValue;
     private TimeSpan _currentPlaybackDuration;
+    private bool _nonGaplessFadeTransitionInProgress;
     private long? _currentAlbumId;
     private string? _currentAlbumTitle;
     private CancellationTokenSource? _lyricsCts;
@@ -564,6 +566,8 @@ public partial class MainWindow : Window
         _remoteScanPollTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(12) };
         _remoteScanPollTimer.Tick += (_, _) => _ = PollRemoteServerScansAsync();
         _remoteScanPollTimer.Start();
+
+        SetupQueueDragAndDrop();
         using (StartupTimingLog.Time("MainWindow.RestoreFixedDataGridColumnWidths"))
             RestoreFixedDataGridColumnWidths();
         using (StartupTimingLog.Time("MainWindow.AttachDataGridColumnChoosers"))
@@ -716,15 +720,7 @@ public partial class MainWindow : Window
             RefreshQueueNavigationButtons();
             await RefreshActiveGaplessQueueAsync();
         };
-        _mcpBridge.ClearQueueFunc = () =>
-        {
-            _queue.Clear();
-            _queueIndex = -1;
-            ResetQueuePlaybackState();
-            PersistPlaybackQueue();
-            RefreshQueueRowsIfVisible();
-            RefreshQueueNavigationButtons();
-        };
+        _mcpBridge.ClearQueueFunc = () => ClearPlaybackQueue();
         _mcpBridge.ReplaceQueueFunc = async paths =>
         {
             _queue.Clear();
@@ -1442,6 +1438,7 @@ public partial class MainWindow : Window
             Height = 13,
             Margin = new Thickness(0, 0, 7, 0),
             VerticalAlignment = VerticalAlignment.Center,
+            Stretch = Stretch.Uniform,
             Data = FindResource<Geometry>(resourceKey),
             Stroke = new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF)),
             StrokeThickness = 1.6,
@@ -1582,8 +1579,79 @@ public partial class MainWindow : Window
             ? persistedIndex
             : persisted.Count == 0 ? -1 : Math.Min(_queueIndex, persisted.Count - 1);
         using var db = AudioDatabase.OpenDefault();
+
+        // Detect a wholesale replacement (playing a completely different selection) and keep
+        // the outgoing queue as a restorable "previous queue". Appends, moves, removals, and
+        // next/previous keep some of the old items, so the intersection stays non-empty.
+        var previous = db.GetPlaybackQueue();
+        if (previous.Paths.Count > 0)
+        {
+            var newSet = new HashSet<string>(persisted, StringComparer.OrdinalIgnoreCase);
+            if (!previous.Paths.Any(newSet.Contains))
+                db.SavePreviousPlaybackQueue(previous.Paths);
+        }
+
         db.SavePlaybackQueue(persisted, currentIndex);
         ClearLegacyPlaybackQueueSettings();
+    }
+
+    /// <summary>Restores the queue that was playing before the most recent wholesale replacement.</summary>
+    /// <returns>A task representing the asynchronous restore.</returns>
+    private async Task RestorePreviousQueueAsync()
+    {
+        IReadOnlyList<string> paths;
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            paths = db.GetPreviousPlaybackQueue();
+        }
+        catch { paths = []; }
+
+        if (paths.Count == 0)
+        {
+            StatusTextBlock.Text = LocalizationManager.Current.NoPreviousQueue;
+            return;
+        }
+
+        _queue.Clear();
+        foreach (var path in paths)
+            _queue.Add(CreatePlaylistItem(path));
+        _queueIndex = _queue.Count > 0 ? 0 : -1;
+        ResetQueuePlaybackState();
+        // Persisting captures the outgoing queue as the new "previous", making restore reversible.
+        PersistPlaybackQueue();
+        RefreshQueueRowsIfVisible();
+        RefreshQueueNavigationButtons();
+
+        if (_queue.Count == 0)
+            return;
+        try { await StartPlaybackAsync(_queue[0].FilePath); }
+        catch (OperationCanceledException) { StatusTextBlock.Text = LocalizationManager.Current.PlaybackStopped; }
+        catch (Exception ex) { StopPlayback(); StatusTextBlock.Text = ex.Message; }
+        UpdateNowPlayingRowHighlights();
+    }
+
+    /// <summary>Handles the Up Next "restore last queue" header button.</summary>
+    /// <param name="sender">The button.</param>
+    /// <param name="e">The click event data.</param>
+    private async void RestoreQueueButton_OnClick(object? sender, RoutedEventArgs e)
+        => await RestorePreviousQueueAsync();
+
+    /// <summary>Shows the "restore last queue" button in the Up Next view when a previous queue exists.</summary>
+    /// <param name="tag">The current top-level view tag.</param>
+    private void UpdateRestoreQueueButtonState(string tag)
+    {
+        var available = false;
+        if (tag == "Queue")
+        {
+            try
+            {
+                using var db = AudioDatabase.OpenDefault();
+                available = db.GetPreviousPlaybackQueue().Count > 0;
+            }
+            catch { available = false; }
+        }
+        RestoreQueueButton.IsVisible = available;
     }
 
     private bool ClearLegacyPlaybackQueueSettings()
@@ -2181,9 +2249,12 @@ public partial class MainWindow : Window
             SetViewModeButtons(tag == "Albums" ? _showAlbumArtworkView : _showArtistArtworkView);
         TrackFilterButton.IsVisible = tag == "Tracks" ? true : false;
         SaveSmartPlaylistButton.IsVisible = tag == "Tracks" ? true : false;
+        ClearQueueButton.IsVisible = tag == "Queue";
+        ClearQueueButton.IsEnabled = _queue.Count > 0;
         SaveQueueAsPlaylistButton.IsVisible = tag == "Queue";
         SaveQueueAsPlaylistButton.IsEnabled =
             _queue.Any(item => CanPersistQueuePath(item.FilePath));
+        UpdateRestoreQueueButtonState(tag);
         if (tag == "Tracks") UpdateSaveSmartPlaylistButtonState();
         TrackFilterPopup.IsOpen = false;
         try
@@ -5091,10 +5162,19 @@ public partial class MainWindow : Window
         return true;
     }
 
-    private List<ContentRow> ResolveUnifiedSmartPlaylistRows(SmartPlaylistCriteria criteria)
+    /// <summary>
+    /// Builds the unified smart-playlist candidate set — the local library plus every configured
+    /// remote Orynivo Server — that a smart playlist is resolved against. Remote tracks get
+    /// negative pseudo-IDs mapped through <paramref name="remoteTracks"/>. Blocks on server
+    /// calls, so it must run off the UI thread.
+    /// </summary>
+    /// <param name="remoteTracks">Receives the pseudo-ID → (server, track) map for remote candidates.</param>
+    /// <returns>The merged candidate list.</returns>
+    private List<SmartPlaylistTrackInfo> BuildUnifiedSmartPlaylistCandidates(
+        out Dictionary<long, (OrynivoServerSettings Server, LibraryCatalogTrack Track)> remoteTracks)
     {
         var candidates = new List<SmartPlaylistTrackInfo>();
-        var remoteTracks = new Dictionary<long, (OrynivoServerSettings Server, LibraryCatalogTrack Track)>();
+        remoteTracks = new Dictionary<long, (OrynivoServerSettings Server, LibraryCatalogTrack Track)>();
         long nextRemoteId = -1;
 
         try
@@ -5128,6 +5208,29 @@ public partial class MainWindow : Window
             }
         }
 
+        return candidates;
+    }
+
+    /// <summary>
+    /// Counts how many tracks match the criteria across the unified candidate set (local library
+    /// plus configured remote servers), matching what a smart playlist actually contains when
+    /// opened. Runs off the UI thread.
+    /// </summary>
+    /// <param name="criteria">The criteria to evaluate.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The number of matching tracks.</returns>
+    private Task<int?> ResolveUnifiedSmartPlaylistCountAsync(
+        SmartPlaylistCriteria criteria,
+        CancellationToken cancellationToken)
+        => Task.Run<int?>(() =>
+        {
+            var candidates = BuildUnifiedSmartPlaylistCandidates(out _);
+            return criteria.Resolve(candidates).Count;
+        }, cancellationToken);
+
+    private List<ContentRow> ResolveUnifiedSmartPlaylistRows(SmartPlaylistCriteria criteria)
+    {
+        var candidates = BuildUnifiedSmartPlaylistCandidates(out var remoteTracks);
         var resolved = criteria.Resolve(candidates);
         var localIds = resolved
             .Where(candidate => candidate.Id > 0)
@@ -7003,6 +7106,7 @@ public partial class MainWindow : Window
 
         ContentDataGrid.ItemsSource = _queueRows;
         ContentCountTextBlock.Text = LocalizationManager.FormatTrackCount(_queueRows.Count);
+        ClearQueueButton.IsEnabled = _queue.Count > 0;
         SaveQueueAsPlaylistButton.IsEnabled =
             _queue.Any(item => CanPersistQueuePath(item.FilePath));
         Dispatcher.UIThread.Post(UpdateNowPlayingRowHighlights, DispatcherPriority.Loaded);
@@ -7059,6 +7163,28 @@ public partial class MainWindow : Window
         RefreshQueueRowsIfVisible();
         RefreshQueueNavigationButtons();
         await RefreshActiveGaplessQueueAsync();
+    }
+
+    /// <summary>Handles the Up Next header button that clears the complete queue.</summary>
+    /// <param name="sender">The button.</param>
+    /// <param name="e">The click event data.</param>
+    private void ClearQueueButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        ClearPlaybackQueue();
+        StatusTextBlock.Text = LocalizationManager.Current.QueueCleared;
+    }
+
+    /// <summary>Clears the editable playback queue without stopping the currently playing item.</summary>
+    private void ClearPlaybackQueue()
+    {
+        _queue.Clear();
+        _queueIndex = -1;
+        ResetQueuePlaybackState();
+        PersistPlaybackQueue();
+        RefreshQueueRowsIfVisible();
+        RefreshQueueNavigationButtons();
+        ClearQueueButton.IsEnabled = false;
+        SaveQueueAsPlaylistButton.IsEnabled = false;
     }
 
     private PlaylistItem? GetCurrentQueueItem() =>
@@ -9269,6 +9395,7 @@ public partial class MainWindow : Window
     {
         NowPlayingFavoriteButton.IsEnabled = _currentTrackId.HasValue || CurrentOrynivoFavoriteTarget is not null;
         NowPlayingFavoriteGlyph.Text = _currentTrackIsFavorite ? "❤" : "♡";
+        NowPlayingFavoriteGlyph.FontSize = _currentTrackIsFavorite ? 18 : 15;
     }
 
     private void NowPlayingFavoriteButton_OnClick(object? sender, RoutedEventArgs e)
@@ -10495,6 +10622,7 @@ public partial class MainWindow : Window
             StartRadioMetadataMonitor(radioStation);
         }
         UpdateNowPlayingFavoriteButton();
+        UpdateReplayGainBadge(usesNativeDsd);
         RefreshWindowsMediaMetadata();
         _windowsMediaTransport?.SetPlaybackStatus(MediaPlaybackStatus.Playing);
         _windowsMediaTransport?.UpdateTimeline(
@@ -10558,7 +10686,14 @@ public partial class MainWindow : Window
             _currentPlayHistoryId = null;
         }
 
-        await player.WaitForCompletionAsync();
+        try
+        {
+            await player.WaitForCompletionAsync();
+        }
+        catch (OperationCanceledException) when (!ReferenceEquals(_player, player))
+        {
+            return;
+        }
 
         if (_player == player)
         {
@@ -11061,6 +11196,7 @@ public partial class MainWindow : Window
                 BuildNowPlayingTrackContext(filePath));
 
         UpdateNowPlayingFavoriteButton();
+        UpdateReplayGainBadge(nativeDsdOutput: false);
         RefreshWindowsMediaMetadata();
         _windowsMediaTransport?.SetPlaybackStatus(MediaPlaybackStatus.Playing);
         if (_player is not null)
@@ -11097,8 +11233,12 @@ public partial class MainWindow : Window
         else if (_currentRadioStation is { } radioStation)
         {
             album = radioStation.Name;
-            if (Uri.TryCreate(radioStation.Favicon, UriKind.Absolute, out var radioArtworkUri))
+            artworkPath = _currentRadioArtworkPath;
+            if (string.IsNullOrWhiteSpace(artworkPath) &&
+                Uri.TryCreate(radioStation.Favicon, UriKind.Absolute, out var radioArtworkUri))
+            {
                 artworkUri = radioArtworkUri;
+            }
         }
         else if (_plexTracksByUrl.TryGetValue(_currentFilePath, out var plexTrack))
         {
@@ -11517,6 +11657,7 @@ public partial class MainWindow : Window
         NowPlayingArtistBlock.Text = "";
         ClearNowPlayingAlbum();
         FileInfoTextBlock.Text     = "";
+        ReplayGainBadgeBorder.IsVisible = false;
         NowPlayingArtworkImage.Source = null;
         LyricsBackgroundImage.Source = null;
         _currentTrackId = null;
@@ -11524,6 +11665,7 @@ public partial class MainWindow : Window
         _currentArtistName = null;
         _currentTrackIsFavorite = false;
         _currentRadioStation = null;
+        _currentRadioArtworkPath = null;
         _currentPodcastPlayback = null;
         _windowsMediaTransport?.Clear();
         LyricsButton.IsEnabled = false;
@@ -11668,6 +11810,131 @@ public partial class MainWindow : Window
         try { await StartPlaybackAsync(_queue[_queueIndex].FilePath); return true; }
         catch { return false; }
     }
+
+    private void MaybeStartNonGaplessFadeTransition(TimeSpan visiblePosition)
+    {
+        if (_nonGaplessFadeTransitionInProgress ||
+            _settings.NonGaplessCrossfadeSeconds <= 0 ||
+            _currentRadioStation is not null ||
+            _currentPodcastPlayback is not null ||
+            _player is null ||
+            _player.Duration <= TimeSpan.Zero ||
+            IsContinuousGaplessQueueActive() ||
+            !HasNextQueueItem())
+        {
+            return;
+        }
+
+        var fade = TimeSpan.FromSeconds(Math.Clamp(_settings.NonGaplessCrossfadeSeconds, 0.5, 10));
+        if (_player.Duration <= fade + TimeSpan.FromSeconds(1))
+            return;
+        if (_player.Duration - visiblePosition > fade)
+            return;
+
+        _ = RunNonGaplessFadeTransitionAsync(fade);
+    }
+
+    private bool IsContinuousGaplessQueueActive() =>
+        _player is IGaplessAudioPlayer &&
+        !_shuffleEnabled &&
+        _queueIndex >= 0 &&
+        _queueIndex + 1 < _queue.Count &&
+        _queueIndex < _queue.Count &&
+        string.Equals(_queue[_queueIndex].FilePath, _currentFilePath, StringComparison.OrdinalIgnoreCase);
+
+    private bool HasNextQueueItem()
+    {
+        if (_shuffleEnabled)
+            return HasUnplayedShuffleCandidate();
+        return _queueIndex == -1
+            ? _queue.Count > 0
+            : _queueIndex + 1 < _queue.Count;
+    }
+
+    private async Task RunNonGaplessFadeTransitionAsync(TimeSpan fade)
+    {
+        if (_nonGaplessFadeTransitionInProgress || _player is null)
+            return;
+
+        _nonGaplessFadeTransitionInProgress = true;
+        var outgoing = _player;
+        var outgoingVolume = outgoing.Volume;
+        try
+        {
+            await FadePlayerVolumeAsync(outgoing, outgoingVolume, 0f, fade);
+            if (!ReferenceEquals(_player, outgoing) || !TryMoveToNextQueueIndex())
+                return;
+
+            PersistPlaybackQueue();
+            RefreshQueueRowsIfVisible();
+            RefreshQueueNavigationButtons();
+
+            var nextPath = _queue[_queueIndex].FilePath;
+            var playbackTask = StartPlaybackAsync(nextPath);
+            _ = playbackTask.ContinueWith(task =>
+            {
+                if (task.Exception is { } exception)
+                    CrashLogger.Log(exception.GetBaseException(), "Non-gapless fade playback");
+            }, TaskContinuationOptions.OnlyOnFaulted);
+
+            var incoming = await WaitForCurrentPlayerReplacementAsync(outgoing, TimeSpan.FromSeconds(3));
+            if (incoming is null)
+                return;
+            var targetVolume = GetNormalPlayerVolume();
+            incoming.Volume = 0f;
+            await FadePlayerVolumeAsync(incoming, 0f, targetVolume, fade);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            CrashLogger.Log(ex, "Non-gapless fade transition");
+        }
+        finally
+        {
+            if (ReferenceEquals(_player, outgoing))
+                outgoing.Volume = outgoingVolume;
+            _nonGaplessFadeTransitionInProgress = false;
+        }
+    }
+
+    private async Task<IAudioPlayer?> WaitForCurrentPlayerReplacementAsync(
+        IAudioPlayer outgoing,
+        TimeSpan timeout)
+    {
+        var deadline = DateTimeOffset.UtcNow + timeout;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            if (_player is { } current && !ReferenceEquals(current, outgoing))
+                return current;
+            await Task.Delay(25);
+        }
+        return _player is { } player && !ReferenceEquals(player, outgoing) ? player : null;
+    }
+
+    private async Task FadePlayerVolumeAsync(
+        IAudioPlayer player,
+        float from,
+        float to,
+        TimeSpan duration)
+    {
+        var steps = Math.Max(1, (int)Math.Ceiling(duration.TotalMilliseconds / 50d));
+        for (var step = 1; step <= steps; step++)
+        {
+            if (!ReferenceEquals(_player, player) && step > 1)
+                return;
+            var ratio = (float)step / steps;
+            player.Volume = from + ((to - from) * ratio);
+            await Task.Delay(TimeSpan.FromMilliseconds(duration.TotalMilliseconds / steps));
+        }
+        player.Volume = to;
+    }
+
+    private float GetNormalPlayerVolume() =>
+        _settings.OutputBackend == OutputBackend.Wasapi && _endpointVolumeSynchronizer is not null
+            ? 1.0f
+            : (float)VolumeSlider.Value;
 
     private void RefreshQueueNavigationButtons()
     {
@@ -11889,6 +12156,7 @@ public partial class MainWindow : Window
             SavePodcastProgress(completed: false);
         }
         UpdateActiveLyric(_player.Position);
+        MaybeStartNonGaplessFadeTransition(visiblePosition);
     }
 
     /// <summary>Commits the pending waveform-progress seek and leaves preview mode.</summary>
@@ -13664,20 +13932,68 @@ public partial class MainWindow : Window
         if (_settings.ReplayGainMode == ReplayGainMode.Off)
             return pcmGain;
 
+        if (TryGetCurrentReplayGainValues(filePath, out var trackGain, out var albumGain))
+        {
+            return pcmGain * ReplayGain.GetLinearFactor(
+                _settings.ReplayGainMode,
+                trackGain,
+                albumGain);
+        }
+
+        return pcmGain;
+    }
+
+    private void UpdateReplayGainBadge(bool nativeDsdOutput)
+    {
+        ReplayGainBadgeBorder.IsVisible =
+            !nativeDsdOutput &&
+            _settings.ReplayGainMode != ReplayGainMode.Off &&
+            TryGetCurrentReplayGainValues(_currentFilePath, out var trackGain, out var albumGain) &&
+            HasPreferredReplayGainValue(trackGain, albumGain);
+    }
+
+    private bool HasPreferredReplayGainValue(string? trackGain, string? albumGain) =>
+        _settings.ReplayGainMode switch
+        {
+            ReplayGainMode.Track => !string.IsNullOrWhiteSpace(trackGain) ||
+                                    !string.IsNullOrWhiteSpace(albumGain),
+            ReplayGainMode.Album => !string.IsNullOrWhiteSpace(albumGain) ||
+                                    !string.IsNullOrWhiteSpace(trackGain),
+            _ => false
+        };
+
+    private bool TryGetCurrentReplayGainValues(
+        string? filePath,
+        out string? trackGain,
+        out string? albumGain)
+    {
+        trackGain = null;
+        albumGain = null;
+        if (string.IsNullOrWhiteSpace(filePath))
+            return false;
+
+        if (_orynivoTracksByUrl.TryGetValue(filePath, out var orynivoRow))
+        {
+            trackGain = orynivoRow.ReplayGainTrack;
+            albumGain = orynivoRow.ReplayGainAlbum;
+            return !string.IsNullOrWhiteSpace(trackGain) ||
+                   !string.IsNullOrWhiteSpace(albumGain);
+        }
+
         try
         {
             using var db = AudioDatabase.OpenDefault();
             var track = db.GetByPath(filePath);
-            return track is null
-                ? pcmGain
-                : pcmGain * ReplayGain.GetLinearFactor(
-                    _settings.ReplayGainMode,
-                    track.ReplayGainTrack,
-                    track.ReplayGainAlbum);
+            if (track is null)
+                return false;
+            trackGain = track.ReplayGainTrack;
+            albumGain = track.ReplayGainAlbum;
+            return !string.IsNullOrWhiteSpace(trackGain) ||
+                   !string.IsNullOrWhiteSpace(albumGain);
         }
         catch
         {
-            return pcmGain;
+            return false;
         }
     }
 
@@ -13939,6 +14255,7 @@ public partial class MainWindow : Window
             _settings.ReplayGainMode        = window.SelectedReplayGainMode;
             _settings.AlwaysConvertDsdToPcm = window.AlwaysConvertDsdToPcm;
             _settings.PcmOutputBoostEnabled = window.PcmOutputBoostEnabled;
+            _settings.NonGaplessCrossfadeSeconds = window.NonGaplessCrossfadeSeconds;
             _settings.EqualizerEnabled      = window.EqualizerEnabled;
             _settings.EqualizerProfile      = window.SelectedEqualizerProfile;
             _settings.EqualizerProfiles     = window.SelectedEqualizerProfiles.ToList();
@@ -14035,6 +14352,7 @@ public partial class MainWindow : Window
                         StringComparison.OrdinalIgnoreCase))
                 {
                     _player.ReplayGainFactor = replayGainFactor;
+                    UpdateReplayGainBadge(_player is DsfAudioPlayer or DffAudioPlayer or RemoteDsfAudioPlayer or RemoteDffAudioPlayer);
                 }
             }
             if (_player is IEqualizerAudioPlayer equalizerPlayer)
@@ -14057,27 +14375,7 @@ public partial class MainWindow : Window
     }
 
     private float GetReplayGainFactorFromDatabase(string filePath)
-    {
-        var pcmGain = GetPcmOutputGainFactor();
-        if (_settings.ReplayGainMode == ReplayGainMode.Off)
-            return pcmGain;
-
-        try
-        {
-            using var db = AudioDatabase.OpenDefault();
-            var track = db.GetByPath(filePath);
-            return track is null
-                ? pcmGain
-                : pcmGain * ReplayGain.GetLinearFactor(
-                    _settings.ReplayGainMode,
-                    track.ReplayGainTrack,
-                    track.ReplayGainAlbum);
-        }
-        catch
-        {
-            return pcmGain;
-        }
-    }
+        => GetReplayGainFactor(filePath);
 
     private static bool PlexServerSettingsEqual(
         IReadOnlyList<PlexServerSettings>? left,

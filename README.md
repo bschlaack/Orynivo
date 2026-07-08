@@ -6,7 +6,7 @@
 
 A native Windows music player and cross-platform music server for local Hi-Fi libraries.
 
-ASIO/WASAPI · DSD/DSF/DFF · Gapless Playback · ReplayGain · Parametric EQ
+cwASIO/Steinberg ASIO/WASAPI · DSD/DSF/DFF · Gapless Playback · ReplayGain · Parametric EQ
 Plex · Radio · Podcasts · AI Chat · MCP Server · Network Streaming
 
 ## Why Orynivo?
@@ -15,8 +15,8 @@ Orynivo is for people who still own and manage a local music library
 and want a modern Windows player with serious audio output support —
 and the ability to reach that library from any device on the local network.
 
-- Bit-perfect/native DSD playback via ASIO
-- Exclusive WASAPI and ASIO output profiles
+- Bit-perfect/native DSD playback via cwASIO or the optional Steinberg ASIO bridge
+- Exclusive WASAPI, cwASIO, and Steinberg ASIO output profiles
 - Gapless playback
 - CUE sheet support
 - ReplayGain and parametric EQ
@@ -29,8 +29,8 @@ and the ability to reach that library from any device on the local network.
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 A native Windows audio player with an Avalonia UI interface, local music
-library, ASIO and WASAPI playback, and built-in AI control via an embedded
-chat and an MCP server.
+library, cwASIO/Steinberg ASIO and WASAPI playback, and built-in AI control
+via an embedded chat and an MCP server.
 
 The application uses the Orynivo wordmark in the startup screen, sidebar, and
 About dialog, plus a multi-resolution Windows application icon based on the
@@ -41,7 +41,7 @@ standalone logo.
 
 ## AI Integration
 
-Orynivo includes two complementary AI interfaces that share the same 19
+Orynivo includes two complementary AI interfaces that share the same 23
 player-control, queue-management, and library tools.
 
 ### Embedded AI Chat
@@ -76,6 +76,10 @@ The model picks the right queue tool automatically: `replace_queue` clears the
 old list and starts playing immediately when the user asks for new content;
 `queue_append` adds to the existing queue when the user wants to add more;
 `clear_queue` empties the queue without interrupting the current track.
+Library search includes configured Orynivo Server libraries as opaque
+`orynivo://serverId/track/trackId` references. Playback and queue tools resolve
+those references inside the app, so API keys and authenticated stream URLs are
+not exposed to the model.
 
 ### MCP Server
 
@@ -136,7 +140,11 @@ works directly in FFmpeg and browser URLs.
 | `PUT /api/artwork/artist/{id}` | Store raw client-selected artist image bytes on the server |
 | `GET /api/playlists` | All playlists (regular and smart) |
 | `GET /api/playlists/{id}/tracks` | Resolved track list (smart playlists are evaluated live) |
+| `POST /api/playlists/{id}/resolve` | Resolve a smart playlist while applying client-side favorite track IDs |
+| `POST /api/playlists/resolve-count` | Return the match count for ad-hoc smart-playlist criteria |
 | `POST /api/playlists` | Create a regular playlist from server-side track IDs |
+| `POST /api/playlists/smart` | Create a smart playlist from criteria |
+| `PUT /api/playlists/{id}/smart` | Update a smart playlist name and criteria |
 | `POST /api/playlists/{id}/tracks` | Append server-side track IDs to a regular playlist |
 | `DELETE /api/playlists/{id}` | Delete a playlist on the server |
 | `DELETE /api/playlist-tracks/{id}` | Remove one entry from a server playlist |
@@ -177,6 +185,10 @@ instead of aborting the complete scan.
 Configured Orynivo Server connections are merged into the main Artists, Albums,
 Tracks, and search-result library views. Rows from a server are marked with an
 optional `OS` source badge that shows the server name as a tooltip.
+The Windows client probes server compatibility in Settings, reports missing
+newer endpoints explicitly, shows the last successful connection time when a
+server is unreachable, and can clear cached remote artwork, track lists, and
+folder trees per server or globally.
 
 ### Running the server
 
@@ -205,19 +217,20 @@ byte-range streaming without FFmpeg.
 
 ## Features
 
-- Playback through ASIO or exclusive-mode WASAPI
+- Playback through cwASIO, the optional Steinberg ASIO bridge, or exclusive-mode WASAPI
 - Automatic PCM down-conversion through `ffmpeg` when the source sample rate
   exceeds the selected ASIO or WASAPI device's capabilities; WASAPI uses the
   highest supported 32-bit float, 24-bit PCM, or 16-bit PCM output format
 - Native stereo DSD playback for local DSF and uncompressed DFF files through
-  ASIO, plus native DSF and uncompressed DFF streaming from an Orynivo Server
-  through HTTP byte ranges. The remote path validates the file header before
-  claiming native DSD output and falls back to DSD-to-PCM when native playback
-  cannot be opened.
+  cwASIO or the optional Steinberg ASIO bridge, plus native DSF and uncompressed
+  DFF streaming from an Orynivo Server through HTTP byte ranges. The remote path
+  validates the file header before claiming native DSD output and falls back to
+  DSD-to-PCM when native playback cannot be opened.
 - Real-time DSF/DFF-to-PCM conversion for playback through WASAPI, with the
   active conversion and PCM sample rate shown in the transport and status bar
-- Optional forced DSF/DFF-to-PCM conversion with ASIO/cwASIO, allowing volume,
-  ReplayGain, and the parametric equalizer to affect DSD sources
+- Optional forced DSF/DFF-to-PCM conversion with cwASIO or Steinberg ASIO,
+  allowing volume, ReplayGain, and the parametric equalizer to affect DSD
+  sources
 - Optional +6 dB PCM output boost for users whose DAC plays native DSD
   noticeably louder than PCM. The boost applies only to PCM playback paths;
   native DSD remains bit-perfect.
@@ -228,9 +241,13 @@ byte-range streaming without FFmpeg.
   a `Default` WASAPI profile from the Windows default multimedia output device
   when no output has been configured yet.
 - Seeking, volume control, pause, and an editable persistent **Up next** queue
-  with play-next/append actions, removal, reordering, playlist saving, and
-  shuffle without repeating a track within the currently loaded queue. The queue
-  is stored in the SQLite library database instead of the JSON settings file.
+  with play-next/append actions, drag-and-drop from track, album, and folder
+  views, removal, reordering, complete clearing, restore-last-queue, playlist
+  saving, and shuffle without repeating a track within the currently loaded
+  queue. The queue is stored in the SQLite library database instead of the JSON
+  settings file.
+- Optional fade transitions can smooth queue advances that are not already
+  handled by the gapless PCM engine.
 - The transport progress control shows a waveform-style peak view for local
   audio files and remote Orynivo Server tracks, caches compact peak data, and
   keeps click/drag seeking on the same timeline. Remote tracks first use the
@@ -278,7 +295,8 @@ byte-range streaming without FFmpeg.
   metadata, album art, playback state, and timeline synchronization
 - Optional ReplayGain volume adjustment for PCM playback, using track or album
   gain metadata with fallback to the other available value; native DSD output
-  remains bit-perfect
+  remains bit-perfect. A small transport badge appears when ReplayGain is active
+  for the current PCM track.
 - Multiple named parametric PCM equalizers with one selected profile, a live
   frequency-response graph, editable preamp, dynamic filter rows, persisted
   on/off state, and Equalizer APO/AutoEQ text-profile import. Preamp, peak,
@@ -320,14 +338,17 @@ byte-range streaming without FFmpeg.
   track lists
 - Artist and album views with table and virtualized artwork modes, including
   Favorites-only filtering in both modes
-- Dashboard with larger recently added album cards, second-precision playback
-  calendar, and linked top genres that open the matching filtered track list
+- Dashboard with recently played cards, mixed local/server recently added
+  albums, most-listened album/artist/genre analytics, a shared period selector,
+  a second-precision playback calendar, and linked genres that open the matching
+  filtered track list
 - Clickable populated calendar days with a modal daily listening history;
   local title, album, and artist links open the corresponding library view,
   and title links immediately start playback
 - Internet radio search through the free Radio Browser directory, direct
   playback, persistent personal stations in the sidebar, station logos, and
-  live ICY title/artist metadata when supplied by the stream
+  live ICY title/artist metadata when supplied by the stream. Radio ICY updates
+  and locally cached station logos are also pushed to the Windows media overlay.
 - Multi-select genre filtering for radio search results using normalized
   station tags, with filter options built from the complete Radio Browser tag
   statistics rather than the first result page; selecting a genre runs a new
@@ -348,11 +369,13 @@ byte-range streaming without FFmpeg.
 - Regular playlists and live smart playlists with metadata, library-age,
   playback-history, ordering, and result-limit criteria
 - Smart playlists are created directly from active track filters and can be
-  refined later through their sidebar context menu
+  refined later through their sidebar context menu. The editor previews the live
+  match count while criteria are changed, including unified local/server counts
+  and server-side counts when the connected Orynivo Server supports them.
 - UTF-8 M3U8 import and export for regular playlists, including relative local
   paths, retained missing-file entries, and HTTP/HTTPS streams; credentialed
   Plex URLs are excluded
-- Gapless sequential PCM playback through ASIO, cwASIO, and exclusive WASAPI:
+- Gapless sequential PCM playback through cwASIO, Steinberg ASIO, and exclusive WASAPI:
   the next FFmpeg decoder is prefetched and handed to the existing output
   session without reopening the audio device
 - Theme-aware table highlighting follows the currently audible track across
@@ -390,6 +413,10 @@ byte-range streaming without FFmpeg.
   stations, pinned podcasts, history, artwork, and configured library directories
 - Modern light and dark themes with neutral surfaces, a shared accent resource,
   cover-derived transport accents, and refined sidebar/table/transport styling
+- Shared vector icons for compact symbol buttons, clearer empty states for
+  missing local libraries, servers, radios, and podcasts, plus a mini context
+  menu on the now-playing cover for opening the album/artist, searching cover
+  art, and toggling the favorite state
 - German, English, French, and Spanish user interfaces
 - Multiple Plex Media Server configurations with protected access tokens and
   music-library discovery, artist/album/track browsing, folder navigation, and
@@ -398,13 +425,10 @@ byte-range streaming without FFmpeg.
 - Provider-neutral streaming interfaces with a prepared Qobuz configuration
   page for future approved partner API access
 - Embedded **MCP server** (Model Context Protocol) that, when enabled under
-  Settings > Integration, exposes 12 player-control and library-search tools
-  to any MCP-compatible AI assistant (e.g. Claude Desktop). Tools cover
-  playback control (`play`, `pause_resume`, `next_track`, `previous_track`,
-  `stop`, `seek`, `set_volume`), queue management (`queue_append`,
-  `queue_play_next`), and library lookup (`get_now_playing`, `get_queue`,
-  `search_library`). The server binds to `localhost` only; the TCP port is
-  configurable (default 49200)
+  Settings > Integration, exposes 23 player, queue, playlist, history, library,
+  and controlled web-browsing tools to any MCP-compatible AI assistant (e.g.
+  Claude Desktop). Tools can be individually enabled or disabled, the server
+  binds to `localhost` only, and the TCP port is configurable (default 49200).
 
 ## Supported Formats
 
@@ -421,11 +445,13 @@ support depends on the build.
 For CUE sheets, Orynivo uses `INDEX 01` boundaries to seek and stop FFmpeg
 within the referenced source file; no temporary split files are created.
 When WASAPI is selected, DSD audio in DSF or DFF containers is converted to PCM
-in real time without creating a temporary file. PCM and converted DSD are
-output at the highest supported endpoint sample rate that does not exceed the
-source rate; if the endpoint exposes only higher rates, its lowest supported
-rate is used. Unsupported sample rates and bit depths are converted by
-`ffmpeg`.
+in real time without creating a temporary file. When cwASIO or the optional
+Steinberg ASIO backend is selected, DSF and uncompressed stereo DFF can be sent
+as native DSD when the driver reports compatible DSD support; otherwise Orynivo
+can fall back to the same FFmpeg-backed DSD-to-PCM path. PCM and converted DSD
+are output at the highest supported endpoint sample rate that does not exceed
+the source rate; if the endpoint exposes only higher rates, its lowest supported
+rate is used. Unsupported sample rates and bit depths are converted by `ffmpeg`.
 
 ## Requirements
 
@@ -584,7 +610,7 @@ the dropdown selects the only profile eligible for active playback. With no
 selection, the editor and import controls remain hidden. Profiles can be
 deleted after confirmation. Edits are previewed during active PCM playback.
 The DSD playback option can force DSF/DFF files through this PCM path even when
-ASIO/cwASIO native DSD is available.
+cwASIO or Steinberg ASIO native DSD is available.
 Available library roots are monitored automatically after configuration.
 File-system events are debounced before updating the database and search index;
 periodic full scans reconcile changes that a watcher may have missed.
@@ -633,6 +659,8 @@ Orynivo stores its local data under `%LOCALAPPDATA%\Orynivo\`:
 - `artist-images\`: cached Wikipedia/Wikimedia artist images
 - `search-index\`: Lucene.NET search index
 - `catalog-filter-cache.json`: cached radio genres and podcast categories/languages
+- `radio-logos\`: cached internet-radio station logos used for robust Windows
+  media-overlay artwork updates
 
 These files are not part of the repository.
 
@@ -665,10 +693,12 @@ artwork, rebasing paths, and rebuilding the search index.
 
 ## Current Limitations
 
-- Native, bit-perfect DSD playback is available only through ASIO. WASAPI can
-  play DSF/DFF by converting the audio to PCM in real time.
-- Builds without the optional ASIO bridge use WASAPI for playback and do not
-  offer ASIO in Settings.
+- Native, bit-perfect DSD playback is available only through cwASIO or the
+  optional Steinberg ASIO bridge. WASAPI can play DSF/DFF by converting the
+  audio to PCM in real time.
+- Builds without the optional Steinberg ASIO SDK still offer ASIO through the
+  vendored MIT-licensed cwASIO bridge. ASIO disappears from Settings only when
+  both native ASIO bridges are unavailable or intentionally skipped.
 - Native DFF playback currently supports only uncompressed stereo files.
 - DST-compressed DFF files are not played natively.
 - Kernel Streaming is represented in the settings model but is not yet

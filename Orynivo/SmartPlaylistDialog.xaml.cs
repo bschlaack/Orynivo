@@ -1,7 +1,9 @@
 using System.Globalization;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Orynivo.Library;
 using Orynivo.Localization;
 
@@ -13,12 +15,22 @@ namespace Orynivo;
 public partial class SmartPlaylistDialog : Window
 {
     private readonly SmartPlaylistCriteria _initialCriteria;
+    private DispatcherTimer? _previewTimer;
+    private CancellationTokenSource? _previewCts;
 
     /// <summary>Gets the confirmed playlist name.</summary>
     public string? PlaylistName { get; private set; }
 
     /// <summary>Gets the confirmed smart-playlist criteria.</summary>
     public SmartPlaylistCriteria? Criteria { get; private set; }
+
+    /// <summary>
+    /// Gets or sets an optional resolver that counts how many tracks match the current criteria,
+    /// used for the live preview. When <see langword="null"/> the preview line stays hidden
+    /// (e.g. for remote smart playlists that cannot be resolved ad hoc). Set by the caller
+    /// before the dialog is shown.
+    /// </summary>
+    public Func<SmartPlaylistCriteria, CancellationToken, Task<int?>>? CountResolver { get; set; }
 
     /// <summary>
     /// Initializes a runtime-loader instance with empty criteria.
@@ -40,10 +52,12 @@ public partial class SmartPlaylistDialog : Window
         NameTextBox.Text = playlistName;
         CreateButton.IsEnabled = !string.IsNullOrWhiteSpace(playlistName);
         PopulateFields();
+        WirePreviewTriggers();
         Opened += (_, _) =>
         {
             WindowChrome.ApplyTheme(this);
             NameTextBox.Focus();
+            SchedulePreview();
         };
         KeyDown += (_, e) =>
         {
@@ -101,6 +115,19 @@ public partial class SmartPlaylistDialog : Window
 
     private bool TryBuildCriteria(out SmartPlaylistCriteria criteria)
     {
+        if (TryBuildCriteriaCore(out criteria))
+        {
+            ValidationTextBlock.IsVisible = false;
+            return true;
+        }
+
+        ValidationTextBlock.Text = LocalizationManager.Current.InvalidSmartPlaylistCriteria;
+        ValidationTextBlock.IsVisible = true;
+        return false;
+    }
+
+    private bool TryBuildCriteriaCore(out SmartPlaylistCriteria criteria)
+    {
         criteria = new SmartPlaylistCriteria();
         if (!TryOptionalInt(MinimumYearTextBox.Text, out var minimumYear) ||
             !TryOptionalInt(MaximumYearTextBox.Text, out var maximumYear) ||
@@ -127,12 +154,9 @@ public partial class SmartPlaylistDialog : Window
             (NeverPlayedCheckBox.IsChecked == true &&
              (playedWithinDays.HasValue || minimumPlayCount is > 0)))
         {
-            ValidationTextBlock.Text = LocalizationManager.Current.InvalidSmartPlaylistCriteria;
-            ValidationTextBlock.IsVisible = true;
             return false;
         }
 
-        ValidationTextBlock.IsVisible = false;
         criteria = new SmartPlaylistCriteria
         {
             FavoritesOnly = FavoritesOnlyCheckBox.IsChecked == true,
@@ -161,6 +185,84 @@ public partial class SmartPlaylistDialog : Window
             ResultLimit = resultLimit
         };
         return true;
+    }
+
+    /// <summary>Subscribes every criteria input to the debounced live-preview refresh.</summary>
+    private void WirePreviewTriggers()
+    {
+        TextBox[] textBoxes =
+        [
+            SearchTextTextBox, GenresTextBox, FormatsTextBox, BitratesTextBox, SourcesTextBox,
+            MinimumYearTextBox, MaximumYearTextBox, ArtistTextBox, AlbumTextBox,
+            MinimumDurationTextBox, MaximumDurationTextBox, AddedWithinDaysTextBox,
+            PlayedWithinDaysTextBox, MinimumPlayCountTextBox, MaximumPlayCountTextBox, ResultLimitTextBox
+        ];
+        foreach (var box in textBoxes)
+            box.TextChanged += (_, _) => SchedulePreview();
+
+        FavoritesOnlyCheckBox.IsCheckedChanged += (_, _) => SchedulePreview();
+        NeverPlayedCheckBox.IsCheckedChanged += (_, _) => SchedulePreview();
+        SortOrderComboBox.SelectionChanged += (_, _) => SchedulePreview();
+    }
+
+    /// <summary>Restarts the debounce timer so the preview updates shortly after typing stops.</summary>
+    private void SchedulePreview()
+    {
+        if (CountResolver is null)
+            return;
+        _previewTimer ??= CreatePreviewTimer();
+        _previewTimer.Stop();
+        _previewTimer.Start();
+    }
+
+    private DispatcherTimer CreatePreviewTimer()
+    {
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            _ = UpdatePreviewAsync();
+        };
+        return timer;
+    }
+
+    /// <summary>Resolves the current criteria to a match count and shows it in the preview line.</summary>
+    /// <returns>A task representing the asynchronous preview refresh.</returns>
+    private async Task UpdatePreviewAsync()
+    {
+        if (CountResolver is null)
+        {
+            PreviewTextBlock.IsVisible = false;
+            return;
+        }
+
+        PreviewTextBlock.IsVisible = true;
+        if (!TryBuildCriteriaCore(out var criteria))
+        {
+            PreviewTextBlock.Text = LocalizationManager.Current.SmartPlaylistPreviewInvalid;
+            return;
+        }
+
+        _previewCts?.Cancel();
+        _previewCts?.Dispose();
+        _previewCts = new CancellationTokenSource();
+        var ct = _previewCts.Token;
+
+        PreviewTextBlock.Text = LocalizationManager.Current.SmartPlaylistPreviewComputing;
+        try
+        {
+            var count = await CountResolver(criteria, ct);
+            if (ct.IsCancellationRequested)
+                return;
+            PreviewTextBlock.Text = count.HasValue
+                ? string.Format(LocalizationManager.Current.SmartPlaylistPreviewCount, count.Value)
+                : string.Empty;
+        }
+        catch (OperationCanceledException) { }
+        catch
+        {
+            PreviewTextBlock.Text = string.Empty;
+        }
     }
 
     private static List<string> ParseStringList(string? value) =>

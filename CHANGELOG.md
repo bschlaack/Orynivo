@@ -8,6 +8,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Smart-playlist editor live preview: while editing a smart playlist's criteria,
+  a debounced preview line shows how many tracks currently match, resolved the
+  same way the playlist actually opens. A locally stored smart playlist counts
+  across the unified library (local plus every configured Orynivo Server), so
+  server-sourced criteria are no longer counted as zero; a server-stored one is
+  resolved on that server via a new `/api/playlists/resolve-count` endpoint
+  (older servers simply show no preview).
+- "Restore last queue": when the queue is replaced by a completely different
+  selection, the outgoing queue is remembered and can be restored from a header
+  button in the Up Next view (the restore is reversible).
+- Added an Up Next header button for clearing the complete queue without stopping
+  the currently playing track.
+- Drag & drop into the queue: track rows, album rows, and folder nodes — local
+  and remote Orynivo Server alike — can be dragged onto the "Up Next" sidebar item
+  to append them (remote albums/folders resolve to their tracks on drop);
+  album artwork cards can now be dragged as well.
+- Added an optional fade transition for queue advances that are not handled by
+  the gapless PCM engine, plus a small transport badge when ReplayGain is active
+  for the current PCM track.
+- Radio playback now refreshes Windows media-overlay metadata after ICY title
+  changes and after the station logo has been downloaded into a local SMTC-safe
+  cache file.
 - Remote Orynivo Server compatibility display: each server row in Settings now
   probes the newer feature endpoints and concretely reports what an older server
   is missing ("Server does not support: Track facets, Recent albums, Waveforms").
@@ -51,12 +73,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   when a server cannot be reached.
 - Split several `MainWindow` domains into dedicated partial files for dashboard,
   history, playlists, internet radio, and Orynivo Server navigation code.
-- Replaced several small text/emoji glyph buttons with shared vector icon
-  geometries and expanded empty-state text for missing library, radio, and
-  podcast sources.
+- Replaced several small text/emoji glyph buttons, including transport actions,
+  with shared vector icon geometries and expanded empty-state text for missing
+  library, radio, and podcast sources.
+- Updated the README to reflect current queue, smart-playlist, dashboard, MCP,
+  remote Orynivo Server, and cwASIO/native-DSD capabilities.
 
 ### Fixed
 
+- Fixed dragging albums onto the "Up Next" sidebar item restarting the current
+  gapless playback session and potentially surfacing a cancellation exception
+  instead of visibly updating the queue.
 - AI chat: assistant messages now render inline Markdown (bold, italic, inline
   code, and links) as styled text instead of showing raw `**markers**`, including
   inside numbered and bulleted lists and block quotes.

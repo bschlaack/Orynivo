@@ -299,6 +299,24 @@ public static class LibraryEndpoints
             return ResolveSmartPlaylistTracks(db, playlist, favoriteOverride);
         });
 
+        api.MapPost("/playlists/resolve-count", (SmartCriteriaResolveRequest request) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.Criteria))
+                return Results.BadRequest();
+            SmartPlaylistCriteria? criteria;
+            try { criteria = JsonSerializer.Deserialize<SmartPlaylistCriteria>(request.Criteria); }
+            catch { return Results.BadRequest(new { error = "Invalid smart playlist criteria." }); }
+            if (criteria is null)
+                return Results.BadRequest();
+
+            using var db = AudioDatabase.OpenDefault();
+            var favoriteOverride = new HashSet<long>(request.FavoriteTrackIds ?? []);
+            var candidates = db.GetSmartPlaylistTracks()
+                .Select(t => t with { IsFavorite = favoriteOverride.Contains(t.Id) })
+                .ToList();
+            return Results.Ok(new { Count = criteria.Resolve(candidates).Count });
+        });
+
         api.MapPost("/playlists", (PlaylistCreateRequest request) =>
         {
             var name = request.Name?.Trim();
@@ -648,3 +666,8 @@ public sealed record SmartPlaylistSaveRequest(string? Name, string? FilterCriter
 /// <summary>Request body for resolving a smart playlist with client-side favourite state.</summary>
 /// <param name="FavoriteTrackIds">Track IDs the requesting client treats as favourites.</param>
 public sealed record SmartPlaylistResolveRequest(IReadOnlyList<long>? FavoriteTrackIds);
+
+/// <summary>Request body for counting matches of ad-hoc smart-playlist criteria (editor live preview).</summary>
+/// <param name="Criteria">Serialized <see cref="SmartPlaylistCriteria"/> JSON.</param>
+/// <param name="FavoriteTrackIds">Track IDs the requesting client treats as favourites.</param>
+public sealed record SmartCriteriaResolveRequest(string? Criteria, IReadOnlyList<long>? FavoriteTrackIds);

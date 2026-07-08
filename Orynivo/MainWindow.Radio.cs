@@ -358,6 +358,7 @@ public partial class MainWindow : Window
         RadioNowPlayingDescription.Text = BuildRadioDescription(station, info, null);
         RadioNowPlayingLogo.Source = null;
         NowPlayingArtworkImage.Source = null;
+        _currentRadioArtworkPath = null;
         _ = LoadRadioLogoAsync(station.Favicon, _playbackCts?.Token ?? CancellationToken.None);
     }
 
@@ -475,8 +476,10 @@ public partial class MainWindow : Window
             var image = new Bitmap(stream);
             if (!cancellationToken.IsCancellationRequested)
             {
+                _currentRadioArtworkPath = CacheRadioLogo(uri, bytes);
                 RadioNowPlayingLogo.Source = image;
                 NowPlayingArtworkImage.Source = image;
+                RefreshWindowsMediaMetadata();
             }
         }
         catch
@@ -485,9 +488,30 @@ public partial class MainWindow : Window
         }
     }
 
+    private static string? CacheRadioLogo(Uri uri, byte[] bytes)
+    {
+        try
+        {
+            var directory = AppPaths.GetDataPath("radio-logos");
+            Directory.CreateDirectory(directory);
+            var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(uri.AbsoluteUri)));
+            var extension = Path.GetExtension(uri.AbsolutePath);
+            if (string.IsNullOrWhiteSpace(extension) || extension.Length > 8)
+                extension = ".jpg";
+            var path = Path.Combine(directory, $"{hash}{extension}");
+            File.WriteAllBytes(path, bytes);
+            return path;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private void ClearRadioNowPlaying()
     {
         RadioNowPlayingPanel.IsVisible = false;
+        _currentRadioArtworkPath = null;
         RadioNowPlayingLogo.Source = null;
         RadioNowPlayingStation.Text = string.Empty;
         RadioNowPlayingTitle.Text = string.Empty;

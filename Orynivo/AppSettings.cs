@@ -40,6 +40,8 @@ public sealed class AppSettings
     public bool AlwaysConvertDsdToPcm { get; set; }
     /// <summary>Gets or sets a value indicating whether PCM playback receives an additional +6 dB output boost.</summary>
     public bool PcmOutputBoostEnabled { get; set; }
+    /// <summary>Gets or sets the fade duration used when advancing non-gapless queues, in seconds.</summary>
+    public double NonGaplessCrossfadeSeconds { get; set; }
     /// <summary>Gets or sets a value indicating whether the imported PCM equalizer profile is active.</summary>
     public bool EqualizerEnabled { get; set; }
     /// <summary>Gets or sets the selected Equalizer APO or AutoEQ profile compatibility snapshot.</summary>

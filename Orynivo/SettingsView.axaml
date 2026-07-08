@@ -464,6 +464,23 @@
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"/>
 
+                    <TextBlock Text="{DynamicResource L_NonGaplessCrossfade}"
+                               FontSize="{DynamicResource FontSizeCaption}"
+                               FontWeight="SemiBold"
+                               Margin="0,18,0,6"/>
+                    <NumericUpDown x:Name="NonGaplessCrossfadeNumericUpDown"
+                                   Minimum="0"
+                                   Maximum="10"
+                                   Increment="0.5"
+                                   FormatString="0.0"
+                                   Height="30"
+                                   HorizontalAlignment="Stretch"
+                                   Margin="0,0,0,8"/>
+                    <TextBlock Text="{DynamicResource L_NonGaplessCrossfadeHint}"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"/>
+
                     <Separator Margin="0,18,0,14"/>
 
                     <TextBlock Text="{DynamicResource L_ReplayGain}"

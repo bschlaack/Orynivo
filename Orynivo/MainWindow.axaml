@@ -1290,8 +1290,27 @@
                                 <TextBlock Text="{DynamicResource L_SaveSmartPlaylist}" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
-                        <Button x:Name="SaveQueueAsPlaylistButton"
+                        <Button x:Name="RestoreQueueButton"
+                                Grid.Column="4"
+                                Margin="8,0,0,0"
+                                Padding="12,5"
+                                VerticalAlignment="Center"
+                                IsVisible="False"
+                                Theme="{StaticResource HeaderFilterButtonTheme}"
+                                ToolTip.Tip="{DynamicResource L_RestoreQueueTooltip}"
+                                Content="{DynamicResource L_RestoreQueue}"
+                                Click="RestoreQueueButton_OnClick"/>
+                        <Button x:Name="ClearQueueButton"
                                 Grid.Column="5"
+                                Margin="8,0,0,0"
+                                Padding="12,5"
+                                VerticalAlignment="Center"
+                                IsVisible="False"
+                                Theme="{StaticResource HeaderFilterButtonTheme}"
+                                Content="{DynamicResource L_ClearQueue}"
+                                Click="ClearQueueButton_OnClick"/>
+                        <Button x:Name="SaveQueueAsPlaylistButton"
+                                Grid.Column="6"
                                 Margin="8,0,0,0"
                                 Padding="12,5"
                                 VerticalAlignment="Center"
@@ -3113,7 +3132,7 @@
                                 <MenuItem Header="{DynamicResource L_ToggleFavorite}"
                                           Click="NowPlayingCoverFavoriteMenuItem_OnClick">
                                     <MenuItem.Icon>
-                                        <Path Width="16" Height="16" Data="M12,20 C5,15 3,11 5,7.8 C7,5.2 10.2,6 12,8.4 C13.8,6 17,5.2 19,7.8 C21,11 19,15 12,20 Z"
+                                        <Path Width="16" Height="16" Stretch="Uniform" Data="{StaticResource IconFavorite}"
                                               Stroke="{DynamicResource AppFavoriteBrush}"
                                               StrokeThickness="1.7"
                                               Fill="Transparent"
@@ -3147,9 +3166,24 @@
                                 Theme="{StaticResource EntityLinkButtonTheme}"
                                 Click="NowPlayingArtistButton_OnClick"/>
                         <TextBlock x:Name="NowPlayingArtistBlock" IsVisible="False"/>
-                        <TextBlock x:Name="FileInfoTextBlock"
-                                   Foreground="{DynamicResource AppMutedTextBrush}" FontSize="{DynamicResource FontSizeMeta}" Margin="0,2,0,0"
-                                   TextTrimming="CharacterEllipsis"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                            <Border x:Name="ReplayGainBadgeBorder"
+                                    IsVisible="False"
+                                    Margin="0,0,6,0"
+                                    Padding="5,1"
+                                    CornerRadius="4"
+                                    Background="{DynamicResource AppAccentBrush}"
+                                    VerticalAlignment="Center">
+                                <TextBlock Text="{DynamicResource L_ReplayGainBadge}"
+                                           Foreground="{DynamicResource AppAccentTextBrush}"
+                                           FontSize="{DynamicResource FontSizeMeta}"
+                                           FontWeight="SemiBold"/>
+                            </Border>
+                            <TextBlock x:Name="FileInfoTextBlock"
+                                       Foreground="{DynamicResource AppMutedTextBrush}"
+                                       FontSize="{DynamicResource FontSizeMeta}"
+                                       TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
                     </StackPanel>
                 </Grid>
 
@@ -3228,11 +3262,9 @@
                                     IsEnabled="False"
                                     ToolTip.Tip="{DynamicResource L_ShowArtistInfo}"
                                     Click="ArtistInfoButton_OnClick">
-                                <TextBlock Text="i"
-                                           FontFamily="Segoe UI"
-                                           FontStyle="Italic"
-                                           FontWeight="Bold"
-                                           FontSize="{DynamicResource FontSizeBodyStrong}"/>
+                                <Path Width="15" Height="15" Stretch="Uniform"
+                                      Data="{StaticResource IconInfo}"
+                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                             </Button>
                             <Button x:Name="LyricsButton"
                                     Theme="{StaticResource TransportBtnTheme}"
@@ -3240,7 +3272,9 @@
                                     IsEnabled="False"
                                     ToolTip.Tip="{DynamicResource L_ShowLyrics}"
                                     Click="LyricsButton_OnClick">
-                                <TextBlock Text="♪" FontSize="{DynamicResource FontSizeSubtitle}"/>
+                                <Path Width="16" Height="16" Stretch="Uniform"
+                                      Data="{StaticResource IconLyrics}"
+                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                             </Button>
                             <Button x:Name="NowPlayingFavoriteButton"
                                     Theme="{StaticResource TransportBtnTheme}"
@@ -3252,7 +3286,9 @@
                                            Text="♡"
                                            FontFamily="Segoe UI Symbol"
                                            Foreground="{DynamicResource AppFavoriteBrush}"
-                                           FontSize="{DynamicResource FontSizeSubtitle}"/>
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontSize="15"/>
                             </Button>
                             <Button x:Name="ShuffleButton"
                                     Theme="{StaticResource TransportBtnTheme}"

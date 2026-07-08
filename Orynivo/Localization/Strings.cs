@@ -203,6 +203,12 @@ public sealed record LocalizedStrings(
     public string ReplayGainTrack { get; init; } = "";
     /// <summary>Gets the album ReplayGain mode label.</summary>
     public string ReplayGainAlbum { get; init; } = "";
+    /// <summary>Gets the settings label for non-gapless queue fade transitions.</summary>
+    public string NonGaplessCrossfade { get; init; } = "";
+    /// <summary>Gets the explanatory text for non-gapless queue fade transitions.</summary>
+    public string NonGaplessCrossfadeHint { get; init; } = "";
+    /// <summary>Gets the short transport badge text shown while ReplayGain is active.</summary>
+    public string ReplayGainBadge { get; init; } = "";
     /// <summary>Gets the DSD playback settings heading.</summary>
     public string DsdPlayback { get; init; } = "";
     /// <summary>Gets the option label for forcing DSD sources through PCM conversion.</summary>
@@ -386,6 +392,22 @@ public sealed record LocalizedStrings(
     public string RemoteScanning { get; init; } = "";
     /// <summary>Gets the sidebar status with file progress while a remote server scans ({0} = server, {1} = current, {2} = total).</summary>
     public string RemoteScanningWithCount { get; init; } = "";
+    /// <summary>Gets the smart-playlist editor live-preview match count ({0} = count).</summary>
+    public string SmartPlaylistPreviewCount { get; init; } = "";
+    /// <summary>Gets the smart-playlist editor preview status while the count is being computed.</summary>
+    public string SmartPlaylistPreviewComputing { get; init; } = "";
+    /// <summary>Gets the smart-playlist editor preview status when the criteria are invalid.</summary>
+    public string SmartPlaylistPreviewInvalid { get; init; } = "";
+    /// <summary>Gets the Up Next "restore last queue" button label.</summary>
+    public string RestoreQueue { get; init; } = "";
+    /// <summary>Gets the Up Next "restore last queue" button tooltip.</summary>
+    public string RestoreQueueTooltip { get; init; } = "";
+    /// <summary>Gets the status shown when there is no previous queue to restore.</summary>
+    public string NoPreviousQueue { get; init; } = "";
+    /// <summary>Gets the Up Next action label for clearing the complete queue.</summary>
+    public string ClearQueue { get; init; } = "";
+    /// <summary>Gets the status shown after the queue has been cleared.</summary>
+    public string QueueCleared { get; init; } = "";
     /// <summary>Gets the dashboard "recently played" section title.</summary>
     public string RecentlyPlayed { get; init; } = "";
     /// <summary>Gets the dashboard morning greeting.</summary>

@@ -2899,6 +2899,33 @@ public sealed class AudioDatabase : IDisposable
         transaction.Commit();
     }
 
+    /// <summary>
+    /// Returns the paths of the previously playing queue, captured the last time the queue was
+    /// replaced wholesale, so it can be restored on demand. Empty when no snapshot exists.
+    /// </summary>
+    /// <returns>The previous queue's ordered paths, or an empty list.</returns>
+    public IReadOnlyList<string> GetPreviousPlaybackQueue()
+    {
+        var json = GetMeta("previous_playback_queue");
+        if (string.IsNullOrWhiteSpace(json))
+            return [];
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<List<string>>(json) ?? [];
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    /// <summary>Stores the paths of the queue that was just replaced, for later restoration.</summary>
+    /// <param name="paths">The previous queue's ordered paths.</param>
+    public void SavePreviousPlaybackQueue(IReadOnlyList<string> paths)
+    {
+        SetMeta("previous_playback_queue", System.Text.Json.JsonSerializer.Serialize(paths));
+    }
+
     public long CreateSmartPlaylist(string name, string filterCriteria)
     {
         long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();

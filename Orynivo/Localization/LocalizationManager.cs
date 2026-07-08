@@ -171,6 +171,9 @@ public static class LocalizationManager
         resources["L_OutputProfileDeleteConfirm"] = Current.OutputProfileDeleteConfirm;
         resources["L_ReplayGain"] = Current.ReplayGain;
         resources["L_ReplayGainHint"] = Current.ReplayGainHint;
+        resources["L_NonGaplessCrossfade"] = Current.NonGaplessCrossfade;
+        resources["L_NonGaplessCrossfadeHint"] = Current.NonGaplessCrossfadeHint;
+        resources["L_ReplayGainBadge"] = Current.ReplayGainBadge;
         resources["L_DsdPlayback"] = Current.DsdPlayback;
         resources["L_AlwaysConvertDsdToPcm"] = Current.AlwaysConvertDsdToPcm;
         resources["L_AlwaysConvertDsdToPcmHint"] = Current.AlwaysConvertDsdToPcmHint;
@@ -346,6 +349,9 @@ public static class LocalizationManager
         resources["L_AiChatNotEnabled"]        = Current.AiChatNotEnabled;
         resources["L_RemoteCache"]             = Current.RemoteCache;
         resources["L_ClearRemoteCacheAll"]     = Current.ClearRemoteCacheAll;
+        resources["L_RestoreQueue"]            = Current.RestoreQueue;
+        resources["L_RestoreQueueTooltip"]     = Current.RestoreQueueTooltip;
+        resources["L_ClearQueue"]              = Current.ClearQueue;
         resources["L_AiChatEmptyResponse"]     = Current.AiChatEmptyResponse;
         resources["L_AiChatToolResultFallback"] = Current.AiChatToolResultFallback;
     }
@@ -458,6 +464,9 @@ public static class LocalizationManager
         ReplayGainOff = "Aus",
         ReplayGainTrack = "Track",
         ReplayGainAlbum = "Album",
+        NonGaplessCrossfade = "Fade für nicht-gapless Queues (Sekunden)",
+        NonGaplessCrossfadeHint = "0 deaktiviert den Übergang. Gilt nur für Queue-Wechsel, die nicht bereits über die Gapless-PCM-Engine laufen.",
+        ReplayGainBadge = "RG",
         DsdPlayback = "DSD-Wiedergabe",
         AlwaysConvertDsdToPcm = "DSD-Dateien immer in PCM umwandeln",
         AlwaysConvertDsdToPcmHint = "Verwendet auch mit ASIO/cwASIO den PCM-Pfad, damit Lautstärke, ReplayGain und Equalizer wirken. Bei deaktivierter Option bleibt native DSD-Ausgabe bitgenau.",
@@ -531,6 +540,14 @@ public static class LocalizationManager
         ClearCache = "Cache leeren",
         RemoteScanning = "{0} wird aktualisiert…",
         RemoteScanningWithCount = "{0} wird aktualisiert… {1} / {2} Dateien",
+        SmartPlaylistPreviewCount = "{0} Tracks passen",
+        SmartPlaylistPreviewComputing = "Wird berechnet…",
+        SmartPlaylistPreviewInvalid = "Ungültige Kriterien",
+        RestoreQueue = "Letzte Queue",
+        RestoreQueueTooltip = "Zuletzt gespielte Queue wiederherstellen",
+        NoPreviousQueue = "Keine vorherige Queue vorhanden.",
+        ClearQueue = "Queue leeren",
+        QueueCleared = "Queue geleert.",
         NoData = "Keine Daten vorhanden.",
         RecentlyPlayed = "Zuletzt gespielt",
         GreetingMorning = "Guten Morgen",
@@ -924,6 +941,9 @@ public static class LocalizationManager
         ReplayGain = "ReplayGain volume adjustment",
         ReplayGainHint = "Applies to PCM playback. Track mode prefers track gain; album mode prefers album gain. Native DSD output remains bit-perfect.",
         ReplayGainOff = "Off", ReplayGainTrack = "Track", ReplayGainAlbum = "Album",
+        NonGaplessCrossfade = "Fade for non-gapless queues (seconds)",
+        NonGaplessCrossfadeHint = "0 disables the transition. Applies only to queue changes that are not already handled by the gapless PCM engine.",
+        ReplayGainBadge = "RG",
         DsdPlayback = "DSD playback",
         AlwaysConvertDsdToPcm = "Always convert DSD files to PCM",
         AlwaysConvertDsdToPcmHint = "Uses the PCM path with ASIO/cwASIO as well, allowing volume, ReplayGain, and the equalizer to apply. With this option disabled, native DSD output remains bit-perfect.",
@@ -995,6 +1015,14 @@ public static class LocalizationManager
         ClearCache = "Clear cache",
         RemoteScanning = "Updating {0}…",
         RemoteScanningWithCount = "Updating {0}… {1} / {2} files",
+        SmartPlaylistPreviewCount = "{0} tracks match",
+        SmartPlaylistPreviewComputing = "Computing…",
+        SmartPlaylistPreviewInvalid = "Invalid criteria",
+        RestoreQueue = "Last queue",
+        RestoreQueueTooltip = "Restore the last played queue",
+        NoPreviousQueue = "No previous queue available.",
+        ClearQueue = "Clear queue",
+        QueueCleared = "Queue cleared.",
         NoData = "No data available.",
         RecentlyPlayed = "Recently played",
         GreetingMorning = "Good morning", GreetingAfternoon = "Good afternoon", GreetingEvening = "Good evening",
@@ -1386,6 +1414,9 @@ public static class LocalizationManager
         ReplayGain = "Ajustement du volume ReplayGain",
         ReplayGainHint = "S’applique à la lecture PCM. Le mode piste privilégie le gain de piste, le mode album le gain d’album. La sortie DSD native reste bit-perfect.",
         ReplayGainOff = "Désactivé", ReplayGainTrack = "Piste", ReplayGainAlbum = "Album",
+        NonGaplessCrossfade = "Fondu pour files non gapless (secondes)",
+        NonGaplessCrossfadeHint = "0 désactive la transition. S’applique uniquement aux changements de file qui ne passent pas déjà par le moteur PCM gapless.",
+        ReplayGainBadge = "RG",
         DsdPlayback = "Lecture DSD",
         AlwaysConvertDsdToPcm = "Toujours convertir les fichiers DSD en PCM",
         AlwaysConvertDsdToPcmHint = "Utilise également le chemin PCM avec ASIO/cwASIO afin d’appliquer le volume, ReplayGain et l’égaliseur. Lorsque cette option est désactivée, la sortie DSD native reste bit-perfect.",
@@ -1457,6 +1488,14 @@ public static class LocalizationManager
         ClearCache = "Vider le cache",
         RemoteScanning = "Mise à jour de {0}…",
         RemoteScanningWithCount = "Mise à jour de {0}… {1} / {2} fichiers",
+        SmartPlaylistPreviewCount = "{0} pistes correspondent",
+        SmartPlaylistPreviewComputing = "Calcul…",
+        SmartPlaylistPreviewInvalid = "Critères non valides",
+        RestoreQueue = "Dernière file",
+        RestoreQueueTooltip = "Restaurer la dernière file d’attente lue",
+        NoPreviousQueue = "Aucune file d’attente précédente.",
+        ClearQueue = "Vider la file",
+        QueueCleared = "File d’attente vidée.",
         NoData = "Aucune donnée disponible.",
         RecentlyPlayed = "Écoutés récemment",
         GreetingMorning = "Bonjour", GreetingAfternoon = "Bon après-midi", GreetingEvening = "Bonsoir",
@@ -1845,6 +1884,9 @@ public static class LocalizationManager
         ReplayGain = "Ajuste de volumen ReplayGain",
         ReplayGainHint = "Se aplica a la reproducción PCM. El modo pista prioriza la ganancia de pista y el modo álbum la ganancia de álbum. La salida DSD nativa sigue siendo bit-perfect.",
         ReplayGainOff = "Desactivado", ReplayGainTrack = "Pista", ReplayGainAlbum = "Álbum",
+        NonGaplessCrossfade = "Fundido para colas sin gapless (segundos)",
+        NonGaplessCrossfadeHint = "0 desactiva la transición. Solo se aplica a cambios de cola que no usa ya el motor PCM gapless.",
+        ReplayGainBadge = "RG",
         DsdPlayback = "Reproducción DSD",
         AlwaysConvertDsdToPcm = "Convertir siempre los archivos DSD a PCM",
         AlwaysConvertDsdToPcmHint = "También usa la ruta PCM con ASIO/cwASIO para aplicar volumen, ReplayGain y ecualizador. Con esta opción desactivada, la salida DSD nativa sigue siendo bit-perfect.",
@@ -1916,6 +1958,14 @@ public static class LocalizationManager
         ClearCache = "Vaciar caché",
         RemoteScanning = "Actualizando {0}…",
         RemoteScanningWithCount = "Actualizando {0}… {1} / {2} archivos",
+        SmartPlaylistPreviewCount = "{0} pistas coinciden",
+        SmartPlaylistPreviewComputing = "Calculando…",
+        SmartPlaylistPreviewInvalid = "Criterios no válidos",
+        RestoreQueue = "Última cola",
+        RestoreQueueTooltip = "Restaurar la última cola reproducida",
+        NoPreviousQueue = "No hay ninguna cola anterior.",
+        ClearQueue = "Vaciar cola",
+        QueueCleared = "Cola vaciada.",
         NoData = "No hay datos disponibles.",
         RecentlyPlayed = "Reproducidos recientemente",
         GreetingMorning = "Buenos días", GreetingAfternoon = "Buenas tardes", GreetingEvening = "Buenas noches",

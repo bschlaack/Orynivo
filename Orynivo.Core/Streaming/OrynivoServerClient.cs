@@ -233,6 +233,15 @@ public sealed record OrynivoSmartPlaylistSaveRequest(string Name, string FilterC
 /// <param name="FavoriteTrackIds">Server-side track IDs the client treats as favourites.</param>
 public sealed record OrynivoSmartPlaylistResolveRequest(IReadOnlyList<long> FavoriteTrackIds);
 
+/// <summary>Request body for counting how many server tracks match ad-hoc smart-playlist criteria.</summary>
+/// <param name="Criteria">Serialized smart-playlist criteria JSON.</param>
+/// <param name="FavoriteTrackIds">Server-side track IDs the client treats as favourites.</param>
+public sealed record OrynivoSmartCriteriaResolveRequest(string Criteria, IReadOnlyList<long> FavoriteTrackIds);
+
+/// <summary>Match-count response returned by the smart-criteria resolve endpoint.</summary>
+/// <param name="Count">Number of tracks that match the supplied criteria.</param>
+public sealed record OrynivoSmartCriteriaCount(int Count);
+
 /// <summary>Server info returned by <c>/api/info</c>.</summary>
 public sealed record OrynivoServerInfo(
     string Name,
@@ -722,6 +731,39 @@ public sealed class OrynivoServerClient : IDisposable
             return await response.Content.ReadFromJsonAsync<List<OrynivoPlaylistTrackInfo>>(JsonOptions, cancellationToken) ?? [];
         }
         catch { return []; }
+    }
+
+    /// <summary>
+    /// Counts how many of the server's tracks match ad-hoc smart-playlist criteria, for the
+    /// editor's live preview. Returns <see langword="null"/> when the server does not support
+    /// the resolve-count endpoint (older servers) or the request fails.
+    /// </summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="criteriaJson">Serialized smart-playlist criteria JSON.</param>
+    /// <param name="favoriteTrackIds">Client-side favourite track IDs used for a FavoritesOnly criterion.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The number of matching tracks, or <see langword="null"/>.</returns>
+    public async Task<int?> ResolveSmartPlaylistCountAsync(
+        OrynivoServerSettings server,
+        string criteriaJson,
+        IReadOnlyList<long> favoriteTrackIds,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, BuildUrl(server, "/api/playlists/resolve-count"))
+            {
+                Content = JsonContent.Create(
+                    new OrynivoSmartCriteriaResolveRequest(criteriaJson, favoriteTrackIds), options: JsonOptions)
+            };
+            request.Headers.Add("X-Api-Key", server.ApiKey);
+            using var response = await _http.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+                return null;
+            var result = await response.Content.ReadFromJsonAsync<OrynivoSmartCriteriaCount>(JsonOptions, cancellationToken);
+            return result?.Count;
+        }
+        catch { return null; }
     }
 
     /// <summary>Creates a smart playlist on the remote server.</summary>

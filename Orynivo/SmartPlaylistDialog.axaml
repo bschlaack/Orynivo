@@ -293,23 +293,32 @@
             </StackPanel>
         </ScrollViewer>
 
-        <StackPanel Grid.Row="1"
-                    Orientation="Horizontal"
-                    HorizontalAlignment="Right"
-                    Margin="0,20,0,0">
-            <Button Content="{DynamicResource L_Cancel}"
-                    Width="104"
-                    Height="34"
-                    Margin="0,0,8,0"
-                    Theme="{StaticResource SmartPlaylistButtonTheme}"
-                    Click="CancelButton_OnClick"/>
-            <Button x:Name="CreateButton"
-                    Content="{DynamicResource L_Save}"
-                    Width="164"
-                    Height="34"
-                    IsEnabled="False"
-                    Theme="{StaticResource SmartPlaylistButtonTheme}"
-                    Click="CreateButton_OnClick"/>
-        </StackPanel>
+        <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,20,0,0">
+            <TextBlock x:Name="PreviewTextBlock"
+                       Grid.Column="0"
+                       IsVisible="False"
+                       VerticalAlignment="Center"
+                       FontSize="{DynamicResource FontSizeCaption}"
+                       FontWeight="SemiBold"
+                       TextTrimming="CharacterEllipsis"
+                       Foreground="{DynamicResource AppAccentBrush}"/>
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right">
+                <Button Content="{DynamicResource L_Cancel}"
+                        Width="104"
+                        Height="34"
+                        Margin="0,0,8,0"
+                        Theme="{StaticResource SmartPlaylistButtonTheme}"
+                        Click="CancelButton_OnClick"/>
+                <Button x:Name="CreateButton"
+                        Content="{DynamicResource L_Save}"
+                        Width="164"
+                        Height="34"
+                        IsEnabled="False"
+                        Theme="{StaticResource SmartPlaylistButtonTheme}"
+                        Click="CreateButton_OnClick"/>
+            </StackPanel>
+        </Grid>
     </Grid>
 </Window>
