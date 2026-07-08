@@ -25,6 +25,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   playback-history dialog; only the categories present that day are shown.
 - AI chat messages are now copyable: text is selectable (Ctrl+C) and each user
   and assistant bubble has a copy button that copies the whole message.
+- Added a mini context menu to the now-playing cover for opening the current
+  album or artist, searching album artwork, and toggling the current favorite.
 - Playback history now stores a stable Plex context (server plus track, album, and
   artist rating keys) so Plex history entries stay identifiable and their albums
   and artists are clickable throughout the history and dashboard statistics.
@@ -40,6 +42,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   when a server cannot be reached.
 - Split several `MainWindow` domains into dedicated partial files for dashboard,
   history, playlists, internet radio, and Orynivo Server navigation code.
+- Replaced several small text/emoji glyph buttons with shared vector icon
+  geometries and expanded empty-state text for missing library, radio, and
+  podcast sources.
 
 ### Fixed
 

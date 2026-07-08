@@ -1178,14 +1178,18 @@ public partial class MainWindow : Window
         {
             using var db = AudioDatabase.OpenDefault();
             var podcastHeaderIndex = NavListBox.Items.IndexOf(MyPodcastsHeaderItem);
-            foreach (var radio in db.GetRadioStations())
+            var savedRadios = db.GetRadioStations().ToList();
+            if (savedRadios.Count == 0 && podcastHeaderIndex >= 0)
+            {
+                NavListBox.Items.Insert(podcastHeaderIndex++, CreateSidebarHintItem(
+                    "Radio:EmptyHint",
+                    LocalizationManager.Current.OwnRadiosEmptyHint));
+            }
+
+            foreach (var radio in savedRadios)
             {
                 var content = new StackPanel { Orientation = Orientation.Horizontal };
-                content.Children.Add(new TextBlock
-                {
-                    Text = "◉ ",
-                    Foreground = new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF))
-                });
+                content.Children.Add(CreateSidebarIcon("IconRadio"));
                 content.Children.Add(CreateSidebarEntryText(radio.Name));
 
                 NavListBox.Items.Insert(podcastHeaderIndex++, new ListBoxItem
@@ -1198,14 +1202,18 @@ public partial class MainWindow : Window
             }
 
             var plexHeaderIndex = NavListBox.Items.IndexOf(PlexHeaderItem);
-            foreach (var podcast in db.GetPodcasts())
+            var savedPodcasts = db.GetPodcasts().ToList();
+            if (savedPodcasts.Count == 0 && plexHeaderIndex >= 0)
+            {
+                NavListBox.Items.Insert(plexHeaderIndex++, CreateSidebarHintItem(
+                    "Podcast:EmptyHint",
+                    LocalizationManager.Current.MyPodcastsEmptyHint));
+            }
+
+            foreach (var podcast in savedPodcasts)
             {
                 var content = new StackPanel { Orientation = Orientation.Horizontal };
-                content.Children.Add(new TextBlock
-                {
-                    Text = "◍ ",
-                    Foreground = new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF))
-                });
+                content.Children.Add(CreateSidebarIcon("IconPodcast"));
                 content.Children.Add(CreateSidebarEntryText(podcast.Name));
 
                 NavListBox.Items.Insert(plexHeaderIndex++, new ListBoxItem
@@ -1349,6 +1357,39 @@ public partial class MainWindow : Window
         var tb = new TextBlock { Text = text };
         tb.Classes.Add("navItemText");
         return tb;
+    }
+
+    private AvaloniaPath CreateSidebarIcon(string resourceKey)
+    {
+        return new AvaloniaPath
+        {
+            Width = 13,
+            Height = 13,
+            Margin = new Thickness(0, 0, 7, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Data = FindResource<Geometry>(resourceKey),
+            Stroke = new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF)),
+            StrokeThickness = 1.6,
+            StrokeLineCap = PenLineCap.Round,
+            StrokeJoin = PenLineJoin.Round
+        };
+    }
+
+    private ListBoxItem CreateSidebarHintItem(string tag, string text)
+    {
+        var hint = CreateSidebarEntryText(text);
+        hint.Margin = new Thickness(16, 0, 8, 0);
+        hint.TextWrapping = TextWrapping.Wrap;
+        hint.Foreground = FindResource<IBrush>("AppMutedTextBrush");
+        hint.FontSize = ResolveFontSize("FontSizeMeta");
+        return new ListBoxItem
+        {
+            Content = hint,
+            Tag = tag,
+            IsHitTestVisible = false,
+            Focusable = false,
+            Theme = FindResource<ControlTheme>("NavItemTheme")
+        };
     }
 
     private Grid CreateLibraryGroupHeader(string title, bool isExpanded, double leftIndent = 0)
@@ -2116,7 +2157,10 @@ public partial class MainWindow : Window
                 InternetRadioView.IsVisible = true;
                 await EnsureRadioFilterCatalogAsync();
                 if (RadioStationsDataGrid.ItemsSource is null)
-                    await SearchRadioStationsAsync();
+                {
+                    RadioStatusTextBlock.Text = LocalizationManager.Current.RadioEmptyState;
+                    RadioStatusTextBlock.IsVisible = true;
+                }
             }
             else if (tag == "Podcasts")
             {
@@ -2127,6 +2171,11 @@ public partial class MainWindow : Window
                 PodcastView.IsVisible = true;
                 PodcastEpisodesView.IsVisible = false;
                 await EnsurePodcastFilterCatalogAsync();
+                if (PodcastsDataGrid.ItemsSource is null)
+                {
+                    PodcastStatusTextBlock.Text = LocalizationManager.Current.PodcastEmptyState;
+                    PodcastStatusTextBlock.IsVisible = true;
+                }
             }
             else if (tag == "Queue")
             {
@@ -7593,27 +7642,42 @@ public partial class MainWindow : Window
     private async void NowPlayingArtistButton_OnClick(object? sender, RoutedEventArgs e)
     {
         e.Handled = true;
-
-        // A remote server track navigates within its own server library; its server
-        // and artist ID are carried on the now-playing row (local artist IDs would
-        // open an unrelated local artist).
-        if (_currentOrynivoTrackRow is { OrynivoServer: { } server, ArtistId: long remoteArtistId })
-        {
-            _activeOrynivoServer = server;
-            await OpenOrynivoArtistAlbumsAsync(remoteArtistId, _currentArtistName);
-            return;
-        }
-
-        if (_currentArtistId is long artistId)
-            await ShowArtistAlbumsAsync(
-                artistId,
-                _currentArtistName ?? LocalizationManager.Current.Unknown);
+        await OpenNowPlayingArtistAsync();
     }
 
     private async void NowPlayingAlbumButton_OnClick(object? sender, RoutedEventArgs e)
     {
         e.Handled = true;
 
+        await OpenNowPlayingAlbumAsync();
+    }
+
+    private async void NowPlayingCoverOpenAlbumMenuItem_OnClick(object? sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        await OpenNowPlayingAlbumAsync();
+    }
+
+    private async void NowPlayingCoverOpenArtistMenuItem_OnClick(object? sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        await OpenNowPlayingArtistAsync();
+    }
+
+    private async void NowPlayingCoverSearchMenuItem_OnClick(object? sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        await SearchNowPlayingCoverAsync();
+    }
+
+    private void NowPlayingCoverFavoriteMenuItem_OnClick(object? sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        NowPlayingFavoriteButton_OnClick(sender, e);
+    }
+
+    private async Task OpenNowPlayingAlbumAsync()
+    {
         if (_currentOrynivoTrackRow is { OrynivoServer: { } server, AlbumId: long remoteAlbumId })
         {
             _activeOrynivoServer = server;
@@ -7628,6 +7692,56 @@ public partial class MainWindow : Window
             await ShowAlbumTracksAsync(
                 albumId,
                 _currentAlbumTitle ?? LocalizationManager.Current.Unknown);
+    }
+
+    private async Task OpenNowPlayingArtistAsync()
+    {
+        if (_currentOrynivoTrackRow is { OrynivoServer: { } server, ArtistId: long remoteArtistId })
+        {
+            _activeOrynivoServer = server;
+            await OpenOrynivoArtistAlbumsAsync(remoteArtistId, _currentArtistName);
+            return;
+        }
+
+        if (_currentArtistId is long artistId)
+            await ShowArtistAlbumsAsync(
+                artistId,
+                _currentArtistName ?? LocalizationManager.Current.Unknown);
+    }
+
+    private async Task SearchNowPlayingCoverAsync()
+    {
+        if (_currentOrynivoTrackRow is { OrynivoServer: { } server, AlbumId: long remoteAlbumId })
+        {
+            var row = new ContentRow
+            {
+                Id = remoteAlbumId,
+                Title = _currentOrynivoTrackRow.Album ?? _currentAlbumTitle ?? LocalizationManager.Current.Unknown,
+                Artist = _currentOrynivoTrackRow.Artist,
+                AlbumArtist = _currentOrynivoTrackRow.AlbumArtist,
+                EntityType = "OrynivoAlbum",
+                ExternalId = remoteAlbumId.ToString(CultureInfo.InvariantCulture),
+                OrynivoServer = server
+            };
+            await OpenOrynivoAlbumCoverSearchAsync(server, remoteAlbumId, row);
+            NowPlayingArtworkImage.Source = row.Thumbnail ?? row.Artwork ?? NowPlayingArtworkImage.Source;
+            LyricsBackgroundImage.Source = row.Artwork ?? row.Thumbnail ?? LyricsBackgroundImage.Source;
+            return;
+        }
+
+        if (_currentAlbumId is not long albumId)
+            return;
+
+        var localRow = new ContentRow
+        {
+            Id = albumId,
+            Title = _currentAlbumTitle ?? LocalizationManager.Current.Unknown,
+            Artist = _currentArtistName,
+            EntityType = "Album"
+        };
+        await OpenCoverSearchAsync(localRow);
+        NowPlayingArtworkImage.Source = localRow.Thumbnail ?? localRow.Artwork ?? NowPlayingArtworkImage.Source;
+        LyricsBackgroundImage.Source = localRow.Artwork ?? localRow.Thumbnail ?? LyricsBackgroundImage.Source;
     }
 
     private void SetNowPlayingAlbum(string? albumTitle, long? albumId, bool canNavigate)

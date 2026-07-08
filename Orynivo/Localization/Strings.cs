@@ -183,6 +183,12 @@ public sealed record LocalizedStrings(
     public string SearchIndexFailed { get; init; } = "";
     public string Back { get; init; } = "";
     public string MarkAsFavorite { get; init; } = "";
+    /// <summary>Gets the context-menu action for opening the current album.</summary>
+    public string OpenAlbum { get; init; } = "";
+    /// <summary>Gets the context-menu action for opening the current artist.</summary>
+    public string OpenArtist { get; init; } = "";
+    /// <summary>Gets the context-menu action for toggling the current favorite state.</summary>
+    public string ToggleFavorite { get; init; } = "";
     public string PlaybackThrough { get; init; } = "";
     public string PlaybackThroughWithDsdConversion { get; init; } = "";
     public string NativeDsdOutput { get; init; } = "";
@@ -459,6 +465,10 @@ public sealed record LocalizedStrings(
     public string DeleteRadio { get; init; } = "";
     public string RadioLoading { get; init; } = "";
     public string RadioNoResults { get; init; } = "";
+    /// <summary>Gets the empty-state text shown before an internet-radio search is run.</summary>
+    public string RadioEmptyState { get; init; } = "";
+    /// <summary>Gets the sidebar hint shown when no personal radio station is saved.</summary>
+    public string OwnRadiosEmptyHint { get; init; } = "";
     public string RadioAdded { get; init; } = "";
     public string RadioDeleted { get; init; } = "";
     public string RadioSearchFailed { get; init; } = "";
@@ -478,6 +488,10 @@ public sealed record LocalizedStrings(
     public string DeletePodcast { get; init; } = "";
     public string PodcastLoading { get; init; } = "";
     public string PodcastNoResults { get; init; } = "";
+    /// <summary>Gets the empty-state text shown before a podcast search is run.</summary>
+    public string PodcastEmptyState { get; init; } = "";
+    /// <summary>Gets the sidebar hint shown when no podcast is pinned.</summary>
+    public string MyPodcastsEmptyHint { get; init; } = "";
     public string PodcastAdded { get; init; } = "";
     public string PodcastDeleted { get; init; } = "";
     public string PodcastSearchFailed { get; init; } = "";

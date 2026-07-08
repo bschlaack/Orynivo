@@ -200,6 +200,9 @@ public static class LocalizationManager
         resources["L_NormalizeArtistsHint"] = Current.NormalizeArtistsHint;
         resources["L_Back"] = Current.Back;
         resources["L_MarkAsFavorite"] = Current.MarkAsFavorite;
+        resources["L_OpenAlbum"] = Current.OpenAlbum;
+        resources["L_OpenArtist"] = Current.OpenArtist;
+        resources["L_ToggleFavorite"] = Current.ToggleFavorite;
         resources["L_DevicePcmSampleRates"] = Current.DevicePcmSampleRates;
         resources["L_DeviceDsdRates"] = Current.DeviceDsdRates;
         resources["L_DevicePcmFormats"] = Current.DevicePcmFormats;
@@ -248,6 +251,8 @@ public static class LocalizationManager
         resources["L_DeleteRadio"] = Current.DeleteRadio;
         resources["L_RadioNowPlaying"] = Current.RadioNowPlaying;
         resources["L_RadioGenres"] = Current.RadioGenres;
+        resources["L_RadioEmptyState"] = Current.RadioEmptyState;
+        resources["L_OwnRadiosEmptyHint"] = Current.OwnRadiosEmptyHint;
         resources["L_ClearFilter"] = Current.ClearFilter;
         resources["L_Podcasts"] = Current.Podcasts;
         resources["L_MyPodcasts"] = Current.MyPodcasts;
@@ -287,6 +292,8 @@ public static class LocalizationManager
         resources["L_PodcastDirectory"] = Current.PodcastDirectory;
         resources["L_PodcastDirectoryHint"] = Current.PodcastDirectoryHint;
         resources["L_PodcastSearch"] = Current.PodcastSearch;
+        resources["L_PodcastEmptyState"] = Current.PodcastEmptyState;
+        resources["L_MyPodcastsEmptyHint"] = Current.MyPodcastsEmptyHint;
         resources["L_Podcast"] = Current.Podcast;
         resources["L_PodcastAuthor"] = Current.PodcastAuthor;
         resources["L_PlayLatestEpisode"] = Current.PlayLatestEpisode;
@@ -437,6 +444,9 @@ public static class LocalizationManager
         SearchIndexFailed = "Suchindex konnte nicht aktualisiert werden: {0}",
         Back = "Zurück",
         MarkAsFavorite = "Als Favorit markieren",
+        OpenAlbum = "Album öffnen",
+        OpenArtist = "Künstler öffnen",
+        ToggleFavorite = "Favorit umschalten",
         PlaybackThrough = "Wiedergabe über {0}",
         PlaybackThroughWithDsdConversion = "Wiedergabe über {0} · DSD wird in PCM ({1:N0} Hz) konvertiert",
         NativeDsdOutput = "DSD nativ",
@@ -607,6 +617,8 @@ public static class LocalizationManager
         , DeleteRadio = "Sender löschen"
         , RadioLoading = "Radiosender werden geladen …"
         , RadioNoResults = "Keine passenden Radiosender gefunden."
+        , RadioEmptyState = "Suche nach Sendername, Land oder Genre, oder speichere gefundene Sender unter „Eigene Radios“."
+        , OwnRadiosEmptyHint = "Noch keine eigenen Radios gespeichert. Suche im Internetradio-Verzeichnis und füge Sender hinzu."
         , RadioAdded = "Radiosender „{0}“ wurde hinzugefügt."
         , RadioDeleted = "Radiosender „{0}“ wurde gelöscht."
         , RadioSearchFailed = "Radiosender konnten nicht geladen werden."
@@ -619,6 +631,7 @@ public static class LocalizationManager
         , PodcastDirectory = "Podcasts entdecken"
         , PodcastDirectoryHint = "Durchsuche das Apple-Podcast-Verzeichnis, pinne Podcasts dauerhaft an und spiele die neueste Episode aus dem RSS-Feed ab."
         , PodcastSearch = "Podcasts suchen"
+        , PodcastEmptyState = "Suche nach einem Podcast, filtere nach Kategorie oder Sprache und pinne Favoriten unter „Meine Podcasts“."
         , Podcast = "Podcast"
         , PodcastAuthor = "Autor"
         , PlayLatestEpisode = "Neueste abspielen"
@@ -626,6 +639,7 @@ public static class LocalizationManager
         , DeletePodcast = "Podcast löschen"
         , PodcastLoading = "Podcasts werden geladen …"
         , PodcastNoResults = "Keine passenden Podcasts gefunden."
+        , MyPodcastsEmptyHint = "Noch keine Podcasts angepinnt. Suche im Podcast-Verzeichnis und füge Podcasts hinzu."
         , PodcastAdded = "Podcast „{0}“ wurde hinzugefügt."
         , PodcastDeleted = "Podcast „{0}“ wurde gelöscht."
         , PodcastSearchFailed = "Podcasts konnten nicht geladen werden."
@@ -750,7 +764,7 @@ public static class LocalizationManager
         , CreateSmartPlaylist = "Smart-Playlist erstellen"
         , InvalidSmartPlaylistCriteria = "Bitte gültige Zahlen und widerspruchsfreie Mindest-/Maximalwerte eingeben. „Noch nie gespielt“ kann nicht mit einer kürzlichen Wiedergabe oder einer Mindestanzahl kombiniert werden."
         , EditSmartPlaylist = "Smart-Playlist bearbeiten"
-        , LibraryEmptyHint = "Noch keine Medienquelle eingerichtet. Lege in den Einstellungen lokale Verzeichnisse oder einen oder mehrere Orynivo Server an."
+        , LibraryEmptyHint = "Noch keine Medienquelle eingerichtet. Öffne Einstellungen > Bibliothek, füge lokale Musikordner hinzu oder verbinde einen Orynivo Server."
         , SmartPlaylistUpdated = "Smart-Playlist »{0}« aktualisiert."
         , ImportM3u8Playlist = "M3U8-Playlist importieren"
         , ExportM3u8Playlist = "Als M3U8 exportieren"
@@ -889,6 +903,9 @@ public static class LocalizationManager
         SearchIndexReady = "Search index is up to date.",
         SearchIndexFailed = "Search index could not be updated: {0}",
         Back = "Back", MarkAsFavorite = "Mark as favorite",
+        OpenAlbum = "Open album",
+        OpenArtist = "Open artist",
+        ToggleFavorite = "Toggle favorite",
         PlaybackThrough = "Playback through {0}",
         PlaybackThroughWithDsdConversion = "Playback through {0} · DSD is converted to PCM ({1:N0} Hz)",
         NativeDsdOutput = "Native DSD", DsdToPcmOutput = "DSD → PCM",
@@ -1049,6 +1066,8 @@ public static class LocalizationManager
         , DeleteRadio = "Delete station"
         , RadioLoading = "Loading radio stations …"
         , RadioNoResults = "No matching radio stations found."
+        , RadioEmptyState = "Search by station name, country, or genre, or save discovered stations under “Own radios”."
+        , OwnRadiosEmptyHint = "No saved radio stations yet. Search the internet radio directory and add stations here."
         , RadioAdded = "Radio station “{0}” was added."
         , RadioDeleted = "Radio station “{0}” was deleted."
         , RadioSearchFailed = "Radio stations could not be loaded."
@@ -1061,6 +1080,7 @@ public static class LocalizationManager
         , PodcastDirectory = "Discover podcasts"
         , PodcastDirectoryHint = "Search the Apple Podcasts directory, pin podcasts permanently, and play the latest episode from the RSS feed."
         , PodcastSearch = "Search podcasts"
+        , PodcastEmptyState = "Search for a podcast, filter by category or language, and pin favorites under “My podcasts”."
         , Podcast = "Podcast"
         , PodcastAuthor = "Author"
         , PlayLatestEpisode = "Play latest"
@@ -1068,6 +1088,7 @@ public static class LocalizationManager
         , DeletePodcast = "Delete podcast"
         , PodcastLoading = "Loading podcasts …"
         , PodcastNoResults = "No matching podcasts found."
+        , MyPodcastsEmptyHint = "No pinned podcasts yet. Search the podcast directory and add podcasts here."
         , PodcastAdded = "Podcast “{0}” was added."
         , PodcastDeleted = "Podcast “{0}” was deleted."
         , PodcastSearchFailed = "Podcasts could not be loaded."
@@ -1192,7 +1213,7 @@ public static class LocalizationManager
         , CreateSmartPlaylist = "Create smart playlist"
         , InvalidSmartPlaylistCriteria = "Enter valid numbers and consistent minimum/maximum values. “Never played” cannot be combined with recent playback or a positive minimum play count."
         , EditSmartPlaylist = "Edit smart playlist"
-        , LibraryEmptyHint = "No media source configured yet. Add local directories or one or more Orynivo Servers in the settings."
+        , LibraryEmptyHint = "No media source is configured yet. Open Settings > Library, add local music folders, or connect an Orynivo Server."
         , SmartPlaylistUpdated = "Smart playlist '{0}' updated."
         , ImportM3u8Playlist = "Import M3U8 playlist"
         , ExportM3u8Playlist = "Export as M3U8"
@@ -1334,6 +1355,9 @@ public static class LocalizationManager
         SearchIndexReady = "L’index de recherche est à jour.",
         SearchIndexFailed = "L’index de recherche n’a pas pu être mis à jour : {0}",
         Back = "Retour", MarkAsFavorite = "Ajouter aux favoris",
+        OpenAlbum = "Ouvrir l’album",
+        OpenArtist = "Ouvrir l’artiste",
+        ToggleFavorite = "Basculer le favori",
         PlaybackThrough = "Lecture via {0}",
         PlaybackThroughWithDsdConversion = "Lecture via {0} · Le DSD est converti en PCM ({1:N0} Hz)",
         NativeDsdOutput = "DSD natif", DsdToPcmOutput = "DSD → PCM",
@@ -1494,6 +1518,8 @@ public static class LocalizationManager
         , DeleteRadio = "Supprimer la station"
         , RadioLoading = "Chargement des stations de radio …"
         , RadioNoResults = "Aucune station de radio correspondante trouvée."
+        , RadioEmptyState = "Recherchez par nom de station, pays ou genre, ou enregistrez des stations dans « Mes radios »."
+        , OwnRadiosEmptyHint = "Aucune radio enregistrée. Recherchez dans l’annuaire de radio Internet et ajoutez des stations ici."
         , RadioAdded = "La station « {0} » a été ajoutée."
         , RadioDeleted = "La station « {0} » a été supprimée."
         , RadioSearchFailed = "Impossible de charger les stations de radio."
@@ -1506,6 +1532,7 @@ public static class LocalizationManager
         , PodcastDirectory = "Découvrir des podcasts"
         , PodcastDirectoryHint = "Recherchez dans l’annuaire Apple Podcasts, épinglez durablement des podcasts et écoutez le dernier épisode du flux RSS."
         , PodcastSearch = "Rechercher des podcasts"
+        , PodcastEmptyState = "Recherchez un podcast, filtrez par catégorie ou langue, puis épinglez vos favoris dans « Mes podcasts »."
         , Podcast = "Podcast"
         , PodcastAuthor = "Auteur"
         , PlayLatestEpisode = "Écouter le dernier"
@@ -1513,6 +1540,7 @@ public static class LocalizationManager
         , DeletePodcast = "Supprimer le podcast"
         , PodcastLoading = "Chargement des podcasts …"
         , PodcastNoResults = "Aucun podcast correspondant trouvé."
+        , MyPodcastsEmptyHint = "Aucun podcast épinglé. Recherchez dans l’annuaire de podcasts et ajoutez-en ici."
         , PodcastAdded = "Le podcast « {0} » a été ajouté."
         , PodcastDeleted = "Le podcast « {0} » a été supprimé."
         , PodcastSearchFailed = "Impossible de charger les podcasts."
@@ -1637,7 +1665,7 @@ public static class LocalizationManager
         , CreateSmartPlaylist = "Créer la playlist intelligente"
         , InvalidSmartPlaylistCriteria = "Saisissez des nombres valides et des valeurs minimum/maximum cohérentes. « Jamais lu » ne peut pas être combiné avec une lecture récente ou un minimum de lectures positif."
         , EditSmartPlaylist = "Modifier la playlist intelligente"
-        , LibraryEmptyHint = "Aucune source multimédia configurée. Ajoutez des répertoires locaux ou un ou plusieurs serveurs Orynivo dans les paramètres."
+        , LibraryEmptyHint = "Aucune source multimédia configurée. Ouvrez Paramètres > Bibliothèque, ajoutez des dossiers musicaux locaux ou connectez un serveur Orynivo."
         , SmartPlaylistUpdated = "Playlist intelligente « {0} » mise à jour."
         , ImportM3u8Playlist = "Importer une playlist M3U8"
         , ExportM3u8Playlist = "Exporter au format M3U8"
@@ -1776,6 +1804,9 @@ public static class LocalizationManager
         SearchIndexReady = "El índice de búsqueda está actualizado.",
         SearchIndexFailed = "No se pudo actualizar el índice de búsqueda: {0}",
         Back = "Atrás", MarkAsFavorite = "Marcar como favorita",
+        OpenAlbum = "Abrir álbum",
+        OpenArtist = "Abrir artista",
+        ToggleFavorite = "Alternar favorito",
         PlaybackThrough = "Reproducción mediante {0}",
         PlaybackThroughWithDsdConversion = "Reproducción mediante {0} · DSD se convierte a PCM ({1:N0} Hz)",
         NativeDsdOutput = "DSD nativo", DsdToPcmOutput = "DSD → PCM",
@@ -1936,6 +1967,8 @@ public static class LocalizationManager
         , DeleteRadio = "Eliminar emisora"
         , RadioLoading = "Cargando emisoras de radio …"
         , RadioNoResults = "No se encontraron emisoras de radio coincidentes."
+        , RadioEmptyState = "Busca por nombre de emisora, país o género, o guarda emisoras encontradas en «Mis radios»."
+        , OwnRadiosEmptyHint = "Aún no hay emisoras guardadas. Busca en el directorio de radio por Internet y añade emisoras aquí."
         , RadioAdded = "Se añadió la emisora «{0}»."
         , RadioDeleted = "Se eliminó la emisora «{0}»."
         , RadioSearchFailed = "No se pudieron cargar las emisoras de radio."
@@ -1948,6 +1981,7 @@ public static class LocalizationManager
         , PodcastDirectory = "Descubrir podcasts"
         , PodcastDirectoryHint = "Busca en el directorio de Apple Podcasts, fija podcasts de forma permanente y reproduce el episodio más reciente del canal RSS."
         , PodcastSearch = "Buscar podcasts"
+        , PodcastEmptyState = "Busca un podcast, filtra por categoría o idioma y fija favoritos en «Mis podcasts»."
         , Podcast = "Podcast"
         , PodcastAuthor = "Autor"
         , PlayLatestEpisode = "Reproducir el último"
@@ -1955,6 +1989,7 @@ public static class LocalizationManager
         , DeletePodcast = "Eliminar podcast"
         , PodcastLoading = "Cargando podcasts …"
         , PodcastNoResults = "No se encontraron podcasts coincidentes."
+        , MyPodcastsEmptyHint = "Aún no hay podcasts fijados. Busca en el directorio de podcasts y añádelos aquí."
         , PodcastAdded = "Se añadió el podcast «{0}»."
         , PodcastDeleted = "Se eliminó el podcast «{0}»."
         , PodcastSearchFailed = "No se pudieron cargar los podcasts."
@@ -2079,7 +2114,7 @@ public static class LocalizationManager
         , CreateSmartPlaylist = "Crear lista inteligente"
         , InvalidSmartPlaylistCriteria = "Introduce números válidos y valores mínimos/máximos coherentes. «Nunca reproducido» no puede combinarse con reproducción reciente ni con un mínimo positivo de reproducciones."
         , EditSmartPlaylist = "Editar lista inteligente"
-        , LibraryEmptyHint = "Aún no hay ninguna fuente multimedia configurada. Añade directorios locales o uno o varios servidores Orynivo en los ajustes."
+        , LibraryEmptyHint = "Aún no hay ninguna fuente multimedia configurada. Abre Ajustes > Biblioteca, añade carpetas de música locales o conecta un servidor Orynivo."
         , SmartPlaylistUpdated = "Lista inteligente '{0}' actualizada."
         , ImportM3u8Playlist = "Importar lista M3U8"
         , ExportM3u8Playlist = "Exportar como M3U8"

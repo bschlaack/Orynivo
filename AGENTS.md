@@ -1312,8 +1312,10 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
 - WASAPI playback position subtracts frames still queued in
   `BufferedWaveProvider`, so transport time, history, and synchronized lyrics
   follow audible output instead of producer progress
-- Transport uses custom vector icons for previous, play/pause, and next;
-  unavailable queue directions are disabled
+- Transport uses custom vector icons for previous, play/pause, next, secondary
+  action buttons, quick-picker settings, and volume; unavailable queue
+  directions are disabled. Small UI icons should use shared `StreamGeometry`
+  resources from `App.axaml` instead of text glyphs or emoji.
 - Seeking is implemented for ASIO PCM, WASAPI PCM, DSF, and DFF
 - Loading a file or folder builds a playback queue; completion advances automatically
 - Sequential PCM queues use one persistent ASIO/cwASIO or exclusive WASAPI
@@ -1472,9 +1474,12 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   floating card) showing 72 × 72 px rounded album artwork, track information,
   favorite state, playback controls, position, volume, and two quick-pick
   buttons (EQ and Output) below the volume control. The EQ popup contains a
-  profile ComboBox, a ⚙ settings button, and a themed enable/disable checkbox
+  profile ComboBox, a vector settings button, and a themed enable/disable checkbox
   (`PopupCheckBoxTheme`). The Output popup contains a profile ComboBox and a
-  ⚙ settings button. Both buttons use vector SVG path icons and tooltips.
+  vector settings button. Both buttons use vector path icons and tooltips.
+  Right-clicking the now-playing cover opens a compact themed menu for opening
+  the current album or artist, searching album artwork, and toggling the
+  current track favorite.
 - The transport uses a cover-derived accent brush (`AppTransportAccentBrush`,
   default `#6C63FF`) for the position-slider progress fill/thumb and the
   play/pause button background. `UpdateTransportAccentFromArtwork` recomputes it
@@ -1571,6 +1576,8 @@ asynchronous file I/O from the UI thread
   hard-coded assumption such as white text. Check dark and light themes before
   accepting new color combinations.
 - Empty artwork areas use a dedicated placeholder resource
+- Empty library, radio, and podcast states should explain the next useful
+  setup or discovery action instead of only reporting that no rows exist.
 - Tables, lists, and trees must not expose default-white backgrounds in dark mode
 - DataGrid and ScrollViewer backgrounds are overridden via Avalonia styles in
   `MainWindow.axaml`
