@@ -111,6 +111,13 @@ public partial class MainWindow : Window
     private AppSettings _settings = new();
     private LibraryWatcherService? _libraryWatcher;
     private int _libraryWatcherRefreshPending;
+    private bool _libraryScanActive;
+    private DateTime _lastLibraryActivityUiUpdate;
+    private bool _libraryRefreshAvailable;
+    private string? _localScanText;
+    private string? _remoteScanText;
+    private bool _remoteScanPollInProgress;
+    private DispatcherTimer? _remoteScanPollTimer;
     private readonly DispatcherTimer _transportTimer;
     private bool _isSeekingWithSlider;
     private DateTimeOffset _positionSliderSeekStartedAt;
@@ -195,10 +202,12 @@ public partial class MainWindow : Window
     private int _shuffleHistoryPosition = -1;
     private string _currentFilePath = string.Empty;
     private RadioStationRecord? _currentRadioStation;
+    private string? _currentRadioArtworkPath;
     private PodcastPlayback? _currentPodcastPlayback;
     private PodcastRecord? _activePodcast;
     private DateTimeOffset _lastPodcastProgressSave = DateTimeOffset.MinValue;
     private TimeSpan _currentPlaybackDuration;
+    private bool _nonGaplessFadeTransitionInProgress;
     private long? _currentAlbumId;
     private string? _currentAlbumTitle;
     private CancellationTokenSource? _lyricsCts;
@@ -222,6 +231,7 @@ public partial class MainWindow : Window
 
     private int _dashboardYear;
     private int _dashboardMonth;
+    private StatsPeriod _dashboardStatsPeriod = StatsPeriod.AllTime;
     private StackPanel? _calendarInner;
     private bool _dashboardResizeHooked;
     private bool? _dashboardTwoColumnLayout;
@@ -389,6 +399,12 @@ public partial class MainWindow : Window
         public bool ImageIsManual { get; set; }
         public string EntityType { get; set; } = "Track";
         public string? ExternalId { get; init; }
+        /// <summary>Gets the Plex server identifier a Plex track/album/artist row belongs to, or <see langword="null"/>.</summary>
+        public string? PlexServerId { get; init; }
+        /// <summary>Gets the Plex album (parent) rating key for a Plex track row, or <see langword="null"/>.</summary>
+        public string? PlexAlbumRatingKey { get; init; }
+        /// <summary>Gets the Plex artist (grandparent) rating key for a Plex track row, or <see langword="null"/>.</summary>
+        public string? PlexArtistRatingKey { get; init; }
         public OrynivoServerSettings? OrynivoServer { get; set; }
         public string SourceKey => OrynivoServer is null ? LocalSourceKey : GetServerSourceKey(OrynivoServer.Id);
         public string SourceBadge => OrynivoServer is null ? LocalizationManager.Current.LocalSourceShort : "OS";
@@ -540,10 +556,18 @@ public partial class MainWindow : Window
         using (StartupTimingLog.Time("MainWindow.RestorePlaybackQueueState"))
             RestorePlaybackQueueState();
         LogUiDiagnostics("MainWindow RestorePlaybackQueueState completed");
-        _libraryWatcher = new LibraryWatcherService(OnWatchedLibraryChanged);
+        _libraryWatcher = new LibraryWatcherService(OnWatchedLibraryChanged, OnLibraryScanActivity);
         using (StartupTimingLog.Time("MainWindow.LibraryWatcher.UpdatePaths"))
             _libraryWatcher.UpdatePaths(_settings.LibraryPaths ?? []);
         LogUiDiagnostics("MainWindow LibraryWatcher.UpdatePaths completed");
+
+        // Poll configured remote servers for in-progress scans so their progress shows in the
+        // sidebar activity line without blocking or reloading the current view.
+        _remoteScanPollTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(12) };
+        _remoteScanPollTimer.Tick += (_, _) => _ = PollRemoteServerScansAsync();
+        _remoteScanPollTimer.Start();
+
+        SetupQueueDragAndDrop();
         using (StartupTimingLog.Time("MainWindow.RestoreFixedDataGridColumnWidths"))
             RestoreFixedDataGridColumnWidths();
         using (StartupTimingLog.Time("MainWindow.AttachDataGridColumnChoosers"))
@@ -696,15 +720,7 @@ public partial class MainWindow : Window
             RefreshQueueNavigationButtons();
             await RefreshActiveGaplessQueueAsync();
         };
-        _mcpBridge.ClearQueueFunc = () =>
-        {
-            _queue.Clear();
-            _queueIndex = -1;
-            ResetQueuePlaybackState();
-            PersistPlaybackQueue();
-            RefreshQueueRowsIfVisible();
-            RefreshQueueNavigationButtons();
-        };
+        _mcpBridge.ClearQueueFunc = () => ClearPlaybackQueue();
         _mcpBridge.ReplaceQueueFunc = async paths =>
         {
             _queue.Clear();
@@ -719,6 +735,49 @@ public partial class MainWindow : Window
                 await StartPlaybackAsync(paths[0]);
         };
         _mcpBridge.RefreshPlaylistsFunc = LoadNavPlaylists;
+        _mcpBridge.GetOrynivoServersFunc = () => _settings.OrynivoServers ?? [];
+        _mcpBridge.ResolveRemoteTrackFunc = ResolveRemoteMcpTrackAsync;
+    }
+
+    /// <summary>
+    /// Resolves a path supplied by an MCP/AI tool into a playable path. A remote Orynivo
+    /// Server reference (<c>orynivo://serverId/track/trackId</c>) is resolved to the real
+    /// authenticated stream URL, and the track's metadata is registered in
+    /// <see cref="_orynivoTracksByUrl"/> so the transport, history, lyrics, and favorite
+    /// button work exactly like a track opened from the UI. Any other path is returned
+    /// unchanged so local files and already-real URLs pass straight through.
+    /// </summary>
+    /// <param name="path">The tool-supplied path or remote reference.</param>
+    /// <returns>The playable path, or <see langword="null"/> when a remote reference cannot be resolved.</returns>
+    private async Task<string?> ResolveRemoteMcpTrackAsync(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return path;
+        if (!path.StartsWith("orynivo://", StringComparison.OrdinalIgnoreCase))
+            return path;
+        if (!TryResolveOrynivoPlaylistReference(path, out var server, out var trackId))
+            return null;
+
+        try
+        {
+            var tracks = await _orynivoClient.GetTracksByIdsAsync(server, [trackId], CancellationToken.None);
+            var track = tracks.FirstOrDefault(t => t.Id == trackId);
+            if (track is null)
+                return null;
+            // ToOrynivoTrackContentRow registers the row in _orynivoTracksByUrl keyed by the
+            // real stream URL, which is what CreatePlaylistItem/StartPlaybackAsync consume.
+            // Build/register on the UI thread because that cache and the transport are UI-affine.
+            return await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                var row = ToOrynivoTrackContentRow(server, track);
+                EnsureArtworkHydrated(row);
+                return row.FilePath;
+            });
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>Appends one audit line to the web-browsing request log.</summary>
@@ -931,39 +990,145 @@ public partial class MainWindow : Window
 
     private void OnWatchedLibraryChanged()
     {
-        if (Interlocked.Increment(ref _libraryWatcherRefreshPending) != 1)
+        // Coalesce bursts of change signals into a single UI-thread pass.
+        if (Interlocked.Exchange(ref _libraryWatcherRefreshPending, 1) != 0)
             return;
 
-        Dispatcher.UIThread.Post(async () =>
+        Dispatcher.UIThread.Post(() =>
         {
-            while (true)
+            Interlocked.Exchange(ref _libraryWatcherRefreshPending, 0);
+            try
             {
-                Interlocked.Exchange(ref _libraryWatcherRefreshPending, 1);
+                // The sidebar playlist list is lightweight metadata, not a content
+                // reload, so keep it in sync immediately.
+                LoadNavPlaylists();
+
+                // Do NOT auto-reload the visible content view. Instead offer a
+                // controlled "new library data available" refresh action on views
+                // that can safely reload in place. No automatic navigation.
+                if (CanReloadCurrentViewAfterLibraryChange())
+                    SetLibraryRefreshAvailable(true);
+            }
+            catch
+            {
+                // Background library refreshes must not affect playback or input handling.
+            }
+        }, DispatcherPriority.Background);
+    }
+
+    /// <summary>
+    /// Updates the subtle sidebar activity indicator while the background scanner or
+    /// indexer is running. Throttled so a fast per-file scan does not flood the UI thread.
+    /// </summary>
+    /// <param name="activity">The reported scan-activity snapshot.</param>
+    private void OnLibraryScanActivity(LibraryScanActivity activity)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            // Always render start/stop transitions; throttle intermediate progress.
+            var stateChanged = activity.Active != _libraryScanActive;
+            if (!stateChanged && activity.Active &&
+                (DateTime.UtcNow - _lastLibraryActivityUiUpdate).TotalMilliseconds < 200)
+            {
+                return;
+            }
+
+            _libraryScanActive = activity.Active;
+            _lastLibraryActivityUiUpdate = DateTime.UtcNow;
+            _localScanText = activity.Active
+                ? (activity.Total > 0 && activity.Current > 0
+                    ? string.Format(
+                        LocalizationManager.Current.LibraryUpdatingWithCount,
+                        activity.Current,
+                        activity.Total)
+                    : LocalizationManager.Current.LibraryUpdating)
+                : null;
+            UpdateLibraryActivityIndicator();
+        }, DispatcherPriority.Background);
+    }
+
+    /// <summary>
+    /// Shows the subtle sidebar activity line. The local scan takes priority; when no local
+    /// scan is running the most recent remote server scan status (if any) is shown instead.
+    /// </summary>
+    private void UpdateLibraryActivityIndicator()
+    {
+        var text = _localScanText ?? _remoteScanText;
+        LibraryActivityPanel.IsVisible = text is not null;
+        if (text is not null)
+            LibraryActivityTextBlock.Text = text;
+    }
+
+    /// <summary>
+    /// Polls every configured remote Orynivo Server for an in-progress scan and surfaces its
+    /// progress in the sidebar activity line, without reloading or blocking the current view.
+    /// </summary>
+    /// <returns>A task representing the asynchronous poll.</returns>
+    private async Task PollRemoteServerScansAsync()
+    {
+        if (_remoteScanPollInProgress)
+            return;
+        var servers = _settings.OrynivoServers;
+        if (servers is null || servers.Count == 0)
+        {
+            if (_remoteScanText is not null)
+            {
+                _remoteScanText = null;
+                UpdateLibraryActivityIndicator();
+            }
+            return;
+        }
+
+        _remoteScanPollInProgress = true;
+        try
+        {
+            string? scanning = null;
+            foreach (var server in servers)
+            {
                 try
                 {
-                    LoadNavPlaylists();
-                    if (SearchResultsScrollViewer.IsVisible &&
-                        !string.IsNullOrWhiteSpace(SearchTextBox.Text) &&
-                        _currentTopLevelTag?.StartsWith("OrynivoServer:", StringComparison.Ordinal) != true)
+                    var status = await _orynivoClient.GetScanStatusAsync(server, CancellationToken.None);
+                    if (status is { IsRunning: true })
                     {
-                        // Local library changes must not replace a remote server's
-                        // search results with local ones.
-                        await ShowSearchResultsAsync(SearchTextBox.Text);
-                    }
-                    else if (_currentTopLevelTag is { } currentTag &&
-                             CanReloadCurrentViewAfterLibraryChange())
-                    {
-                        await ShowTopLevelViewAsync(currentTag);
+                        scanning = status is { Total: > 0, Current: > 0 }
+                            ? string.Format(
+                                LocalizationManager.Current.RemoteScanningWithCount,
+                                server.Name, status.Current, status.Total)
+                            : string.Format(LocalizationManager.Current.RemoteScanning, server.Name);
+                        break;
                     }
                 }
                 catch
                 {
-                    // Background library refreshes must not affect playback or input handling.
+                    // Unreachable or older servers are skipped silently.
                 }
-                if (Interlocked.CompareExchange(ref _libraryWatcherRefreshPending, 0, 1) == 1)
-                    break;
             }
-        }, DispatcherPriority.Background);
+
+            _remoteScanText = scanning;
+            UpdateLibraryActivityIndicator();
+        }
+        finally
+        {
+            _remoteScanPollInProgress = false;
+        }
+    }
+
+    /// <summary>Shows or hides the per-view "new library data available" refresh action.</summary>
+    /// <param name="available">Whether fresh library data is available for the current view.</param>
+    private void SetLibraryRefreshAvailable(bool available)
+    {
+        _libraryRefreshAvailable = available;
+        LibraryRefreshButton.IsVisible = available;
+    }
+
+    /// <summary>Reloads the current view on demand when the user accepts the refresh prompt.</summary>
+    /// <param name="sender">The refresh button.</param>
+    /// <param name="e">The click event data.</param>
+    private async void LibraryRefreshButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        SetLibraryRefreshAvailable(false);
+        if (_currentTopLevelTag is { } tag && CanReloadCurrentViewAfterLibraryChange())
+            await ShowTopLevelViewAsync(tag);
     }
 
     private bool CanReloadCurrentViewAfterLibraryChange()
@@ -1084,14 +1249,18 @@ public partial class MainWindow : Window
         {
             using var db = AudioDatabase.OpenDefault();
             var podcastHeaderIndex = NavListBox.Items.IndexOf(MyPodcastsHeaderItem);
-            foreach (var radio in db.GetRadioStations())
+            var savedRadios = db.GetRadioStations().ToList();
+            if (savedRadios.Count == 0 && podcastHeaderIndex >= 0)
+            {
+                NavListBox.Items.Insert(podcastHeaderIndex++, CreateSidebarHintItem(
+                    "Radio:EmptyHint",
+                    LocalizationManager.Current.OwnRadiosEmptyHint));
+            }
+
+            foreach (var radio in savedRadios)
             {
                 var content = new StackPanel { Orientation = Orientation.Horizontal };
-                content.Children.Add(new TextBlock
-                {
-                    Text = "◉ ",
-                    Foreground = new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF))
-                });
+                content.Children.Add(CreateSidebarIcon("IconRadio"));
                 content.Children.Add(CreateSidebarEntryText(radio.Name));
 
                 NavListBox.Items.Insert(podcastHeaderIndex++, new ListBoxItem
@@ -1104,14 +1273,18 @@ public partial class MainWindow : Window
             }
 
             var plexHeaderIndex = NavListBox.Items.IndexOf(PlexHeaderItem);
-            foreach (var podcast in db.GetPodcasts())
+            var savedPodcasts = db.GetPodcasts().ToList();
+            if (savedPodcasts.Count == 0 && plexHeaderIndex >= 0)
+            {
+                NavListBox.Items.Insert(plexHeaderIndex++, CreateSidebarHintItem(
+                    "Podcast:EmptyHint",
+                    LocalizationManager.Current.MyPodcastsEmptyHint));
+            }
+
+            foreach (var podcast in savedPodcasts)
             {
                 var content = new StackPanel { Orientation = Orientation.Horizontal };
-                content.Children.Add(new TextBlock
-                {
-                    Text = "◍ ",
-                    Foreground = new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF))
-                });
+                content.Children.Add(CreateSidebarIcon("IconPodcast"));
                 content.Children.Add(CreateSidebarEntryText(podcast.Name));
 
                 NavListBox.Items.Insert(plexHeaderIndex++, new ListBoxItem
@@ -1250,94 +1423,45 @@ public partial class MainWindow : Window
         };
     }
 
-    private async void LoadOrynivoServerNavigation()
-    {
-        var loadVersion = ++_orynivoNavigationLoadVersion;
-        _orynivoPlaylistsByTag.Clear();
-        foreach (var item in NavListBox.Items
-                     .OfType<ListBoxItem>()
-                     .Where(item => item.Tag is string tag &&
-                                    (tag.StartsWith("OrynivoServer:", StringComparison.Ordinal) ||
-                                     tag.StartsWith("OrynivoServerPlaylist:", StringComparison.Ordinal) ||
-                                     tag.StartsWith("LibraryGroup:OrynivoServer", StringComparison.Ordinal)))
-                     .ToList())
-            NavListBox.Items.Remove(item);
-
-        // Orynivo Server libraries are shown in the shared Artists, Albums, and
-        // Tracks views. Keep the server playlist cache populated for existing
-        // server-owned playlist actions, but do not render separate server
-        // library branches in the sidebar.
-        foreach (var server in _settings.OrynivoServers ?? [])
-        {
-            if (loadVersion != _orynivoNavigationLoadVersion)
-                return;
-            try
-            {
-                var playlists = await _orynivoClient.GetPlaylistsAsync(server);
-                if (loadVersion != _orynivoNavigationLoadVersion)
-                    return;
-                foreach (var playlist in playlists)
-                {
-                    var tag = $"OrynivoServerPlaylist:{server.Id}:{playlist.Id}";
-                    _orynivoPlaylistsByTag[tag] = playlist;
-                }
-            }
-            catch { }
-        }
-
-        ApplySidebarNavigationSettings();
-    }
-
-    private int GetOrynivoServerInsertIndex()
-    {
-        var insertIndex = NavListBox.Items.IndexOf(FoldersNavItem);
-        if (insertIndex < 0)
-            return -1;
-
-        for (var index = insertIndex + 1; index < NavListBox.Items.Count; index++)
-        {
-            if (NavListBox.Items[index] is ListBoxItem { Tag: string tag } &&
-                (tag == "LibraryGroup:LocalPlaylists" ||
-                 tag.StartsWith("Playlist:", StringComparison.Ordinal)))
-            {
-                insertIndex = index;
-            }
-        }
-
-        return insertIndex + 1;
-    }
-
-    private StackPanel CreateSmartPlaylistSidebarContent(string text)
-    {
-        var sp = new StackPanel { Orientation = Orientation.Horizontal };
-        sp.Children.Add(new TextBlock
-        {
-            Text = "⚡ ",
-            Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0xCC, 0x00))
-        });
-        sp.Children.Add(CreateSidebarEntryText(text));
-        return sp;
-    }
-
-    private int InsertOrynivoServerNavItem(int index, string serverId, string view, string title, bool isEnabled = true)
-    {
-        var text = CreateSidebarEntryText(title);
-        text.Margin = new Thickness(16, 0, 0, 0);
-        NavListBox.Items.Insert(index, new ListBoxItem
-        {
-            Content = text,
-            Tag = $"OrynivoServer:{serverId}:{view}",
-            IsEnabled = isEnabled,
-            Theme = FindResource<ControlTheme>("NavItemTheme")
-        });
-        return index + 1;
-    }
-
     private TextBlock CreateSidebarEntryText(string text)
     {
         var tb = new TextBlock { Text = text };
         tb.Classes.Add("navItemText");
         return tb;
+    }
+
+    private AvaloniaPath CreateSidebarIcon(string resourceKey)
+    {
+        return new AvaloniaPath
+        {
+            Width = 13,
+            Height = 13,
+            Margin = new Thickness(0, 0, 7, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Stretch = Stretch.Uniform,
+            Data = FindResource<Geometry>(resourceKey),
+            Stroke = new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF)),
+            StrokeThickness = 1.6,
+            StrokeLineCap = PenLineCap.Round,
+            StrokeJoin = PenLineJoin.Round
+        };
+    }
+
+    private ListBoxItem CreateSidebarHintItem(string tag, string text)
+    {
+        var hint = CreateSidebarEntryText(text);
+        hint.Margin = new Thickness(16, 0, 8, 0);
+        hint.TextWrapping = TextWrapping.Wrap;
+        hint.Foreground = FindResource<IBrush>("AppMutedTextBrush");
+        hint.FontSize = ResolveFontSize("FontSizeMeta");
+        return new ListBoxItem
+        {
+            Content = hint,
+            Tag = tag,
+            IsHitTestVisible = false,
+            Focusable = false,
+            Theme = FindResource<ControlTheme>("NavItemTheme")
+        };
     }
 
     private Grid CreateLibraryGroupHeader(string title, bool isExpanded, double leftIndent = 0)
@@ -1455,8 +1579,79 @@ public partial class MainWindow : Window
             ? persistedIndex
             : persisted.Count == 0 ? -1 : Math.Min(_queueIndex, persisted.Count - 1);
         using var db = AudioDatabase.OpenDefault();
+
+        // Detect a wholesale replacement (playing a completely different selection) and keep
+        // the outgoing queue as a restorable "previous queue". Appends, moves, removals, and
+        // next/previous keep some of the old items, so the intersection stays non-empty.
+        var previous = db.GetPlaybackQueue();
+        if (previous.Paths.Count > 0)
+        {
+            var newSet = new HashSet<string>(persisted, StringComparer.OrdinalIgnoreCase);
+            if (!previous.Paths.Any(newSet.Contains))
+                db.SavePreviousPlaybackQueue(previous.Paths);
+        }
+
         db.SavePlaybackQueue(persisted, currentIndex);
         ClearLegacyPlaybackQueueSettings();
+    }
+
+    /// <summary>Restores the queue that was playing before the most recent wholesale replacement.</summary>
+    /// <returns>A task representing the asynchronous restore.</returns>
+    private async Task RestorePreviousQueueAsync()
+    {
+        IReadOnlyList<string> paths;
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            paths = db.GetPreviousPlaybackQueue();
+        }
+        catch { paths = []; }
+
+        if (paths.Count == 0)
+        {
+            StatusTextBlock.Text = LocalizationManager.Current.NoPreviousQueue;
+            return;
+        }
+
+        _queue.Clear();
+        foreach (var path in paths)
+            _queue.Add(CreatePlaylistItem(path));
+        _queueIndex = _queue.Count > 0 ? 0 : -1;
+        ResetQueuePlaybackState();
+        // Persisting captures the outgoing queue as the new "previous", making restore reversible.
+        PersistPlaybackQueue();
+        RefreshQueueRowsIfVisible();
+        RefreshQueueNavigationButtons();
+
+        if (_queue.Count == 0)
+            return;
+        try { await StartPlaybackAsync(_queue[0].FilePath); }
+        catch (OperationCanceledException) { StatusTextBlock.Text = LocalizationManager.Current.PlaybackStopped; }
+        catch (Exception ex) { StopPlayback(); StatusTextBlock.Text = ex.Message; }
+        UpdateNowPlayingRowHighlights();
+    }
+
+    /// <summary>Handles the Up Next "restore last queue" header button.</summary>
+    /// <param name="sender">The button.</param>
+    /// <param name="e">The click event data.</param>
+    private async void RestoreQueueButton_OnClick(object? sender, RoutedEventArgs e)
+        => await RestorePreviousQueueAsync();
+
+    /// <summary>Shows the "restore last queue" button in the Up Next view when a previous queue exists.</summary>
+    /// <param name="tag">The current top-level view tag.</param>
+    private void UpdateRestoreQueueButtonState(string tag)
+    {
+        var available = false;
+        if (tag == "Queue")
+        {
+            try
+            {
+                using var db = AudioDatabase.OpenDefault();
+                available = db.GetPreviousPlaybackQueue().Count > 0;
+            }
+            catch { available = false; }
+        }
+        RestoreQueueButton.IsVisible = available;
     }
 
     private bool ClearLegacyPlaybackQueueSettings()
@@ -1977,6 +2172,8 @@ public partial class MainWindow : Window
             ShowContentLoadingSkeleton();
         _currentTopLevelTag = tag;
         _orynivoTrackFacets = null;
+        // A fresh load reflects current library data, so any pending refresh prompt is stale.
+        SetLibraryRefreshAvailable(false);
         LyricsView.IsVisible = false;
         ArtistInfoView.IsVisible = false;
         PodcastInfoView.IsVisible = false;
@@ -2052,9 +2249,12 @@ public partial class MainWindow : Window
             SetViewModeButtons(tag == "Albums" ? _showAlbumArtworkView : _showArtistArtworkView);
         TrackFilterButton.IsVisible = tag == "Tracks" ? true : false;
         SaveSmartPlaylistButton.IsVisible = tag == "Tracks" ? true : false;
+        ClearQueueButton.IsVisible = tag == "Queue";
+        ClearQueueButton.IsEnabled = _queue.Count > 0;
         SaveQueueAsPlaylistButton.IsVisible = tag == "Queue";
         SaveQueueAsPlaylistButton.IsEnabled =
             _queue.Any(item => CanPersistQueuePath(item.FilePath));
+        UpdateRestoreQueueButtonState(tag);
         if (tag == "Tracks") UpdateSaveSmartPlaylistButtonState();
         TrackFilterPopup.IsOpen = false;
         try
@@ -2103,7 +2303,10 @@ public partial class MainWindow : Window
                 InternetRadioView.IsVisible = true;
                 await EnsureRadioFilterCatalogAsync();
                 if (RadioStationsDataGrid.ItemsSource is null)
-                    await SearchRadioStationsAsync();
+                {
+                    RadioStatusTextBlock.Text = LocalizationManager.Current.RadioEmptyState;
+                    RadioStatusTextBlock.IsVisible = true;
+                }
             }
             else if (tag == "Podcasts")
             {
@@ -2114,6 +2317,11 @@ public partial class MainWindow : Window
                 PodcastView.IsVisible = true;
                 PodcastEpisodesView.IsVisible = false;
                 await EnsurePodcastFilterCatalogAsync();
+                if (PodcastsDataGrid.ItemsSource is null)
+                {
+                    PodcastStatusTextBlock.Text = LocalizationManager.Current.PodcastEmptyState;
+                    PodcastStatusTextBlock.IsVisible = true;
+                }
             }
             else if (tag == "Queue")
             {
@@ -2792,13 +3000,7 @@ public partial class MainWindow : Window
     }
 
     private static string GetOrynivoTrackListCachePath(OrynivoServerSettings server)
-    {
-        // Include the API key in the cache key: cached playback paths embed the
-        // key, so a key change must invalidate the cache to avoid stale URLs.
-        var key = Convert.ToHexString(
-            SHA256.HashData(Encoding.UTF8.GetBytes($"{server.Id}|{server.BaseUrl}|{server.ApiKey}")));
-        return AppPaths.GetDataPath("remote-track-cache", $"{key}.json");
-    }
+        => RemoteServerCache.TrackListCachePath(server);
 
     private async Task<List<LibraryCatalogArtist>> LoadAllOrynivoArtistsAsync(
         OrynivoServerSettings server,
@@ -3110,10 +3312,7 @@ public partial class MainWindow : Window
     }
 
     private static string GetOrynivoFolderTrackCachePath(OrynivoServerSettings server)
-    {
-        var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"{server.Id}|{server.BaseUrl}")));
-        return AppPaths.GetDataPath("remote-folder-cache", $"{key}.json");
-    }
+        => RemoteServerCache.FolderTrackCachePath(server);
 
     private async Task<Dictionary<long, OrynivoTrackInfo>> LoadOrynivoFolderTrackMetadataAsync(
         OrynivoServerSettings server,
@@ -3503,7 +3702,10 @@ public partial class MainWindow : Window
             KnownDuration = item.DurationMilliseconds is long durationMilliseconds
                 ? TimeSpan.FromMilliseconds(durationMilliseconds)
                 : null,
-            EntityType = entityType
+            EntityType = entityType,
+            PlexServerId = server.Id,
+            PlexAlbumRatingKey = item.ParentRatingKey,
+            PlexArtistRatingKey = item.GrandparentRatingKey
         };
         if (entityType == "PlexTrack" && row.FilePath.Length > 0)
             _plexTracksByUrl[row.FilePath] = row;
@@ -4960,10 +5162,19 @@ public partial class MainWindow : Window
         return true;
     }
 
-    private List<ContentRow> ResolveUnifiedSmartPlaylistRows(SmartPlaylistCriteria criteria)
+    /// <summary>
+    /// Builds the unified smart-playlist candidate set — the local library plus every configured
+    /// remote Orynivo Server — that a smart playlist is resolved against. Remote tracks get
+    /// negative pseudo-IDs mapped through <paramref name="remoteTracks"/>. Blocks on server
+    /// calls, so it must run off the UI thread.
+    /// </summary>
+    /// <param name="remoteTracks">Receives the pseudo-ID → (server, track) map for remote candidates.</param>
+    /// <returns>The merged candidate list.</returns>
+    private List<SmartPlaylistTrackInfo> BuildUnifiedSmartPlaylistCandidates(
+        out Dictionary<long, (OrynivoServerSettings Server, LibraryCatalogTrack Track)> remoteTracks)
     {
         var candidates = new List<SmartPlaylistTrackInfo>();
-        var remoteTracks = new Dictionary<long, (OrynivoServerSettings Server, LibraryCatalogTrack Track)>();
+        remoteTracks = new Dictionary<long, (OrynivoServerSettings Server, LibraryCatalogTrack Track)>();
         long nextRemoteId = -1;
 
         try
@@ -4997,6 +5208,29 @@ public partial class MainWindow : Window
             }
         }
 
+        return candidates;
+    }
+
+    /// <summary>
+    /// Counts how many tracks match the criteria across the unified candidate set (local library
+    /// plus configured remote servers), matching what a smart playlist actually contains when
+    /// opened. Runs off the UI thread.
+    /// </summary>
+    /// <param name="criteria">The criteria to evaluate.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The number of matching tracks.</returns>
+    private Task<int?> ResolveUnifiedSmartPlaylistCountAsync(
+        SmartPlaylistCriteria criteria,
+        CancellationToken cancellationToken)
+        => Task.Run<int?>(() =>
+        {
+            var candidates = BuildUnifiedSmartPlaylistCandidates(out _);
+            return criteria.Resolve(candidates).Count;
+        }, cancellationToken);
+
+    private List<ContentRow> ResolveUnifiedSmartPlaylistRows(SmartPlaylistCriteria criteria)
+    {
+        var candidates = BuildUnifiedSmartPlaylistCandidates(out var remoteTracks);
         var resolved = criteria.Resolve(candidates);
         var localIds = resolved
             .Where(candidate => candidate.Id > 0)
@@ -6872,6 +7106,7 @@ public partial class MainWindow : Window
 
         ContentDataGrid.ItemsSource = _queueRows;
         ContentCountTextBlock.Text = LocalizationManager.FormatTrackCount(_queueRows.Count);
+        ClearQueueButton.IsEnabled = _queue.Count > 0;
         SaveQueueAsPlaylistButton.IsEnabled =
             _queue.Any(item => CanPersistQueuePath(item.FilePath));
         Dispatcher.UIThread.Post(UpdateNowPlayingRowHighlights, DispatcherPriority.Loaded);
@@ -6928,6 +7163,28 @@ public partial class MainWindow : Window
         RefreshQueueRowsIfVisible();
         RefreshQueueNavigationButtons();
         await RefreshActiveGaplessQueueAsync();
+    }
+
+    /// <summary>Handles the Up Next header button that clears the complete queue.</summary>
+    /// <param name="sender">The button.</param>
+    /// <param name="e">The click event data.</param>
+    private void ClearQueueButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        ClearPlaybackQueue();
+        StatusTextBlock.Text = LocalizationManager.Current.QueueCleared;
+    }
+
+    /// <summary>Clears the editable playback queue without stopping the currently playing item.</summary>
+    private void ClearPlaybackQueue()
+    {
+        _queue.Clear();
+        _queueIndex = -1;
+        ResetQueuePlaybackState();
+        PersistPlaybackQueue();
+        RefreshQueueRowsIfVisible();
+        RefreshQueueNavigationButtons();
+        ClearQueueButton.IsEnabled = false;
+        SaveQueueAsPlaylistButton.IsEnabled = false;
     }
 
     private PlaylistItem? GetCurrentQueueItem() =>
@@ -7577,27 +7834,42 @@ public partial class MainWindow : Window
     private async void NowPlayingArtistButton_OnClick(object? sender, RoutedEventArgs e)
     {
         e.Handled = true;
-
-        // A remote server track navigates within its own server library; its server
-        // and artist ID are carried on the now-playing row (local artist IDs would
-        // open an unrelated local artist).
-        if (_currentOrynivoTrackRow is { OrynivoServer: { } server, ArtistId: long remoteArtistId })
-        {
-            _activeOrynivoServer = server;
-            await OpenOrynivoArtistAlbumsAsync(remoteArtistId, _currentArtistName);
-            return;
-        }
-
-        if (_currentArtistId is long artistId)
-            await ShowArtistAlbumsAsync(
-                artistId,
-                _currentArtistName ?? LocalizationManager.Current.Unknown);
+        await OpenNowPlayingArtistAsync();
     }
 
     private async void NowPlayingAlbumButton_OnClick(object? sender, RoutedEventArgs e)
     {
         e.Handled = true;
 
+        await OpenNowPlayingAlbumAsync();
+    }
+
+    private async void NowPlayingCoverOpenAlbumMenuItem_OnClick(object? sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        await OpenNowPlayingAlbumAsync();
+    }
+
+    private async void NowPlayingCoverOpenArtistMenuItem_OnClick(object? sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        await OpenNowPlayingArtistAsync();
+    }
+
+    private async void NowPlayingCoverSearchMenuItem_OnClick(object? sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        await SearchNowPlayingCoverAsync();
+    }
+
+    private void NowPlayingCoverFavoriteMenuItem_OnClick(object? sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        NowPlayingFavoriteButton_OnClick(sender, e);
+    }
+
+    private async Task OpenNowPlayingAlbumAsync()
+    {
         if (_currentOrynivoTrackRow is { OrynivoServer: { } server, AlbumId: long remoteAlbumId })
         {
             _activeOrynivoServer = server;
@@ -7612,6 +7884,56 @@ public partial class MainWindow : Window
             await ShowAlbumTracksAsync(
                 albumId,
                 _currentAlbumTitle ?? LocalizationManager.Current.Unknown);
+    }
+
+    private async Task OpenNowPlayingArtistAsync()
+    {
+        if (_currentOrynivoTrackRow is { OrynivoServer: { } server, ArtistId: long remoteArtistId })
+        {
+            _activeOrynivoServer = server;
+            await OpenOrynivoArtistAlbumsAsync(remoteArtistId, _currentArtistName);
+            return;
+        }
+
+        if (_currentArtistId is long artistId)
+            await ShowArtistAlbumsAsync(
+                artistId,
+                _currentArtistName ?? LocalizationManager.Current.Unknown);
+    }
+
+    private async Task SearchNowPlayingCoverAsync()
+    {
+        if (_currentOrynivoTrackRow is { OrynivoServer: { } server, AlbumId: long remoteAlbumId })
+        {
+            var row = new ContentRow
+            {
+                Id = remoteAlbumId,
+                Title = _currentOrynivoTrackRow.Album ?? _currentAlbumTitle ?? LocalizationManager.Current.Unknown,
+                Artist = _currentOrynivoTrackRow.Artist,
+                AlbumArtist = _currentOrynivoTrackRow.AlbumArtist,
+                EntityType = "OrynivoAlbum",
+                ExternalId = remoteAlbumId.ToString(CultureInfo.InvariantCulture),
+                OrynivoServer = server
+            };
+            await OpenOrynivoAlbumCoverSearchAsync(server, remoteAlbumId, row);
+            NowPlayingArtworkImage.Source = row.Thumbnail ?? row.Artwork ?? NowPlayingArtworkImage.Source;
+            LyricsBackgroundImage.Source = row.Artwork ?? row.Thumbnail ?? LyricsBackgroundImage.Source;
+            return;
+        }
+
+        if (_currentAlbumId is not long albumId)
+            return;
+
+        var localRow = new ContentRow
+        {
+            Id = albumId,
+            Title = _currentAlbumTitle ?? LocalizationManager.Current.Unknown,
+            Artist = _currentArtistName,
+            EntityType = "Album"
+        };
+        await OpenCoverSearchAsync(localRow);
+        NowPlayingArtworkImage.Source = localRow.Thumbnail ?? localRow.Artwork ?? NowPlayingArtworkImage.Source;
+        LyricsBackgroundImage.Source = localRow.Artwork ?? localRow.Thumbnail ?? LyricsBackgroundImage.Source;
     }
 
     private void SetNowPlayingAlbum(string? albumTitle, long? albumId, bool canNavigate)
@@ -9073,6 +9395,7 @@ public partial class MainWindow : Window
     {
         NowPlayingFavoriteButton.IsEnabled = _currentTrackId.HasValue || CurrentOrynivoFavoriteTarget is not null;
         NowPlayingFavoriteGlyph.Text = _currentTrackIsFavorite ? "❤" : "♡";
+        NowPlayingFavoriteGlyph.FontSize = _currentTrackIsFavorite ? 18 : 15;
     }
 
     private void NowPlayingFavoriteButton_OnClick(object? sender, RoutedEventArgs e)
@@ -9255,1329 +9578,6 @@ public partial class MainWindow : Window
             return;
 
         AppendPlaylistItems(menu, GetPathsForRow(row));
-    }
-
-    private MenuFlyout BuildPlaylistContextFlyout(IReadOnlyList<string> paths)
-    {
-        var menu = CreateSidebarMenuFlyout();
-        if (TryCreatePlaylistSelection(paths, out var provider, out var selection))
-            AppendPlaylistItems(menu, provider, selection);
-        else
-            foreach (var item in CreateQueueMenuItems(paths))
-                menu.Items.Add(item);
-        return menu;
-    }
-
-    private MenuFlyout BuildQueueContextFlyout(IReadOnlyList<string> paths)
-    {
-        var menu = CreateSidebarMenuFlyout();
-        foreach (var item in CreateQueueMenuItems(paths))
-            menu.Items.Add(item);
-        return menu;
-    }
-
-    private void AppendPlaylistItems(MenuFlyout menu, IReadOnlyList<string> paths)
-    {
-        if (!TryCreatePlaylistSelection(paths, out var provider, out var selection))
-            return;
-        AppendPlaylistItems(menu, provider, selection);
-    }
-
-    private void AppendPlaylistItems(ItemsControl menu, IReadOnlyList<string> paths)
-    {
-        if (!TryCreatePlaylistSelection(paths, out var provider, out var selection))
-            return;
-        AppendPlaylistItems(menu, provider, selection);
-    }
-
-    private void AppendPlaylistItems(ItemsControl menu, ILibraryPlaylistProvider provider, PlaylistSelection selection)
-    {
-        foreach (var item in CreatePlaylistMenuItems(provider, selection))
-            menu.Items.Add(item);
-    }
-
-    private void AppendPlaylistItems(MenuFlyout menu, ILibraryPlaylistProvider provider, PlaylistSelection selection)
-    {
-        foreach (var item in CreatePlaylistMenuItems(provider, selection))
-            menu.Items.Add(item);
-    }
-
-    private IReadOnlyList<Control> CreatePlaylistMenuItems(ILibraryPlaylistProvider provider, PlaylistSelection selection)
-    {
-        var items = new List<Control>(CreateQueueMenuItems(selection.QueuePaths));
-        items.Add(new Separator());
-
-        var header = CreateFlyoutMenuItem(
-            LocalizationManager.Current.AddToPlaylist,
-            new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF)));
-        header.IsHitTestVisible = false;
-        header.Focusable = false;
-        header.FontSize = 11;
-        header.FontWeight = FontWeight.SemiBold;
-        items.Add(header);
-
-        var sep0 = new Separator();
-        items.Add(sep0);
-
-        var playlists = provider.GetWritablePlaylists();
-
-        foreach (var pl in playlists)
-        {
-            var item = CreateFlyoutMenuItem(pl.Name);
-            item.Tag = new PlaylistActionTag(provider, pl.Id, selection);
-            item.Click += PlaylistMenuItem_OnClick;
-            items.Add(item);
-        }
-
-        if (playlists.Count > 0)
-        {
-            var sep1 = new Separator();
-            items.Add(sep1);
-        }
-
-        var newItem = CreateFlyoutMenuItem(LocalizationManager.Current.NewPlaylist);
-        newItem.Tag = new NewPlaylistActionTag(provider, selection);
-        newItem.Click += NewPlaylistMenuItem_OnClick;
-        items.Add(newItem);
-        return items;
-    }
-
-    private bool TryCreatePlaylistSelection(
-        IReadOnlyList<string> paths,
-        out ILibraryPlaylistProvider provider,
-        out PlaylistSelection selection)
-    {
-        provider = _localPlaylistProvider;
-        selection = new PlaylistSelection(paths, paths, []);
-        return paths.Count > 0 && paths.All(CanPersistQueuePath);
-    }
-
-    private IReadOnlyList<OrynivoPlaylistInfo> GetCachedOrynivoPlaylists(OrynivoServerSettings server) =>
-        _orynivoPlaylistsByTag
-            .Where(pair =>
-            {
-                var parts = pair.Key.Split(':');
-                return parts.Length == 3 && parts[1] == server.Id;
-            })
-            .Select(pair => pair.Value)
-            .ToList();
-
-    private bool TryGetOrynivoPlaylistTarget(
-        IReadOnlyList<string> paths,
-        out OrynivoServerSettings? server,
-        out List<long> trackIds)
-    {
-        server = null;
-        trackIds = [];
-        foreach (var path in paths)
-        {
-            if (!_orynivoTracksByUrl.TryGetValue(path, out var row) ||
-                row.OrynivoServer is null ||
-                row.Id is not long trackId)
-            {
-                return false;
-            }
-
-            server ??= row.OrynivoServer;
-            if (server.Id != row.OrynivoServer.Id)
-                return false;
-            trackIds.Add(trackId);
-        }
-
-        return trackIds.Count > 0 && server is not null;
-    }
-
-    private IReadOnlyList<Control> CreateQueueMenuItems(IReadOnlyList<string> paths)
-    {
-        var items = new List<Control>();
-        var queueHeader = CreateFlyoutMenuItem(
-            LocalizationManager.Current.UpNext,
-            new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF)));
-        queueHeader.IsHitTestVisible = false;
-        queueHeader.Focusable = false;
-        queueHeader.FontSize = 11;
-        queueHeader.FontWeight = FontWeight.SemiBold;
-        items.Add(queueHeader);
-
-        var playNextItem = CreateFlyoutMenuItem(LocalizationManager.Current.PlayNext);
-        playNextItem.Tag = paths;
-        playNextItem.Click += PlayNextMenuItem_OnClick;
-        items.Add(playNextItem);
-
-        var appendQueueItem = CreateFlyoutMenuItem(LocalizationManager.Current.AppendToQueue);
-        appendQueueItem.Tag = paths;
-        appendQueueItem.Click += AppendToQueueMenuItem_OnClick;
-        items.Add(appendQueueItem);
-        return items;
-    }
-
-    private async void PlayNextMenuItem_OnClick(object? sender, RoutedEventArgs e)
-    {
-        if (sender is not MenuItem { Tag: IReadOnlyList<string> paths } || paths.Count == 0)
-            return;
-
-        var insertIndex = Math.Clamp(_queueIndex + 1, 0, _queue.Count);
-        foreach (var path in paths)
-            _queue.Insert(insertIndex++, CreatePlaylistItem(path));
-        ResetQueuePlaybackState();
-        PersistPlaybackQueue();
-        RefreshQueueRowsIfVisible();
-        RefreshQueueNavigationButtons();
-        StatusTextBlock.Text = string.Format(
-            LocalizationManager.Current.TracksQueuedNext,
-            paths.Count);
-        await RefreshActiveGaplessQueueAsync();
-    }
-
-    private async void AppendToQueueMenuItem_OnClick(object? sender, RoutedEventArgs e)
-    {
-        if (sender is not MenuItem { Tag: IReadOnlyList<string> paths } || paths.Count == 0)
-            return;
-
-        foreach (var path in paths)
-            _queue.Add(CreatePlaylistItem(path));
-        ResetQueuePlaybackState();
-        PersistPlaybackQueue();
-        RefreshQueueRowsIfVisible();
-        RefreshQueueNavigationButtons();
-        StatusTextBlock.Text = string.Format(
-            LocalizationManager.Current.TracksAppendedToQueue,
-            paths.Count);
-        await RefreshActiveGaplessQueueAsync();
-    }
-
-    private async void PlaylistMenuItem_OnClick(object? sender, RoutedEventArgs e)
-    {
-        if (sender is not MenuItem { Tag: PlaylistActionTag tag })
-            return;
-
-        var tracksCount = GetPlaylistSelectionTrackCount(tag.Selection);
-        if (tracksCount == 0)
-            return;
-
-        var playlistName = tag.Provider
-            .GetWritablePlaylists()
-            .FirstOrDefault(playlist => playlist.Id == tag.PlaylistId)
-            ?.Name ?? string.Empty;
-        var ok = await tag.Provider.AddTracksAsync(tag.PlaylistId, tag.Selection);
-        if (!ok)
-        {
-            StatusTextBlock.Text = tag.Provider.NavigationRefresh == PlaylistNavigationRefresh.OrynivoServer
-                ? LocalizationManager.Current.OrynivoConnectionFailed
-                : string.Empty;
-            return;
-        }
-
-        RefreshPlaylistNavigation(tag.Provider.NavigationRefresh);
-
-        StatusTextBlock.Text = tracksCount == 1
-            ? string.Format(LocalizationManager.Current.TrackAddedToPlaylist, playlistName)
-            : string.Format(LocalizationManager.Current.TracksAddedToPlaylist, tracksCount, playlistName);
-    }
-
-    private async void NewPlaylistMenuItem_OnClick(object? sender, RoutedEventArgs e)
-    {
-        if (sender is not MenuItem { Tag: NewPlaylistActionTag tag })
-            return;
-
-        var dialog = new NewPlaylistDialog();
-        if (await dialog.ShowDialog<bool>(this) == false || string.IsNullOrWhiteSpace(dialog.PlaylistName))
-            return;
-
-        var tracksCount = GetPlaylistSelectionTrackCount(tag.Selection);
-        if (tracksCount == 0)
-            return;
-
-        var playlistName = dialog.PlaylistName.Trim();
-        var playlist = await tag.Provider.CreatePlaylistAsync(playlistName, tag.Selection);
-        if (playlist is null)
-        {
-            StatusTextBlock.Text = tag.Provider.NavigationRefresh == PlaylistNavigationRefresh.OrynivoServer
-                ? LocalizationManager.Current.OrynivoConnectionFailed
-                : string.Empty;
-            return;
-        }
-
-        RefreshPlaylistNavigation(tag.Provider.NavigationRefresh);
-        StatusTextBlock.Text = tracksCount == 1
-            ? string.Format(LocalizationManager.Current.TrackAddedToPlaylist, playlistName)
-            : string.Format(LocalizationManager.Current.TracksAddedToPlaylist, tracksCount, playlistName);
-    }
-
-    private static int GetPlaylistSelectionTrackCount(PlaylistSelection selection) =>
-        selection.RemoteTrackIds.Count > 0 ? selection.RemoteTrackIds.Count : selection.LocalPaths.Count;
-
-    private void RefreshPlaylistNavigation(PlaylistNavigationRefresh refresh)
-    {
-        if (refresh == PlaylistNavigationRefresh.OrynivoServer)
-            LoadOrynivoServerNavigation();
-        else
-            LoadNavPlaylists();
-    }
-
-    private List<string> GetPathsForRow(ContentRow row)
-    {
-        if (!string.IsNullOrEmpty(row.FilePath))
-            return [GetPersistablePlaylistPath(row)];
-
-        if (row.Id is not long albumId)
-            return [];
-
-        if (row.EntityType == "OrynivoAlbum" && row.OrynivoServer is { } server)
-        {
-            try
-            {
-                var provider = CreateOrynivoCatalogProvider(server);
-                return provider.GetTracksByAlbumAsync(albumId)
-                    .GetAwaiter()
-                    .GetResult()
-                    .Select(track => BuildOrynivoPlaylistReference(server, track.Id))
-                    .ToList();
-            }
-            catch { return []; }
-        }
-
-        try
-        {
-            using var db = AudioDatabase.OpenDefault();
-            return db.GetTrackListByAlbum(albumId).Select(t => t.Path).ToList();
-        }
-        catch { return []; }
-    }
-
-    private static string GetPersistablePlaylistPath(ContentRow row) =>
-        row.OrynivoServer is { } server && row.Id is long trackId && row.EntityType == "OrynivoTrack"
-            ? BuildOrynivoPlaylistReference(server, trackId)
-            : row.FilePath;
-
-    private static string BuildOrynivoPlaylistReference(OrynivoServerSettings server, long trackId) =>
-        $"orynivo://{Uri.EscapeDataString(server.Id)}/track/{trackId.ToString(CultureInfo.InvariantCulture)}";
-
-    private bool TryResolveOrynivoPlaylistReference(
-        string path,
-        out OrynivoServerSettings server,
-        out long trackId)
-    {
-        server = null!;
-        trackId = 0;
-        if (!Uri.TryCreate(path, UriKind.Absolute, out var uri) ||
-            !uri.Scheme.Equals("orynivo", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        var segments = uri.AbsolutePath
-            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (segments.Length != 2 ||
-            !segments[0].Equals("track", StringComparison.OrdinalIgnoreCase) ||
-            !long.TryParse(segments[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out trackId))
-        {
-            return false;
-        }
-
-        var serverId = Uri.UnescapeDataString(uri.Host);
-        server = (_settings.OrynivoServers ?? [])
-            .FirstOrDefault(candidate => string.Equals(candidate.Id, serverId, StringComparison.Ordinal))
-            ?? null!;
-        return server is not null;
-    }
-
-    // ------------------------------------------------------------------
-    // Playlist – Löschen aus Sidebar / Entfernen aus Playlist-Ansicht
-    // ------------------------------------------------------------------
-
-    private MenuFlyout BuildDeleteRadioContextFlyout(RadioStationRecord radio)
-    {
-        var menu = CreateSidebarMenuFlyout();
-        var header = CreateFlyoutMenuItem(
-            radio.Name,
-            new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF)));
-        header.IsHitTestVisible = false;
-        header.Focusable = false;
-        header.FontWeight = FontWeight.SemiBold;
-        menu.Items.Add(header);
-
-        var separator = new Separator();
-        menu.Items.Add(separator);
-
-        var deleteItem = CreateFlyoutMenuItem(
-            LocalizationManager.Current.DeleteRadio,
-            new SolidColorBrush(Color.FromRgb(0xFF, 0x6B, 0x6B)));
-        deleteItem.Tag = radio;
-        deleteItem.Click += DeleteRadioMenuItem_OnClick;
-        menu.Items.Add(deleteItem);
-        return menu;
-    }
-
-    private void DeleteRadioMenuItem_OnClick(object? sender, RoutedEventArgs e)
-    {
-        if (sender is not MenuItem { Tag: RadioStationRecord radio })
-            return;
-        try
-        {
-            using var db = AudioDatabase.OpenDefault();
-            db.DeleteRadioStation(radio.Id);
-        }
-        catch
-        {
-            return;
-        }
-
-        LoadNavPlaylists();
-        var internetRadioItem = NavListBox.Items.OfType<ListBoxItem>()
-            .FirstOrDefault(item => string.Equals(item.Tag as string, "InternetRadio", StringComparison.Ordinal));
-        NavListBox.SelectedItem = internetRadioItem;
-        StatusTextBlock.Text = string.Format(LocalizationManager.Current.RadioDeleted, radio.Name);
-    }
-
-    private MenuFlyout BuildDeletePodcastContextFlyout(PodcastRecord podcast)
-    {
-        var menu = CreateSidebarMenuFlyout();
-        var header = CreateFlyoutMenuItem(
-            podcast.Name,
-            new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF)));
-        header.IsHitTestVisible = false;
-        header.Focusable = false;
-        header.FontWeight = FontWeight.SemiBold;
-        menu.Items.Add(header);
-
-        var separator = new Separator();
-        menu.Items.Add(separator);
-
-        var deleteItem = CreateFlyoutMenuItem(
-            LocalizationManager.Current.DeletePodcast,
-            new SolidColorBrush(Color.FromRgb(0xFF, 0x6B, 0x6B)));
-        deleteItem.Tag = podcast;
-        deleteItem.Click += DeletePodcastMenuItem_OnClick;
-        menu.Items.Add(deleteItem);
-        return menu;
-    }
-
-    private void DeletePodcastMenuItem_OnClick(object? sender, RoutedEventArgs e)
-    {
-        if (sender is not MenuItem { Tag: PodcastRecord podcast })
-            return;
-        try
-        {
-            using var db = AudioDatabase.OpenDefault();
-            db.DeletePodcast(podcast.Id);
-        }
-        catch
-        {
-            return;
-        }
-
-        LoadNavPlaylists();
-        var podcastsItem = NavListBox.Items.OfType<ListBoxItem>()
-            .FirstOrDefault(item => string.Equals(item.Tag as string, "Podcasts", StringComparison.Ordinal));
-        NavListBox.SelectedItem = podcastsItem;
-        StatusTextBlock.Text = string.Format(LocalizationManager.Current.PodcastDeleted, podcast.Name);
-    }
-
-    private MenuFlyout BuildPlaylistSidebarContextFlyout(PlaylistRecord playlist)
-    {
-        var menu = CreateSidebarMenuFlyout();
-        var header = CreateFlyoutMenuItem(
-            playlist.Name,
-            new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF)));
-        header.IsHitTestVisible = false;
-        header.Focusable = false;
-        header.FontWeight = FontWeight.SemiBold;
-        menu.Items.Add(header);
-
-        var sep = new Separator();
-        menu.Items.Add(sep);
-
-        if (playlist.IsSmartPlaylist)
-        {
-            var editItem = CreateFlyoutMenuItem(LocalizationManager.Current.EditSmartPlaylist);
-            editItem.Tag = playlist.Id;
-            editItem.Click += EditSmartPlaylistMenuItem_OnClick;
-            menu.Items.Add(editItem);
-        }
-        else
-        {
-            var exportItem = CreateFlyoutMenuItem(LocalizationManager.Current.ExportM3u8Playlist);
-            exportItem.Tag = playlist.Id;
-            exportItem.Click += ExportM3u8PlaylistMenuItem_OnClick;
-            menu.Items.Add(exportItem);
-        }
-
-        var deleteItem = CreateFlyoutMenuItem(
-            LocalizationManager.Current.DeletePlaylist,
-            new SolidColorBrush(Color.FromRgb(0xFF, 0x6B, 0x6B)));
-        deleteItem.Tag = playlist.Id;
-        deleteItem.Click += DeletePlaylistMenuItem_OnClick;
-        menu.Items.Add(deleteItem);
-
-        return menu;
-    }
-
-    private MenuFlyout BuildOrynivoPlaylistSidebarContextFlyout(
-        OrynivoServerSettings server,
-        OrynivoPlaylistInfo playlist)
-    {
-        var menu = CreateSidebarMenuFlyout();
-        var header = CreateFlyoutMenuItem(
-            playlist.Name,
-            new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF)));
-        header.IsHitTestVisible = false;
-        header.Focusable = false;
-        header.FontWeight = FontWeight.SemiBold;
-        menu.Items.Add(header);
-        menu.Items.Add(new Separator());
-
-        if (playlist.IsSmartPlaylist)
-        {
-            var editItem = CreateFlyoutMenuItem(LocalizationManager.Current.EditSmartPlaylist);
-            editItem.Click += (_, _) => EditOrynivoSmartPlaylistAsync(server, playlist);
-            menu.Items.Add(editItem);
-        }
-
-        var deleteItem = CreateFlyoutMenuItem(
-            LocalizationManager.Current.DeletePlaylist,
-            new SolidColorBrush(Color.FromRgb(0xFF, 0x6B, 0x6B)));
-        deleteItem.Tag = new OrynivoPlaylistMenuTag(server, playlist.Id, []);
-        deleteItem.Click += DeleteOrynivoPlaylistMenuItem_OnClick;
-        menu.Items.Add(deleteItem);
-
-        return menu;
-    }
-
-    /// <summary>Opens the shared smart-playlist editor for a remote server playlist and persists the result on that server.</summary>
-    /// <param name="server">Server hosting the playlist.</param>
-    /// <param name="playlist">Smart playlist to edit.</param>
-    private async void EditOrynivoSmartPlaylistAsync(
-        OrynivoServerSettings server,
-        OrynivoPlaylistInfo playlist)
-    {
-        if (!playlist.IsSmartPlaylist || string.IsNullOrWhiteSpace(playlist.FilterCriteria))
-            return;
-
-        SmartPlaylistCriteria criteria;
-        try
-        {
-            criteria = JsonSerializer.Deserialize<SmartPlaylistCriteria>(playlist.FilterCriteria)
-                       ?? new SmartPlaylistCriteria();
-        }
-        catch
-        {
-            return;
-        }
-
-        var dialog = new SmartPlaylistDialog(criteria, playlist.Name);
-        if (await dialog.ShowDialog<bool>(this) == false ||
-            string.IsNullOrWhiteSpace(dialog.PlaylistName) ||
-            dialog.Criteria is null)
-            return;
-
-        var name = dialog.PlaylistName.Trim();
-        var updated = await _orynivoClient.UpdateSmartPlaylistAsync(
-            server,
-            playlist.Id,
-            name,
-            JsonSerializer.Serialize(dialog.Criteria));
-        if (updated is null)
-        {
-            StatusTextBlock.Text = LocalizationManager.Current.OrynivoConnectionFailed;
-            return;
-        }
-
-        LoadOrynivoServerNavigation();
-        if (_activeOrynivoPlaylistServer?.Id == server.Id && _activeOrynivoPlaylistId == playlist.Id)
-            await ShowTopLevelViewAsync($"OrynivoServerPlaylist:{server.Id}:{playlist.Id}");
-        StatusTextBlock.Text = string.Format(LocalizationManager.Current.SmartPlaylistUpdated, name);
-    }
-
-    private async void DeleteOrynivoPlaylistMenuItem_OnClick(object? sender, RoutedEventArgs e)
-    {
-        if (sender is not MenuItem { Tag: OrynivoPlaylistMenuTag tag })
-            return;
-
-        var name = _orynivoPlaylistsByTag.Values.FirstOrDefault(playlist => playlist.Id == tag.PlaylistId)?.Name ?? string.Empty;
-        var ok = await _orynivoClient.DeletePlaylistAsync(tag.Server, tag.PlaylistId);
-        if (!ok)
-        {
-            StatusTextBlock.Text = LocalizationManager.Current.OrynivoConnectionFailed;
-            return;
-        }
-
-        if (_activeOrynivoPlaylistServer?.Id == tag.Server.Id && _activeOrynivoPlaylistId == tag.PlaylistId)
-        {
-            _activeOrynivoPlaylistServer = null;
-            _activeOrynivoPlaylistId = null;
-            var tracksItem = NavListBox.Items.OfType<ListBoxItem>()
-                .FirstOrDefault(item => item.Tag is string itemTag &&
-                                        itemTag == $"OrynivoServer:{tag.Server.Id}:Tracks");
-            if (tracksItem is not null)
-                NavListBox.SelectedItem = tracksItem;
-        }
-
-        LoadOrynivoServerNavigation();
-        StatusTextBlock.Text = string.Format(LocalizationManager.Current.PlaylistDeleted, name);
-    }
-
-    private MenuFlyout BuildPlaylistsHeaderContextFlyout()
-    {
-        var menu = CreateSidebarMenuFlyout();
-        var importItem = CreateFlyoutMenuItem(LocalizationManager.Current.ImportM3u8Playlist);
-        importItem.Click += ImportM3u8PlaylistMenuItem_OnClick;
-        menu.Items.Add(importItem);
-        return menu;
-    }
-
-    private MenuFlyout CreateSidebarMenuFlyout() => new()
-    {
-        FlyoutPresenterTheme = FindResource<ControlTheme>("AppMenuFlyoutPresenterTheme"),
-        ItemContainerTheme = FindResource<ControlTheme>("AppMenuFlyoutItemTheme")
-    };
-
-    private MenuItem CreateFlyoutMenuItem(string header, IBrush? foreground = null)
-    {
-        foreground ??= FindResource<IBrush>("AppPrimaryTextBrush");
-        return new MenuItem
-        {
-            Header = new TextBlock
-            {
-                Text = header,
-                Foreground = foreground,
-                VerticalAlignment = VerticalAlignment.Center
-            },
-            Theme = FindResource<ControlTheme>("AppMenuFlyoutItemTheme"),
-            Foreground = foreground
-        };
-    }
-
-    private async void ImportM3u8PlaylistMenuItem_OnClick(object? sender, RoutedEventArgs e)
-    {
-        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-        {
-            Title = LocalizationManager.Current.ImportM3u8Playlist,
-            FileTypeFilter =
-            [
-                new FilePickerFileType("M3U8") { Patterns = ["*.m3u8", "*.m3u"] }
-            ],
-            AllowMultiple = false
-        });
-        if (files.Count == 0 || files[0].TryGetLocalPath() is not { Length: > 0 } filePath)
-            return;
-
-        try
-        {
-            var result = await M3u8PlaylistService.ImportAsync(filePath);
-            if (result.Entries.Count == 0)
-            {
-                StatusTextBlock.Text = LocalizationManager.Current.M3u8ImportNoEntries;
-                return;
-            }
-
-            var name = Path.GetFileNameWithoutExtension(filePath).Trim();
-            if (name.Length == 0)
-                name = LocalizationManager.Current.NewPlaylist;
-            using var db = AudioDatabase.OpenDefault();
-            db.CreatePlaylist(name, result.Entries);
-            LoadNavPlaylists();
-            StatusTextBlock.Text = string.Format(
-                LocalizationManager.Current.M3u8ImportCompleted,
-                name,
-                result.Entries.Count,
-                result.MissingLocalFiles,
-                result.RemoteEntries,
-                result.SkippedCredentialUrls + result.SkippedInvalidEntries);
-        }
-        catch (Exception ex)
-        {
-            StatusTextBlock.Text = string.Format(
-                LocalizationManager.Current.M3u8ImportFailed,
-                ex.Message);
-        }
-    }
-
-    private async void ExportM3u8PlaylistMenuItem_OnClick(object? sender, RoutedEventArgs e)
-    {
-        if (sender is not MenuItem { Tag: long playlistId })
-            return;
-
-        PlaylistRecord? playlist;
-        List<string> entries;
-        try
-        {
-            using var db = AudioDatabase.OpenDefault();
-            playlist = db.GetPlaylistById(playlistId);
-            if (playlist is null || playlist.IsSmartPlaylist)
-                return;
-            entries = db.GetPlaylistTracks(playlistId).Select(item => item.Path).ToList();
-        }
-        catch
-        {
-            return;
-        }
-
-        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
-        {
-            Title = LocalizationManager.Current.ExportM3u8Playlist,
-            FileTypeChoices = [new FilePickerFileType("M3U8") { Patterns = ["*.m3u8"] }],
-            DefaultExtension = "m3u8",
-            SuggestedFileName = SanitizeFileName(playlist.Name) + ".m3u8"
-        });
-        if (file?.TryGetLocalPath() is not { Length: > 0 } filePath)
-            return;
-
-        try
-        {
-            var result = await M3u8PlaylistService.ExportAsync(filePath, entries);
-            StatusTextBlock.Text = string.Format(
-                LocalizationManager.Current.M3u8ExportCompleted,
-                playlist.Name,
-                result.ExportedEntries,
-                result.SkippedCredentialUrls + result.SkippedInvalidEntries);
-        }
-        catch (Exception ex)
-        {
-            StatusTextBlock.Text = string.Format(
-                LocalizationManager.Current.M3u8ExportFailed,
-                ex.Message);
-        }
-    }
-
-    private static string SanitizeFileName(string value)
-    {
-        var invalid = Path.GetInvalidFileNameChars().ToHashSet();
-        var sanitized = new string(value.Select(character =>
-            invalid.Contains(character) ? '_' : character).ToArray()).Trim();
-        return sanitized.Length == 0 ? "playlist" : sanitized;
-    }
-
-    private async void EditSmartPlaylistMenuItem_OnClick(object? sender, RoutedEventArgs e)
-    {
-        if (sender is not MenuItem { Tag: long playlistId })
-            return;
-
-        PlaylistRecord? playlist;
-        SmartPlaylistCriteria criteria;
-        try
-        {
-            using var db = AudioDatabase.OpenDefault();
-            playlist = db.GetPlaylistById(playlistId);
-            if (playlist is not { IsSmartPlaylist: true } ||
-                string.IsNullOrWhiteSpace(playlist.FilterCriteria))
-                return;
-            criteria = JsonSerializer.Deserialize<SmartPlaylistCriteria>(playlist.FilterCriteria)
-                       ?? new SmartPlaylistCriteria();
-        }
-        catch
-        {
-            return;
-        }
-
-        var dialog = new SmartPlaylistDialog(criteria, playlist.Name);
-        if (await dialog.ShowDialog<bool>(this) == false ||
-            string.IsNullOrWhiteSpace(dialog.PlaylistName) ||
-            dialog.Criteria is null)
-            return;
-
-        try
-        {
-            using var db = AudioDatabase.OpenDefault();
-            db.UpdateSmartPlaylist(
-                playlistId,
-                dialog.PlaylistName.Trim(),
-                JsonSerializer.Serialize(dialog.Criteria));
-        }
-        catch
-        {
-            return;
-        }
-
-        LoadNavPlaylists();
-        if (_activePlaylistId == playlistId)
-            await ShowTopLevelViewAsync($"Playlist:{playlistId}");
-        StatusTextBlock.Text = string.Format(
-            LocalizationManager.Current.SmartPlaylistUpdated,
-            dialog.PlaylistName.Trim());
-    }
-
-    private void DeletePlaylistMenuItem_OnClick(object? sender, RoutedEventArgs e)
-    {
-        if (sender is not MenuItem { Tag: long playlistId })
-            return;
-
-        string name;
-        try
-        {
-            using var db = AudioDatabase.OpenDefault();
-            name = db.GetPlaylistById(playlistId)?.Name ?? string.Empty;
-            db.DeletePlaylist(playlistId);
-        }
-        catch { return; }
-
-        if (_activePlaylistId == playlistId)
-        {
-            _activePlaylistId = null;
-            for (int i = 0; i < NavListBox.Items.Count; i++)
-            {
-                if (NavListBox.Items[i] is ListBoxItem { Tag: "Tracks" } tracksItem)
-                {
-                    NavListBox.SelectedItem = tracksItem;
-                    break;
-                }
-            }
-        }
-
-        LoadNavPlaylists();
-        StatusTextBlock.Text = string.Format(LocalizationManager.Current.PlaylistDeleted, name);
-    }
-
-    private MenuFlyout BuildRemoveFromPlaylistContextFlyout(
-        long playlistEntryId,
-        string path)
-    {
-        var menu = CreateSidebarMenuFlyout();
-        foreach (var item in CreateQueueMenuItems([path]))
-            menu.Items.Add(item);
-        menu.Items.Add(new Separator());
-        var header = CreateFlyoutMenuItem(
-            LocalizationManager.Current.RemoveFromPlaylist,
-            new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF)));
-        header.IsHitTestVisible = false;
-        header.Focusable = false;
-        header.FontSize = 11;
-        header.FontWeight = FontWeight.SemiBold;
-        menu.Items.Add(header);
-
-        var sep = new Separator();
-        menu.Items.Add(sep);
-
-        var removeItem = CreateFlyoutMenuItem(LocalizationManager.Current.RemoveFromPlaylist);
-        removeItem.Tag = new RemovePlaylistEntryTag(playlistEntryId);
-        removeItem.Click += RemoveFromPlaylistMenuItem_OnClick;
-        menu.Items.Add(removeItem);
-
-        return menu;
-    }
-
-    private MenuFlyout BuildRemoveFromOrynivoPlaylistContextFlyout(
-        OrynivoServerSettings server,
-        long playlistEntryId,
-        string path)
-    {
-        var menu = CreateSidebarMenuFlyout();
-        foreach (var item in CreateQueueMenuItems([path]))
-            menu.Items.Add(item);
-        menu.Items.Add(new Separator());
-        var header = CreateFlyoutMenuItem(
-            LocalizationManager.Current.RemoveFromPlaylist,
-            new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF)));
-        header.IsHitTestVisible = false;
-        header.Focusable = false;
-        header.FontSize = 11;
-        header.FontWeight = FontWeight.SemiBold;
-        menu.Items.Add(header);
-        menu.Items.Add(new Separator());
-
-        var removeItem = CreateFlyoutMenuItem(LocalizationManager.Current.RemoveFromPlaylist);
-        removeItem.Tag = new RemoveOrynivoPlaylistEntryTag(server, playlistEntryId);
-        removeItem.Click += RemoveFromOrynivoPlaylistMenuItem_OnClick;
-        menu.Items.Add(removeItem);
-        return menu;
-    }
-
-    private async void RemoveFromPlaylistMenuItem_OnClick(object? sender, RoutedEventArgs e)
-    {
-        if (sender is not MenuItem { Tag: RemovePlaylistEntryTag tag })
-            return;
-
-        try
-        {
-            using var db = AudioDatabase.OpenDefault();
-            db.RemoveTrackFromPlaylist(tag.PlaylistEntryId);
-        }
-        catch { return; }
-
-        StatusTextBlock.Text = LocalizationManager.Current.TrackRemovedFromPlaylist;
-
-        if (NavListBox.SelectedItem is ListBoxItem { Tag: string navTag })
-            await ShowTopLevelViewAsync(navTag);
-    }
-
-    private async void RemoveFromOrynivoPlaylistMenuItem_OnClick(object? sender, RoutedEventArgs e)
-    {
-        if (sender is not MenuItem { Tag: RemoveOrynivoPlaylistEntryTag tag })
-            return;
-
-        var ok = await _orynivoClient.RemovePlaylistEntryAsync(tag.Server, tag.PlaylistEntryId);
-        if (!ok)
-        {
-            StatusTextBlock.Text = LocalizationManager.Current.OrynivoConnectionFailed;
-            return;
-        }
-
-        StatusTextBlock.Text = LocalizationManager.Current.TrackRemovedFromPlaylist;
-        LoadOrynivoServerNavigation();
-        if (NavListBox.SelectedItem is ListBoxItem { Tag: string navTag })
-            await ShowTopLevelViewAsync(navTag);
-    }
-
-    // ------------------------------------------------------------------
-    // Internetradio
-    // ------------------------------------------------------------------
-
-    private void LoadCatalogFilterCache()
-    {
-        _catalogFilterCacheData = _catalogFilterCache.Load();
-        if (_catalogFilterCacheData.RadioGenres.Any(option => option.Count is not null))
-            _catalogFilterCacheData.RadioGenresUpdatedAt = null;
-        _radioGenreCatalog.Clear();
-        _radioGenreCatalog.AddRange(_catalogFilterCacheData.RadioGenres
-            .Select(option => new CatalogFilterOption(option.Value)));
-        _podcastCategoryCatalog.Clear();
-        _podcastCategoryCatalog.AddRange(_catalogFilterCacheData.PodcastCategories);
-        _podcastLanguageCatalog.Clear();
-        _podcastLanguageCatalog.AddRange(_catalogFilterCacheData.PodcastLanguages);
-        if (_podcastCategoryCatalog.Any(option => string.IsNullOrWhiteSpace(option.Key)))
-            _catalogFilterCacheData.PodcastCategoriesUpdatedAt = null;
-        BuildRadioGenreFilter();
-        BuildPodcastCategoryFilter();
-        BuildPodcastLanguageFilter();
-    }
-
-    private async Task EnsureRadioFilterCatalogAsync()
-    {
-        BuildRadioGenreFilter();
-        if (_radioFilterCatalogLoading ||
-            CatalogFilterCache.IsFresh(_catalogFilterCacheData.RadioGenresUpdatedAt))
-            return;
-
-        _radioFilterCatalogLoading = true;
-        try
-        {
-            var tags = await _radioBrowserService.GetTagsAsync();
-            var options = tags
-                .Select(tag => (Genre: NormalizeRadioGenre(tag.Name), tag.StationCount))
-                .Where(item => item.Genre is not null)
-                .GroupBy(item => item.Genre!, StringComparer.OrdinalIgnoreCase)
-                .Select(group => new CatalogFilterOption(group.Key))
-                .OrderBy(option => option.Value, StringComparer.CurrentCultureIgnoreCase)
-                .ToList();
-            _radioGenreCatalog.Clear();
-            _radioGenreCatalog.AddRange(options);
-            _catalogFilterCacheData.RadioGenres = options;
-            _catalogFilterCacheData.RadioGenresUpdatedAt = DateTimeOffset.UtcNow;
-            _catalogFilterCache.Save(_catalogFilterCacheData);
-            BuildRadioGenreFilter();
-        }
-        catch
-        {
-            // Existing cached filter data remains usable.
-        }
-        finally
-        {
-            _radioFilterCatalogLoading = false;
-        }
-    }
-
-    private async void RadioSearchButton_OnClick(object? sender, RoutedEventArgs e) =>
-        await SearchRadioStationsAsync();
-
-    private async void RadioSearchTextBox_OnKeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.Key != Key.Enter)
-            return;
-        e.Handled = true;
-        await SearchRadioStationsAsync();
-    }
-
-    private async Task SearchRadioStationsAsync()
-    {
-        CancelAndDispose(ref _radioSearchCts);
-        _radioSearchCts = new CancellationTokenSource();
-        var cancellationToken = _radioSearchCts.Token;
-
-        RadioStationsDataGrid.ItemsSource = null;
-        RadioStatusTextBlock.IsVisible = true;
-        RadioStatusTextBlock.Text = LocalizationManager.Current.RadioLoading;
-        try
-        {
-            var stations = await _radioBrowserService.SearchAsync(
-                RadioSearchTextBox.Text,
-                _selectedRadioGenres,
-                cancellationToken);
-            var rows = stations.Select(station => new RadioStationViewModel
-            {
-                StationUuid = station.StationUuid,
-                Name = station.Name,
-                StreamUrl = station.StreamUrl,
-                Homepage = station.Homepage,
-                Favicon = station.Favicon,
-                CountryCode = station.CountryCode,
-                Codec = station.Codec,
-                Bitrate = station.Bitrate,
-                Tags = station.Tags,
-                Genres = NormalizeRadioGenres(station.Tags)
-            }).ToList();
-            _radioSearchResults.Clear();
-            _radioSearchResults.AddRange(rows);
-            BuildRadioGenreFilter();
-            ApplyRadioGenreFilter();
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        catch (Exception)
-        {
-            RadioStatusTextBlock.Text = LocalizationManager.Current.RadioSearchFailed;
-        }
-    }
-
-    private void RadioGenreFilterButton_OnClick(object? sender, RoutedEventArgs e)
-    {
-        BuildRadioGenreFilter();
-        RadioGenreFilterPopup.IsOpen = !RadioGenreFilterPopup.IsOpen;
-    }
-
-    private async void ClearRadioGenreFilterButton_OnClick(object? sender, RoutedEventArgs e)
-    {
-        _selectedRadioGenres.Clear();
-        BuildRadioGenreFilter();
-        await SearchRadioStationsAsync();
-    }
-
-    private void BuildRadioGenreFilter()
-    {
-        var useCatalog = string.IsNullOrWhiteSpace(RadioSearchTextBox.Text);
-        var options = useCatalog && _radioGenreCatalog.Count > 0
-            ? _radioGenreCatalog
-            : _radioSearchResults
-                .SelectMany(row => row.Genres)
-                .GroupBy(genre => genre, StringComparer.OrdinalIgnoreCase)
-                .Select(group => new CatalogFilterOption(group.Key, group.Count()))
-                .OrderByDescending(option => option.Count)
-                .ThenBy(option => option.Value, StringComparer.CurrentCultureIgnoreCase)
-                .ToList();
-
-        RadioGenreFilterPanel.Children.Clear();
-        foreach (var option in options)
-        {
-            var checkBox = new CheckBox
-            {
-                Content = option.Count is > 0
-                    ? $"{option.Value} ({option.Count:N0})"
-                    : option.Value,
-                Tag = option.Value,
-                IsChecked = _selectedRadioGenres.Contains(option.Value),
-                Margin = new Thickness(2, 4, 2, 4),
-                Foreground = FindResource<IBrush>("AppPrimaryTextBrush"),
-                Theme = FindResource<ControlTheme>("HeaderCheckBoxTheme")
-            };
-            checkBox.IsCheckedChanged += RadioGenreCheckBox_OnChanged;
-            RadioGenreFilterPanel.Children.Add(checkBox);
-        }
-
-        UpdateRadioGenreFilterButton();
-    }
-
-    private async void RadioGenreCheckBox_OnChanged(object? sender, RoutedEventArgs e)
-    {
-        if (sender is not CheckBox { Tag: string genre } checkBox)
-            return;
-        if (checkBox.IsChecked == true)
-            _selectedRadioGenres.Add(genre);
-        else
-            _selectedRadioGenres.Remove(genre);
-        UpdateRadioGenreFilterButton();
-        await SearchRadioStationsAsync();
-    }
-
-    private void ApplyRadioGenreFilter()
-    {
-        var rows = _radioSearchResults;
-        RadioStationsDataGrid.ItemsSource = rows;
-        RadioStatusTextBlock.Text = rows.Count == 0
-            ? LocalizationManager.Current.RadioNoResults
-            : string.Empty;
-        RadioStatusTextBlock.IsVisible = rows.Count == 0;
-        ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(rows.Count);
-    }
-
-    private void UpdateRadioGenreFilterButton()
-    {
-        RadioGenreFilterButton.Content = _selectedRadioGenres.Count == 0
-            ? LocalizationManager.Current.RadioGenres
-            : $"{LocalizationManager.Current.RadioGenres} ({_selectedRadioGenres.Count})";
-    }
-
-    private static IReadOnlyList<string> NormalizeRadioGenres(string? tags)
-    {
-        if (string.IsNullOrWhiteSpace(tags))
-            return [];
-
-        return tags.Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(NormalizeRadioGenre)
-            .Where(genre => genre is not null)
-            .Cast<string>()
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(genre => genre, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-    }
-
-    private static string? NormalizeRadioGenre(string tag)
-    {
-        var value = tag.Trim().ToLowerInvariant();
-        if (value.Length < 2 ||
-            value is "aac" or "mp3" or "ogg" or "fm" or "am" or "radio" or "music" or "otr")
-            return null;
-
-        if (value.Contains("news", StringComparison.Ordinal) || value == "information") return "News";
-        if (value.Contains("talk", StringComparison.Ordinal)) return "Talk";
-        if (value.Contains("public radio", StringComparison.Ordinal)) return "Public Radio";
-        if (value.Contains("classical", StringComparison.Ordinal)) return "Classical";
-        if (value.Contains("jazz", StringComparison.Ordinal)) return "Jazz";
-        if (value.Contains("easy listening", StringComparison.Ordinal)) return "Easy Listening";
-        if (value.Contains("adult contemporary", StringComparison.Ordinal)) return "Adult Contemporary";
-        if (value.Contains("top 40", StringComparison.Ordinal) || value == "hits") return "Hits";
-        if (value.Contains("oldies", StringComparison.Ordinal)) return "Oldies";
-        if (value.Contains("80s", StringComparison.Ordinal)) return "80s";
-        if (value.Contains("90s", StringComparison.Ordinal)) return "90s";
-        if (value.Contains("70s", StringComparison.Ordinal)) return "70s";
-        if (value.Contains("hip hop", StringComparison.Ordinal) || value.Contains("hip-hop", StringComparison.Ordinal)) return "Hip-Hop";
-        if (value.Contains("r&b", StringComparison.Ordinal) || value.Contains("soul", StringComparison.Ordinal)) return "R&B / Soul";
-        if (value.Contains("electronic", StringComparison.Ordinal) || value is "edm" or "techno" or "house" or "trance") return "Electronic";
-        if (value.Contains("dance", StringComparison.Ordinal)) return "Dance";
-        if (value.Contains("alternative", StringComparison.Ordinal)) return "Alternative";
-        if (value.Contains("indie", StringComparison.Ordinal)) return "Indie";
-        if (value.Contains("metal", StringComparison.Ordinal)) return "Metal";
-        if (value.Contains("rock", StringComparison.Ordinal)) return "Rock";
-        if (value.Contains("pop", StringComparison.Ordinal)) return "Pop";
-        if (value.Contains("blues", StringComparison.Ordinal)) return "Blues";
-        if (value.Contains("country", StringComparison.Ordinal)) return "Country";
-        if (value.Contains("reggae", StringComparison.Ordinal)) return "Reggae";
-        if (value.Contains("folk", StringComparison.Ordinal)) return "Folk";
-        if (value.Contains("latin", StringComparison.Ordinal)) return "Latin";
-        if (value.Contains("world", StringComparison.Ordinal)) return "World";
-        if (value.Contains("culture", StringComparison.Ordinal)) return "Culture";
-        if (value.Contains("comedy", StringComparison.Ordinal)) return "Comedy";
-        if (value.Contains("sport", StringComparison.Ordinal)) return "Sports";
-        return null;
-    }
-
-    private async void RadioStationsDataGrid_OnMouseDoubleClick(object? sender, Avalonia.Input.TappedEventArgs e)
-    {
-        if (FindAncestor<Button>(e.Source as Visual) is not null ||
-            !TryGetDoubleTappedRow<RadioStationViewModel>(RadioStationsDataGrid, e, out var station))
-            return;
-        await PlayRadioAsync(station.ToRecord());
-    }
-
-    private async void PlayRadioButton_OnClick(object? sender, RoutedEventArgs e)
-    {
-        if (sender is Button { Tag: RadioStationViewModel station })
-            await PlayRadioAsync(station.ToRecord());
-    }
-
-    private void AddRadioButton_OnClick(object? sender, RoutedEventArgs e)
-    {
-        if (sender is not Button { Tag: RadioStationViewModel station })
-            return;
-        try
-        {
-            using var db = AudioDatabase.OpenDefault();
-            db.SaveRadioStation(station.ToBrowserStation());
-            LoadNavPlaylists();
-            StatusTextBlock.Text = string.Format(LocalizationManager.Current.RadioAdded, station.Name);
-        }
-        catch (Exception)
-        {
-            StatusTextBlock.Text = LocalizationManager.Current.RadioSearchFailed;
-        }
-    }
-
-    private async Task PlaySavedRadioAsync(long radioId)
-    {
-        RadioStationRecord? station;
-        try
-        {
-            using var db = AudioDatabase.OpenDefault();
-            station = db.GetRadioStation(radioId);
-        }
-        catch
-        {
-            station = null;
-        }
-
-        if (station is not null)
-            await PlayRadioAsync(station);
-    }
-
-    private async Task PlayRadioAsync(RadioStationRecord station)
-    {
-        RefreshQueueNavigationButtons();
-        _ = _radioBrowserService.RegisterClickAsync(station.StationUuid);
-        try
-        {
-            await StartPlaybackAsync(station.StreamUrl, station);
-        }
-        catch (OperationCanceledException)
-        {
-            StatusTextBlock.Text = LocalizationManager.Current.PlaybackStopped;
-        }
-        catch (Exception ex)
-        {
-            StopPlayback();
-            StatusTextBlock.Text = ex.Message;
-        }
-    }
-
-    private void ShowRadioNowPlaying(RadioStationRecord station, AudioFileInfo info)
-    {
-        RadioNowPlayingPanel.IsVisible = true;
-        RadioNowPlayingStation.Text = station.Name;
-        RadioNowPlayingTitle.Text = LocalizationManager.Current.RadioMetadataUnavailable;
-        RadioNowPlayingArtist.Text = string.Empty;
-        RadioNowPlayingDescription.Text = BuildRadioDescription(station, info, null);
-        RadioNowPlayingLogo.Source = null;
-        NowPlayingArtworkImage.Source = null;
-        _ = LoadRadioLogoAsync(station.Favicon, _playbackCts?.Token ?? CancellationToken.None);
-    }
-
-    private void StartRadioMetadataMonitor(RadioStationRecord station)
-    {
-        CancelAndDispose(ref _radioMetadataCts);
-        _radioMetadataCts = CancellationTokenSource.CreateLinkedTokenSource(
-            _playbackCts?.Token ?? CancellationToken.None);
-        _ = MonitorRadioMetadataAsync(station, _radioMetadataCts.Token);
-    }
-
-    private async Task MonitorRadioMetadataAsync(
-        RadioStationRecord station,
-        CancellationToken cancellationToken)
-    {
-        string? previousSignature = null;
-        while (!cancellationToken.IsCancellationRequested)
-        {
-            try
-            {
-                var metadata = await _radioMetadataService.ProbeAsync(
-                    station.StreamUrl,
-                    cancellationToken);
-                var signature = metadata is null
-                    ? string.Empty
-                    : $"{metadata.StreamTitle}\n{metadata.Description}\n{metadata.Genre}";
-                if (!string.Equals(signature, previousSignature, StringComparison.Ordinal))
-                {
-                    previousSignature = signature;
-                    await Dispatcher.UIThread.InvokeAsync(() => UpdateRadioMetadata(station, metadata));
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-            catch
-            {
-                if (previousSignature is null)
-                {
-                    previousSignature = string.Empty;
-                    await Dispatcher.UIThread.InvokeAsync(() => UpdateRadioMetadata(station, null));
-                }
-            }
-
-            try
-            {
-                await Task.Delay(TimeSpan.FromSeconds(15), cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-        }
-    }
-
-    private void UpdateRadioMetadata(RadioStationRecord station, RadioStreamMetadata? metadata)
-    {
-        if (_currentRadioStation?.StationUuid != station.StationUuid)
-            return;
-
-        var title = metadata?.Title;
-        var artist = metadata?.Artist;
-        if (string.IsNullOrWhiteSpace(title))
-        {
-            RadioNowPlayingTitle.Text = LocalizationManager.Current.RadioMetadataUnavailable;
-            RadioNowPlayingArtist.Text = string.Empty;
-            NowPlayingTitleBlock.Text = station.Name;
-            NowPlayingArtistBlock.Text = LocalizationManager.Current.InternetRadio;
-        }
-        else
-        {
-            RadioNowPlayingTitle.Text = title;
-            RadioNowPlayingArtist.Text = artist ?? metadata!.StationName ?? station.Name;
-            NowPlayingTitleBlock.Text = title;
-            NowPlayingArtistBlock.Text = artist ?? station.Name;
-        }
-
-        RadioNowPlayingDescription.Text = BuildRadioDescription(
-            station,
-            null,
-            metadata);
-        RefreshWindowsMediaMetadata();
-    }
-
-    private static string BuildRadioDescription(
-        RadioStationRecord station,
-        AudioFileInfo? info,
-        RadioStreamMetadata? metadata)
-    {
-        var parts = new List<string>();
-        if (!string.IsNullOrWhiteSpace(metadata?.Description))
-            parts.Add(metadata.Description);
-        if (!string.IsNullOrWhiteSpace(metadata?.Genre))
-            parts.Add(metadata.Genre);
-        if (!string.IsNullOrWhiteSpace(station.CountryCode))
-            parts.Add(station.CountryCode);
-        if (!string.IsNullOrWhiteSpace(station.Codec))
-            parts.Add(station.Bitrate > 0
-                ? $"{station.Codec} · {station.Bitrate} kbps"
-                : station.Codec);
-        else if (info is not null)
-            parts.Add($"{info.CodecName.ToUpperInvariant()} · {info.SourceSampleRate:N0} Hz");
-        return string.Join("  ·  ", parts.Distinct(StringComparer.OrdinalIgnoreCase));
-    }
-
-    private async Task LoadRadioLogoAsync(string? favicon, CancellationToken cancellationToken)
-    {
-        if (!Uri.TryCreate(favicon, UriKind.Absolute, out var uri))
-            return;
-        try
-        {
-            var bytes = await RadioImageHttpClient.GetByteArrayAsync(uri, cancellationToken);
-            await using var stream = new MemoryStream(bytes);
-            var image = new Bitmap(stream);
-            if (!cancellationToken.IsCancellationRequested)
-            {
-                RadioNowPlayingLogo.Source = image;
-                NowPlayingArtworkImage.Source = image;
-            }
-        }
-        catch
-        {
-            // A missing or invalid station logo does not affect playback.
-        }
-    }
-
-    private void ClearRadioNowPlaying()
-    {
-        RadioNowPlayingPanel.IsVisible = false;
-        RadioNowPlayingLogo.Source = null;
-        RadioNowPlayingStation.Text = string.Empty;
-        RadioNowPlayingTitle.Text = string.Empty;
-        RadioNowPlayingArtist.Text = string.Empty;
-        RadioNowPlayingDescription.Text = string.Empty;
-    }
-
-    private static HttpClient CreateRadioImageHttpClient()
-    {
-        var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("Orynivo/1.0");
-        return client;
     }
 
     // ------------------------------------------------------------------
@@ -11622,6 +10622,7 @@ public partial class MainWindow : Window
             StartRadioMetadataMonitor(radioStation);
         }
         UpdateNowPlayingFavoriteButton();
+        UpdateReplayGainBadge(usesNativeDsd);
         RefreshWindowsMediaMetadata();
         _windowsMediaTransport?.SetPlaybackStatus(MediaPlaybackStatus.Playing);
         _windowsMediaTransport?.UpdateTimeline(
@@ -11685,7 +10686,14 @@ public partial class MainWindow : Window
             _currentPlayHistoryId = null;
         }
 
-        await player.WaitForCompletionAsync();
+        try
+        {
+            await player.WaitForCompletionAsync();
+        }
+        catch (OperationCanceledException) when (!ReferenceEquals(_player, player))
+        {
+            return;
+        }
 
         if (_player == player)
         {
@@ -12188,6 +11196,7 @@ public partial class MainWindow : Window
                 BuildNowPlayingTrackContext(filePath));
 
         UpdateNowPlayingFavoriteButton();
+        UpdateReplayGainBadge(nativeDsdOutput: false);
         RefreshWindowsMediaMetadata();
         _windowsMediaTransport?.SetPlaybackStatus(MediaPlaybackStatus.Playing);
         if (_player is not null)
@@ -12224,8 +11233,12 @@ public partial class MainWindow : Window
         else if (_currentRadioStation is { } radioStation)
         {
             album = radioStation.Name;
-            if (Uri.TryCreate(radioStation.Favicon, UriKind.Absolute, out var radioArtworkUri))
+            artworkPath = _currentRadioArtworkPath;
+            if (string.IsNullOrWhiteSpace(artworkPath) &&
+                Uri.TryCreate(radioStation.Favicon, UriKind.Absolute, out var radioArtworkUri))
+            {
                 artworkUri = radioArtworkUri;
+            }
         }
         else if (_plexTracksByUrl.TryGetValue(_currentFilePath, out var plexTrack))
         {
@@ -12498,6 +11511,14 @@ public partial class MainWindow : Window
             return BuildOrynivoHistoryExternalId(rowServer, rowTrackId);
         }
 
+        if (_plexTracksByUrl.TryGetValue(filePath, out var plexRow) &&
+            plexRow is { PlexServerId: { } plexServerId, ExternalId: { } plexRatingKey } &&
+            !string.IsNullOrWhiteSpace(plexServerId) && !string.IsNullOrWhiteSpace(plexRatingKey))
+        {
+            return BuildPlexHistoryExternalId(
+                plexServerId, plexRatingKey, plexRow.PlexAlbumRatingKey, plexRow.PlexArtistRatingKey);
+        }
+
         return null;
     }
 
@@ -12507,6 +11528,23 @@ public partial class MainWindow : Window
     /// <returns>A compact, parseable history identifier.</returns>
     private static string BuildOrynivoHistoryExternalId(OrynivoServerSettings server, long trackId) =>
         $"orynivo:{server.Id}:track:{trackId}";
+
+    /// <summary>
+    /// Builds a stable Plex playback-history external ID carrying the server, track,
+    /// album, and artist rating keys so a Plex history entry stays resolvable to its
+    /// in-library album and artist. Rating keys are numeric and contain no colons.
+    /// </summary>
+    /// <param name="serverId">Plex server identifier.</param>
+    /// <param name="ratingKey">Plex track rating key.</param>
+    /// <param name="albumRatingKey">Plex album (parent) rating key, or <see langword="null"/>.</param>
+    /// <param name="artistRatingKey">Plex artist (grandparent) rating key, or <see langword="null"/>.</param>
+    /// <returns>A compact, parseable history identifier of the form <c>plex:server:track:album:artist</c>.</returns>
+    private static string BuildPlexHistoryExternalId(
+        string serverId,
+        string ratingKey,
+        string? albumRatingKey,
+        string? artistRatingKey) =>
+        $"plex:{serverId}:{ratingKey}:{albumRatingKey ?? string.Empty}:{artistRatingKey ?? string.Empty}";
 
     private void StartLocalPlaybackHistory(string filePath)
     {
@@ -12619,6 +11657,7 @@ public partial class MainWindow : Window
         NowPlayingArtistBlock.Text = "";
         ClearNowPlayingAlbum();
         FileInfoTextBlock.Text     = "";
+        ReplayGainBadgeBorder.IsVisible = false;
         NowPlayingArtworkImage.Source = null;
         LyricsBackgroundImage.Source = null;
         _currentTrackId = null;
@@ -12626,6 +11665,7 @@ public partial class MainWindow : Window
         _currentArtistName = null;
         _currentTrackIsFavorite = false;
         _currentRadioStation = null;
+        _currentRadioArtworkPath = null;
         _currentPodcastPlayback = null;
         _windowsMediaTransport?.Clear();
         LyricsButton.IsEnabled = false;
@@ -12770,6 +11810,131 @@ public partial class MainWindow : Window
         try { await StartPlaybackAsync(_queue[_queueIndex].FilePath); return true; }
         catch { return false; }
     }
+
+    private void MaybeStartNonGaplessFadeTransition(TimeSpan visiblePosition)
+    {
+        if (_nonGaplessFadeTransitionInProgress ||
+            _settings.NonGaplessCrossfadeSeconds <= 0 ||
+            _currentRadioStation is not null ||
+            _currentPodcastPlayback is not null ||
+            _player is null ||
+            _player.Duration <= TimeSpan.Zero ||
+            IsContinuousGaplessQueueActive() ||
+            !HasNextQueueItem())
+        {
+            return;
+        }
+
+        var fade = TimeSpan.FromSeconds(Math.Clamp(_settings.NonGaplessCrossfadeSeconds, 0.5, 10));
+        if (_player.Duration <= fade + TimeSpan.FromSeconds(1))
+            return;
+        if (_player.Duration - visiblePosition > fade)
+            return;
+
+        _ = RunNonGaplessFadeTransitionAsync(fade);
+    }
+
+    private bool IsContinuousGaplessQueueActive() =>
+        _player is IGaplessAudioPlayer &&
+        !_shuffleEnabled &&
+        _queueIndex >= 0 &&
+        _queueIndex + 1 < _queue.Count &&
+        _queueIndex < _queue.Count &&
+        string.Equals(_queue[_queueIndex].FilePath, _currentFilePath, StringComparison.OrdinalIgnoreCase);
+
+    private bool HasNextQueueItem()
+    {
+        if (_shuffleEnabled)
+            return HasUnplayedShuffleCandidate();
+        return _queueIndex == -1
+            ? _queue.Count > 0
+            : _queueIndex + 1 < _queue.Count;
+    }
+
+    private async Task RunNonGaplessFadeTransitionAsync(TimeSpan fade)
+    {
+        if (_nonGaplessFadeTransitionInProgress || _player is null)
+            return;
+
+        _nonGaplessFadeTransitionInProgress = true;
+        var outgoing = _player;
+        var outgoingVolume = outgoing.Volume;
+        try
+        {
+            await FadePlayerVolumeAsync(outgoing, outgoingVolume, 0f, fade);
+            if (!ReferenceEquals(_player, outgoing) || !TryMoveToNextQueueIndex())
+                return;
+
+            PersistPlaybackQueue();
+            RefreshQueueRowsIfVisible();
+            RefreshQueueNavigationButtons();
+
+            var nextPath = _queue[_queueIndex].FilePath;
+            var playbackTask = StartPlaybackAsync(nextPath);
+            _ = playbackTask.ContinueWith(task =>
+            {
+                if (task.Exception is { } exception)
+                    CrashLogger.Log(exception.GetBaseException(), "Non-gapless fade playback");
+            }, TaskContinuationOptions.OnlyOnFaulted);
+
+            var incoming = await WaitForCurrentPlayerReplacementAsync(outgoing, TimeSpan.FromSeconds(3));
+            if (incoming is null)
+                return;
+            var targetVolume = GetNormalPlayerVolume();
+            incoming.Volume = 0f;
+            await FadePlayerVolumeAsync(incoming, 0f, targetVolume, fade);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            CrashLogger.Log(ex, "Non-gapless fade transition");
+        }
+        finally
+        {
+            if (ReferenceEquals(_player, outgoing))
+                outgoing.Volume = outgoingVolume;
+            _nonGaplessFadeTransitionInProgress = false;
+        }
+    }
+
+    private async Task<IAudioPlayer?> WaitForCurrentPlayerReplacementAsync(
+        IAudioPlayer outgoing,
+        TimeSpan timeout)
+    {
+        var deadline = DateTimeOffset.UtcNow + timeout;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            if (_player is { } current && !ReferenceEquals(current, outgoing))
+                return current;
+            await Task.Delay(25);
+        }
+        return _player is { } player && !ReferenceEquals(player, outgoing) ? player : null;
+    }
+
+    private async Task FadePlayerVolumeAsync(
+        IAudioPlayer player,
+        float from,
+        float to,
+        TimeSpan duration)
+    {
+        var steps = Math.Max(1, (int)Math.Ceiling(duration.TotalMilliseconds / 50d));
+        for (var step = 1; step <= steps; step++)
+        {
+            if (!ReferenceEquals(_player, player) && step > 1)
+                return;
+            var ratio = (float)step / steps;
+            player.Volume = from + ((to - from) * ratio);
+            await Task.Delay(TimeSpan.FromMilliseconds(duration.TotalMilliseconds / steps));
+        }
+        player.Volume = to;
+    }
+
+    private float GetNormalPlayerVolume() =>
+        _settings.OutputBackend == OutputBackend.Wasapi && _endpointVolumeSynchronizer is not null
+            ? 1.0f
+            : (float)VolumeSlider.Value;
 
     private void RefreshQueueNavigationButtons()
     {
@@ -12991,6 +12156,7 @@ public partial class MainWindow : Window
             SavePodcastProgress(completed: false);
         }
         UpdateActiveLyric(_player.Position);
+        MaybeStartNonGaplessFadeTransition(visiblePosition);
     }
 
     /// <summary>Commits the pending waveform-progress seek and leaves preview mode.</summary>
@@ -14766,20 +13932,68 @@ public partial class MainWindow : Window
         if (_settings.ReplayGainMode == ReplayGainMode.Off)
             return pcmGain;
 
+        if (TryGetCurrentReplayGainValues(filePath, out var trackGain, out var albumGain))
+        {
+            return pcmGain * ReplayGain.GetLinearFactor(
+                _settings.ReplayGainMode,
+                trackGain,
+                albumGain);
+        }
+
+        return pcmGain;
+    }
+
+    private void UpdateReplayGainBadge(bool nativeDsdOutput)
+    {
+        ReplayGainBadgeBorder.IsVisible =
+            !nativeDsdOutput &&
+            _settings.ReplayGainMode != ReplayGainMode.Off &&
+            TryGetCurrentReplayGainValues(_currentFilePath, out var trackGain, out var albumGain) &&
+            HasPreferredReplayGainValue(trackGain, albumGain);
+    }
+
+    private bool HasPreferredReplayGainValue(string? trackGain, string? albumGain) =>
+        _settings.ReplayGainMode switch
+        {
+            ReplayGainMode.Track => !string.IsNullOrWhiteSpace(trackGain) ||
+                                    !string.IsNullOrWhiteSpace(albumGain),
+            ReplayGainMode.Album => !string.IsNullOrWhiteSpace(albumGain) ||
+                                    !string.IsNullOrWhiteSpace(trackGain),
+            _ => false
+        };
+
+    private bool TryGetCurrentReplayGainValues(
+        string? filePath,
+        out string? trackGain,
+        out string? albumGain)
+    {
+        trackGain = null;
+        albumGain = null;
+        if (string.IsNullOrWhiteSpace(filePath))
+            return false;
+
+        if (_orynivoTracksByUrl.TryGetValue(filePath, out var orynivoRow))
+        {
+            trackGain = orynivoRow.ReplayGainTrack;
+            albumGain = orynivoRow.ReplayGainAlbum;
+            return !string.IsNullOrWhiteSpace(trackGain) ||
+                   !string.IsNullOrWhiteSpace(albumGain);
+        }
+
         try
         {
             using var db = AudioDatabase.OpenDefault();
             var track = db.GetByPath(filePath);
-            return track is null
-                ? pcmGain
-                : pcmGain * ReplayGain.GetLinearFactor(
-                    _settings.ReplayGainMode,
-                    track.ReplayGainTrack,
-                    track.ReplayGainAlbum);
+            if (track is null)
+                return false;
+            trackGain = track.ReplayGainTrack;
+            albumGain = track.ReplayGainAlbum;
+            return !string.IsNullOrWhiteSpace(trackGain) ||
+                   !string.IsNullOrWhiteSpace(albumGain);
         }
         catch
         {
-            return pcmGain;
+            return false;
         }
     }
 
@@ -15041,6 +14255,7 @@ public partial class MainWindow : Window
             _settings.ReplayGainMode        = window.SelectedReplayGainMode;
             _settings.AlwaysConvertDsdToPcm = window.AlwaysConvertDsdToPcm;
             _settings.PcmOutputBoostEnabled = window.PcmOutputBoostEnabled;
+            _settings.NonGaplessCrossfadeSeconds = window.NonGaplessCrossfadeSeconds;
             _settings.EqualizerEnabled      = window.EqualizerEnabled;
             _settings.EqualizerProfile      = window.SelectedEqualizerProfile;
             _settings.EqualizerProfiles     = window.SelectedEqualizerProfiles.ToList();
@@ -15137,6 +14352,7 @@ public partial class MainWindow : Window
                         StringComparison.OrdinalIgnoreCase))
                 {
                     _player.ReplayGainFactor = replayGainFactor;
+                    UpdateReplayGainBadge(_player is DsfAudioPlayer or DffAudioPlayer or RemoteDsfAudioPlayer or RemoteDffAudioPlayer);
                 }
             }
             if (_player is IEqualizerAudioPlayer equalizerPlayer)
@@ -15159,27 +14375,7 @@ public partial class MainWindow : Window
     }
 
     private float GetReplayGainFactorFromDatabase(string filePath)
-    {
-        var pcmGain = GetPcmOutputGainFactor();
-        if (_settings.ReplayGainMode == ReplayGainMode.Off)
-            return pcmGain;
-
-        try
-        {
-            using var db = AudioDatabase.OpenDefault();
-            var track = db.GetByPath(filePath);
-            return track is null
-                ? pcmGain
-                : pcmGain * ReplayGain.GetLinearFactor(
-                    _settings.ReplayGainMode,
-                    track.ReplayGainTrack,
-                    track.ReplayGainAlbum);
-        }
-        catch
-        {
-            return pcmGain;
-        }
-    }
+        => GetReplayGainFactor(filePath);
 
     private static bool PlexServerSettingsEqual(
         IReadOnlyList<PlexServerSettings>? left,
@@ -15222,1403 +14418,6 @@ public partial class MainWindow : Window
         await new AboutWindow().ShowDialog<object?>(this);
     }
 
-    // ------------------------------------------------------------------
-    // Dashboard
-    // ------------------------------------------------------------------
-
-    private async Task ShowDashboardAsync()
-    {
-        ContentTitleTextBlock.Text = LocalizationManager.Current.Dashboard;
-        var now = DateTime.Now;
-        if (_dashboardYear == 0)
-        {
-            _dashboardYear  = now.Year;
-            _dashboardMonth = now.Month;
-        }
-
-        // Re-flow the calendar/genre columns when the window crosses the
-        // two-column width threshold; only rebuilds on an actual layout change.
-        if (!_dashboardResizeHooked)
-        {
-            _dashboardResizeHooked = true;
-            DashboardScrollViewer.SizeChanged += DashboardScrollViewer_OnSizeChanged;
-        }
-
-        await BuildDashboardAsync();
-    }
-
-    private async void DashboardScrollViewer_OnSizeChanged(object? sender, SizeChangedEventArgs e)
-    {
-        // Only the main dashboard re-flows its two-column stats layout; the
-        // full-page "show all" views share this surface but must not be replaced.
-        if (!DashboardScrollViewer.IsVisible || _currentTopLevelTag != "Dashboard")
-            return;
-        if (ComputeDashboardTwoColumn() == _dashboardTwoColumnLayout)
-            return;
-        await BuildDashboardAsync();
-    }
-
-    /// <summary>Decides whether the calendar and top-genre blocks fit side by side.</summary>
-    /// <returns><see langword="true"/> when the dashboard is wide enough for two columns.</returns>
-    private bool ComputeDashboardTwoColumn()
-    {
-        var width = DashboardScrollViewer.Bounds.Width;
-        if (width < 1)
-            width = Bounds.Width - 260; // sidebar + margins fallback before first layout
-        return width >= 980;
-    }
-
-    private async Task BuildDashboardAsync()
-    {
-        var buildVersion = ++_dashboardBuildVersion;
-        var visiblePanel = _dashboardRootPanel ?? DashboardPanel;
-        _dashboardRootPanel = visiblePanel;
-        var buildPanel = new StackPanel
-        {
-            Spacing = visiblePanel.Spacing,
-            Margin = visiblePanel.Margin,
-            Orientation = visiblePanel.Orientation,
-            HorizontalAlignment = visiblePanel.HorizontalAlignment,
-            VerticalAlignment = visiblePanel.VerticalAlignment
-        };
-
-        DashboardPanel = buildPanel;
-        try
-        {
-            _calendarInner = null;
-            _dashboardTwoColumnLayout = ComputeDashboardTwoColumn();
-
-            var recentAlbums = await LoadRecentAlbumsAsync();
-            if (buildVersion != _dashboardBuildVersion)
-                return;
-
-            var (recentlyPlayed, recentThumbs) = await LoadRecentlyPlayedAsync(12);
-            if (buildVersion != _dashboardBuildVersion)
-                return;
-
-            var calendarData = await Task.Run(() =>
-            {
-                using var db = AudioDatabase.OpenDefault();
-                return db.GetCalendarData(_dashboardYear, _dashboardMonth);
-            });
-            if (buildVersion != _dashboardBuildVersion)
-                return;
-
-            var topGenres = await Task.Run(() =>
-            {
-                using var db = AudioDatabase.OpenDefault();
-                return db.GetTopGenres(10);
-            });
-            if (buildVersion != _dashboardBuildVersion)
-                return;
-
-            DashboardBuildGreeting();
-
-            if (recentlyPlayed.Count > 0)
-            {
-                DashboardPanel.Children.Add(DashboardCreateSectionHeader(
-                    LocalizationManager.Current.RecentlyPlayed,
-                    showAllAction: () => _ = ShowAllRecentlyPlayedAsync()));
-                DashboardBuildRecentlyPlayed(recentlyPlayed, recentThumbs);
-            }
-
-            DashboardPanel.Children.Add(DashboardCreateSectionHeader(
-                LocalizationManager.Current.RecentAlbums,
-                showAllAction: () => _ = ShowAllRecentAlbumsAsync()));
-            DashboardBuildRecentAlbums(recentAlbums);
-
-            DashboardBuildStatsSection(calendarData, topGenres);
-            if (buildVersion != _dashboardBuildVersion)
-                return;
-
-            DashboardPanel = visiblePanel;
-            visiblePanel.Children.Clear();
-            while (buildPanel.Children.Count > 0)
-            {
-                var child = buildPanel.Children[0];
-                buildPanel.Children.RemoveAt(0);
-                visiblePanel.Children.Add(child);
-            }
-        }
-        finally
-        {
-            if (ReferenceEquals(DashboardPanel, buildPanel))
-                DashboardPanel = visiblePanel;
-        }
-    }
-
-    /// <summary>
-    /// Loads the most recent, path-de-duplicated playback-history entries together
-    /// with local album thumbnail paths, shared by the dashboard strip and the
-    /// full "recently played" view.
-    /// </summary>
-    /// <param name="count">Maximum number of distinct entries to return.</param>
-    /// <returns>The de-duplicated entries and their album thumbnail paths.</returns>
-    private static Task<(List<DailyHistoryEntry> Entries, Dictionary<long, string> Thumbs)> LoadRecentlyPlayedAsync(int count) =>
-        Task.Run(() =>
-        {
-            using var db = AudioDatabase.OpenDefault();
-            // Over-fetch so de-duplication by path can still fill the requested count.
-            var history = db.GetRecentHistory(count * 4);
-            var deduped = new List<DailyHistoryEntry>();
-            var seenPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var entry in history)
-            {
-                if (seenPaths.Add(entry.Path))
-                    deduped.Add(entry);
-                if (deduped.Count >= count)
-                    break;
-            }
-
-            var localTrackIds = deduped
-                .Where(entry => entry.TrackId is long)
-                .Select(entry => entry.TrackId!.Value)
-                .Distinct()
-                .ToList();
-            var thumbs = db.GetAlbumsByTrackIds(localTrackIds)
-                .Where(album => !string.IsNullOrEmpty(album.ThumbnailPath))
-                .GroupBy(album => album.Id)
-                .ToDictionary(group => group.Key, group => group.First().ThumbnailPath!);
-            return (deduped, thumbs);
-        });
-
-    /// <summary>Opens the full-page "recently added" view, preserving Back navigation.</summary>
-    /// <returns>A task representing the asynchronous navigation.</returns>
-    private async Task ShowAllRecentAlbumsAsync()
-    {
-        PushCurrentNavigationState();
-        ResetDrilldownState(clearNavigationHistory: false);
-        await ShowTopLevelViewAsync("RecentAlbumsAll");
-    }
-
-    /// <summary>Opens the full-page "recently played" view, preserving Back navigation.</summary>
-    /// <returns>A task representing the asynchronous navigation.</returns>
-    private async Task ShowAllRecentlyPlayedAsync()
-    {
-        PushCurrentNavigationState();
-        ResetDrilldownState(clearNavigationHistory: false);
-        await ShowTopLevelViewAsync("RecentlyPlayedAll");
-    }
-
-    /// <summary>Builds the full-page grid of up to 200 recently added albums.</summary>
-    /// <returns>A task representing the asynchronous build.</returns>
-    private async Task BuildAllRecentAlbumsViewAsync()
-    {
-        DashboardPanel.Children.Clear();
-        _calendarInner = null;
-        SearchTextBox.IsVisible = false;
-
-        var albums = await LoadRecentAlbumsAsync(200);
-        DashboardPanel.Children.Add(DashboardCreateSectionHeader(LocalizationManager.Current.RecentAlbums));
-        var wrap = new WrapPanel { Orientation = Orientation.Horizontal };
-        var template = FindResource<IDataTemplate>("AlbumArtworkCardTemplate");
-        if (template is not null)
-            foreach (var album in albums)
-                wrap.Children.Add(BuildRecentAlbumCard(album, template));
-        DashboardPanel.Children.Add(wrap);
-        ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(albums.Count);
-    }
-
-    /// <summary>Builds the full-page grid of up to 200 recently played entries.</summary>
-    /// <returns>A task representing the asynchronous build.</returns>
-    private async Task BuildAllRecentlyPlayedViewAsync()
-    {
-        DashboardPanel.Children.Clear();
-        _calendarInner = null;
-        SearchTextBox.IsVisible = false;
-
-        var (entries, thumbs) = await LoadRecentlyPlayedAsync(200);
-        DashboardPanel.Children.Add(DashboardCreateSectionHeader(LocalizationManager.Current.RecentlyPlayed));
-        var wrap = new WrapPanel { Orientation = Orientation.Horizontal };
-        foreach (var entry in entries)
-            wrap.Children.Add(BuildRecentlyPlayedCard(entry, thumbs, expandedSpacing: true));
-        DashboardPanel.Children.Add(wrap);
-        ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(entries.Count);
-    }
-
-    /// <summary>Builds the personal greeting hero shown at the top of the dashboard.</summary>
-    private void DashboardBuildGreeting()
-    {
-        var hour = DateTime.Now.Hour;
-        var greeting = hour switch
-        {
-            >= 5 and < 12 => LocalizationManager.Current.GreetingMorning,
-            >= 12 and < 18 => LocalizationManager.Current.GreetingAfternoon,
-            _ => LocalizationManager.Current.GreetingEvening
-        };
-
-        var stack = new StackPanel { Spacing = 2, Margin = new Thickness(0, 0, 0, 4) };
-        stack.Children.Add(new TextBlock
-        {
-            Text = greeting,
-            FontSize = ResolveFontSize("FontSizeHeadline"),
-            FontWeight = FontWeight.Bold,
-            Foreground = FindResource<IBrush>("AppPrimaryTextBrush")
-        });
-        stack.Children.Add(new TextBlock
-        {
-            Text = LocalizationManager.Current.DashboardTagline,
-            FontSize = ResolveFontSize("FontSizeBody"),
-            Foreground = FindResource<IBrush>("AppSecondaryTextBrush")
-        });
-        DashboardPanel.Children.Add(stack);
-    }
-
-    private void DashboardAddSectionHeader(string title, bool calendarNav = false) =>
-        DashboardPanel.Children.Add(DashboardCreateSectionHeader(title, calendarNav));
-
-    /// <summary>Builds a dashboard section header with an accent underline and optional month navigation.</summary>
-    /// <param name="title">Section title text.</param>
-    /// <param name="calendarNav">Whether to include the previous/next month buttons.</param>
-    /// <param name="showAllAction">Optional "show all" action rendered as a right-aligned link.</param>
-    /// <returns>The header control, ready to be inserted into a dashboard column.</returns>
-    private Control DashboardCreateSectionHeader(
-        string title,
-        bool calendarNav = false,
-        Action? showAllAction = null)
-    {
-        var container = new StackPanel();
-
-        var grid = new Grid { Margin = new Thickness(0, 24, 0, 10) };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        if (calendarNav)
-        {
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        }
-
-        var tb = new TextBlock
-        {
-            Text       = title,
-            FontSize   = ResolveFontSize("FontSizeSubtitle"),
-            FontWeight = FontWeight.SemiBold,
-            Foreground = FindResource<IBrush>("AppPrimaryTextBrush"),
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        Grid.SetColumn(tb, 0);
-        grid.Children.Add(tb);
-
-        if (showAllAction is not null)
-        {
-            var showAll = new Button
-            {
-                Content = $"{LocalizationManager.Current.ShowAll} →",
-                FontSize = ResolveFontSize("FontSizeCaption"),
-                FontWeight = FontWeight.SemiBold,
-                Foreground = FindResource<IBrush>("AppAccentBrush"),
-                Theme = FindResource<ControlTheme>("EntityLinkButtonTheme"),
-                HorizontalAlignment = HorizontalAlignment.Right,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            showAll.Click += (_, e) =>
-            {
-                e.Handled = true;
-                showAllAction();
-            };
-            Grid.SetColumn(showAll, 1);
-            grid.Children.Add(showAll);
-        }
-
-        if (calendarNav)
-        {
-            var prev = CreateCalNavButton("◀");
-            var next = CreateCalNavButton("▶");
-            prev.Click += CalendarPrev_OnClick;
-            next.Click += CalendarNext_OnClick;
-            Grid.SetColumn(prev, 2);
-            Grid.SetColumn(next, 3);
-            grid.Children.Add(prev);
-            grid.Children.Add(next);
-        }
-
-        container.Children.Add(grid);
-        container.Children.Add(new Border
-        {
-            Height = 3,
-            Width = 34,
-            Background = FindResource<IBrush>("AppAccentBrush"),
-            CornerRadius = new CornerRadius(2),
-            HorizontalAlignment = HorizontalAlignment.Left,
-            Margin = new Thickness(0, 0, 0, 14)
-        });
-        return container;
-    }
-
-    private Button CreateCalNavButton(string symbol)
-    {
-        return new Button
-        {
-            Content    = symbol,
-            FontSize   = 13,
-            Padding    = new Thickness(8, 3, 8, 3),
-            Margin     = new Thickness(4, 0, 0, 0),
-            Background = FindResource<IBrush>("AppButtonBrush"),
-            Foreground = FindResource<IBrush>("AppPrimaryTextBrush"),
-            BorderBrush = FindResource<IBrush>("AppGridLineBrush"),
-            BorderThickness = new Thickness(1),
-            Cursor     = new Cursor(StandardCursorType.Hand),
-            VerticalAlignment = VerticalAlignment.Center
-        };
-    }
-
-    /// <summary>A recently added album for the dashboard, from the local library or a remote server.</summary>
-    /// <param name="Id">Album identifier within its source library.</param>
-    /// <param name="Title">Album title.</param>
-    /// <param name="Artist">Display artist name.</param>
-    /// <param name="ArtistId">Album-artist identifier, or <see langword="null"/>.</param>
-    /// <param name="AddedAt">Unix timestamp of the most recently added track in the album.</param>
-    /// <param name="Server">The owning remote server, or <see langword="null"/> for the local library.</param>
-    /// <param name="ArtworkPath">Local artwork file path or authenticated remote artwork URL, or <see langword="null"/>.</param>
-    /// <param name="HasArtwork">Whether artwork is available for the album.</param>
-    /// <param name="IsFavorite">Whether the album is flagged as a favorite (local flag or client-side remote favorite).</param>
-    private sealed record DashboardAlbum(
-        long Id,
-        string Title,
-        string Artist,
-        long? ArtistId,
-        long AddedAt,
-        OrynivoServerSettings? Server,
-        string? ArtworkPath,
-        bool HasArtwork,
-        bool IsFavorite);
-
-    /// <summary>
-    /// Loads the recently added albums for the dashboard, merging the local library with every
-    /// configured remote Orynivo Server and keeping the globally most recent entries.
-    /// </summary>
-    /// <param name="perSource">Maximum entries to fetch per source and to return overall.</param>
-    /// <returns>The merged, recency-sorted recently added albums.</returns>
-    private async Task<List<DashboardAlbum>> LoadRecentAlbumsAsync(int perSource = 12)
-    {
-        var local = await Task.Run(() =>
-        {
-            using var db = AudioDatabase.OpenDefault();
-            return db.GetRecentAlbums(perSource);
-        });
-
-        var combined = local
-            .Select(a => new DashboardAlbum(
-                a.Id, a.Title, a.Artist, a.ArtistId, a.AddedAt,
-                null, a.ArtworkPath ?? a.ThumbPath, !string.IsNullOrEmpty(a.ArtworkPath ?? a.ThumbPath),
-                a.IsFavorite))
-            .ToList();
-
-        var servers = _settings.OrynivoServers ?? [];
-        if (servers.Count > 0)
-        {
-            var remoteTasks = servers
-                .Select(server => (Server: server, Task: _orynivoClient.GetRecentAlbumsAsync(server, perSource)))
-                .ToList();
-            try { await Task.WhenAll(remoteTasks.Select(t => t.Task)); }
-            catch { /* Individual failures already yield empty lists. */ }
-
-            foreach (var (server, task) in remoteTasks)
-            {
-                if (!task.IsCompletedSuccessfully)
-                    continue;
-                combined.AddRange(task.Result.Select(a => new DashboardAlbum(
-                    a.Id, a.Title, a.Artist, a.ArtistId, a.AddedAt,
-                    server,
-                    a.HasArtwork ? OrynivoServerClient.GetAlbumArtworkUrl(server, a.Id, 320) : null,
-                    a.HasArtwork,
-                    IsOrynivoFavorite(server, "Album", a.Id))));
-            }
-        }
-
-        return combined
-            .OrderByDescending(a => a.AddedAt)
-            .Take(perSource)
-            .ToList();
-    }
-
-    private void DashboardBuildRecentAlbums(List<DashboardAlbum> albums)
-    {
-        var scroll = new ScrollViewer
-        {
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-            VerticalScrollBarVisibility   = ScrollBarVisibility.Disabled,
-            Margin = new Thickness(0, 0, 0, 4)
-        };
-
-        var panel = new StackPanel { Orientation = Orientation.Horizontal };
-        var template = FindResource<IDataTemplate>("AlbumArtworkCardTemplate");
-        if (template is not null)
-            foreach (var album in albums)
-                panel.Children.Add(BuildRecentAlbumCard(album, template));
-
-        scroll.Content = panel;
-        DashboardPanel.Children.Add(scroll);
-    }
-
-    /// <summary>
-    /// Builds one recently added album card from the shared album artwork template,
-    /// so it looks and behaves exactly like the normal Albums artwork view
-    /// (cover change, favorite toggle, and in-library navigation).
-    /// </summary>
-    /// <param name="album">The recently added album to render.</param>
-    /// <param name="template">The shared album artwork card template.</param>
-    /// <returns>The realised card control bound to a backing <see cref="ContentRow"/>.</returns>
-    private Control BuildRecentAlbumCard(DashboardAlbum album, IDataTemplate template)
-    {
-        var row = BuildRecentAlbumRow(album);
-        var control = template.Build(row) ?? new Border();
-        control.DataContext = row;
-        control.DoubleTapped += RecentAlbumCard_OnDoubleTapped;
-        return control;
-    }
-
-    /// <summary>Maps a dashboard album to a <see cref="ContentRow"/> for the shared artwork card.</summary>
-    /// <param name="album">The dashboard album.</param>
-    /// <returns>A hydrated content row (local <c>Album</c> or remote <c>OrynivoAlbum</c>).</returns>
-    private ContentRow BuildRecentAlbumRow(DashboardAlbum album)
-    {
-        var isRemote = album.Server is not null;
-        var row = new ContentRow
-        {
-            Id = album.Id,
-            AlbumId = album.Id,
-            ArtistId = album.ArtistId,
-            Title = string.IsNullOrWhiteSpace(album.Title) ? LocalizationManager.Current.Unknown : album.Title,
-            Artist = string.IsNullOrWhiteSpace(album.Artist) ? null : album.Artist,
-            ArtworkPath = album.ArtworkPath,
-            IsFavorite = album.IsFavorite,
-            EntityType = isRemote ? "OrynivoAlbum" : "Album",
-            ExternalId = isRemote ? album.Id.ToString(CultureInfo.InvariantCulture) : null,
-            OrynivoServer = album.Server,
-            FilePath = ""
-        };
-        EnsureArtworkHydrated(row);
-        return row;
-    }
-
-    /// <summary>Opens a recently added album card on double-click, staying in its own library.</summary>
-    /// <param name="sender">The tapped card control.</param>
-    /// <param name="e">The tap event data.</param>
-    private async void RecentAlbumCard_OnDoubleTapped(object? sender, TappedEventArgs e)
-    {
-        // Buttons inside the card (title/artist links, favorite, cover) handle
-        // their own clicks; ignore double-taps that land on them.
-        if (FindAncestor<Button>(e.Source as Visual) is not null)
-            return;
-        if (sender is not Control { DataContext: ContentRow { Id: long albumId } row })
-            return;
-
-        if (row.EntityType == "OrynivoAlbum")
-        {
-            _activeArtistFilterId = null;
-            _activeArtistFilterName = null;
-            _activeOrynivoServer = row.OrynivoServer;
-            await OpenOrynivoAlbumTracksAsync(albumId, row.Title, row.Artist);
-        }
-        else
-        {
-            await ShowAlbumTracksAsync(albumId, row.Title ?? LocalizationManager.Current.Unknown);
-        }
-    }
-
-    /// <summary>Builds the horizontal "recently played" strip of compact history cards.</summary>
-    /// <param name="entries">Recent, de-duplicated playback-history entries.</param>
-    /// <param name="thumbs">Local album thumbnail paths keyed by album identifier.</param>
-    private void DashboardBuildRecentlyPlayed(
-        List<DailyHistoryEntry> entries,
-        Dictionary<long, string> thumbs)
-    {
-        var scroll = new ScrollViewer
-        {
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-            VerticalScrollBarVisibility   = ScrollBarVisibility.Disabled,
-            Margin = new Thickness(0, 0, 0, 4)
-        };
-        var panel = new StackPanel { Orientation = Orientation.Horizontal };
-        foreach (var entry in entries)
-            panel.Children.Add(BuildRecentlyPlayedCard(entry, thumbs));
-        scroll.Content = panel;
-        DashboardPanel.Children.Add(scroll);
-    }
-
-    /// <summary>Builds a compact recently played card for the dashboard strip or full-page history grid.</summary>
-    /// <param name="entry">Playback-history entry to render.</param>
-    /// <param name="thumbs">Local album thumbnail paths keyed by album identifier.</param>
-    /// <param name="expandedSpacing">Whether to use the roomier spacing needed by the full-page grid.</param>
-    /// <returns>The card control.</returns>
-    private Control BuildRecentlyPlayedCard(
-        DailyHistoryEntry entry,
-        Dictionary<long, string> thumbs,
-        bool expandedSpacing = false)
-    {
-        const double artSize = 116;
-        var playable = IsPlayableHistoryEntry(entry);
-        var normalBorderBrush = FindResource<IBrush>("AppGridLineBrush");
-        var hoverBorderBrush = FindResource<IBrush>("AppAccentBrush");
-
-        var card = new Border
-        {
-            Width           = artSize + 20,
-            Margin          = expandedSpacing
-                ? new Thickness(0, 0, 20, 24)
-                : new Thickness(0, 0, 12, 0),
-            Padding         = new Thickness(10),
-            Background      = FindResource<IBrush>("AppSurfaceBrush"),
-            BorderBrush     = normalBorderBrush,
-            BorderThickness = new Thickness(1),
-            CornerRadius    = new CornerRadius(0, 18, 0, 18),
-            Cursor          = new Cursor(playable ? StandardCursorType.Hand : StandardCursorType.Arrow)
-        };
-        card.Classes.Add("motionCard");
-
-        var stack = new StackPanel { Spacing = 4 };
-
-        var artHost = new Border
-        {
-            Width        = artSize,
-            Height       = artSize,
-            Background   = FindResource<IBrush>("AppArtworkPlaceholderBrush"),
-            CornerRadius = new CornerRadius(0, 14, 0, 14),
-            ClipToBounds = true
-        };
-        var artContent = new Grid();
-
-        // Initials placeholder as the base layer; a thumbnail (decoded off the UI
-        // thread) is layered on top when available so 200 cards build without a hitch.
-        var initialsAvatar = new Orynivo.Controls.InitialsAvatar
-        {
-            DisplayName = string.IsNullOrWhiteSpace(entry.Title) ? entry.Artist : entry.Title,
-            FontSize    = 30,
-            IsHitTestVisible = false
-        };
-        artContent.Children.Add(initialsAvatar);
-
-        string? thumbPath = entry.AlbumId is long albumId && thumbs.TryGetValue(albumId, out var path) ? path : null;
-        if (!string.IsNullOrEmpty(thumbPath))
-        {
-            var thumbImage = new Image
-            {
-                Width   = artSize,
-                Height  = artSize,
-                Stretch = Stretch.UniformToFill,
-                IsHitTestVisible = false
-            };
-            artContent.Children.Add(thumbImage);
-            _ = LoadDashboardLocalArtworkAsync(thumbImage, thumbPath);
-        }
-        else if (TryGetOrynivoHistoryTarget(entry, out var server, out var trackId))
-        {
-            var thumbImage = new Image
-            {
-                Width   = artSize,
-                Height  = artSize,
-                Stretch = Stretch.UniformToFill,
-                IsHitTestVisible = false
-            };
-            artContent.Children.Add(thumbImage);
-            _ = LoadDashboardRemoteArtworkAsync(
-                thumbImage,
-                OrynivoServerClient.GetTrackArtworkUrl(server, trackId, 320));
-        }
-
-        // A play affordance that fades in on hover for playable history entries.
-        // The overlay needs an explicit size and a high ZIndex: without a fixed-size
-        // sibling (e.g. an avatar-only card with no cover) a stretch-only overlay was
-        // arranged to just the glyph size, so the play symbol did not appear on hover.
-        var playOverlay = new Border
-        {
-            Width              = artSize,
-            Height             = artSize,
-            ZIndex             = 10,
-            Background         = new SolidColorBrush(Color.FromArgb(0x66, 0, 0, 0)),
-            CornerRadius       = new CornerRadius(0, 14, 0, 14),
-            IsHitTestVisible   = false,
-            IsVisible          = false,
-            Child = new TextBlock
-            {
-                Text = "▶",
-                FontSize = 26,
-                Foreground = Brushes.White,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            }
-        };
-        if (playable)
-            artContent.Children.Add(playOverlay);
-
-        artHost.Child = artContent;
-        stack.Children.Add(artHost);
-
-        var titleBlock = new TextBlock
-        {
-            Text              = entry.Title,
-            FontSize          = ResolveFontSize("FontSizeCaption"),
-            FontWeight        = FontWeight.SemiBold,
-            Foreground        = FindResource<IBrush>("AppPrimaryTextBrush"),
-            TextTrimming      = TextTrimming.CharacterEllipsis,
-            MaxLines          = 1,
-            Margin            = new Thickness(2, 2, 2, 0)
-        };
-        stack.Children.Add(titleBlock);
-
-        var artistButton = new Button
-        {
-            Content = entry.Artist,
-            FontSize = ResolveFontSize("FontSizeMeta"),
-            Foreground = FindResource<IBrush>("AppSecondaryTextBrush"),
-            Theme = FindResource<ControlTheme>("EntityLinkButtonTheme"),
-            HorizontalAlignment = HorizontalAlignment.Left,
-            MaxWidth = artSize,
-            Margin = new Thickness(2, 0, 2, 0),
-            IsVisible = CanOpenHistoryArtist(entry)
-        };
-        artistButton.Click += async (_, e) =>
-        {
-            e.Handled = true;
-            await OpenHistoryArtistAsync(entry);
-        };
-        var artistBlock = new TextBlock
-        {
-            Text         = entry.Artist,
-            FontSize     = ResolveFontSize("FontSizeMeta"),
-            Foreground   = FindResource<IBrush>("AppSecondaryTextBrush"),
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            MaxLines     = 1,
-            Margin       = new Thickness(2, 0, 2, 0),
-            IsVisible    = !string.IsNullOrWhiteSpace(entry.Artist) && !artistButton.IsVisible
-        };
-        stack.Children.Add(artistButton);
-        stack.Children.Add(artistBlock);
-
-        card.Child = stack;
-
-        if (TryGetOrynivoHistoryTarget(entry, out _, out _))
-            _ = HydrateRecentlyPlayedRemoteCardAsync(entry, titleBlock, artistButton, artistBlock, initialsAvatar);
-
-        card.PointerEntered += (_, _) =>
-        {
-            card.BorderBrush = hoverBorderBrush;
-            if (playable)
-                playOverlay.IsVisible = true;
-        };
-        card.PointerExited += (_, _) =>
-        {
-            card.BorderBrush = normalBorderBrush;
-            if (playable)
-                playOverlay.IsVisible = false;
-        };
-
-        if (playable)
-        {
-            card.PointerReleased += async (_, e) =>
-            {
-                e.Handled = true;
-                await PlayHistoryEntryInPlaceAsync(entry);
-            };
-        }
-
-        return card;
-    }
-
-    /// <summary>Refreshes a remote recently played card with authoritative server metadata.</summary>
-    /// <param name="entry">Playback-history entry to resolve.</param>
-    /// <param name="titleBlock">Title text block to update.</param>
-    /// <param name="artistButton">Artist link button to update.</param>
-    /// <param name="artistBlock">Artist text block to update.</param>
-    /// <param name="initialsAvatar">Artwork placeholder to retitle.</param>
-    /// <returns>A task representing the asynchronous metadata refresh.</returns>
-    private async Task HydrateRecentlyPlayedRemoteCardAsync(
-        DailyHistoryEntry entry,
-        TextBlock titleBlock,
-        Button artistButton,
-        TextBlock artistBlock,
-        Orynivo.Controls.InitialsAvatar initialsAvatar)
-    {
-        try
-        {
-            var row = await ResolveOrynivoHistoryTrackRowAsync(entry);
-            if (row is null)
-                return;
-
-            if (!string.IsNullOrWhiteSpace(row.Title))
-                titleBlock.Text = row.Title;
-            var canOpenArtist = row.ArtistId.HasValue && !string.IsNullOrWhiteSpace(row.Artist);
-            artistButton.Content = row.Artist;
-            artistButton.IsVisible = canOpenArtist;
-            artistBlock.Text = row.Artist;
-            artistBlock.IsVisible = !canOpenArtist && !string.IsNullOrWhiteSpace(row.Artist);
-            initialsAvatar.DisplayName = string.IsNullOrWhiteSpace(row.Title) ? row.Artist : row.Title;
-        }
-        catch
-        {
-            // Stale or unreachable servers leave the persisted history text visible.
-        }
-    }
-
-    /// <summary>
-    /// Determines whether a recently played entry can be replayed in place: only
-    /// music tracks (not radio/podcast, which have their own views) that are either
-    /// a locally available file or a playable stream URL (remote server / Plex).
-    /// </summary>
-    /// <param name="entry">The history entry to test.</param>
-    /// <returns><see langword="true"/> when the entry can be played from its card.</returns>
-    private static bool IsPlayableHistoryEntry(DailyHistoryEntry entry) =>
-        string.Equals(entry.MediaType, "track", StringComparison.OrdinalIgnoreCase) &&
-        (IsAvailableLocalTrack(entry.Path) || IsHttpUrl(entry.Path));
-
-    /// <summary>Determines whether a playback-history artist can be opened from local or remote metadata.</summary>
-    /// <param name="entry">The history entry to test.</param>
-    /// <returns><see langword="true"/> when the artist has a local ID or a resolvable Orynivo Server track target.</returns>
-    private bool CanOpenHistoryArtist(DailyHistoryEntry entry) =>
-        !string.IsNullOrWhiteSpace(entry.Artist) &&
-        (entry.ArtistId.HasValue || TryGetOrynivoHistoryTarget(entry, out _, out _));
-
-    /// <summary>Opens the artist album list for a local or Orynivo Server playback-history entry.</summary>
-    /// <param name="entry">The history entry whose artist should be opened.</param>
-    /// <returns>A task representing the asynchronous navigation.</returns>
-    private async Task OpenHistoryArtistAsync(DailyHistoryEntry entry)
-    {
-        if (entry.ArtistId is long localArtistId)
-        {
-            await ShowArtistAlbumsAsync(
-                localArtistId,
-                entry.Artist ?? LocalizationManager.Current.Unknown);
-            return;
-        }
-
-        var remoteRow = await ResolveOrynivoHistoryTrackRowAsync(entry);
-        if (remoteRow is not { OrynivoServer: { } server, ArtistId: long remoteArtistId })
-            return;
-
-        _activeOrynivoServer = server;
-        await OpenOrynivoArtistAlbumsAsync(
-            remoteArtistId,
-            remoteRow.Artist ?? entry.Artist ?? LocalizationManager.Current.Unknown);
-    }
-
-    /// <summary>
-    /// Plays a recently played entry without leaving the current view: it replaces
-    /// the queue with just this track and starts playback, so the dashboard or the
-    /// full "recently played" view stays open.
-    /// </summary>
-    /// <param name="entry">The history entry to play.</param>
-    /// <returns>A task representing the asynchronous playback start.</returns>
-    private async Task PlayHistoryEntryInPlaceAsync(DailyHistoryEntry entry)
-    {
-        if (!IsPlayableHistoryEntry(entry))
-            return;
-
-        var remoteRow = await ResolveOrynivoHistoryTrackRowAsync(entry);
-        var queueItem = remoteRow is not null
-            ? ToPlaylistItem(remoteRow)
-            : new PlaylistItem(
-                entry.Path,
-                string.IsNullOrWhiteSpace(entry.Title) ? null : entry.Title,
-                string.IsNullOrWhiteSpace(entry.Artist) ? null : entry.Artist,
-                string.IsNullOrWhiteSpace(entry.Album) ? null : entry.Album,
-                null,
-                null,
-                entry.DurationSeconds is > 0 ? TimeSpan.FromSeconds(entry.DurationSeconds.Value) : null);
-
-        _queue.Clear();
-        _queue.Add(queueItem);
-        _queueIndex = 0;
-        ResetQueuePlaybackState();
-        PersistPlaybackQueue();
-        RefreshQueueNavigationButtons();
-
-        try { await StartPlaybackAsync(queueItem.FilePath); }
-        catch (OperationCanceledException) { StatusTextBlock.Text = LocalizationManager.Current.PlaybackStopped; }
-        catch (Exception ex) { StopPlayback(); StatusTextBlock.Text = ex.Message; }
-        UpdateNowPlayingRowHighlights();
-    }
-
-    /// <summary>Loads and registers a full remote track row for a history entry before replay.</summary>
-    /// <param name="entry">The playback-history entry.</param>
-    /// <returns>The hydrated remote row, or <see langword="null"/> when the entry is not resolvable.</returns>
-    private async Task<ContentRow?> ResolveOrynivoHistoryTrackRowAsync(DailyHistoryEntry entry)
-    {
-        if (!TryGetOrynivoHistoryTarget(entry, out var server, out var trackId))
-            return null;
-
-        var streamUrl = OrynivoServerClient.GetStreamUrl(server, trackId);
-        if (_orynivoTracksByUrl.TryGetValue(streamUrl, out var cached))
-            return cached;
-
-        var tracks = await _orynivoClient.GetTracksByIdsAsync(server, [trackId], CancellationToken.None);
-        var track = tracks.FirstOrDefault(t => t.Id == trackId);
-        if (track is null)
-            return null;
-
-        var row = ToOrynivoTrackContentRow(server, track);
-        EnsureArtworkHydrated(row);
-        return row;
-    }
-
-    /// <summary>Fills a card image with a local thumbnail, decoding off the UI thread.</summary>
-    /// <param name="image">The card image control to populate.</param>
-    /// <param name="thumbnailPath">The local thumbnail file path.</param>
-    /// <returns>A task representing the asynchronous load.</returns>
-    private static async Task LoadDashboardLocalArtworkAsync(Image image, string thumbnailPath)
-    {
-        try
-        {
-            var bitmap = await Task.Run(() =>
-            {
-                if (!File.Exists(thumbnailPath))
-                    return null;
-                using var stream = File.OpenRead(thumbnailPath);
-                return new Bitmap(stream);
-            });
-            if (bitmap is not null)
-                image.Source = bitmap;
-        }
-        catch { /* a missing or invalid thumbnail leaves the placeholder visible */ }
-    }
-
-    /// <summary>Fills a dashboard album card's image with remote server artwork (cached locally).</summary>
-    /// <param name="image">The card image control to populate.</param>
-    /// <param name="artUrl">The authenticated remote artwork URL.</param>
-    /// <returns>A task representing the asynchronous load.</returns>
-    private async Task LoadDashboardRemoteArtworkAsync(Image image, string artUrl)
-    {
-        try
-        {
-            var bitmap = await LoadRemoteArtworkImageAsync(artUrl, 320);
-            if (bitmap is not null)
-                image.Source = bitmap;
-        }
-        catch { }
-    }
-
-    /// <summary>Builds the calendar card control for the dashboard stats section.</summary>
-    /// <param name="data">Per-day playback aggregates for the current month.</param>
-    /// <returns>The bordered calendar card.</returns>
-    private Control DashboardBuildCalendarCard(List<CalendarDayData> data)
-    {
-        var dayMap = data.ToDictionary(d => d.Day);
-        int daysInMonth = DateTime.DaysInMonth(_dashboardYear, _dashboardMonth);
-        var firstDay = new DateTime(_dashboardYear, _dashboardMonth, 1);
-        int startDow = ((int)firstDay.DayOfWeek + 6) % 7; // Monday=0
-
-        var outer = new Border
-        {
-            Background      = FindResource<IBrush>("AppSurfaceBrush"),
-            BorderBrush     = FindResource<IBrush>("AppGridLineBrush"),
-            BorderThickness = new Thickness(1),
-            CornerRadius    = new CornerRadius(14),
-            Padding         = new Thickness(14),
-            Margin          = new Thickness(0, 0, 0, 4)
-        };
-
-        var inner = new StackPanel();
-        _calendarInner = inner;
-
-        var headerRow = new Grid { Margin = new Thickness(0, 0, 0, 4) };
-        for (int i = 0; i < 7; i++)
-            headerRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-        string[] dayNames = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
-        for (int i = 0; i < 7; i++)
-        {
-            var tb = new TextBlock
-            {
-                Text      = dayNames[i],
-                FontSize  = 10,
-                FontWeight = FontWeight.SemiBold,
-                Foreground = FindResource<IBrush>("AppSecondaryTextBrush"),
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Margin    = new Thickness(0, 0, 0, 4)
-            };
-            Grid.SetColumn(tb, i);
-            headerRow.Children.Add(tb);
-        }
-        inner.Children.Add(headerRow);
-
-        DashboardRefreshCalendarContent(inner, dayMap, daysInMonth, startDow);
-
-        outer.Child = inner;
-        return outer;
-    }
-
-    private void DashboardRefreshCalendarContent(StackPanel inner, Dictionary<int, CalendarDayData> dayMap,
-        int daysInMonth, int startDow)
-    {
-        // Remove all rows except the header (index 0)
-        while (inner.Children.Count > 1)
-            inner.Children.RemoveAt(1);
-
-        int col = startDow;
-        Grid? rowGrid = null;
-
-        for (int day = 1; day <= daysInMonth; day++)
-        {
-            if (col == 0 || rowGrid is null)
-            {
-                rowGrid = new Grid { Margin = new Thickness(0, 2, 0, 2) };
-                for (int i = 0; i < 7; i++)
-                    rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                inner.Children.Add(rowGrid);
-            }
-
-            dayMap.TryGetValue(day, out var dayData);
-            var cell = BuildCalDayCell(day, dayData);
-            Grid.SetColumn(cell, col);
-            rowGrid.Children.Add(cell);
-
-            col = (col + 1) % 7;
-        }
-    }
-
-    private Control BuildCalDayCell(int day, CalendarDayData? data)
-    {
-        bool isToday = _dashboardYear == DateTime.Now.Year
-                    && _dashboardMonth == DateTime.Now.Month
-                    && day == DateTime.Now.Day;
-
-        var border = new Border
-        {
-            Margin          = new Thickness(2),
-            MinHeight       = 72,
-            Background      = isToday
-                ? FindResource<IBrush>("AppAccentSoftBrush")
-                : Brushes.Transparent,
-            BorderBrush     = FindResource<IBrush>("AppGridLineBrush"),
-            BorderThickness = new Thickness(1),
-            CornerRadius    = new CornerRadius(8),
-            Padding         = new Thickness(6),
-            Cursor          = data is not null && data.TotalSeconds > 0
-                ? new Cursor(StandardCursorType.Hand)
-                : new Cursor(StandardCursorType.Arrow)
-        };
-        if (data is not null && data.TotalSeconds > 0)
-            ToolTip.SetTip(border, string.Format(
-                LocalizationManager.Current.DailyHistoryTitle,
-                new DateTime(_dashboardYear, _dashboardMonth, day)
-                    .ToString("D", CultureInfo.CurrentCulture)));
-
-        var stack = new StackPanel();
-
-        stack.Children.Add(new TextBlock
-        {
-            Text       = day.ToString(),
-            FontSize   = 11,
-            FontWeight = isToday ? FontWeight.Bold : FontWeight.Normal,
-            Foreground = FindResource<IBrush>("AppPrimaryTextBrush"),
-            HorizontalAlignment = HorizontalAlignment.Right
-        });
-
-        if (data is not null && data.TotalSeconds > 0)
-        {
-            var ts = TimeSpan.FromSeconds(data.TotalSeconds);
-            stack.Children.Add(new TextBlock
-            {
-                Text       = FormatDashboardDuration(ts),
-                FontSize   = 10,
-                Foreground = FindResource<IBrush>("AppAccentBrush"),
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Margin = new Thickness(0, 2, 0, 2)
-            });
-
-            foreach (var genre in data.TopGenres.Take(3))
-            {
-                var genreButton = new Button
-                {
-                    Content = genre,
-                    FontSize = 9,
-                    Foreground = FindResource<IBrush>("AppSecondaryTextBrush"),
-                    Theme = FindResource<ControlTheme>("EntityLinkButtonTheme"),
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    Padding = new Thickness(2, 0, 2, 0),
-                    Tag = genre
-                };
-                genreButton.Click += DashboardGenreButton_OnClick;
-                stack.Children.Add(genreButton);
-            }
-        }
-
-        if (data is not null && data.TotalSeconds > 0)
-        {
-            var date = new DateTime(_dashboardYear, _dashboardMonth, day);
-            border.PointerReleased += async (_, e) =>
-            {
-                e.Handled = true;
-                await ShowDailyHistoryAsync(date);
-            };
-        }
-
-        border.Child = stack;
-        return border;
-    }
-
-    private void ShowPodcastInfo(PodcastPlayback playback)
-    {
-        var episode = playback.Episode;
-        PodcastInfoImage.Source = null;
-        PodcastInfoImagePlaceholder.IsVisible = true;
-        PodcastInfoPodcastName.Text = playback.Podcast.Name;
-        PodcastInfoEpisodeTitle.Text = episode.Title;
-
-        var metadata = new List<string>();
-        if (episode.PublishedAt is { } publishedAt)
-            metadata.Add(string.Format(
-                LocalizationManager.Current.PodcastPublishedOn,
-                publishedAt.ToLocalTime().ToString("d")));
-        if (episode.FeedDuration is { } duration && duration > TimeSpan.Zero)
-            metadata.Add(string.Format(
-                LocalizationManager.Current.PodcastEpisodeDuration,
-                FormatTime(duration)));
-        if (!string.IsNullOrWhiteSpace(playback.Podcast.Author))
-            metadata.Add(playback.Podcast.Author);
-        if (!string.IsNullOrWhiteSpace(playback.Podcast.Genre))
-            metadata.Add(playback.Podcast.Genre);
-        PodcastInfoMetadata.Text = string.Join("  ·  ", metadata);
-
-        var description = NormalizePodcastDescription(episode.Description);
-        PodcastInfoDescription.Text = string.IsNullOrWhiteSpace(description)
-            ? LocalizationManager.Current.PodcastDescriptionUnavailable
-            : description;
-
-        _ = LoadPodcastInfoArtworkAsync(
-            playback.Podcast.ArtworkUrl,
-            _playbackCts?.Token ?? CancellationToken.None);
-    }
-
-    private async Task LoadPodcastInfoArtworkAsync(
-        string? artworkUrl,
-        CancellationToken cancellationToken)
-    {
-        var image = await DownloadPodcastImageAsync(artworkUrl, 600, cancellationToken);
-        if (image is null || cancellationToken.IsCancellationRequested)
-            return;
-
-        PodcastInfoImage.Source = image;
-        PodcastInfoImagePlaceholder.IsVisible = false;
-    }
-
-    /// <summary>
-    /// Arranges the calendar and top-genre analytics blocks, placing them side by
-    /// side on wide dashboards and stacking them on narrow ones.
-    /// </summary>
-    /// <param name="calendarData">Per-day playback aggregates for the current month.</param>
-    /// <param name="topGenres">Ranked genres by play time.</param>
-    private void DashboardBuildStatsSection(
-        List<CalendarDayData> calendarData,
-        List<(string Genre, double Seconds)> topGenres)
-    {
-        var calendarHeader = DashboardCreateSectionHeader(
-            string.Format(
-                LocalizationManager.Current.Calendar,
-                new DateTime(_dashboardYear, _dashboardMonth, 1).ToString("MMMM yyyy")),
-            calendarNav: true);
-        var calendarCard = DashboardBuildCalendarCard(calendarData);
-
-        var genresHeader = DashboardCreateSectionHeader(LocalizationManager.Current.TopGenres);
-        var genresCard = DashboardBuildTopGenresCard(topGenres);
-
-        var calendarColumn = new StackPanel();
-        calendarColumn.Children.Add(calendarHeader);
-        calendarColumn.Children.Add(calendarCard);
-
-        var genresColumn = new StackPanel();
-        genresColumn.Children.Add(genresHeader);
-        genresColumn.Children.Add(genresCard);
-
-        if (_dashboardTwoColumnLayout == true)
-        {
-            var grid = new Grid();
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.15, GridUnitType.Star) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(28) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            Grid.SetColumn(calendarColumn, 0);
-            Grid.SetColumn(genresColumn, 2);
-            grid.Children.Add(calendarColumn);
-            grid.Children.Add(genresColumn);
-            DashboardPanel.Children.Add(grid);
-        }
-        else
-        {
-            DashboardPanel.Children.Add(calendarColumn);
-            DashboardPanel.Children.Add(genresColumn);
-        }
-    }
-
-    /// <summary>Builds the modern top-genres analytics card for the dashboard.</summary>
-    /// <param name="genres">Ranked genres with total play seconds.</param>
-    /// <returns>The analytics card control.</returns>
-    private Control DashboardBuildTopGenresCard(List<(string Genre, double Seconds)> genres)
-    {
-        if (genres.Count == 0)
-            return new TextBlock
-            {
-                Text       = LocalizationManager.Current.NoData,
-                Foreground = FindResource<IBrush>("AppSecondaryTextBrush"),
-                Margin     = new Thickness(0, 4, 0, 0)
-            };
-
-        double maxSecs = genres[0].Seconds;
-
-        var panel = new Border
-        {
-            Background = FindResource<IBrush>("AppSurfaceBrush"),
-            BorderBrush = FindResource<IBrush>("AppGridLineBrush"),
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(14),
-            Padding = new Thickness(16, 14, 16, 8),
-            Margin = new Thickness(0, 0, 0, 4)
-        };
-        var rows = new StackPanel { Spacing = 12 };
-
-        for (int i = 0; i < genres.Count; i++)
-        {
-            var (genre, secs) = genres[i];
-            var color = _genreColors[i % _genreColors.Length];
-            var brush = new SolidColorBrush(color);
-
-            var row = new StackPanel { Spacing = 6 };
-
-            // Top line: rank chip + genre name (link) on the left, duration on the right.
-            var topLine = new Grid();
-            topLine.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            topLine.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            topLine.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-            var rankChip = new Border
-            {
-                Width = 22,
-                Height = 22,
-                CornerRadius = new CornerRadius(7),
-                Background = brush,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 10, 0),
-                Child = new TextBlock
-                {
-                    Text = (i + 1).ToString(CultureInfo.CurrentCulture),
-                    FontSize = ResolveFontSize("FontSizeMeta"),
-                    FontWeight = FontWeight.Bold,
-                    Foreground = PickContrastBrush(color),
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
-                }
-            };
-            Grid.SetColumn(rankChip, 0);
-            topLine.Children.Add(rankChip);
-
-            var labelButton = new Button
-            {
-                Content = genre,
-                FontSize = ResolveFontSize("FontSizeBody"),
-                FontWeight = FontWeight.SemiBold,
-                Foreground = FindResource<IBrush>("AppPrimaryTextBrush"),
-                Theme = FindResource<ControlTheme>("EntityLinkButtonTheme"),
-                VerticalAlignment = VerticalAlignment.Center,
-                HorizontalContentAlignment = HorizontalAlignment.Left,
-                Tag = genre
-            };
-            labelButton.Click += DashboardGenreButton_OnClick;
-            Grid.SetColumn(labelButton, 1);
-            topLine.Children.Add(labelButton);
-
-            var durationTb = new TextBlock
-            {
-                Text = FormatDashboardDuration(TimeSpan.FromSeconds(secs)),
-                FontSize = ResolveFontSize("FontSizeCaption"),
-                FontWeight = FontWeight.Medium,
-                Foreground = FindResource<IBrush>("AppSecondaryTextBrush"),
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(12, 0, 0, 0)
-            };
-            Grid.SetColumn(durationTb, 2);
-            topLine.Children.Add(durationTb);
-            row.Children.Add(topLine);
-
-            // Thin proportional bar over a muted track.
-            double fraction = maxSecs > 0 ? secs / maxSecs : 0;
-            var barBg = new Border
-            {
-                Height       = 8,
-                Background   = FindResource<IBrush>("AppGridLineBrush"),
-                CornerRadius = new CornerRadius(4)
-            };
-            var barGrid = new Grid();
-            barGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(fraction, GridUnitType.Star) });
-            barGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1 - fraction, GridUnitType.Star) });
-            var barFill = new Border
-            {
-                Height       = 8,
-                Background   = brush,
-                CornerRadius = new CornerRadius(4)
-            };
-            Grid.SetColumn(barFill, 0);
-            barGrid.Children.Add(barFill);
-
-            var barHost = new Grid();
-            barHost.Children.Add(barBg);
-            barHost.Children.Add(barGrid);
-            row.Children.Add(barHost);
-
-            rows.Children.Add(row);
-        }
-
-        panel.Child = rows;
-        return panel;
-    }
-
-    /// <summary>Chooses black or white text for readable contrast on a colored background.</summary>
-    /// <param name="background">The background color.</param>
-    /// <returns>A near-black or white brush, whichever contrasts better.</returns>
-    private static IBrush PickContrastBrush(Color background)
-    {
-        // Relative luminance (sRGB approximation); bright backgrounds get dark text.
-        var luminance = (0.299 * background.R + 0.587 * background.G + 0.114 * background.B) / 255.0;
-        return luminance > 0.6
-            ? new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1A))
-            : Brushes.White;
-    }
-
-    private async void DashboardGenreButton_OnClick(object? sender, RoutedEventArgs e)
-    {
-        if (sender is not Button { Tag: string genre } || string.IsNullOrWhiteSpace(genre))
-            return;
-        e.Handled = true;
-
-        _trackFavoritesOnly = false;
-        _selectedTrackGenres.Clear();
-        _selectedTrackGenres.Add(genre);
-        _selectedTrackFormats.Clear();
-        _selectedTrackBitrates.Clear();
-        _expandedTrackFilterSections.Add(LocalizationManager.Current.Genre);
-        PushCurrentNavigationState();
-        ResetDrilldownState(clearNavigationHistory: false);
-        _settings.LastMainView = "Tracks";
-
-        var tracksItem = NavListBox.Items
-            .OfType<ListBoxItem>()
-            .FirstOrDefault(item =>
-                string.Equals(item.Tag as string, "Tracks", StringComparison.Ordinal));
-        if (tracksItem is null)
-            return;
-        if (ReferenceEquals(NavListBox.SelectedItem, tracksItem))
-            await ShowTopLevelViewAsync("Tracks");
-        else
-            NavListBox.SelectedItem = tracksItem;
-    }
-
-    private static string FormatDashboardDuration(TimeSpan value) =>
-        $"{(int)value.TotalHours:D2}:{value.Minutes:D2}:{value.Seconds:D2}";
-
-    private async Task ShowDailyHistoryAsync(DateTime date)
-    {
-        var entries = await Task.Run(() =>
-        {
-            using var db = AudioDatabase.OpenDefault();
-            return db.GetHistoryForDay(date);
-        });
-
-        var dialog = new DailyHistoryDialog(date, entries, _settings);
-        if (await dialog.ShowDialog<bool>(this) == false || dialog.SelectedEntry is not { } entry)
-            return;
-
-        switch (dialog.SelectedAction)
-        {
-            case DailyHistoryAction.Track:
-                await OpenHistoryTrackAsync(entry);
-                break;
-            case DailyHistoryAction.Album:
-                await OpenHistoryAlbumAsync(entry);
-                break;
-            case DailyHistoryAction.Artist when entry.ArtistId is long artistId:
-                await ShowArtistAlbumsAsync(
-                    artistId,
-                    entry.Artist ?? LocalizationManager.Current.Unknown);
-                break;
-            case DailyHistoryAction.Artist:
-                await OpenHistoryArtistAsync(entry);
-                break;
-        }
-    }
-
-    /// <summary>Opens the album track list for a local or Orynivo Server playback-history entry.</summary>
-    /// <param name="entry">The history entry whose album should be opened.</param>
-    /// <returns>A task representing the asynchronous navigation.</returns>
-    private async Task OpenHistoryAlbumAsync(DailyHistoryEntry entry)
-    {
-        if (entry.AlbumId is long localAlbumId)
-        {
-            await ShowAlbumTracksAsync(
-                localAlbumId,
-                entry.Album ?? LocalizationManager.Current.Unknown);
-            return;
-        }
-
-        var remoteRow = await ResolveOrynivoHistoryTrackRowAsync(entry);
-        if (remoteRow is not { OrynivoServer: { } server, AlbumId: long remoteAlbumId })
-            return;
-
-        _activeArtistFilterId = null;
-        _activeArtistFilterName = null;
-        _activeOrynivoServer = server;
-        await OpenOrynivoAlbumTracksAsync(
-            remoteAlbumId,
-            remoteRow.Album ?? entry.Album ?? LocalizationManager.Current.Unknown,
-            remoteRow.AlbumArtist ?? remoteRow.Artist ?? entry.Artist);
-    }
-
-    private async Task OpenHistoryTrackAsync(DailyHistoryEntry entry)
-    {
-        if (entry.TrackId is null || !IsAvailableLocalTrack(entry.Path))
-            return;
-
-        _trackFavoritesOnly = false;
-        _selectedTrackGenres.Clear();
-        _selectedTrackFormats.Clear();
-        _selectedTrackBitrates.Clear();
-        PushCurrentNavigationState();
-        ResetDrilldownState(clearNavigationHistory: false);
-        _settings.LastMainView = "Tracks";
-
-        var tracksItem = NavListBox.Items
-            .OfType<ListBoxItem>()
-            .FirstOrDefault(item =>
-                string.Equals(item.Tag as string, "Tracks", StringComparison.Ordinal));
-        if (tracksItem is not null && !ReferenceEquals(NavListBox.SelectedItem, tracksItem))
-        {
-            _suppressNavSelectionChanged = true;
-            try
-            {
-                NavListBox.SelectedItem = tracksItem;
-            }
-            finally
-            {
-                _suppressNavSelectionChanged = false;
-            }
-        }
-
-        await ShowTopLevelViewAsync("Tracks");
-        var rows = (ContentDataGrid.ItemsSource as IEnumerable<ContentRow>)?.ToList() ?? [];
-        var row = rows.FirstOrDefault(item =>
-            string.Equals(item.FilePath, entry.Path, StringComparison.OrdinalIgnoreCase));
-        if (row is null)
-            return;
-
-        ContentDataGrid.SelectedItem = row;
-        ContentDataGrid.ScrollIntoView(row, null);
-        await PlayTrackFromRowsAsync(row, rows);
-    }
-
-    private async void CalendarPrev_OnClick(object? sender, RoutedEventArgs e)
-    {
-        _dashboardMonth--;
-        if (_dashboardMonth < 1) { _dashboardMonth = 12; _dashboardYear--; }
-        await RefreshCalendarSectionAsync();
-    }
-
-    private async void CalendarNext_OnClick(object? sender, RoutedEventArgs e)
-    {
-        _dashboardMonth++;
-        if (_dashboardMonth > 12) { _dashboardMonth = 1; _dashboardYear++; }
-        await RefreshCalendarSectionAsync();
-    }
-
-    private async Task RefreshCalendarSectionAsync()
-    {
-        // Rebuild the whole dashboard — section header title contains the month/year
-        await BuildDashboardAsync();
-    }
 }
+
+

@@ -183,6 +183,12 @@ public sealed record LocalizedStrings(
     public string SearchIndexFailed { get; init; } = "";
     public string Back { get; init; } = "";
     public string MarkAsFavorite { get; init; } = "";
+    /// <summary>Gets the context-menu action for opening the current album.</summary>
+    public string OpenAlbum { get; init; } = "";
+    /// <summary>Gets the context-menu action for opening the current artist.</summary>
+    public string OpenArtist { get; init; } = "";
+    /// <summary>Gets the context-menu action for toggling the current favorite state.</summary>
+    public string ToggleFavorite { get; init; } = "";
     public string PlaybackThrough { get; init; } = "";
     public string PlaybackThroughWithDsdConversion { get; init; } = "";
     public string NativeDsdOutput { get; init; } = "";
@@ -197,6 +203,12 @@ public sealed record LocalizedStrings(
     public string ReplayGainTrack { get; init; } = "";
     /// <summary>Gets the album ReplayGain mode label.</summary>
     public string ReplayGainAlbum { get; init; } = "";
+    /// <summary>Gets the settings label for non-gapless queue fade transitions.</summary>
+    public string NonGaplessCrossfade { get; init; } = "";
+    /// <summary>Gets the explanatory text for non-gapless queue fade transitions.</summary>
+    public string NonGaplessCrossfadeHint { get; init; } = "";
+    /// <summary>Gets the short transport badge text shown while ReplayGain is active.</summary>
+    public string ReplayGainBadge { get; init; } = "";
     /// <summary>Gets the DSD playback settings heading.</summary>
     public string DsdPlayback { get; init; } = "";
     /// <summary>Gets the option label for forcing DSD sources through PCM conversion.</summary>
@@ -325,7 +337,77 @@ public sealed record LocalizedStrings(
     public string RecentAlbums { get; init; } = "";
     public string Calendar { get; init; } = "";
     public string TopGenres { get; init; } = "";
+    /// <summary>Gets the dashboard "most listened albums" section title.</summary>
+    public string TopAlbums { get; init; } = "";
+    /// <summary>Gets the dashboard "most listened artists" section title.</summary>
+    public string TopArtists { get; init; } = "";
+    /// <summary>Gets the dashboard listening-statistics section title.</summary>
+    public string ListeningStats { get; init; } = "";
+    /// <summary>Gets the "all time" statistics period option.</summary>
+    public string PeriodAllTime { get; init; } = "";
+    /// <summary>Gets the "this year" statistics period option.</summary>
+    public string PeriodThisYear { get; init; } = "";
+    /// <summary>Gets the "this month" statistics period option.</summary>
+    public string PeriodThisMonth { get; init; } = "";
+    /// <summary>Gets the "last 30 days" statistics period option.</summary>
+    public string PeriodLast30Days { get; init; } = "";
+    /// <summary>Gets the "last 7 days" statistics period option.</summary>
+    public string PeriodLast7Days { get; init; } = "";
+    /// <summary>Gets the history-source label for remote Orynivo Server tracks.</summary>
+    public string HistorySourceRemote { get; init; } = "";
+    /// <summary>Gets the history-source label for Plex tracks.</summary>
+    public string HistorySourcePlex { get; init; } = "";
     public string NoData { get; init; } = "";
+    /// <summary>Gets the subtle sidebar status shown while the library is being scanned/indexed.</summary>
+    public string LibraryUpdating { get; init; } = "";
+    /// <summary>Gets the subtle sidebar status with file progress ({0} = processed, {1} = total).</summary>
+    public string LibraryUpdatingWithCount { get; init; } = "";
+    /// <summary>Gets the per-view "new library data available" refresh action label.</summary>
+    public string RefreshView { get; init; } = "";
+    /// <summary>Gets the tooltip explaining that fresh library data is available for the current view.</summary>
+    public string LibraryDataAvailable { get; init; } = "";
+    /// <summary>Gets the server status label shown when a remote server cannot be reached.</summary>
+    public string ServerUnreachable { get; init; } = "";
+    /// <summary>Gets the last-successful-connection line for a server ({0} = timestamp).</summary>
+    public string ServerLastConnected { get; init; } = "";
+    /// <summary>Gets the status line shown when a server has never successfully connected.</summary>
+    public string ServerNeverConnected { get; init; } = "";
+    /// <summary>Gets the per-server compatibility line listing unsupported features ({0} = comma-separated list).</summary>
+    public string ServerMissingFeatures { get; init; } = "";
+    /// <summary>Gets the label for the track-facets server feature.</summary>
+    public string CapabilityTrackFacets { get; init; } = "";
+    /// <summary>Gets the label for the recent-albums server feature.</summary>
+    public string CapabilityRecentAlbums { get; init; } = "";
+    /// <summary>Gets the label for the waveforms server feature.</summary>
+    public string CapabilityWaveforms { get; init; } = "";
+    /// <summary>Gets the remote-cache settings section heading.</summary>
+    public string RemoteCache { get; init; } = "";
+    /// <summary>Gets the remote-cache size line ({0} = formatted size).</summary>
+    public string RemoteCacheSize { get; init; } = "";
+    /// <summary>Gets the button label for clearing all remote-server caches.</summary>
+    public string ClearRemoteCacheAll { get; init; } = "";
+    /// <summary>Gets the per-server "clear cache" button label.</summary>
+    public string ClearCache { get; init; } = "";
+    /// <summary>Gets the sidebar status shown while a remote server is scanning ({0} = server name).</summary>
+    public string RemoteScanning { get; init; } = "";
+    /// <summary>Gets the sidebar status with file progress while a remote server scans ({0} = server, {1} = current, {2} = total).</summary>
+    public string RemoteScanningWithCount { get; init; } = "";
+    /// <summary>Gets the smart-playlist editor live-preview match count ({0} = count).</summary>
+    public string SmartPlaylistPreviewCount { get; init; } = "";
+    /// <summary>Gets the smart-playlist editor preview status while the count is being computed.</summary>
+    public string SmartPlaylistPreviewComputing { get; init; } = "";
+    /// <summary>Gets the smart-playlist editor preview status when the criteria are invalid.</summary>
+    public string SmartPlaylistPreviewInvalid { get; init; } = "";
+    /// <summary>Gets the Up Next "restore last queue" button label.</summary>
+    public string RestoreQueue { get; init; } = "";
+    /// <summary>Gets the Up Next "restore last queue" button tooltip.</summary>
+    public string RestoreQueueTooltip { get; init; } = "";
+    /// <summary>Gets the status shown when there is no previous queue to restore.</summary>
+    public string NoPreviousQueue { get; init; } = "";
+    /// <summary>Gets the Up Next action label for clearing the complete queue.</summary>
+    public string ClearQueue { get; init; } = "";
+    /// <summary>Gets the status shown after the queue has been cleared.</summary>
+    public string QueueCleared { get; init; } = "";
     /// <summary>Gets the dashboard "recently played" section title.</summary>
     public string RecentlyPlayed { get; init; } = "";
     /// <summary>Gets the dashboard morning greeting.</summary>
@@ -425,6 +507,10 @@ public sealed record LocalizedStrings(
     public string DeleteRadio { get; init; } = "";
     public string RadioLoading { get; init; } = "";
     public string RadioNoResults { get; init; } = "";
+    /// <summary>Gets the empty-state text shown before an internet-radio search is run.</summary>
+    public string RadioEmptyState { get; init; } = "";
+    /// <summary>Gets the sidebar hint shown when no personal radio station is saved.</summary>
+    public string OwnRadiosEmptyHint { get; init; } = "";
     public string RadioAdded { get; init; } = "";
     public string RadioDeleted { get; init; } = "";
     public string RadioSearchFailed { get; init; } = "";
@@ -444,6 +530,10 @@ public sealed record LocalizedStrings(
     public string DeletePodcast { get; init; } = "";
     public string PodcastLoading { get; init; } = "";
     public string PodcastNoResults { get; init; } = "";
+    /// <summary>Gets the empty-state text shown before a podcast search is run.</summary>
+    public string PodcastEmptyState { get; init; } = "";
+    /// <summary>Gets the sidebar hint shown when no podcast is pinned.</summary>
+    public string MyPodcastsEmptyHint { get; init; } = "";
     public string PodcastAdded { get; init; } = "";
     public string PodcastDeleted { get; init; } = "";
     public string PodcastSearchFailed { get; init; } = "";
@@ -745,6 +835,8 @@ public sealed record LocalizedStrings(
     public string AiChatSend { get; init; } = "";
     /// <summary>Gets the clear-conversation button label.</summary>
     public string AiChatClear { get; init; } = "";
+    /// <summary>Gets the copy-message button tooltip.</summary>
+    public string AiChatCopy { get; init; } = "";
     /// <summary>Gets the message shown when AI chat is not enabled in settings.</summary>
     public string AiChatNotEnabled { get; init; } = "";
     /// <summary>Gets the message shown when the model returns no answer text.</summary>

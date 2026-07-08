@@ -166,6 +166,9 @@ runtime dependency.
   because remote favourites live client-side; this is what the Windows client
   uses to open remote smart playlists so a `FavoritesOnly` criterion matches the
   client's favourites instead of the server's unset flags),
+  `POST /api/playlists/resolve-count` (resolves ad-hoc client-supplied criteria
+  and returns only the match count, backing the smart-playlist editor's live
+  preview for remote playlists),
   `POST /api/playlists`,
   `POST /api/playlists/smart` and `PUT /api/playlists/{id}/smart` (create and
   update a smart playlist from client-supplied criteria, which the server
@@ -313,6 +316,10 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   local and remote tracks. For a remote track the now-playing artist button
   navigates within that track's server library (`OpenOrynivoArtistAlbumsAsync`
   using the row's `OrynivoServer` and `ArtistId`), not the local album view.
+- `Orynivo/MainWindow.*.cs`: `MainWindow` remains one Avalonia partial class;
+  domain-sized partials keep dashboard, daily history, internet radio,
+  Orynivo Server navigation, and playlist/context-menu code out of
+  `MainWindow.xaml.cs` without changing ownership or runtime behavior.
 - `Orynivo/Audio/WindowsEndpointVolumeSynchronizer.cs`: bidirectional
   synchronization between the transport volume slider and the selected
   Windows render endpoint's master volume
@@ -348,7 +355,32 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   a live connection badge probed asynchronously (`CheckServerStatusAsync` +
   `ProbeOrynivoServerAsync`/`ProbePlexServerAsync`), so opening Settings never
   blocks on network calls; pending probes are cancelled per-list on rebuild and
-  in `Deactivate()`.
+  in `Deactivate()`. When a probe succeeds the timestamp is persisted through
+  `ServerConnectionStore`; when it fails the row badge shows "Unreachable" and a
+  muted detail line reports the last successful connection (or "Never connected").
+- `Orynivo/ServerConnectionStore.cs`: standalone JSON store
+  (`%LOCALAPPDATA%\Orynivo\server-status.json`) mapping a server ID to the Unix
+  timestamp of its last successful connection. Kept separate from `settings.json`
+  so recording a connection never contends with the settings-save flow.
+- `Orynivo/RemoteServerCache.cs`: single source of truth for the remote-server
+  caches (`remote-artworks`, `remote-track-cache`, `remote-folder-cache`). Exposes
+  the per-server track-list/folder-track cache file paths (used by `MainWindow`),
+  `GetTotalSizeBytes()`, `ClearAll()`, and `ClearServer(server)` (clears the
+  server's hashed track/folder caches plus its `track-art-<id>-*` /
+  `artist-info-<id>-*` artwork). Settings shows the total size and offers a
+  per-server "Clear cache" button and a clear-all button.
+- Remote server compatibility: `OrynivoServerClient.GetCapabilitiesAsync` probes
+  whether the newer endpoints exist (`/api/tracks/facets`, `/api/albums/recent`,
+  `/api/tracks/{id}/waveform`) by sending an unsupported method and reading
+  `405` (route exists) vs `404` (missing) — every server reports the same
+  `ApiVersion`, so routes are probed directly. `SettingsView`
+  (`CheckServerCapabilitiesAsync`) shows a per-row "Server does not support: …"
+  line for missing features.
+- Remote scan progress: `MainWindow` polls each configured server's `/api/scan`
+  (`_remoteScanPollTimer`, `PollRemoteServerScansAsync`) and shows an in-progress
+  scan in the shared sidebar activity line (`UpdateLibraryActivityIndicator`,
+  which prefers the local `_localScanText` over the remote `_remoteScanText`),
+  never reloading or blocking the current view.
 - `Orynivo/EqualizerProfileNameDialog.*`: themed unique-name dialog used when
   creating a new persisted equalizer profile
 - `Native/AsioBridge/bridge.cpp`: shared Steinberg/cwASIO initialization,
@@ -380,7 +412,11 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   returned by the state and queue delegates; `DisabledTools` (`HashSet<string>?`)
   and `IsToolEnabled(name)` control per-tool gating; `RefreshPlaylistsFunc`
   triggers `LoadNavPlaylists` after MCP creates a playlist; `WebBrowsing`
-  (`Orynivo.Web.WebBrowsingService`) backs the web tools
+  (`Orynivo.Web.WebBrowsingService`) backs the web tools; `GetOrynivoServersFunc`
+  returns the configured remote Orynivo Servers and `ResolveRemoteTrackFunc`
+  turns an `orynivo://serverId/track/trackId` reference into the real playable
+  stream URL (registering the track's metadata in `_orynivoTracksByUrl`), so MCP
+  and AI-chat playback of remote tracks work without exposing the server API key
 - `Orynivo.Core/Web/WebBrowsingService.cs` (+ `WebBrowsingOptions`,
   `HtmlContentExtractor`): the controlled internet layer used by both MCP and the
   AI chat. `SearchAsync` queries the configured SearXNG JSON API (trusted
@@ -404,7 +440,16 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   `bridge.WebBrowsing` (a `Orynivo.Web.WebBrowsingService`); `search_library`
   calls
   `TrackSearchIndex.SearchByCategory` then `AudioDatabase.OpenDefault()` for id
-  resolution; property access uses `AlbumInfo.Album`, `AlbumInfo.DisplayArtist`,
+  resolution, and additionally queries every configured remote Orynivo Server
+  through `OrynivoServerClient.SearchFullAsync` (`AppendRemoteSearchResultsAsync`),
+  emitting remote tracks as opaque `orynivo://serverId/track/trackId` references
+  (`BuildOrynivoTrackReference`) rather than credential-bearing stream URLs;
+  `play`/`queue_append`/`queue_play_next`/`replace_queue` first pass each path
+  through `ResolvePlayablePathAsync` (→ `bridge.ResolveRemoteTrackFunc`) so a
+  remote reference resolves to a real registered stream URL while local paths and
+  real URLs pass through unchanged; `RedactKey` masks any `key=` query value in
+  tool output (`get_queue`, `get_now_playing`) so API keys never reach the model;
+  property access uses `AlbumInfo.Album`, `AlbumInfo.DisplayArtist`,
   and `ArtistInfo.Artist`; playlist tools use `GetAllPlaylists`,
   `GetPlaylistById`, `GetPlaylistTracks`, `CreatePlaylist`, and
   `CreateSmartPlaylist`; `get_play_history` uses `GetHistoryForDay` for a
@@ -439,7 +484,26 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   tool-call status centered and muted; streams tokens into the last assistant
   message; Enter sends, Shift+Enter inserts a newline; Clear button wipes
   history and resets `AiChatService`; `SetBridge(McpPlayerBridge)` wires the
-  executor; `GetSettings` delegate is read on each send
+  executor; `GetSettings` delegate is read on each send. Messages are copyable:
+  user bubbles use `SelectableTextBlock`, assistant bubbles render selectable
+  Markdown, and each bubble has a copy button (`CopyMessage_OnClick` → the
+  `TopLevel` clipboard). Auto-scroll is robust: while `_stickToBottom`, the message
+  `ScrollViewer` is re-pinned to the true bottom from its `ScrollChanged` handler
+  (which — unlike `LayoutUpdated` on the `ScrollViewer`, that does not fire when
+  only the content's extent grows — reliably fires as the streamed reply grows;
+  `LayoutUpdated` is kept as a backup). `_stickToBottom` is released ONLY by a real
+  mouse-wheel gesture (`PointerWheelChanged` tunnel handler), never from
+  `ScrollChanged`/offset changes, so the constant re-layout of the streamed
+  Markdown cannot be misread as a manual scroll-up and disable auto-scroll. The
+  view is hosted in the bounded content row (`Grid.Row="2"`), never spanning the
+  Auto intro-card row, so its `ScrollViewer` is measured with a bounded height.
+- `Orynivo/AI/MarkdownTextBlock.cs`: lightweight Markdown renderer for assistant
+  messages. Block level: headings, bullet/numbered lists, block quotes, dividers,
+  and fenced code blocks (rendered verbatim). Inline level (`AppendInlines`):
+  `**bold**`/`__bold__`, `*italic*`/`_italic_`, `` `code` ``, and `[label](url)`
+  become styled `Run`s — applied to paragraphs, list items, and quotes alike, so
+  no raw `**markers**` leak through. Code blocks use `CreateLiteralText` so inline
+  Markdown is not interpreted inside them.
 - `Orynivo/ThemeManager.cs`: sets global Avalonia resources for light and dark themes
 - `Orynivo/Controls/DataGridColumnWidthStore.cs`: validates, captures, and
   restores per-table pixel widths
@@ -469,7 +533,12 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   reports to `%LOCALAPPDATA%\Orynivo\logs\`
 - `Orynivo/DailyHistoryDialog.*`: themed modal dashboard dialog that lists
   playback-history entries for a selected calendar day and returns track, album,
-  or artist navigation actions to the main window
+  or artist navigation actions to the main window. A source-filter chip row
+  (`HistorySource`: Track/Radio/Podcast/Remote/Plex, classified via
+  `ClassifySource`) toggles which categories are shown; only categories present
+  that day get a chip. Album/artist links are available for local, remote Orynivo
+  Server, and Plex entries; Plex clickability requires the stored Plex context
+  (album/artist rating keys) and a still-configured Plex server
 - `Orynivo/SettingsStore.cs`: persists `%LOCALAPPDATA%\Orynivo\settings.json`
 - `Orynivo/Streaming/IStreamingCatalog.cs` and `IStreamingPlaybackProvider.cs`:
   provider-neutral contracts for future streaming catalog and playback integrations
@@ -486,7 +555,9 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
 - `Orynivo/Streaming/PlexServerClient.cs`: queries configured Plex Media Servers,
   exposes only music library sections (`type=artist`), pages
   artists/albums/tracks, resolves drill-down children, browses folders lazily,
-  and builds authenticated direct-part URLs
+  and builds authenticated direct-part URLs. `PlexMediaItem` also carries the
+  optional `ParentRatingKey` (album) and `GrandparentRatingKey` (artist) so a
+  played Plex track can record a stable album/artist context in playback history
 - `Orynivo.Core/Streaming/OrynivoServerClient.cs`: HTTP client for a remote
   Orynivo Server; methods load artists, a single artist profile (`GetArtistAsync`),
   albums by artist, albums, tracks by
@@ -719,6 +790,12 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   but must not be edited independently of their profile.
 - `AppSettings.ReplayGainMode` selects disabled, track, or album ReplayGain for
   PCM playback; native ASIO DSD remains bit-perfect
+- `AppSettings.NonGaplessCrossfadeSeconds` controls the optional fade transition
+  used for queue advances that are not already covered by the continuous gapless
+  PCM session. A value of `0` disables it; the UI caps it to 10 seconds. The
+  transition fades the current player out shortly before track end, starts the
+  next queue item, and fades the new player in without trying to open a second
+  exclusive ASIO/WASAPI session concurrently.
 - `AppSettings.AlwaysConvertDsdToPcm` forces DSF/DFF sources through FFmpeg and
   the PCM output path even when ASIO/cwASIO native DSD is available, allowing
   volume, ReplayGain, and equalizer processing
@@ -768,7 +845,19 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   formats, bitrates, source keys, metadata ranges, library/play-history rules,
   ordering, and result limits
 - `Orynivo/SmartPlaylistDialog.*`: localized editor for the name and advanced
-  criteria of an existing smart playlist
+  criteria of an existing smart playlist. An optional `CountResolver`
+  (`Func<SmartPlaylistCriteria, CancellationToken, Task<int?>>`) drives a debounced
+  live preview ("N tracks match") that re-evaluates on every criteria change. The
+  preview resolves the criteria exactly how the playlist opens: a locally stored
+  smart playlist uses `ResolveUnifiedSmartPlaylistCountAsync`
+  (`BuildUnifiedSmartPlaylistCandidates` = local library + every configured server,
+  the same candidate set as `ResolveUnifiedSmartPlaylistRows`), so smart playlists
+  do not distinguish local vs server sources; the server-stored edit path uses a
+  resolver backed by `OrynivoServerClient.ResolveSmartPlaylistCountAsync`
+  (`POST /api/playlists/resolve-count`, server-side `criteria.Resolve` with the
+  client's favourite IDs; older servers without the endpoint return no count → no
+  preview). `TryBuildCriteriaCore` builds criteria without touching the validation
+  UI so the preview can reuse it.
 - `Orynivo/Library/PlaylistTrackRecord.cs`: playlist entry model with position,
   optional TrackId reference, and required path
 - `Orynivo/Library/M3u8PlaylistService.cs`: UTF-8 M3U8 import/export with
@@ -842,7 +931,17 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   podcast episodes, and internet-radio sessions with media type, display
   title/subtitle, optional external ID, an optional `genre` captured at playback
   time (so genre statistics include tracks without a local library row),
-    playback start/end, duration, final position, and completion state
+    playback start/end, duration, final position, and completion state.
+  The `external_id` stores a stable source context for non-local tracks:
+  `orynivo:{serverId}:track:{trackId}` for remote Orynivo Server tracks
+  (`ResolveNowPlayingExternalId` / `BuildOrynivoHistoryExternalId`), and
+  `plex:{serverId}:{trackKey}:{albumKey}:{artistKey}` for Plex tracks
+  (`BuildPlexHistoryExternalId`, using the Plex track/parent/grandparent rating
+  keys carried on the `ContentRow` as `PlexServerId`/`PlexAlbumRatingKey`/
+  `PlexArtistRatingKey`). This is what makes Plex history albums/artists clickable
+  (`TryGetPlexHistoryTarget` → `OpenPlexAlbumFromHistoryAsync` /
+  `OpenPlexArtistFromHistoryAsync`, which synthesize a Plex parent row and reuse
+  `ShowPlexChildrenAsync`)
 - `radio_stations` stores personal Radio Browser stations by stable station
   UUID, including stream URL, logo, country, codec, bitrate, and tags
 - `podcasts` stores pinned podcasts by Apple collection ID, including author,
@@ -878,6 +977,19 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
 - Full scans are the authoritative fallback: they upsert new/changed files and
   remove missing paths from both SQLite and Lucene, covering lost or overflowed
   file-system events.
+- Background watcher activity is reported to the UI: `LibraryWatcherService`
+  takes an optional `Action<LibraryScanActivity>` and raises it when an
+  incremental batch or a full reconciliation starts, progresses (per-file), and
+  ends. `MainWindow` (`OnLibraryScanActivity`) shows a subtle, throttled sidebar
+  indicator (`LibraryActivityPanel` / `LibraryActivityTextBlock`, e.g. "Updating
+  library… N / M files") and never reloads a view for it.
+- A background library change (`OnWatchedLibraryChanged`) must NOT auto-reload
+  the visible content view. It refreshes the sidebar playlist list and, for a
+  view that `CanReloadCurrentViewAfterLibraryChange()` allows, shows the
+  header `LibraryRefreshButton` ("New library data available" / "Refresh"). The
+  user reloads on demand (`LibraryRefreshButton_OnClick`); the button is hidden
+  again on any explicit navigation (`ShowTopLevelViewAsync`). No automatic
+  navigation and no skeleton for background changes.
 - Removing a configured library root removes tracks outside the remaining roots
   from SQLite, Lucene, and the waveform cache through
   `LibraryScanner.RemoveTracksOutsideRoots`.
@@ -1127,11 +1239,33 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   `_queueIndex` by reference, not by path equality.
 - Queue rows can move up/down or be removed, and the complete queue can be
   saved as a regular playlist through `NewPlaylistDialog`.
+- The Up Next header exposes a localized **Clear queue** action that clears the
+  editable queue without stopping the currently playing track; MCP `clear_queue`
+  uses the same `ClearPlaybackQueue` path.
 - Queue mutations update navigation buttons, the visible queue table, shuffle
   history, and persisted settings together.
 - The gapless PCM players receive an immutable item list at startup. Mutating
   an active gapless queue therefore restarts the current stream and seeks back
   to its audible position so the revised order takes effect immediately.
+- **Restore last queue**: `CapturePlaybackQueueState` detects a wholesale queue
+  replacement (the new queue shares no path with the outgoing one) and stores the
+  outgoing queue via `AudioDatabase.SavePreviousPlaybackQueue` (kept in `app_meta`
+  as `previous_playback_queue`). The Up Next header shows `RestoreQueueButton`
+  when `GetPreviousPlaybackQueue()` is non-empty; `RestorePreviousQueueAsync`
+  swaps it back in and re-captures the outgoing queue, so restore is reversible.
+- **Drag & drop into the queue**: `SetupQueueDragAndDrop` makes the `ContentDataGrid`,
+  `AlbumArtworkListBox`, and `FolderTreeView` drag sources (tunnel pointer
+  handlers start a `DragDrop` operation carrying `orynivo/queue-paths`) and the
+  always-visible `QueueNavItem` the drop target. Dropping on **Up Next** appends
+  the resolved paths to the queue end and must not restart the active playback
+  session. Track rows (local, remote, Plex) use their
+  `FilePath`; local album rows and album cards resolve via `GetTrackListByAlbum`;
+  local folders via `GetTrackPathsUnderDirectory`; remote folders via the in-memory
+  `FolderTree` (`_folderTreesBySource`). Remote album rows/cards carry an
+  `orynivo-album:server:id` reference that
+  `ResolveDroppedQueuePathsAsync` expands to registered track stream URLs on drop
+  (`QueueNavItem_OnDrop` is async). The queue and the source lists are never
+  co-visible, so the sidebar item is the drop target.
 
 ## Playlist Database Structure
 
@@ -1234,14 +1368,20 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   the highest available rate that does not exceed the source.
 - The transport file-information line and status bar explicitly identify
   DSD-to-PCM conversion and show the selected PCM output sample rate.
+- The transport file-information line shows a compact localized `RG` badge when
+  ReplayGain is enabled and the current PCM track has a usable track or album
+  ReplayGain value. Native DSD, radio, podcasts, and tracks without ReplayGain
+  metadata keep the badge hidden.
 - WASAPI pause keeps the exclusive AudioClient running and supplies silence so
   drivers do not loop the final endpoint buffer; buffered audio remains
   available for resume
 - WASAPI playback position subtracts frames still queued in
   `BufferedWaveProvider`, so transport time, history, and synchronized lyrics
   follow audible output instead of producer progress
-- Transport uses custom vector icons for previous, play/pause, and next;
-  unavailable queue directions are disabled
+- Transport uses custom vector icons for previous, play/pause, next, secondary
+  action buttons, quick-picker settings, and volume; unavailable queue
+  directions are disabled. Small UI icons should use shared `StreamGeometry`
+  resources from `App.axaml` instead of text glyphs or emoji.
 - Seeking is implemented for ASIO PCM, WASAPI PCM, DSF, and DFF
 - Loading a file or folder builds a playback queue; completion advances automatically
 - Sequential PCM queues use one persistent ASIO/cwASIO or exclusive WASAPI
@@ -1400,9 +1540,12 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   floating card) showing 72 × 72 px rounded album artwork, track information,
   favorite state, playback controls, position, volume, and two quick-pick
   buttons (EQ and Output) below the volume control. The EQ popup contains a
-  profile ComboBox, a ⚙ settings button, and a themed enable/disable checkbox
+  profile ComboBox, a vector settings button, and a themed enable/disable checkbox
   (`PopupCheckBoxTheme`). The Output popup contains a profile ComboBox and a
-  ⚙ settings button. Both buttons use vector SVG path icons and tooltips.
+  vector settings button. Both buttons use vector path icons and tooltips.
+  Right-clicking the now-playing cover opens a compact themed menu for opening
+  the current album or artist, searching album artwork, and toggling the
+  current track favorite.
 - The transport uses a cover-derived accent brush (`AppTransportAccentBrush`,
   default `#6C63FF`) for the position-slider progress fill/thumb and the
   play/pause button background. `UpdateTransportAccentFromArtwork` recomputes it
@@ -1499,6 +1642,8 @@ asynchronous file I/O from the UI thread
   hard-coded assumption such as white text. Check dark and light themes before
   accepting new color combinations.
 - Empty artwork areas use a dedicated placeholder resource
+- Empty library, radio, and podcast states should explain the next useful
+  setup or discovery action instead of only reporting that no rows exist.
 - Tables, lists, and trees must not expose default-white backgrounds in dark mode
 - DataGrid and ScrollViewer backgrounds are overridden via Avalonia styles in
   `MainWindow.axaml`
@@ -1594,7 +1739,10 @@ asynchronous file I/O from the UI thread
   metadata, duration, genre, and the episode RSS summary
 - During radio playback, the Internet Radio page shows a large station logo and
   live ICY title/artist metadata when supplied by the stream; the transport
-  summary is updated at the same time.
+  summary and Windows media overlay are updated at the same time. Downloaded
+  station logos are cached under `%LOCALAPPDATA%\Orynivo\radio-logos\` and the
+  cached local file is passed to SMTC so Windows does not have to refetch the
+  remote favicon URL itself.
 - Radio search results expose a multi-select genre popup derived from normalized
   Radio Browser tags. Selected genres use OR semantics, technical tags are
   excluded, and unavailable selections are removed after a new search.
@@ -1633,10 +1781,15 @@ asynchronous file I/O from the UI thread
   Selecting a card supports Back navigation. Cover/favorite handlers refresh the
   bound card in place on the dashboard surface (`UpdateRowArtworkFromBytes`)
   instead of rebuilding the hidden Albums list.
-  3. **Stats section** (`DashboardBuildStatsSection`): the calendar and top-genre
-  blocks, each with its own section header. They sit side by side in a two-column
-  grid on wide dashboards and stack on narrow ones; the layout switches at a
-  980-px threshold (`ComputeDashboardTwoColumn`) and re-flows on the
+  3. **Stats section** (`DashboardBuildStatsSection`): a shared period selector
+  header (`DashboardCreateStatsPeriodHeader`, backed by `_dashboardStatsPeriod`
+  / `StatsPeriod` and `StatsPeriodSinceUnix`) governs the genre, album, and
+  artist analytics cards together (All time / This year / This month / Last 30
+  days / Last 7 days); changing it rebuilds the dashboard. The calendar keeps its
+  own independent month navigation. On wide dashboards the blocks sit in a
+  two-column grid (left: calendar + top albums; right: top genres + top artists)
+  and stack on narrow ones; the layout switches at a 980-px threshold
+  (`ComputeDashboardTwoColumn`) and re-flows on the
   `DashboardScrollViewer.SizeChanged` boundary crossing only.
      - **Calendar** (`DashboardBuildCalendarCard`): Monday-first month grid with
      day number, `HH:mm:ss` playback time, top three linked genres, today
@@ -1645,6 +1798,17 @@ asynchronous file I/O from the UI thread
      with a colored numbered rank chip (contrast-safe text via
      `PickContrastBrush`), a linked genre label, `HH:mm:ss` duration, and a thin
      proportional bar per genre, colored from `_genreColors`.
+     - **Most listened albums** (`DashboardBuildTopAlbumsCard`) and **Most listened
+     artists** (`DashboardBuildTopArtistsCard`): analytics cards mirroring the
+     genre card, backed by `AudioDatabase.GetTopAlbums`/`GetTopArtists`
+     (`TopAlbumStat`/`TopArtistStat`), which merge local, remote Orynivo Server,
+     and Plex playback by album title+artist / artist name in the selected period.
+     Album rows show a small cover (local thumbnail, remote track artwork, or an
+     `InitialsAvatar`). Album/artist labels are links that open the entity in its
+     own library through `OpenTopAlbumAsync`/`OpenTopArtistAsync`, which route a
+     synthetic `DailyHistoryEntry` (`MakeStatHistoryEntry`) through the shared
+     `OpenHistoryAlbumAsync`/`OpenHistoryArtistAsync` so local, remote, and Plex
+     targets all work.
 - The **Recently played** and **Recently added** section headers carry a
   right-aligned **Show all** link (`DashboardCreateSectionHeader`'s
   `showAllAction`). It opens a full-page view (`ShowAllRecentlyPlayedAsync` /
@@ -1666,13 +1830,18 @@ asynchronous file I/O from the UI thread
   Daily-history cells without an available action must render as plain text, not
   disabled link-style buttons.
 - Data comes from `GetRecentAlbums` (now also exposing `ArtistId`/`AddedAt` for
-  cross-library merging), `GetCalendarData`, and `GetTopGenres`
+  cross-library merging), `GetCalendarData`, `GetTopGenres`, `GetTopAlbums`, and
+  `GetTopArtists`. `GetTopGenres`/`GetTopAlbums`/`GetTopArtists` take an optional
+  `sinceUnix` lower bound driven by the dashboard period selector.
 - Dashboard calendar playback time includes local, remote Orynivo Server, and
-  Plex tracks, podcasts, and internet radio. Top-genre statistics (the Top genres
-  section and per-day calendar genres) include local, remote Orynivo Server, and
-  Plex tracks: the genre query uses `COALESCE(tracks.genre, play_history.genre)`
-  over a `LEFT JOIN`, falling back to the genre captured at playback time
-  (`ResolveNowPlayingGenre`) for tracks without a local library row
+  Plex tracks, podcasts, and internet radio. The Top genres / albums / artists
+  statistics include local, remote Orynivo Server, and Plex tracks: the genre
+  query uses `COALESCE(tracks.genre, play_history.genre)` over a `LEFT JOIN`,
+  falling back to the genre captured at playback time (`ResolveNowPlayingGenre`)
+  for tracks without a local library row; the album/artist aggregations merge by
+  album title+artist / artist name and prefer a local match (album ID + artwork)
+  as the representative identity, otherwise keep a representative external ID and
+  path for remote/Plex resolution
 - Clicking a dashboard genre opens Tracks with only that genre facet selected;
   other track filters are cleared and the genre filter section is expanded
 - `RecentAlbumInfo` and `CalendarDayData` are records in `AudioDatabase.cs`

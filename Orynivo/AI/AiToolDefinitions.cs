@@ -51,10 +51,10 @@ internal static class AiToolDefinitions
             ["url"]),
 
         Make("play",
-            "Plays a local audio file by its absolute path. Omit the path to resume the current paused track.",
+            "Plays an audio track by its path. Accepts a local absolute file path or an orynivo:// remote reference from search_library. Omit the path to resume the current paused track.",
             new JsonObject
             {
-                ["path"] = Str("Absolute path of the audio file to play. Leave empty to resume.")
+                ["path"] = Str("Local absolute file path or orynivo:// remote reference to play. Leave empty to resume.")
             }),
 
         Make("pause_resume",
@@ -90,18 +90,18 @@ internal static class AiToolDefinitions
             ["volume"]),
 
         Make("queue_append",
-            "Appends a local audio file to the end of the playback queue.",
+            "Appends an audio track to the end of the playback queue. Accepts a local absolute file path or an orynivo:// remote reference from search_library.",
             new JsonObject
             {
-                ["path"] = Str("Absolute path of the audio file to append.")
+                ["path"] = Str("Local absolute file path or orynivo:// remote reference to append.")
             },
             ["path"]),
 
         Make("queue_play_next",
-            "Inserts a local audio file immediately after the current queue position so it plays next.",
+            "Inserts an audio track immediately after the current queue position so it plays next. Accepts a local absolute file path or an orynivo:// remote reference from search_library.",
             new JsonObject
             {
-                ["path"] = Str("Absolute path of the audio file to play next.")
+                ["path"] = Str("Local absolute file path or orynivo:// remote reference to play next.")
             },
             ["path"]),
 
@@ -110,20 +110,20 @@ internal static class AiToolDefinitions
             new JsonObject()),
 
         Make("replace_queue",
-            "Replaces the entire playback queue with the given list of audio file paths and immediately starts playing the first track. Use this when the user wants to play a specific set of tracks — it removes whatever was queued before. Use queue_append to add to the existing queue instead.",
+            "Replaces the entire playback queue with the given list of tracks and immediately starts playing the first one. Each entry may be a local absolute file path or an orynivo:// remote reference from search_library. Use this when the user wants to play a specific set of tracks — it removes whatever was queued before. Use queue_append to add to the existing queue instead.",
             new JsonObject
             {
                 ["paths"] = new JsonObject
                 {
                     ["type"] = "array",
                     ["items"] = new JsonObject { ["type"] = "string" },
-                    ["description"] = "Ordered list of absolute audio file paths to set as the new queue."
+                    ["description"] = "Ordered list of local absolute file paths and/or orynivo:// remote references to set as the new queue."
                 }
             },
             ["paths"]),
 
         Make("search_library",
-            "Searches the local music library for tracks, albums, and artists. Returns file paths that can be passed to play or queue tools.",
+            "Searches the music library for tracks, albums, and artists across the local library and every configured remote Orynivo Server. Local tracks return a file path; remote tracks return an orynivo:// reference. Both can be passed directly to the play and queue tools.",
             new JsonObject
             {
                 ["query"] = Str("Free-text search query, e.g. an artist name, album title, or track title."),

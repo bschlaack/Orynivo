@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -17,6 +18,7 @@ internal partial class AiChatView : UserControl
     private readonly AiChatService _service = new();
     private AiToolExecutor? _executor;
     private CancellationTokenSource? _cts;
+    private bool _stickToBottom = true;
 
     /// <summary>Gets or sets the bridge used to dispatch tool calls to the Avalonia UI thread.</summary>
     public McpPlayerBridge? Bridge { get; set; }
@@ -29,6 +31,21 @@ internal partial class AiChatView : UserControl
     {
         InitializeComponent();
         MessagesControl.ItemsSource = _messages;
+        // Robust auto-scroll. Two facts drove this design:
+        //  1) The streamed Markdown message rebuilds its content on every token, so the
+        //     content extent keeps growing. LayoutUpdated on the ScrollViewer does NOT fire
+        //     reliably for that (the ScrollViewer's own bounds don't change), which left the
+        //     view pinned to a stale, too-high offset with the last lines clipped. The
+        //     ScrollViewer DOES raise ScrollChanged when its extent grows, so that is the
+        //     reliable trigger to re-pin to the true bottom.
+        //  2) Those same extent/offset changes must never be mistaken for a user scroll, so
+        //     sticky mode is released ONLY by a real mouse-wheel gesture.
+        MessagesScrollViewer.LayoutUpdated += MessagesScrollViewer_OnLayoutUpdated;
+        MessagesScrollViewer.ScrollChanged += MessagesScrollViewer_OnScrollChanged;
+        MessagesScrollViewer.AddHandler(
+            InputElement.PointerWheelChangedEvent,
+            MessagesScrollViewer_OnWheel,
+            RoutingStrategies.Tunnel);
     }
 
     // ------------------------------------------------------------------ public API
@@ -167,13 +184,80 @@ internal partial class AiChatView : UserControl
 
     private void AddMessage(AiChatMessageVm msg)
     {
+        // A new message (or a fresh turn) always re-enables sticky auto-scroll.
+        _stickToBottom = true;
         _messages.Add(msg);
         ScrollToBottom();
     }
 
-    private void ScrollToBottom() =>
-        Dispatcher.UIThread.Post(() => MessagesScrollViewer.ScrollToEnd(),
-            DispatcherPriority.Loaded);
+    private void ScrollToBottom()
+    {
+        _stickToBottom = true;
+        // The actual scroll is performed by the LayoutUpdated handler once the new
+        // content has been laid out; nudging here covers the case where no further
+        // layout pass is pending.
+        Dispatcher.UIThread.Post(ForceScrollToEnd, DispatcherPriority.Background);
+    }
+
+    private void ForceScrollToEnd()
+    {
+        var sv = MessagesScrollViewer;
+        var target = Math.Max(0, sv.Extent.Height - sv.Viewport.Height);
+        if (Math.Abs(sv.Offset.Y - target) < 0.5)
+        {
+            MessagesBottomAnchor.BringIntoView();
+            return;
+        }
+
+        sv.Offset = new Vector(sv.Offset.X, target);
+        MessagesBottomAnchor.BringIntoView();
+    }
+
+    private void MessagesScrollViewer_OnLayoutUpdated(object? sender, EventArgs e)
+    {
+        if (_stickToBottom)
+            ForceScrollToEnd();
+    }
+
+    private void MessagesScrollViewer_OnScrollChanged(object? sender, ScrollChangedEventArgs e)
+    {
+        // Fires whenever the extent, viewport, or offset changes — including while the
+        // streamed reply grows — so it is the reliable place to re-pin to the bottom.
+        // It only *follows* the content; detaching is handled by the wheel gesture.
+        if (_stickToBottom)
+            ForceScrollToEnd();
+    }
+
+    private void MessagesScrollViewer_OnWheel(object? sender, PointerWheelEventArgs e)
+    {
+        // Positive Y = wheel up = the user wants to read earlier messages, so stop
+        // following. Wheel down re-attaches once they return to the bottom.
+        if (e.Delta.Y > 0)
+        {
+            _stickToBottom = false;
+        }
+        else if (e.Delta.Y < 0)
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                var sv = MessagesScrollViewer;
+                if (sv.Offset.Y >= sv.Extent.Height - sv.Viewport.Height - 24)
+                    _stickToBottom = true;
+            }, DispatcherPriority.Background);
+        }
+    }
+
+    /// <summary>Copies a chat message's raw text to the clipboard.</summary>
+    /// <param name="sender">The copy button whose data context is the message.</param>
+    /// <param name="e">The click event data.</param>
+    private async void CopyMessage_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Control { DataContext: AiChatMessageVm vm })
+            return;
+        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+        if (clipboard is not null)
+            await clipboard.SetTextAsync(vm.Content ?? string.Empty);
+    }
 
     private void SetBusy(bool busy)
     {

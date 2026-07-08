@@ -233,11 +233,30 @@ public sealed record OrynivoSmartPlaylistSaveRequest(string Name, string FilterC
 /// <param name="FavoriteTrackIds">Server-side track IDs the client treats as favourites.</param>
 public sealed record OrynivoSmartPlaylistResolveRequest(IReadOnlyList<long> FavoriteTrackIds);
 
+/// <summary>Request body for counting how many server tracks match ad-hoc smart-playlist criteria.</summary>
+/// <param name="Criteria">Serialized smart-playlist criteria JSON.</param>
+/// <param name="FavoriteTrackIds">Server-side track IDs the client treats as favourites.</param>
+public sealed record OrynivoSmartCriteriaResolveRequest(string Criteria, IReadOnlyList<long> FavoriteTrackIds);
+
+/// <summary>Match-count response returned by the smart-criteria resolve endpoint.</summary>
+/// <param name="Count">Number of tracks that match the supplied criteria.</param>
+public sealed record OrynivoSmartCriteriaCount(int Count);
+
 /// <summary>Server info returned by <c>/api/info</c>.</summary>
 public sealed record OrynivoServerInfo(
     string Name,
     string Version,
     int ApiVersion);
+
+/// <summary>
+/// Feature-support flags probed on a remote Orynivo Server so the client can warn when an
+/// older server lacks specific endpoints. Each value is <see langword="true"/> (supported),
+/// <see langword="false"/> (missing), or <see langword="null"/> (probe inconclusive).
+/// </summary>
+/// <param name="TrackFacets">Whether the <c>/api/tracks/facets</c> endpoint exists.</param>
+/// <param name="RecentAlbums">Whether the <c>/api/albums/recent</c> endpoint exists.</param>
+/// <param name="Waveforms">Whether the <c>/api/tracks/{id}/waveform</c> endpoint exists.</param>
+public sealed record OrynivoServerCapabilities(bool? TrackFacets, bool? RecentAlbums, bool? Waveforms);
 
 /// <summary>Library path configuration returned by the Orynivo Server API.</summary>
 public sealed record OrynivoLibraryPaths(IReadOnlyList<string> Paths);
@@ -347,6 +366,60 @@ public sealed class OrynivoServerClient : IDisposable
             return await response.Content.ReadFromJsonAsync<OrynivoServerInfo>(JsonOptions, cancellationToken);
         }
         catch { return null; }
+    }
+
+    /// <summary>
+    /// Probes whether the server supports the newer feature endpoints (track facets, recent
+    /// albums, and per-track waveforms) so the client can concretely report what an older
+    /// server is missing. Because every server currently reports the same API version, this
+    /// tests the routes directly instead of relying on a version number.
+    /// </summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The probed capability flags.</returns>
+    public async Task<OrynivoServerCapabilities> GetCapabilitiesAsync(
+        OrynivoServerSettings server,
+        CancellationToken cancellationToken = default)
+    {
+        var facets = ProbeRouteExistsAsync(server, "/api/tracks/facets", cancellationToken);
+        var recent = ProbeRouteExistsAsync(server, "/api/albums/recent", cancellationToken);
+        var waveform = ProbeRouteExistsAsync(server, "/api/tracks/0/waveform", cancellationToken);
+        await Task.WhenAll(facets, recent, waveform).ConfigureAwait(false);
+        return new OrynivoServerCapabilities(facets.Result, recent.Result, waveform.Result);
+    }
+
+    /// <summary>
+    /// Tests whether a route exists by sending a method it does not implement: an existing
+    /// route replies <c>405 Method Not Allowed</c>, a missing route replies <c>404</c>. This
+    /// distinguishes "endpoint present" from "older server without the endpoint" without
+    /// downloading any payload.
+    /// </summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="path">API path to probe.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when the route exists, <see langword="false"/> when it is missing, or <see langword="null"/> when inconclusive.</returns>
+    private async Task<bool?> ProbeRouteExistsAsync(
+        OrynivoServerSettings server,
+        string path,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Delete, BuildUrl(server, path));
+            request.Headers.Add("X-Api-Key", server.ApiKey);
+            using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            return response.StatusCode switch
+            {
+                System.Net.HttpStatusCode.MethodNotAllowed => true,
+                System.Net.HttpStatusCode.NotFound => false,
+                System.Net.HttpStatusCode.Unauthorized => (bool?)null,
+                _ => true
+            };
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     // ------------------------------------------------------------------
@@ -658,6 +731,39 @@ public sealed class OrynivoServerClient : IDisposable
             return await response.Content.ReadFromJsonAsync<List<OrynivoPlaylistTrackInfo>>(JsonOptions, cancellationToken) ?? [];
         }
         catch { return []; }
+    }
+
+    /// <summary>
+    /// Counts how many of the server's tracks match ad-hoc smart-playlist criteria, for the
+    /// editor's live preview. Returns <see langword="null"/> when the server does not support
+    /// the resolve-count endpoint (older servers) or the request fails.
+    /// </summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="criteriaJson">Serialized smart-playlist criteria JSON.</param>
+    /// <param name="favoriteTrackIds">Client-side favourite track IDs used for a FavoritesOnly criterion.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The number of matching tracks, or <see langword="null"/>.</returns>
+    public async Task<int?> ResolveSmartPlaylistCountAsync(
+        OrynivoServerSettings server,
+        string criteriaJson,
+        IReadOnlyList<long> favoriteTrackIds,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, BuildUrl(server, "/api/playlists/resolve-count"))
+            {
+                Content = JsonContent.Create(
+                    new OrynivoSmartCriteriaResolveRequest(criteriaJson, favoriteTrackIds), options: JsonOptions)
+            };
+            request.Headers.Add("X-Api-Key", server.ApiKey);
+            using var response = await _http.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+                return null;
+            var result = await response.Content.ReadFromJsonAsync<OrynivoSmartCriteriaCount>(JsonOptions, cancellationToken);
+            return result?.Count;
+        }
+        catch { return null; }
     }
 
     /// <summary>Creates a smart playlist on the remote server.</summary>

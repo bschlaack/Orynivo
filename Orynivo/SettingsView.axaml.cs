@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.IO;
 using Avalonia;
 using Avalonia.Threading;
@@ -110,6 +111,10 @@ internal partial class SettingsView : UserControl
             ?? replayGainChoices[0];
         AlwaysConvertDsdToPcmCheckBox.IsChecked = settings.AlwaysConvertDsdToPcm;
         PcmOutputBoostCheckBox.IsChecked = settings.PcmOutputBoostEnabled;
+        NonGaplessCrossfadeNumericUpDown.Value = (decimal)Math.Clamp(
+            settings.NonGaplessCrossfadeSeconds,
+            0,
+            10);
         _equalizerProfiles.AddRange((settings.EqualizerProfiles ?? [])
             .Select(static profile => profile.Clone()));
         if (_equalizerProfiles.Count == 0 && settings.EqualizerProfile is not null)
@@ -253,6 +258,8 @@ internal partial class SettingsView : UserControl
     public bool AlwaysConvertDsdToPcm => AlwaysConvertDsdToPcmCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether PCM playback should receive the additional output boost.</summary>
     public bool PcmOutputBoostEnabled => PcmOutputBoostCheckBox.IsChecked == true;
+    /// <summary>Gets the configured non-gapless queue fade duration in seconds.</summary>
+    public double NonGaplessCrossfadeSeconds => (double)(NonGaplessCrossfadeNumericUpDown.Value ?? 0);
     /// <summary>Gets a value indicating whether the imported equalizer profile is enabled.</summary>
     public bool EqualizerEnabled =>
         _equalizerProfile is not null && EqualizerEnabledCheckBox.IsChecked == true;
@@ -372,6 +379,8 @@ internal partial class SettingsView : UserControl
     /// <param name="cancellationToken">Token cancelling a superseded or closed check.</param>
     private async void CheckServerStatusAsync(
         StatusBadge badge,
+        TextBlock detail,
+        string serverId,
         Func<CancellationToken, Task<bool>> probe,
         CancellationToken cancellationToken)
     {
@@ -381,9 +390,38 @@ internal partial class SettingsView : UserControl
         if (cancellationToken.IsCancellationRequested)
             return;
         var loc = LocalizationManager.Current;
-        badge.State = ok ? StatusBadgeState.Ok : StatusBadgeState.Warning;
-        badge.Text = ok ? loc.StatusAvailable : loc.StatusUnavailable;
+        if (ok)
+        {
+            ServerConnectionStore.RecordSuccess(serverId);
+            badge.State = StatusBadgeState.Ok;
+            badge.Text = loc.StatusAvailable;
+            detail.IsVisible = false;
+            return;
+        }
+
+        // Unreachable: show a clear status plus the last successful connection so the
+        // user can tell a transient outage apart from a server that never worked.
+        badge.State = StatusBadgeState.Warning;
+        badge.Text = loc.ServerUnreachable;
+        var last = ServerConnectionStore.GetLastConnected(serverId);
+        detail.Text = last is long ts
+            ? string.Format(
+                loc.ServerLastConnected,
+                DateTimeOffset.FromUnixTimeSeconds(ts).LocalDateTime.ToString("g", CultureInfo.CurrentCulture))
+            : loc.ServerNeverConnected;
+        detail.IsVisible = true;
     }
+
+    /// <summary>Creates the muted per-server status-detail line shown when a server is unreachable.</summary>
+    /// <returns>A collapsed detail text block.</returns>
+    private static TextBlock CreateServerStatusDetail() => new()
+    {
+        FontSize = 11,
+        IsVisible = false,
+        Foreground = AvaloniaApp.Current!.Resources["AppMutedTextBrush"] as IBrush,
+        TextTrimming = TextTrimming.CharacterEllipsis,
+        Margin = new Thickness(0, 2, 0, 0)
+    };
 
     /// <summary>Tests whether a remote Orynivo Server responds on its info endpoint.</summary>
     /// <param name="server">The server to probe.</param>
@@ -448,6 +486,8 @@ internal partial class SettingsView : UserControl
                 Foreground = mutedBrush,
                 TextTrimming = TextTrimming.CharacterEllipsis
             });
+            var statusDetail = CreateServerStatusDetail();
+            description.Children.Add(statusDetail);
             row.Children.Add(description);
 
             var statusBadge = CreateServerStatusBadge();
@@ -469,7 +509,7 @@ internal partial class SettingsView : UserControl
             PlexServersPanel.Children.Add(row);
 
             var plexServer = server;
-            CheckServerStatusAsync(statusBadge, ct => ProbePlexServerAsync(plexServer, ct), statusToken);
+            CheckServerStatusAsync(statusBadge, statusDetail, plexServer.Id, ct => ProbePlexServerAsync(plexServer, ct), statusToken);
         }
     }
 
@@ -526,6 +566,7 @@ internal partial class SettingsView : UserControl
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             var description = new StackPanel();
             description.Children.Add(new TextBlock
@@ -542,6 +583,10 @@ internal partial class SettingsView : UserControl
                 Foreground = mutedBrush,
                 TextTrimming = TextTrimming.CharacterEllipsis
             });
+            var statusDetail = CreateServerStatusDetail();
+            description.Children.Add(statusDetail);
+            var capabilityDetail = CreateServerStatusDetail();
+            description.Children.Add(capabilityDetail);
             row.Children.Add(description);
 
             var statusBadge = CreateServerStatusBadge();
@@ -554,17 +599,110 @@ internal partial class SettingsView : UserControl
             Grid.SetColumn(editButton, 2);
             row.Children.Add(editButton);
 
+            var cacheButton = CreateStyledButton(LocalizationManager.Current.ClearCache, 90, 28, new Thickness(8, 0, 0, 0));
+            cacheButton.Tag    = server.Id;
+            cacheButton.Click += ClearOrynivoServerCacheButton_OnClick;
+            Grid.SetColumn(cacheButton, 3);
+            row.Children.Add(cacheButton);
+
             var removeButton = CreateStyledButton(LocalizationManager.Current.OrynivoRemoveServer, 80, 28, new Thickness(8, 0, 0, 0));
             removeButton.Tag    = server.Id;
             removeButton.Click += RemoveOrynivoServerButton_OnClick;
-            Grid.SetColumn(removeButton, 3);
+            Grid.SetColumn(removeButton, 4);
             row.Children.Add(removeButton);
 
             OrynivoServersPanel.Children.Add(row);
 
             var orynivoServer = server;
-            CheckServerStatusAsync(statusBadge, ct => ProbeOrynivoServerAsync(orynivoServer, ct), statusToken);
+            CheckServerStatusAsync(statusBadge, statusDetail, orynivoServer.Id, ct => ProbeOrynivoServerAsync(orynivoServer, ct), statusToken);
+            CheckServerCapabilitiesAsync(capabilityDetail, orynivoServer, statusToken);
         }
+
+        RefreshRemoteCacheSize();
+    }
+
+    /// <summary>
+    /// Probes the server's newer feature endpoints and, if any are missing, shows a concrete
+    /// "server does not support …" line so older servers are clearly identified.
+    /// </summary>
+    /// <param name="target">The detail text block to populate.</param>
+    /// <param name="server">The server to probe.</param>
+    /// <param name="cancellationToken">Cancellation token tied to the server-list rebuild.</param>
+    private async void CheckServerCapabilitiesAsync(
+        TextBlock target,
+        OrynivoServerSettings server,
+        CancellationToken cancellationToken)
+    {
+        OrynivoServerCapabilities caps;
+        try
+        {
+            using var client = new OrynivoServerClient();
+            caps = await client.GetCapabilitiesAsync(server, cancellationToken);
+        }
+        catch { return; }
+        if (cancellationToken.IsCancellationRequested)
+            return;
+
+        var loc = LocalizationManager.Current;
+        var missing = new List<string>();
+        if (caps.TrackFacets == false) missing.Add(loc.CapabilityTrackFacets);
+        if (caps.RecentAlbums == false) missing.Add(loc.CapabilityRecentAlbums);
+        if (caps.Waveforms == false) missing.Add(loc.CapabilityWaveforms);
+
+        if (missing.Count > 0)
+        {
+            target.Text = string.Format(loc.ServerMissingFeatures, string.Join(", ", missing));
+            target.IsVisible = true;
+        }
+        else
+        {
+            target.IsVisible = false;
+        }
+    }
+
+    /// <summary>Recomputes the combined remote-server cache size off the UI thread and updates the label.</summary>
+    private async void RefreshRemoteCacheSize()
+    {
+        long bytes = 0;
+        try { bytes = await Task.Run(RemoteServerCache.GetTotalSizeBytes); }
+        catch { /* Size reporting is best-effort. */ }
+        RemoteCacheSizeText.Text = string.Format(
+            LocalizationManager.Current.RemoteCacheSize, FormatCacheSize(bytes));
+    }
+
+    /// <summary>Formats a byte count as a compact human-readable size.</summary>
+    /// <param name="bytes">The size in bytes.</param>
+    /// <returns>A localized-invariant size string (e.g. "12.3 MB").</returns>
+    private static string FormatCacheSize(long bytes)
+    {
+        string[] units = ["B", "KB", "MB", "GB", "TB"];
+        double size = bytes;
+        var unit = 0;
+        while (size >= 1024 && unit < units.Length - 1)
+        {
+            size /= 1024;
+            unit++;
+        }
+        return unit == 0
+            ? $"{bytes} {units[unit]}"
+            : string.Create(CultureInfo.CurrentCulture, $"{size:0.0} {units[unit]}");
+    }
+
+    private void ClearAllRemoteCacheButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        RemoteServerCache.ClearAll();
+        RefreshRemoteCacheSize();
+    }
+
+    private void ClearOrynivoServerCacheButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string id })
+            return;
+        var server = _orynivoServers.FirstOrDefault(item => item.Id == id);
+        if (server is null)
+            return;
+        RemoteServerCache.ClearServer(server);
+        RefreshRemoteCacheSize();
     }
 
     private async void AddOrynivoServerButton_OnClick(object? sender, RoutedEventArgs e)

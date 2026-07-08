@@ -171,6 +171,9 @@ public static class LocalizationManager
         resources["L_OutputProfileDeleteConfirm"] = Current.OutputProfileDeleteConfirm;
         resources["L_ReplayGain"] = Current.ReplayGain;
         resources["L_ReplayGainHint"] = Current.ReplayGainHint;
+        resources["L_NonGaplessCrossfade"] = Current.NonGaplessCrossfade;
+        resources["L_NonGaplessCrossfadeHint"] = Current.NonGaplessCrossfadeHint;
+        resources["L_ReplayGainBadge"] = Current.ReplayGainBadge;
         resources["L_DsdPlayback"] = Current.DsdPlayback;
         resources["L_AlwaysConvertDsdToPcm"] = Current.AlwaysConvertDsdToPcm;
         resources["L_AlwaysConvertDsdToPcmHint"] = Current.AlwaysConvertDsdToPcmHint;
@@ -200,6 +203,9 @@ public static class LocalizationManager
         resources["L_NormalizeArtistsHint"] = Current.NormalizeArtistsHint;
         resources["L_Back"] = Current.Back;
         resources["L_MarkAsFavorite"] = Current.MarkAsFavorite;
+        resources["L_OpenAlbum"] = Current.OpenAlbum;
+        resources["L_OpenArtist"] = Current.OpenArtist;
+        resources["L_ToggleFavorite"] = Current.ToggleFavorite;
         resources["L_DevicePcmSampleRates"] = Current.DevicePcmSampleRates;
         resources["L_DeviceDsdRates"] = Current.DeviceDsdRates;
         resources["L_DevicePcmFormats"] = Current.DevicePcmFormats;
@@ -248,6 +254,8 @@ public static class LocalizationManager
         resources["L_DeleteRadio"] = Current.DeleteRadio;
         resources["L_RadioNowPlaying"] = Current.RadioNowPlaying;
         resources["L_RadioGenres"] = Current.RadioGenres;
+        resources["L_RadioEmptyState"] = Current.RadioEmptyState;
+        resources["L_OwnRadiosEmptyHint"] = Current.OwnRadiosEmptyHint;
         resources["L_ClearFilter"] = Current.ClearFilter;
         resources["L_Podcasts"] = Current.Podcasts;
         resources["L_MyPodcasts"] = Current.MyPodcasts;
@@ -287,6 +295,8 @@ public static class LocalizationManager
         resources["L_PodcastDirectory"] = Current.PodcastDirectory;
         resources["L_PodcastDirectoryHint"] = Current.PodcastDirectoryHint;
         resources["L_PodcastSearch"] = Current.PodcastSearch;
+        resources["L_PodcastEmptyState"] = Current.PodcastEmptyState;
+        resources["L_MyPodcastsEmptyHint"] = Current.MyPodcastsEmptyHint;
         resources["L_Podcast"] = Current.Podcast;
         resources["L_PodcastAuthor"] = Current.PodcastAuthor;
         resources["L_PlayLatestEpisode"] = Current.PlayLatestEpisode;
@@ -306,6 +316,8 @@ public static class LocalizationManager
         resources["L_MediaType"] = Current.MediaType;
         resources["L_Close"] = Current.Close;
         resources["L_DailyHistoryNoEntries"] = Current.DailyHistoryNoEntries;
+        resources["L_RefreshView"] = Current.RefreshView;
+        resources["L_LibraryDataAvailable"] = Current.LibraryDataAvailable;
         resources["L_Integration"]      = Current.Integration;
         resources["L_McpServer"]        = Current.McpServer;
         resources["L_McpServerHint"]    = Current.McpServerHint;
@@ -333,7 +345,13 @@ public static class LocalizationManager
         resources["L_AiChatInputPlaceholder"]  = Current.AiChatInputPlaceholder;
         resources["L_AiChatSend"]              = Current.AiChatSend;
         resources["L_AiChatClear"]             = Current.AiChatClear;
+        resources["L_AiChatCopy"]              = Current.AiChatCopy;
         resources["L_AiChatNotEnabled"]        = Current.AiChatNotEnabled;
+        resources["L_RemoteCache"]             = Current.RemoteCache;
+        resources["L_ClearRemoteCacheAll"]     = Current.ClearRemoteCacheAll;
+        resources["L_RestoreQueue"]            = Current.RestoreQueue;
+        resources["L_RestoreQueueTooltip"]     = Current.RestoreQueueTooltip;
+        resources["L_ClearQueue"]              = Current.ClearQueue;
         resources["L_AiChatEmptyResponse"]     = Current.AiChatEmptyResponse;
         resources["L_AiChatToolResultFallback"] = Current.AiChatToolResultFallback;
     }
@@ -434,6 +452,9 @@ public static class LocalizationManager
         SearchIndexFailed = "Suchindex konnte nicht aktualisiert werden: {0}",
         Back = "Zurück",
         MarkAsFavorite = "Als Favorit markieren",
+        OpenAlbum = "Album öffnen",
+        OpenArtist = "Künstler öffnen",
+        ToggleFavorite = "Favorit umschalten",
         PlaybackThrough = "Wiedergabe über {0}",
         PlaybackThroughWithDsdConversion = "Wiedergabe über {0} · DSD wird in PCM ({1:N0} Hz) konvertiert",
         NativeDsdOutput = "DSD nativ",
@@ -443,6 +464,9 @@ public static class LocalizationManager
         ReplayGainOff = "Aus",
         ReplayGainTrack = "Track",
         ReplayGainAlbum = "Album",
+        NonGaplessCrossfade = "Fade für nicht-gapless Queues (Sekunden)",
+        NonGaplessCrossfadeHint = "0 deaktiviert den Übergang. Gilt nur für Queue-Wechsel, die nicht bereits über die Gapless-PCM-Engine laufen.",
+        ReplayGainBadge = "RG",
         DsdPlayback = "DSD-Wiedergabe",
         AlwaysConvertDsdToPcm = "DSD-Dateien immer in PCM umwandeln",
         AlwaysConvertDsdToPcmHint = "Verwendet auch mit ASIO/cwASIO den PCM-Pfad, damit Lautstärke, ReplayGain und Equalizer wirken. Bei deaktivierter Option bleibt native DSD-Ausgabe bitgenau.",
@@ -488,7 +512,42 @@ public static class LocalizationManager
         SearchResultSummary = "{0:N0} Titel · {1:N0} Alben · {2:N0} Künstler",
         RecentAlbums = "Zuletzt hinzugefügte Alben",
         Calendar = "Kalender – {0}",
-        TopGenres = "Top 10 Genres nach Spielzeit",
+        TopGenres = "Meistgehörte Genres",
+        TopAlbums = "Meistgehörte Alben",
+        TopArtists = "Meistgehörte Künstler",
+        ListeningStats = "Hör-Statistik",
+        PeriodAllTime = "Gesamt",
+        PeriodThisYear = "Dieses Jahr",
+        PeriodThisMonth = "Dieser Monat",
+        PeriodLast30Days = "Letzte 30 Tage",
+        PeriodLast7Days = "Letzte 7 Tage",
+        HistorySourceRemote = "Remote",
+        HistorySourcePlex = "Plex",
+        LibraryUpdating = "Bibliothek wird aktualisiert…",
+        LibraryUpdatingWithCount = "Bibliothek wird aktualisiert… {0} / {1} Dateien",
+        RefreshView = "Aktualisieren",
+        LibraryDataAvailable = "Neue Bibliotheksdaten verfügbar",
+        ServerUnreachable = "Nicht erreichbar",
+        ServerLastConnected = "Zuletzt verbunden: {0}",
+        ServerNeverConnected = "Noch nie verbunden",
+        ServerMissingFeatures = "Server unterstützt nicht: {0}",
+        CapabilityTrackFacets = "Track-Facets",
+        CapabilityRecentAlbums = "Recent Albums",
+        CapabilityWaveforms = "Waveforms",
+        RemoteCache = "Remote-Cache",
+        RemoteCacheSize = "Cache-Größe: {0}",
+        ClearRemoteCacheAll = "Gesamten Cache leeren",
+        ClearCache = "Cache leeren",
+        RemoteScanning = "{0} wird aktualisiert…",
+        RemoteScanningWithCount = "{0} wird aktualisiert… {1} / {2} Dateien",
+        SmartPlaylistPreviewCount = "{0} Tracks passen",
+        SmartPlaylistPreviewComputing = "Wird berechnet…",
+        SmartPlaylistPreviewInvalid = "Ungültige Kriterien",
+        RestoreQueue = "Letzte Queue",
+        RestoreQueueTooltip = "Zuletzt gespielte Queue wiederherstellen",
+        NoPreviousQueue = "Keine vorherige Queue vorhanden.",
+        ClearQueue = "Queue leeren",
+        QueueCleared = "Queue geleert.",
         NoData = "Keine Daten vorhanden.",
         RecentlyPlayed = "Zuletzt gespielt",
         GreetingMorning = "Guten Morgen",
@@ -587,6 +646,8 @@ public static class LocalizationManager
         , DeleteRadio = "Sender löschen"
         , RadioLoading = "Radiosender werden geladen …"
         , RadioNoResults = "Keine passenden Radiosender gefunden."
+        , RadioEmptyState = "Suche nach Sendername, Land oder Genre, oder speichere gefundene Sender unter „Eigene Radios“."
+        , OwnRadiosEmptyHint = "Noch keine eigenen Radios gespeichert. Suche im Internetradio-Verzeichnis und füge Sender hinzu."
         , RadioAdded = "Radiosender „{0}“ wurde hinzugefügt."
         , RadioDeleted = "Radiosender „{0}“ wurde gelöscht."
         , RadioSearchFailed = "Radiosender konnten nicht geladen werden."
@@ -599,6 +660,7 @@ public static class LocalizationManager
         , PodcastDirectory = "Podcasts entdecken"
         , PodcastDirectoryHint = "Durchsuche das Apple-Podcast-Verzeichnis, pinne Podcasts dauerhaft an und spiele die neueste Episode aus dem RSS-Feed ab."
         , PodcastSearch = "Podcasts suchen"
+        , PodcastEmptyState = "Suche nach einem Podcast, filtere nach Kategorie oder Sprache und pinne Favoriten unter „Meine Podcasts“."
         , Podcast = "Podcast"
         , PodcastAuthor = "Autor"
         , PlayLatestEpisode = "Neueste abspielen"
@@ -606,6 +668,7 @@ public static class LocalizationManager
         , DeletePodcast = "Podcast löschen"
         , PodcastLoading = "Podcasts werden geladen …"
         , PodcastNoResults = "Keine passenden Podcasts gefunden."
+        , MyPodcastsEmptyHint = "Noch keine Podcasts angepinnt. Suche im Podcast-Verzeichnis und füge Podcasts hinzu."
         , PodcastAdded = "Podcast „{0}“ wurde hinzugefügt."
         , PodcastDeleted = "Podcast „{0}“ wurde gelöscht."
         , PodcastSearchFailed = "Podcasts konnten nicht geladen werden."
@@ -730,7 +793,7 @@ public static class LocalizationManager
         , CreateSmartPlaylist = "Smart-Playlist erstellen"
         , InvalidSmartPlaylistCriteria = "Bitte gültige Zahlen und widerspruchsfreie Mindest-/Maximalwerte eingeben. „Noch nie gespielt“ kann nicht mit einer kürzlichen Wiedergabe oder einer Mindestanzahl kombiniert werden."
         , EditSmartPlaylist = "Smart-Playlist bearbeiten"
-        , LibraryEmptyHint = "Noch keine Medienquelle eingerichtet. Lege in den Einstellungen lokale Verzeichnisse oder einen oder mehrere Orynivo Server an."
+        , LibraryEmptyHint = "Noch keine Medienquelle eingerichtet. Öffne Einstellungen > Bibliothek, füge lokale Musikordner hinzu oder verbinde einen Orynivo Server."
         , SmartPlaylistUpdated = "Smart-Playlist »{0}« aktualisiert."
         , ImportM3u8Playlist = "M3U8-Playlist importieren"
         , ExportM3u8Playlist = "Als M3U8 exportieren"
@@ -777,6 +840,7 @@ public static class LocalizationManager
         , AiChatInputPlaceholder = "Frage stellen …"
         , AiChatSend            = "Senden"
         , AiChatClear           = "Löschen"
+        , AiChatCopy            = "Kopieren"
         , AiChatNotEnabled      = "KI-Chat ist nicht aktiviert. Bitte unter Einstellungen › KI-Chat aktivieren."
         , AiChatEmptyResponse   = "Das Modell hat eine leere Antwort zurückgegeben."
         , AiChatToolResultFallback = "Das Modell hat nach dem Tool-Aufruf keine finale Antwort erzeugt. Tool-Ergebnis:"
@@ -868,12 +932,18 @@ public static class LocalizationManager
         SearchIndexReady = "Search index is up to date.",
         SearchIndexFailed = "Search index could not be updated: {0}",
         Back = "Back", MarkAsFavorite = "Mark as favorite",
+        OpenAlbum = "Open album",
+        OpenArtist = "Open artist",
+        ToggleFavorite = "Toggle favorite",
         PlaybackThrough = "Playback through {0}",
         PlaybackThroughWithDsdConversion = "Playback through {0} · DSD is converted to PCM ({1:N0} Hz)",
         NativeDsdOutput = "Native DSD", DsdToPcmOutput = "DSD → PCM",
         ReplayGain = "ReplayGain volume adjustment",
         ReplayGainHint = "Applies to PCM playback. Track mode prefers track gain; album mode prefers album gain. Native DSD output remains bit-perfect.",
         ReplayGainOff = "Off", ReplayGainTrack = "Track", ReplayGainAlbum = "Album",
+        NonGaplessCrossfade = "Fade for non-gapless queues (seconds)",
+        NonGaplessCrossfadeHint = "0 disables the transition. Applies only to queue changes that are not already handled by the gapless PCM engine.",
+        ReplayGainBadge = "RG",
         DsdPlayback = "DSD playback",
         AlwaysConvertDsdToPcm = "Always convert DSD files to PCM",
         AlwaysConvertDsdToPcmHint = "Uses the PCM path with ASIO/cwASIO as well, allowing volume, ReplayGain, and the equalizer to apply. With this option disabled, native DSD output remains bit-perfect.",
@@ -917,7 +987,42 @@ public static class LocalizationManager
         ReplayGainAlbumColumn = "ReplayGain album", Codec = "Codec", Tags = "Tags",
         Homepage = "Homepage", FeedUrl = "Feed address",
         SearchResultSummary = "{0:N0} tracks · {1:N0} albums · {2:N0} artists",
-        RecentAlbums = "Recently added albums", Calendar = "Calendar – {0}", TopGenres = "Top 10 genres by play time",
+        RecentAlbums = "Recently added albums", Calendar = "Calendar – {0}", TopGenres = "Most listened genres",
+        TopAlbums = "Most listened albums",
+        TopArtists = "Most listened artists",
+        ListeningStats = "Listening stats",
+        PeriodAllTime = "All time",
+        PeriodThisYear = "This year",
+        PeriodThisMonth = "This month",
+        PeriodLast30Days = "Last 30 days",
+        PeriodLast7Days = "Last 7 days",
+        HistorySourceRemote = "Remote",
+        HistorySourcePlex = "Plex",
+        LibraryUpdating = "Updating library…",
+        LibraryUpdatingWithCount = "Updating library… {0} / {1} files",
+        RefreshView = "Refresh",
+        LibraryDataAvailable = "New library data available",
+        ServerUnreachable = "Unreachable",
+        ServerLastConnected = "Last connected: {0}",
+        ServerNeverConnected = "Never connected",
+        ServerMissingFeatures = "Server does not support: {0}",
+        CapabilityTrackFacets = "Track facets",
+        CapabilityRecentAlbums = "Recent albums",
+        CapabilityWaveforms = "Waveforms",
+        RemoteCache = "Remote cache",
+        RemoteCacheSize = "Cache size: {0}",
+        ClearRemoteCacheAll = "Clear entire cache",
+        ClearCache = "Clear cache",
+        RemoteScanning = "Updating {0}…",
+        RemoteScanningWithCount = "Updating {0}… {1} / {2} files",
+        SmartPlaylistPreviewCount = "{0} tracks match",
+        SmartPlaylistPreviewComputing = "Computing…",
+        SmartPlaylistPreviewInvalid = "Invalid criteria",
+        RestoreQueue = "Last queue",
+        RestoreQueueTooltip = "Restore the last played queue",
+        NoPreviousQueue = "No previous queue available.",
+        ClearQueue = "Clear queue",
+        QueueCleared = "Queue cleared.",
         NoData = "No data available.",
         RecentlyPlayed = "Recently played",
         GreetingMorning = "Good morning", GreetingAfternoon = "Good afternoon", GreetingEvening = "Good evening",
@@ -1011,6 +1116,8 @@ public static class LocalizationManager
         , DeleteRadio = "Delete station"
         , RadioLoading = "Loading radio stations …"
         , RadioNoResults = "No matching radio stations found."
+        , RadioEmptyState = "Search by station name, country, or genre, or save discovered stations under “Own radios”."
+        , OwnRadiosEmptyHint = "No saved radio stations yet. Search the internet radio directory and add stations here."
         , RadioAdded = "Radio station “{0}” was added."
         , RadioDeleted = "Radio station “{0}” was deleted."
         , RadioSearchFailed = "Radio stations could not be loaded."
@@ -1023,6 +1130,7 @@ public static class LocalizationManager
         , PodcastDirectory = "Discover podcasts"
         , PodcastDirectoryHint = "Search the Apple Podcasts directory, pin podcasts permanently, and play the latest episode from the RSS feed."
         , PodcastSearch = "Search podcasts"
+        , PodcastEmptyState = "Search for a podcast, filter by category or language, and pin favorites under “My podcasts”."
         , Podcast = "Podcast"
         , PodcastAuthor = "Author"
         , PlayLatestEpisode = "Play latest"
@@ -1030,6 +1138,7 @@ public static class LocalizationManager
         , DeletePodcast = "Delete podcast"
         , PodcastLoading = "Loading podcasts …"
         , PodcastNoResults = "No matching podcasts found."
+        , MyPodcastsEmptyHint = "No pinned podcasts yet. Search the podcast directory and add podcasts here."
         , PodcastAdded = "Podcast “{0}” was added."
         , PodcastDeleted = "Podcast “{0}” was deleted."
         , PodcastSearchFailed = "Podcasts could not be loaded."
@@ -1154,7 +1263,7 @@ public static class LocalizationManager
         , CreateSmartPlaylist = "Create smart playlist"
         , InvalidSmartPlaylistCriteria = "Enter valid numbers and consistent minimum/maximum values. “Never played” cannot be combined with recent playback or a positive minimum play count."
         , EditSmartPlaylist = "Edit smart playlist"
-        , LibraryEmptyHint = "No media source configured yet. Add local directories or one or more Orynivo Servers in the settings."
+        , LibraryEmptyHint = "No media source is configured yet. Open Settings > Library, add local music folders, or connect an Orynivo Server."
         , SmartPlaylistUpdated = "Smart playlist '{0}' updated."
         , ImportM3u8Playlist = "Import M3U8 playlist"
         , ExportM3u8Playlist = "Export as M3U8"
@@ -1201,6 +1310,7 @@ public static class LocalizationManager
         , AiChatInputPlaceholder = "Ask a question …"
         , AiChatSend            = "Send"
         , AiChatClear           = "Clear"
+        , AiChatCopy            = "Copy"
         , AiChatNotEnabled      = "AI Chat is not enabled. Enable it in Settings › AI Chat."
         , AiChatEmptyResponse   = "The model returned an empty answer."
         , AiChatToolResultFallback = "The model did not return a final answer after the tool call. Tool result:"
@@ -1295,12 +1405,18 @@ public static class LocalizationManager
         SearchIndexReady = "L’index de recherche est à jour.",
         SearchIndexFailed = "L’index de recherche n’a pas pu être mis à jour : {0}",
         Back = "Retour", MarkAsFavorite = "Ajouter aux favoris",
+        OpenAlbum = "Ouvrir l’album",
+        OpenArtist = "Ouvrir l’artiste",
+        ToggleFavorite = "Basculer le favori",
         PlaybackThrough = "Lecture via {0}",
         PlaybackThroughWithDsdConversion = "Lecture via {0} · Le DSD est converti en PCM ({1:N0} Hz)",
         NativeDsdOutput = "DSD natif", DsdToPcmOutput = "DSD → PCM",
         ReplayGain = "Ajustement du volume ReplayGain",
         ReplayGainHint = "S’applique à la lecture PCM. Le mode piste privilégie le gain de piste, le mode album le gain d’album. La sortie DSD native reste bit-perfect.",
         ReplayGainOff = "Désactivé", ReplayGainTrack = "Piste", ReplayGainAlbum = "Album",
+        NonGaplessCrossfade = "Fondu pour files non gapless (secondes)",
+        NonGaplessCrossfadeHint = "0 désactive la transition. S’applique uniquement aux changements de file qui ne passent pas déjà par le moteur PCM gapless.",
+        ReplayGainBadge = "RG",
         DsdPlayback = "Lecture DSD",
         AlwaysConvertDsdToPcm = "Toujours convertir les fichiers DSD en PCM",
         AlwaysConvertDsdToPcmHint = "Utilise également le chemin PCM avec ASIO/cwASIO afin d’appliquer le volume, ReplayGain et l’égaliseur. Lorsque cette option est désactivée, la sortie DSD native reste bit-perfect.",
@@ -1344,7 +1460,42 @@ public static class LocalizationManager
         ReplayGainAlbumColumn = "ReplayGain album", Codec = "Codec", Tags = "Tags",
         Homepage = "Page d’accueil", FeedUrl = "Adresse du flux",
         SearchResultSummary = "{0:N0} titres · {1:N0} albums · {2:N0} artistes",
-        RecentAlbums = "Albums ajoutés récemment", Calendar = "Calendrier – {0}", TopGenres = "Top 10 des genres par durée d’écoute",
+        RecentAlbums = "Albums ajoutés récemment", Calendar = "Calendrier – {0}", TopGenres = "Genres les plus écoutés",
+        TopAlbums = "Albums les plus écoutés",
+        TopArtists = "Artistes les plus écoutés",
+        ListeningStats = "Statistiques d’écoute",
+        PeriodAllTime = "Tout",
+        PeriodThisYear = "Cette année",
+        PeriodThisMonth = "Ce mois-ci",
+        PeriodLast30Days = "30 derniers jours",
+        PeriodLast7Days = "7 derniers jours",
+        HistorySourceRemote = "Distant",
+        HistorySourcePlex = "Plex",
+        LibraryUpdating = "Mise à jour de la bibliothèque…",
+        LibraryUpdatingWithCount = "Mise à jour de la bibliothèque… {0} / {1} fichiers",
+        RefreshView = "Actualiser",
+        LibraryDataAvailable = "Nouvelles données de bibliothèque disponibles",
+        ServerUnreachable = "Injoignable",
+        ServerLastConnected = "Dernière connexion : {0}",
+        ServerNeverConnected = "Jamais connecté",
+        ServerMissingFeatures = "Le serveur ne prend pas en charge : {0}",
+        CapabilityTrackFacets = "Facettes de pistes",
+        CapabilityRecentAlbums = "Albums récents",
+        CapabilityWaveforms = "Formes d’onde",
+        RemoteCache = "Cache distant",
+        RemoteCacheSize = "Taille du cache : {0}",
+        ClearRemoteCacheAll = "Vider tout le cache",
+        ClearCache = "Vider le cache",
+        RemoteScanning = "Mise à jour de {0}…",
+        RemoteScanningWithCount = "Mise à jour de {0}… {1} / {2} fichiers",
+        SmartPlaylistPreviewCount = "{0} pistes correspondent",
+        SmartPlaylistPreviewComputing = "Calcul…",
+        SmartPlaylistPreviewInvalid = "Critères non valides",
+        RestoreQueue = "Dernière file",
+        RestoreQueueTooltip = "Restaurer la dernière file d’attente lue",
+        NoPreviousQueue = "Aucune file d’attente précédente.",
+        ClearQueue = "Vider la file",
+        QueueCleared = "File d’attente vidée.",
         NoData = "Aucune donnée disponible.",
         RecentlyPlayed = "Écoutés récemment",
         GreetingMorning = "Bonjour", GreetingAfternoon = "Bon après-midi", GreetingEvening = "Bonsoir",
@@ -1438,6 +1589,8 @@ public static class LocalizationManager
         , DeleteRadio = "Supprimer la station"
         , RadioLoading = "Chargement des stations de radio …"
         , RadioNoResults = "Aucune station de radio correspondante trouvée."
+        , RadioEmptyState = "Recherchez par nom de station, pays ou genre, ou enregistrez des stations dans « Mes radios »."
+        , OwnRadiosEmptyHint = "Aucune radio enregistrée. Recherchez dans l’annuaire de radio Internet et ajoutez des stations ici."
         , RadioAdded = "La station « {0} » a été ajoutée."
         , RadioDeleted = "La station « {0} » a été supprimée."
         , RadioSearchFailed = "Impossible de charger les stations de radio."
@@ -1450,6 +1603,7 @@ public static class LocalizationManager
         , PodcastDirectory = "Découvrir des podcasts"
         , PodcastDirectoryHint = "Recherchez dans l’annuaire Apple Podcasts, épinglez durablement des podcasts et écoutez le dernier épisode du flux RSS."
         , PodcastSearch = "Rechercher des podcasts"
+        , PodcastEmptyState = "Recherchez un podcast, filtrez par catégorie ou langue, puis épinglez vos favoris dans « Mes podcasts »."
         , Podcast = "Podcast"
         , PodcastAuthor = "Auteur"
         , PlayLatestEpisode = "Écouter le dernier"
@@ -1457,6 +1611,7 @@ public static class LocalizationManager
         , DeletePodcast = "Supprimer le podcast"
         , PodcastLoading = "Chargement des podcasts …"
         , PodcastNoResults = "Aucun podcast correspondant trouvé."
+        , MyPodcastsEmptyHint = "Aucun podcast épinglé. Recherchez dans l’annuaire de podcasts et ajoutez-en ici."
         , PodcastAdded = "Le podcast « {0} » a été ajouté."
         , PodcastDeleted = "Le podcast « {0} » a été supprimé."
         , PodcastSearchFailed = "Impossible de charger les podcasts."
@@ -1581,7 +1736,7 @@ public static class LocalizationManager
         , CreateSmartPlaylist = "Créer la playlist intelligente"
         , InvalidSmartPlaylistCriteria = "Saisissez des nombres valides et des valeurs minimum/maximum cohérentes. « Jamais lu » ne peut pas être combiné avec une lecture récente ou un minimum de lectures positif."
         , EditSmartPlaylist = "Modifier la playlist intelligente"
-        , LibraryEmptyHint = "Aucune source multimédia configurée. Ajoutez des répertoires locaux ou un ou plusieurs serveurs Orynivo dans les paramètres."
+        , LibraryEmptyHint = "Aucune source multimédia configurée. Ouvrez Paramètres > Bibliothèque, ajoutez des dossiers musicaux locaux ou connectez un serveur Orynivo."
         , SmartPlaylistUpdated = "Playlist intelligente « {0} » mise à jour."
         , ImportM3u8Playlist = "Importer une playlist M3U8"
         , ExportM3u8Playlist = "Exporter au format M3U8"
@@ -1628,6 +1783,7 @@ public static class LocalizationManager
         , AiChatInputPlaceholder = "Posez une question …"
         , AiChatSend            = "Envoyer"
         , AiChatClear           = "Effacer"
+        , AiChatCopy            = "Copier"
         , AiChatNotEnabled      = "Le Chat IA n'est pas activé. Activez-le dans Paramètres › Chat IA."
         , AiChatEmptyResponse   = "Le modèle a renvoyé une réponse vide."
         , AiChatToolResultFallback = "Le modèle n'a pas renvoyé de réponse finale après l'appel d'outil. Résultat de l'outil :"
@@ -1719,12 +1875,18 @@ public static class LocalizationManager
         SearchIndexReady = "El índice de búsqueda está actualizado.",
         SearchIndexFailed = "No se pudo actualizar el índice de búsqueda: {0}",
         Back = "Atrás", MarkAsFavorite = "Marcar como favorita",
+        OpenAlbum = "Abrir álbum",
+        OpenArtist = "Abrir artista",
+        ToggleFavorite = "Alternar favorito",
         PlaybackThrough = "Reproducción mediante {0}",
         PlaybackThroughWithDsdConversion = "Reproducción mediante {0} · DSD se convierte a PCM ({1:N0} Hz)",
         NativeDsdOutput = "DSD nativo", DsdToPcmOutput = "DSD → PCM",
         ReplayGain = "Ajuste de volumen ReplayGain",
         ReplayGainHint = "Se aplica a la reproducción PCM. El modo pista prioriza la ganancia de pista y el modo álbum la ganancia de álbum. La salida DSD nativa sigue siendo bit-perfect.",
         ReplayGainOff = "Desactivado", ReplayGainTrack = "Pista", ReplayGainAlbum = "Álbum",
+        NonGaplessCrossfade = "Fundido para colas sin gapless (segundos)",
+        NonGaplessCrossfadeHint = "0 desactiva la transición. Solo se aplica a cambios de cola que no usa ya el motor PCM gapless.",
+        ReplayGainBadge = "RG",
         DsdPlayback = "Reproducción DSD",
         AlwaysConvertDsdToPcm = "Convertir siempre los archivos DSD a PCM",
         AlwaysConvertDsdToPcmHint = "También usa la ruta PCM con ASIO/cwASIO para aplicar volumen, ReplayGain y ecualizador. Con esta opción desactivada, la salida DSD nativa sigue siendo bit-perfect.",
@@ -1768,7 +1930,42 @@ public static class LocalizationManager
         ReplayGainAlbumColumn = "ReplayGain álbum", Codec = "Códec", Tags = "Etiquetas",
         Homepage = "Página principal", FeedUrl = "Dirección del feed",
         SearchResultSummary = "{0:N0} pistas · {1:N0} álbumes · {2:N0} artistas",
-        RecentAlbums = "Álbumes añadidos recientemente", Calendar = "Calendario – {0}", TopGenres = "10 géneros principales por tiempo de reproducción",
+        RecentAlbums = "Álbumes añadidos recientemente", Calendar = "Calendario – {0}", TopGenres = "Géneros más escuchados",
+        TopAlbums = "Álbumes más escuchados",
+        TopArtists = "Artistas más escuchados",
+        ListeningStats = "Estadísticas de escucha",
+        PeriodAllTime = "Todo",
+        PeriodThisYear = "Este año",
+        PeriodThisMonth = "Este mes",
+        PeriodLast30Days = "Últimos 30 días",
+        PeriodLast7Days = "Últimos 7 días",
+        HistorySourceRemote = "Remoto",
+        HistorySourcePlex = "Plex",
+        LibraryUpdating = "Actualizando biblioteca…",
+        LibraryUpdatingWithCount = "Actualizando biblioteca… {0} / {1} archivos",
+        RefreshView = "Actualizar",
+        LibraryDataAvailable = "Nuevos datos de biblioteca disponibles",
+        ServerUnreachable = "No accesible",
+        ServerLastConnected = "Última conexión: {0}",
+        ServerNeverConnected = "Nunca conectado",
+        ServerMissingFeatures = "El servidor no admite: {0}",
+        CapabilityTrackFacets = "Facetas de pistas",
+        CapabilityRecentAlbums = "Álbumes recientes",
+        CapabilityWaveforms = "Formas de onda",
+        RemoteCache = "Caché remota",
+        RemoteCacheSize = "Tamaño de caché: {0}",
+        ClearRemoteCacheAll = "Vaciar toda la caché",
+        ClearCache = "Vaciar caché",
+        RemoteScanning = "Actualizando {0}…",
+        RemoteScanningWithCount = "Actualizando {0}… {1} / {2} archivos",
+        SmartPlaylistPreviewCount = "{0} pistas coinciden",
+        SmartPlaylistPreviewComputing = "Calculando…",
+        SmartPlaylistPreviewInvalid = "Criterios no válidos",
+        RestoreQueue = "Última cola",
+        RestoreQueueTooltip = "Restaurar la última cola reproducida",
+        NoPreviousQueue = "No hay ninguna cola anterior.",
+        ClearQueue = "Vaciar cola",
+        QueueCleared = "Cola vaciada.",
         NoData = "No hay datos disponibles.",
         RecentlyPlayed = "Reproducidos recientemente",
         GreetingMorning = "Buenos días", GreetingAfternoon = "Buenas tardes", GreetingEvening = "Buenas noches",
@@ -1862,6 +2059,8 @@ public static class LocalizationManager
         , DeleteRadio = "Eliminar emisora"
         , RadioLoading = "Cargando emisoras de radio …"
         , RadioNoResults = "No se encontraron emisoras de radio coincidentes."
+        , RadioEmptyState = "Busca por nombre de emisora, país o género, o guarda emisoras encontradas en «Mis radios»."
+        , OwnRadiosEmptyHint = "Aún no hay emisoras guardadas. Busca en el directorio de radio por Internet y añade emisoras aquí."
         , RadioAdded = "Se añadió la emisora «{0}»."
         , RadioDeleted = "Se eliminó la emisora «{0}»."
         , RadioSearchFailed = "No se pudieron cargar las emisoras de radio."
@@ -1874,6 +2073,7 @@ public static class LocalizationManager
         , PodcastDirectory = "Descubrir podcasts"
         , PodcastDirectoryHint = "Busca en el directorio de Apple Podcasts, fija podcasts de forma permanente y reproduce el episodio más reciente del canal RSS."
         , PodcastSearch = "Buscar podcasts"
+        , PodcastEmptyState = "Busca un podcast, filtra por categoría o idioma y fija favoritos en «Mis podcasts»."
         , Podcast = "Podcast"
         , PodcastAuthor = "Autor"
         , PlayLatestEpisode = "Reproducir el último"
@@ -1881,6 +2081,7 @@ public static class LocalizationManager
         , DeletePodcast = "Eliminar podcast"
         , PodcastLoading = "Cargando podcasts …"
         , PodcastNoResults = "No se encontraron podcasts coincidentes."
+        , MyPodcastsEmptyHint = "Aún no hay podcasts fijados. Busca en el directorio de podcasts y añádelos aquí."
         , PodcastAdded = "Se añadió el podcast «{0}»."
         , PodcastDeleted = "Se eliminó el podcast «{0}»."
         , PodcastSearchFailed = "No se pudieron cargar los podcasts."
@@ -2005,7 +2206,7 @@ public static class LocalizationManager
         , CreateSmartPlaylist = "Crear lista inteligente"
         , InvalidSmartPlaylistCriteria = "Introduce números válidos y valores mínimos/máximos coherentes. «Nunca reproducido» no puede combinarse con reproducción reciente ni con un mínimo positivo de reproducciones."
         , EditSmartPlaylist = "Editar lista inteligente"
-        , LibraryEmptyHint = "Aún no hay ninguna fuente multimedia configurada. Añade directorios locales o uno o varios servidores Orynivo en los ajustes."
+        , LibraryEmptyHint = "Aún no hay ninguna fuente multimedia configurada. Abre Ajustes > Biblioteca, añade carpetas de música locales o conecta un servidor Orynivo."
         , SmartPlaylistUpdated = "Lista inteligente '{0}' actualizada."
         , ImportM3u8Playlist = "Importar lista M3U8"
         , ExportM3u8Playlist = "Exportar como M3U8"
@@ -2052,6 +2253,7 @@ public static class LocalizationManager
         , AiChatInputPlaceholder = "Haz una pregunta …"
         , AiChatSend            = "Enviar"
         , AiChatClear           = "Borrar"
+        , AiChatCopy            = "Copiar"
         , AiChatNotEnabled      = "El Chat IA no está activado. Actívalo en Ajustes › Chat IA."
         , AiChatEmptyResponse   = "El modelo devolvió una respuesta vacía."
         , AiChatToolResultFallback = "El modelo no devolvió una respuesta final después de llamar a la herramienta. Resultado de la herramienta:"

@@ -1138,11 +1138,26 @@
             </ListBox>
 
             <!-- Status -->
-            <TextBlock x:Name="StatusTextBlock"
-                       Grid.Row="2"
-                       Padding="24,8"
-                       Foreground="{DynamicResource AppMutedTextBrush}" FontSize="{DynamicResource FontSizeMeta}"
-                       TextWrapping="Wrap"/>
+            <StackPanel Grid.Row="2">
+                <StackPanel x:Name="LibraryActivityPanel"
+                            Orientation="Horizontal"
+                            Margin="24,6,24,2"
+                            IsVisible="False">
+                    <Ellipse Width="7" Height="7"
+                             Margin="0,0,7,0"
+                             VerticalAlignment="Center"
+                             Fill="{DynamicResource AppAccentBrush}"/>
+                    <TextBlock x:Name="LibraryActivityTextBlock"
+                               Foreground="{DynamicResource AppAccentBrush}"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+                <TextBlock x:Name="StatusTextBlock"
+                           Padding="24,4,24,8"
+                           Foreground="{DynamicResource AppMutedTextBrush}" FontSize="{DynamicResource FontSizeMeta}"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
 
             <!-- About -->
             <Button Grid.Row="3"
@@ -1152,11 +1167,11 @@
                     Click="AboutButton_OnClick">
                 <StackPanel Orientation="Horizontal"
                             VerticalAlignment="Center">
-                    <TextBlock Text="ⓘ"
-                               Width="16"
-                               FontSize="{DynamicResource FontSizeSubtitle}"
-                               Margin="0,0,8,0"
-                               VerticalAlignment="Center"/>
+                    <Path Width="16"
+                          Height="16"
+                          Stretch="Uniform" Data="{StaticResource IconAbout}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                          Margin="0,0,8,0"
+                          VerticalAlignment="Center"/>
                     <TextBlock Text="{DynamicResource L_About}"
                                VerticalAlignment="Center"/>
                 </StackPanel>
@@ -1168,12 +1183,9 @@
                     Click="SettingsButton_OnClick">
                 <StackPanel Orientation="Horizontal"
                             VerticalAlignment="Center">
-                    <TextBlock Text="⚙"
-                               Width="16"
-                               FontSize="{DynamicResource FontSizeBodyStrong}"
-                               Margin="0,0,8,0"
-                               TextAlignment="Center"
-                               VerticalAlignment="Center"/>
+                    <Path Width="14" Height="14" Stretch="Uniform" Data="{StaticResource IconSettings}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                          Margin="0,0,8,0"
+                          VerticalAlignment="Center"/>
                     <TextBlock Text="{DynamicResource L_Settings}"
                                VerticalAlignment="Center"/>
                 </StackPanel>
@@ -1225,11 +1237,27 @@
                                    Grid.Column="1"
                                    FontSize="{DynamicResource FontSizeTitle}" FontWeight="SemiBold" Foreground="{DynamicResource AppPrimaryTextBrush}"
                                    VerticalAlignment="Top"/>
-                        <TextBlock x:Name="ContentCountTextBlock"
-                                Grid.Column="2"
-                                Margin="14,0,0,0"
-                                   FontSize="{DynamicResource FontSizeCaption}" Foreground="{DynamicResource AppMutedTextBrush}"
-                                   VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="2"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center">
+                            <TextBlock x:Name="ContentCountTextBlock"
+                                       Margin="14,0,0,0"
+                                       FontSize="{DynamicResource FontSizeCaption}" Foreground="{DynamicResource AppMutedTextBrush}"
+                                       VerticalAlignment="Center"/>
+                            <Button x:Name="LibraryRefreshButton"
+                                    Margin="14,0,0,0"
+                                    Padding="10,4"
+                                    VerticalAlignment="Center"
+                                    IsVisible="False"
+                                    Theme="{StaticResource HeaderFilterButtonTheme}"
+                                    ToolTip.Tip="{DynamicResource L_LibraryDataAvailable}"
+                                    Click="LibraryRefreshButton_OnClick">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="↻" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{DynamicResource L_RefreshView}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
                         <CheckBox x:Name="EntityFavoritesOnlyCheckBox"
                                 Grid.Column="3"
                                 Margin="14,0,0,0"
@@ -1262,8 +1290,27 @@
                                 <TextBlock Text="{DynamicResource L_SaveSmartPlaylist}" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
-                        <Button x:Name="SaveQueueAsPlaylistButton"
+                        <Button x:Name="RestoreQueueButton"
+                                Grid.Column="4"
+                                Margin="8,0,0,0"
+                                Padding="12,5"
+                                VerticalAlignment="Center"
+                                IsVisible="False"
+                                Theme="{StaticResource HeaderFilterButtonTheme}"
+                                ToolTip.Tip="{DynamicResource L_RestoreQueueTooltip}"
+                                Content="{DynamicResource L_RestoreQueue}"
+                                Click="RestoreQueueButton_OnClick"/>
+                        <Button x:Name="ClearQueueButton"
                                 Grid.Column="5"
+                                Margin="8,0,0,0"
+                                Padding="12,5"
+                                VerticalAlignment="Center"
+                                IsVisible="False"
+                                Theme="{StaticResource HeaderFilterButtonTheme}"
+                                Content="{DynamicResource L_ClearQueue}"
+                                Click="ClearQueueButton_OnClick"/>
+                        <Button x:Name="SaveQueueAsPlaylistButton"
+                                Grid.Column="6"
                                 Margin="8,0,0,0"
                                 Padding="12,5"
                                 VerticalAlignment="Center"
@@ -1451,10 +1498,14 @@
                 <StackPanel x:Name="DashboardPanel" Margin="28,24,28,28"/>
             </ScrollViewer>
 
-            <!-- AI Chat -->
+            <!-- AI Chat.
+                 Placed only in the star row (not spanning the Auto intro-card row):
+                 a *-height ScrollViewer that spans an Auto row is measured with an
+                 unbounded height, which lets the message list eat the input row's
+                 space so the input overlaps the newest messages. The intro card in
+                 row 1 is hidden for the AI chat, so row 2 alone is correct. -->
             <ai:AiChatView x:Name="AiChatViewControl"
-                           Grid.Row="1"
-                           Grid.RowSpan="2"
+                           Grid.Row="2"
                            IsVisible="False"
                            ZIndex="15"/>
 
@@ -1553,11 +1604,15 @@
                                        Foreground="{DynamicResource AppSecondaryTextBrush}"
                                        TextWrapping="Wrap"/>
                         </StackPanel>
-                        <TextBlock Grid.Column="1"
-                                   Text="◉"
-                                   FontSize="{DynamicResource FontSizeDisplay}"
-                                   Foreground="{DynamicResource AppAccentBrush}"
-                                   VerticalAlignment="Center"/>
+                        <Path Grid.Column="1"
+                              Width="46"
+                              Height="46"
+                              Stretch="Uniform" Data="{StaticResource IconRadio}"
+                              Stroke="{DynamicResource AppAccentBrush}"
+                              StrokeThickness="1.7"
+                              StrokeLineCap="Round"
+                              StrokeJoin="Round"
+                              VerticalAlignment="Center"/>
                     </Grid>
                 </Border>
 
@@ -1656,10 +1711,15 @@
                                                 Background="{DynamicResource AppArtworkPlaceholderBrush}"
                                                 ClipToBounds="True">
                                             <Grid>
-                                                <TextBlock Text="♪"
-                                                           HorizontalAlignment="Center"
-                                                           VerticalAlignment="Center"
-                                                           Foreground="{DynamicResource AppMutedTextBrush}"/>
+                                                <Path Width="16"
+                                                      Height="16"
+                                                      Stretch="Uniform" Data="{StaticResource IconRadio}"
+                                                      Stroke="{DynamicResource AppMutedTextBrush}"
+                                                      StrokeThickness="1.6"
+                                                      StrokeLineCap="Round"
+                                                      StrokeJoin="Round"
+                                                      HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"/>
                                                 <Image Source="{Binding Favicon}" Stretch="UniformToFill"/>
                                             </Grid>
                                         </Border>
@@ -1770,11 +1830,15 @@
                                        Foreground="{DynamicResource AppSecondaryTextBrush}"
                                        TextWrapping="Wrap"/>
                         </StackPanel>
-                        <TextBlock Grid.Column="1"
-                                   Text="◍"
-                                   FontSize="{DynamicResource FontSizeDisplay}"
-                                   Foreground="{DynamicResource AppAccentBrush}"
-                                   VerticalAlignment="Center"/>
+                        <Path Grid.Column="1"
+                              Width="46"
+                              Height="46"
+                              Stretch="Uniform" Data="{StaticResource IconPodcast}"
+                              Stroke="{DynamicResource AppAccentBrush}"
+                              StrokeThickness="1.7"
+                              StrokeLineCap="Round"
+                              StrokeJoin="Round"
+                              VerticalAlignment="Center"/>
                     </Grid>
                 </Border>
 
@@ -1918,10 +1982,15 @@
                                                 Background="{DynamicResource AppArtworkPlaceholderBrush}"
                                                 ClipToBounds="True">
                                             <Grid>
-                                                <TextBlock Text="◍"
-                                                           HorizontalAlignment="Center"
-                                                           VerticalAlignment="Center"
-                                                           Foreground="{DynamicResource AppMutedTextBrush}"/>
+                                                <Path Width="18"
+                                                      Height="18"
+                                                      Stretch="Uniform" Data="{StaticResource IconPodcast}"
+                                                      Stroke="{DynamicResource AppMutedTextBrush}"
+                                                      StrokeThickness="1.6"
+                                                      StrokeLineCap="Round"
+                                                      StrokeJoin="Round"
+                                                      HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"/>
                                                 <Image Source="{Binding ArtworkUrl}" Stretch="UniformToFill"/>
                                             </Grid>
                                         </Border>
@@ -3023,8 +3092,55 @@
                         <ColumnDefinition Width="84"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <Border Width="72" Height="72" Background="{DynamicResource AppArtworkPlaceholderBrush}"
+                    <Border x:Name="NowPlayingArtworkBorder"
+                            Width="72" Height="72" Background="{DynamicResource AppArtworkPlaceholderBrush}"
                             CornerRadius="10" ClipToBounds="True">
+                        <Border.ContextFlyout>
+                            <MenuFlyout FlyoutPresenterTheme="{StaticResource AppMenuFlyoutPresenterTheme}"
+                                        ItemContainerTheme="{StaticResource AppMenuFlyoutItemTheme}">
+                                <MenuItem Header="{DynamicResource L_OpenAlbum}"
+                                          Click="NowPlayingCoverOpenAlbumMenuItem_OnClick">
+                                    <MenuItem.Icon>
+                                        <Path Width="16" Height="16" Stretch="Uniform" Data="{StaticResource IconAlbum}"
+                                              Stroke="{DynamicResource AppPrimaryTextBrush}"
+                                              StrokeThickness="1.7"
+                                              StrokeLineCap="Round"
+                                              StrokeJoin="Round"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{DynamicResource L_OpenArtist}"
+                                          Click="NowPlayingCoverOpenArtistMenuItem_OnClick">
+                                    <MenuItem.Icon>
+                                        <Path Width="16" Height="16" Stretch="Uniform" Data="{StaticResource IconArtist}"
+                                              Stroke="{DynamicResource AppPrimaryTextBrush}"
+                                              StrokeThickness="1.7"
+                                              StrokeLineCap="Round"
+                                              StrokeJoin="Round"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{DynamicResource L_SearchCover}"
+                                          Click="NowPlayingCoverSearchMenuItem_OnClick">
+                                    <MenuItem.Icon>
+                                        <Path Width="16" Height="16" Stretch="Uniform" Data="{StaticResource IconImageSearch}"
+                                              Stroke="{DynamicResource AppPrimaryTextBrush}"
+                                              StrokeThickness="1.7"
+                                              StrokeLineCap="Round"
+                                              StrokeJoin="Round"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <Separator/>
+                                <MenuItem Header="{DynamicResource L_ToggleFavorite}"
+                                          Click="NowPlayingCoverFavoriteMenuItem_OnClick">
+                                    <MenuItem.Icon>
+                                        <Path Width="16" Height="16" Stretch="Uniform" Data="{StaticResource IconFavorite}"
+                                              Stroke="{DynamicResource AppFavoriteBrush}"
+                                              StrokeThickness="1.7"
+                                              Fill="Transparent"
+                                              StrokeJoin="Round"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                            </MenuFlyout>
+                        </Border.ContextFlyout>
                         <Image x:Name="NowPlayingArtworkImage" Stretch="UniformToFill"/>
                     </Border>
                     <StackPanel Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center">
@@ -3050,9 +3166,24 @@
                                 Theme="{StaticResource EntityLinkButtonTheme}"
                                 Click="NowPlayingArtistButton_OnClick"/>
                         <TextBlock x:Name="NowPlayingArtistBlock" IsVisible="False"/>
-                        <TextBlock x:Name="FileInfoTextBlock"
-                                   Foreground="{DynamicResource AppMutedTextBrush}" FontSize="{DynamicResource FontSizeMeta}" Margin="0,2,0,0"
-                                   TextTrimming="CharacterEllipsis"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                            <Border x:Name="ReplayGainBadgeBorder"
+                                    IsVisible="False"
+                                    Margin="0,0,6,0"
+                                    Padding="5,1"
+                                    CornerRadius="4"
+                                    Background="{DynamicResource AppAccentBrush}"
+                                    VerticalAlignment="Center">
+                                <TextBlock Text="{DynamicResource L_ReplayGainBadge}"
+                                           Foreground="{DynamicResource AppAccentTextBrush}"
+                                           FontSize="{DynamicResource FontSizeMeta}"
+                                           FontWeight="SemiBold"/>
+                            </Border>
+                            <TextBlock x:Name="FileInfoTextBlock"
+                                       Foreground="{DynamicResource AppMutedTextBrush}"
+                                       FontSize="{DynamicResource FontSizeMeta}"
+                                       TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
                     </StackPanel>
                 </Grid>
 
@@ -3131,11 +3262,9 @@
                                     IsEnabled="False"
                                     ToolTip.Tip="{DynamicResource L_ShowArtistInfo}"
                                     Click="ArtistInfoButton_OnClick">
-                                <TextBlock Text="i"
-                                           FontFamily="Segoe UI"
-                                           FontStyle="Italic"
-                                           FontWeight="Bold"
-                                           FontSize="{DynamicResource FontSizeBodyStrong}"/>
+                                <Path Width="15" Height="15" Stretch="Uniform"
+                                      Data="{StaticResource IconInfo}"
+                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                             </Button>
                             <Button x:Name="LyricsButton"
                                     Theme="{StaticResource TransportBtnTheme}"
@@ -3143,7 +3272,9 @@
                                     IsEnabled="False"
                                     ToolTip.Tip="{DynamicResource L_ShowLyrics}"
                                     Click="LyricsButton_OnClick">
-                                <TextBlock Text="♪" FontSize="{DynamicResource FontSizeSubtitle}"/>
+                                <Path Width="16" Height="16" Stretch="Uniform"
+                                      Data="{StaticResource IconLyrics}"
+                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                             </Button>
                             <Button x:Name="NowPlayingFavoriteButton"
                                     Theme="{StaticResource TransportBtnTheme}"
@@ -3155,7 +3286,9 @@
                                            Text="♡"
                                            FontFamily="Segoe UI Symbol"
                                            Foreground="{DynamicResource AppFavoriteBrush}"
-                                           FontSize="{DynamicResource FontSizeSubtitle}"/>
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontSize="15"/>
                             </Button>
                             <Button x:Name="ShuffleButton"
                                     Theme="{StaticResource TransportBtnTheme}"
@@ -3231,7 +3364,7 @@
                                         Theme="{StaticResource TransportBtnTheme}"
                                         ToolTip.Tip="{DynamicResource L_Settings}"
                                         Click="EqPickerSettingsButton_OnClick">
-                                    <TextBlock Text="⚙" FontSize="{DynamicResource FontSizeBodyStrong}"/>
+                                    <Path Width="14" Height="14" Stretch="Uniform" Data="{StaticResource IconSettings}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                                 </Button>
                             </Grid>
                             <CheckBox x:Name="EqPickerEnabledCheckBox"
@@ -3272,7 +3405,7 @@
                                     Theme="{StaticResource TransportBtnTheme}"
                                     ToolTip.Tip="{DynamicResource L_Settings}"
                                     Click="OutputPickerSettingsButton_OnClick">
-                                <TextBlock Text="⚙" FontSize="{DynamicResource FontSizeBodyStrong}"/>
+                                <Path Width="14" Height="14" Stretch="Uniform" Data="{StaticResource IconSettings}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                             </Button>
                         </Grid>
                     </Border>
@@ -3283,8 +3416,16 @@
                             HorizontalAlignment="Right"
                             VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="🔊" Foreground="{DynamicResource AppMutedTextBrush}" FontSize="{DynamicResource FontSizeBody}"
-                                   VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <Path Width="18"
+                              Height="18"
+                              Stretch="Uniform" Data="{StaticResource IconVolume}"
+                              Stroke="{DynamicResource AppMutedTextBrush}"
+                              Fill="{DynamicResource AppMutedTextBrush}"
+                              StrokeThickness="1.7"
+                              StrokeLineCap="Round"
+                              StrokeJoin="Round"
+                              VerticalAlignment="Center"
+                              Margin="0,0,10,0"/>
                         <Slider x:Name="VolumeSlider"
                                 Theme="{StaticResource DarkSliderTheme}"
                                 Width="100" Minimum="0" Maximum="1" Value="1"
@@ -3335,3 +3476,4 @@
 
     </Grid>
 </Window>
+

@@ -1,6 +1,8 @@
+using System.Text;
 using System.Text.RegularExpressions;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Documents;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Styling;
@@ -105,6 +107,10 @@ internal sealed partial class MarkdownTextBlock : UserControl
         FlushParagraph(paragraph);
         if (inCode && code.Count > 0)
             AddCodeBlock(string.Join(Environment.NewLine, code));
+
+        _panel.InvalidateMeasure();
+        InvalidateMeasure();
+        InvalidateArrange();
     }
 
     /// <summary>Flushes pending paragraph lines into one wrapped text block.</summary>
@@ -217,13 +223,14 @@ internal sealed partial class MarkdownTextBlock : UserControl
     /// <param name="fontSize">The font size to use.</param>
     /// <param name="fontWeight">The font weight to use.</param>
     private void AddText(string text, double fontSize, FontWeight fontWeight) =>
-        _panel.Children.Add(CreateText(StripInlineMarkdown(text), fontSize, fontWeight));
+        _panel.Children.Add(CreateText(text, fontSize, fontWeight));
 
     /// <summary>Adds a monospace code block to the rendered output.</summary>
     /// <param name="text">The code text to render.</param>
     private void AddCodeBlock(string text)
     {
-        var block = CreateText(text.TrimEnd(), FontSizeResource("FontSizeCaption"), FontWeight.Normal);
+        // Code is rendered verbatim: inline Markdown must not be interpreted inside it.
+        var block = CreateLiteralText(text.TrimEnd(), FontSizeResource("FontSizeCaption"));
         block.FontFamily = FontFamily.Parse("Consolas, Cascadia Mono, monospace");
         block.LineHeight = 19;
 
@@ -239,23 +246,129 @@ internal sealed partial class MarkdownTextBlock : UserControl
         _panel.Children.Add(border);
     }
 
-    /// <summary>Creates a themed wrapped text block.</summary>
-    /// <param name="text">The text to display.</param>
+    /// <summary>Creates a themed wrapped text block with inline Markdown (bold, italic, code, links) rendered as styled runs.</summary>
+    /// <param name="text">The text to display, possibly containing inline Markdown.</param>
     /// <param name="fontSize">The font size to use.</param>
-    /// <param name="fontWeight">The font weight to use.</param>
+    /// <param name="fontWeight">The base font weight to use.</param>
     /// <returns>The configured text block.</returns>
     private TextBlock CreateText(string text, double fontSize, FontWeight fontWeight)
     {
-        var block = new TextBlock
+        var block = new SelectableTextBlock
         {
-            Text = text,
             TextWrapping = TextWrapping.Wrap,
             FontSize = fontSize,
             FontWeight = fontWeight,
             LineHeight = Math.Max(18, fontSize + 7),
         };
         block.Foreground = Foreground ?? Brushes.White;
+        var inlines = new InlineCollection();
+        AppendInlines(inlines, text);
+        block.Inlines = inlines;
         return block;
+    }
+
+    /// <summary>Creates a themed wrapped text block that renders its text verbatim (no inline Markdown).</summary>
+    /// <param name="text">The literal text to display.</param>
+    /// <param name="fontSize">The font size to use.</param>
+    /// <returns>The configured text block.</returns>
+    private TextBlock CreateLiteralText(string text, double fontSize)
+    {
+        var block = new SelectableTextBlock
+        {
+            Text = text,
+            TextWrapping = TextWrapping.Wrap,
+            FontSize = fontSize,
+            LineHeight = Math.Max(18, fontSize + 7),
+        };
+        block.Foreground = Foreground ?? Brushes.White;
+        return block;
+    }
+
+    /// <summary>
+    /// Parses inline Markdown (<c>**bold**</c>/<c>__bold__</c>, <c>*italic*</c>/<c>_italic_</c>,
+    /// <c>`code`</c>, and <c>[label](url)</c>) into styled runs. Unmatched markers are kept as
+    /// literal text so ordinary asterisks and underscores are not swallowed.
+    /// </summary>
+    /// <param name="inlines">The inline collection to append runs to.</param>
+    /// <param name="text">The source text.</param>
+    private static void AppendInlines(InlineCollection inlines, string text)
+    {
+        var buffer = new StringBuilder();
+        void Flush()
+        {
+            if (buffer.Length == 0)
+                return;
+            inlines.Add(new Run(buffer.ToString()));
+            buffer.Clear();
+        }
+
+        int i = 0;
+        while (i < text.Length)
+        {
+            var c = text[i];
+
+            // Inline code: `...`
+            if (c == '`')
+            {
+                var end = text.IndexOf('`', i + 1);
+                if (end > i)
+                {
+                    Flush();
+                    inlines.Add(new Run(text[(i + 1)..end])
+                    {
+                        FontFamily = FontFamily.Parse("Consolas, Cascadia Mono, monospace")
+                    });
+                    i = end + 1;
+                    continue;
+                }
+            }
+
+            // Bold: **...** or __...__
+            if ((c == '*' || c == '_') && i + 1 < text.Length && text[i + 1] == c)
+            {
+                var marker = new string(c, 2);
+                var end = text.IndexOf(marker, i + 2, StringComparison.Ordinal);
+                if (end > i + 1)
+                {
+                    Flush();
+                    inlines.Add(new Run(text[(i + 2)..end]) { FontWeight = FontWeight.SemiBold });
+                    i = end + 2;
+                    continue;
+                }
+            }
+
+            // Italic: *...* or _..._
+            if (c == '*' || c == '_')
+            {
+                var end = text.IndexOf(c, i + 1);
+                if (end > i + 1)
+                {
+                    Flush();
+                    inlines.Add(new Run(text[(i + 1)..end]) { FontStyle = FontStyle.Italic });
+                    i = end + 1;
+                    continue;
+                }
+            }
+
+            // Link: [label](url) -> "label (url)"
+            if (c == '[')
+            {
+                var match = LinkRegex().Match(text, i);
+                if (match.Success && match.Index == i)
+                {
+                    Flush();
+                    inlines.Add(new Run(match.Groups[1].Value));
+                    inlines.Add(new Run($" ({match.Groups[2].Value})"));
+                    i = match.Index + match.Length;
+                    continue;
+                }
+            }
+
+            buffer.Append(c);
+            i++;
+        }
+
+        Flush();
     }
 
     /// <summary>Resolves a typography resource to a numeric font size.</summary>
@@ -284,30 +397,9 @@ internal sealed partial class MarkdownTextBlock : UserControl
         };
     }
 
-    /// <summary>Removes simple inline Markdown markers that this lightweight renderer does not style separately.</summary>
-    /// <param name="text">The source text.</param>
-    /// <returns>The text with common inline markers removed.</returns>
-    private static string StripInlineMarkdown(string text)
-    {
-        var result = InlineCodeRegex().Replace(text, "$1");
-        result = LinkRegex().Replace(result, "$1 ($2)");
-        result = BoldRegex().Replace(result, match => match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value);
-        result = ItalicRegex().Replace(result, match => match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value);
-        return result;
-    }
-
     [GeneratedRegex(@"^(\d+)\.\s+(.+)$")]
     private static partial Regex NumberedListRegex();
 
-    [GeneratedRegex(@"`([^`]+)`")]
-    private static partial Regex InlineCodeRegex();
-
     [GeneratedRegex(@"\[([^\]]+)\]\(([^)]+)\)")]
     private static partial Regex LinkRegex();
-
-    [GeneratedRegex(@"\*\*([^*]+)\*\*|__([^_]+)__")]
-    private static partial Regex BoldRegex();
-
-    [GeneratedRegex(@"(?<!\*)\*([^*]+)\*(?!\*)|_([^_]+)_")]
-    private static partial Regex ItalicRegex();
 }

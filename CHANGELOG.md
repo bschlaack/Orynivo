@@ -4,6 +4,100 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Smart-playlist editor live preview: while editing a smart playlist's criteria,
+  a debounced preview line shows how many tracks currently match, resolved the
+  same way the playlist actually opens. A locally stored smart playlist counts
+  across the unified library (local plus every configured Orynivo Server), so
+  server-sourced criteria are no longer counted as zero; a server-stored one is
+  resolved on that server via a new `/api/playlists/resolve-count` endpoint
+  (older servers simply show no preview).
+- "Restore last queue": when the queue is replaced by a completely different
+  selection, the outgoing queue is remembered and can be restored from a header
+  button in the Up Next view (the restore is reversible).
+- Added an Up Next header button for clearing the complete queue without stopping
+  the currently playing track.
+- Drag & drop into the queue: track rows, album rows, and folder nodes — local
+  and remote Orynivo Server alike — can be dragged onto the "Up Next" sidebar item
+  to append them (remote albums/folders resolve to their tracks on drop);
+  album artwork cards can now be dragged as well.
+- Added an optional fade transition for queue advances that are not handled by
+  the gapless PCM engine, plus a small transport badge when ReplayGain is active
+  for the current PCM track.
+- Radio playback now refreshes Windows media-overlay metadata after ICY title
+  changes and after the station logo has been downloaded into a local SMTC-safe
+  cache file.
+- Remote Orynivo Server compatibility display: each server row in Settings now
+  probes the newer feature endpoints and concretely reports what an older server
+  is missing ("Server does not support: Track facets, Recent albums, Waveforms").
+- Remote cache management in Settings: shows the combined remote-cache size and
+  offers clearing per server or the entire cache (artwork, track, and folder-tree
+  caches).
+- Server-side scan progress is shown in the sidebar activity line: configured
+  servers are polled and an in-progress scan appears as an "Updating … N / M
+  files" status without reloading or blocking the current view.
+- MCP tools and the built-in AI chat can now reach remote Orynivo Server tracks:
+  `search_library` returns results from the local library **and** every configured
+  Orynivo Server, and the `play`, `queue_append`, `queue_play_next`, and
+  `replace_queue` tools accept the `orynivo://serverId/track/trackId` references
+  those results provide. References resolve to the real stream and register full
+  track metadata, so remote playback shows correct transport/history/lyrics. API
+  keys are never exposed to the model (opaque references; keys redacted in output).
+
+- Added "Most listened albums" and "Most listened artists" analytics cards to the
+  dashboard alongside Top Genres, merging local, remote Orynivo Server, and Plex
+  playback. A shared period selector (All time / This year / This month / Last 30
+  days / Last 7 days) governs all three cards. Album and artist entries link into
+  their own library (local, remote, or Plex).
+- Added a source filter (Tracks / Radio / Podcasts / Remote / Plex) to the daily
+  playback-history dialog; only the categories present that day are shown.
+- AI chat messages are now copyable: text is selectable (Ctrl+C) and each user
+  and assistant bubble has a copy button that copies the whole message.
+- Added a mini context menu to the now-playing cover for opening the current
+  album or artist, searching album artwork, and toggling the current favorite.
+- Playback history now stores a stable Plex context (server plus track, album, and
+  artist rating keys) so Plex history entries stay identifiable and their albums
+  and artists are clickable throughout the history and dashboard statistics.
+
+### Changed
+
+- Background library scans no longer auto-reload the visible view. A subtle
+  sidebar status ("Updating library… N / M files") shows scan/index activity,
+  and reloadable views offer a controlled "New library data available" refresh
+  button instead of navigating on their own.
+- Remote server rows in Settings now show a clear "Unreachable" status with the
+  last successful connection time (persisted per server in `server-status.json`)
+  when a server cannot be reached.
+- Split several `MainWindow` domains into dedicated partial files for dashboard,
+  history, playlists, internet radio, and Orynivo Server navigation code.
+- Replaced several small text/emoji glyph buttons, including transport actions,
+  with shared vector icon geometries and expanded empty-state text for missing
+  library, radio, and podcast sources.
+- Updated the README to reflect current queue, smart-playlist, dashboard, MCP,
+  remote Orynivo Server, and cwASIO/native-DSD capabilities.
+
+### Fixed
+
+- Fixed dragging albums onto the "Up Next" sidebar item restarting the current
+  gapless playback session and potentially surfacing a cancellation exception
+  instead of visibly updating the queue.
+- AI chat: assistant messages now render inline Markdown (bold, italic, inline
+  code, and links) as styled text instead of showing raw `**markers**`, including
+  inside numbered and bulleted lists and block quotes.
+- AI chat: the last lines of a streamed reply are no longer left clipped at the
+  input edge. The chat view sits in the bounded content row (it no longer spans
+  the Auto intro-card row), and auto-scroll re-pins to the true bottom whenever
+  the message list's extent grows (via the `ScrollChanged` event, which — unlike
+  `LayoutUpdated` on the `ScrollViewer` — reliably fires as the streamed reply
+  grows). The "stick to bottom" state is released only by a real mouse-wheel
+  gesture, so the constant re-layout of the streamed Markdown no longer disables
+  auto-scroll; scrolling up still pauses it so earlier messages stay readable.
+  A dedicated bottom anchor and explicit Markdown renderer measure invalidation
+  keep the final rendered lines visible after formatted content settles.
+
 ## [0.23.3] - 2026-07-05
 
 ### Added

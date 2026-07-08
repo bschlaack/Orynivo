@@ -5,6 +5,25 @@
              Background="{DynamicResource AppContentBrush}"
              Foreground="{DynamicResource AppPrimaryTextBrush}">
 
+    <UserControl.Styles>
+        <Style Selector="Button.copyBtn">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="4,1"/>
+            <Setter Property="Height" Value="18"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Opacity" Value="0.5"/>
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeCaption}"/>
+        </Style>
+        <Style Selector="Button.copyBtn:pointerover">
+            <Setter Property="Opacity" Value="1"/>
+        </Style>
+        <Style Selector="Button.copyBtn /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+    </UserControl.Styles>
+
     <Grid RowDefinitions="*,Auto">
 
         <!-- Messages -->
@@ -12,11 +31,12 @@
                       Grid.Row="0"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled"
-                      Padding="20,16,20,8">
-            <ItemsControl x:Name="MessagesControl">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate DataType="{x:Type ai:AiChatMessageVm}">
-                        <Grid Margin="0,3">
+                      Padding="20,16,20,24">
+            <StackPanel>
+                <ItemsControl x:Name="MessagesControl">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type ai:AiChatMessageVm}">
+                            <Grid Margin="0,3">
 
                             <!-- User bubble -->
                             <Border IsVisible="{Binding IsUser}"
@@ -25,11 +45,26 @@
                                     Background="#6C63FF"
                                     CornerRadius="14,14,2,14"
                                     Padding="14,9">
-                                <TextBlock Text="{Binding Content}"
-                                           TextWrapping="Wrap"
-                                           Foreground="White"
-                                           FontSize="{DynamicResource FontSizeBody}"
-                                           LineHeight="20"/>
+                                <StackPanel Spacing="3">
+                                    <SelectableTextBlock Text="{Binding Content}"
+                                                         TextWrapping="Wrap"
+                                                         Foreground="White"
+                                                         SelectionBrush="#B8B2FF"
+                                                         FontSize="{DynamicResource FontSizeBody}"
+                                                         LineHeight="20"/>
+                                    <Button Classes="copyBtn"
+                                            HorizontalAlignment="Right"
+                                            Click="CopyMessage_OnClick"
+                                            ToolTip.Tip="{DynamicResource L_AiChatCopy}">
+                                        <Path Width="13"
+                                              Height="13"
+                                              Stretch="Uniform" Data="{StaticResource IconCopy}"
+                                              Stroke="White"
+                                              StrokeThickness="1.7"
+                                              StrokeLineCap="Round"
+                                              StrokeJoin="Round"/>
+                                    </Button>
+                                </StackPanel>
                             </Border>
 
                             <!-- Assistant bubble -->
@@ -41,8 +76,22 @@
                                     BorderThickness="1"
                                     CornerRadius="14,14,14,2"
                                     Padding="14,9">
-                                <ai:MarkdownTextBlock Text="{Binding Content}"
-                                                      Foreground="{DynamicResource AppPrimaryTextBrush}"/>
+                                <StackPanel Spacing="3">
+                                    <ai:MarkdownTextBlock Text="{Binding Content}"
+                                                          Foreground="{DynamicResource AppPrimaryTextBrush}"/>
+                                    <Button Classes="copyBtn"
+                                            HorizontalAlignment="Right"
+                                            Click="CopyMessage_OnClick"
+                                            ToolTip.Tip="{DynamicResource L_AiChatCopy}">
+                                        <Path Width="13"
+                                              Height="13"
+                                              Stretch="Uniform" Data="{StaticResource IconCopy}"
+                                              Stroke="{DynamicResource AppMutedTextBrush}"
+                                              StrokeThickness="1.7"
+                                              StrokeLineCap="Round"
+                                              StrokeJoin="Round"/>
+                                    </Button>
+                                </StackPanel>
                             </Border>
 
                             <!-- Tool status / error (centered, muted) -->
@@ -51,10 +100,10 @@
                                         Orientation="Horizontal"
                                         Spacing="6"
                                         Opacity="0.7">
-                                <TextBlock Text="⚙"
-                                           FontSize="{DynamicResource FontSizeMeta}"
-                                           Foreground="{DynamicResource AppMutedTextBrush}"
-                                           VerticalAlignment="Center"/>
+                                <Path Width="12"
+                                      Height="12"
+                                      Stretch="Uniform" Data="{StaticResource IconSettings}" Fill="{DynamicResource AppMutedTextBrush}"
+                                      VerticalAlignment="Center"/>
                                 <TextBlock Text="{Binding Content}"
                                            FontSize="{DynamicResource FontSizeMeta}"
                                            FontStyle="Italic"
@@ -77,10 +126,13 @@
                                            FontSize="{DynamicResource FontSizeCaption}"/>
                             </Border>
 
-                        </Grid>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Border x:Name="MessagesBottomAnchor"
+                        Height="88"/>
+            </StackPanel>
         </ScrollViewer>
 
         <!-- Input area -->
@@ -167,3 +219,4 @@
 
     </Grid>
 </UserControl>
+

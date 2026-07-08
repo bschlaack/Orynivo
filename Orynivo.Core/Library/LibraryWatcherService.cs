@@ -4,6 +4,15 @@ using System.IO;
 namespace Orynivo.Library;
 
 /// <summary>
+/// Reports background library scan/index activity so the UI can show a subtle status
+/// indicator instead of reloading views.
+/// </summary>
+/// <param name="Active">Whether a background scan or incremental update is currently running.</param>
+/// <param name="Current">Number of files processed so far in the current operation.</param>
+/// <param name="Total">Total number of files in the current operation, or <c>0</c> when unknown.</param>
+public readonly record struct LibraryScanActivity(bool Active, int Current, int Total);
+
+/// <summary>
 /// Watches configured library roots, debounces file-system events, and runs periodic full reconciliation scans.
 /// </summary>
 public sealed class LibraryWatcherService : IDisposable
@@ -14,6 +23,7 @@ public sealed class LibraryWatcherService : IDisposable
 
     private readonly object _sync = new();
     private readonly Action _libraryChanged;
+    private readonly Action<LibraryScanActivity>? _activityChanged;
     private readonly CancellationTokenSource _cts = new();
     private readonly Dictionary<string, WatchRegistration> _registrations =
         new(StringComparer.OrdinalIgnoreCase);
@@ -26,9 +36,11 @@ public sealed class LibraryWatcherService : IDisposable
     /// Initializes the watcher service.
     /// </summary>
     /// <param name="libraryChanged">Callback invoked after database or index content changes.</param>
-    public LibraryWatcherService(Action libraryChanged)
+    /// <param name="activityChanged">Optional callback invoked when background scan/index activity starts, progresses, or ends.</param>
+    public LibraryWatcherService(Action libraryChanged, Action<LibraryScanActivity>? activityChanged = null)
     {
         _libraryChanged = libraryChanged;
+        _activityChanged = activityChanged;
         _fullScanTimer = new Timer(
             _ => _ = RunFullReconciliationAsync(),
             null,
@@ -116,9 +128,19 @@ public sealed class LibraryWatcherService : IDisposable
                     .Where(IsUnderConfiguredRoot)
                     .ToList();
             }
-            if (configuredPaths.Count > 0 &&
-                await LibraryScanner.ApplyFileChangesAsync(configuredPaths, _cts.Token).ConfigureAwait(false))
-                _libraryChanged();
+            if (configuredPaths.Count == 0)
+                return;
+
+            RaiseActivity(new LibraryScanActivity(true, 0, configuredPaths.Count));
+            try
+            {
+                if (await LibraryScanner.ApplyFileChangesAsync(configuredPaths, _cts.Token).ConfigureAwait(false))
+                    _libraryChanged();
+            }
+            finally
+            {
+                RaiseActivity(new LibraryScanActivity(false, 0, 0));
+            }
         }
         catch (OperationCanceledException) when (_cts.IsCancellationRequested)
         {
@@ -127,6 +149,14 @@ public sealed class LibraryWatcherService : IDisposable
         {
             ScheduleFullReconciliation();
         }
+    }
+
+    /// <summary>Reports background scan/index activity to the optional activity callback, swallowing UI errors.</summary>
+    /// <param name="activity">The activity snapshot to report.</param>
+    private void RaiseActivity(LibraryScanActivity activity)
+    {
+        try { _activityChanged?.Invoke(activity); }
+        catch { /* Activity reporting must never affect scanning. */ }
     }
 
     private bool IsUnderConfiguredRoot(string path) =>
@@ -164,25 +194,37 @@ public sealed class LibraryWatcherService : IDisposable
             }
 
             var changed = false;
-            foreach (var root in roots)
+            var reconciliationRoots = roots.Where(Directory.Exists).ToList();
+            var activityStarted = reconciliationRoots.Count > 0;
+            if (activityStarted)
+                RaiseActivity(new LibraryScanActivity(true, 0, 0));
+            var progress = new ActivityProgress(this);
+            try
             {
-                try
+                foreach (var root in reconciliationRoots)
                 {
-                    if (!Directory.Exists(root))
-                        continue;
-                    var result = await LibraryScanner.ScanAsync(
-                        root,
-                        cancellationToken: _cts.Token).ConfigureAwait(false);
-                    changed |= result.Added > 0 || result.Updated > 0 || result.Removed > 0;
+                    try
+                    {
+                        var result = await LibraryScanner.ScanAsync(
+                            root,
+                            progress,
+                            _cts.Token).ConfigureAwait(false);
+                        changed |= result.Added > 0 || result.Updated > 0 || result.Removed > 0;
+                    }
+                    catch (OperationCanceledException) when (_cts.IsCancellationRequested)
+                    {
+                        return;
+                    }
+                    catch
+                    {
+                        // The next periodic reconciliation retries unavailable roots.
+                    }
                 }
-                catch (OperationCanceledException) when (_cts.IsCancellationRequested)
-                {
-                    return;
-                }
-                catch
-                {
-                    // The next periodic reconciliation retries unavailable roots.
-                }
+            }
+            finally
+            {
+                if (activityStarted)
+                    RaiseActivity(new LibraryScanActivity(false, 0, 0));
             }
 
             if (changed)
@@ -193,6 +235,20 @@ public sealed class LibraryWatcherService : IDisposable
         {
             Interlocked.Exchange(ref _fullScanRunning, 0);
         }
+    }
+
+    /// <summary>Forwards scanner file progress to the watcher's activity callback.</summary>
+    private sealed class ActivityProgress : IProgress<ScanProgress>
+    {
+        private readonly LibraryWatcherService _owner;
+
+        /// <summary>Initializes the progress forwarder.</summary>
+        /// <param name="owner">The owning watcher service.</param>
+        internal ActivityProgress(LibraryWatcherService owner) => _owner = owner;
+
+        /// <inheritdoc/>
+        public void Report(ScanProgress value) =>
+            _owner.RaiseActivity(new LibraryScanActivity(true, value.Current, value.Total));
     }
 
     private sealed class WatchRegistration : IDisposable
