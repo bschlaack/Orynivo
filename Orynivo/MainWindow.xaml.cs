@@ -111,6 +111,9 @@ public partial class MainWindow : Window
     private AppSettings _settings = new();
     private LibraryWatcherService? _libraryWatcher;
     private int _libraryWatcherRefreshPending;
+    private bool _libraryScanActive;
+    private DateTime _lastLibraryActivityUiUpdate;
+    private bool _libraryRefreshAvailable;
     private readonly DispatcherTimer _transportTimer;
     private bool _isSeekingWithSlider;
     private DateTimeOffset _positionSliderSeekStartedAt;
@@ -547,7 +550,7 @@ public partial class MainWindow : Window
         using (StartupTimingLog.Time("MainWindow.RestorePlaybackQueueState"))
             RestorePlaybackQueueState();
         LogUiDiagnostics("MainWindow RestorePlaybackQueueState completed");
-        _libraryWatcher = new LibraryWatcherService(OnWatchedLibraryChanged);
+        _libraryWatcher = new LibraryWatcherService(OnWatchedLibraryChanged, OnLibraryScanActivity);
         using (StartupTimingLog.Time("MainWindow.LibraryWatcher.UpdatePaths"))
             _libraryWatcher.UpdatePaths(_settings.LibraryPaths ?? []);
         LogUiDiagnostics("MainWindow LibraryWatcher.UpdatePaths completed");
@@ -938,39 +941,80 @@ public partial class MainWindow : Window
 
     private void OnWatchedLibraryChanged()
     {
-        if (Interlocked.Increment(ref _libraryWatcherRefreshPending) != 1)
+        // Coalesce bursts of change signals into a single UI-thread pass.
+        if (Interlocked.Exchange(ref _libraryWatcherRefreshPending, 1) != 0)
             return;
 
-        Dispatcher.UIThread.Post(async () =>
+        Dispatcher.UIThread.Post(() =>
         {
-            while (true)
+            Interlocked.Exchange(ref _libraryWatcherRefreshPending, 0);
+            try
             {
-                Interlocked.Exchange(ref _libraryWatcherRefreshPending, 1);
-                try
-                {
-                    LoadNavPlaylists();
-                    if (SearchResultsScrollViewer.IsVisible &&
-                        !string.IsNullOrWhiteSpace(SearchTextBox.Text) &&
-                        _currentTopLevelTag?.StartsWith("OrynivoServer:", StringComparison.Ordinal) != true)
-                    {
-                        // Local library changes must not replace a remote server's
-                        // search results with local ones.
-                        await ShowSearchResultsAsync(SearchTextBox.Text);
-                    }
-                    else if (_currentTopLevelTag is { } currentTag &&
-                             CanReloadCurrentViewAfterLibraryChange())
-                    {
-                        await ShowTopLevelViewAsync(currentTag);
-                    }
-                }
-                catch
-                {
-                    // Background library refreshes must not affect playback or input handling.
-                }
-                if (Interlocked.CompareExchange(ref _libraryWatcherRefreshPending, 0, 1) == 1)
-                    break;
+                // The sidebar playlist list is lightweight metadata, not a content
+                // reload, so keep it in sync immediately.
+                LoadNavPlaylists();
+
+                // Do NOT auto-reload the visible content view. Instead offer a
+                // controlled "new library data available" refresh action on views
+                // that can safely reload in place. No automatic navigation.
+                if (CanReloadCurrentViewAfterLibraryChange())
+                    SetLibraryRefreshAvailable(true);
+            }
+            catch
+            {
+                // Background library refreshes must not affect playback or input handling.
             }
         }, DispatcherPriority.Background);
+    }
+
+    /// <summary>
+    /// Updates the subtle sidebar activity indicator while the background scanner or
+    /// indexer is running. Throttled so a fast per-file scan does not flood the UI thread.
+    /// </summary>
+    /// <param name="activity">The reported scan-activity snapshot.</param>
+    private void OnLibraryScanActivity(LibraryScanActivity activity)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            // Always render start/stop transitions; throttle intermediate progress.
+            var stateChanged = activity.Active != _libraryScanActive;
+            if (!stateChanged && activity.Active &&
+                (DateTime.UtcNow - _lastLibraryActivityUiUpdate).TotalMilliseconds < 200)
+            {
+                return;
+            }
+
+            _libraryScanActive = activity.Active;
+            _lastLibraryActivityUiUpdate = DateTime.UtcNow;
+            LibraryActivityPanel.IsVisible = activity.Active;
+            if (activity.Active)
+            {
+                LibraryActivityTextBlock.Text = activity.Total > 0 && activity.Current > 0
+                    ? string.Format(
+                        LocalizationManager.Current.LibraryUpdatingWithCount,
+                        activity.Current,
+                        activity.Total)
+                    : LocalizationManager.Current.LibraryUpdating;
+            }
+        }, DispatcherPriority.Background);
+    }
+
+    /// <summary>Shows or hides the per-view "new library data available" refresh action.</summary>
+    /// <param name="available">Whether fresh library data is available for the current view.</param>
+    private void SetLibraryRefreshAvailable(bool available)
+    {
+        _libraryRefreshAvailable = available;
+        LibraryRefreshButton.IsVisible = available;
+    }
+
+    /// <summary>Reloads the current view on demand when the user accepts the refresh prompt.</summary>
+    /// <param name="sender">The refresh button.</param>
+    /// <param name="e">The click event data.</param>
+    private async void LibraryRefreshButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        SetLibraryRefreshAvailable(false);
+        if (_currentTopLevelTag is { } tag && CanReloadCurrentViewAfterLibraryChange())
+            await ShowTopLevelViewAsync(tag);
     }
 
     private bool CanReloadCurrentViewAfterLibraryChange()
@@ -1901,6 +1945,8 @@ public partial class MainWindow : Window
             ShowContentLoadingSkeleton();
         _currentTopLevelTag = tag;
         _orynivoTrackFacets = null;
+        // A fresh load reflects current library data, so any pending refresh prompt is stale.
+        SetLibraryRefreshAvailable(false);
         LyricsView.IsVisible = false;
         ArtistInfoView.IsVisible = false;
         PodcastInfoView.IsVisible = false;

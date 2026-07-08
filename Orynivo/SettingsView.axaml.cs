@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.IO;
 using Avalonia;
 using Avalonia.Threading;
@@ -372,6 +373,8 @@ internal partial class SettingsView : UserControl
     /// <param name="cancellationToken">Token cancelling a superseded or closed check.</param>
     private async void CheckServerStatusAsync(
         StatusBadge badge,
+        TextBlock detail,
+        string serverId,
         Func<CancellationToken, Task<bool>> probe,
         CancellationToken cancellationToken)
     {
@@ -381,9 +384,38 @@ internal partial class SettingsView : UserControl
         if (cancellationToken.IsCancellationRequested)
             return;
         var loc = LocalizationManager.Current;
-        badge.State = ok ? StatusBadgeState.Ok : StatusBadgeState.Warning;
-        badge.Text = ok ? loc.StatusAvailable : loc.StatusUnavailable;
+        if (ok)
+        {
+            ServerConnectionStore.RecordSuccess(serverId);
+            badge.State = StatusBadgeState.Ok;
+            badge.Text = loc.StatusAvailable;
+            detail.IsVisible = false;
+            return;
+        }
+
+        // Unreachable: show a clear status plus the last successful connection so the
+        // user can tell a transient outage apart from a server that never worked.
+        badge.State = StatusBadgeState.Warning;
+        badge.Text = loc.ServerUnreachable;
+        var last = ServerConnectionStore.GetLastConnected(serverId);
+        detail.Text = last is long ts
+            ? string.Format(
+                loc.ServerLastConnected,
+                DateTimeOffset.FromUnixTimeSeconds(ts).LocalDateTime.ToString("g", CultureInfo.CurrentCulture))
+            : loc.ServerNeverConnected;
+        detail.IsVisible = true;
     }
+
+    /// <summary>Creates the muted per-server status-detail line shown when a server is unreachable.</summary>
+    /// <returns>A collapsed detail text block.</returns>
+    private static TextBlock CreateServerStatusDetail() => new()
+    {
+        FontSize = 11,
+        IsVisible = false,
+        Foreground = AvaloniaApp.Current!.Resources["AppMutedTextBrush"] as IBrush,
+        TextTrimming = TextTrimming.CharacterEllipsis,
+        Margin = new Thickness(0, 2, 0, 0)
+    };
 
     /// <summary>Tests whether a remote Orynivo Server responds on its info endpoint.</summary>
     /// <param name="server">The server to probe.</param>
@@ -448,6 +480,8 @@ internal partial class SettingsView : UserControl
                 Foreground = mutedBrush,
                 TextTrimming = TextTrimming.CharacterEllipsis
             });
+            var statusDetail = CreateServerStatusDetail();
+            description.Children.Add(statusDetail);
             row.Children.Add(description);
 
             var statusBadge = CreateServerStatusBadge();
@@ -469,7 +503,7 @@ internal partial class SettingsView : UserControl
             PlexServersPanel.Children.Add(row);
 
             var plexServer = server;
-            CheckServerStatusAsync(statusBadge, ct => ProbePlexServerAsync(plexServer, ct), statusToken);
+            CheckServerStatusAsync(statusBadge, statusDetail, plexServer.Id, ct => ProbePlexServerAsync(plexServer, ct), statusToken);
         }
     }
 
@@ -542,6 +576,8 @@ internal partial class SettingsView : UserControl
                 Foreground = mutedBrush,
                 TextTrimming = TextTrimming.CharacterEllipsis
             });
+            var statusDetail = CreateServerStatusDetail();
+            description.Children.Add(statusDetail);
             row.Children.Add(description);
 
             var statusBadge = CreateServerStatusBadge();
@@ -563,7 +599,7 @@ internal partial class SettingsView : UserControl
             OrynivoServersPanel.Children.Add(row);
 
             var orynivoServer = server;
-            CheckServerStatusAsync(statusBadge, ct => ProbeOrynivoServerAsync(orynivoServer, ct), statusToken);
+            CheckServerStatusAsync(statusBadge, statusDetail, orynivoServer.Id, ct => ProbeOrynivoServerAsync(orynivoServer, ct), statusToken);
         }
     }
 

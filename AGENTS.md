@@ -352,7 +352,13 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   a live connection badge probed asynchronously (`CheckServerStatusAsync` +
   `ProbeOrynivoServerAsync`/`ProbePlexServerAsync`), so opening Settings never
   blocks on network calls; pending probes are cancelled per-list on rebuild and
-  in `Deactivate()`.
+  in `Deactivate()`. When a probe succeeds the timestamp is persisted through
+  `ServerConnectionStore`; when it fails the row badge shows "Unreachable" and a
+  muted detail line reports the last successful connection (or "Never connected").
+- `Orynivo/ServerConnectionStore.cs`: standalone JSON store
+  (`%LOCALAPPDATA%\Orynivo\server-status.json`) mapping a server ID to the Unix
+  timestamp of its last successful connection. Kept separate from `settings.json`
+  so recording a connection never contends with the settings-save flow.
 - `Orynivo/EqualizerProfileNameDialog.*`: themed unique-name dialog used when
   creating a new persisted equalizer profile
 - `Native/AsioBridge/bridge.cpp`: shared Steinberg/cwASIO initialization,
@@ -899,6 +905,19 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
 - Full scans are the authoritative fallback: they upsert new/changed files and
   remove missing paths from both SQLite and Lucene, covering lost or overflowed
   file-system events.
+- Background watcher activity is reported to the UI: `LibraryWatcherService`
+  takes an optional `Action<LibraryScanActivity>` and raises it when an
+  incremental batch or a full reconciliation starts, progresses (per-file), and
+  ends. `MainWindow` (`OnLibraryScanActivity`) shows a subtle, throttled sidebar
+  indicator (`LibraryActivityPanel` / `LibraryActivityTextBlock`, e.g. "Updating
+  library… N / M files") and never reloads a view for it.
+- A background library change (`OnWatchedLibraryChanged`) must NOT auto-reload
+  the visible content view. It refreshes the sidebar playlist list and, for a
+  view that `CanReloadCurrentViewAfterLibraryChange()` allows, shows the
+  header `LibraryRefreshButton` ("New library data available" / "Refresh"). The
+  user reloads on demand (`LibraryRefreshButton_OnClick`); the button is hidden
+  again on any explicit navigation (`ShowTopLevelViewAsync`). No automatic
+  navigation and no skeleton for background changes.
 - Removing a configured library root removes tracks outside the remaining roots
   from SQLite, Lucene, and the waveform cache through
   `LibraryScanner.RemoveTracksOutsideRoots`.

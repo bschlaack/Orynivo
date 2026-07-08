@@ -306,6 +306,8 @@ public static class LocalizationManager
         resources["L_MediaType"] = Current.MediaType;
         resources["L_Close"] = Current.Close;
         resources["L_DailyHistoryNoEntries"] = Current.DailyHistoryNoEntries;
+        resources["L_RefreshView"] = Current.RefreshView;
+        resources["L_LibraryDataAvailable"] = Current.LibraryDataAvailable;
         resources["L_Integration"]      = Current.Integration;
         resources["L_McpServer"]        = Current.McpServer;
         resources["L_McpServerHint"]    = Current.McpServerHint;
@@ -499,6 +501,13 @@ public static class LocalizationManager
         PeriodLast7Days = "Letzte 7 Tage",
         HistorySourceRemote = "Remote",
         HistorySourcePlex = "Plex",
+        LibraryUpdating = "Bibliothek wird aktualisiert…",
+        LibraryUpdatingWithCount = "Bibliothek wird aktualisiert… {0} / {1} Dateien",
+        RefreshView = "Aktualisieren",
+        LibraryDataAvailable = "Neue Bibliotheksdaten verfügbar",
+        ServerUnreachable = "Nicht erreichbar",
+        ServerLastConnected = "Zuletzt verbunden: {0}",
+        ServerNeverConnected = "Noch nie verbunden",
         NoData = "Keine Daten vorhanden.",
         RecentlyPlayed = "Zuletzt gespielt",
         GreetingMorning = "Guten Morgen",
@@ -938,6 +947,13 @@ public static class LocalizationManager
         PeriodLast7Days = "Last 7 days",
         HistorySourceRemote = "Remote",
         HistorySourcePlex = "Plex",
+        LibraryUpdating = "Updating library…",
+        LibraryUpdatingWithCount = "Updating library… {0} / {1} files",
+        RefreshView = "Refresh",
+        LibraryDataAvailable = "New library data available",
+        ServerUnreachable = "Unreachable",
+        ServerLastConnected = "Last connected: {0}",
+        ServerNeverConnected = "Never connected",
         NoData = "No data available.",
         RecentlyPlayed = "Recently played",
         GreetingMorning = "Good morning", GreetingAfternoon = "Good afternoon", GreetingEvening = "Good evening",
@@ -1375,6 +1391,13 @@ public static class LocalizationManager
         PeriodLast7Days = "7 derniers jours",
         HistorySourceRemote = "Distant",
         HistorySourcePlex = "Plex",
+        LibraryUpdating = "Mise à jour de la bibliothèque…",
+        LibraryUpdatingWithCount = "Mise à jour de la bibliothèque… {0} / {1} fichiers",
+        RefreshView = "Actualiser",
+        LibraryDataAvailable = "Nouvelles données de bibliothèque disponibles",
+        ServerUnreachable = "Injoignable",
+        ServerLastConnected = "Dernière connexion : {0}",
+        ServerNeverConnected = "Jamais connecté",
         NoData = "Aucune donnée disponible.",
         RecentlyPlayed = "Écoutés récemment",
         GreetingMorning = "Bonjour", GreetingAfternoon = "Bon après-midi", GreetingEvening = "Bonsoir",
@@ -1809,6 +1832,13 @@ public static class LocalizationManager
         PeriodLast7Days = "Últimos 7 días",
         HistorySourceRemote = "Remoto",
         HistorySourcePlex = "Plex",
+        LibraryUpdating = "Actualizando biblioteca…",
+        LibraryUpdatingWithCount = "Actualizando biblioteca… {0} / {1} archivos",
+        RefreshView = "Actualizar",
+        LibraryDataAvailable = "Nuevos datos de biblioteca disponibles",
+        ServerUnreachable = "No accesible",
+        ServerLastConnected = "Última conexión: {0}",
+        ServerNeverConnected = "Nunca conectado",
         NoData = "No hay datos disponibles.",
         RecentlyPlayed = "Reproducidos recientemente",
         GreetingMorning = "Buenos días", GreetingAfternoon = "Buenas tardes", GreetingEvening = "Buenas noches",

@@ -1138,11 +1138,26 @@
             </ListBox>
 
             <!-- Status -->
-            <TextBlock x:Name="StatusTextBlock"
-                       Grid.Row="2"
-                       Padding="24,8"
-                       Foreground="{DynamicResource AppMutedTextBrush}" FontSize="{DynamicResource FontSizeMeta}"
-                       TextWrapping="Wrap"/>
+            <StackPanel Grid.Row="2">
+                <StackPanel x:Name="LibraryActivityPanel"
+                            Orientation="Horizontal"
+                            Margin="24,6,24,2"
+                            IsVisible="False">
+                    <Ellipse Width="7" Height="7"
+                             Margin="0,0,7,0"
+                             VerticalAlignment="Center"
+                             Fill="{DynamicResource AppAccentBrush}"/>
+                    <TextBlock x:Name="LibraryActivityTextBlock"
+                               Foreground="{DynamicResource AppAccentBrush}"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+                <TextBlock x:Name="StatusTextBlock"
+                           Padding="24,4,24,8"
+                           Foreground="{DynamicResource AppMutedTextBrush}" FontSize="{DynamicResource FontSizeMeta}"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
 
             <!-- About -->
             <Button Grid.Row="3"
@@ -1225,11 +1240,27 @@
                                    Grid.Column="1"
                                    FontSize="{DynamicResource FontSizeTitle}" FontWeight="SemiBold" Foreground="{DynamicResource AppPrimaryTextBrush}"
                                    VerticalAlignment="Top"/>
-                        <TextBlock x:Name="ContentCountTextBlock"
-                                Grid.Column="2"
-                                Margin="14,0,0,0"
-                                   FontSize="{DynamicResource FontSizeCaption}" Foreground="{DynamicResource AppMutedTextBrush}"
-                                   VerticalAlignment="Center"/>
+                        <StackPanel Grid.Column="2"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center">
+                            <TextBlock x:Name="ContentCountTextBlock"
+                                       Margin="14,0,0,0"
+                                       FontSize="{DynamicResource FontSizeCaption}" Foreground="{DynamicResource AppMutedTextBrush}"
+                                       VerticalAlignment="Center"/>
+                            <Button x:Name="LibraryRefreshButton"
+                                    Margin="14,0,0,0"
+                                    Padding="10,4"
+                                    VerticalAlignment="Center"
+                                    IsVisible="False"
+                                    Theme="{StaticResource HeaderFilterButtonTheme}"
+                                    ToolTip.Tip="{DynamicResource L_LibraryDataAvailable}"
+                                    Click="LibraryRefreshButton_OnClick">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="↻" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{DynamicResource L_RefreshView}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
                         <CheckBox x:Name="EntityFavoritesOnlyCheckBox"
                                 Grid.Column="3"
                                 Margin="14,0,0,0"

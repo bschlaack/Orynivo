@@ -21,6 +21,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Background library scans no longer auto-reload the visible view. A subtle
+  sidebar status ("Updating library… N / M files") shows scan/index activity,
+  and reloadable views offer a controlled "New library data available" refresh
+  button instead of navigating on their own.
+- Remote server rows in Settings now show a clear "Unreachable" status with the
+  last successful connection time (persisted per server in `server-status.json`)
+  when a server cannot be reached.
 - Split several `MainWindow` domains into dedicated partial files for dashboard,
   history, playlists, internet radio, and Orynivo Server navigation code.
 

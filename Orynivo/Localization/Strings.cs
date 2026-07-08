@@ -346,6 +346,20 @@ public sealed record LocalizedStrings(
     /// <summary>Gets the history-source label for Plex tracks.</summary>
     public string HistorySourcePlex { get; init; } = "";
     public string NoData { get; init; } = "";
+    /// <summary>Gets the subtle sidebar status shown while the library is being scanned/indexed.</summary>
+    public string LibraryUpdating { get; init; } = "";
+    /// <summary>Gets the subtle sidebar status with file progress ({0} = processed, {1} = total).</summary>
+    public string LibraryUpdatingWithCount { get; init; } = "";
+    /// <summary>Gets the per-view "new library data available" refresh action label.</summary>
+    public string RefreshView { get; init; } = "";
+    /// <summary>Gets the tooltip explaining that fresh library data is available for the current view.</summary>
+    public string LibraryDataAvailable { get; init; } = "";
+    /// <summary>Gets the server status label shown when a remote server cannot be reached.</summary>
+    public string ServerUnreachable { get; init; } = "";
+    /// <summary>Gets the last-successful-connection line for a server ({0} = timestamp).</summary>
+    public string ServerLastConnected { get; init; } = "";
+    /// <summary>Gets the status line shown when a server has never successfully connected.</summary>
+    public string ServerNeverConnected { get; init; } = "";
     /// <summary>Gets the dashboard "recently played" section title.</summary>
     public string RecentlyPlayed { get; init; } = "";
     /// <summary>Gets the dashboard morning greeting.</summary>
