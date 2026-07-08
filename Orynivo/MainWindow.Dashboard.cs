@@ -44,6 +44,21 @@ public partial class MainWindow : Window
     // Dashboard
     // ------------------------------------------------------------------
 
+    /// <summary>Selectable time window for the dashboard listening-statistics cards.</summary>
+    private enum StatsPeriod
+    {
+        /// <summary>All recorded playback history.</summary>
+        AllTime,
+        /// <summary>Playback since the start of the current calendar year.</summary>
+        ThisYear,
+        /// <summary>Playback since the start of the current calendar month.</summary>
+        ThisMonth,
+        /// <summary>Playback within the last 30 days.</summary>
+        Last30Days,
+        /// <summary>Playback within the last 7 days.</summary>
+        Last7Days
+    }
+
     private async Task ShowDashboardAsync()
     {
         ContentTitleTextBlock.Text = LocalizationManager.Current.Dashboard;
@@ -122,10 +137,27 @@ public partial class MainWindow : Window
             if (buildVersion != _dashboardBuildVersion)
                 return;
 
+            var since = StatsPeriodSinceUnix(_dashboardStatsPeriod);
             var topGenres = await Task.Run(() =>
             {
                 using var db = AudioDatabase.OpenDefault();
-                return db.GetTopGenres(10);
+                return db.GetTopGenres(10, since);
+            });
+            if (buildVersion != _dashboardBuildVersion)
+                return;
+
+            var topAlbums = await Task.Run(() =>
+            {
+                using var db = AudioDatabase.OpenDefault();
+                return db.GetTopAlbums(10, since);
+            });
+            if (buildVersion != _dashboardBuildVersion)
+                return;
+
+            var topArtists = await Task.Run(() =>
+            {
+                using var db = AudioDatabase.OpenDefault();
+                return db.GetTopArtists(10, since);
             });
             if (buildVersion != _dashboardBuildVersion)
                 return;
@@ -145,7 +177,7 @@ public partial class MainWindow : Window
                 showAllAction: () => _ = ShowAllRecentAlbumsAsync()));
             DashboardBuildRecentAlbums(recentAlbums);
 
-            DashboardBuildStatsSection(calendarData, topGenres);
+            DashboardBuildStatsSection(calendarData, topGenres, topAlbums, topArtists);
             if (buildVersion != _dashboardBuildVersion)
                 return;
 
@@ -1034,15 +1066,23 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Arranges the calendar and top-genre analytics blocks, placing them side by
-    /// side on wide dashboards and stacking them on narrow ones.
+    /// Arranges the listening-statistics blocks: a shared period selector governs the
+    /// genre, album, and artist analytics cards, while the calendar keeps its own month
+    /// navigation. Blocks sit side by side on wide dashboards and stack on narrow ones.
     /// </summary>
     /// <param name="calendarData">Per-day playback aggregates for the current month.</param>
-    /// <param name="topGenres">Ranked genres by play time.</param>
+    /// <param name="topGenres">Ranked genres by play time in the selected period.</param>
+    /// <param name="topAlbums">Ranked albums by play time in the selected period.</param>
+    /// <param name="topArtists">Ranked artists by play time in the selected period.</param>
     private void DashboardBuildStatsSection(
         List<CalendarDayData> calendarData,
-        List<(string Genre, double Seconds)> topGenres)
+        List<(string Genre, double Seconds)> topGenres,
+        List<TopAlbumStat> topAlbums,
+        List<TopArtistStat> topArtists)
     {
+        // Shared period selector header for all three "top" analytics cards.
+        DashboardPanel.Children.Add(DashboardCreateStatsPeriodHeader());
+
         var calendarHeader = DashboardCreateSectionHeader(
             string.Format(
                 LocalizationManager.Current.Calendar,
@@ -1050,34 +1090,136 @@ public partial class MainWindow : Window
             calendarNav: true);
         var calendarCard = DashboardBuildCalendarCard(calendarData);
 
-        var genresHeader = DashboardCreateSectionHeader(LocalizationManager.Current.TopGenres);
-        var genresCard = DashboardBuildTopGenresCard(topGenres);
-
         var calendarColumn = new StackPanel();
         calendarColumn.Children.Add(calendarHeader);
         calendarColumn.Children.Add(calendarCard);
 
         var genresColumn = new StackPanel();
-        genresColumn.Children.Add(genresHeader);
-        genresColumn.Children.Add(genresCard);
+        genresColumn.Children.Add(DashboardCreateSectionHeader(LocalizationManager.Current.TopGenres));
+        genresColumn.Children.Add(DashboardBuildTopGenresCard(topGenres));
+
+        var albumsColumn = new StackPanel();
+        albumsColumn.Children.Add(DashboardCreateSectionHeader(LocalizationManager.Current.TopAlbums));
+        albumsColumn.Children.Add(DashboardBuildTopAlbumsCard(topAlbums));
+
+        var artistsColumn = new StackPanel();
+        artistsColumn.Children.Add(DashboardCreateSectionHeader(LocalizationManager.Current.TopArtists));
+        artistsColumn.Children.Add(DashboardBuildTopArtistsCard(topArtists));
 
         if (_dashboardTwoColumnLayout == true)
         {
+            // Left: calendar + top albums. Right: top genres + top artists.
+            var leftColumn = new StackPanel();
+            leftColumn.Children.Add(calendarColumn);
+            leftColumn.Children.Add(albumsColumn);
+
+            var rightColumn = new StackPanel();
+            rightColumn.Children.Add(genresColumn);
+            rightColumn.Children.Add(artistsColumn);
+
             var grid = new Grid();
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.15, GridUnitType.Star) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(28) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            Grid.SetColumn(calendarColumn, 0);
-            Grid.SetColumn(genresColumn, 2);
-            grid.Children.Add(calendarColumn);
-            grid.Children.Add(genresColumn);
+            Grid.SetColumn(leftColumn, 0);
+            Grid.SetColumn(rightColumn, 2);
+            grid.Children.Add(leftColumn);
+            grid.Children.Add(rightColumn);
             DashboardPanel.Children.Add(grid);
         }
         else
         {
             DashboardPanel.Children.Add(calendarColumn);
             DashboardPanel.Children.Add(genresColumn);
+            DashboardPanel.Children.Add(albumsColumn);
+            DashboardPanel.Children.Add(artistsColumn);
         }
+    }
+
+    /// <summary>Builds the statistics section header carrying the shared period selector.</summary>
+    /// <returns>The header control with an accent underline and a right-aligned period dropdown.</returns>
+    private Control DashboardCreateStatsPeriodHeader()
+    {
+        var container = new StackPanel();
+
+        var grid = new Grid { Margin = new Thickness(0, 24, 0, 10) };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var tb = new TextBlock
+        {
+            Text = LocalizationManager.Current.ListeningStats,
+            FontSize = ResolveFontSize("FontSizeSubtitle"),
+            FontWeight = FontWeight.SemiBold,
+            Foreground = FindResource<IBrush>("AppPrimaryTextBrush"),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(tb, 0);
+        grid.Children.Add(tb);
+
+        var periodBox = new ComboBox
+        {
+            MinWidth = 170,
+            VerticalAlignment = VerticalAlignment.Center,
+            ItemsSource = new[]
+            {
+                LocalizationManager.Current.PeriodAllTime,
+                LocalizationManager.Current.PeriodThisYear,
+                LocalizationManager.Current.PeriodThisMonth,
+                LocalizationManager.Current.PeriodLast30Days,
+                LocalizationManager.Current.PeriodLast7Days
+            },
+            SelectedIndex = (int)_dashboardStatsPeriod
+        };
+        periodBox.SelectionChanged += DashboardStatsPeriod_OnSelectionChanged;
+        Grid.SetColumn(periodBox, 1);
+        grid.Children.Add(periodBox);
+
+        container.Children.Add(grid);
+        container.Children.Add(new Border
+        {
+            Height = 3,
+            Width = 34,
+            Background = FindResource<IBrush>("AppAccentBrush"),
+            CornerRadius = new CornerRadius(2),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Margin = new Thickness(0, 0, 0, 14)
+        });
+        return container;
+    }
+
+    /// <summary>Rebuilds the dashboard when the statistics period changes.</summary>
+    /// <param name="sender">The period selector.</param>
+    /// <param name="e">The selection change event data.</param>
+    private async void DashboardStatsPeriod_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (sender is not ComboBox { SelectedIndex: >= 0 and var index })
+            return;
+        var period = (StatsPeriod)index;
+        if (period == _dashboardStatsPeriod)
+            return;
+        _dashboardStatsPeriod = period;
+        await BuildDashboardAsync();
+    }
+
+    /// <summary>Returns the inclusive Unix-second lower bound for a statistics period.</summary>
+    /// <param name="period">The selected statistics period.</param>
+    /// <returns>The lower bound, or <see langword="null"/> for all-time.</returns>
+    private static long? StatsPeriodSinceUnix(StatsPeriod period)
+    {
+        var now = DateTime.Now;
+        return period switch
+        {
+            StatsPeriod.ThisYear => new DateTimeOffset(new DateTime(now.Year, 1, 1, 0, 0, 0, DateTimeKind.Local))
+                .ToUnixTimeSeconds(),
+            StatsPeriod.ThisMonth => new DateTimeOffset(new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Local))
+                .ToUnixTimeSeconds(),
+            StatsPeriod.Last30Days => new DateTimeOffset(now.Date.AddDays(-30), TimeZoneInfo.Local.GetUtcOffset(now.Date.AddDays(-30)))
+                .ToUnixTimeSeconds(),
+            StatsPeriod.Last7Days => new DateTimeOffset(now.Date.AddDays(-7), TimeZoneInfo.Local.GetUtcOffset(now.Date.AddDays(-7)))
+                .ToUnixTimeSeconds(),
+            _ => null
+        };
     }
 
     /// <summary>Builds the modern top-genres analytics card for the dashboard.</summary>
@@ -1200,6 +1342,315 @@ public partial class MainWindow : Window
         panel.Child = rows;
         return panel;
     }
+
+    /// <summary>Builds the most-listened-albums analytics card for the dashboard.</summary>
+    /// <param name="albums">Ranked albums with total play seconds.</param>
+    /// <returns>The analytics card control.</returns>
+    private Control DashboardBuildTopAlbumsCard(List<TopAlbumStat> albums)
+    {
+        if (albums.Count == 0)
+            return DashboardNoDataText();
+
+        double maxSecs = albums[0].Seconds;
+        var panel = DashboardSurfaceCard();
+        var rows = new StackPanel { Spacing = 12 };
+
+        for (int i = 0; i < albums.Count; i++)
+        {
+            var album = albums[i];
+            var color = _genreColors[i % _genreColors.Length];
+            var brush = new SolidColorBrush(color);
+
+            var row = new StackPanel { Spacing = 6 };
+
+            var topLine = new Grid();
+            topLine.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            topLine.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            topLine.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var cover = DashboardBuildTopAlbumCover(album);
+            Grid.SetColumn(cover, 0);
+            topLine.Children.Add(cover);
+
+            var textStack = new StackPanel
+            {
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(10, 0, 0, 0)
+            };
+            var titleButton = new Button
+            {
+                Content = album.Title,
+                FontSize = ResolveFontSize("FontSizeBody"),
+                FontWeight = FontWeight.SemiBold,
+                Foreground = FindResource<IBrush>("AppPrimaryTextBrush"),
+                Theme = FindResource<ControlTheme>("EntityLinkButtonTheme"),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                HorizontalContentAlignment = HorizontalAlignment.Left
+            };
+            titleButton.Click += async (_, e) => { e.Handled = true; await OpenTopAlbumAsync(album); };
+            textStack.Children.Add(titleButton);
+
+            if (!string.IsNullOrWhiteSpace(album.Artist))
+            {
+                var artistButton = new Button
+                {
+                    Content = album.Artist,
+                    FontSize = ResolveFontSize("FontSizeMeta"),
+                    Foreground = FindResource<IBrush>("AppSecondaryTextBrush"),
+                    Theme = FindResource<ControlTheme>("EntityLinkButtonTheme"),
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    HorizontalContentAlignment = HorizontalAlignment.Left
+                };
+                artistButton.Click += async (_, e) =>
+                {
+                    e.Handled = true;
+                    await OpenTopArtistAsync(new TopArtistStat(
+                        album.Artist, album.Seconds, album.LocalArtistId, album.ExternalId, album.Path));
+                };
+                textStack.Children.Add(artistButton);
+            }
+            Grid.SetColumn(textStack, 1);
+            topLine.Children.Add(textStack);
+
+            var durationTb = new TextBlock
+            {
+                Text = FormatDashboardDuration(TimeSpan.FromSeconds(album.Seconds)),
+                FontSize = ResolveFontSize("FontSizeCaption"),
+                FontWeight = FontWeight.Medium,
+                Foreground = FindResource<IBrush>("AppSecondaryTextBrush"),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(12, 0, 0, 0)
+            };
+            Grid.SetColumn(durationTb, 2);
+            topLine.Children.Add(durationTb);
+            row.Children.Add(topLine);
+
+            row.Children.Add(DashboardBuildStatBar(album.Seconds, maxSecs, brush));
+            rows.Children.Add(row);
+        }
+
+        panel.Child = rows;
+        return panel;
+    }
+
+    /// <summary>Builds the most-listened-artists analytics card for the dashboard.</summary>
+    /// <param name="artists">Ranked artists with total play seconds.</param>
+    /// <returns>The analytics card control.</returns>
+    private Control DashboardBuildTopArtistsCard(List<TopArtistStat> artists)
+    {
+        if (artists.Count == 0)
+            return DashboardNoDataText();
+
+        double maxSecs = artists[0].Seconds;
+        var panel = DashboardSurfaceCard();
+        var rows = new StackPanel { Spacing = 12 };
+
+        for (int i = 0; i < artists.Count; i++)
+        {
+            var artist = artists[i];
+            var color = _genreColors[i % _genreColors.Length];
+            var brush = new SolidColorBrush(color);
+
+            var row = new StackPanel { Spacing = 6 };
+
+            var topLine = new Grid();
+            topLine.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            topLine.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            topLine.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var rankChip = new Border
+            {
+                Width = 22,
+                Height = 22,
+                CornerRadius = new CornerRadius(7),
+                Background = brush,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 10, 0),
+                Child = new TextBlock
+                {
+                    Text = (i + 1).ToString(CultureInfo.CurrentCulture),
+                    FontSize = ResolveFontSize("FontSizeMeta"),
+                    FontWeight = FontWeight.Bold,
+                    Foreground = PickContrastBrush(color),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                }
+            };
+            Grid.SetColumn(rankChip, 0);
+            topLine.Children.Add(rankChip);
+
+            var labelButton = new Button
+            {
+                Content = artist.Name,
+                FontSize = ResolveFontSize("FontSizeBody"),
+                FontWeight = FontWeight.SemiBold,
+                Foreground = FindResource<IBrush>("AppPrimaryTextBrush"),
+                Theme = FindResource<ControlTheme>("EntityLinkButtonTheme"),
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalContentAlignment = HorizontalAlignment.Left
+            };
+            labelButton.Click += async (_, e) => { e.Handled = true; await OpenTopArtistAsync(artist); };
+            Grid.SetColumn(labelButton, 1);
+            topLine.Children.Add(labelButton);
+
+            var durationTb = new TextBlock
+            {
+                Text = FormatDashboardDuration(TimeSpan.FromSeconds(artist.Seconds)),
+                FontSize = ResolveFontSize("FontSizeCaption"),
+                FontWeight = FontWeight.Medium,
+                Foreground = FindResource<IBrush>("AppSecondaryTextBrush"),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(12, 0, 0, 0)
+            };
+            Grid.SetColumn(durationTb, 2);
+            topLine.Children.Add(durationTb);
+            row.Children.Add(topLine);
+
+            row.Children.Add(DashboardBuildStatBar(artist.Seconds, maxSecs, brush));
+            rows.Children.Add(row);
+        }
+
+        panel.Child = rows;
+        return panel;
+    }
+
+    /// <summary>Builds a small album cover for a top-albums row: local thumbnail, remote artwork, or initials.</summary>
+    /// <param name="album">The ranked album.</param>
+    /// <returns>A fixed-size cover control.</returns>
+    private Control DashboardBuildTopAlbumCover(TopAlbumStat album)
+    {
+        const double size = 40;
+        var host = new Border
+        {
+            Width = size,
+            Height = size,
+            Background = FindResource<IBrush>("AppArtworkPlaceholderBrush"),
+            CornerRadius = new CornerRadius(0, 10, 0, 10),
+            ClipToBounds = true,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var content = new Grid();
+        content.Children.Add(new Orynivo.Controls.InitialsAvatar
+        {
+            DisplayName = string.IsNullOrWhiteSpace(album.Title) ? album.Artist : album.Title,
+            FontSize = 14,
+            IsHitTestVisible = false
+        });
+
+        if (!string.IsNullOrEmpty(album.ThumbPath))
+        {
+            var image = new Image { Width = size, Height = size, Stretch = Stretch.UniformToFill, IsHitTestVisible = false };
+            content.Children.Add(image);
+            _ = LoadDashboardLocalArtworkAsync(image, album.ThumbPath!);
+        }
+        else if (TryGetTopAlbumRemoteArtUrl(album, out var artUrl))
+        {
+            var image = new Image { Width = size, Height = size, Stretch = Stretch.UniformToFill, IsHitTestVisible = false };
+            content.Children.Add(image);
+            _ = LoadDashboardRemoteArtworkAsync(image, artUrl);
+        }
+
+        host.Child = content;
+        return host;
+    }
+
+    /// <summary>Resolves a remote Orynivo Server track-artwork URL for a top-albums row, when applicable.</summary>
+    /// <param name="album">The ranked album.</param>
+    /// <param name="artUrl">The resolved authenticated artwork URL.</param>
+    /// <returns><see langword="true"/> when the album maps to a configured Orynivo Server track.</returns>
+    private bool TryGetTopAlbumRemoteArtUrl(TopAlbumStat album, out string artUrl)
+    {
+        artUrl = string.Empty;
+        var pseudo = MakeStatHistoryEntry(album.ExternalId, album.Path, album.Title, album.Artist, album.Title, null, null);
+        if (TryGetOrynivoHistoryTarget(pseudo, out var server, out var trackId))
+        {
+            artUrl = OrynivoServerClient.GetTrackArtworkUrl(server, trackId, 96);
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>Builds the thin proportional stat bar shared by the album and artist cards.</summary>
+    /// <param name="seconds">This row's play seconds.</param>
+    /// <param name="maxSeconds">The largest row's play seconds, used to scale the fill.</param>
+    /// <param name="fill">The fill brush.</param>
+    /// <returns>The bar control.</returns>
+    private Control DashboardBuildStatBar(double seconds, double maxSeconds, IBrush fill)
+    {
+        double fraction = maxSeconds > 0 ? seconds / maxSeconds : 0;
+        var barBg = new Border
+        {
+            Height = 8,
+            Background = FindResource<IBrush>("AppGridLineBrush"),
+            CornerRadius = new CornerRadius(4)
+        };
+        var barGrid = new Grid();
+        barGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(fraction, GridUnitType.Star) });
+        barGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1 - fraction, GridUnitType.Star) });
+        var barFill = new Border { Height = 8, Background = fill, CornerRadius = new CornerRadius(4) };
+        Grid.SetColumn(barFill, 0);
+        barGrid.Children.Add(barFill);
+
+        var barHost = new Grid();
+        barHost.Children.Add(barBg);
+        barHost.Children.Add(barGrid);
+        return barHost;
+    }
+
+    /// <summary>Builds the bordered surface container shared by the analytics cards.</summary>
+    /// <returns>An empty surface border ready to host its content.</returns>
+    private Border DashboardSurfaceCard() => new()
+    {
+        Background = FindResource<IBrush>("AppSurfaceBrush"),
+        BorderBrush = FindResource<IBrush>("AppGridLineBrush"),
+        BorderThickness = new Thickness(1),
+        CornerRadius = new CornerRadius(14),
+        Padding = new Thickness(16, 14, 16, 8),
+        Margin = new Thickness(0, 0, 0, 4)
+    };
+
+    /// <summary>Builds the muted "no data" placeholder shown when an analytics card is empty.</summary>
+    /// <returns>A muted text block.</returns>
+    private Control DashboardNoDataText() => new TextBlock
+    {
+        Text = LocalizationManager.Current.NoData,
+        Foreground = FindResource<IBrush>("AppSecondaryTextBrush"),
+        Margin = new Thickness(0, 4, 0, 0)
+    };
+
+    /// <summary>Opens a ranked album, staying in whichever library (local, remote, Plex) it belongs to.</summary>
+    /// <param name="album">The ranked album to open.</param>
+    /// <returns>A task representing the asynchronous navigation.</returns>
+    private Task OpenTopAlbumAsync(TopAlbumStat album) =>
+        OpenHistoryAlbumAsync(MakeStatHistoryEntry(
+            album.ExternalId, album.Path, album.Title, album.Artist, album.Title,
+            album.LocalAlbumId, album.LocalArtistId));
+
+    /// <summary>Opens a ranked artist, staying in whichever library (local, remote, Plex) it belongs to.</summary>
+    /// <param name="artist">The ranked artist to open.</param>
+    /// <returns>A task representing the asynchronous navigation.</returns>
+    private Task OpenTopArtistAsync(TopArtistStat artist) =>
+        OpenHistoryArtistAsync(MakeStatHistoryEntry(
+            artist.ExternalId, artist.Path, artist.Name, artist.Name, null, null, artist.LocalArtistId));
+
+    /// <summary>Builds a synthetic playback-history entry used to route statistics-card clicks through the shared open logic.</summary>
+    /// <param name="externalId">Representative external identifier.</param>
+    /// <param name="path">Representative playback path.</param>
+    /// <param name="title">Display title.</param>
+    /// <param name="artist">Artist display name.</param>
+    /// <param name="album">Album display title.</param>
+    /// <param name="albumId">Local album identifier, or <see langword="null"/>.</param>
+    /// <param name="artistId">Local artist identifier, or <see langword="null"/>.</param>
+    /// <returns>A minimal <see cref="DailyHistoryEntry"/> carrying the identity fields.</returns>
+    private static DailyHistoryEntry MakeStatHistoryEntry(
+        string? externalId,
+        string? path,
+        string title,
+        string? artist,
+        string? album,
+        long? albumId,
+        long? artistId) =>
+        new(0, null, path ?? string.Empty, DateTime.Now, 0, null, "track", title, artist, album, artistId, albumId, externalId);
 
     /// <summary>Chooses black or white text for readable contrast on a colored background.</summary>
     /// <param name="background">The background color.</param>

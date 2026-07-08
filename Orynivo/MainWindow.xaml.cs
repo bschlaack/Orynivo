@@ -222,6 +222,7 @@ public partial class MainWindow : Window
 
     private int _dashboardYear;
     private int _dashboardMonth;
+    private StatsPeriod _dashboardStatsPeriod = StatsPeriod.AllTime;
     private StackPanel? _calendarInner;
     private bool _dashboardResizeHooked;
     private bool? _dashboardTwoColumnLayout;
@@ -389,6 +390,12 @@ public partial class MainWindow : Window
         public bool ImageIsManual { get; set; }
         public string EntityType { get; set; } = "Track";
         public string? ExternalId { get; init; }
+        /// <summary>Gets the Plex server identifier a Plex track/album/artist row belongs to, or <see langword="null"/>.</summary>
+        public string? PlexServerId { get; init; }
+        /// <summary>Gets the Plex album (parent) rating key for a Plex track row, or <see langword="null"/>.</summary>
+        public string? PlexAlbumRatingKey { get; init; }
+        /// <summary>Gets the Plex artist (grandparent) rating key for a Plex track row, or <see langword="null"/>.</summary>
+        public string? PlexArtistRatingKey { get; init; }
         public OrynivoServerSettings? OrynivoServer { get; set; }
         public string SourceKey => OrynivoServer is null ? LocalSourceKey : GetServerSourceKey(OrynivoServer.Id);
         public string SourceBadge => OrynivoServer is null ? LocalizationManager.Current.LocalSourceShort : "OS";
@@ -3420,7 +3427,10 @@ public partial class MainWindow : Window
             KnownDuration = item.DurationMilliseconds is long durationMilliseconds
                 ? TimeSpan.FromMilliseconds(durationMilliseconds)
                 : null,
-            EntityType = entityType
+            EntityType = entityType,
+            PlexServerId = server.Id,
+            PlexAlbumRatingKey = item.ParentRatingKey,
+            PlexArtistRatingKey = item.GrandparentRatingKey
         };
         if (entityType == "PlexTrack" && row.FilePath.Length > 0)
             _plexTracksByUrl[row.FilePath] = row;
@@ -11092,6 +11102,14 @@ public partial class MainWindow : Window
             return BuildOrynivoHistoryExternalId(rowServer, rowTrackId);
         }
 
+        if (_plexTracksByUrl.TryGetValue(filePath, out var plexRow) &&
+            plexRow is { PlexServerId: { } plexServerId, ExternalId: { } plexRatingKey } &&
+            !string.IsNullOrWhiteSpace(plexServerId) && !string.IsNullOrWhiteSpace(plexRatingKey))
+        {
+            return BuildPlexHistoryExternalId(
+                plexServerId, plexRatingKey, plexRow.PlexAlbumRatingKey, plexRow.PlexArtistRatingKey);
+        }
+
         return null;
     }
 
@@ -11101,6 +11119,23 @@ public partial class MainWindow : Window
     /// <returns>A compact, parseable history identifier.</returns>
     private static string BuildOrynivoHistoryExternalId(OrynivoServerSettings server, long trackId) =>
         $"orynivo:{server.Id}:track:{trackId}";
+
+    /// <summary>
+    /// Builds a stable Plex playback-history external ID carrying the server, track,
+    /// album, and artist rating keys so a Plex history entry stays resolvable to its
+    /// in-library album and artist. Rating keys are numeric and contain no colons.
+    /// </summary>
+    /// <param name="serverId">Plex server identifier.</param>
+    /// <param name="ratingKey">Plex track rating key.</param>
+    /// <param name="albumRatingKey">Plex album (parent) rating key, or <see langword="null"/>.</param>
+    /// <param name="artistRatingKey">Plex artist (grandparent) rating key, or <see langword="null"/>.</param>
+    /// <returns>A compact, parseable history identifier of the form <c>plex:server:track:album:artist</c>.</returns>
+    private static string BuildPlexHistoryExternalId(
+        string serverId,
+        string ratingKey,
+        string? albumRatingKey,
+        string? artistRatingKey) =>
+        $"plex:{serverId}:{ratingKey}:{albumRatingKey ?? string.Empty}:{artistRatingKey ?? string.Empty}";
 
     private void StartLocalPlaybackHistory(string filePath)
     {

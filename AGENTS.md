@@ -473,7 +473,12 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   reports to `%LOCALAPPDATA%\Orynivo\logs\`
 - `Orynivo/DailyHistoryDialog.*`: themed modal dashboard dialog that lists
   playback-history entries for a selected calendar day and returns track, album,
-  or artist navigation actions to the main window
+  or artist navigation actions to the main window. A source-filter chip row
+  (`HistorySource`: Track/Radio/Podcast/Remote/Plex, classified via
+  `ClassifySource`) toggles which categories are shown; only categories present
+  that day get a chip. Album/artist links are available for local, remote Orynivo
+  Server, and Plex entries; Plex clickability requires the stored Plex context
+  (album/artist rating keys) and a still-configured Plex server
 - `Orynivo/SettingsStore.cs`: persists `%LOCALAPPDATA%\Orynivo\settings.json`
 - `Orynivo/Streaming/IStreamingCatalog.cs` and `IStreamingPlaybackProvider.cs`:
   provider-neutral contracts for future streaming catalog and playback integrations
@@ -490,7 +495,9 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
 - `Orynivo/Streaming/PlexServerClient.cs`: queries configured Plex Media Servers,
   exposes only music library sections (`type=artist`), pages
   artists/albums/tracks, resolves drill-down children, browses folders lazily,
-  and builds authenticated direct-part URLs
+  and builds authenticated direct-part URLs. `PlexMediaItem` also carries the
+  optional `ParentRatingKey` (album) and `GrandparentRatingKey` (artist) so a
+  played Plex track can record a stable album/artist context in playback history
 - `Orynivo.Core/Streaming/OrynivoServerClient.cs`: HTTP client for a remote
   Orynivo Server; methods load artists, a single artist profile (`GetArtistAsync`),
   albums by artist, albums, tracks by
@@ -846,7 +853,17 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   podcast episodes, and internet-radio sessions with media type, display
   title/subtitle, optional external ID, an optional `genre` captured at playback
   time (so genre statistics include tracks without a local library row),
-    playback start/end, duration, final position, and completion state
+    playback start/end, duration, final position, and completion state.
+  The `external_id` stores a stable source context for non-local tracks:
+  `orynivo:{serverId}:track:{trackId}` for remote Orynivo Server tracks
+  (`ResolveNowPlayingExternalId` / `BuildOrynivoHistoryExternalId`), and
+  `plex:{serverId}:{trackKey}:{albumKey}:{artistKey}` for Plex tracks
+  (`BuildPlexHistoryExternalId`, using the Plex track/parent/grandparent rating
+  keys carried on the `ContentRow` as `PlexServerId`/`PlexAlbumRatingKey`/
+  `PlexArtistRatingKey`). This is what makes Plex history albums/artists clickable
+  (`TryGetPlexHistoryTarget` → `OpenPlexAlbumFromHistoryAsync` /
+  `OpenPlexArtistFromHistoryAsync`, which synthesize a Plex parent row and reuse
+  `ShowPlexChildrenAsync`)
 - `radio_stations` stores personal Radio Browser stations by stable station
   UUID, including stream URL, logo, country, codec, bitrate, and tags
 - `podcasts` stores pinned podcasts by Apple collection ID, including author,
@@ -1637,10 +1654,15 @@ asynchronous file I/O from the UI thread
   Selecting a card supports Back navigation. Cover/favorite handlers refresh the
   bound card in place on the dashboard surface (`UpdateRowArtworkFromBytes`)
   instead of rebuilding the hidden Albums list.
-  3. **Stats section** (`DashboardBuildStatsSection`): the calendar and top-genre
-  blocks, each with its own section header. They sit side by side in a two-column
-  grid on wide dashboards and stack on narrow ones; the layout switches at a
-  980-px threshold (`ComputeDashboardTwoColumn`) and re-flows on the
+  3. **Stats section** (`DashboardBuildStatsSection`): a shared period selector
+  header (`DashboardCreateStatsPeriodHeader`, backed by `_dashboardStatsPeriod`
+  / `StatsPeriod` and `StatsPeriodSinceUnix`) governs the genre, album, and
+  artist analytics cards together (All time / This year / This month / Last 30
+  days / Last 7 days); changing it rebuilds the dashboard. The calendar keeps its
+  own independent month navigation. On wide dashboards the blocks sit in a
+  two-column grid (left: calendar + top albums; right: top genres + top artists)
+  and stack on narrow ones; the layout switches at a 980-px threshold
+  (`ComputeDashboardTwoColumn`) and re-flows on the
   `DashboardScrollViewer.SizeChanged` boundary crossing only.
      - **Calendar** (`DashboardBuildCalendarCard`): Monday-first month grid with
      day number, `HH:mm:ss` playback time, top three linked genres, today
@@ -1649,6 +1671,17 @@ asynchronous file I/O from the UI thread
      with a colored numbered rank chip (contrast-safe text via
      `PickContrastBrush`), a linked genre label, `HH:mm:ss` duration, and a thin
      proportional bar per genre, colored from `_genreColors`.
+     - **Most listened albums** (`DashboardBuildTopAlbumsCard`) and **Most listened
+     artists** (`DashboardBuildTopArtistsCard`): analytics cards mirroring the
+     genre card, backed by `AudioDatabase.GetTopAlbums`/`GetTopArtists`
+     (`TopAlbumStat`/`TopArtistStat`), which merge local, remote Orynivo Server,
+     and Plex playback by album title+artist / artist name in the selected period.
+     Album rows show a small cover (local thumbnail, remote track artwork, or an
+     `InitialsAvatar`). Album/artist labels are links that open the entity in its
+     own library through `OpenTopAlbumAsync`/`OpenTopArtistAsync`, which route a
+     synthetic `DailyHistoryEntry` (`MakeStatHistoryEntry`) through the shared
+     `OpenHistoryAlbumAsync`/`OpenHistoryArtistAsync` so local, remote, and Plex
+     targets all work.
 - The **Recently played** and **Recently added** section headers carry a
   right-aligned **Show all** link (`DashboardCreateSectionHeader`'s
   `showAllAction`). It opens a full-page view (`ShowAllRecentlyPlayedAsync` /
@@ -1670,13 +1703,18 @@ asynchronous file I/O from the UI thread
   Daily-history cells without an available action must render as plain text, not
   disabled link-style buttons.
 - Data comes from `GetRecentAlbums` (now also exposing `ArtistId`/`AddedAt` for
-  cross-library merging), `GetCalendarData`, and `GetTopGenres`
+  cross-library merging), `GetCalendarData`, `GetTopGenres`, `GetTopAlbums`, and
+  `GetTopArtists`. `GetTopGenres`/`GetTopAlbums`/`GetTopArtists` take an optional
+  `sinceUnix` lower bound driven by the dashboard period selector.
 - Dashboard calendar playback time includes local, remote Orynivo Server, and
-  Plex tracks, podcasts, and internet radio. Top-genre statistics (the Top genres
-  section and per-day calendar genres) include local, remote Orynivo Server, and
-  Plex tracks: the genre query uses `COALESCE(tracks.genre, play_history.genre)`
-  over a `LEFT JOIN`, falling back to the genre captured at playback time
-  (`ResolveNowPlayingGenre`) for tracks without a local library row
+  Plex tracks, podcasts, and internet radio. The Top genres / albums / artists
+  statistics include local, remote Orynivo Server, and Plex tracks: the genre
+  query uses `COALESCE(tracks.genre, play_history.genre)` over a `LEFT JOIN`,
+  falling back to the genre captured at playback time (`ResolveNowPlayingGenre`)
+  for tracks without a local library row; the album/artist aggregations merge by
+  album title+artist / artist name and prefer a local match (album ID + artwork)
+  as the representative identity, otherwise keep a representative external ID and
+  path for remote/Plex resolution
 - Clicking a dashboard genre opens Tracks with only that genre facet selected;
   other track filters are cleared and the genre filter section is expanded
 - `RecentAlbumInfo` and `CalendarDayData` are records in `AudioDatabase.cs`

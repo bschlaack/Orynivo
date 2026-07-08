@@ -325,6 +325,26 @@ public sealed record LocalizedStrings(
     public string RecentAlbums { get; init; } = "";
     public string Calendar { get; init; } = "";
     public string TopGenres { get; init; } = "";
+    /// <summary>Gets the dashboard "most listened albums" section title.</summary>
+    public string TopAlbums { get; init; } = "";
+    /// <summary>Gets the dashboard "most listened artists" section title.</summary>
+    public string TopArtists { get; init; } = "";
+    /// <summary>Gets the dashboard listening-statistics section title.</summary>
+    public string ListeningStats { get; init; } = "";
+    /// <summary>Gets the "all time" statistics period option.</summary>
+    public string PeriodAllTime { get; init; } = "";
+    /// <summary>Gets the "this year" statistics period option.</summary>
+    public string PeriodThisYear { get; init; } = "";
+    /// <summary>Gets the "this month" statistics period option.</summary>
+    public string PeriodThisMonth { get; init; } = "";
+    /// <summary>Gets the "last 30 days" statistics period option.</summary>
+    public string PeriodLast30Days { get; init; } = "";
+    /// <summary>Gets the "last 7 days" statistics period option.</summary>
+    public string PeriodLast7Days { get; init; } = "";
+    /// <summary>Gets the history-source label for remote Orynivo Server tracks.</summary>
+    public string HistorySourceRemote { get; init; } = "";
+    /// <summary>Gets the history-source label for Plex tracks.</summary>
+    public string HistorySourcePlex { get; init; } = "";
     public string NoData { get; init; } = "";
     /// <summary>Gets the dashboard "recently played" section title.</summary>
     public string RecentlyPlayed { get; init; } = "";

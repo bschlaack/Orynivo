@@ -110,10 +110,47 @@
             <Setter Property="Foreground" Value="{DynamicResource AppSecondaryTextBrush}"/>
             <Setter Property="Cursor" Value="Arrow"/>
         </Style>
+        <Style Selector="ToggleButton.filterChip">
+            <Setter Property="Background" Value="{DynamicResource AppButtonBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppSecondaryTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppButtonBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Padding" Value="12,5"/>
+            <Setter Property="MinHeight" Value="28"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}"
+                            CornerRadius="14">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          TextBlock.Foreground="{Binding Foreground, RelativeSource={RelativeSource TemplatedParent}}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="ToggleButton.filterChip:pointerover /template/ Border#Bd">
+            <Setter Property="Background" Value="{DynamicResource AppButtonHoverBrush}"/>
+        </Style>
+        <Style Selector="ToggleButton.filterChip:checked">
+            <Setter Property="Background" Value="{DynamicResource AppAccentBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppAccentTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}"/>
+        </Style>
+        <Style Selector="ToggleButton.filterChip:checked /template/ Border#Bd">
+            <Setter Property="Background" Value="{DynamicResource AppAccentBrush}"/>
+        </Style>
     </Window.Styles>
 
     <Grid Margin="20">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
@@ -125,7 +162,12 @@
                    Foreground="{DynamicResource AppPrimaryTextBrush}"
                    Margin="0,0,0,16"/>
 
-        <Grid Grid.Row="1">
+        <WrapPanel x:Name="FilterPanel"
+                   Grid.Row="1"
+                   Orientation="Horizontal"
+                   Margin="0,0,0,14"/>
+
+        <Grid Grid.Row="2">
             <TextBlock Text="{DynamicResource L_DailyHistoryNoEntries}"
                        IsVisible="{Binding ShowEmpty}"
                        Foreground="{DynamicResource AppSecondaryTextBrush}"
@@ -220,7 +262,7 @@
             </DataGrid>
         </Grid>
 
-        <Button Grid.Row="2"
+        <Button Grid.Row="3"
                 Classes="dialogAction"
                 Content="{DynamicResource L_Close}"
                 Width="100"

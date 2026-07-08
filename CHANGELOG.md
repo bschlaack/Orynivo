@@ -8,6 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Added "Most listened albums" and "Most listened artists" analytics cards to the
+  dashboard alongside Top Genres, merging local, remote Orynivo Server, and Plex
+  playback. A shared period selector (All time / This year / This month / Last 30
+  days / Last 7 days) governs all three cards. Album and artist entries link into
+  their own library (local, remote, or Plex).
+- Added a source filter (Tracks / Radio / Podcasts / Remote / Plex) to the daily
+  playback-history dialog; only the categories present that day are shown.
+- Playback history now stores a stable Plex context (server plus track, album, and
+  artist rating keys) so Plex history entries stay identifiable and their albums
+  and artists are clickable throughout the history and dashboard statistics.
+
 ### Changed
 
 - Split several `MainWindow` domains into dedicated partial files for dashboard,

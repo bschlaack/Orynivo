@@ -182,6 +182,38 @@ public sealed record DailyHistoryEntry(
     long? AlbumId,
     string? ExternalId);
 
+/// <summary>Aggregated listening statistics for a single album across every playback source.</summary>
+/// <param name="Title">Album display title.</param>
+/// <param name="Artist">Album artist display name.</param>
+/// <param name="Seconds">Total listened seconds in the requested period.</param>
+/// <param name="LocalAlbumId">Local album identifier when a local library album matched, otherwise <see langword="null"/>.</param>
+/// <param name="LocalArtistId">Local album-artist identifier when known, otherwise <see langword="null"/>.</param>
+/// <param name="ThumbPath">Local artwork thumbnail path when available, otherwise <see langword="null"/>.</param>
+/// <param name="ExternalId">Representative playback-history external identifier for remote/Plex resolution, or <see langword="null"/>.</param>
+/// <param name="Path">Representative playback path for remote/Plex resolution, or <see langword="null"/>.</param>
+public sealed record TopAlbumStat(
+    string Title,
+    string Artist,
+    double Seconds,
+    long? LocalAlbumId,
+    long? LocalArtistId,
+    string? ThumbPath,
+    string? ExternalId,
+    string? Path);
+
+/// <summary>Aggregated listening statistics for a single artist across every playback source.</summary>
+/// <param name="Name">Artist display name.</param>
+/// <param name="Seconds">Total listened seconds in the requested period.</param>
+/// <param name="LocalArtistId">Local artist identifier when a local library artist matched, otherwise <see langword="null"/>.</param>
+/// <param name="ExternalId">Representative playback-history external identifier for remote/Plex resolution, or <see langword="null"/>.</param>
+/// <param name="Path">Representative playback path for remote/Plex resolution, or <see langword="null"/>.</param>
+public sealed record TopArtistStat(
+    string Name,
+    double Seconds,
+    long? LocalArtistId,
+    string? ExternalId,
+    string? Path);
+
 /// <summary>Result returned after an artist-name normalisation run.</summary>
 public sealed record ArtistNormalizationResult(int MergedArtists, int UpdatedTracks);
 
@@ -4000,13 +4032,17 @@ public sealed class AudioDatabase : IDisposable
         return result;
     }
 
-    public List<(string Genre, double Seconds)> GetTopGenres(int limit = 10)
+    /// <summary>Aggregates listening time per genre across all playback sources.</summary>
+    /// <param name="limit">Maximum number of genres to return.</param>
+    /// <param name="sinceUnix">Optional inclusive lower bound on the playback start (Unix seconds); <see langword="null"/> means all time.</param>
+    /// <returns>Genres ordered by total play time descending.</returns>
+    public List<(string Genre, double Seconds)> GetTopGenres(int limit = 10, long? sinceUnix = null)
     {
         var agg = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
         using var cmd = _conn.CreateCommand();
         // COALESCE so that remote/Plex tracks (no local row, genre captured at
         // playback time in play_history.genre) are included alongside local tracks.
-        cmd.CommandText = """
+        cmd.CommandText = $"""
             SELECT COALESCE(t.genre, ph.genre) AS genre,
                    SUM(COALESCE(ph.position_seconds, 0)) AS secs
             FROM play_history ph
@@ -4014,9 +4050,12 @@ public sealed class AudioDatabase : IDisposable
             WHERE ph.position_seconds > 0
               AND COALESCE(t.genre, ph.genre) IS NOT NULL
               AND COALESCE(t.genre, ph.genre) != ''
+              {(sinceUnix.HasValue ? "AND ph.started_at >= $since" : string.Empty)}
             GROUP BY COALESCE(t.genre, ph.genre)
             ORDER BY secs DESC;
             """;
+        if (sinceUnix.HasValue)
+            cmd.Parameters.AddWithValue("$since", sinceUnix.Value);
         using var r = cmd.ExecuteReader();
         while (r.Read())
         {
@@ -4027,6 +4066,171 @@ public sealed class AudioDatabase : IDisposable
         }
         return agg.OrderByDescending(x => x.Value).Take(limit)
                   .Select(x => (x.Key, x.Value)).ToList();
+    }
+
+    /// <summary>
+    /// Aggregates listening time per album across local, remote Orynivo Server, and Plex
+    /// playback, merging entries by album title plus artist so the same album from any
+    /// source is counted once. Local matches carry their album ID and artwork thumbnail
+    /// for in-library navigation; remote/Plex matches carry a representative external ID
+    /// and stream path so they can be resolved when clicked.
+    /// </summary>
+    /// <param name="limit">Maximum number of albums to return.</param>
+    /// <param name="sinceUnix">Optional inclusive lower bound on the playback start (Unix seconds); <see langword="null"/> means all time.</param>
+    /// <returns>Albums ordered by total play time descending.</returns>
+    public List<TopAlbumStat> GetTopAlbums(int limit = 10, long? sinceUnix = null)
+    {
+        var agg = new Dictionary<string, TopAlbumAccumulator>(StringComparer.Ordinal);
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = $"""
+            SELECT COALESCE(ph.position_seconds, 0) AS secs,
+                   COALESCE(a.title, t.album, ph.album) AS album_title,
+                   COALESCE(ar.name, t.artist, ph.subtitle) AS artist_name,
+                   t.album_id AS local_album_id,
+                   a.artist_id AS local_artist_id,
+                   ph.external_id AS ext,
+                   ph.path AS path,
+                   COALESCE(art.thumb_320_path, art.thumb_96_path, art.original_path) AS thumb
+            FROM play_history ph
+            LEFT JOIN tracks   t   ON t.id = ph.track_id
+            LEFT JOIN albums   a   ON a.id = t.album_id
+            LEFT JOIN artists  ar  ON ar.id = a.artist_id
+            LEFT JOIN artworks art ON art.id = a.artwork_id
+            WHERE ph.media_type = 'track'
+              AND COALESCE(ph.position_seconds, 0) > 0
+              AND TRIM(COALESCE(a.title, t.album, ph.album, '')) != ''
+              {(sinceUnix.HasValue ? "AND ph.started_at >= $since" : string.Empty)};
+            """;
+        if (sinceUnix.HasValue)
+            cmd.Parameters.AddWithValue("$since", sinceUnix.Value);
+
+        using var r = cmd.ExecuteReader();
+        while (r.Read())
+        {
+            double secs = r.GetDouble(0);
+            string title = r.GetString(1);
+            string artist = r.IsDBNull(2) ? string.Empty : r.GetString(2);
+            long? albumId = r.IsDBNull(3) ? null : r.GetInt64(3);
+            long? artistId = r.IsDBNull(4) ? null : r.GetInt64(4);
+            string? ext = r.IsDBNull(5) ? null : r.GetString(5);
+            string? path = r.IsDBNull(6) ? null : r.GetString(6);
+            string? thumb = r.IsDBNull(7) ? null : r.GetString(7);
+
+            var key = title.ToLowerInvariant() + "" + artist.ToLowerInvariant();
+            if (!agg.TryGetValue(key, out var acc))
+                agg[key] = acc = new TopAlbumAccumulator { Title = title, Artist = artist };
+            acc.Seconds += secs;
+            // Prefer a local match (album ID + thumbnail) as the representative identity;
+            // otherwise keep the first remote/Plex external ID and path for resolution.
+            if (albumId.HasValue && !acc.LocalAlbumId.HasValue)
+            {
+                acc.LocalAlbumId = albumId;
+                acc.LocalArtistId = artistId;
+                acc.ThumbPath = thumb;
+            }
+            acc.ExternalId ??= ext;
+            acc.Path ??= path;
+        }
+
+        return agg.Values
+            .OrderByDescending(a => a.Seconds)
+            .Take(limit)
+            .Select(a => new TopAlbumStat(
+                a.Title, a.Artist, a.Seconds,
+                a.LocalAlbumId, a.LocalArtistId, a.ThumbPath, a.ExternalId, a.Path))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Aggregates listening time per artist across local, remote Orynivo Server, and Plex
+    /// playback, merging entries by display name. Local matches carry their artist ID for
+    /// in-library navigation; remote/Plex matches carry a representative external ID and
+    /// stream path so they can be resolved when clicked.
+    /// </summary>
+    /// <param name="limit">Maximum number of artists to return.</param>
+    /// <param name="sinceUnix">Optional inclusive lower bound on the playback start (Unix seconds); <see langword="null"/> means all time.</param>
+    /// <returns>Artists ordered by total play time descending.</returns>
+    public List<TopArtistStat> GetTopArtists(int limit = 10, long? sinceUnix = null)
+    {
+        var agg = new Dictionary<string, TopArtistAccumulator>(StringComparer.Ordinal);
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = $"""
+            SELECT COALESCE(ph.position_seconds, 0) AS secs,
+                   COALESCE(ar.name, t.artist, ph.subtitle) AS artist_name,
+                   t.artist_id AS local_artist_id,
+                   ph.external_id AS ext,
+                   ph.path AS path
+            FROM play_history ph
+            LEFT JOIN tracks  t  ON t.id = ph.track_id
+            LEFT JOIN artists ar ON ar.id = t.artist_id
+            WHERE ph.media_type = 'track'
+              AND COALESCE(ph.position_seconds, 0) > 0
+              AND TRIM(COALESCE(ar.name, t.artist, ph.subtitle, '')) != ''
+              {(sinceUnix.HasValue ? "AND ph.started_at >= $since" : string.Empty)};
+            """;
+        if (sinceUnix.HasValue)
+            cmd.Parameters.AddWithValue("$since", sinceUnix.Value);
+
+        using var r = cmd.ExecuteReader();
+        while (r.Read())
+        {
+            double secs = r.GetDouble(0);
+            string name = r.GetString(1);
+            long? artistId = r.IsDBNull(2) ? null : r.GetInt64(2);
+            string? ext = r.IsDBNull(3) ? null : r.GetString(3);
+            string? path = r.IsDBNull(4) ? null : r.GetString(4);
+
+            var key = name.ToLowerInvariant();
+            if (!agg.TryGetValue(key, out var acc))
+                agg[key] = acc = new TopArtistAccumulator { Name = name };
+            acc.Seconds += secs;
+            if (artistId.HasValue && !acc.LocalArtistId.HasValue)
+                acc.LocalArtistId = artistId;
+            acc.ExternalId ??= ext;
+            acc.Path ??= path;
+        }
+
+        return agg.Values
+            .OrderByDescending(a => a.Seconds)
+            .Take(limit)
+            .Select(a => new TopArtistStat(a.Name, a.Seconds, a.LocalArtistId, a.ExternalId, a.Path))
+            .ToList();
+    }
+
+    /// <summary>Mutable accumulator used while aggregating <see cref="GetTopAlbums"/>.</summary>
+    private sealed class TopAlbumAccumulator
+    {
+        /// <summary>Gets or sets the album display title.</summary>
+        public string Title { get; set; } = string.Empty;
+        /// <summary>Gets or sets the album artist display name.</summary>
+        public string Artist { get; set; } = string.Empty;
+        /// <summary>Gets or sets the accumulated listened seconds.</summary>
+        public double Seconds { get; set; }
+        /// <summary>Gets or sets the local album identifier when matched.</summary>
+        public long? LocalAlbumId { get; set; }
+        /// <summary>Gets or sets the local album-artist identifier when known.</summary>
+        public long? LocalArtistId { get; set; }
+        /// <summary>Gets or sets the local artwork thumbnail path when available.</summary>
+        public string? ThumbPath { get; set; }
+        /// <summary>Gets or sets the representative external identifier for remote/Plex resolution.</summary>
+        public string? ExternalId { get; set; }
+        /// <summary>Gets or sets the representative playback path for remote/Plex resolution.</summary>
+        public string? Path { get; set; }
+    }
+
+    /// <summary>Mutable accumulator used while aggregating <see cref="GetTopArtists"/>.</summary>
+    private sealed class TopArtistAccumulator
+    {
+        /// <summary>Gets or sets the artist display name.</summary>
+        public string Name { get; set; } = string.Empty;
+        /// <summary>Gets or sets the accumulated listened seconds.</summary>
+        public double Seconds { get; set; }
+        /// <summary>Gets or sets the local artist identifier when matched.</summary>
+        public long? LocalArtistId { get; set; }
+        /// <summary>Gets or sets the representative external identifier for remote/Plex resolution.</summary>
+        public string? ExternalId { get; set; }
+        /// <summary>Gets or sets the representative playback path for remote/Plex resolution.</summary>
+        public string? Path { get; set; }
     }
 
     public void Dispose() => _conn.Dispose();

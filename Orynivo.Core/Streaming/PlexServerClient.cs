@@ -27,7 +27,9 @@ public sealed record PlexMediaItem(
     long? DurationMilliseconds,
     string? Format,
     IReadOnlyList<string> PartKeys,
-    bool IsFolder);
+    bool IsFolder,
+    string? ParentRatingKey = null,
+    string? GrandparentRatingKey = null);
 
 public sealed record PlexMediaPage(IReadOnlyList<PlexMediaItem> Items, int TotalSize);
 
@@ -208,7 +210,9 @@ public sealed class PlexServerClient
                 GetLong(item, "duration"),
                 GetString(media, "container") ?? GetString(media, "audioCodec"),
                 partKeys,
-                string.IsNullOrWhiteSpace(ratingKey));
+                string.IsNullOrWhiteSpace(ratingKey),
+                GetString(item, "parentRatingKey"),
+                GetString(item, "grandparentRatingKey"));
         }).Where(item => item.Title.Length > 0).ToList();
         return new PlexMediaPage(items, totalSize);
     }
