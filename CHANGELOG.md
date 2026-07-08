@@ -23,6 +23,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   their own library (local, remote, or Plex).
 - Added a source filter (Tracks / Radio / Podcasts / Remote / Plex) to the daily
   playback-history dialog; only the categories present that day are shown.
+- AI chat messages are now copyable: text is selectable (Ctrl+C) and each user
+  and assistant bubble has a copy button that copies the whole message.
 - Playback history now stores a stable Plex context (server plus track, album, and
   artist rating keys) so Plex history entries stay identifiable and their albums
   and artists are clickable throughout the history and dashboard statistics.
@@ -44,11 +46,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - AI chat: assistant messages now render inline Markdown (bold, italic, inline
   code, and links) as styled text instead of showing raw `**markers**`, including
   inside numbered and bulleted lists and block quotes.
-- AI chat: the input row no longer overlaps the newest messages. The chat view
-  was spanning the content grid's Auto intro-card row, which left its message
-  `ScrollViewer` measured with an unbounded height so it consumed the input row's
-  space; it now sits in the bounded content row, and auto-scroll runs after
-  layout so the last lines stay visible above the input.
+- AI chat: the last lines of a streamed reply are no longer left clipped at the
+  input edge. The chat view sits in the bounded content row (it no longer spans
+  the Auto intro-card row), and auto-scroll re-pins to the true bottom whenever
+  the message list's extent grows (via the `ScrollChanged` event, which — unlike
+  `LayoutUpdated` on the `ScrollViewer` — reliably fires as the streamed reply
+  grows). The "stick to bottom" state is released only by a real mouse-wheel
+  gesture, so the constant re-layout of the streamed Markdown no longer disables
+  auto-scroll; scrolling up still pauses it so earlier messages stay readable.
+  A dedicated bottom anchor and explicit Markdown renderer measure invalidation
+  keep the final rendered lines visible after formatted content settles.
 
 ## [0.23.3] - 2026-07-05
 

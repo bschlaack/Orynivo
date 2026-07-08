@@ -335,6 +335,7 @@ public static class LocalizationManager
         resources["L_AiChatInputPlaceholder"]  = Current.AiChatInputPlaceholder;
         resources["L_AiChatSend"]              = Current.AiChatSend;
         resources["L_AiChatClear"]             = Current.AiChatClear;
+        resources["L_AiChatCopy"]              = Current.AiChatCopy;
         resources["L_AiChatNotEnabled"]        = Current.AiChatNotEnabled;
         resources["L_AiChatEmptyResponse"]     = Current.AiChatEmptyResponse;
         resources["L_AiChatToolResultFallback"] = Current.AiChatToolResultFallback;
@@ -796,6 +797,7 @@ public static class LocalizationManager
         , AiChatInputPlaceholder = "Frage stellen …"
         , AiChatSend            = "Senden"
         , AiChatClear           = "Löschen"
+        , AiChatCopy            = "Kopieren"
         , AiChatNotEnabled      = "KI-Chat ist nicht aktiviert. Bitte unter Einstellungen › KI-Chat aktivieren."
         , AiChatEmptyResponse   = "Das Modell hat eine leere Antwort zurückgegeben."
         , AiChatToolResultFallback = "Das Modell hat nach dem Tool-Aufruf keine finale Antwort erzeugt. Tool-Ergebnis:"
@@ -1237,6 +1239,7 @@ public static class LocalizationManager
         , AiChatInputPlaceholder = "Ask a question …"
         , AiChatSend            = "Send"
         , AiChatClear           = "Clear"
+        , AiChatCopy            = "Copy"
         , AiChatNotEnabled      = "AI Chat is not enabled. Enable it in Settings › AI Chat."
         , AiChatEmptyResponse   = "The model returned an empty answer."
         , AiChatToolResultFallback = "The model did not return a final answer after the tool call. Tool result:"
@@ -1681,6 +1684,7 @@ public static class LocalizationManager
         , AiChatInputPlaceholder = "Posez une question …"
         , AiChatSend            = "Envoyer"
         , AiChatClear           = "Effacer"
+        , AiChatCopy            = "Copier"
         , AiChatNotEnabled      = "Le Chat IA n'est pas activé. Activez-le dans Paramètres › Chat IA."
         , AiChatEmptyResponse   = "Le modèle a renvoyé une réponse vide."
         , AiChatToolResultFallback = "Le modèle n'a pas renvoyé de réponse finale après l'appel d'outil. Résultat de l'outil :"
@@ -2122,6 +2126,7 @@ public static class LocalizationManager
         , AiChatInputPlaceholder = "Haz una pregunta …"
         , AiChatSend            = "Enviar"
         , AiChatClear           = "Borrar"
+        , AiChatCopy            = "Copiar"
         , AiChatNotEnabled      = "El Chat IA no está activado. Actívalo en Ajustes › Chat IA."
         , AiChatEmptyResponse   = "El modelo devolvió una respuesta vacía."
         , AiChatToolResultFallback = "El modelo no devolvió una respuesta final después de llamar a la herramienta. Resultado de la herramienta:"

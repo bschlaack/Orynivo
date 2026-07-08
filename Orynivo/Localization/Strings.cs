@@ -779,6 +779,8 @@ public sealed record LocalizedStrings(
     public string AiChatSend { get; init; } = "";
     /// <summary>Gets the clear-conversation button label.</summary>
     public string AiChatClear { get; init; } = "";
+    /// <summary>Gets the copy-message button tooltip.</summary>
+    public string AiChatCopy { get; init; } = "";
     /// <summary>Gets the message shown when AI chat is not enabled in settings.</summary>
     public string AiChatNotEnabled { get; init; } = "";
     /// <summary>Gets the message shown when the model returns no answer text.</summary>

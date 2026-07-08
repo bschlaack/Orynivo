@@ -107,6 +107,10 @@ internal sealed partial class MarkdownTextBlock : UserControl
         FlushParagraph(paragraph);
         if (inCode && code.Count > 0)
             AddCodeBlock(string.Join(Environment.NewLine, code));
+
+        _panel.InvalidateMeasure();
+        InvalidateMeasure();
+        InvalidateArrange();
     }
 
     /// <summary>Flushes pending paragraph lines into one wrapped text block.</summary>
@@ -249,7 +253,7 @@ internal sealed partial class MarkdownTextBlock : UserControl
     /// <returns>The configured text block.</returns>
     private TextBlock CreateText(string text, double fontSize, FontWeight fontWeight)
     {
-        var block = new TextBlock
+        var block = new SelectableTextBlock
         {
             TextWrapping = TextWrapping.Wrap,
             FontSize = fontSize,
@@ -269,7 +273,7 @@ internal sealed partial class MarkdownTextBlock : UserControl
     /// <returns>The configured text block.</returns>
     private TextBlock CreateLiteralText(string text, double fontSize)
     {
-        var block = new TextBlock
+        var block = new SelectableTextBlock
         {
             Text = text,
             TextWrapping = TextWrapping.Wrap,

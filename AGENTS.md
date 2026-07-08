@@ -462,9 +462,19 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   tool-call status centered and muted; streams tokens into the last assistant
   message; Enter sends, Shift+Enter inserts a newline; Clear button wipes
   history and resets `AiChatService`; `SetBridge(McpPlayerBridge)` wires the
-  executor; `GetSettings` delegate is read on each send. Auto-scroll posts
-  `ScrollToEnd` at `DispatcherPriority.Background` so it runs after the streamed
-  message is laid out and the last lines are never hidden behind the input box.
+  executor; `GetSettings` delegate is read on each send. Messages are copyable:
+  user bubbles use `SelectableTextBlock`, assistant bubbles render selectable
+  Markdown, and each bubble has a copy button (`CopyMessage_OnClick` → the
+  `TopLevel` clipboard). Auto-scroll is robust: while `_stickToBottom`, the message
+  `ScrollViewer` is re-pinned to the true bottom from its `ScrollChanged` handler
+  (which — unlike `LayoutUpdated` on the `ScrollViewer`, that does not fire when
+  only the content's extent grows — reliably fires as the streamed reply grows;
+  `LayoutUpdated` is kept as a backup). `_stickToBottom` is released ONLY by a real
+  mouse-wheel gesture (`PointerWheelChanged` tunnel handler), never from
+  `ScrollChanged`/offset changes, so the constant re-layout of the streamed
+  Markdown cannot be misread as a manual scroll-up and disable auto-scroll. The
+  view is hosted in the bounded content row (`Grid.Row="2"`), never spanning the
+  Auto intro-card row, so its `ScrollViewer` is measured with a bounded height.
 - `Orynivo/AI/MarkdownTextBlock.cs`: lightweight Markdown renderer for assistant
   messages. Block level: headings, bullet/numbered lists, block quotes, dividers,
   and fenced code blocks (rendered verbatim). Inline level (`AppendInlines`):
