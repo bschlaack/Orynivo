@@ -44,9 +44,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - AI chat: assistant messages now render inline Markdown (bold, italic, inline
   code, and links) as styled text instead of showing raw `**markers**`, including
   inside numbered and bulleted lists and block quotes.
-- AI chat: the message list now reliably scrolls to the very bottom while a
-  response streams in, so the newest lines are no longer left hidden behind the
-  input box.
+- AI chat: the input row no longer overlaps the newest messages. The chat view
+  was spanning the content grid's Auto intro-card row, which left its message
+  `ScrollViewer` measured with an unbounded height so it consumed the input row's
+  space; it now sits in the bounded content row, and auto-scroll runs after
+  layout so the last lines stay visible above the input.
 
 ## [0.23.3] - 2026-07-05
 

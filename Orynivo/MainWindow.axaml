@@ -1482,10 +1482,14 @@
                 <StackPanel x:Name="DashboardPanel" Margin="28,24,28,28"/>
             </ScrollViewer>
 
-            <!-- AI Chat -->
+            <!-- AI Chat.
+                 Placed only in the star row (not spanning the Auto intro-card row):
+                 a *-height ScrollViewer that spans an Auto row is measured with an
+                 unbounded height, which lets the message list eat the input row's
+                 space so the input overlaps the newest messages. The intro card in
+                 row 1 is hidden for the AI chat, so row 2 alone is correct. -->
             <ai:AiChatView x:Name="AiChatViewControl"
-                           Grid.Row="1"
-                           Grid.RowSpan="2"
+                           Grid.Row="2"
                            IsVisible="False"
                            ZIndex="15"/>
 
