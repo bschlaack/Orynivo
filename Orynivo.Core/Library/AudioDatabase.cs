@@ -515,6 +515,44 @@ public sealed class AudioDatabase : IDisposable
         cmd.ExecuteNonQuery();
     }
 
+    /// <summary>Stores an album-level ReplayGain value for selected tracks.</summary>
+    /// <param name="trackIds">Database track identifiers to update.</param>
+    /// <param name="albumGain">Album-level ReplayGain value in dB text form.</param>
+    /// <param name="onlyMissing">When true, existing album ReplayGain values are preserved.</param>
+    /// <returns>The number of rows updated.</returns>
+    public int UpdateReplayGainAlbumForTracks(
+        IEnumerable<long> trackIds,
+        string albumGain,
+        bool onlyMissing = true)
+    {
+        var ids = trackIds.Distinct().ToList();
+        if (ids.Count == 0 || string.IsNullOrWhiteSpace(albumGain))
+            return 0;
+
+        var updated = 0;
+        foreach (var batch in ids.Chunk(500))
+        {
+            using var cmd = _conn.CreateCommand();
+            var parameters = batch.Select((id, index) =>
+            {
+                var name = $"$id{index}";
+                Add(cmd, name, id);
+                return name;
+            }).ToList();
+            cmd.CommandText = $"""
+                UPDATE tracks
+                SET replay_gain_album = $album_gain
+                WHERE id IN ({string.Join(", ", parameters)})
+                  AND ($only_missing = 0 OR replay_gain_album IS NULL OR TRIM(replay_gain_album) = '');
+                """;
+            Add(cmd, "$album_gain", albumGain);
+            Add(cmd, "$only_missing", onlyMissing ? 1 : 0);
+            updated += cmd.ExecuteNonQuery();
+        }
+
+        return updated;
+    }
+
     /// <summary>Stores downloaded plain and synchronised lyrics for the track with the given identifier.</summary>
     /// <param name="trackId">Database identifier of the track to update.</param>
     /// <param name="plainLyrics">Unsynchronised plain-text lyrics, or <see langword="null"/>.</param>

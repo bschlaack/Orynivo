@@ -1,4 +1,6 @@
 using System.IO;
+using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Net.Http;
 using Orynivo.Audio;
@@ -220,13 +222,15 @@ public static class LibraryScanner
                 var fi = new FileInfo(filePath);
                 long modifiedAt = new DateTimeOffset(fi.LastWriteTimeUtc).ToUnixTimeSeconds();
 
-                if (!refreshReplayGainMetadata &&
-                    timestamps.TryGetValue(filePath, out long knownModified) &&
-                    knownModified == modifiedAt)
+                var metadataChanged = !timestamps.TryGetValue(filePath, out long knownModified) ||
+                                      knownModified != modifiedAt;
+                if (!refreshReplayGainMetadata && !metadataChanged)
                     continue;
 
                 bool isNew = !timestamps.ContainsKey(filePath);
                 var record = BuildRecord(filePath, fi, modifiedAt, now, out _);
+                if (metadataChanged)
+                    EnsureReplayGain(record, ct);
                 db.Upsert(record);
                 changedTracks.Add(db.GetByPath(filePath) ?? record);
 
@@ -244,7 +248,9 @@ public static class LibraryScanner
             progress?.Report(new ScanProgress(files.Count + 1, total, cueGroup.Key));
             try
             {
-                var records = BuildCueRecords(cueGroup.Key, cueGroup.ToList(), now);
+                var calculateReplayGain = cueGroup.Any(definition =>
+                    db.GetByPath(definition.VirtualPath) is not { ReplayGainTrack: { Length: > 0 } });
+                var records = BuildCueRecords(cueGroup.Key, cueGroup.ToList(), now, ct, calculateReplayGain);
                 foreach (var record in records)
                 {
                     var isNew = db.GetByPath(record.Path) is null;
@@ -265,6 +271,7 @@ public static class LibraryScanner
             }
         }
 
+        changedTracks.AddRange(EnsureAlbumReplayGain(db, changedTracks, ct));
         if (changedTracks.Count > 0)
             TrackSearchIndex.UpdateMany(changedTracks);
         var existing = new HashSet<string>(
@@ -343,7 +350,7 @@ public static class LibraryScanner
                 var definitions = CueSheetParser.Parse(path)
                     .Where(definition => System.IO.File.Exists(definition.SourcePath))
                     .ToList();
-                var records = BuildCueRecords(path, definitions, now);
+                var records = BuildCueRecords(path, definitions, now, cancellationToken, calculateMissingReplayGain: true);
                 foreach (var cueRecord in records)
                 {
                     db.Upsert(cueRecord);
@@ -367,7 +374,7 @@ public static class LibraryScanner
                             .Where(definition => System.IO.File.Exists(definition.SourcePath))
                             .ToList()
                         : [];
-                    var records = BuildCueRecords(cuePath, definitions, now);
+                    var records = BuildCueRecords(cuePath, definitions, now, cancellationToken, calculateMissingReplayGain: true);
                     foreach (var cueRecord in records)
                     {
                         db.Upsert(cueRecord);
@@ -409,6 +416,7 @@ public static class LibraryScanner
                         }
                         break;
                     }
+                    EnsureReplayGain(candidate, cancellationToken);
                     record = candidate;
                 }
                 catch (IOException) when (attempt < 3)
@@ -427,6 +435,8 @@ public static class LibraryScanner
             db.Upsert(record);
             updatedTracks.Add(db.GetByPath(path) ?? record);
         }
+
+        updatedTracks.AddRange(EnsureAlbumReplayGain(db, updatedTracks, cancellationToken));
 
         if (updatedTracks.Count > 0)
             TrackSearchIndex.UpdateMany(updatedTracks);
@@ -587,7 +597,9 @@ public static class LibraryScanner
     private static List<TrackRecord> BuildCueRecords(
         string cuePath,
         IReadOnlyList<CueTrackDefinition> definitions,
-        long addedAt)
+        long addedAt,
+        CancellationToken cancellationToken,
+        bool calculateMissingReplayGain)
     {
         var cueModified = new DateTimeOffset(System.IO.File.GetLastWriteTimeUtc(cuePath)).ToUnixTimeSeconds();
         var result = new List<TrackRecord>(definitions.Count);
@@ -618,10 +630,264 @@ public static class LibraryScanner
             record.Year = definition.Year ?? record.Year;
             record.TrackNumber = definition.Number;
             record.TrackTotal = definitions.Count;
+            if (calculateMissingReplayGain)
+                EnsureReplayGain(record, cancellationToken);
             result.Add(record);
         }
         return result;
     }
+
+    private static void EnsureReplayGain(TrackRecord record, CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(record.ReplayGainTrack))
+            return;
+
+        var sourcePath = string.IsNullOrWhiteSpace(record.SourcePath) ? record.Path : record.SourcePath;
+        if (string.IsNullOrWhiteSpace(sourcePath) || !System.IO.File.Exists(sourcePath))
+            return;
+
+        try
+        {
+            record.ReplayGainTrack = AnalyzeReplayGainTrack(
+                sourcePath,
+                record.SegmentStart,
+                record.SegmentEnd,
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            // ReplayGain analysis is opportunistic; a failed analyzer must not fail the library scan.
+        }
+    }
+
+    private static string? AnalyzeReplayGainTrack(
+        string sourcePath,
+        double? segmentStart,
+        double? segmentEnd,
+        CancellationToken cancellationToken,
+        Action<IList<string>>? configureInputArguments = null)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "ffmpeg",
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WorkingDirectory = FfmpegLocator.GetSafeWorkingDirectory()
+        };
+        AddReplayGainArguments(startInfo, sourcePath, segmentStart, segmentEnd, configureInputArguments);
+
+        using var process = Process.Start(startInfo);
+
+        if (process is null)
+            return null;
+
+        try
+        {
+            var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+            var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            process.WaitForExitAsync(cancellationToken).GetAwaiter().GetResult();
+            _ = stdoutTask.GetAwaiter().GetResult();
+
+            var stderr = stderrTask.GetAwaiter().GetResult();
+            if (process.ExitCode != 0)
+                return null;
+
+            return ParseReplayGainTrack(stderr);
+        }
+        catch
+        {
+            TryKill(process);
+            throw;
+        }
+    }
+
+    private static void AddReplayGainArguments(
+        ProcessStartInfo startInfo,
+        string sourcePath,
+        double? segmentStart,
+        double? segmentEnd,
+        Action<IList<string>>? configureInputArguments)
+    {
+        if (segmentStart is > 0)
+        {
+            startInfo.ArgumentList.Add("-ss");
+            startInfo.ArgumentList.Add(segmentStart.Value.ToString("F6", CultureInfo.InvariantCulture));
+        }
+
+        configureInputArguments?.Invoke(startInfo.ArgumentList);
+        startInfo.ArgumentList.Add("-i");
+        startInfo.ArgumentList.Add(sourcePath);
+
+        if (segmentStart is double start && segmentEnd is double end && end > start)
+        {
+            startInfo.ArgumentList.Add("-t");
+            startInfo.ArgumentList.Add((end - start).ToString("F6", CultureInfo.InvariantCulture));
+        }
+
+        startInfo.ArgumentList.Add("-map");
+        startInfo.ArgumentList.Add("0:a:0");
+        startInfo.ArgumentList.Add("-af");
+        startInfo.ArgumentList.Add("replaygain");
+        startInfo.ArgumentList.Add("-f");
+        startInfo.ArgumentList.Add("null");
+        startInfo.ArgumentList.Add("-");
+    }
+
+    private static string? ParseReplayGainTrack(string stderr)
+    {
+        foreach (var line in stderr.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            const string marker = "track_gain =";
+            var markerIndex = line.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            if (markerIndex < 0)
+                continue;
+
+            var value = line[(markerIndex + marker.Length)..].Trim();
+            if (value.EndsWith("dB", StringComparison.OrdinalIgnoreCase))
+                value = value[..^2].Trim();
+
+            if (double.TryParse(value, NumberStyles.Float | NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var gain) &&
+                double.IsFinite(gain))
+            {
+                return FormatReplayGain(gain);
+            }
+        }
+
+        return null;
+    }
+
+    private static void TryKill(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+                process.Kill(entireProcessTree: true);
+        }
+        catch
+        {
+            // Best effort cleanup only.
+        }
+    }
+
+    private static List<TrackRecord> EnsureAlbumReplayGain(
+        AudioDatabase db,
+        IReadOnlyCollection<TrackRecord> changedTracks,
+        CancellationToken cancellationToken)
+    {
+        if (changedTracks.Count == 0)
+            return [];
+
+        var changedRows = db.GetTrackListByPaths(changedTracks.Select(track => track.Path));
+        var albumIds = changedRows
+            .Select(track => track.AlbumId)
+            .Where(id => id.HasValue)
+            .Select(id => id!.Value)
+            .Distinct()
+            .ToList();
+        if (albumIds.Count == 0)
+            return [];
+
+        var updated = new List<TrackRecord>();
+        foreach (var albumId in albumIds)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var albumRows = db.GetTrackListByAlbum(albumId);
+            if (albumRows.Count == 0 || albumRows.All(row => !string.IsNullOrWhiteSpace(row.ReplayGainAlbum)))
+                continue;
+
+            var existingAlbumGain = albumRows
+                .Select(row => row.ReplayGainAlbum)
+                .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+            var albumGain = existingAlbumGain ?? AnalyzeReplayGainAlbum(
+                albumRows
+                    .Select(row => db.GetByPath(row.Path))
+                    .Where(track => track is not null)
+                    .Cast<TrackRecord>()
+                    .ToList(),
+                cancellationToken);
+
+            if (string.IsNullOrWhiteSpace(albumGain))
+                continue;
+
+            var missingIds = albumRows
+                .Where(row => string.IsNullOrWhiteSpace(row.ReplayGainAlbum))
+                .Select(row => row.Id)
+                .ToList();
+            if (db.UpdateReplayGainAlbumForTracks(missingIds, albumGain) == 0)
+                continue;
+
+            updated.AddRange(
+                db.GetTrackListByIds(missingIds)
+                    .Select(row => db.GetByPath(row.Path))
+                    .Where(track => track is not null)
+                    .Cast<TrackRecord>());
+        }
+
+        return updated;
+    }
+
+    private static string? AnalyzeReplayGainAlbum(
+        IReadOnlyList<TrackRecord> tracks,
+        CancellationToken cancellationToken)
+    {
+        var playableTracks = tracks
+            .Where(track =>
+            {
+                var sourcePath = string.IsNullOrWhiteSpace(track.SourcePath) ? track.Path : track.SourcePath;
+                return !string.IsNullOrWhiteSpace(sourcePath) && System.IO.File.Exists(sourcePath);
+            })
+            .OrderBy(track => track.DiscNumber ?? 0)
+            .ThenBy(track => track.TrackNumber ?? 0)
+            .ThenBy(track => track.FileName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (playableTracks.Count == 0)
+            return null;
+
+        var listPath = Path.Combine(Path.GetTempPath(), $"orynivo-rg-{Guid.NewGuid():N}.ffconcat");
+        try
+        {
+            WriteReplayGainConcatFile(listPath, playableTracks);
+            return AnalyzeReplayGainTrack(listPath, null, null, cancellationToken, inputArguments =>
+            {
+                inputArguments.Add("-safe");
+                inputArguments.Add("0");
+                inputArguments.Add("-f");
+                inputArguments.Add("concat");
+            });
+        }
+        finally
+        {
+            try { System.IO.File.Delete(listPath); }
+            catch { }
+        }
+    }
+
+    private static void WriteReplayGainConcatFile(string listPath, IReadOnlyList<TrackRecord> tracks)
+    {
+        using var writer = new StreamWriter(listPath, false, new System.Text.UTF8Encoding(false));
+        writer.WriteLine("ffconcat version 1.0");
+        foreach (var track in tracks)
+        {
+            var sourcePath = string.IsNullOrWhiteSpace(track.SourcePath) ? track.Path : track.SourcePath;
+            writer.WriteLine($"file '{EscapeFfconcatPath(sourcePath)}'");
+            if (track.SegmentStart is double start && start > 0)
+                writer.WriteLine($"inpoint {start.ToString("F6", CultureInfo.InvariantCulture)}");
+            if (track.SegmentEnd is double end && end > 0)
+                writer.WriteLine($"outpoint {end.ToString("F6", CultureInfo.InvariantCulture)}");
+        }
+    }
+
+    private static string EscapeFfconcatPath(string path)
+        => path.Replace("\\", "/", StringComparison.Ordinal)
+            .Replace("'", "'\\''", StringComparison.Ordinal);
 
     private static int RepairMissingAlbumArtwork(IProgress<ScanProgress>? progress, CancellationToken ct)
     {
