@@ -171,6 +171,7 @@ public static class LocalizationManager
         resources["L_OutputProfileDeleteConfirm"] = Current.OutputProfileDeleteConfirm;
         resources["L_ReplayGain"] = Current.ReplayGain;
         resources["L_ReplayGainHint"] = Current.ReplayGainHint;
+        resources["L_CalculateReplayGain"] = Current.CalculateReplayGain;
         resources["L_NonGaplessCrossfade"] = Current.NonGaplessCrossfade;
         resources["L_NonGaplessCrossfadeHint"] = Current.NonGaplessCrossfadeHint;
         resources["L_ReplayGainBadge"] = Current.ReplayGainBadge;
@@ -464,6 +465,10 @@ public static class LocalizationManager
         ReplayGainOff = "Aus",
         ReplayGainTrack = "Track",
         ReplayGainAlbum = "Album",
+        CalculateReplayGain = "Fehlendes ReplayGain berechnen",
+        ReplayGainCalculating = "ReplayGain wird berechnet …",
+        ReplayGainCalculated = "ReplayGain berechnet: {0} Tracks aktualisiert.",
+        ReplayGainCalculationFailed = "ReplayGain-Berechnung fehlgeschlagen: {0}",
         NonGaplessCrossfade = "Fade für nicht-gapless Queues (Sekunden)",
         NonGaplessCrossfadeHint = "0 deaktiviert den Übergang. Gilt nur für Queue-Wechsel, die nicht bereits über die Gapless-PCM-Engine laufen.",
         ReplayGainBadge = "RG",
@@ -941,6 +946,10 @@ public static class LocalizationManager
         ReplayGain = "ReplayGain volume adjustment",
         ReplayGainHint = "Applies to PCM playback. Track mode prefers track gain; album mode prefers album gain. Native DSD output remains bit-perfect.",
         ReplayGainOff = "Off", ReplayGainTrack = "Track", ReplayGainAlbum = "Album",
+        CalculateReplayGain = "Calculate missing ReplayGain",
+        ReplayGainCalculating = "Calculating ReplayGain …",
+        ReplayGainCalculated = "ReplayGain calculated: {0} tracks updated.",
+        ReplayGainCalculationFailed = "ReplayGain calculation failed: {0}",
         NonGaplessCrossfade = "Fade for non-gapless queues (seconds)",
         NonGaplessCrossfadeHint = "0 disables the transition. Applies only to queue changes that are not already handled by the gapless PCM engine.",
         ReplayGainBadge = "RG",
@@ -1414,6 +1423,10 @@ public static class LocalizationManager
         ReplayGain = "Ajustement du volume ReplayGain",
         ReplayGainHint = "S’applique à la lecture PCM. Le mode piste privilégie le gain de piste, le mode album le gain d’album. La sortie DSD native reste bit-perfect.",
         ReplayGainOff = "Désactivé", ReplayGainTrack = "Piste", ReplayGainAlbum = "Album",
+        CalculateReplayGain = "Calculer les ReplayGain manquants",
+        ReplayGainCalculating = "Calcul des ReplayGain …",
+        ReplayGainCalculated = "ReplayGain calculé : {0} pistes mises à jour.",
+        ReplayGainCalculationFailed = "Échec du calcul ReplayGain : {0}",
         NonGaplessCrossfade = "Fondu pour files non gapless (secondes)",
         NonGaplessCrossfadeHint = "0 désactive la transition. S’applique uniquement aux changements de file qui ne passent pas déjà par le moteur PCM gapless.",
         ReplayGainBadge = "RG",
@@ -1884,6 +1897,10 @@ public static class LocalizationManager
         ReplayGain = "Ajuste de volumen ReplayGain",
         ReplayGainHint = "Se aplica a la reproducción PCM. El modo pista prioriza la ganancia de pista y el modo álbum la ganancia de álbum. La salida DSD nativa sigue siendo bit-perfect.",
         ReplayGainOff = "Desactivado", ReplayGainTrack = "Pista", ReplayGainAlbum = "Álbum",
+        CalculateReplayGain = "Calcular ReplayGain faltante",
+        ReplayGainCalculating = "Calculando ReplayGain …",
+        ReplayGainCalculated = "ReplayGain calculado: {0} pistas actualizadas.",
+        ReplayGainCalculationFailed = "Error al calcular ReplayGain: {0}",
         NonGaplessCrossfade = "Fundido para colas sin gapless (segundos)",
         NonGaplessCrossfadeHint = "0 desactiva la transición. Solo se aplica a cambios de cola que no usa ya el motor PCM gapless.",
         ReplayGainBadge = "RG",

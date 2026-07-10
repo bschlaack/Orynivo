@@ -203,6 +203,14 @@ public sealed record LocalizedStrings(
     public string ReplayGainTrack { get; init; } = "";
     /// <summary>Gets the album ReplayGain mode label.</summary>
     public string ReplayGainAlbum { get; init; } = "";
+    /// <summary>Gets the button label for calculating missing ReplayGain metadata.</summary>
+    public string CalculateReplayGain { get; init; } = "";
+    /// <summary>Gets the status text shown while missing ReplayGain metadata is calculated.</summary>
+    public string ReplayGainCalculating { get; init; } = "";
+    /// <summary>Gets the completion text for missing ReplayGain calculation.</summary>
+    public string ReplayGainCalculated { get; init; } = "";
+    /// <summary>Gets the failure text for missing ReplayGain calculation.</summary>
+    public string ReplayGainCalculationFailed { get; init; } = "";
     /// <summary>Gets the settings label for non-gapless queue fade transitions.</summary>
     public string NonGaplessCrossfade { get; init; } = "";
     /// <summary>Gets the explanatory text for non-gapless queue fade transitions.</summary>

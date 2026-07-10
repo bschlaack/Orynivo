@@ -8,7 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Library scans now calculate missing ReplayGain track and album values with
+  FFmpeg when files do not provide ReplayGain tags. Settings > Playback also has
+  a manual "Calculate missing ReplayGain" action to backfill existing local
+  tracks without overwriting existing metadata.
+
 ### Fixed
+
+- Plex and Orynivo Server "Test connection" buttons now size to their localized
+  text instead of clipping longer labels.
 
 ## [0.24.0] - 2026-07-08
 

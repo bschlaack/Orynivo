@@ -496,6 +496,20 @@
                                FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"/>
+                    <Button x:Name="CalculateReplayGainButton"
+                            MinWidth="230"
+                            Height="30"
+                            Padding="12,0"
+                            HorizontalAlignment="Left"
+                            Margin="0,10,0,0"
+                            Theme="{StaticResource SettingsButtonTheme}"
+                            Content="{DynamicResource L_CalculateReplayGain}"
+                            Click="CalculateReplayGainButton_OnClick"/>
+                    <TextBlock x:Name="ReplayGainCalculationStatusTextBlock"
+                               Margin="0,8,0,0"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppSecondaryTextBrush}"
+                               TextWrapping="Wrap"/>
 
                     <Separator Margin="0,18,0,14"/>
 

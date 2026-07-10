@@ -108,6 +108,30 @@ public static class LibraryScanner
         => Task.Run(() => RepairMissingAlbumArtwork(progress, cancellationToken), cancellationToken);
 
     /// <summary>
+    /// Calculates missing ReplayGain track and album values for tracks already present in the database.
+    /// Existing ReplayGain values are preserved.
+    /// </summary>
+    /// <param name="progress">Optional progress callback.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Number of track rows that received at least one ReplayGain value.</returns>
+    public static async Task<int> CalculateMissingReplayGainAsync(
+        IProgress<ScanProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        await ScanGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await Task.Run(
+                () => CalculateMissingReplayGain(progress, cancellationToken),
+                cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            ScanGate.Release();
+        }
+    }
+
+    /// <summary>
     /// Re-reads embedded artwork for one album that is missing artwork in the database.
     /// </summary>
     /// <param name="albumId">Identifier of the album to repair.</param>
@@ -443,6 +467,60 @@ public static class LibraryScanner
         if (removedPaths.Count > 0)
             TrackSearchIndex.RemovePaths(removedPaths);
         return updatedTracks.Count > 0 || removedPaths.Count > 0;
+    }
+
+    private static int CalculateMissingReplayGain(
+        IProgress<ScanProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        using var db = AudioDatabase.OpenDefault();
+        var rows = db.GetTrackList()
+            .Where(row => string.IsNullOrWhiteSpace(row.ReplayGainTrack) ||
+                          string.IsNullOrWhiteSpace(row.ReplayGainAlbum))
+            .ToList();
+        if (rows.Count == 0)
+            return 0;
+
+        var updatedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var albumSeedTracks = new List<TrackRecord>();
+        for (var i = 0; i < rows.Count; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var row = rows[i];
+            progress?.Report(new ScanProgress(i + 1, rows.Count, row.Path));
+
+            var track = db.GetByPath(row.Path);
+            if (track is null)
+                continue;
+
+            if (string.IsNullOrWhiteSpace(row.ReplayGainTrack))
+            {
+                EnsureReplayGain(track, cancellationToken);
+                if (!string.IsNullOrWhiteSpace(track.ReplayGainTrack) &&
+                    db.UpdateReplayGainTrack(row.Id, track.ReplayGainTrack))
+                {
+                    updatedPaths.Add(row.Path);
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(row.ReplayGainAlbum))
+                albumSeedTracks.Add(track);
+        }
+
+        foreach (var updatedTrack in EnsureAlbumReplayGain(db, albumSeedTracks, cancellationToken))
+            updatedPaths.Add(updatedTrack.Path);
+
+        if (updatedPaths.Count > 0)
+        {
+            var updatedTracks = updatedPaths
+                .Select(db.GetByPath)
+                .Where(track => track is not null)
+                .Cast<TrackRecord>()
+                .ToList();
+            TrackSearchIndex.UpdateMany(updatedTracks);
+        }
+
+        return updatedPaths.Count;
     }
 
     private static bool DeleteTrackAndWaveform(AudioDatabase db, string path)

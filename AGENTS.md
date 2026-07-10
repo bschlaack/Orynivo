@@ -1002,7 +1002,14 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   the virtual path so tracks sharing one source remain distinct.
 - Metadata extraction stores track and album ReplayGain values. The first scan
   of each configured root after ReplayGain support was added refreshes unchanged
-    tracks once so existing libraries receive those values.
+  tracks once so existing libraries receive those values. New or changed files
+  that do not contain ReplayGain tags are analysed with FFmpeg during the scan:
+  the scanner calculates missing track gain per file and missing album gain by
+  analysing the affected album as a whole through a temporary FFmpeg concat list.
+  Existing ReplayGain metadata is preserved. Settings > Playback exposes
+  **Calculate missing ReplayGain** to backfill existing local tracks manually;
+  remote Orynivo Server libraries use the same Core scanner when a server scan is
+  started from the Orynivo Server dialog.
 - Opening the database runs a legacy-data migration that normalizes artists,
   albums, and artwork and removes old per-track artwork BLOBs
 - `album_artist_rebuild_v1` rebuilds album assignments strictly from

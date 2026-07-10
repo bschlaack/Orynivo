@@ -553,6 +553,32 @@ public sealed class AudioDatabase : IDisposable
         return updated;
     }
 
+    /// <summary>Stores a track-level ReplayGain value for one track.</summary>
+    /// <param name="trackId">Database track identifier.</param>
+    /// <param name="trackGain">Track-level ReplayGain value in dB text form.</param>
+    /// <param name="onlyMissing">When true, an existing track ReplayGain value is preserved.</param>
+    /// <returns><see langword="true"/> when a row was updated.</returns>
+    public bool UpdateReplayGainTrack(
+        long trackId,
+        string trackGain,
+        bool onlyMissing = true)
+    {
+        if (string.IsNullOrWhiteSpace(trackGain))
+            return false;
+
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            UPDATE tracks
+            SET replay_gain_track = $track_gain
+            WHERE id = $id
+              AND ($only_missing = 0 OR replay_gain_track IS NULL OR TRIM(replay_gain_track) = '');
+            """;
+        Add(cmd, "$track_gain", trackGain);
+        Add(cmd, "$id", trackId);
+        Add(cmd, "$only_missing", onlyMissing ? 1 : 0);
+        return cmd.ExecuteNonQuery() > 0;
+    }
+
     /// <summary>Stores downloaded plain and synchronised lyrics for the track with the given identifier.</summary>
     /// <param name="trackId">Database identifier of the track to update.</param>
     /// <param name="plainLyrics">Unsynchronised plain-text lyrics, or <see langword="null"/>.</param>
