@@ -231,7 +231,7 @@ public partial class MainWindow : Window
 
     private int _dashboardYear;
     private int _dashboardMonth;
-    private StatsPeriod _dashboardStatsPeriod = StatsPeriod.AllTime;
+    private StatsPeriod _dashboardStatsPeriod = StatsPeriod.Last30Days;
     private StackPanel? _calendarInner;
     private bool _dashboardResizeHooked;
     private bool? _dashboardTwoColumnLayout;
@@ -2552,7 +2552,6 @@ public partial class MainWindow : Window
         var strings = LocalizationManager.Current;
         var intro = tag switch
         {
-            "Dashboard" => (strings.DashboardIntroTitle, strings.DashboardIntroHint, "▦"),
             "Artists" => (strings.ArtistsIntroTitle, strings.ArtistsIntroHint, "●"),
             "Albums" => (strings.AlbumsIntroTitle, strings.AlbumsIntroHint, "▣"),
             "Tracks" => (strings.TracksIntroTitle, strings.TracksIntroHint, "♪"),
@@ -11283,7 +11282,7 @@ public partial class MainWindow : Window
             artworkUri));
     }
 
-    private static readonly Color DefaultTransportAccent = Color.Parse("#5BE7C4");
+    private static readonly Color DefaultTransportAccent = Color.Parse("#20D9E8");
 
     /// <summary>
     /// Updates the cover-derived transport accent brush (progress fill, slider

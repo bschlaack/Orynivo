@@ -426,6 +426,20 @@ public sealed record LocalizedStrings(
     public string GreetingEvening { get; init; } = "";
     /// <summary>Gets the dashboard personal-hub tagline shown under the greeting.</summary>
     public string DashboardTagline { get; init; } = "";
+    /// <summary>Gets the small overline above the dashboard greeting.</summary>
+    public string DashboardWelcomeBack { get; init; } = "";
+    /// <summary>Gets the longer dashboard hero invitation.</summary>
+    public string DashboardHeroHint { get; init; } = "";
+    /// <summary>Gets the dashboard random-play action label.</summary>
+    public string DashboardRandomPlayback { get; init; } = "";
+    /// <summary>Gets the dashboard quick-access section title.</summary>
+    public string DashboardQuickAccess { get; init; } = "";
+    /// <summary>Gets the dashboard total-minutes statistic label.</summary>
+    public string DashboardTotalMinutes { get; init; } = "";
+    /// <summary>Gets the abbreviated minutes unit used by the listening chart axis.</summary>
+    public string DashboardMinutesShort { get; init; } = "";
+    /// <summary>Gets the comparison label for the preceding statistics period.</summary>
+    public string PeriodPrevious { get; init; } = "";
     /// <summary>Gets the "show all" action shown on dashboard section headers.</summary>
     public string ShowAll { get; init; } = "";
     public string DevicePcmSampleRates { get; init; } = "";

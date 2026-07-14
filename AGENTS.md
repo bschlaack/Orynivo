@@ -1494,9 +1494,10 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
 - The main window uses a modern sidebar, content area, and full-width transport
   bar
 - The full Orynivo logo appears directly, without a surrounding logo surface, in
-  the startup window and About dialog; the program wordmark appears directly at
-  the top of the main sidebar
-- The 248 px sidebar contains Dashboard, library navigation with local and
+  the startup window and About dialog. The main sidebar uses the linked
+  `Logo/orynivo.png` asset (`Assets/DashboardLogo.png` at runtime) as its
+  wordmark.
+- The 260 px sidebar contains Dashboard, library navigation with local and
   Orynivo Server playlists, device information, About, and Settings
 - Library, personal radio, pinned podcast, and Plex server sidebar groups use
   independently expandable accordion headers; local playlists are a nested
@@ -1529,12 +1530,14 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
 - The content header continues the native title-bar/sidebar appearance and shows
   title, count, search, filters, or album mode controls
 - Main library views keep the plain content header for title, count, search,
-  filters, and mode controls. Directly below it, Dashboard, Artists, Albums,
-  Tracks, Folder structure, and equivalent library overview views use a shared
-  compact accent-bordered intro card (`#6C63FF`, `CornerRadius="0,24,0,24"`)
+  filters, and mode controls. Directly below it, Artists, Albums, Tracks, Folder
+  structure, and equivalent library overview views use a shared
+  compact accent-bordered intro card (`#20D9E8`, `CornerRadius="14"`)
   with a short view-specific headline and explanatory text. Search and filter
   controls stay outside and above that card in the plain header layout; A-Z
-  indexes stay aligned with the content/table area, not the intro card.
+  indexes stay aligned with the content/table area, not the intro card. The
+  Dashboard deliberately has no shared intro card because its greeting hero is
+  the first content surface.
 - Main content view switches use short opacity fade-ins and longer library,
   remote-library, Dashboard, and album-detail loads show the shared
   `ContentLoadingOverlay` skeleton/progress state. Keep this motion subtle and
@@ -1554,7 +1557,7 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   the current album or artist, searching album artwork, and toggling the
   current track favorite.
 - The transport uses a cover-derived accent brush (`AppTransportAccentBrush`,
-  default `#6C63FF`) for the position-slider progress fill/thumb and the
+  default `#20D9E8`) for the position-slider progress fill/thumb and the
   play/pause button background. `UpdateTransportAccentFromArtwork` recomputes it
   whenever the now-playing cover changes (subscribed on
   `NowPlayingArtworkImage.Source`): `ExtractAccentColor` samples a 24 × 24 scaled
@@ -1757,19 +1760,32 @@ asynchronous file I/O from the UI thread
   code in `BuildDashboardAsync`. Section headers are created by the reusable
   `DashboardCreateSectionHeader` (accent underline, optional month navigation).
   The page contains, top to bottom:
-  0. **Greeting hero** (`DashboardBuildGreeting`): a time-of-day greeting
-  (`GreetingMorning`/`GreetingAfternoon`/`GreetingEvening`) plus the
-  `DashboardTagline`; no heavy card, just headline + subtitle text.
+  0. **Greeting hero** (`DashboardBuildGreeting`): a 210-px hero with a
+  cyan-to-blue gradient outline
+  using the linked `Logo/bg.png` asset (`Assets/DashboardHeroBackground.png` at
+  runtime). It contains the localized time-of-day greeting, welcome overline and
+  descriptive text; working random-play and Up Next buttons; and four live
+  album, track, artist, and favorite counters. Local aggregates come from
+  `AudioDatabase.GetDashboardLibrarySummary()`; the favorite counter additionally
+  includes the client-side track favorites of every currently configured Orynivo
+  Server through `GetOrynivoFavoriteTrackIds`. The database query returns only
+  aggregate counts and must not materialize complete library lists. The four
+  counters are compact 148-px cards in a right-aligned horizontal group; their
+  circular icon badges remain left-aligned above the value and label.
   1. **Recently played** (`DashboardBuildRecentlyPlayed`, when history exists):
-  a horizontal strip of up to 12 compact cards from `GetRecentHistory` (deduped
-  by path). Each card shows the local album thumbnail (resolved via
-  `GetAlbumsByTrackIds`) or an `InitialsAvatar` placeholder, with a hover play
-  overlay. A card is playable (`IsPlayableHistoryEntry`) when the entry is a
-  music track (media type `track`, not radio/podcast) that is either a locally
+  a horizontal strip of up to 12 cards from `GetRecentHistory` (deduped by path)
+  placed beside Recently Added in a matching surface card. History cards use the
+  same 180 × 276 proportions and 160-px cover size as album artwork cards. Each
+  shows a local/remote album thumbnail or `InitialsAvatar`, hover play overlay,
+  favorite heart, and an `L`, `OS`, or `P` source badge. Local and remote Orynivo
+  hearts are toggleable; Plex hearts are display-only because Plex favorites are
+  not persisted. A card is playable (`IsPlayableHistoryEntry`) when the entry is
+  a music track (media type `track`, not radio/podcast) that is either a locally
   available file or a playable stream URL (remote server / Plex), independent of
-  the history track id or artist tag. Clicking it plays the track **in place**
-  through `PlayHistoryEntryInPlaceAsync` (replaces the queue with just that track
-  and starts playback) without leaving the dashboard.
+  the history track id or artist tag. Clicking the card outside its link/favorite
+  buttons plays it **in place** through `PlayHistoryEntryInPlaceAsync` (replaces
+  the queue with just that track and starts playback) without leaving the
+  dashboard.
   2. **Recently added albums**: horizontal artwork strip of up to 12 albums,
   merging the local library with every configured remote Orynivo Server
   (`LoadRecentAlbumsAsync`, sorted by each album's last-added timestamp). Cards
@@ -1788,37 +1804,56 @@ asynchronous file I/O from the UI thread
   Selecting a card supports Back navigation. Cover/favorite handlers refresh the
   bound card in place on the dashboard surface (`UpdateRowArtworkFromBytes`)
   instead of rebuilding the hidden Albums list.
-  3. **Stats section** (`DashboardBuildStatsSection`): a shared period selector
-  header (`DashboardCreateStatsPeriodHeader`, backed by `_dashboardStatsPeriod`
-  / `StatsPeriod` and `StatsPeriodSinceUnix`) governs the genre, album, and
-  artist analytics cards together (All time / This year / This month / Last 30
-  days / Last 7 days); changing it rebuilds the dashboard. The calendar keeps its
-  own independent month navigation. On wide dashboards the blocks sit in a
-  two-column grid (left: calendar + top albums; right: top genres + top artists)
-  and stack on narrow ones; the layout switches at a 980-px threshold
+  3. **Stats section** (`DashboardBuildStatsSection`): a first row mirrors the
+  visual hierarchy of the reference design with Listening stats, Most listened
+  genres, Calendar, and Quick access cards. The period selector lives inside the
+  Listening stats card, defaults to Last 30 days, and governs listening, genre,
+  album, and artist data (All time / This year / This month / Last 30 days / Last
+  7 days); changing it rebuilds the dashboard. Listening data comes from
+  `GetTotalListeningSeconds` and `GetListeningTrend`, is drawn from seven
+  chronological buckets as a cyan line/area chart with a minute Y-axis, localized
+  date/month X-axis, and Catmull-Rom-derived cubic Bézier segments (never straight
+  point-to-point joins). The area under the line uses a vertical cyan-to-nearly-
+  transparent gradient; do not replace it with a flat fill. It compares with the
+  immediately preceding period where one exists. Quick access links to favorites,
+  Up Next, full recent history, and
+  random local playback and shows short secondary labels/counts. The calendar
+  keeps independent month navigation. On wide dashboards the four overview
+  cards sit in one row; on narrow dashboards they form a 2 × 2 grid. The layout
+  switches at a 980-px threshold
   (`ComputeDashboardTwoColumn`) and re-flows on the
   `DashboardScrollViewer.SizeChanged` boundary crossing only.
-     - **Calendar** (`DashboardBuildCalendarCard`): Monday-first month grid with
-     day number, `HH:mm:ss` playback time, top three linked genres, today
-     highlight, and month navigation.
-     - **Top 10 genres** (`DashboardBuildTopGenresCard`): a modern analytics card
-     with a colored numbered rank chip (contrast-safe text via
-     `PickContrastBrush`), a linked genre label, `HH:mm:ss` duration, and a thin
-     proportional bar per genre, colored from `_genreColors`.
+     - **Calendar** (`DashboardBuildCalendarCard`): compact Monday-first month
+     grid with day numbers, today highlight, activity dots, month navigation,
+     tooltips, and clickable populated days.
+     - **Top genres** (`DashboardBuildTopGenresCard`): the five leading linked
+     genres in compact rows with cyan proportional bars and listened-minute
+     totals. Genre bars use `DashboardBuildStatBar`, including the complete muted
+     100-percent background track; do not render them as fill-only bars. Their
+     31-px rows and spacing intentionally fill the complete overview-card body.
      - **Most listened albums** (`DashboardBuildTopAlbumsCard`) and **Most listened
-     artists** (`DashboardBuildTopArtistsCard`): analytics cards mirroring the
-     genre card, backed by `AudioDatabase.GetTopAlbums`/`GetTopArtists`
+     artists** (`DashboardBuildTopArtistsCard`): matching bordered analytics
+     cards below the overview row, with wide cyan proportional bars (including
+     the muted 100-percent background track) and listened-minute totals, backed
+     by `AudioDatabase.GetTopAlbums`/`GetTopArtists`
      (`TopAlbumStat`/`TopArtistStat`), which merge local, remote Orynivo Server,
      and Plex playback by album title+artist / artist name in the selected period.
      Album rows show a small cover (local thumbnail, remote track artwork, or an
-     `InitialsAvatar`). Album/artist labels are links that open the entity in its
-     own library through `OpenTopAlbumAsync`/`OpenTopArtistAsync`, which route a
+     `InitialsAvatar`); artist rows retain colored rank markers. Album/artist
+     labels are links that open the entity in its own library through
+     `OpenTopAlbumAsync`/`OpenTopArtistAsync`, which route a
      synthetic `DailyHistoryEntry` (`MakeStatHistoryEntry`) through the shared
      `OpenHistoryAlbumAsync`/`OpenHistoryArtistAsync` so local, remote, and Plex
      targets all work.
-- The **Recently played** and **Recently added** section headers carry a
-  right-aligned **Show all** link (`DashboardCreateSectionHeader`'s
-  `showAllAction`). It opens a full-page view (`ShowAllRecentlyPlayedAsync` /
+     Album and artist ranking rows both use a 40-px minimum height so the two
+     side-by-side cards remain vertically aligned.
+  Quick-access buttons must set both `HorizontalAlignment` and
+  `HorizontalContentAlignment` to `Stretch`, so every action occupies the full
+  inner width of its card.
+- The side-by-side **Recently played** and **Recently added** surface-card
+  headers carry a right-aligned **Show all** link
+  (`DashboardBuildMediaSectionCard`). It opens a full-page view
+  (`ShowAllRecentlyPlayedAsync` /
   `ShowAllRecentAlbumsAsync`) that reuses the dashboard scroll surface and shows
   up to 200 entries in a `WrapPanel` of the same cards (identical double-click /
   click behaviour). These views are pseudo-top-level tags `RecentlyPlayedAll` /
@@ -1837,9 +1872,10 @@ asynchronous file I/O from the UI thread
   Daily-history cells without an available action must render as plain text, not
   disabled link-style buttons.
 - Data comes from `GetRecentAlbums` (now also exposing `ArtistId`/`AddedAt` for
-  cross-library merging), `GetCalendarData`, `GetTopGenres`, `GetTopAlbums`, and
-  `GetTopArtists`. `GetTopGenres`/`GetTopAlbums`/`GetTopArtists` take an optional
-  `sinceUnix` lower bound driven by the dashboard period selector.
+  cross-library merging), `GetDashboardLibrarySummary`, `GetTotalListeningSeconds`,
+  `GetListeningTrend`, `GetCalendarData`, `GetTopGenres`, `GetTopAlbums`, and
+  `GetTopArtists`. Listening and top-stat queries take an optional `sinceUnix`
+  lower bound driven by the dashboard period selector.
 - Dashboard calendar playback time includes local, remote Orynivo Server, and
   Plex tracks, podcasts, and internet radio. The Top genres / albums / artists
   statistics include local, remote Orynivo Server, and Plex tracks: the genre

@@ -12,8 +12,34 @@
 
         <!-- Cover-derived transport accent. Updated at runtime from the current
              artwork (UpdateTransportAccentFromArtwork); defaults to the app accent. -->
-        <SolidColorBrush x:Key="AppTransportAccentBrush" Color="#4FDDBD"/>
+        <SolidColorBrush x:Key="AppTransportAccentBrush" Color="#20D9E8"/>
         <SolidColorBrush x:Key="AppTransportAccentTextBrush" Color="#102033"/>
+        <ImageBrush x:Key="DashboardHeroBackgroundBrush"
+                    Source="avares://Orynivo/Assets/DashboardHeroBackground.png"
+                    Stretch="UniformToFill"
+                    AlignmentX="Center"
+                    AlignmentY="Center"/>
+        <LinearGradientBrush x:Key="DashboardHeroBorderBrush"
+                             StartPoint="0%,50%"
+                             EndPoint="100%,50%">
+            <GradientStop Color="#20D9E8" Offset="0"/>
+            <GradientStop Color="#3867FF" Offset="0.42"/>
+            <GradientStop Color="#20D9E8" Offset="1"/>
+        </LinearGradientBrush>
+        <LinearGradientBrush x:Key="DashboardNavSelectedBackgroundBrush"
+                             StartPoint="0%,50%"
+                             EndPoint="100%,50%">
+            <GradientStop Color="#4A20D9E8" Offset="0"/>
+            <GradientStop Color="#241C6FE8" Offset="0.48"/>
+            <GradientStop Color="#071C6FE8" Offset="1"/>
+        </LinearGradientBrush>
+        <LinearGradientBrush x:Key="DashboardNavSelectedBorderBrush"
+                             StartPoint="0%,50%"
+                             EndPoint="100%,50%">
+            <GradientStop Color="#20D9E8" Offset="0"/>
+            <GradientStop Color="#5875FF" Offset="0.52"/>
+            <GradientStop Color="#1820D9E8" Offset="1"/>
+        </LinearGradientBrush>
 
         <!-- Shared album artwork card. Used by the Albums artwork view and by the
              Dashboard "recently added" strip/full view so both look identical and
@@ -27,12 +53,12 @@
                     Background="{DynamicResource AppSurfaceBrush}"
                     BorderBrush="{DynamicResource AppGridLineBrush}"
                     BorderThickness="1"
-                    CornerRadius="0,18,0,18">
+                    CornerRadius="14">
                 <StackPanel>
                     <Border Width="160"
                             Height="160"
                             Background="{DynamicResource AppArtworkPlaceholderBrush}"
-                            CornerRadius="0,14,0,14"
+                            CornerRadius="10"
                             ClipToBounds="True">
                         <Border.ContextMenu>
                             <ContextMenu Opening="AlbumArtworkContextMenu_OnOpened">
@@ -160,9 +186,9 @@
                             Background="Transparent"
                             BorderThickness="1"
                             BorderBrush="Transparent"
-                            Padding="14,8,12,8"
-                            Margin="10,2"
-                            CornerRadius="8"
+                            Padding="14,9,12,9"
+                            Margin="8,2"
+                            CornerRadius="9"
                             ClipToBounds="True">
                         <ContentPresenter Content="{TemplateBinding Content}"
                                           VerticalAlignment="Center"
@@ -171,8 +197,9 @@
                 </ControlTemplate>
             </Setter>
             <Style Selector="^:selected /template/ Border#Bd">
-                <Setter Property="Background" Value="{DynamicResource AppNavSelectedBrush}"/>
-                <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}"/>
+                <Setter Property="Background" Value="{StaticResource DashboardNavSelectedBackgroundBrush}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource DashboardNavSelectedBorderBrush}"/>
+                <Setter Property="BorderThickness" Value="2,1,1,1"/>
             </Style>
             <Style Selector="^:selected">
                 <Setter Property="Foreground" Value="{DynamicResource AppNavSelectedTextBrush}"/>
@@ -882,7 +909,7 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="248"/>
+            <ColumnDefinition Width="260"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
@@ -901,10 +928,11 @@
             </Grid.RowDefinitions>
 
             <!-- App title -->
-            <Border Padding="18,16,18,14" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource AppHeaderBorderBrush}">
+            <Border Padding="20,18,20,16" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource AppHeaderBorderBrush}">
                 <StackPanel>
-                    <Image HorizontalAlignment="Stretch"
-                           Source="{DynamicResource AppProgramLogoSource}"
+                    <Image Height="58"
+                           HorizontalAlignment="Left"
+                           Source="avares://Orynivo/Assets/DashboardLogo.png"
                            Stretch="Uniform"/>
                     <TextBlock x:Name="SelectedDriverTextBlock"
                                Foreground="{DynamicResource AppMutedTextBrush}" FontSize="{DynamicResource FontSizeMeta}" Margin="4,8,4,0"
@@ -918,7 +946,7 @@
                      Grid.Row="1"
                      Background="Transparent"
                      BorderThickness="0"
-                     Padding="0,8,18,8"
+                     Padding="0,10,10,10"
                      FontSize="{DynamicResource FontSizeBody}"
                      ClipToBounds="True"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -1203,7 +1231,7 @@
             <!-- Header -->
             <Border Background="{DynamicResource AppHeaderBrush}"
                     BorderThickness="0,0,0,1" BorderBrush="{DynamicResource AppHeaderBorderBrush}"
-                    Padding="24,16">
+                    Padding="28,19">
                 <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -1235,7 +1263,7 @@
                         </Button>
                         <TextBlock x:Name="ContentTitleTextBlock"
                                    Grid.Column="1"
-                                   FontSize="{DynamicResource FontSizeTitle}" FontWeight="SemiBold" Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                   FontSize="{DynamicResource FontSizeTitleLarge}" FontWeight="SemiBold" Foreground="{DynamicResource AppPrimaryTextBrush}"
                                    VerticalAlignment="Top"/>
                         <StackPanel Grid.Column="2"
                                     Orientation="Horizontal"
@@ -1320,13 +1348,14 @@
                                 Click="SaveQueueAsPlaylistButton_OnClick"/>
                         <TextBox x:Name="SearchTextBox"
                                 Grid.Column="6"
-                                 Width="240"
-                                 Height="32"
+                                 Width="250"
+                                 Height="36"
                                  Margin="20,0,0,0"
                                  VerticalContentAlignment="Center"
                                  Background="{DynamicResource AppInputBrush}"
                                  Foreground="{DynamicResource AppPrimaryTextBrush}"
-                                 BorderBrush="{DynamicResource AppInputBorderBrush}"
+                                 BorderBrush="{DynamicResource AppHeaderBorderBrush}"
+                                 CornerRadius="18"
                                  Watermark="{DynamicResource L_Search}"
                                  ToolTip.Tip="{DynamicResource L_Search}"
                                  TextChanged="SearchTextBox_OnTextChanged"/>
@@ -1457,13 +1486,13 @@
 
             <Border x:Name="LibraryIntroCard"
                     Grid.Row="1"
-                    Height="96"
-                    Margin="28,16,28,10"
-                    Padding="24,16"
-                    Background="{DynamicResource AppSurfaceBrush}"
+                    Height="108"
+                    Margin="28,18,28,12"
+                    Padding="26,18"
+                    Background="{DynamicResource AppAccentSoftBrush}"
                     BorderBrush="{DynamicResource AppAccentBrush}"
                     BorderThickness="1"
-                    CornerRadius="0,24,0,24"
+                    CornerRadius="14"
                     IsVisible="False">
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -1495,7 +1524,7 @@
                           IsVisible="False"
                           Background="{DynamicResource AppContentBrush}"
                           VerticalScrollBarVisibility="Auto">
-                <StackPanel x:Name="DashboardPanel" Margin="28,24,28,28"/>
+                <StackPanel x:Name="DashboardPanel" Margin="18,16,18,22" Spacing="14"/>
             </ScrollViewer>
 
             <!-- AI Chat.
@@ -2540,13 +2569,13 @@
                                 Background="{DynamicResource AppSurfaceBrush}"
                                 BorderBrush="{DynamicResource AppGridLineBrush}"
                                 BorderThickness="1"
-                                CornerRadius="0,18,0,18">
+                                CornerRadius="14">
                             <Grid>
                                 <StackPanel>
                                     <Border Width="176"
                                             Height="176"
                                             Background="{DynamicResource AppArtworkPlaceholderBrush}"
-                                            CornerRadius="0,24,0,24"
+                                            CornerRadius="10"
                                             ClipToBounds="True">
                                         <Grid>
                                             <controls:InitialsAvatar DisplayName="{Binding Title}"
@@ -3078,7 +3107,7 @@
         <Border Grid.Column="0" Grid.ColumnSpan="2" Grid.Row="1"
                 Background="{DynamicResource AppTransportBrush}"
                 BorderThickness="0,1,0,0" BorderBrush="{DynamicResource AppTransportBorderBrush}"
-                Padding="20,14">
+                Padding="22,12">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -3094,7 +3123,7 @@
                     </Grid.ColumnDefinitions>
                     <Border x:Name="NowPlayingArtworkBorder"
                             Width="72" Height="72" Background="{DynamicResource AppArtworkPlaceholderBrush}"
-                            CornerRadius="10" ClipToBounds="True">
+                            CornerRadius="12" ClipToBounds="True">
                         <Border.ContextFlyout>
                             <MenuFlyout FlyoutPresenterTheme="{StaticResource AppMenuFlyoutPresenterTheme}"
                                         ItemContainerTheme="{StaticResource AppMenuFlyoutItemTheme}">

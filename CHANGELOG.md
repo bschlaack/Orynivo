@@ -8,13 +8,48 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Redesigned the Dashboard around a large artwork-backed greeting hero using the
+  Orynivo wordmark and bundled light-wave background. The hero exposes live,
+  lightweight album/track/artist/favorite counters plus working random-play and
+  Up Next actions.
+- Added efficient SQLite dashboard summary and listening-trend queries. The
+  listening card now plots the selected period as a cyan area chart and, when a
+  preceding period exists, shows the percentage change from that period.
 - Library scans now calculate missing ReplayGain track and album values with
   FFmpeg when files do not provide ReplayGain tags. Settings > Playback also has
   a manual "Calculate missing ReplayGain" action to backfill existing local
   tracks without overwriting existing metadata.
 
+### Changed
+
+- Rebuilt the Dashboard layout to match the new visual direction: Recently
+  Played and Recently Added sit in parallel surface cards; Recently Played uses
+  the same large artwork-card proportions as albums and now includes a
+  toggleable favorite heart plus `L`, `OS`, or `P` source badges. The redundant
+  Dashboard intro card was removed.
+- Restyled listening statistics, top genres, quick access, most-listened albums,
+  and most-listened artists as compact analytics cards. Genre, album, and artist
+  rows use proportional cyan bars and minute totals; album rankings retain their
+  local or remote artwork. The period selector now lives inside the listening
+  card and defaults to the last 30 days.
+- Refined the analytics geometry: album and artist bars now use a wider plotting
+  area, genre bars use the same full-width background track, and the listening
+  chart uses seven labeled time buckets with minute/date legends and a smoothed
+  cubic curve instead of straight point-to-point segments.
+- Added a vertical cyan-to-transparent gradient below the listening curve and
+  balanced the analytics-card bodies: genre rows now fill their card height,
+  artist rows match album-row height, and quick-access actions stretch across
+  the complete available card width.
+- Added cyan-to-blue gradient outlines to the Dashboard hero and the selected
+  sidebar navigation item, including a matching translucent selected-row fill.
+- Tightened the four hero counter tiles to compact fixed-width cards and aligned
+  their icon badges to the left like the reference layout.
+
 ### Fixed
 
+- The Dashboard favorite counter and Quick Access summary now combine local
+  favorite tracks with client-side favorites from every configured Orynivo
+  Server instead of reporting only the local SQLite count.
 - Plex and Orynivo Server "Test connection" buttons now size to their localized
   text instead of clipping longer labels.
 

@@ -125,7 +125,21 @@ public partial class MainWindow : Window
             if (buildVersion != _dashboardBuildVersion)
                 return;
 
-            var (recentlyPlayed, recentThumbs) = await LoadRecentlyPlayedAsync(12);
+            var librarySummary = await Task.Run(() =>
+            {
+                using var db = AudioDatabase.OpenDefault();
+                return db.GetDashboardLibrarySummary();
+            });
+            var remoteFavoriteTrackCount = (_settings.OrynivoServers ?? [])
+                .Sum(server => GetOrynivoFavoriteTrackIds(server).Count);
+            librarySummary = librarySummary with
+            {
+                FavoriteCount = librarySummary.FavoriteCount + remoteFavoriteTrackCount
+            };
+            if (buildVersion != _dashboardBuildVersion)
+                return;
+
+            var (recentlyPlayed, recentThumbs, recentFavorites) = await LoadRecentlyPlayedAsync(12);
             if (buildVersion != _dashboardBuildVersion)
                 return;
 
@@ -138,6 +152,22 @@ public partial class MainWindow : Window
                 return;
 
             var since = StatsPeriodSinceUnix(_dashboardStatsPeriod);
+            var listeningStats = await Task.Run(() =>
+            {
+                using var db = AudioDatabase.OpenDefault();
+                var total = db.GetTotalListeningSeconds(since);
+                var trend = db.GetListeningTrend(since, 7);
+                double previous = 0;
+                if (since is long currentStart)
+                {
+                    var nowUnix = DateTimeOffset.Now.ToUnixTimeSeconds();
+                    var span = Math.Max(1, nowUnix - currentStart);
+                    previous = db.GetTotalListeningSeconds(currentStart - span, currentStart);
+                }
+                return (Total: total, Previous: previous, Trend: trend);
+            });
+            if (buildVersion != _dashboardBuildVersion)
+                return;
             var topGenres = await Task.Run(() =>
             {
                 using var db = AudioDatabase.OpenDefault();
@@ -162,22 +192,12 @@ public partial class MainWindow : Window
             if (buildVersion != _dashboardBuildVersion)
                 return;
 
-            DashboardBuildGreeting();
-
-            if (recentlyPlayed.Count > 0)
-            {
-                DashboardPanel.Children.Add(DashboardCreateSectionHeader(
-                    LocalizationManager.Current.RecentlyPlayed,
-                    showAllAction: () => _ = ShowAllRecentlyPlayedAsync()));
-                DashboardBuildRecentlyPlayed(recentlyPlayed, recentThumbs);
-            }
-
-            DashboardPanel.Children.Add(DashboardCreateSectionHeader(
-                LocalizationManager.Current.RecentAlbums,
-                showAllAction: () => _ = ShowAllRecentAlbumsAsync()));
-            DashboardBuildRecentAlbums(recentAlbums);
-
-            DashboardBuildStatsSection(calendarData, topGenres, topAlbums, topArtists);
+            DashboardBuildGreeting(librarySummary);
+            DashboardBuildMediaOverview(recentlyPlayed, recentThumbs, recentFavorites, recentAlbums);
+            DashboardBuildStatsSection(
+                calendarData, topGenres, topAlbums, topArtists,
+                listeningStats.Total, listeningStats.Previous, listeningStats.Trend,
+                librarySummary);
             if (buildVersion != _dashboardBuildVersion)
                 return;
 
@@ -204,7 +224,7 @@ public partial class MainWindow : Window
     /// </summary>
     /// <param name="count">Maximum number of distinct entries to return.</param>
     /// <returns>The de-duplicated entries and their album thumbnail paths.</returns>
-    private static Task<(List<DailyHistoryEntry> Entries, Dictionary<long, string> Thumbs)> LoadRecentlyPlayedAsync(int count) =>
+    private static Task<(List<DailyHistoryEntry> Entries, Dictionary<long, string> Thumbs, HashSet<long> FavoriteTrackIds)> LoadRecentlyPlayedAsync(int count) =>
         Task.Run(() =>
         {
             using var db = AudioDatabase.OpenDefault();
@@ -229,7 +249,11 @@ public partial class MainWindow : Window
                 .Where(album => !string.IsNullOrEmpty(album.ThumbnailPath))
                 .GroupBy(album => album.Id)
                 .ToDictionary(group => group.Key, group => group.First().ThumbnailPath!);
-            return (deduped, thumbs);
+            var favoriteTrackIds = db.GetTrackListByIds(localTrackIds)
+                .Where(track => track.IsFavorite)
+                .Select(track => track.Id)
+                .ToHashSet();
+            return (deduped, thumbs, favoriteTrackIds);
         });
 
     /// <summary>Opens the full-page "recently added" view, preserving Back navigation.</summary>
@@ -277,17 +301,17 @@ public partial class MainWindow : Window
         _calendarInner = null;
         SearchTextBox.IsVisible = false;
 
-        var (entries, thumbs) = await LoadRecentlyPlayedAsync(200);
+        var (entries, thumbs, favorites) = await LoadRecentlyPlayedAsync(200);
         DashboardPanel.Children.Add(DashboardCreateSectionHeader(LocalizationManager.Current.RecentlyPlayed));
         var wrap = new WrapPanel { Orientation = Orientation.Horizontal };
         foreach (var entry in entries)
-            wrap.Children.Add(BuildRecentlyPlayedCard(entry, thumbs, expandedSpacing: true));
+            wrap.Children.Add(BuildRecentlyPlayedCard(entry, thumbs, favorites, expandedSpacing: true));
         DashboardPanel.Children.Add(wrap);
         ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(entries.Count);
     }
 
     /// <summary>Builds the personal greeting hero shown at the top of the dashboard.</summary>
-    private void DashboardBuildGreeting()
+    private void DashboardBuildGreeting(DashboardLibrarySummary summary)
     {
         var hour = DateTime.Now.Hour;
         var greeting = hour switch
@@ -297,21 +321,158 @@ public partial class MainWindow : Window
             _ => LocalizationManager.Current.GreetingEvening
         };
 
-        var stack = new StackPanel { Spacing = 2, Margin = new Thickness(0, 0, 0, 4) };
+        var hero = new Border
+        {
+            Height = 210,
+            Background = FindResource<IBrush>("DashboardHeroBackgroundBrush"),
+            BorderBrush = FindResource<IBrush>("DashboardHeroBorderBrush") ?? FindResource<IBrush>("AppAccentBrush"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(16),
+            ClipToBounds = true,
+            Padding = new Thickness(30, 24)
+        };
+        var layout = new Grid();
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.05, GridUnitType.Star) });
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(24) });
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.35, GridUnitType.Star) });
+
+        var stack = new StackPanel { Spacing = 5, VerticalAlignment = VerticalAlignment.Center };
         stack.Children.Add(new TextBlock
         {
-            Text = greeting,
+            Text = LocalizationManager.Current.DashboardWelcomeBack,
+            FontSize = ResolveFontSize("FontSizeMeta"),
+            FontWeight = FontWeight.Bold,
+            LetterSpacing = 1.8,
+            Foreground = new SolidColorBrush(Color.Parse("#78A8EA"))
+        });
+        stack.Children.Add(new TextBlock
+        {
+            Text = $"{greeting}  👋",
             FontSize = ResolveFontSize("FontSizeHeadline"),
             FontWeight = FontWeight.Bold,
-            Foreground = FindResource<IBrush>("AppPrimaryTextBrush")
+            Foreground = Brushes.White
         });
         stack.Children.Add(new TextBlock
         {
-            Text = LocalizationManager.Current.DashboardTagline,
+            Text = LocalizationManager.Current.DashboardHeroHint,
             FontSize = ResolveFontSize("FontSizeBody"),
-            Foreground = FindResource<IBrush>("AppSecondaryTextBrush")
+            Foreground = new SolidColorBrush(Color.Parse("#C3D1E7")),
+            TextWrapping = TextWrapping.Wrap,
+            MaxWidth = 430,
+            Margin = new Thickness(0, 2, 0, 10)
         });
-        DashboardPanel.Children.Add(stack);
+
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
+        var randomButton = DashboardHeroButton(LocalizationManager.Current.DashboardRandomPlayback, primary: true);
+        randomButton.Click += DashboardRandomPlayback_OnClick;
+        actions.Children.Add(randomButton);
+        var queueButton = DashboardHeroButton(LocalizationManager.Current.UpNext, primary: false);
+        queueButton.Click += async (_, e) =>
+        {
+            e.Handled = true;
+            await DashboardNavigateAsync("Queue");
+        };
+        actions.Children.Add(queueButton);
+        stack.Children.Add(actions);
+        Grid.SetColumn(stack, 0);
+        layout.Children.Add(stack);
+
+        var stats = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 12,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var values = new[]
+        {
+            ("♫", summary.AlbumCount, LocalizationManager.Current.Albums, Color.Parse("#C56CFF")),
+            ("♪", summary.TrackCount, LocalizationManager.Current.Tracks, Color.Parse("#20D9E8")),
+            ("●", summary.ArtistCount, LocalizationManager.Current.Artists, Color.Parse("#4FD58A")),
+            ("♡", summary.FavoriteCount, LocalizationManager.Current.Favorites, Color.Parse("#FF806C"))
+        };
+        for (var i = 0; i < values.Length; i++)
+        {
+            var tile = DashboardBuildHeroStatTile(values[i].Item1, values[i].Item2, values[i].Item3, values[i].Item4);
+            stats.Children.Add(tile);
+        }
+        Grid.SetColumn(stats, 2);
+        layout.Children.Add(stats);
+        hero.Child = layout;
+        DashboardPanel.Children.Add(hero);
+    }
+
+    private Button DashboardHeroButton(string text, bool primary)
+    {
+        var button = new Button
+        {
+            Content = text,
+            MinHeight = 36,
+            Padding = new Thickness(18, 8),
+            FontSize = ResolveFontSize("FontSizeCaption"),
+            FontWeight = FontWeight.SemiBold,
+            Foreground = primary ? FindResource<IBrush>("AppAccentTextBrush") : Brushes.White,
+            Background = primary ? FindResource<IBrush>("AppAccentBrush") : new SolidColorBrush(Color.FromArgb(0x35, 0x08, 0x17, 0x2A)),
+            BorderBrush = primary ? FindResource<IBrush>("AppAccentBrush") : new SolidColorBrush(Color.Parse("#53658D")),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(9),
+            Cursor = new Cursor(StandardCursorType.Hand)
+        };
+        return button;
+    }
+
+    private Border DashboardBuildHeroStatTile(string icon, int value, string label, Color accent)
+    {
+        var stack = new StackPanel
+        {
+            Spacing = 3,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        stack.Children.Add(new Border
+        {
+            Width = 38,
+            Height = 38,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            CornerRadius = new CornerRadius(19),
+            Background = new SolidColorBrush(Color.FromArgb(0x28, accent.R, accent.G, accent.B)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(0x80, accent.R, accent.G, accent.B)),
+            BorderThickness = new Thickness(1),
+            Child = new TextBlock
+            {
+                Text = icon,
+                FontSize = ResolveFontSize("FontSizeSubtitle"),
+                FontWeight = FontWeight.Bold,
+                Foreground = new SolidColorBrush(accent),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            }
+        });
+        stack.Children.Add(new TextBlock
+        {
+            Text = value.ToString("N0", CultureInfo.CurrentCulture),
+            FontSize = ResolveFontSize("FontSizeTitle"),
+            FontWeight = FontWeight.Bold,
+            Foreground = Brushes.White,
+            Margin = new Thickness(0, 5, 0, 0)
+        });
+        stack.Children.Add(new TextBlock
+        {
+            Text = label,
+            FontSize = ResolveFontSize("FontSizeCaption"),
+            Foreground = new SolidColorBrush(Color.Parse("#AFC0D8"))
+        });
+        return new Border
+        {
+            Width = 148,
+            MinHeight = 126,
+            Padding = new Thickness(14, 12),
+            CornerRadius = new CornerRadius(12),
+            Background = new SolidColorBrush(Color.FromArgb(0xB5, 0x0B, 0x1A, 0x2B)),
+            BorderBrush = new SolidColorBrush(Color.Parse("#29415D")),
+            BorderThickness = new Thickness(1),
+            Child = stack
+        };
     }
 
     private void DashboardAddSectionHeader(string title, bool calendarNav = false) =>
@@ -483,6 +644,9 @@ public partial class MainWindow : Window
     }
 
     private void DashboardBuildRecentAlbums(List<DashboardAlbum> albums)
+        => DashboardPanel.Children.Add(DashboardCreateRecentAlbumsStrip(albums));
+
+    private ScrollViewer DashboardCreateRecentAlbumsStrip(List<DashboardAlbum> albums)
     {
         var scroll = new ScrollViewer
         {
@@ -498,7 +662,80 @@ public partial class MainWindow : Window
                 panel.Children.Add(BuildRecentAlbumCard(album, template));
 
         scroll.Content = panel;
-        DashboardPanel.Children.Add(scroll);
+        return scroll;
+    }
+
+    private void DashboardBuildMediaOverview(
+        List<DailyHistoryEntry> recentlyPlayed,
+        Dictionary<long, string> recentThumbs,
+        HashSet<long> recentFavorites,
+        List<DashboardAlbum> recentAlbums)
+    {
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(14) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var playedCard = DashboardBuildMediaSectionCard(
+            LocalizationManager.Current.RecentlyPlayed,
+            () => _ = ShowAllRecentlyPlayedAsync(),
+            recentlyPlayed.Count == 0
+                ? DashboardNoDataText()
+                : DashboardCreateRecentlyPlayedStrip(recentlyPlayed, recentThumbs, recentFavorites));
+        Grid.SetColumn(playedCard, 0);
+        grid.Children.Add(playedCard);
+
+        var albumsCard = DashboardBuildMediaSectionCard(
+            LocalizationManager.Current.RecentAlbums,
+            () => _ = ShowAllRecentAlbumsAsync(),
+            recentAlbums.Count == 0
+                ? DashboardNoDataText()
+                : DashboardCreateRecentAlbumsStrip(recentAlbums));
+        Grid.SetColumn(albumsCard, 2);
+        grid.Children.Add(albumsCard);
+        DashboardPanel.Children.Add(grid);
+    }
+
+    private Border DashboardBuildMediaSectionCard(string title, Action showAllAction, Control content)
+    {
+        var layout = new Grid();
+        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var header = new Grid { Margin = new Thickness(2, 0, 2, 10) };
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        header.Children.Add(new TextBlock
+        {
+            Text = title,
+            FontSize = ResolveFontSize("FontSizeBodyStrong"),
+            FontWeight = FontWeight.SemiBold,
+            Foreground = FindResource<IBrush>("AppPrimaryTextBrush"),
+            VerticalAlignment = VerticalAlignment.Center
+        });
+        var showAll = new Button
+        {
+            Content = LocalizationManager.Current.ShowAll,
+            FontSize = ResolveFontSize("FontSizeCaption"),
+            FontWeight = FontWeight.SemiBold,
+            Foreground = FindResource<IBrush>("AppAccentBrush"),
+            Theme = FindResource<ControlTheme>("EntityLinkButtonTheme"),
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        showAll.Click += (_, e) => { e.Handled = true; showAllAction(); };
+        Grid.SetColumn(showAll, 1);
+        header.Children.Add(showAll);
+        layout.Children.Add(header);
+        Grid.SetRow(content, 1);
+        layout.Children.Add(content);
+        return new Border
+        {
+            Padding = new Thickness(12, 12, 12, 10),
+            Background = FindResource<IBrush>("AppSurfaceBrush"),
+            BorderBrush = FindResource<IBrush>("AppGridLineBrush"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(14),
+            Child = layout
+        };
     }
 
     /// <summary>
@@ -572,7 +809,14 @@ public partial class MainWindow : Window
     /// <param name="thumbs">Local album thumbnail paths keyed by album identifier.</param>
     private void DashboardBuildRecentlyPlayed(
         List<DailyHistoryEntry> entries,
-        Dictionary<long, string> thumbs)
+        Dictionary<long, string> thumbs,
+        HashSet<long> favoriteTrackIds)
+        => DashboardPanel.Children.Add(DashboardCreateRecentlyPlayedStrip(entries, thumbs, favoriteTrackIds));
+
+    private ScrollViewer DashboardCreateRecentlyPlayedStrip(
+        List<DailyHistoryEntry> entries,
+        Dictionary<long, string> thumbs,
+        HashSet<long> favoriteTrackIds)
     {
         var scroll = new ScrollViewer
         {
@@ -582,9 +826,9 @@ public partial class MainWindow : Window
         };
         var panel = new StackPanel { Orientation = Orientation.Horizontal };
         foreach (var entry in entries)
-            panel.Children.Add(BuildRecentlyPlayedCard(entry, thumbs));
+            panel.Children.Add(BuildRecentlyPlayedCard(entry, thumbs, favoriteTrackIds));
         scroll.Content = panel;
-        DashboardPanel.Children.Add(scroll);
+        return scroll;
     }
 
     /// <summary>Builds a compact recently played card for the dashboard strip or full-page history grid.</summary>
@@ -595,24 +839,32 @@ public partial class MainWindow : Window
     private Control BuildRecentlyPlayedCard(
         DailyHistoryEntry entry,
         Dictionary<long, string> thumbs,
+        HashSet<long> favoriteTrackIds,
         bool expandedSpacing = false)
     {
-        const double artSize = 116;
+        const double artSize = 160;
         var playable = IsPlayableHistoryEntry(entry);
+        var isRemote = TryGetOrynivoHistoryTarget(entry, out var favoriteServer, out var favoriteRemoteTrackId);
+        var isPlex = entry.ExternalId?.StartsWith("plex:", StringComparison.OrdinalIgnoreCase) == true;
+        var sourceBadge = isRemote ? "OS" : isPlex ? "P" : "L";
+        var isFavorite = isRemote
+            ? IsOrynivoFavorite(favoriteServer, "Track", favoriteRemoteTrackId)
+            : entry.TrackId is long localTrackId && favoriteTrackIds.Contains(localTrackId);
         var normalBorderBrush = FindResource<IBrush>("AppGridLineBrush");
         var hoverBorderBrush = FindResource<IBrush>("AppAccentBrush");
 
         var card = new Border
         {
-            Width           = artSize + 20,
+            Width           = 180,
+            MinHeight       = 276,
             Margin          = expandedSpacing
-                ? new Thickness(0, 0, 20, 24)
-                : new Thickness(0, 0, 12, 0),
+                ? new Thickness(8, 0, 12, 20)
+                : new Thickness(8),
             Padding         = new Thickness(10),
             Background      = FindResource<IBrush>("AppSurfaceBrush"),
             BorderBrush     = normalBorderBrush,
             BorderThickness = new Thickness(1),
-            CornerRadius    = new CornerRadius(0, 18, 0, 18),
+            CornerRadius    = new CornerRadius(12),
             Cursor          = new Cursor(playable ? StandardCursorType.Hand : StandardCursorType.Arrow)
         };
         card.Classes.Add("motionCard");
@@ -624,7 +876,7 @@ public partial class MainWindow : Window
             Width        = artSize,
             Height       = artSize,
             Background   = FindResource<IBrush>("AppArtworkPlaceholderBrush"),
-            CornerRadius = new CornerRadius(0, 14, 0, 14),
+            CornerRadius = new CornerRadius(9),
             ClipToBounds = true
         };
         var artContent = new Grid();
@@ -677,7 +929,7 @@ public partial class MainWindow : Window
             Height             = artSize,
             ZIndex             = 10,
             Background         = new SolidColorBrush(Color.FromArgb(0x66, 0, 0, 0)),
-            CornerRadius       = new CornerRadius(0, 14, 0, 14),
+            CornerRadius       = new CornerRadius(9),
             IsHitTestVisible   = false,
             IsVisible          = false,
             Child = new TextBlock
@@ -736,6 +988,78 @@ public partial class MainWindow : Window
         stack.Children.Add(artistButton);
         stack.Children.Add(artistBlock);
 
+        var footer = new Grid { Margin = new Thickness(0, 3, 0, 0) };
+        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var favoriteButton = new Button
+        {
+            Content = isFavorite ? "❤" : "♡",
+            Width = 28,
+            Height = 24,
+            MinWidth = 0,
+            MinHeight = 0,
+            Padding = new Thickness(0),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Background = Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            Foreground = FindResource<IBrush>("AppFavoriteBrush"),
+            FontFamily = new FontFamily("Segoe UI Symbol"),
+            FontSize = ResolveFontSize("FontSizeBodyStrong"),
+            Cursor = new Cursor(StandardCursorType.Hand),
+            IsEnabled = !isPlex
+        };
+        favoriteButton.Click += (_, e) =>
+        {
+            e.Handled = true;
+            isFavorite = !isFavorite;
+            favoriteButton.Content = isFavorite ? "❤" : "♡";
+            if (isRemote)
+            {
+                var key = GetOrynivoFavoriteKey(favoriteServer.Id, "Track", favoriteRemoteTrackId);
+                if (isFavorite)
+                    _settings.OrynivoServerFavorites.Add(key);
+                else
+                    _settings.OrynivoServerFavorites.Remove(key);
+                _settingsStore.Save(_settings);
+                RefreshOrynivoFavoriteRows(favoriteServer, favoriteRemoteTrackId, isFavorite);
+            }
+            else if (entry.TrackId is long id)
+            {
+                using var db = AudioDatabase.OpenDefault();
+                db.SetTrackFavorite(id, isFavorite);
+            }
+        };
+        footer.Children.Add(favoriteButton);
+        var badge = new Border
+        {
+            Height = 20,
+            MinWidth = 27,
+            Padding = new Thickness(6, 0),
+            CornerRadius = new CornerRadius(10),
+            Background = FindResource<IBrush>("AppAccentSoftBrush"),
+            BorderBrush = FindResource<IBrush>("AppAccentBrush"),
+            BorderThickness = new Thickness(1),
+            VerticalAlignment = VerticalAlignment.Center,
+            Child = new TextBlock
+            {
+                Text = sourceBadge,
+                FontSize = 10,
+                FontWeight = FontWeight.SemiBold,
+                Foreground = FindResource<IBrush>("AppAccentBrush"),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            }
+        };
+        ToolTip.SetTip(badge, sourceBadge switch
+        {
+            "OS" => "Orynivo Server",
+            "P" => "Plex",
+            _ => LocalizationManager.Current.LocalLibrary
+        });
+        Grid.SetColumn(badge, 1);
+        footer.Children.Add(badge);
+        stack.Children.Add(footer);
+
         card.Child = stack;
 
         if (TryGetOrynivoHistoryTarget(entry, out _, out _))
@@ -758,6 +1082,8 @@ public partial class MainWindow : Window
         {
             card.PointerReleased += async (_, e) =>
             {
+                if (FindAncestor<Button>(e.Source as Visual) is not null)
+                    return;
                 e.Handled = true;
                 await PlayHistoryEntryInPlaceAsync(entry);
             };
@@ -872,12 +1198,10 @@ public partial class MainWindow : Window
 
         var outer = new Border
         {
-            Background      = FindResource<IBrush>("AppSurfaceBrush"),
-            BorderBrush     = FindResource<IBrush>("AppGridLineBrush"),
-            BorderThickness = new Thickness(1),
-            CornerRadius    = new CornerRadius(14),
-            Padding         = new Thickness(14),
-            Margin          = new Thickness(0, 0, 0, 4)
+            Background      = Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            Padding         = new Thickness(0),
+            Margin          = new Thickness(0)
         };
 
         var inner = new StackPanel();
@@ -948,14 +1272,14 @@ public partial class MainWindow : Window
         var border = new Border
         {
             Margin          = new Thickness(2),
-            MinHeight       = 72,
+            MinHeight       = 31,
             Background      = isToday
                 ? FindResource<IBrush>("AppAccentSoftBrush")
                 : Brushes.Transparent,
             BorderBrush     = FindResource<IBrush>("AppGridLineBrush"),
-            BorderThickness = new Thickness(1),
-            CornerRadius    = new CornerRadius(8),
-            Padding         = new Thickness(6),
+            BorderThickness = new Thickness(0),
+            CornerRadius    = new CornerRadius(16),
+            Padding         = new Thickness(3),
             Cursor          = data is not null && data.TotalSeconds > 0
                 ? new Cursor(StandardCursorType.Hand)
                 : new Cursor(StandardCursorType.Arrow)
@@ -974,36 +1298,21 @@ public partial class MainWindow : Window
             FontSize   = 11,
             FontWeight = isToday ? FontWeight.Bold : FontWeight.Normal,
             Foreground = FindResource<IBrush>("AppPrimaryTextBrush"),
-            HorizontalAlignment = HorizontalAlignment.Right
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
         });
 
         if (data is not null && data.TotalSeconds > 0)
         {
-            var ts = TimeSpan.FromSeconds(data.TotalSeconds);
-            stack.Children.Add(new TextBlock
+            stack.Children.Add(new Border
             {
-                Text       = FormatDashboardDuration(ts),
-                FontSize   = 10,
-                Foreground = FindResource<IBrush>("AppAccentBrush"),
+                Width = 4,
+                Height = 4,
+                CornerRadius = new CornerRadius(2),
+                Background = FindResource<IBrush>("AppAccentBrush"),
                 HorizontalAlignment = HorizontalAlignment.Center,
-                Margin = new Thickness(0, 2, 0, 2)
+                Margin = new Thickness(0, 1, 0, 0)
             });
-
-            foreach (var genre in data.TopGenres.Take(3))
-            {
-                var genreButton = new Button
-                {
-                    Content = genre,
-                    FontSize = 9,
-                    Foreground = FindResource<IBrush>("AppSecondaryTextBrush"),
-                    Theme = FindResource<ControlTheme>("EntityLinkButtonTheme"),
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    Padding = new Thickness(2, 0, 2, 0),
-                    Tag = genre
-                };
-                genreButton.Click += DashboardGenreButton_OnClick;
-                stack.Children.Add(genreButton);
-            }
         }
 
         if (data is not null && data.TotalSeconds > 0)
@@ -1078,62 +1387,391 @@ public partial class MainWindow : Window
         List<CalendarDayData> calendarData,
         List<(string Genre, double Seconds)> topGenres,
         List<TopAlbumStat> topAlbums,
-        List<TopArtistStat> topArtists)
+        List<TopArtistStat> topArtists,
+        double totalListeningSeconds,
+        double previousListeningSeconds,
+        IReadOnlyList<double> listeningTrend,
+        DashboardLibrarySummary librarySummary)
     {
-        // Shared period selector header for all three "top" analytics cards.
-        DashboardPanel.Children.Add(DashboardCreateStatsPeriodHeader());
+        var overview = new UniformGrid();
+        var wide = _dashboardTwoColumnLayout == true;
+        var columns = wide ? 4 : 2;
+        overview.Columns = columns;
+        overview.Rows = wide ? 1 : 2;
 
-        var calendarHeader = DashboardCreateSectionHeader(
-            string.Format(
-                LocalizationManager.Current.Calendar,
-                new DateTime(_dashboardYear, _dashboardMonth, 1).ToString("MMMM yyyy")),
-            calendarNav: true);
-        var calendarCard = DashboardBuildCalendarCard(calendarData);
-
-        var calendarColumn = new StackPanel();
-        calendarColumn.Children.Add(calendarHeader);
-        calendarColumn.Children.Add(calendarCard);
-
-        var genresColumn = new StackPanel();
-        genresColumn.Children.Add(DashboardCreateSectionHeader(LocalizationManager.Current.TopGenres));
-        genresColumn.Children.Add(DashboardBuildTopGenresCard(topGenres));
-
-        var albumsColumn = new StackPanel();
-        albumsColumn.Children.Add(DashboardCreateSectionHeader(LocalizationManager.Current.TopAlbums));
-        albumsColumn.Children.Add(DashboardBuildTopAlbumsCard(topAlbums));
-
-        var artistsColumn = new StackPanel();
-        artistsColumn.Children.Add(DashboardCreateSectionHeader(LocalizationManager.Current.TopArtists));
-        artistsColumn.Children.Add(DashboardBuildTopArtistsCard(topArtists));
-
-        if (_dashboardTwoColumnLayout == true)
+        var cards = new Control[]
         {
-            // Left: calendar + top albums. Right: top genres + top artists.
-            var leftColumn = new StackPanel();
-            leftColumn.Children.Add(calendarColumn);
-            leftColumn.Children.Add(albumsColumn);
-
-            var rightColumn = new StackPanel();
-            rightColumn.Children.Add(genresColumn);
-            rightColumn.Children.Add(artistsColumn);
-
-            var grid = new Grid();
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.15, GridUnitType.Star) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(28) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            Grid.SetColumn(leftColumn, 0);
-            Grid.SetColumn(rightColumn, 2);
-            grid.Children.Add(leftColumn);
-            grid.Children.Add(rightColumn);
-            DashboardPanel.Children.Add(grid);
-        }
-        else
+            DashboardBuildListeningSummaryCard(totalListeningSeconds, previousListeningSeconds, listeningTrend),
+            DashboardWrapOverviewCard(
+                LocalizationManager.Current.TopGenres,
+                DashboardBuildTopGenresCard(topGenres.Take(5).ToList())),
+            DashboardBuildCompactCalendarCard(calendarData),
+            DashboardBuildQuickAccessCard(librarySummary)
+        };
+        for (var i = 0; i < cards.Length; i++)
         {
-            DashboardPanel.Children.Add(calendarColumn);
-            DashboardPanel.Children.Add(genresColumn);
-            DashboardPanel.Children.Add(albumsColumn);
-            DashboardPanel.Children.Add(artistsColumn);
+            cards[i].Margin = new Thickness(6);
+            overview.Children.Add(cards[i]);
         }
+        DashboardPanel.Children.Add(overview);
+
+        var details = new Grid();
+        details.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        details.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(14) });
+        details.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var albumsCard = DashboardWrapOverviewCard(
+            LocalizationManager.Current.TopAlbums,
+            DashboardBuildTopAlbumsCard(topAlbums));
+        details.Children.Add(albumsCard);
+        var artistsCard = DashboardWrapOverviewCard(
+            LocalizationManager.Current.TopArtists,
+            DashboardBuildTopArtistsCard(topArtists));
+        Grid.SetColumn(artistsCard, 2);
+        details.Children.Add(artistsCard);
+        DashboardPanel.Children.Add(details);
+    }
+
+    private Border DashboardBuildListeningSummaryCard(
+        double totalListeningSeconds,
+        double previousListeningSeconds,
+        IReadOnlyList<double> listeningTrend)
+    {
+        var content = new StackPanel { Spacing = 4 };
+        content.Children.Add(new TextBlock
+        {
+            Text = Math.Round(totalListeningSeconds / 60).ToString("N0", CultureInfo.CurrentCulture),
+            FontSize = ResolveFontSize("FontSizeHeadline"),
+            FontWeight = FontWeight.Bold,
+            Foreground = FindResource<IBrush>("AppPrimaryTextBrush")
+        });
+        content.Children.Add(new TextBlock
+        {
+            Text = LocalizationManager.Current.DashboardTotalMinutes,
+            FontSize = ResolveFontSize("FontSizeCaption"),
+            Foreground = FindResource<IBrush>("AppSecondaryTextBrush")
+        });
+
+        if (previousListeningSeconds > 0)
+        {
+            var change = (totalListeningSeconds - previousListeningSeconds) / previousListeningSeconds * 100;
+            content.Children.Add(new TextBlock
+            {
+                Text = $"{(change >= 0 ? "▲" : "▼")} {Math.Abs(change):0}%  ·  {LocalizationManager.Current.PeriodPrevious}",
+                FontSize = ResolveFontSize("FontSizeMeta"),
+                FontWeight = FontWeight.SemiBold,
+                Foreground = new SolidColorBrush(Color.Parse(change >= 0 ? "#4FD58A" : "#FF806C")),
+                Margin = new Thickness(0, 2, 0, 0)
+            });
+        }
+
+        content.Children.Add(DashboardBuildListeningChart(listeningTrend));
+        var periodBox = new ComboBox
+        {
+            MinWidth = 138,
+            Height = 30,
+            VerticalAlignment = VerticalAlignment.Center,
+            ItemsSource = new[]
+            {
+                LocalizationManager.Current.PeriodAllTime,
+                LocalizationManager.Current.PeriodThisYear,
+                LocalizationManager.Current.PeriodThisMonth,
+                LocalizationManager.Current.PeriodLast30Days,
+                LocalizationManager.Current.PeriodLast7Days
+            },
+            SelectedIndex = (int)_dashboardStatsPeriod
+        };
+        periodBox.SelectionChanged += DashboardStatsPeriod_OnSelectionChanged;
+        return DashboardWrapOverviewCard(LocalizationManager.Current.ListeningStats, content, periodBox);
+    }
+
+    private Control DashboardBuildListeningChart(IReadOnlyList<double> listeningTrend)
+    {
+        var values = listeningTrend.Count > 1
+            ? listeningTrend.ToArray()
+            : new double[] { 0, 0, 0, 0, 0, 0, 0 };
+        var maxSeconds = Math.Max(60, values.Max());
+        var maxMinutes = Math.Ceiling(maxSeconds / 60);
+        const double plotWidth = 300;
+        const double plotHeight = 82;
+        const double topPadding = 5;
+        const double bottomY = 76;
+
+        var outer = new Grid { Height = 124, Margin = new Thickness(0, 8, 0, 0) };
+        outer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(38) });
+        outer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        outer.RowDefinitions.Add(new RowDefinition { Height = new GridLength(94) });
+        outer.RowDefinitions.Add(new RowDefinition { Height = new GridLength(24) });
+
+        var yLegend = new Grid { Margin = new Thickness(0, 0, 6, 0) };
+        yLegend.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        yLegend.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        yLegend.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        var yLabels = new[] { maxMinutes, maxMinutes / 2, 0d };
+        for (var i = 0; i < yLabels.Length; i++)
+        {
+            var label = new TextBlock
+            {
+                Text = yLabels[i].ToString("0", CultureInfo.CurrentCulture),
+                FontSize = 9,
+                Foreground = FindResource<IBrush>("AppMutedTextBrush"),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = i == 0 ? VerticalAlignment.Top : i == 2 ? VerticalAlignment.Bottom : VerticalAlignment.Center
+            };
+            Grid.SetRow(label, i);
+            yLegend.Children.Add(label);
+        }
+        outer.Children.Add(yLegend);
+
+        var plot = new Grid { ClipToBounds = true };
+        for (var i = 0; i < 3; i++)
+            plot.Children.Add(new Border
+            {
+                Height = 1,
+                Background = FindResource<IBrush>("AppGridLineBrush"),
+                Opacity = 0.65,
+                VerticalAlignment = i == 0 ? VerticalAlignment.Top : i == 2 ? VerticalAlignment.Bottom : VerticalAlignment.Center
+            });
+
+        var points = values.Select((value, index) => new Point(
+            index * plotWidth / Math.Max(1, values.Length - 1),
+            bottomY - value / maxSeconds * (bottomY - topPadding))).ToList();
+        var smoothLine = DashboardBuildSmoothCurve(points);
+        var areaData = $"{smoothLine} L {plotWidth.ToString(CultureInfo.InvariantCulture)},{plotHeight.ToString(CultureInfo.InvariantCulture)} L 0,{plotHeight.ToString(CultureInfo.InvariantCulture)} Z";
+        plot.Children.Add(new AvaloniaPath
+        {
+            Data = Geometry.Parse(areaData),
+            Stretch = Stretch.Fill,
+            Fill = new LinearGradientBrush
+            {
+                StartPoint = new RelativePoint(0.5, 0, RelativeUnit.Relative),
+                EndPoint = new RelativePoint(0.5, 1, RelativeUnit.Relative),
+                GradientStops =
+                {
+                    new GradientStop(Color.FromArgb(0x88, 0x20, 0xD9, 0xE8), 0),
+                    new GradientStop(Color.FromArgb(0x3D, 0x20, 0xD9, 0xE8), 0.55),
+                    new GradientStop(Color.FromArgb(0x05, 0x20, 0xD9, 0xE8), 1)
+                }
+            },
+            Stroke = FindResource<IBrush>("AppAccentBrush"),
+            StrokeThickness = 2,
+            StrokeLineCap = PenLineCap.Round,
+            StrokeJoin = PenLineJoin.Round
+        });
+        Grid.SetColumn(plot, 1);
+        outer.Children.Add(plot);
+
+        var unit = new TextBlock
+        {
+            Text = LocalizationManager.Current.DashboardMinutesShort,
+            FontSize = 9,
+            Foreground = FindResource<IBrush>("AppMutedTextBrush"),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 2, 6, 0)
+        };
+        Grid.SetRow(unit, 1);
+        outer.Children.Add(unit);
+
+        var xLegend = new Grid { Margin = new Thickness(0, 4, 0, 0) };
+        var xLabels = DashboardListeningLegendLabels(values.Length);
+        for (var i = 0; i < xLabels.Count; i++)
+        {
+            xLegend.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            var label = new TextBlock
+            {
+                Text = xLabels[i],
+                FontSize = 9,
+                Foreground = FindResource<IBrush>("AppMutedTextBrush"),
+                HorizontalAlignment = i == 0 ? HorizontalAlignment.Left : i == xLabels.Count - 1 ? HorizontalAlignment.Right : HorizontalAlignment.Center
+            };
+            Grid.SetColumn(label, i);
+            xLegend.Children.Add(label);
+        }
+        Grid.SetColumn(xLegend, 1);
+        Grid.SetRow(xLegend, 1);
+        outer.Children.Add(xLegend);
+        return outer;
+    }
+
+    private static string DashboardBuildSmoothCurve(IReadOnlyList<Point> points)
+    {
+        var path = new StringBuilder($"M {DashboardPoint(points[0])} ");
+        for (var i = 0; i < points.Count - 1; i++)
+        {
+            var p0 = i > 0 ? points[i - 1] : points[i];
+            var p1 = points[i];
+            var p2 = points[i + 1];
+            var p3 = i + 2 < points.Count ? points[i + 2] : p2;
+            var c1 = new Point(p1.X + (p2.X - p0.X) / 6, p1.Y + (p2.Y - p0.Y) / 6);
+            var c2 = new Point(p2.X - (p3.X - p1.X) / 6, p2.Y - (p3.Y - p1.Y) / 6);
+            path.Append($"C {DashboardPoint(c1)} {DashboardPoint(c2)} {DashboardPoint(p2)} ");
+        }
+        return path.ToString();
+    }
+
+    private static string DashboardPoint(Point point) =>
+        $"{point.X.ToString("0.###", CultureInfo.InvariantCulture)},{point.Y.ToString("0.###", CultureInfo.InvariantCulture)}";
+
+    private IReadOnlyList<string> DashboardListeningLegendLabels(int count)
+    {
+        var now = DateTime.Now.Date;
+        DateTime start = _dashboardStatsPeriod switch
+        {
+            StatsPeriod.ThisYear => new DateTime(now.Year, 1, 1),
+            StatsPeriod.ThisMonth => new DateTime(now.Year, now.Month, 1),
+            StatsPeriod.Last7Days => now.AddDays(-7),
+            StatsPeriod.Last30Days => now.AddDays(-30),
+            _ => now.AddMonths(-Math.Max(1, count - 1))
+        };
+        return Enumerable.Range(0, count)
+            .Select(i => start.AddTicks((now - start).Ticks * i / Math.Max(1, count - 1)))
+            .Select(date => _dashboardStatsPeriod == StatsPeriod.ThisYear
+                ? date.ToString("MMM", CultureInfo.CurrentCulture)
+                : date.ToString("dd.MM", CultureInfo.CurrentCulture))
+            .ToList();
+    }
+
+    private Border DashboardBuildCompactCalendarCard(List<CalendarDayData> calendarData)
+    {
+        var content = DashboardBuildCalendarCard(calendarData);
+        var title = string.Format(
+            LocalizationManager.Current.Calendar,
+            new DateTime(_dashboardYear, _dashboardMonth, 1).ToString("MMMM yyyy"));
+        var card = DashboardWrapOverviewCard(title, content);
+        if (card.Child is Grid layout && layout.Children.FirstOrDefault() is Grid header)
+        {
+            var nav = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right
+            };
+            var prev = CreateCalNavButton("‹");
+            var next = CreateCalNavButton("›");
+            prev.Click += CalendarPrev_OnClick;
+            next.Click += CalendarNext_OnClick;
+            nav.Children.Add(prev);
+            nav.Children.Add(next);
+            Grid.SetColumn(nav, 1);
+            header.Children.Add(nav);
+        }
+        return card;
+    }
+
+    private Border DashboardBuildQuickAccessCard(DashboardLibrarySummary summary)
+    {
+        var rows = new StackPanel { Spacing = 7, HorizontalAlignment = HorizontalAlignment.Stretch };
+        rows.Children.Add(DashboardQuickAccessButton("♡", LocalizationManager.Current.Favorites, async () =>
+        {
+            _trackFavoritesOnly = true;
+            await DashboardNavigateAsync("Tracks");
+        }, "#FF5D7A", $"{summary.FavoriteCount:N0} {LocalizationManager.Current.Tracks}"));
+        rows.Children.Add(DashboardQuickAccessButton("≡", LocalizationManager.Current.UpNext,
+            () => DashboardNavigateAsync("Queue"), "#F59E42", $"{_queue.Count:N0} {LocalizationManager.Current.Tracks}"));
+        rows.Children.Add(DashboardQuickAccessButton("◷", LocalizationManager.Current.RecentlyPlayed,
+            ShowAllRecentlyPlayedAsync, "#43D7C8", LocalizationManager.Current.ShowAll));
+        rows.Children.Add(DashboardQuickAccessButton("⤨", LocalizationManager.Current.DashboardRandomPlayback,
+            DashboardPlayRandomAsync, "#20D9E8", LocalizationManager.Current.LocalLibrary));
+        return DashboardWrapOverviewCard(LocalizationManager.Current.DashboardQuickAccess, rows);
+    }
+
+    private Button DashboardQuickAccessButton(string icon, string label, Func<Task> action, string accent, string subtitle)
+    {
+        var content = new Grid();
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        content.Children.Add(new Border
+        {
+            Width = 28,
+            Height = 28,
+            CornerRadius = new CornerRadius(8),
+            Background = new SolidColorBrush(Color.FromArgb(
+                0x28, Color.Parse(accent).R, Color.Parse(accent).G, Color.Parse(accent).B)),
+            Child = new TextBlock
+            {
+                Text = icon,
+                Foreground = new SolidColorBrush(Color.Parse(accent)),
+                FontSize = ResolveFontSize("FontSizeBodyStrong"),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            }
+        });
+        var textStack = new StackPanel { Margin = new Thickness(7, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        textStack.Children.Add(new TextBlock
+        {
+            Text = label,
+            FontSize = ResolveFontSize("FontSizeCaption"),
+            FontWeight = FontWeight.SemiBold,
+            Foreground = FindResource<IBrush>("AppPrimaryTextBrush"),
+            TextTrimming = TextTrimming.CharacterEllipsis
+        });
+        textStack.Children.Add(new TextBlock
+        {
+            Text = subtitle,
+            FontSize = ResolveFontSize("FontSizeMeta"),
+            Foreground = FindResource<IBrush>("AppMutedTextBrush"),
+            TextTrimming = TextTrimming.CharacterEllipsis
+        });
+        Grid.SetColumn(textStack, 1);
+        content.Children.Add(textStack);
+        var arrow = new TextBlock
+        {
+            Text = "›",
+            FontSize = ResolveFontSize("FontSizeSubtitle"),
+            Foreground = FindResource<IBrush>("AppSecondaryTextBrush"),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(arrow, 2);
+        content.Children.Add(arrow);
+        var button = new Button
+        {
+            Content = content,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            Padding = new Thickness(7, 5),
+            Background = FindResource<IBrush>("AppSurfaceHoverBrush"),
+            BorderThickness = new Thickness(0),
+            CornerRadius = new CornerRadius(9),
+            Cursor = new Cursor(StandardCursorType.Hand)
+        };
+        button.Click += async (_, e) => { e.Handled = true; await action(); };
+        return button;
+    }
+
+    private Border DashboardWrapOverviewCard(string title, Control content, Control? headerAction = null)
+    {
+        var layout = new Grid();
+        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        var header = new Grid { Margin = new Thickness(0, 0, 0, 10) };
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        header.Children.Add(new TextBlock
+        {
+            Text = title,
+            FontSize = ResolveFontSize("FontSizeBodyStrong"),
+            FontWeight = FontWeight.SemiBold,
+            Foreground = FindResource<IBrush>("AppPrimaryTextBrush"),
+            TextTrimming = TextTrimming.CharacterEllipsis
+        });
+        if (headerAction is not null)
+        {
+            Grid.SetColumn(headerAction, 1);
+            header.Children.Add(headerAction);
+        }
+        layout.Children.Add(header);
+        Grid.SetRow(content, 1);
+        layout.Children.Add(content);
+        return new Border
+        {
+            MinHeight = 250,
+            Padding = new Thickness(14),
+            Background = FindResource<IBrush>("AppSurfaceBrush"),
+            BorderBrush = FindResource<IBrush>("AppGridLineBrush"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(14),
+            Child = layout
+        };
     }
 
     /// <summary>Builds the statistics section header carrying the shared period selector.</summary>
@@ -1235,59 +1873,20 @@ public partial class MainWindow : Window
                 Margin     = new Thickness(0, 4, 0, 0)
             };
 
-        double maxSecs = genres[0].Seconds;
-
-        var panel = new Border
-        {
-            Background = FindResource<IBrush>("AppSurfaceBrush"),
-            BorderBrush = FindResource<IBrush>("AppGridLineBrush"),
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(14),
-            Padding = new Thickness(16, 14, 16, 8),
-            Margin = new Thickness(0, 0, 0, 4)
-        };
-        var rows = new StackPanel { Spacing = 12 };
+        double maxSecs = genres.Max(item => item.Seconds);
+        var rows = new StackPanel { Spacing = 8 };
 
         for (int i = 0; i < genres.Count; i++)
         {
             var (genre, secs) = genres[i];
-            var color = _genreColors[i % _genreColors.Length];
-            var brush = new SolidColorBrush(color);
-
-            var row = new StackPanel { Spacing = 6 };
-
-            // Top line: rank chip + genre name (link) on the left, duration on the right.
-            var topLine = new Grid();
-            topLine.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            topLine.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            topLine.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-            var rankChip = new Border
-            {
-                Width = 22,
-                Height = 22,
-                CornerRadius = new CornerRadius(7),
-                Background = brush,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 10, 0),
-                Child = new TextBlock
-                {
-                    Text = (i + 1).ToString(CultureInfo.CurrentCulture),
-                    FontSize = ResolveFontSize("FontSizeMeta"),
-                    FontWeight = FontWeight.Bold,
-                    Foreground = PickContrastBrush(color),
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
-                }
-            };
-            Grid.SetColumn(rankChip, 0);
-            topLine.Children.Add(rankChip);
-
+            var row = new Grid { MinHeight = 31 };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(82) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(62) });
             var labelButton = new Button
             {
                 Content = genre,
-                FontSize = ResolveFontSize("FontSizeBody"),
-                FontWeight = FontWeight.SemiBold,
+                FontSize = ResolveFontSize("FontSizeCaption"),
                 Foreground = FindResource<IBrush>("AppPrimaryTextBrush"),
                 Theme = FindResource<ControlTheme>("EntityLinkButtonTheme"),
                 VerticalAlignment = VerticalAlignment.Center,
@@ -1295,52 +1894,28 @@ public partial class MainWindow : Window
                 Tag = genre
             };
             labelButton.Click += DashboardGenreButton_OnClick;
-            Grid.SetColumn(labelButton, 1);
-            topLine.Children.Add(labelButton);
+            row.Children.Add(labelButton);
+
+            var barHost = DashboardBuildStatBar(
+                secs, maxSecs, FindResource<IBrush>("AppAccentBrush") ?? Brushes.Cyan);
+            barHost.Margin = new Thickness(8, 0);
+            barHost.VerticalAlignment = VerticalAlignment.Center;
+            Grid.SetColumn(barHost, 1);
+            row.Children.Add(barHost);
 
             var durationTb = new TextBlock
             {
-                Text = FormatDashboardDuration(TimeSpan.FromSeconds(secs)),
+                Text = Math.Round(secs / 60).ToString("N0", CultureInfo.CurrentCulture),
                 FontSize = ResolveFontSize("FontSizeCaption"),
-                FontWeight = FontWeight.Medium,
                 Foreground = FindResource<IBrush>("AppSecondaryTextBrush"),
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(12, 0, 0, 0)
+                HorizontalAlignment = HorizontalAlignment.Right
             };
             Grid.SetColumn(durationTb, 2);
-            topLine.Children.Add(durationTb);
-            row.Children.Add(topLine);
-
-            // Thin proportional bar over a muted track.
-            double fraction = maxSecs > 0 ? secs / maxSecs : 0;
-            var barBg = new Border
-            {
-                Height       = 8,
-                Background   = FindResource<IBrush>("AppGridLineBrush"),
-                CornerRadius = new CornerRadius(4)
-            };
-            var barGrid = new Grid();
-            barGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(fraction, GridUnitType.Star) });
-            barGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1 - fraction, GridUnitType.Star) });
-            var barFill = new Border
-            {
-                Height       = 8,
-                Background   = brush,
-                CornerRadius = new CornerRadius(4)
-            };
-            Grid.SetColumn(barFill, 0);
-            barGrid.Children.Add(barFill);
-
-            var barHost = new Grid();
-            barHost.Children.Add(barBg);
-            barHost.Children.Add(barGrid);
-            row.Children.Add(barHost);
-
+            row.Children.Add(durationTb);
             rows.Children.Add(row);
         }
-
-        panel.Child = rows;
-        return panel;
+        return rows;
     }
 
     /// <summary>Builds the most-listened-albums analytics card for the dashboard.</summary>
@@ -1352,25 +1927,19 @@ public partial class MainWindow : Window
             return DashboardNoDataText();
 
         double maxSecs = albums[0].Seconds;
-        var panel = DashboardSurfaceCard();
-        var rows = new StackPanel { Spacing = 12 };
+        var rows = new StackPanel { Spacing = 10 };
 
         for (int i = 0; i < albums.Count; i++)
         {
             var album = albums[i];
-            var color = _genreColors[i % _genreColors.Length];
-            var brush = new SolidColorBrush(color);
-
-            var row = new StackPanel { Spacing = 6 };
-
-            var topLine = new Grid();
-            topLine.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            topLine.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            topLine.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var row = new Grid { MinHeight = 40 };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(68) });
 
             var cover = DashboardBuildTopAlbumCover(album);
-            Grid.SetColumn(cover, 0);
-            topLine.Children.Add(cover);
+            row.Children.Add(cover);
 
             var textStack = new StackPanel
             {
@@ -1410,27 +1979,30 @@ public partial class MainWindow : Window
                 textStack.Children.Add(artistButton);
             }
             Grid.SetColumn(textStack, 1);
-            topLine.Children.Add(textStack);
+            row.Children.Add(textStack);
+
+            var bar = DashboardBuildStatBar(
+                album.Seconds, maxSecs, FindResource<IBrush>("AppAccentBrush") ?? Brushes.Cyan);
+            bar.Margin = new Thickness(12, 0);
+            bar.VerticalAlignment = VerticalAlignment.Center;
+            Grid.SetColumn(bar, 2);
+            row.Children.Add(bar);
 
             var durationTb = new TextBlock
             {
-                Text = FormatDashboardDuration(TimeSpan.FromSeconds(album.Seconds)),
+                Text = Math.Round(album.Seconds / 60).ToString("N0", CultureInfo.CurrentCulture),
                 FontSize = ResolveFontSize("FontSizeCaption"),
                 FontWeight = FontWeight.Medium,
                 Foreground = FindResource<IBrush>("AppSecondaryTextBrush"),
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(12, 0, 0, 0)
+                HorizontalAlignment = HorizontalAlignment.Right
             };
-            Grid.SetColumn(durationTb, 2);
-            topLine.Children.Add(durationTb);
-            row.Children.Add(topLine);
-
-            row.Children.Add(DashboardBuildStatBar(album.Seconds, maxSecs, brush));
+            Grid.SetColumn(durationTb, 3);
+            row.Children.Add(durationTb);
             rows.Children.Add(row);
         }
 
-        panel.Child = rows;
-        return panel;
+        return rows;
     }
 
     /// <summary>Builds the most-listened-artists analytics card for the dashboard.</summary>
@@ -1442,28 +2014,26 @@ public partial class MainWindow : Window
             return DashboardNoDataText();
 
         double maxSecs = artists[0].Seconds;
-        var panel = DashboardSurfaceCard();
-        var rows = new StackPanel { Spacing = 12 };
+        var rows = new StackPanel { Spacing = 10 };
 
         for (int i = 0; i < artists.Count; i++)
         {
             var artist = artists[i];
             var color = _genreColors[i % _genreColors.Length];
-            var brush = new SolidColorBrush(color);
-
-            var row = new StackPanel { Spacing = 6 };
-
-            var topLine = new Grid();
-            topLine.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            topLine.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            topLine.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var row = new Grid { MinHeight = 40 };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(36) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(200) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(68) });
 
             var rankChip = new Border
             {
-                Width = 22,
-                Height = 22,
-                CornerRadius = new CornerRadius(7),
-                Background = brush,
+                Width = 28,
+                Height = 28,
+                CornerRadius = new CornerRadius(14),
+                Background = new SolidColorBrush(Color.FromArgb(0x42, color.R, color.G, color.B)),
+                BorderBrush = new SolidColorBrush(color),
+                BorderThickness = new Thickness(1),
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 10, 0),
                 Child = new TextBlock
@@ -1471,13 +2041,13 @@ public partial class MainWindow : Window
                     Text = (i + 1).ToString(CultureInfo.CurrentCulture),
                     FontSize = ResolveFontSize("FontSizeMeta"),
                     FontWeight = FontWeight.Bold,
-                    Foreground = PickContrastBrush(color),
+                    Foreground = new SolidColorBrush(color),
                     HorizontalAlignment = HorizontalAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Center
                 }
             };
             Grid.SetColumn(rankChip, 0);
-            topLine.Children.Add(rankChip);
+            row.Children.Add(rankChip);
 
             var labelButton = new Button
             {
@@ -1491,27 +2061,30 @@ public partial class MainWindow : Window
             };
             labelButton.Click += async (_, e) => { e.Handled = true; await OpenTopArtistAsync(artist); };
             Grid.SetColumn(labelButton, 1);
-            topLine.Children.Add(labelButton);
+            row.Children.Add(labelButton);
+
+            var bar = DashboardBuildStatBar(
+                artist.Seconds, maxSecs, FindResource<IBrush>("AppAccentBrush") ?? Brushes.Cyan);
+            bar.Margin = new Thickness(12, 0);
+            bar.VerticalAlignment = VerticalAlignment.Center;
+            Grid.SetColumn(bar, 2);
+            row.Children.Add(bar);
 
             var durationTb = new TextBlock
             {
-                Text = FormatDashboardDuration(TimeSpan.FromSeconds(artist.Seconds)),
+                Text = Math.Round(artist.Seconds / 60).ToString("N0", CultureInfo.CurrentCulture),
                 FontSize = ResolveFontSize("FontSizeCaption"),
                 FontWeight = FontWeight.Medium,
                 Foreground = FindResource<IBrush>("AppSecondaryTextBrush"),
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(12, 0, 0, 0)
+                HorizontalAlignment = HorizontalAlignment.Right
             };
-            Grid.SetColumn(durationTb, 2);
-            topLine.Children.Add(durationTb);
-            row.Children.Add(topLine);
-
-            row.Children.Add(DashboardBuildStatBar(artist.Seconds, maxSecs, brush));
+            Grid.SetColumn(durationTb, 3);
+            row.Children.Add(durationTb);
             rows.Children.Add(row);
         }
 
-        panel.Child = rows;
-        return panel;
+        return rows;
     }
 
     /// <summary>Builds a small album cover for a top-albums row: local thumbnail, remote artwork, or initials.</summary>
@@ -1525,7 +2098,7 @@ public partial class MainWindow : Window
             Width = size,
             Height = size,
             Background = FindResource<IBrush>("AppArtworkPlaceholderBrush"),
-            CornerRadius = new CornerRadius(0, 10, 0, 10),
+            CornerRadius = new CornerRadius(8),
             ClipToBounds = true,
             VerticalAlignment = VerticalAlignment.Center
         };
@@ -1690,6 +2263,55 @@ public partial class MainWindow : Window
             await ShowTopLevelViewAsync("Tracks");
         else
             NavListBox.SelectedItem = tracksItem;
+    }
+
+    private async Task DashboardNavigateAsync(string tag)
+    {
+        PushCurrentNavigationState();
+        ResetDrilldownState(clearNavigationHistory: false);
+        _settings.LastMainView = tag;
+        var item = NavListBox.Items
+            .OfType<ListBoxItem>()
+            .FirstOrDefault(candidate => string.Equals(candidate.Tag as string, tag, StringComparison.Ordinal));
+        if (item is null || ReferenceEquals(NavListBox.SelectedItem, item))
+            await ShowTopLevelViewAsync(tag);
+        else
+            NavListBox.SelectedItem = item;
+    }
+
+    private async void DashboardRandomPlayback_OnClick(object? sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        await DashboardPlayRandomAsync();
+    }
+
+    private async Task DashboardPlayRandomAsync()
+    {
+        var path = await Task.Run(() =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            var candidates = db.GetTracksLite()
+                .Where(track => File.Exists(track.SourcePath))
+                .ToList();
+            return candidates.Count == 0
+                ? null
+                : candidates[Random.Shared.Next(candidates.Count)].Path;
+        });
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            StatusTextBlock.Text = LocalizationManager.Current.NoData;
+            return;
+        }
+
+        _queue.Clear();
+        _queue.Add(CreatePlaylistItem(path));
+        _queueIndex = 0;
+        ResetQueuePlaybackState();
+        PersistPlaybackQueue();
+        RefreshQueueNavigationButtons();
+        try { await StartPlaybackAsync(path); }
+        catch (OperationCanceledException) { StatusTextBlock.Text = LocalizationManager.Current.PlaybackStopped; }
+        catch (Exception ex) { StopPlayback(); StatusTextBlock.Text = ex.Message; }
     }
 
     private static string FormatDashboardDuration(TimeSpan value) =>

@@ -112,7 +112,7 @@ internal sealed class WaveformProgressControl : Control
         context.DrawRectangle(Brushes.Transparent, null, bounds);
 
         var neutral = GetBrush("AppSeparatorBrush", Color.FromRgb(84, 91, 104));
-        var accent = GetBrush("AppTransportAccentBrush", Color.FromRgb(79, 221, 189));
+        var accent = GetBrush("AppTransportAccentBrush", Color.FromRgb(32, 217, 232));
         var disabled = GetBrush("AppGridLineBrush", Color.FromRgb(42, 48, 58));
         var waveformBrush = IsEnabled ? neutral : disabled;
         var playedBrush = IsEnabled ? accent : disabled;

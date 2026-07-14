@@ -338,10 +338,15 @@ byte-range streaming without FFmpeg.
   track lists
 - Artist and album views with table and virtualized artwork modes, including
   Favorites-only filtering in both modes
-- Dashboard with recently played cards, mixed local/server recently added
-  albums, most-listened album/artist/genre analytics, a shared period selector,
-  a second-precision playback calendar, and linked genres that open the matching
-  filtered track list
+- Dashboard with an artwork-backed, gradient-outlined greeting hero, live
+  library counters (including local and configured Orynivo Server track
+  favorites), random
+  playback and queue shortcuts, parallel Recently Played/Recently Added artwork
+  strips, source and favorite state on history cards, a period-aware listening
+  seven-point labeled and smoothed listening-trend chart, compact proportional
+  genre/album/artist analytics, quick access, and a
+  clickable playback calendar. Album rankings retain artwork, and linked genres
+  open the matching filtered track list.
 - Clickable populated calendar days with a modal daily listening history;
   local title, album, and artist links open the corresponding library view,
   and title links immediately start playback

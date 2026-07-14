@@ -1,4 +1,5 @@
 using System.IO;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -162,6 +163,9 @@ public sealed record TrackLite(
 /// <param name="IsFavorite">Whether the album is flagged as a favorite.</param>
 /// <param name="ArtworkPath">Local 320-px thumbnail path for a crisp artwork card, or <see langword="null"/>.</param>
 public sealed record RecentAlbumInfo(long Id, string Title, string Artist, string? ThumbPath, long? ArtistId = null, long AddedAt = 0, bool IsFavorite = false, string? ArtworkPath = null);
+
+/// <summary>Compact library counters displayed in the dashboard hero.</summary>
+public sealed record DashboardLibrarySummary(int AlbumCount, int TrackCount, int ArtistCount, int FavoriteCount);
 
 /// <summary>Aggregated listening data for a single calendar day.</summary>
 public sealed record CalendarDayData(int Day, double TotalSeconds, IReadOnlyList<string> TopGenres);
@@ -3915,6 +3919,76 @@ public sealed class AudioDatabase : IDisposable
     // ------------------------------------------------------------------
     // Dashboard-Abfragen
     // ------------------------------------------------------------------
+
+    /// <summary>Returns the four dashboard counters without materialising library rows.</summary>
+    public DashboardLibrarySummary GetDashboardLibrarySummary()
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT (SELECT COUNT(*) FROM albums),
+                   (SELECT COUNT(*) FROM tracks),
+                   (SELECT COUNT(*) FROM artists),
+                   (SELECT COUNT(*) FROM tracks WHERE is_favorite != 0);
+            """;
+        using var reader = cmd.ExecuteReader();
+        return reader.Read()
+            ? new DashboardLibrarySummary(reader.GetInt32(0), reader.GetInt32(1), reader.GetInt32(2), reader.GetInt32(3))
+            : new DashboardLibrarySummary(0, 0, 0, 0);
+    }
+
+    /// <summary>Returns total listened seconds, optionally limited to history since a Unix timestamp.</summary>
+    public double GetTotalListeningSeconds(long? sinceUnix = null, long? untilUnix = null)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT COALESCE(SUM(position_seconds), 0)
+            FROM play_history
+            WHERE position_seconds > 0
+              AND ($since IS NULL OR started_at >= $since)
+              AND ($until IS NULL OR started_at < $until);
+            """;
+        cmd.Parameters.AddWithValue("$since", (object?)sinceUnix ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$until", (object?)untilUnix ?? DBNull.Value);
+        return Convert.ToDouble(cmd.ExecuteScalar() ?? 0, CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>Returns listened seconds split into equally sized chronological buckets.</summary>
+    public IReadOnlyList<double> GetListeningTrend(long? sinceUnix = null, int bucketCount = 5)
+    {
+        bucketCount = Math.Clamp(bucketCount, 2, 24);
+        var end = DateTimeOffset.Now.ToUnixTimeSeconds() + 1;
+        long start;
+        using (var startCmd = _conn.CreateCommand())
+        {
+            startCmd.CommandText = "SELECT COALESCE($since, MIN(started_at), $end) FROM play_history;";
+            startCmd.Parameters.AddWithValue("$since", (object?)sinceUnix ?? DBNull.Value);
+            startCmd.Parameters.AddWithValue("$end", end);
+            start = Convert.ToInt64(startCmd.ExecuteScalar() ?? end, CultureInfo.InvariantCulture);
+        }
+
+        var width = Math.Max(1d, (end - start) / (double)bucketCount);
+        var result = new double[bucketCount];
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT MIN($last, CAST((started_at - $start) / $width AS INTEGER)) AS bucket,
+                   SUM(position_seconds)
+            FROM play_history
+            WHERE position_seconds > 0 AND started_at >= $start AND started_at < $end
+            GROUP BY bucket;
+            """;
+        cmd.Parameters.AddWithValue("$last", bucketCount - 1);
+        cmd.Parameters.AddWithValue("$start", start);
+        cmd.Parameters.AddWithValue("$end", end);
+        cmd.Parameters.AddWithValue("$width", width);
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            var index = reader.GetInt32(0);
+            if (index >= 0 && index < result.Length)
+                result[index] = reader.GetDouble(1);
+        }
+        return result;
+    }
 
     public List<RecentAlbumInfo> GetRecentAlbums(int limit = 12)
     {
