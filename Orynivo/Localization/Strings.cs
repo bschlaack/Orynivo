@@ -241,6 +241,8 @@ public sealed record LocalizedStrings(
     public string ReplayGainTrack { get; init; } = "";
     /// <summary>Gets the album ReplayGain mode label.</summary>
     public string ReplayGainAlbum { get; init; } = "";
+    /// <summary>Gets the option label for calculating missing ReplayGain values during library scans.</summary>
+    public string CalculateReplayGainDuringScan { get; init; } = "";
     /// <summary>Gets the button label for calculating missing ReplayGain metadata.</summary>
     public string CalculateReplayGain { get; init; } = "";
     /// <summary>Gets the status text shown while missing ReplayGain metadata is calculated.</summary>

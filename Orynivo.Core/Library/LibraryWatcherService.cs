@@ -30,6 +30,7 @@ public sealed class LibraryWatcherService : IDisposable
     private HashSet<string> _configuredPaths = new(StringComparer.OrdinalIgnoreCase);
     private readonly Timer _fullScanTimer;
     private int _fullScanRunning;
+    private bool _calculateMissingReplayGain;
     private bool _disposed;
 
     /// <summary>
@@ -37,15 +38,31 @@ public sealed class LibraryWatcherService : IDisposable
     /// </summary>
     /// <param name="libraryChanged">Callback invoked after database or index content changes.</param>
     /// <param name="activityChanged">Optional callback invoked when background scan/index activity starts, progresses, or ends.</param>
-    public LibraryWatcherService(Action libraryChanged, Action<LibraryScanActivity>? activityChanged = null)
+    /// <param name="calculateMissingReplayGain">Whether scans should calculate ReplayGain values missing from file metadata.</param>
+    public LibraryWatcherService(
+        Action libraryChanged,
+        Action<LibraryScanActivity>? activityChanged = null,
+        bool calculateMissingReplayGain = true)
     {
         _libraryChanged = libraryChanged;
         _activityChanged = activityChanged;
+        _calculateMissingReplayGain = calculateMissingReplayGain;
         _fullScanTimer = new Timer(
             _ => _ = RunFullReconciliationAsync(),
             null,
             InitialFullScanDelay,
             FullScanInterval);
+    }
+
+    /// <summary>Updates whether future watcher and reconciliation scans calculate missing ReplayGain values.</summary>
+    /// <param name="calculateMissingReplayGain">Whether FFmpeg analysis should run for missing ReplayGain values.</param>
+    public void UpdateReplayGainAnalysis(bool calculateMissingReplayGain)
+    {
+        lock (_sync)
+        {
+            if (!_disposed)
+                _calculateMissingReplayGain = calculateMissingReplayGain;
+        }
     }
 
     /// <summary>
@@ -134,7 +151,13 @@ public sealed class LibraryWatcherService : IDisposable
             RaiseActivity(new LibraryScanActivity(true, 0, configuredPaths.Count));
             try
             {
-                if (await LibraryScanner.ApplyFileChangesAsync(configuredPaths, _cts.Token).ConfigureAwait(false))
+                bool calculateMissingReplayGain;
+                lock (_sync)
+                    calculateMissingReplayGain = _calculateMissingReplayGain;
+                if (await LibraryScanner.ApplyFileChangesAsync(
+                        configuredPaths,
+                        calculateMissingReplayGain,
+                        _cts.Token).ConfigureAwait(false))
                     _libraryChanged();
             }
             finally
@@ -186,11 +209,13 @@ public sealed class LibraryWatcherService : IDisposable
         try
         {
             List<string> roots;
+            bool calculateMissingReplayGain;
             lock (_sync)
             {
                 if (_disposed)
                     return;
                 roots = _configuredPaths.ToList();
+                calculateMissingReplayGain = _calculateMissingReplayGain;
             }
 
             var changed = false;
@@ -208,6 +233,7 @@ public sealed class LibraryWatcherService : IDisposable
                         var result = await LibraryScanner.ScanAsync(
                             root,
                             progress,
+                            calculateMissingReplayGain,
                             _cts.Token).ConfigureAwait(false);
                         changed |= result.Added > 0 || result.Updated > 0 || result.Removed > 0;
                     }

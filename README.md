@@ -313,7 +313,9 @@ byte-range streaming without FFmpeg.
 - Optional ReplayGain volume adjustment for PCM playback, using track or album
   gain metadata with fallback to the other available value; native DSD output
   remains bit-perfect. A small transport badge appears when ReplayGain is active
-  for the current PCM track.
+  for the current PCM track. Automatic FFmpeg calculation of missing ReplayGain
+  values during scans is optional and disabled by default; embedded tags are
+  always imported, and missing values can still be calculated manually.
 - Multiple named parametric PCM equalizers with one selected profile, a live
   frequency-response graph, editable preamp, dynamic filter rows, persisted
   on/off state, and Equalizer APO/AutoEQ text-profile import. Preamp, peak,
@@ -699,9 +701,12 @@ WASAPI output from the Windows default multimedia output device so playback
 works without manual setup. Named output profiles allow saving multiple backend and device
 combinations; a quick-pick popup on the transport bar switches between them
 without opening Settings. ReplayGain can be disabled or switched to
-track/album mode
-under the output-device settings. The first subsequent scan of each configured
-library root refreshes unchanged files once to import existing ReplayGain tags.
+track/album mode under the output-device settings. Automatic calculation of
+missing ReplayGain values during library scans can be enabled separately; it is
+disabled by default because analysing complete audio files makes initial scans
+substantially slower. The first subsequent scan of each configured library root
+refreshes unchanged files once to import existing ReplayGain tags regardless of
+that option. The dedicated calculation button can fill missing values later.
 Equalizer APO or AutoEQ `.txt`/`.cfg` profiles can be imported in the same
 section. `GraphicEQ` curves are translated into a log-frequency shelf cascade;
 the imported parameters are stored directly in `settings.json`, so the source

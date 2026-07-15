@@ -1192,10 +1192,6 @@
                             Orientation="Horizontal"
                             Margin="24,6,24,2"
                             IsVisible="False">
-                    <Ellipse Width="7" Height="7"
-                             Margin="0,0,7,0"
-                             VerticalAlignment="Center"
-                             Fill="{DynamicResource AppAccentBrush}"/>
                     <TextBlock x:Name="LibraryActivityTextBlock"
                                Foreground="{DynamicResource AppAccentBrush}"
                                FontSize="{DynamicResource FontSizeMeta}"

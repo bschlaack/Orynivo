@@ -36,6 +36,8 @@ public sealed class AppSettings
     public double Volume { get; set; } = 1.0;
     /// <summary>Gets or sets the ReplayGain mode used for PCM playback.</summary>
     public ReplayGainMode ReplayGainMode { get; set; } = ReplayGainMode.Off;
+    /// <summary>Gets or sets a value indicating whether library scans calculate missing ReplayGain values through FFmpeg.</summary>
+    public bool CalculateMissingReplayGainDuringScan { get; set; }
     /// <summary>Gets or sets a value indicating whether DSF and DFF sources always use the PCM playback path.</summary>
     public bool AlwaysConvertDsdToPcm { get; set; }
     /// <summary>Gets or sets a value indicating whether PCM playback receives an additional +6 dB output boost.</summary>

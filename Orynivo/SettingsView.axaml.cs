@@ -111,6 +111,7 @@ internal partial class SettingsView : UserControl
         ReplayGainModeComboBox.SelectedItem =
             replayGainChoices.FirstOrDefault(choice => choice.Value == settings.ReplayGainMode)
             ?? replayGainChoices[0];
+        CalculateReplayGainDuringScanCheckBox.IsChecked = settings.CalculateMissingReplayGainDuringScan;
         AlwaysConvertDsdToPcmCheckBox.IsChecked = settings.AlwaysConvertDsdToPcm;
         PcmOutputBoostCheckBox.IsChecked = settings.PcmOutputBoostEnabled;
         NonGaplessCrossfadeNumericUpDown.Value = (decimal)Math.Clamp(
@@ -257,6 +258,8 @@ internal partial class SettingsView : UserControl
         ReplayGainModeComboBox.SelectedItem is SettingChoice<ReplayGainMode> choice
             ? choice.Value
             : ReplayGainMode.Off;
+    /// <summary>Gets a value indicating whether scans should calculate missing ReplayGain values.</summary>
+    public bool CalculateMissingReplayGainDuringScan => CalculateReplayGainDuringScanCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether DSF and DFF sources should always be converted to PCM.</summary>
     public bool AlwaysConvertDsdToPcm => AlwaysConvertDsdToPcmCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether PCM playback should receive the additional output boost.</summary>
@@ -1466,7 +1469,11 @@ internal partial class SettingsView : UserControl
                 statusBlock.Text = $"{p.Current}/{p.Total} – {Path.GetFileName(p.CurrentFile)}");
             try
             {
-                var result = await LibraryScanner.ScanAsync(path, progress, cts.Token);
+                var result = await LibraryScanner.ScanAsync(
+                    path,
+                    progress,
+                    CalculateMissingReplayGainDuringScan,
+                    cts.Token);
                 var failed = result.Failed > 0
                     ? $" · {string.Format(LocalizationManager.Current.ScanFailed, result.Failed)}"
                     : string.Empty;
