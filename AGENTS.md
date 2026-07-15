@@ -1,5 +1,42 @@
 # AGENTS.md
 
+## Mandatory Completion Checklist
+
+Before completing any code change:
+
+1. Build and test every affected project in proportion to the change.
+2. Update `CHANGELOG.md` under **Unreleased** for every notable user-visible,
+   architectural, build, compatibility, or bug-fix change.
+3. Update `README.md` whenever features, requirements, build steps, supported
+   formats, or known limitations change.
+4. Update this file or the applicable nested `AGENTS.md` whenever architecture,
+   behavior, invariants, or implementation constraints change.
+5. Add or update English XML documentation for every affected public or
+   internal C# type and member, including parameter and return documentation.
+6. Add every new or changed visible string to German, English, French, and
+   Spanish localization resources; never hard-code visible UI text.
+7. Verify that credentials, authenticated URLs, and secrets are not persisted,
+   logged, documented, or exposed to models.
+
+Documentation and verification are part of the implementation. They must not
+be deferred until the user asks for them separately.
+
+## Instruction Routing
+
+The closest `AGENTS.md` applies in addition to this repository-wide file:
+
+- `Orynivo/AGENTS.md` — Avalonia UI, navigation, playback, Dashboard, remote
+  library integration, localization, and Windows-specific behavior.
+- `Orynivo.Core/AGENTS.md` — cross-platform library, database, scanning, search,
+  web, audio-processing primitives, and streaming contracts/clients.
+- `Orynivo.Server/AGENTS.md` — ASP.NET endpoints, authentication, configuration,
+  packaging, service operation, and server-side caches.
+- `Native/AGENTS.md` — Steinberg ASIO/cwASIO bridge code and native builds.
+
+Read the applicable nested file before editing files in that subtree. The long
+sections below remain the detailed project reference and must not override the
+completion checklist above.
+
 ## Project Overview
 
 Windows audio player with:
@@ -620,6 +657,16 @@ startup with `UnauthorizedAccessException`/`SIGABRT`.
   artwork hydrates lazily as rows or artwork cards become visible; downloaded
   remote artwork is cached client-side under
   `%LOCALAPPDATA%\Orynivo\remote-artworks\`.
+  In the shared Artists view and global search, local and Orynivo Server artists
+  with the same `ArtistNameNormalizer.CreateComparisonKey` are represented by
+  one `UnifiedArtist` row with an `L+OS` source badge. Opening that row loads and
+  combines the matching artist's albums from the local library and every
+  configured Orynivo Server; each album row must retain its own source IDs and
+  `OrynivoServer` context so album navigation, artwork, and favorites continue
+  to route correctly. Dashboard artist analytics use the same unified drill-down,
+  Back navigation restores it as `UnifiedArtistAlbums`, and changing the unified
+  artist favorite applies to every matching local and remote artist identity.
+  Plex artists remain separate and must not be folded into this identity.
   Mixed local/server rows expose stable source keys (`local` and `server:<id>`)
   for the source column, the Tracks source facet, and source-aware smart
   playlists. The visible source column belongs directly after the favorite
@@ -1761,19 +1808,23 @@ asynchronous file I/O from the UI thread
   `DashboardCreateSectionHeader` (accent underline, optional month navigation).
   The page contains, top to bottom:
   0. **Greeting hero** (`DashboardBuildGreeting`): a 210-px hero with a
-  cyan-to-blue gradient outline
+  3-px rounded rim that uses a lightened version of the same background artwork
   using the linked `Logo/bg.png` asset (`Assets/DashboardHeroBackground.png` at
   runtime). It contains the localized time-of-day greeting, welcome overline and
-  descriptive text; working random-play and Up Next buttons; and four live
+  descriptive text (all explicitly left-aligned within the hero content column);
+  working random-play and Up Next buttons; and four live
   album, track, artist, and favorite counters. Local aggregates come from
   `AudioDatabase.GetDashboardLibrarySummary()`; the favorite counter additionally
-  includes the client-side track favorites of every currently configured Orynivo
-  Server through `GetOrynivoFavoriteTrackIds`. The database query returns only
+  includes only client-side track favorites that still occur in each configured
+  Orynivo Server's current facets and resolve through `GetTracksByIdsAsync`
+  (`ResolveDashboardRemoteFavoriteTrackCountAsync`). Stale IDs and unavailable
+  servers must not make the hero/Quick Access count differ from the Favorites
+  view. The database query returns only
   aggregate counts and must not materialize complete library lists. The four
   counters are compact 148-px cards in a right-aligned horizontal group; their
   circular icon badges remain left-aligned above the value and label.
   1. **Recently played** (`DashboardBuildRecentlyPlayed`, when history exists):
-  a horizontal strip of up to 12 cards from `GetRecentHistory` (deduped by path)
+  a horizontal carousel of up to 20 cards from `GetRecentHistory` (deduped by path)
   placed beside Recently Added in a matching surface card. History cards use the
   same 180 × 276 proportions and 160-px cover size as album artwork cards. Each
   shows a local/remote album thumbnail or `InitialsAvatar`, hover play overlay,
@@ -1786,7 +1837,7 @@ asynchronous file I/O from the UI thread
   buttons plays it **in place** through `PlayHistoryEntryInPlaceAsync` (replaces
   the queue with just that track and starts playback) without leaving the
   dashboard.
-  2. **Recently added albums**: horizontal artwork strip of up to 12 albums,
+  2. **Recently added albums**: horizontal artwork carousel of up to 20 albums,
   merging the local library with every configured remote Orynivo Server
   (`LoadRecentAlbumsAsync`, sorted by each album's last-added timestamp). Cards
   are the **same** artwork cards as the Albums view: each `DashboardAlbum` is
@@ -1810,10 +1861,15 @@ asynchronous file I/O from the UI thread
   Listening stats card, defaults to Last 30 days, and governs listening, genre,
   album, and artist data (All time / This year / This month / Last 30 days / Last
   7 days); changing it rebuilds the dashboard. Listening data comes from
-  `GetTotalListeningSeconds` and `GetListeningTrend`, is drawn from seven
-  chronological buckets as a cyan line/area chart with a minute Y-axis, localized
-  date/month X-axis, and Catmull-Rom-derived cubic Bézier segments (never straight
-  point-to-point joins). The area under the line uses a vertical cyan-to-nearly-
+  `GetTotalListeningSeconds` and `GetListeningTrend`. The trend uses daily points
+  for Last 7 days, Last 30 days, and the elapsed current month; This year and All
+  time use 12 buckets. At most seven localized date/month labels are rendered on
+  the X-axis independently of the point count. The minute Y-axis ends at a rounded
+  scale value strictly above the peak so the smoothed curve retains headroom. The
+  cyan line uses Catmull-Rom-derived cubic Bézier segments (never straight
+  point-to-point joins). Clamp each segment's two Bézier control-point Y values
+  to the range of that segment's real endpoints so smoothing can never invent a
+  peak or trough outside the measured values. The area under the line uses a vertical cyan-to-nearly-
   transparent gradient; do not replace it with a flat fill. It compares with the
   immediately preceding period where one exists. Quick access links to favorites,
   Up Next, full recent history, and
@@ -1823,6 +1879,17 @@ asynchronous file I/O from the UI thread
   switches at a 980-px threshold
   (`ComputeDashboardTwoColumn`) and re-flows on the
   `DashboardScrollViewer.SizeChanged` boundary crossing only.
+  The wide overview uses equal star-width columns with fixed gaps and no outside
+  card margins, so its outer edges align with the media cards above; all cards in
+  one row stretch to a common height.
+  Every listening-trend point has its own transparent hover zone and tooltip
+  containing the corresponding localized date and listened-minute value; sparse
+  X-axis labels must not reduce tooltip granularity.
+  Because the chart path uses `Stretch.Fill`, its geometry must retain the
+  zero-length `M 0,0 L 0,0` origin anchor before the curve. Without that anchor,
+  Avalonia normalizes the curve's own peak to the top and falsifies the Y scale.
+  Recently Played cards must not assign borders from pointer handlers; their
+  normal and gradient hover borders come exclusively from `motionCard` styles.
      - **Calendar** (`DashboardBuildCalendarCard`): compact Monday-first month
      grid with day numbers, today highlight, activity dots, month navigation,
      tooltips, and clickable populated days.
@@ -1855,7 +1922,7 @@ asynchronous file I/O from the UI thread
   (`DashboardBuildMediaSectionCard`). It opens a full-page view
   (`ShowAllRecentlyPlayedAsync` /
   `ShowAllRecentAlbumsAsync`) that reuses the dashboard scroll surface and shows
-  up to 200 entries in a `WrapPanel` of the same cards (identical double-click /
+  up to 100 entries in a `WrapPanel` of the same cards (identical double-click /
   click behaviour). These views are pseudo-top-level tags `RecentlyPlayedAll` /
   `RecentAlbumsAll` handled in `ShowTopLevelViewAsync`
   (`BuildAllRecentlyPlayedViewAsync` / `BuildAllRecentAlbumsViewAsync`); opening
@@ -1864,7 +1931,12 @@ asynchronous file I/O from the UI thread
   view. `DashboardScrollViewer.SizeChanged` only re-flows the real dashboard
   (`_currentTopLevelTag == "Dashboard"`), never the full-page views. Dashboard
   album and recently-played thumbnails decode off the UI thread
-  (`LoadDashboardLocalArtworkAsync`) so the 200-item views build without a hitch.
+  (`LoadDashboardLocalArtworkAsync`) so the 100-item views build without a hitch.
+  Each 20-item strip has smoothly animated vector previous/next buttons in the
+  header immediately before **Show all**. These buttons must not overlay or hide
+  any artwork card, and their layout slots remain visible at both ends: unavailable
+  directions are disabled and muted rather than hidden. Keep their compact size
+  aligned with the **Show all** link and leave a clear gap before that link.
 - Clicking a calendar day with playback opens a modal history table with playback
   time, media type, title, artist, album, listened duration, and total duration
 - Local-track title links in daily history open Tracks, select the title, and
@@ -1985,8 +2057,9 @@ asynchronous file I/O from the UI thread
 - **Playlists**: display position, title, artist, album, and duration; sidebar
   entries open their live track list. Playlist tables include a first-column
   favorite heart and a source column immediately beside it.
-- **Smart playlists**: store JSON criteria instead of track rows, show a gold
-  lightning icon, resolve live when opened, and do not permit manual entry
+- **Smart playlists**: store JSON criteria instead of track rows, show an orange
+  vector lightning icon using the same 13-px footprint and spacing as other
+  sidebar icons, resolve live when opened, and do not permit manual entry
   removal. Criteria can include favourites, genre, format, bitrate, year,
   artist, album, duration, recently added/played windows, never played,
   playback-count ranges, alphabetical/random/recent/least-recent ordering, and

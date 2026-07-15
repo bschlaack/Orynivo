@@ -130,8 +130,9 @@ public partial class MainWindow : Window
                 using var db = AudioDatabase.OpenDefault();
                 return db.GetDashboardLibrarySummary();
             });
-            var remoteFavoriteTrackCount = (_settings.OrynivoServers ?? [])
-                .Sum(server => GetOrynivoFavoriteTrackIds(server).Count);
+            var remoteFavoriteTrackCount = await ResolveDashboardRemoteFavoriteTrackCountAsync();
+            if (buildVersion != _dashboardBuildVersion)
+                return;
             librarySummary = librarySummary with
             {
                 FavoriteCount = librarySummary.FavoriteCount + remoteFavoriteTrackCount
@@ -139,7 +140,7 @@ public partial class MainWindow : Window
             if (buildVersion != _dashboardBuildVersion)
                 return;
 
-            var (recentlyPlayed, recentThumbs, recentFavorites) = await LoadRecentlyPlayedAsync(12);
+            var (recentlyPlayed, recentThumbs, recentFavorites) = await LoadRecentlyPlayedAsync(20);
             if (buildVersion != _dashboardBuildVersion)
                 return;
 
@@ -156,7 +157,7 @@ public partial class MainWindow : Window
             {
                 using var db = AudioDatabase.OpenDefault();
                 var total = db.GetTotalListeningSeconds(since);
-                var trend = db.GetListeningTrend(since, 7);
+                var trend = db.GetListeningTrend(since, DashboardListeningBucketCount(_dashboardStatsPeriod));
                 double previous = 0;
                 if (since is long currentStart)
                 {
@@ -282,7 +283,7 @@ public partial class MainWindow : Window
         _calendarInner = null;
         SearchTextBox.IsVisible = false;
 
-        var albums = await LoadRecentAlbumsAsync(200);
+        var albums = await LoadRecentAlbumsAsync(100);
         DashboardPanel.Children.Add(DashboardCreateSectionHeader(LocalizationManager.Current.RecentAlbums));
         var wrap = new WrapPanel { Orientation = Orientation.Horizontal };
         var template = FindResource<IDataTemplate>("AlbumArtworkCardTemplate");
@@ -301,7 +302,7 @@ public partial class MainWindow : Window
         _calendarInner = null;
         SearchTextBox.IsVisible = false;
 
-        var (entries, thumbs, favorites) = await LoadRecentlyPlayedAsync(200);
+        var (entries, thumbs, favorites) = await LoadRecentlyPlayedAsync(100);
         DashboardPanel.Children.Add(DashboardCreateSectionHeader(LocalizationManager.Current.RecentlyPlayed));
         var wrap = new WrapPanel { Orientation = Orientation.Horizontal };
         foreach (var entry in entries)
@@ -325,11 +326,23 @@ public partial class MainWindow : Window
         {
             Height = 210,
             Background = FindResource<IBrush>("DashboardHeroBackgroundBrush"),
-            BorderBrush = FindResource<IBrush>("DashboardHeroBorderBrush") ?? FindResource<IBrush>("AppAccentBrush"),
-            BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(16),
             ClipToBounds = true,
-            Padding = new Thickness(30, 24)
+        };
+        var heroLayers = new Grid();
+        heroLayers.Children.Add(new Border
+        {
+            Background = new SolidColorBrush(Color.FromArgb(0x38, 0xFF, 0xFF, 0xFF)),
+            CornerRadius = new CornerRadius(16),
+            IsHitTestVisible = false
+        });
+        var heroContent = new Border
+        {
+            Margin = new Thickness(3),
+            Background = FindResource<IBrush>("DashboardHeroBackgroundBrush"),
+            CornerRadius = new CornerRadius(13),
+            ClipToBounds = true,
+            Padding = new Thickness(27, 21)
         };
         var layout = new Grid();
         layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.05, GridUnitType.Star) });
@@ -359,6 +372,8 @@ public partial class MainWindow : Window
             Foreground = new SolidColorBrush(Color.Parse("#C3D1E7")),
             TextWrapping = TextWrapping.Wrap,
             MaxWidth = 430,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            TextAlignment = TextAlignment.Left,
             Margin = new Thickness(0, 2, 0, 10)
         });
 
@@ -398,7 +413,9 @@ public partial class MainWindow : Window
         }
         Grid.SetColumn(stats, 2);
         layout.Children.Add(stats);
-        hero.Child = layout;
+        heroContent.Child = layout;
+        heroLayers.Children.Add(heroContent);
+        hero.Child = heroLayers;
         DashboardPanel.Children.Add(hero);
     }
 
@@ -600,7 +617,7 @@ public partial class MainWindow : Window
     /// </summary>
     /// <param name="perSource">Maximum entries to fetch per source and to return overall.</param>
     /// <returns>The merged, recency-sorted recently added albums.</returns>
-    private async Task<List<DashboardAlbum>> LoadRecentAlbumsAsync(int perSource = 12)
+    private async Task<List<DashboardAlbum>> LoadRecentAlbumsAsync(int perSource = 20)
     {
         var local = await Task.Run(() =>
         {
@@ -676,33 +693,43 @@ public partial class MainWindow : Window
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(14) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
+        var playedContent = recentlyPlayed.Count == 0
+            ? DashboardNoDataText()
+            : DashboardCreateRecentlyPlayedStrip(recentlyPlayed, recentThumbs, recentFavorites);
         var playedCard = DashboardBuildMediaSectionCard(
             LocalizationManager.Current.RecentlyPlayed,
             () => _ = ShowAllRecentlyPlayedAsync(),
-            recentlyPlayed.Count == 0
-                ? DashboardNoDataText()
-                : DashboardCreateRecentlyPlayedStrip(recentlyPlayed, recentThumbs, recentFavorites));
+            playedContent,
+            playedContent as ScrollViewer);
         Grid.SetColumn(playedCard, 0);
         grid.Children.Add(playedCard);
 
+        var albumsContent = recentAlbums.Count == 0
+            ? DashboardNoDataText()
+            : DashboardCreateRecentAlbumsStrip(recentAlbums);
         var albumsCard = DashboardBuildMediaSectionCard(
             LocalizationManager.Current.RecentAlbums,
             () => _ = ShowAllRecentAlbumsAsync(),
-            recentAlbums.Count == 0
-                ? DashboardNoDataText()
-                : DashboardCreateRecentAlbumsStrip(recentAlbums));
+            albumsContent,
+            albumsContent as ScrollViewer);
         Grid.SetColumn(albumsCard, 2);
         grid.Children.Add(albumsCard);
         DashboardPanel.Children.Add(grid);
     }
 
-    private Border DashboardBuildMediaSectionCard(string title, Action showAllAction, Control content)
+    private Border DashboardBuildMediaSectionCard(
+        string title,
+        Action showAllAction,
+        Control content,
+        ScrollViewer? carousel = null)
     {
         var layout = new Grid();
         layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         var header = new Grid { Margin = new Thickness(2, 0, 2, 10) };
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         header.Children.Add(new TextBlock
         {
@@ -712,6 +739,49 @@ public partial class MainWindow : Window
             Foreground = FindResource<IBrush>("AppPrimaryTextBrush"),
             VerticalAlignment = VerticalAlignment.Center
         });
+        if (carousel is not null)
+        {
+            var previous = DashboardCreateCarouselButton(forward: false);
+            var next = DashboardCreateCarouselButton(forward: true);
+            var isAnimating = false;
+            previous.IsEnabled = false;
+            next.IsEnabled = false;
+
+            void UpdateButtons()
+            {
+                previous.IsEnabled = !isAnimating && carousel.Offset.X > 1;
+                next.IsEnabled = !isAnimating &&
+                                 carousel.Offset.X + carousel.Viewport.Width < carousel.Extent.Width - 1;
+                previous.Opacity = previous.IsEnabled ? 0.92 : 0.35;
+                next.Opacity = next.IsEnabled ? 0.92 : 0.35;
+            }
+
+            previous.Click += async (_, e) =>
+            {
+                e.Handled = true;
+                isAnimating = true;
+                UpdateButtons();
+                await DashboardScrollCarouselAsync(carousel, -1);
+                isAnimating = false;
+                UpdateButtons();
+            };
+            next.Click += async (_, e) =>
+            {
+                e.Handled = true;
+                isAnimating = true;
+                UpdateButtons();
+                await DashboardScrollCarouselAsync(carousel, 1);
+                isAnimating = false;
+                UpdateButtons();
+            };
+            carousel.ScrollChanged += (_, _) => UpdateButtons();
+            carousel.SizeChanged += (_, _) => UpdateButtons();
+            Grid.SetColumn(previous, 1);
+            Grid.SetColumn(next, 2);
+            header.Children.Add(previous);
+            header.Children.Add(next);
+        }
+
         var showAll = new Button
         {
             Content = LocalizationManager.Current.ShowAll,
@@ -719,10 +789,13 @@ public partial class MainWindow : Window
             FontWeight = FontWeight.SemiBold,
             Foreground = FindResource<IBrush>("AppAccentBrush"),
             Theme = FindResource<ControlTheme>("EntityLinkButtonTheme"),
-            HorizontalAlignment = HorizontalAlignment.Right
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(10, 0, 0, 0),
+            RenderTransform = new TranslateTransform(0, 2)
         };
         showAll.Click += (_, e) => { e.Handled = true; showAllAction(); };
-        Grid.SetColumn(showAll, 1);
+        Grid.SetColumn(showAll, 3);
         header.Children.Add(showAll);
         layout.Children.Add(header);
         Grid.SetRow(content, 1);
@@ -831,6 +904,75 @@ public partial class MainWindow : Window
         return scroll;
     }
 
+    private static async Task DashboardScrollCarouselAsync(ScrollViewer scroll, double direction)
+    {
+        var start = scroll.Offset.X;
+        var step = Math.Max(180, scroll.Viewport.Width * 0.8);
+        var maximum = Math.Max(0, scroll.Extent.Width - scroll.Viewport.Width);
+        var target = Math.Clamp(start + direction * step, 0, maximum);
+        const int frameCount = 12;
+        for (var frame = 1; frame <= frameCount; frame++)
+        {
+            var progress = frame / (double)frameCount;
+            var eased = 1 - Math.Pow(1 - progress, 3);
+            scroll.Offset = new Vector(start + (target - start) * eased, scroll.Offset.Y);
+            await Task.Delay(16);
+        }
+    }
+
+    private async Task<int> ResolveDashboardRemoteFavoriteTrackCountAsync()
+    {
+        var tasks = (_settings.OrynivoServers ?? [])
+            .Select(async server =>
+            {
+                try
+                {
+                    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+                    var facets = await _orynivoClient.GetTrackFacetsAsync(server, timeout.Token);
+                    var favoriteIds = facets
+                        .Where(facet => IsOrynivoFavorite(server, "Track", facet.Id))
+                        .Select(facet => facet.Id)
+                        .Distinct()
+                        .ToList();
+                    if (favoriteIds.Count == 0)
+                        return 0;
+
+                    var tracks = await CreateOrynivoCatalogProvider(server)
+                        .GetTracksByIdsAsync(favoriteIds, timeout.Token);
+                    return tracks.Select(track => track.Id).Distinct().Count();
+                }
+                catch
+                {
+                    // The favorite view also omits a server that cannot resolve its rows.
+                    return 0;
+                }
+            });
+        var counts = await Task.WhenAll(tasks);
+        return counts.Sum();
+    }
+
+    private Button DashboardCreateCarouselButton(bool forward)
+    {
+        var button = CreateCalNavButton(string.Empty);
+        button.Width = 26;
+        button.Height = 26;
+        button.Margin = new Thickness(2, 0);
+        button.VerticalAlignment = VerticalAlignment.Center;
+        button.Opacity = 0.92;
+        button.Content = new AvaloniaPath
+        {
+            Width = 7,
+            Height = 12,
+            Stretch = Stretch.Fill,
+            Data = Geometry.Parse(forward ? "M 0 0 L 7 6 L 0 12" : "M 7 0 L 0 6 L 7 12"),
+            Stroke = FindResource<IBrush>("AppPrimaryTextBrush"),
+            StrokeThickness = 1.8,
+            StrokeLineCap = PenLineCap.Round,
+            StrokeJoin = PenLineJoin.Round
+        };
+        return button;
+    }
+
     /// <summary>Builds a compact recently played card for the dashboard strip or full-page history grid.</summary>
     /// <param name="entry">Playback-history entry to render.</param>
     /// <param name="thumbs">Local album thumbnail paths keyed by album identifier.</param>
@@ -850,9 +992,6 @@ public partial class MainWindow : Window
         var isFavorite = isRemote
             ? IsOrynivoFavorite(favoriteServer, "Track", favoriteRemoteTrackId)
             : entry.TrackId is long localTrackId && favoriteTrackIds.Contains(localTrackId);
-        var normalBorderBrush = FindResource<IBrush>("AppGridLineBrush");
-        var hoverBorderBrush = FindResource<IBrush>("AppAccentBrush");
-
         var card = new Border
         {
             Width           = 180,
@@ -862,8 +1001,6 @@ public partial class MainWindow : Window
                 : new Thickness(8),
             Padding         = new Thickness(10),
             Background      = FindResource<IBrush>("AppSurfaceBrush"),
-            BorderBrush     = normalBorderBrush,
-            BorderThickness = new Thickness(1),
             CornerRadius    = new CornerRadius(12),
             Cursor          = new Cursor(playable ? StandardCursorType.Hand : StandardCursorType.Arrow)
         };
@@ -1067,13 +1204,11 @@ public partial class MainWindow : Window
 
         card.PointerEntered += (_, _) =>
         {
-            card.BorderBrush = hoverBorderBrush;
             if (playable)
                 playOverlay.IsVisible = true;
         };
         card.PointerExited += (_, _) =>
         {
-            card.BorderBrush = normalBorderBrush;
             if (playable)
                 playOverlay.IsVisible = false;
         };
@@ -1393,11 +1528,28 @@ public partial class MainWindow : Window
         IReadOnlyList<double> listeningTrend,
         DashboardLibrarySummary librarySummary)
     {
-        var overview = new UniformGrid();
+        var overview = new Grid();
         var wide = _dashboardTwoColumnLayout == true;
-        var columns = wide ? 4 : 2;
-        overview.Columns = columns;
-        overview.Rows = wide ? 1 : 2;
+        if (wide)
+        {
+            for (var column = 0; column < 7; column++)
+                overview.ColumnDefinitions.Add(new ColumnDefinition
+                {
+                    Width = column % 2 == 0
+                        ? new GridLength(1, GridUnitType.Star)
+                        : new GridLength(12)
+                });
+            overview.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        }
+        else
+        {
+            overview.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            overview.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12) });
+            overview.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            overview.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            overview.RowDefinitions.Add(new RowDefinition { Height = new GridLength(12) });
+            overview.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        }
 
         var cards = new Control[]
         {
@@ -1410,7 +1562,8 @@ public partial class MainWindow : Window
         };
         for (var i = 0; i < cards.Length; i++)
         {
-            cards[i].Margin = new Thickness(6);
+            Grid.SetColumn(cards[i], wide ? i * 2 : (i % 2) * 2);
+            Grid.SetRow(cards[i], wide ? 0 : (i / 2) * 2);
             overview.Children.Add(cards[i]);
         }
         DashboardPanel.Children.Add(overview);
@@ -1489,8 +1642,9 @@ public partial class MainWindow : Window
         var values = listeningTrend.Count > 1
             ? listeningTrend.ToArray()
             : new double[] { 0, 0, 0, 0, 0, 0, 0 };
-        var maxSeconds = Math.Max(60, values.Max());
-        var maxMinutes = Math.Ceiling(maxSeconds / 60);
+        var peakMinutes = Math.Max(1, values.Max() / 60);
+        var maxMinutes = DashboardNiceAxisMaximum(peakMinutes);
+        var maxSeconds = maxMinutes * 60;
         const double plotWidth = 300;
         const double plotHeight = 82;
         const double topPadding = 5;
@@ -1536,7 +1690,11 @@ public partial class MainWindow : Window
             index * plotWidth / Math.Max(1, values.Length - 1),
             bottomY - value / maxSeconds * (bottomY - topPadding))).ToList();
         var smoothLine = DashboardBuildSmoothCurve(points);
-        var areaData = $"{smoothLine} L {plotWidth.ToString(CultureInfo.InvariantCulture)},{plotHeight.ToString(CultureInfo.InvariantCulture)} L 0,{plotHeight.ToString(CultureInfo.InvariantCulture)} Z";
+        // Anchor the geometry at the logical chart origin. Without this zero-length
+        // subpath Avalonia's Stretch.Fill normalizes the curve's own highest point
+        // to the top edge, which visually changes the Y scale whenever no value
+        // reaches the configured axis maximum.
+        var areaData = $"M 0,0 L 0,0 {smoothLine} L {plotWidth.ToString(CultureInfo.InvariantCulture)},{plotHeight.ToString(CultureInfo.InvariantCulture)} L 0,{plotHeight.ToString(CultureInfo.InvariantCulture)} Z";
         plot.Children.Add(new AvaloniaPath
         {
             Data = Geometry.Parse(areaData),
@@ -1557,6 +1715,21 @@ public partial class MainWindow : Window
             StrokeLineCap = PenLineCap.Round,
             StrokeJoin = PenLineJoin.Round
         });
+
+        var hoverZones = new Grid { Background = Brushes.Transparent };
+        var pointDates = DashboardListeningDates(values.Length);
+        for (var index = 0; index < values.Length; index++)
+        {
+            hoverZones.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            var hitZone = new Border { Background = Brushes.Transparent };
+            ToolTip.SetTip(
+                hitZone,
+                $"{pointDates[index].ToString("d", CultureInfo.CurrentCulture)} · " +
+                $"{values[index] / 60:N0} {LocalizationManager.Current.DashboardMinutesShort}");
+            Grid.SetColumn(hitZone, index);
+            hoverZones.Children.Add(hitZone);
+        }
+        plot.Children.Add(hoverZones);
         Grid.SetColumn(plot, 1);
         outer.Children.Add(plot);
 
@@ -1573,7 +1746,7 @@ public partial class MainWindow : Window
         outer.Children.Add(unit);
 
         var xLegend = new Grid { Margin = new Thickness(0, 4, 0, 0) };
-        var xLabels = DashboardListeningLegendLabels(values.Length);
+        var xLabels = DashboardListeningLegendLabels(Math.Min(7, values.Length));
         for (var i = 0; i < xLabels.Count; i++)
         {
             xLegend.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -1604,6 +1777,10 @@ public partial class MainWindow : Window
             var p3 = i + 2 < points.Count ? points[i + 2] : p2;
             var c1 = new Point(p1.X + (p2.X - p0.X) / 6, p1.Y + (p2.Y - p0.Y) / 6);
             var c2 = new Point(p2.X - (p3.X - p1.X) / 6, p2.Y - (p3.Y - p1.Y) / 6);
+            var minimumY = Math.Min(p1.Y, p2.Y);
+            var maximumY = Math.Max(p1.Y, p2.Y);
+            c1 = new Point(c1.X, Math.Clamp(c1.Y, minimumY, maximumY));
+            c2 = new Point(c2.X, Math.Clamp(c2.Y, minimumY, maximumY));
             path.Append($"C {DashboardPoint(c1)} {DashboardPoint(c2)} {DashboardPoint(p2)} ");
         }
         return path.ToString();
@@ -1612,7 +1789,35 @@ public partial class MainWindow : Window
     private static string DashboardPoint(Point point) =>
         $"{point.X.ToString("0.###", CultureInfo.InvariantCulture)},{point.Y.ToString("0.###", CultureInfo.InvariantCulture)}";
 
+    private static double DashboardNiceAxisMaximum(double peakMinutes)
+    {
+        var roughStep = Math.Max(1, peakMinutes / 4);
+        var magnitude = Math.Pow(10, Math.Floor(Math.Log10(roughStep)));
+        var normalized = roughStep / magnitude;
+        var step = (normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10) * magnitude;
+        var maximum = Math.Ceiling(peakMinutes / step) * step;
+        if (maximum <= peakMinutes + 0.0001)
+            maximum += step;
+        return maximum;
+    }
+
+    private static int DashboardListeningBucketCount(StatsPeriod period) => period switch
+    {
+        StatsPeriod.Last7Days => 7,
+        StatsPeriod.Last30Days => 30,
+        StatsPeriod.ThisMonth => Math.Max(2, DateTime.Now.Day),
+        StatsPeriod.ThisYear => 12,
+        _ => 12
+    };
+
     private IReadOnlyList<string> DashboardListeningLegendLabels(int count)
+        => DashboardListeningDates(count)
+            .Select(date => _dashboardStatsPeriod == StatsPeriod.ThisYear
+                ? date.ToString("MMM", CultureInfo.CurrentCulture)
+                : date.ToString("dd.MM", CultureInfo.CurrentCulture))
+            .ToList();
+
+    private IReadOnlyList<DateTime> DashboardListeningDates(int count)
     {
         var now = DateTime.Now.Date;
         DateTime start = _dashboardStatsPeriod switch
@@ -1625,9 +1830,6 @@ public partial class MainWindow : Window
         };
         return Enumerable.Range(0, count)
             .Select(i => start.AddTicks((now - start).Ticks * i / Math.Max(1, count - 1)))
-            .Select(date => _dashboardStatsPeriod == StatsPeriod.ThisYear
-                ? date.ToString("MMM", CultureInfo.CurrentCulture)
-                : date.ToString("dd.MM", CultureInfo.CurrentCulture))
             .ToList();
     }
 
@@ -1662,6 +1864,7 @@ public partial class MainWindow : Window
         var rows = new StackPanel { Spacing = 7, HorizontalAlignment = HorizontalAlignment.Stretch };
         rows.Children.Add(DashboardQuickAccessButton("♡", LocalizationManager.Current.Favorites, async () =>
         {
+            ClearTrackFacetFilters();
             _trackFavoritesOnly = true;
             await DashboardNavigateAsync("Tracks");
         }, "#FF5D7A", $"{summary.FavoriteCount:N0} {LocalizationManager.Current.Tracks}"));
@@ -2203,8 +2406,11 @@ public partial class MainWindow : Window
     /// <param name="artist">The ranked artist to open.</param>
     /// <returns>A task representing the asynchronous navigation.</returns>
     private Task OpenTopArtistAsync(TopArtistStat artist) =>
-        OpenHistoryArtistAsync(MakeStatHistoryEntry(
-            artist.ExternalId, artist.Path, artist.Name, artist.Name, null, null, artist.LocalArtistId));
+        artist.LocalArtistId.HasValue ||
+        artist.ExternalId?.StartsWith("orynivo:", StringComparison.OrdinalIgnoreCase) == true
+            ? ShowUnifiedArtistAlbumsAsync(artist.Name)
+            : OpenHistoryArtistAsync(MakeStatHistoryEntry(
+                artist.ExternalId, artist.Path, artist.Name, artist.Name, null, null, artist.LocalArtistId));
 
     /// <summary>Builds a synthetic playback-history entry used to route statistics-card clicks through the shared open logic.</summary>
     /// <param name="externalId">Representative external identifier.</param>
@@ -2243,11 +2449,8 @@ public partial class MainWindow : Window
             return;
         e.Handled = true;
 
-        _trackFavoritesOnly = false;
-        _selectedTrackGenres.Clear();
+        ClearTrackFacetFilters();
         _selectedTrackGenres.Add(genre);
-        _selectedTrackFormats.Clear();
-        _selectedTrackBitrates.Clear();
         _expandedTrackFilterSections.Add(LocalizationManager.Current.Genre);
         PushCurrentNavigationState();
         ResetDrilldownState(clearNavigationHistory: false);
@@ -2263,6 +2466,15 @@ public partial class MainWindow : Window
             await ShowTopLevelViewAsync("Tracks");
         else
             NavListBox.SelectedItem = tracksItem;
+    }
+
+    private void ClearTrackFacetFilters()
+    {
+        _trackFavoritesOnly = false;
+        _selectedTrackGenres.Clear();
+        _selectedTrackFormats.Clear();
+        _selectedTrackBitrates.Clear();
+        _selectedTrackSources.Clear();
     }
 
     private async Task DashboardNavigateAsync(string tag)

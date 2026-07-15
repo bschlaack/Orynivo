@@ -4,10 +4,19 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.25.0] - 2026-07-15
 
 ### Added
 
+- Added vector previous/next controls directly beside Show all in the Dashboard's
+  20-item Recently Played and Recently Added headers. Scrolling uses a short,
+  eased animation; both controls retain their position and become muted/disabled
+  at the respective end so the header never shifts. The vertically centered
+  Show all action aligns with the arrow controls and exposes up to 100 entries.
+- Added source-appropriate vector icons to the main sidebar navigation and its
+  dynamic radio, podcast, regular-playlist, Plex, and server entries; smart
+  playlists retain their orange emphasis through a new size- and spacing-matched
+  vector lightning icon.
 - Redesigned the Dashboard around a large artwork-backed greeting hero using the
   Orynivo wordmark and bundled light-wave background. The hero exposes live,
   lightweight album/track/artist/favorite counters plus working random-play and
@@ -22,6 +31,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Aligned the four Dashboard overview cards to one edge-to-edge equal-width and
+  equal-height grid, optically centered Show all beside its carousel controls,
+  and gave the listening chart headroom through a rounded Y-axis maximum above
+  the actual peak. Listening trends now use daily points for 7-/30-day and
+  current-month periods and monthly points for the current year instead of
+  always compressing every period into seven points.
+- Left-aligned the Dashboard hero description with the greeting content and
+  added per-point hover tooltips to the listening chart, showing the date and
+  listened minutes for the day/bucket under the pointer.
+- Interactive artwork cards now use a diagonal cyan-violet-purple gradient
+  hover outline instead of a flat single-color accent border.
+- Reorganized contributor instructions around a mandatory completion checklist
+  and scoped `AGENTS.md` files for the Windows client, Core, Server, and native
+  bridges, keeping subsystem invariants close to the code they govern.
+- Unified matching local and Orynivo Server artists in the shared Artists view
+  and global search. A combined `L+OS` artist opens one mixed album view across
+  every matching library; every non-Plex artist link—including Recently Played,
+  Dashboard analytics, search, artist info, and now playing—uses the same
+  cross-library drill-down, and Back navigation preserves that combined view.
+- Toggling the favorite state of a combined artist now applies the change to
+  every matching local and Orynivo Server artist identity.
 - Rebuilt the Dashboard layout to match the new visual direction: Recently
   Played and Recently Added sit in parallel surface cards; Recently Played uses
   the same large artwork-card proportions as albums and now includes a
@@ -40,13 +70,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   balanced the analytics-card bodies: genre rows now fill their card height,
   artist rows match album-row height, and quick-access actions stretch across
   the complete available card width.
-- Added cyan-to-blue gradient outlines to the Dashboard hero and the selected
-  sidebar navigation item, including a matching translucent selected-row fill.
+- Replaced the Dashboard hero's cyan-to-blue gradient outline with a rounded
+  3-pixel rim that brightens the underlying hero artwork. The selected sidebar
+  navigation item retains its gradient outline and translucent selected-row fill.
 - Tightened the four hero counter tiles to compact fixed-width cards and aligned
   their icon badges to the left like the reference layout.
 
 ### Fixed
 
+- Fixed the listening chart's Y-axis rendering: the filled path now includes an
+  invisible origin anchor, preventing Avalonia `Stretch.Fill` from stretching
+  the curve's own peak to the chart ceiling. Its cubic Bézier control points are
+  also clamped to each segment's real endpoint range, preventing Catmull-Rom
+  overshoot from visually inventing peaks above the actual daily values.
+- Recently Played cards now receive normal and gradient hover borders solely
+  from the shared `motionCard` style instead of overriding it with local
+  single-color pointer handlers.
+- Dashboard and Quick Access favorite counts now validate client-side Orynivo
+  Server favorite IDs against current server facets and resolvable track rows,
+  matching the actual unified Favorites view instead of counting stale IDs from
+  settings.
+- Dashboard Quick Access now clears stale genre, format, bitrate, and source
+  facets before opening favorite tracks; Dashboard genre links likewise clear
+  every unrelated track facet before applying the selected genre.
 - The Dashboard favorite counter and Quick Access summary now combine local
   favorite tracks with client-side favorites from every configured Orynivo
   Server instead of reporting only the local SQLite count.

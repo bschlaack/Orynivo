@@ -407,8 +407,12 @@ public partial class MainWindow : Window
         public string? PlexArtistRatingKey { get; init; }
         public OrynivoServerSettings? OrynivoServer { get; set; }
         public string SourceKey => OrynivoServer is null ? LocalSourceKey : GetServerSourceKey(OrynivoServer.Id);
-        public string SourceBadge => OrynivoServer is null ? LocalizationManager.Current.LocalSourceShort : "OS";
-        public string? SourceName => OrynivoServer?.Name ?? LocalizationManager.Current.LocalSource;
+        public string SourceBadge => EntityType == "UnifiedArtist"
+            ? $"{LocalizationManager.Current.LocalSourceShort}+OS"
+            : OrynivoServer is null ? LocalizationManager.Current.LocalSourceShort : "OS";
+        public string? SourceName => EntityType == "UnifiedArtist"
+            ? $"{LocalizationManager.Current.LocalSource} + OS"
+            : OrynivoServer?.Name ?? LocalizationManager.Current.LocalSource;
         private IImage? _artwork;
         private IImage? _thumbnail;
         public bool ArtworkLoadQueued { get; set; }
@@ -1314,7 +1318,7 @@ public partial class MainWindow : Window
             {
                 Control content = pl.IsSmartPlaylist
                     ? CreateSmartPlaylistSidebarContent(pl.Name)
-                    : CreateSidebarEntryText(pl.Name);
+                    : CreateSidebarEntryContent("IconPlaylist", pl.Name);
                 content.Margin = new Thickness(16, 0, 0, 0);
 
                 var item = new ListBoxItem
@@ -1385,7 +1389,7 @@ public partial class MainWindow : Window
         {
             NavListBox.Items.Insert(insertIndex++, new ListBoxItem
             {
-                Content = CreateSidebarEntryText(server.Name),
+                Content = CreateSidebarEntryContent("IconServer", server.Name),
                 Tag = $"PlexServer:{server.Id}",
                 IsEnabled = false,
                 FontWeight = FontWeight.SemiBold,
@@ -1413,11 +1417,11 @@ public partial class MainWindow : Window
 
     private ListBoxItem CreatePlexLibraryItem(string serverId, string libraryKey, string title)
     {
-        var text = CreateSidebarEntryText(title);
-        text.Margin = new Thickness(16, 0, 0, 0);
+        var content = CreateSidebarEntryContent("IconAlbum", title);
+        content.Margin = new Thickness(16, 0, 0, 0);
         return new ListBoxItem
         {
-            Content = text,
+            Content = content,
             Tag = $"PlexLibrary:{serverId}:{libraryKey}",
             Theme = FindResource<ControlTheme>("NavItemTheme")
         };
@@ -1430,6 +1434,14 @@ public partial class MainWindow : Window
         return tb;
     }
 
+    private StackPanel CreateSidebarEntryContent(string iconResourceKey, string text)
+    {
+        var content = new StackPanel { Orientation = Orientation.Horizontal };
+        content.Children.Add(CreateSidebarIcon(iconResourceKey));
+        content.Children.Add(CreateSidebarEntryText(text));
+        return content;
+    }
+
     private AvaloniaPath CreateSidebarIcon(string resourceKey)
     {
         return new AvaloniaPath
@@ -1440,7 +1452,6 @@ public partial class MainWindow : Window
             VerticalAlignment = VerticalAlignment.Center,
             Stretch = Stretch.Uniform,
             Data = FindResource<Geometry>(resourceKey),
-            Stroke = new SolidColorBrush(Color.FromRgb(0x6C, 0x63, 0xFF)),
             StrokeThickness = 1.6,
             StrokeLineCap = PenLineCap.Round,
             StrokeJoin = PenLineJoin.Round
@@ -1470,12 +1481,12 @@ public partial class MainWindow : Window
         grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
         grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(20)));
 
-        var text = CreateSidebarEntryText(title);
-        text.FontWeight = FontWeight.SemiBold;
+        var content = CreateSidebarEntryContent("IconPlaylist", title);
+        content.Children.OfType<TextBlock>().First().FontWeight = FontWeight.SemiBold;
         if (leftIndent > 0)
-            text.Margin = new Thickness(leftIndent, 0, 0, 0);
-        Grid.SetColumn(text, 0);
-        grid.Children.Add(text);
+            content.Margin = new Thickness(leftIndent, 0, 0, 0);
+        Grid.SetColumn(content, 0);
+        grid.Children.Add(content);
 
         var arrow = new Avalonia.Controls.Shapes.Path
         {
@@ -2112,6 +2123,20 @@ public partial class MainWindow : Window
                 "ArtistAlbums",
                 GetSelectedContentRowId(),
                 artistId,
+                _activeArtistFilterName,
+                _activeArtistFilterName,
+                CaptureCurrentVerticalOffset());
+        }
+
+        if (_activeAlbumFilterId is null &&
+            _activeArtistFilterId is null &&
+            !string.IsNullOrWhiteSpace(_activeArtistFilterName) &&
+            string.Equals(_currentTopLevelTag, "Albums", StringComparison.Ordinal))
+        {
+            return new NavigationState(
+                "UnifiedArtistAlbums",
+                GetSelectedContentRowId(),
+                null,
                 _activeArtistFilterName,
                 _activeArtistFilterName,
                 CaptureCurrentVerticalOffset());
@@ -4599,6 +4624,8 @@ public partial class MainWindow : Window
         }
 
         var sortedRows = SortUnifiedRows(rows);
+        if (tag == "Artists")
+            sortedRows = MergeUnifiedArtistRows(sortedRows);
         LogUiDiagnostics(
             $"BindLocalRowsAndStartRemoteAppendAsync combined rows sorted tag={tag} count={sortedRows.Count} elapsed={diagnosticStopwatch.ElapsedMilliseconds}ms");
         ApplyColumns(tag);
@@ -4732,6 +4759,24 @@ public partial class MainWindow : Window
         rows
             .OrderBy(row => row.AlphabetIndexText ?? row.Title ?? string.Empty, StringComparer.CurrentCultureIgnoreCase)
             .ThenBy(row => row.SourceName ?? string.Empty, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+
+    private static List<ContentRow> MergeUnifiedArtistRows(IEnumerable<ContentRow> rows) =>
+        rows
+            .GroupBy(row => ArtistNameNormalizer.CreateComparisonKey(row.Title), StringComparer.Ordinal)
+            .Select(group =>
+            {
+                var candidates = group.ToList();
+                var row = candidates.FirstOrDefault(candidate => candidate.EntityType == "Artist")
+                          ?? candidates[0];
+                if (candidates.Count > 1)
+                {
+                    row.EntityType = "UnifiedArtist";
+                    row.IsFavorite = candidates.Any(candidate => candidate.IsFavorite);
+                }
+                return row;
+            })
+            .OrderBy(row => row.AlphabetIndexText ?? row.Title ?? string.Empty, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
 
     private static ContentRow ToTrackContentRow(TrackListInfo t) => new()
@@ -5608,6 +5653,7 @@ public partial class MainWindow : Window
                     artistScores));
         });
         await AddRemoteSearchResultsAsync(query, result.Tracks, result.Albums, result.Artists);
+        result.Artists = MergeUnifiedArtistRows(result.Artists);
 
         ApplySearchColumns();
         SearchTracksDataGrid.ItemsSource = result.Tracks;
@@ -7699,6 +7745,12 @@ public partial class MainWindow : Window
             row.Id is not long artistId)
             return;
 
+        if (row.EntityType == "UnifiedArtist")
+        {
+            await ShowUnifiedArtistAlbumsAsync(row.Title ?? LocalizationManager.Current.Unknown);
+            return;
+        }
+
         // Remote artists must open within the remote library (IDs can collide).
         if (row.EntityType == "OrynivoArtist")
         {
@@ -7764,6 +7816,12 @@ public partial class MainWindow : Window
             return;
 
         e.Handled = true;
+
+        if (row.EntityType == "UnifiedArtist")
+        {
+            await ShowUnifiedArtistAlbumsAsync(row.Title ?? LocalizationManager.Current.Unknown);
+            return;
+        }
 
         if (row.EntityType.StartsWith("Orynivo", StringComparison.Ordinal))
         {
@@ -7969,6 +8027,12 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (row.EntityType == "UnifiedArtist")
+        {
+            await ShowUnifiedArtistAlbumsAsync(row.Title ?? LocalizationManager.Current.Unknown);
+            return;
+        }
+
         if (row.EntityType == "OrynivoArtist" && row.Id is long orynivoArtistId)
         {
             // In the unified Artists view no server is "active"; navigate within the
@@ -8006,25 +8070,11 @@ public partial class MainWindow : Window
         await PlayTrackFromRowsAsync(row, allRows);
     }
 
-    /// <summary>Opens the albums of a remote server artist, pushing navigation state.</summary>
+    /// <summary>Opens every matching local and Orynivo Server album for a remote artist name.</summary>
     /// <param name="artistId">Remote server artist identifier.</param>
     /// <param name="title">Artist display name for the header.</param>
-    private async Task OpenOrynivoArtistAlbumsAsync(long artistId, string? title)
-    {
-        PushCurrentNavigationState();
-        _orynivoNavigationStack.Push((_activeOrynivoView, null, null));
-        if (_activeOrynivoServer is { } server)
-        {
-            _currentTopLevelTag = $"OrynivoServer:{server.Id}:Albums";
-            _activeOrynivoView = "Albums";
-        }
-
-        _activeArtistFilterId = artistId;
-        _activeArtistFilterName = title;
-        ContentTitleTextBlock.Text = $"{_activeOrynivoServer?.Name} · {title}";
-        BackButton.IsVisible = true;
-        await LoadOrynivoViewAsync(filterArtistId: artistId);
-    }
+    private Task OpenOrynivoArtistAlbumsAsync(long artistId, string? title) =>
+        ShowUnifiedArtistAlbumsAsync(title ?? LocalizationManager.Current.Unknown);
 
     /// <summary>Opens the tracks of a remote server album, pushing navigation state.</summary>
     /// <param name="albumId">Remote server album identifier.</param>
@@ -8730,11 +8780,18 @@ public partial class MainWindow : Window
         button.ContextFlyout.ShowAt(button);
     }
 
-    private async Task ShowArtistAlbumsAsync(long artistId, string artistName)
+    /// <summary>Opens every matching local and Orynivo Server album for a local artist name.</summary>
+    /// <param name="artistId">Local artist identifier retained by the calling navigation surface.</param>
+    /// <param name="artistName">Artist display name used for cross-library identity matching.</param>
+    /// <returns>A task representing the unified navigation operation.</returns>
+    private Task ShowArtistAlbumsAsync(long artistId, string artistName) =>
+        ShowUnifiedArtistAlbumsAsync(artistName);
+
+    private async Task ShowUnifiedArtistAlbumsAsync(string artistName)
     {
         PushCurrentNavigationState();
         _currentTopLevelTag = "Albums";
-        _activeArtistFilterId = artistId;
+        _activeArtistFilterId = null;
         _activeArtistFilterName = artistName;
         _activeAlbumFilterId = null;
         _activeAlbumFilterTitle = null;
@@ -8743,14 +8800,47 @@ public partial class MainWindow : Window
         UpdateEntityFavoritesFilterToggle("Albums");
         AlbumViewModeBorder.IsVisible = true;
         SetViewModeButtons(_showAlbumArtworkView);
-        ContentDataGrid.IsVisible = !(_showAlbumArtworkView);
+        ContentDataGrid.IsVisible = !_showAlbumArtworkView;
         AlbumArtworkListBox.IsVisible = _showAlbumArtworkView;
         ArtistArtworkListBox.IsVisible = false;
         FolderTreeView.IsVisible = false;
         SearchResultsScrollViewer.IsVisible = false;
         HideAlbumDetailHeader();
 
-        var rows = await Task.Run(() => QueryRows("Albums"));
+        var comparisonKey = ArtistNameNormalizer.CreateComparisonKey(artistName);
+        var rows = new List<ContentRow>();
+        var localArtists = await _localCatalogProvider.GetArtistsAsync();
+        foreach (var artist in localArtists.Where(candidate =>
+                     ArtistNameNormalizer.CreateComparisonKey(candidate.Name) == comparisonKey))
+        {
+            var albums = await _localCatalogProvider.GetAlbumsByArtistAsync(artist.Id, _showAlbumArtworkView);
+            rows.AddRange(albums
+                .Where(album => !_albumFavoritesOnly || album.IsFavorite)
+                .Select(album => ToCatalogAlbumContentRow(album)));
+        }
+
+        foreach (var server in _settings.OrynivoServers ?? [])
+        {
+            try
+            {
+                var provider = CreateOrynivoCatalogProvider(server);
+                var artists = await provider.GetArtistsAsync();
+                foreach (var artist in artists.Where(candidate =>
+                             ArtistNameNormalizer.CreateComparisonKey(candidate.Name) == comparisonKey))
+                {
+                    var albums = await provider.GetAlbumsByArtistAsync(artist.Id, _showAlbumArtworkView);
+                    rows.AddRange(albums
+                        .Where(album => !_albumFavoritesOnly || album.IsFavorite)
+                        .Select(album => ToCatalogAlbumContentRow(album, server)));
+                }
+            }
+            catch
+            {
+                // An unavailable server must not hide albums from the other libraries.
+            }
+        }
+
+        rows = SortUnifiedRows(rows);
         ApplyColumns("Albums");
         ContentDataGrid.ItemsSource = rows;
         BindArtworkRows("Albums", rows);
@@ -9173,6 +9263,11 @@ public partial class MainWindow : Window
                     state.VerticalOffset);
                 return;
 
+            case "UnifiedArtistAlbums" when !string.IsNullOrWhiteSpace(state.ArtistFilterName):
+                await ShowUnifiedArtistAlbumsAsync(state.ArtistFilterName);
+                RestoreSelectionFromCurrentItems(state.SelectedId, state.VerticalOffset);
+                return;
+
             case "OrynivoAlbumTracks" when state.SelectedId is long albumId:
                 await RestoreOrynivoAlbumTracksAsync(
                     state.NavigationTag,
@@ -9458,12 +9553,56 @@ public partial class MainWindow : Window
             row.IsFavorite = isFavorite;
     }
 
+    private async Task SetUnifiedArtistFavoriteAsync(string? artistName, bool isFavorite)
+    {
+        var comparisonKey = ArtistNameNormalizer.CreateComparisonKey(artistName);
+        var localArtists = await _localCatalogProvider.GetArtistsAsync();
+        using (var db = AudioDatabase.OpenDefault())
+        {
+            foreach (var artist in localArtists.Where(candidate =>
+                         ArtistNameNormalizer.CreateComparisonKey(candidate.Name) == comparisonKey))
+                db.SetArtistFavorite(artist.Id, isFavorite);
+        }
+
+        foreach (var server in _settings.OrynivoServers ?? [])
+        {
+            try
+            {
+                var artists = await CreateOrynivoCatalogProvider(server).GetArtistsAsync();
+                foreach (var artist in artists.Where(candidate =>
+                             ArtistNameNormalizer.CreateComparisonKey(candidate.Name) == comparisonKey))
+                {
+                    var key = GetOrynivoFavoriteKey(server.Id, "Artist", artist.Id);
+                    if (isFavorite)
+                        _settings.OrynivoServerFavorites.Add(key);
+                    else
+                        _settings.OrynivoServerFavorites.Remove(key);
+                }
+            }
+            catch
+            {
+                // Keep the available libraries in sync even if one server is offline.
+            }
+        }
+
+        _settingsStore.Save(_settings);
+    }
+
     private async void FavoriteButton_OnClick(object? sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: ContentRow row } || row.Id is not long id)
             return;
 
         row.IsFavorite = !row.IsFavorite;
+        if (row.EntityType == "UnifiedArtist")
+        {
+            await SetUnifiedArtistFavoriteAsync(row.Title, row.IsFavorite);
+            if (_artistFavoritesOnly && !row.IsFavorite)
+                await ReloadEntityRowsAsync("Artists");
+            e.Handled = true;
+            return;
+        }
+
         ActivateRowOrynivoServer(row);
         if (row.EntityType.StartsWith("Orynivo", StringComparison.Ordinal) &&
             _activeOrynivoServer is not null)

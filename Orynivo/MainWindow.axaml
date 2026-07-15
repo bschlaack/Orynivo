@@ -19,13 +19,6 @@
                     Stretch="UniformToFill"
                     AlignmentX="Center"
                     AlignmentY="Center"/>
-        <LinearGradientBrush x:Key="DashboardHeroBorderBrush"
-                             StartPoint="0%,50%"
-                             EndPoint="100%,50%">
-            <GradientStop Color="#20D9E8" Offset="0"/>
-            <GradientStop Color="#3867FF" Offset="0.42"/>
-            <GradientStop Color="#20D9E8" Offset="1"/>
-        </LinearGradientBrush>
         <LinearGradientBrush x:Key="DashboardNavSelectedBackgroundBrush"
                              StartPoint="0%,50%"
                              EndPoint="100%,50%">
@@ -39,6 +32,13 @@
             <GradientStop Color="#20D9E8" Offset="0"/>
             <GradientStop Color="#5875FF" Offset="0.52"/>
             <GradientStop Color="#1820D9E8" Offset="1"/>
+        </LinearGradientBrush>
+        <LinearGradientBrush x:Key="CardHoverGradientBrush"
+                             StartPoint="0%,100%"
+                             EndPoint="100%,0%">
+            <GradientStop Color="#20D9E8" Offset="0"/>
+            <GradientStop Color="#6C63FF" Offset="0.5"/>
+            <GradientStop Color="#C56CFF" Offset="1"/>
         </LinearGradientBrush>
 
         <!-- Shared album artwork card. Used by the Albums artwork view and by the
@@ -814,6 +814,8 @@
             <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
         </Style>
         <Style Selector="Border.motionCard">
+            <Setter Property="BorderBrush" Value="{DynamicResource AppGridLineBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Transitions">
                 <Transitions>
                     <DoubleTransition Property="Opacity" Duration="0:0:0.14"/>
@@ -821,12 +823,14 @@
             </Setter>
         </Style>
         <Style Selector="ListBoxItem:pointerover Border.motionCard">
-            <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource CardHoverGradientBrush}"/>
+            <Setter Property="BorderThickness" Value="2"/>
         </Style>
         <!-- Also react when the card border itself is hovered, so the shared card
              works outside a ListBox (e.g. the Dashboard recently-added strip). -->
         <Style Selector="Border.motionCard:pointerover">
-            <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource CardHoverGradientBrush}"/>
+            <Setter Property="BorderThickness" Value="2"/>
         </Style>
         <Style Selector="Border.coverOverlay">
             <Setter Property="Opacity" Value="0"/>
@@ -851,6 +855,9 @@
         </Style>
         <Style Selector="ListBox#NavListBox ListBoxItem TextBlock">
             <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
+        </Style>
+        <Style Selector="ListBox#NavListBox ListBoxItem Path">
+            <Setter Property="Stroke" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"/>
         </Style>
         <Style Selector="TreeViewItem">
             <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
@@ -963,35 +970,35 @@
 
                 <ListBoxItem Tag="Dashboard" Theme="{StaticResource NavItemTheme}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="⊞" Width="18" FontSize="{DynamicResource FontSizeBody}" VerticalAlignment="Center"/>
+                        <Path Data="{DynamicResource IconDashboard}" Width="13" Height="13" Margin="0,0,7,0" Stretch="Uniform" StrokeThickness="1.6"/>
                         <TextBlock Text="{DynamicResource L_Dashboard}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </ListBoxItem>
 
                 <ListBoxItem x:Name="InternetRadioNavItem" Tag="InternetRadio" Theme="{StaticResource NavItemTheme}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="◉" Width="18" FontSize="{DynamicResource FontSizeBody}" VerticalAlignment="Center"/>
+                        <Path Data="{DynamicResource IconRadio}" Width="13" Height="13" Margin="0,0,7,0" Stretch="Uniform" StrokeThickness="1.6"/>
                         <TextBlock Text="{DynamicResource L_InternetRadio}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </ListBoxItem>
 
                 <ListBoxItem x:Name="PodcastsNavItem" Tag="Podcasts" Theme="{StaticResource NavItemTheme}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="◍" Width="18" FontSize="{DynamicResource FontSizeBody}" VerticalAlignment="Center"/>
+                        <Path Data="{DynamicResource IconPodcast}" Width="13" Height="13" Margin="0,0,7,0" Stretch="Uniform" StrokeThickness="1.6"/>
                         <TextBlock Text="{DynamicResource L_Podcasts}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </ListBoxItem>
 
                 <ListBoxItem x:Name="QueueNavItem" Tag="Queue" Theme="{StaticResource NavItemTheme}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="≡" Width="18" FontSize="{DynamicResource FontSizeBodyStrong}" VerticalAlignment="Center"/>
+                        <Path Data="{DynamicResource IconQueue}" Width="13" Height="13" Margin="0,0,7,0" Stretch="Uniform" StrokeThickness="1.6"/>
                         <TextBlock Text="{DynamicResource L_UpNext}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </ListBoxItem>
 
                 <ListBoxItem x:Name="AiChatNavItem" Tag="AiChat" Theme="{StaticResource NavItemTheme}">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock Text="✦" Width="18" FontSize="{DynamicResource FontSizeBody}" VerticalAlignment="Center"/>
+                        <Path Data="{DynamicResource IconAi}" Width="13" Height="13" Margin="0,0,7,0" Stretch="Uniform" StrokeThickness="1.6"/>
                         <TextBlock Text="{DynamicResource L_AiChat}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </ListBoxItem>
@@ -1006,8 +1013,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="20"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="{DynamicResource L_LocalLibrary}"
-                                   TextTrimming="CharacterEllipsis"/>
+                        <StackPanel Orientation="Horizontal"><Path Data="{DynamicResource IconAlbum}" Width="13" Height="13" Margin="0,0,7,0" Stretch="Uniform" StrokeThickness="1.6"/><TextBlock Text="{DynamicResource L_LocalLibrary}" TextTrimming="CharacterEllipsis"/></StackPanel>
                         <Path x:Name="LocalLibraryHeaderArrow"
                               Grid.Column="1"
                               Width="8"
@@ -1040,7 +1046,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="20"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="{DynamicResource L_LocalMedia}" Classes="navItemText" FontWeight="SemiBold"/>
+                        <StackPanel Orientation="Horizontal"><Path Data="{DynamicResource IconFolder}" Width="13" Height="13" Margin="0,0,7,0" Stretch="Uniform" StrokeThickness="1.6"/><TextBlock Text="{DynamicResource L_LocalMedia}" Classes="navItemText" FontWeight="SemiBold"/></StackPanel>
                         <Path x:Name="LocalMediaGroupArrow"
                               Grid.Column="1"
                               Width="8"
@@ -1054,10 +1060,10 @@
                               StrokeJoin="Round"/>
                     </Grid>
                 </ListBoxItem>
-                <ListBoxItem x:Name="ArtistsNavItem" Tag="Artists" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_Artists}" Classes="navItemText"/></ListBoxItem>
-                <ListBoxItem x:Name="AlbumsNavItem" Tag="Albums" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_Albums}" Classes="navItemText"/></ListBoxItem>
-                <ListBoxItem x:Name="TracksNavItem" Tag="Tracks" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_Tracks}" Classes="navItemText"/></ListBoxItem>
-                <ListBoxItem x:Name="FoldersNavItem" Tag="Folders" Theme="{StaticResource NavItemTheme}"><TextBlock Text="{DynamicResource L_FolderStructure}" Classes="navItemText"/></ListBoxItem>
+                <ListBoxItem x:Name="ArtistsNavItem" Tag="Artists" Theme="{StaticResource NavItemTheme}"><StackPanel Orientation="Horizontal"><Path Data="{DynamicResource IconArtist}" Width="13" Height="13" Margin="0,0,7,0" Stretch="Uniform" StrokeThickness="1.6"/><TextBlock Text="{DynamicResource L_Artists}" Classes="navItemText"/></StackPanel></ListBoxItem>
+                <ListBoxItem x:Name="AlbumsNavItem" Tag="Albums" Theme="{StaticResource NavItemTheme}"><StackPanel Orientation="Horizontal"><Path Data="{DynamicResource IconAlbum}" Width="13" Height="13" Margin="0,0,7,0" Stretch="Uniform" StrokeThickness="1.6"/><TextBlock Text="{DynamicResource L_Albums}" Classes="navItemText"/></StackPanel></ListBoxItem>
+                <ListBoxItem x:Name="TracksNavItem" Tag="Tracks" Theme="{StaticResource NavItemTheme}"><StackPanel Orientation="Horizontal"><Path Data="{DynamicResource IconTrack}" Width="13" Height="13" Margin="0,0,7,0" Stretch="Uniform" StrokeThickness="1.6"/><TextBlock Text="{DynamicResource L_Tracks}" Classes="navItemText"/></StackPanel></ListBoxItem>
+                <ListBoxItem x:Name="FoldersNavItem" Tag="Folders" Theme="{StaticResource NavItemTheme}"><StackPanel Orientation="Horizontal"><Path Data="{DynamicResource IconFolder}" Width="13" Height="13" Margin="0,0,7,0" Stretch="Uniform" StrokeThickness="1.6"/><TextBlock Text="{DynamicResource L_FolderStructure}" Classes="navItemText"/></StackPanel></ListBoxItem>
 
                 <ListBoxItem x:Name="OwnRadiosHeaderItem"
                              Tag="Section:OwnRadios"
@@ -1069,8 +1075,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="20"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="{DynamicResource L_OwnRadios}"
-                                   TextTrimming="CharacterEllipsis"/>
+                        <StackPanel Orientation="Horizontal"><Path Data="{DynamicResource IconRadio}" Width="13" Height="13" Margin="0,0,7,0" Stretch="Uniform" StrokeThickness="1.6"/><TextBlock Text="{DynamicResource L_OwnRadios}" TextTrimming="CharacterEllipsis"/></StackPanel>
                         <Path x:Name="OwnRadiosHeaderArrow"
                               Grid.Column="1"
                               Width="8"
@@ -1095,8 +1100,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="20"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="{DynamicResource L_MyPodcasts}"
-                                   TextTrimming="CharacterEllipsis"/>
+                        <StackPanel Orientation="Horizontal"><Path Data="{DynamicResource IconPodcast}" Width="13" Height="13" Margin="0,0,7,0" Stretch="Uniform" StrokeThickness="1.6"/><TextBlock Text="{DynamicResource L_MyPodcasts}" TextTrimming="CharacterEllipsis"/></StackPanel>
                         <Path x:Name="MyPodcastsHeaderArrow"
                               Grid.Column="1"
                               Width="8"
@@ -1121,8 +1125,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="20"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="{DynamicResource L_PlexServers}"
-                                   TextTrimming="CharacterEllipsis"/>
+                        <StackPanel Orientation="Horizontal"><Path Data="{DynamicResource IconServer}" Width="13" Height="13" Margin="0,0,7,0" Stretch="Uniform" StrokeThickness="1.6"/><TextBlock Text="{DynamicResource L_PlexServers}" TextTrimming="CharacterEllipsis"/></StackPanel>
                         <Path x:Name="PlexHeaderArrow"
                               Grid.Column="1"
                               Width="8"
@@ -1147,8 +1150,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="20"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Text="{DynamicResource L_Playlists}"
-                                   TextTrimming="CharacterEllipsis"/>
+                        <StackPanel Orientation="Horizontal"><Path Data="{DynamicResource IconPlaylist}" Width="13" Height="13" Margin="0,0,7,0" Stretch="Uniform" StrokeThickness="1.6"/><TextBlock Text="{DynamicResource L_Playlists}" TextTrimming="CharacterEllipsis"/></StackPanel>
                         <Path x:Name="PlaylistsHeaderArrow"
                               Grid.Column="1"
                               Width="8"

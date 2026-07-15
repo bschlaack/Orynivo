@@ -3953,9 +3953,12 @@ public sealed class AudioDatabase : IDisposable
     }
 
     /// <summary>Returns listened seconds split into equally sized chronological buckets.</summary>
+    /// <param name="sinceUnix">Optional inclusive lower Unix-time bound; all history is used when omitted.</param>
+    /// <param name="bucketCount">Requested number of chronological buckets, clamped to 2–366.</param>
+    /// <returns>One listened-seconds total for each chronological bucket.</returns>
     public IReadOnlyList<double> GetListeningTrend(long? sinceUnix = null, int bucketCount = 5)
     {
-        bucketCount = Math.Clamp(bucketCount, 2, 24);
+        bucketCount = Math.Clamp(bucketCount, 2, 366);
         var end = DateTimeOffset.Now.ToUnixTimeSeconds() + 1;
         long start;
         using (var startCmd = _conn.CreateCommand())
