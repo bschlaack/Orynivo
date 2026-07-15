@@ -1114,7 +1114,11 @@ fallback or allow client-provided commands/paths to reach the helper.
 - The album track detail header uses the same accent border and asymmetric
   `CornerRadius="0,24,0,24"` card shape as the radio, podcast, and shared
   library intro cards.
-- The main window starts maximized
+- `AppSettings.StartMaximized` defaults to maximized startup. When disabled,
+  the main window restores its last normal logical size and physical screen
+  position; saved bounds must be validated against current screen working areas
+  so removed-monitor positions fall back to centered startup. Never persist or
+  restore a minimized state.
 - `artwork_files_v1` exports legacy artwork BLOBs into the file cache;
   `artworks.data` remains for compatibility with old `NOT NULL` schemas
   Artwork file paths are also verified per current app-data artwork root; when

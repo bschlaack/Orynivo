@@ -448,6 +448,8 @@
             <x:String x:Key="L_Table">Tabelle</x:String>
             <x:String x:Key="L_Artwork">Artwork</x:String>
             <x:String x:Key="L_Appearance">Darstellung</x:String>
+            <x:String x:Key="L_WindowBehavior">Fensterverhalten</x:String>
+            <x:String x:Key="L_StartMaximized">Maximiert starten</x:String>
             <x:String x:Key="L_ColorScheme">Farbschema</x:String>
             <x:String x:Key="L_Language">Sprache</x:String>
             <x:String x:Key="L_Playback">WIEDERGABE</x:String>

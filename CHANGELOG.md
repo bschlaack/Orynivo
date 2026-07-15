@@ -4,10 +4,12 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.26.5] - 2026-07-15
 
 ### Added
 
+- Added an Appearance option for maximized startup; when disabled, Orynivo
+  restores the last normal main-window size and on-screen position.
 - Added the connected Orynivo Server version to each server row and allowed the
   startup update notification to launch the existing verified update flow
   directly.

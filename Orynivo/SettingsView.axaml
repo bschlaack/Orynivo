@@ -930,6 +930,15 @@
                               Theme="{StaticResource SettingsToggleTheme}"
                               Margin="0,4,0,20"/>
 
+                    <TextBlock Text="{DynamicResource L_WindowBehavior}"
+                               FontSize="{DynamicResource FontSizeCaption}"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+                    <CheckBox x:Name="StartMaximizedCheckBox"
+                              Content="{DynamicResource L_StartMaximized}"
+                              Theme="{StaticResource SettingsToggleTheme}"
+                              Margin="0,4,0,20"/>
+
                     <TextBlock Text="{DynamicResource L_SidebarSections}"
                                FontSize="{DynamicResource FontSizeCaption}"
                                FontWeight="SemiBold"

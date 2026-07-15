@@ -679,6 +679,10 @@ manifest in the background at startup and reports a newer Windows version. The
 notification offers a localized **Download and install** action that starts the
 same verified update flow as the About window; no download begins without that
 explicit choice.
+Settings > Appearance also controls whether the main window starts maximized.
+When maximized startup is disabled, Orynivo remembers the last normal window
+size and position and restores it only when that placement still intersects an
+attached screen.
 Server package uploads use a route-specific one-GiB safety limit so self-contained
 DEB/RPM packages are not rejected by Kestrel's smaller default request limit.
 The server also reapplies `Kestrel:Limits:MaxRequestBodySize` after loading the

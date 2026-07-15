@@ -154,6 +154,7 @@ internal partial class SettingsView : UserControl
         ShowPodcastsItemCheckBox.IsChecked      = settings.ShowPodcastsItem;
         ShowQueueItemCheckBox.IsChecked         = settings.ShowQueueItem;
         CheckForUpdatesOnStartupCheckBox.IsChecked = settings.CheckForUpdatesOnStartup;
+        StartMaximizedCheckBox.IsChecked             = settings.StartMaximized;
         ShowLocalLibrarySectionCheckBox.IsChecked = settings.ShowLocalLibrarySection;
         ShowOwnRadiosSectionCheckBox.IsChecked = settings.ShowOwnRadiosSection;
         ShowMyPodcastsSectionCheckBox.IsChecked = settings.ShowMyPodcastsSection;
@@ -328,6 +329,8 @@ internal partial class SettingsView : UserControl
     public bool ShowQueueItem => ShowQueueItemCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether signed updates should be checked at application startup.</summary>
     public bool CheckForUpdatesOnStartup => CheckForUpdatesOnStartupCheckBox.IsChecked == true;
+    /// <summary>Gets a value indicating whether the main window should start maximized.</summary>
+    public bool StartMaximized => StartMaximizedCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether the Library sidebar section should be visible.</summary>
     public bool ShowLocalLibrarySection => ShowLocalLibrarySectionCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether the Own Radios sidebar section should be visible.</summary>

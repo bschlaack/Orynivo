@@ -64,6 +64,8 @@ public static class LocalizationManager
         resources["L_CheckForUpdates"] = Current.CheckForUpdates;
         resources["L_Updates"] = Current.Updates;
         resources["L_CheckForUpdatesOnStartup"] = Current.CheckForUpdatesOnStartup;
+        resources["L_WindowBehavior"] = Current.WindowBehavior;
+        resources["L_StartMaximized"] = Current.StartMaximized;
         resources["L_DownloadAndInstall"] = Current.DownloadAndInstall;
         resources["L_UpdateServer"] = Current.UpdateServer;
         resources["L_Settings"] = Current.Settings;
@@ -740,6 +742,8 @@ public static class LocalizationManager
         , CheckForUpdates = "Nach Updates suchen"
         , Updates = "Updates"
         , CheckForUpdatesOnStartup = "Beim Programmstart nach Updates suchen"
+        , WindowBehavior = "Fensterverhalten"
+        , StartMaximized = "Maximiert starten"
         , CheckingForUpdates = "Updates werden gesucht …"
         , UpdateAvailable = "Version {0} ist verfügbar."
         , UpToDate = "Orynivo ist auf dem neuesten Stand."
@@ -1242,6 +1246,8 @@ public static class LocalizationManager
         , CheckForUpdates = "Check for updates"
         , Updates = "Updates"
         , CheckForUpdatesOnStartup = "Check for updates when the application starts"
+        , WindowBehavior = "Window behavior"
+        , StartMaximized = "Start maximized"
         , CheckingForUpdates = "Checking for updates…"
         , UpdateAvailable = "Version {0} is available."
         , UpToDate = "Orynivo is up to date."
@@ -1747,6 +1753,8 @@ public static class LocalizationManager
         , CheckForUpdates = "Rechercher des mises à jour"
         , Updates = "Mises à jour"
         , CheckForUpdatesOnStartup = "Rechercher des mises à jour au démarrage de l’application"
+        , WindowBehavior = "Comportement de la fenêtre"
+        , StartMaximized = "Démarrer agrandie"
         , CheckingForUpdates = "Recherche de mises à jour…"
         , UpdateAvailable = "La version {0} est disponible."
         , UpToDate = "Orynivo est à jour."
@@ -2249,6 +2257,8 @@ public static class LocalizationManager
         , CheckForUpdates = "Buscar actualizaciones"
         , Updates = "Actualizaciones"
         , CheckForUpdatesOnStartup = "Buscar actualizaciones al iniciar la aplicación"
+        , WindowBehavior = "Comportamiento de la ventana"
+        , StartMaximized = "Iniciar maximizada"
         , CheckingForUpdates = "Buscando actualizaciones…"
         , UpdateAvailable = "La versión {0} está disponible."
         , UpToDate = "Orynivo está actualizado."

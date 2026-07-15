@@ -6,7 +6,6 @@
         xmlns:ai="using:Orynivo.AI"
         Title="Orynivo" Icon="avares://Orynivo/Assets/Orynivo.ico"
         Height="760" Width="1100"
-        WindowState="Maximized"
         MinHeight="600" MinWidth="800">
     <Window.Resources>
 
