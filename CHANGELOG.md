@@ -4,6 +4,15 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+### Fixed
+
+- Removed the standalone cyan scan-activity dot from the sidebar while retaining
+  the textual scan-progress indicator.
+
 ## [0.26.3] - 2026-07-15
 
 ### Added
@@ -17,7 +26,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Allowed signed server-update bundles up to the endpoint's verified one-GiB
   safety limit instead of Kestrel's default request limit rejecting current
   packages, and surfaced HTTP rejection codes in Settings.
-- Hidden the sidebar scan-activity dot whenever its status text is empty.
+- Removed the standalone cyan scan-activity dot from the sidebar while retaining
+  the textual scan-progress indicator.
 - Applied Kestrel's global request-body limit again after layering the editable
   Linux configuration, so `Kestrel:Limits:MaxRequestBodySize` from
   `/etc/orynivo-server/appsettings.json` is actually honoured.
