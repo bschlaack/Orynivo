@@ -1,0 +1,32 @@
+<Project>
+  <!-- Local/development builds deliberately derive their base version only from
+       the newest semantic v* tag contained in origin/main. Release workflows
+       pass ReleaseVersionFromTag=true and inject the exact triggering tag. -->
+  <Target Name="ResolveDevelopmentVersionFromMainTag"
+          BeforeTargets="GetAssemblyVersion;AddSourceRevisionToInformationalVersion;GenerateAssemblyInfo"
+          Condition="'$(ReleaseVersionFromTag)' != 'true'">
+    <Exec Command="git describe --tags --abbrev=0 --match &quot;v[0-9]*&quot; origin/main"
+          ConsoleToMSBuild="true"
+          IgnoreExitCode="true"
+          StandardOutputImportance="Low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_MainVersionTag" />
+    </Exec>
+    <Exec Command="git rev-parse --short=8 HEAD"
+          ConsoleToMSBuild="true"
+          IgnoreExitCode="true"
+          StandardOutputImportance="Low">
+      <Output TaskParameter="ConsoleOutput" PropertyName="_DevelopmentCommit" />
+    </Exec>
+    <PropertyGroup Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('$(_MainVersionTag)', '^v[0-9]+\.[0-9]+\.[0-9]+$'))">
+      <_MainVersion>$([System.Text.RegularExpressions.Regex]::Replace('$(_MainVersionTag)', '^v', ''))</_MainVersion>
+      <Version>$(_MainVersion)-dev</Version>
+      <AssemblyVersion>$(_MainVersion).0</AssemblyVersion>
+      <FileVersion>$(_MainVersion).0</FileVersion>
+      <InformationalVersion>$(_MainVersion)-dev+$(_DevelopmentCommit)</InformationalVersion>
+      <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    </PropertyGroup>
+    <Message Importance="High"
+             Condition="'$(_MainVersion)' != ''"
+             Text="Development version resolved from origin/main: $(InformationalVersion)" />
+  </Target>
+</Project>

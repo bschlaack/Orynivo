@@ -2577,10 +2577,10 @@ public partial class MainWindow : Window
         var strings = LocalizationManager.Current;
         var intro = tag switch
         {
-            "Artists" => (strings.ArtistsIntroTitle, strings.ArtistsIntroHint, "●"),
-            "Albums" => (strings.AlbumsIntroTitle, strings.AlbumsIntroHint, "▣"),
-            "Tracks" => (strings.TracksIntroTitle, strings.TracksIntroHint, "♪"),
-            "Folders" => (strings.FoldersIntroTitle, strings.FoldersIntroHint, "⌁"),
+            "Artists" => (strings.ArtistsIntroTitle, strings.ArtistsIntroHint, "IconArtist"),
+            "Albums" => (strings.AlbumsIntroTitle, strings.AlbumsIntroHint, "IconAlbum"),
+            "Tracks" => (strings.TracksIntroTitle, strings.TracksIntroHint, "IconTrack"),
+            "Folders" => (strings.FoldersIntroTitle, strings.FoldersIntroHint, "IconFolder"),
             _ => default
         };
 
@@ -2591,7 +2591,7 @@ public partial class MainWindow : Window
 
         LibraryIntroTitleTextBlock.Text = intro.Item1;
         LibraryIntroHintTextBlock.Text = intro.Item2;
-        LibraryIntroIconTextBlock.Text = intro.Item3;
+        LibraryIntroIconPath.Data = FindResource<Geometry>(intro.Item3);
     }
 
     private async Task ShowPlexLibraryAsync(string tag)

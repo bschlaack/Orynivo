@@ -12,7 +12,15 @@
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/bschlaack/Orynivo</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+    <UpdatePublicKeyBase64 Condition="'$(UpdatePublicKeyBase64)' == ''"></UpdatePublicKeyBase64>
   </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>OrynivoUpdatePublicKey</_Parameter1>
+      <_Parameter2>$(UpdatePublicKeyBase64)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="2.88.9" />

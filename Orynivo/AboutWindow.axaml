@@ -17,7 +17,7 @@
         </Style>
     </Window.Styles>
     <Grid Margin="22"
-          RowDefinitions="Auto,Auto,Auto,*">
+          RowDefinitions="Auto,Auto,Auto,Auto,*">
         <Image Grid.Row="0"
                HorizontalAlignment="Stretch"
                Source="{DynamicResource AppAboutLogoSource}"
@@ -31,14 +31,33 @@
                        Text="Björn Schlaack"/>
             <TextBlock Margin="0,4,0,0"
                        Text="Copyright © 2026 Björn Schlaack"/>
+            <TextBlock x:Name="VersionTextBlock"
+                       Margin="0,8,0,0"
+                       FontWeight="SemiBold"/>
         </StackPanel>
 
-        <TextBlock Grid.Row="2"
+        <StackPanel Grid.Row="2" Margin="0,18,0,0">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <Button x:Name="CheckForUpdatesButton"
+                        Content="{DynamicResource L_CheckForUpdates}"
+                        Click="CheckForUpdatesButton_OnClick"/>
+                <Button x:Name="InstallUpdateButton"
+                        IsVisible="False"
+                        Content="{DynamicResource L_DownloadAndInstall}"
+                        Click="InstallUpdateButton_OnClick"/>
+            </StackPanel>
+            <TextBlock x:Name="UpdateStatusTextBlock"
+                       Margin="0,8,0,0"
+                       Foreground="{DynamicResource AppSecondaryTextBrush}"
+                       TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <TextBlock Grid.Row="3"
                    Margin="0,22,0,10"
                    FontWeight="SemiBold"
                    Text="{DynamicResource L_Licenses}"/>
 
-        <ScrollViewer Grid.Row="3"
+        <ScrollViewer Grid.Row="4"
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="0,0,12,0">

@@ -4,6 +4,8 @@ using Orynivo.Server;
 using Orynivo.Server.Endpoints;
 using Orynivo.Server.Middleware;
 using Orynivo.Server.Services;
+using System.Reflection;
+using System.Runtime.InteropServices;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -47,6 +49,14 @@ builder.Services.AddProblemDetails();
 
 // ---- Build app ------------------------------------------------------------
 var app = builder.Build();
+var serverAssembly = typeof(Program).Assembly;
+var serverVersion = serverAssembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+    ?.InformationalVersion ?? serverAssembly.GetName().Version?.ToString(3) ?? "0.0.0";
+var installTypePath = Path.Combine(AppContext.BaseDirectory, "install-type");
+var installType = File.Exists(installTypePath)
+    ? File.ReadAllText(installTypePath).Trim().ToLowerInvariant()
+    : "portable";
+var updateSupported = OperatingSystem.IsLinux() && installType is "deb" or "rpm";
 
 app.UseMiddleware<ApiKeyMiddleware>();
 app.UseCors();
@@ -58,7 +68,7 @@ app.MapGet("/api/health", () => Results.Ok(new
 {
     Status  = "ok",
     Server  = settings.ServerName,
-    Version = typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "0.0.0",
+    Version = serverVersion,
     Time    = DateTimeOffset.UtcNow
 }));
 
@@ -66,9 +76,15 @@ app.MapGet("/api/health", () => Results.Ok(new
 app.MapGet("/api/info", () => Results.Ok(new
 {
     Name       = settings.ServerName,
-    Version    = typeof(Program).Assembly.GetName().Version?.ToString(3) ?? "0.0.0",
+    Version    = serverVersion,
     ApiVersion = 1,
-    Paths      = settings.LibraryPaths
+    Paths      = settings.LibraryPaths,
+    OperatingSystem = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "windows"
+        : RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? "linux"
+        : RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? "macos" : "unknown",
+    Architecture = RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant(),
+    InstallType = installType,
+    UpdateSupported = updateSupported
 }));
 
 // Library scan trigger
@@ -87,6 +103,7 @@ app.MapGet("/api/scan", (LibraryService svc) =>
 app.MapLibraryEndpoints();
 app.MapStreamEndpoints();
 app.MapConfigurationEndpoints();
+app.MapUpdateEndpoints(settings);
 
 // ---- Start ----------------------------------------------------------------
 var addr = builder.Configuration["Kestrel:Endpoints:Http:Url"] ?? "http://0.0.0.0:5280";

@@ -5,5 +5,6 @@ case "$1" in
     remove|purge)
         systemctl stop orynivo-server 2>/dev/null || true
         systemctl disable orynivo-server 2>/dev/null || true
+        systemctl disable --now orynivo-server-updater.path 2>/dev/null || true
         ;;
 esac

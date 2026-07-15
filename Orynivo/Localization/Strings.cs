@@ -145,6 +145,32 @@ public sealed record LocalizedStrings(
     string CrashMessage,
     string CrashMessageWithoutLog)
 {
+    /// <summary>Gets the application-version label shown in the About window.</summary>
+    public string VersionLabel { get; init; } = "";
+    /// <summary>Gets the label for checking GitHub Releases for an update.</summary>
+    public string CheckForUpdates { get; init; } = "";
+    /// <summary>Gets the status shown while checking for an update.</summary>
+    public string CheckingForUpdates { get; init; } = "";
+    /// <summary>Gets the status shown when a newer version is available.</summary>
+    public string UpdateAvailable { get; init; } = "";
+    /// <summary>Gets the status shown when the current version is up to date.</summary>
+    public string UpToDate { get; init; } = "";
+    /// <summary>Gets the status shown when verified updates are not configured.</summary>
+    public string UpdateUnavailable { get; init; } = "";
+    /// <summary>Gets the label for downloading and installing an update.</summary>
+    public string DownloadAndInstall { get; init; } = "";
+    /// <summary>Gets the status shown while downloading an update.</summary>
+    public string DownloadingUpdate { get; init; } = "";
+    /// <summary>Gets the generic update failure message.</summary>
+    public string UpdateFailed { get; init; } = "";
+    /// <summary>Gets the action label for updating a configured Orynivo Server.</summary>
+    public string UpdateServer { get; init; } = "";
+    /// <summary>Gets the server-update transfer status.</summary>
+    public string UpdatingServer { get; init; } = "";
+    /// <summary>Gets the server-update queued status.</summary>
+    public string ServerUpdateQueued { get; init; } = "";
+    /// <summary>Gets the message for disabled or unsupported server updates.</summary>
+    public string ServerUpdateUnavailable { get; init; } = "";
     public string OutputType { get; init; } = "";
     /// <summary>Gets the label for the local media node inside the library sidebar section.</summary>
     public string LocalMedia { get; init; } = "";

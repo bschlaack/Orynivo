@@ -21,3 +21,4 @@ chown -R orynivo-server:orynivo-server /etc/orynivo-server
 install -d -o orynivo-server -g orynivo-server /var/lib/orynivo-server
 
 systemctl daemon-reload
+systemctl enable --now orynivo-server-updater.path

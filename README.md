@@ -169,10 +169,20 @@ Edit `appsettings.json` before first use:
     "ServerName": "Orynivo Server",
     "ApiKey": "change-this-to-a-long-random-string",
     "LibraryPaths": ["/music", "/mnt/nas/music"],
-    "ScanOnStartup": true
+    "ScanOnStartup": true,
+    "AllowRemoteUpdates": false
   }
 }
 ```
+
+`AllowRemoteUpdates` is disabled by default. When enabled on a packaged Linux
+server, an authenticated Orynivo desktop client can download the matching signed
+DEB/RPM release, relay it to a server without internet access, and request its
+installation. The server verifies the signed manifest and package hash again;
+the unprivileged server process only stages the files. A narrowly scoped root
+systemd updater performs the package-manager operation and restarts the service.
+Portable, development, Windows, and macOS server installations currently report
+managed updates as unsupported.
 
 The server binds to `http://0.0.0.0:5280` by default. Override the port in
 `appsettings.json` under `Kestrel:Endpoints:Http:Url`.
@@ -602,8 +612,59 @@ git push origin v0.14.0
 | `release.yml` | Windows | `Orynivo-{v}-win-x64-Setup.exe`, `Orynivo-{v}-win-x64-Portable.zip` |
 | `server-release.yml` | Ubuntu | `amd64`/`arm64` `.deb` and `x86_64`/`aarch64` `.rpm` packages |
 
-Both workflows upload to the same draft GitHub Release. To trigger a release
-without a tag, use **workflow dispatch** in the Actions tab.
+Both workflows upload to the same draft GitHub Release. Release workflows accept
+only semantic `vMAJOR.MINOR.PATCH` tags whose commit is contained in `main`; the
+tag version is embedded into desktop and server assemblies at build time. To
+trigger a release
+by pushing the tag. **Workflow dispatch** may only rebuild an already existing
+tag that passes the same `main` containment check.
+
+After the draft is published, `update-manifest.yml` hashes the supported Windows
+installer and Linux server packages, creates `update-manifest.json`, signs it
+with the `UPDATE_SIGNING_PRIVATE_KEY_PEM` Actions secret, and attaches the
+manifest/signature to the release. Release builds receive the matching ECDSA
+P-256 public key through the `UPDATE_SIGNING_PUBLIC_KEY_BASE64` repository
+variable. Update functionality remains unavailable rather than accepting an
+unsigned release when those values are not configured.
+
+Configure signing once from a trusted administrator machine (never commit the
+private PEM):
+
+```bash
+openssl ecparam -name prime256v1 -genkey -noout -out update-signing-private.pem
+openssl ec -in update-signing-private.pem -pubout -outform DER \
+  | base64 -w0 > update-signing-public.txt
+gh secret set UPDATE_SIGNING_PRIVATE_KEY_PEM \
+  --repo bschlaack/Orynivo < update-signing-private.pem
+gh variable set UPDATE_SIGNING_PUBLIC_KEY_BASE64 \
+  --repo bschlaack/Orynivo < update-signing-public.txt
+```
+
+Older GitHub CLI versions do not provide `gh variable`. Upgrade `gh`, or create
+the public repository variable through the GitHub API (the value is a public
+verification key, not the private signing secret):
+
+```bash
+gh api --method POST repos/bschlaack/Orynivo/actions/variables \
+  -f name=UPDATE_SIGNING_PUBLIC_KEY_BASE64 \
+  -f value="$(cat update-signing-public.txt)"
+```
+
+If the variable already exists, replace `POST` with `PATCH` and use the endpoint
+`repos/bschlaack/Orynivo/actions/variables/UPDATE_SIGNING_PUBLIC_KEY_BASE64`.
+
+Store an offline backup of the private key; rotating it requires a transition
+release because already-installed builds trust the public key embedded at their
+own build time.
+
+The About window displays the embedded version and can download, verify, and
+launch a newer Windows installer. Settings > Orynivo Server offers the same
+signed update for supported DEB/RPM servers and relays the package from the
+desktop when the server itself cannot reach GitHub.
+
+Local development builds derive their base version from the newest semantic
+`v*` tag contained in `origin/main` and append `-dev+<commit>`; tags reachable
+only from the development branch are intentionally ignored.
 
 ## Run
 

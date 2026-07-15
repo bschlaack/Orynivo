@@ -40,6 +40,15 @@ the repository-wide `../AGENTS.md`.
   sidebar entries carry a source-appropriate shared vector icon; smart playlists
   use the shared 13-px icon footprint and spacing but retain a dedicated orange
   vector lightning icon for emphasis.
+- Non-Dashboard hero and intro surfaces use the normal card background and the
+  shared cyan-violet highlight gradient as their persistent border. They use a
+  consistent 14-px radius on all four corners. The artwork-backed Dashboard
+  greeting hero remains visually distinct. Compact intro heroes reuse their
+  matching sidebar vector icon inside a shared circular, accent-tinted badge.
+- About reads the build-time informational version and performs desktop updates
+  only from a correctly signed GitHub Release manifest. Settings may relay the
+  matching verified DEB/RPM package to an update-enabled Orynivo Server; both
+  client and server must verify it, and unsigned fallback is forbidden.
 - Dashboard Recently Played and Recently Added use 20-item horizontal
   carousels with smoothly animated vector previous/next controls placed in the
   header immediately before Show all; controls must never overlay the cards or

@@ -4,6 +4,34 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.26.0] - 2026-07-15
+
+### Added
+
+- Added build-time desktop/server version reporting and signed GitHub Release
+  updates. The About window can check, verify, download, and launch a newer
+  Windows installer; Orynivo can relay matching DEB/RPM packages to explicitly
+  update-enabled Linux servers without requiring server internet access.
+- Added a privileged, fixed-command Linux server updater that independently
+  verifies the signed release manifest and package digest before invoking the
+  package manager and restarting the service. Remote server updates default to
+  disabled.
+
+### Changed
+
+- Release workflows now accept only semantic `v*` tags contained in `main`,
+  embed that tag version in desktop and server builds, and publish a signed
+  per-asset SHA-256 update manifest after the GitHub Release is published.
+  Development builds derive the same base version exclusively from the newest
+  semantic tag contained in `origin/main` and append the development commit.
+
+- Restyled every non-Dashboard hero and intro surface with the normal card
+  background, the shared cyan-violet highlight gradient border, and a consistent
+  14-pixel radius on all four corners. Compact hero icons now reuse the matching
+  sidebar vectors inside accent-tinted circular badges.
+
+### Fixed
+
 ## [0.25.0] - 2026-07-15
 
 ### Added

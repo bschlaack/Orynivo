@@ -3,4 +3,5 @@
 if [ "$1" -eq 0 ]; then
     systemctl stop orynivo-server 2>/dev/null || true
     systemctl disable orynivo-server 2>/dev/null || true
+    systemctl disable --now orynivo-server-updater.path 2>/dev/null || true
 fi
