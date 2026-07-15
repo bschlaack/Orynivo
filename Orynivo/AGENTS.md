@@ -56,6 +56,8 @@ the repository-wide `../AGENTS.md`.
   `AppSettings.CheckForUpdatesOnStartup` controls the optional background check
   after the main window opens; it may notify about a newer signed desktop
   release but must not download or install it without an explicit user action.
+  The startup update notification offers that explicit action and then reuses
+  the About window's verified download, server-relay, and installer flow.
   Server-update HTTP rejections must expose their status code in Settings rather
   than being collapsed into the "no update" state.
   Starting a desktop update from About first relays the matching signed release

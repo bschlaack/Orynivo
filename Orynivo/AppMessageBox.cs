@@ -23,11 +23,20 @@ internal static class AppMessageBox
     /// <param name="message">Confirmation question displayed by the dialog.</param>
     /// <param name="title">Dialog title.</param>
     /// <param name="owner">Optional owning window.</param>
+    /// <param name="confirmText">Optional label for the primary confirmation action.</param>
     /// <returns><see langword="true"/> when the user confirms; otherwise <see langword="false"/>.</returns>
-    public static Task<bool> ConfirmAsync(string message, string title = "Orynivo", Window? owner = null) =>
-        Dispatcher.UIThread.InvokeAsync(() => ConfirmInternal(message, title, owner));
+    public static Task<bool> ConfirmAsync(
+        string message,
+        string title = "Orynivo",
+        Window? owner = null,
+        string? confirmText = null) =>
+        Dispatcher.UIThread.InvokeAsync(() => ConfirmInternal(message, title, owner, confirmText));
 
-    private static async Task<bool> ConfirmInternal(string message, string title, Window? owner)
+    private static async Task<bool> ConfirmInternal(
+        string message,
+        string title,
+        Window? owner,
+        string? confirmText)
     {
         var result = false;
         var dlg = new Window
@@ -44,9 +53,10 @@ internal static class AppMessageBox
 
         var yes = new Button
         {
-            Content = "OK",
-            Width = 90,
+            Content = string.IsNullOrWhiteSpace(confirmText) ? "OK" : confirmText,
+            MinWidth = 90,
             Height = 32,
+            Padding = new Thickness(12, 0),
             Background = GetBrush("AppTransportPlayBrush", "#6C63FF"),
             Foreground = GetBrush("AppButtonTextBrush", "#FFFFFF"),
             BorderBrush = GetBrush("AppTransportPlayBrush", "#6C63FF"),

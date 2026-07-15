@@ -71,6 +71,24 @@ public partial class AboutWindow : Window
     {
         if (_availableInstaller is null)
             return;
+        await InstallUpdateAsync(_availableInstaller);
+    }
+
+    /// <summary>Starts the verified desktop update flow for an installer selected by the startup update check.</summary>
+    /// <param name="installer">Signed-manifest installer entry selected by the update check.</param>
+    /// <returns>A task representing the download, verification, server relay, and installer launch.</returns>
+    internal async Task StartUpdateAsync(ReleaseAssetInfo installer)
+    {
+        _availableInstaller = installer;
+        InstallUpdateButton.IsVisible = true;
+        await InstallUpdateAsync(installer);
+    }
+
+    /// <summary>Downloads, verifies, relays, and launches the selected desktop installer.</summary>
+    /// <param name="availableInstaller">Installer entry previously obtained from the signed manifest.</param>
+    /// <returns>A task representing the complete update attempt.</returns>
+    private async Task InstallUpdateAsync(ReleaseAssetInfo availableInstaller)
+    {
         CheckForUpdatesButton.IsEnabled = false;
         InstallUpdateButton.IsEnabled = false;
         UpdateStatusTextBlock.Text = LocalizationManager.Current.DownloadingUpdate;
@@ -81,7 +99,7 @@ public partial class AboutWindow : Window
             var installer = verified.Manifest.Assets.FirstOrDefault(asset =>
                 asset.Component == "desktop" && asset.OperatingSystem == "windows" &&
                 asset.Architecture == "x64" && asset.Type == "installer" &&
-                asset.File == _availableInstaller.File)
+                asset.File == availableInstaller.File)
                 ?? throw new InvalidOperationException("The selected desktop installer is no longer available.");
             var installerPath = await updates.DownloadAssetAsync(installer);
             var failedServers = await UpdateServersAsync(updates, verified);

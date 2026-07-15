@@ -2164,7 +2164,8 @@ and move those entries into a dated version section when preparing a release.
 - Genuine on/off options use the pill toggle `SettingsToggleTheme` (still a
   `CheckBox`, so code that reads `IsChecked` is unchanged): DSD-to-PCM, equalizer
   enable, MCP server enable, AI chat enable, and the Appearance sidebar-visibility
-  options. The 19 MCP per-tool entries stay on `SettingsCheckBoxTheme` because
+  options. The toggle track is placed immediately before its label. The 19 MCP
+  per-tool entries stay on `SettingsCheckBoxTheme` because
   they form a permission checklist, not a single on/off switch.
 - Interactive settings inputs (TextBox, ComboBox, NumericUpDown, buttons) share
   a consistent 30 px height.
@@ -2172,3 +2173,4 @@ and move those entries into a dated version section when preparing a release.
   Steinberg ASIO, cwASIO in the Output section; MCP in the MCP section). Each
   configured Orynivo Server / Plex server row additionally shows a live
   connection badge probed asynchronously so opening Settings stays instant.
+  Reachable Orynivo Server rows also show the version returned by `/api/info`.

@@ -431,16 +431,6 @@ internal partial class SettingsView : UserControl
         Margin = new Thickness(0, 2, 0, 0)
     };
 
-    /// <summary>Tests whether a remote Orynivo Server responds on its info endpoint.</summary>
-    /// <param name="server">The server to probe.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns><see langword="true"/> when the server responds successfully.</returns>
-    private static async Task<bool> ProbeOrynivoServerAsync(OrynivoServerSettings server, CancellationToken cancellationToken)
-    {
-        using var client = new OrynivoServerClient();
-        return await client.TestConnectionAsync(server, cancellationToken) is not null;
-    }
-
     /// <summary>Tests whether a Plex server responds to a music-library listing.</summary>
     /// <param name="server">The server to probe.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -461,6 +451,65 @@ internal partial class SettingsView : UserControl
         Margin = new Thickness(8, 0, 0, 0),
         VerticalAlignment = VerticalAlignment.Center
     };
+
+    /// <summary>Creates the initially hidden badge that displays an Orynivo Server version.</summary>
+    /// <returns>A collapsed version badge.</returns>
+    private static StatusBadge CreateServerVersionBadge() => new()
+    {
+        State = StatusBadgeState.Off,
+        IsVisible = false,
+        Margin = new Thickness(8, 0, 0, 0),
+        VerticalAlignment = VerticalAlignment.Center
+    };
+
+    /// <summary>Probes an Orynivo Server and updates its connection and version badges.</summary>
+    /// <param name="statusBadge">Connection-status badge.</param>
+    /// <param name="versionBadge">Badge that displays the returned server version.</param>
+    /// <param name="detail">Muted failure detail.</param>
+    /// <param name="server">Server configuration to probe.</param>
+    /// <param name="cancellationToken">Token cancelling a superseded list probe.</param>
+    private async void CheckOrynivoServerStatusAsync(
+        StatusBadge statusBadge,
+        StatusBadge versionBadge,
+        TextBlock detail,
+        OrynivoServerSettings server,
+        CancellationToken cancellationToken)
+    {
+        OrynivoServerInfo? info;
+        try
+        {
+            using var client = new OrynivoServerClient();
+            info = await client.TestConnectionAsync(server, cancellationToken);
+        }
+        catch
+        {
+            info = null;
+        }
+        if (cancellationToken.IsCancellationRequested)
+            return;
+
+        if (info is not null)
+        {
+            ServerConnectionStore.RecordSuccess(server.Id);
+            statusBadge.State = StatusBadgeState.Ok;
+            statusBadge.Text = LocalizationManager.Current.StatusAvailable;
+            versionBadge.Text = string.Format(LocalizationManager.Current.VersionLabel, info.Version);
+            versionBadge.IsVisible = true;
+            detail.IsVisible = false;
+            return;
+        }
+
+        statusBadge.State = StatusBadgeState.Warning;
+        statusBadge.Text = LocalizationManager.Current.ServerUnreachable;
+        versionBadge.IsVisible = false;
+        var last = ServerConnectionStore.GetLastConnected(server.Id);
+        detail.Text = last is long timestamp
+            ? string.Format(
+                LocalizationManager.Current.ServerLastConnected,
+                DateTimeOffset.FromUnixTimeSeconds(timestamp).ToLocalTime().ToString("g", CultureInfo.CurrentCulture))
+            : LocalizationManager.Current.ServerNeverConnected;
+        detail.IsVisible = true;
+    }
 
     private void RebuildPlexServerList()
     {
@@ -576,6 +625,7 @@ internal partial class SettingsView : UserControl
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             var description = new StackPanel();
             description.Children.Add(new TextBlock
@@ -602,34 +652,38 @@ internal partial class SettingsView : UserControl
             Grid.SetColumn(statusBadge, 1);
             row.Children.Add(statusBadge);
 
+            var versionBadge = CreateServerVersionBadge();
+            Grid.SetColumn(versionBadge, 2);
+            row.Children.Add(versionBadge);
+
             var editButton = CreateStyledButton(LocalizationManager.Current.OrynivoEditServer, 80, 28, new Thickness(8, 0, 0, 0));
             editButton.Tag    = server.Id;
             editButton.Click += EditOrynivoServerButton_OnClick;
-            Grid.SetColumn(editButton, 2);
+            Grid.SetColumn(editButton, 3);
             row.Children.Add(editButton);
 
             var cacheButton = CreateStyledButton(LocalizationManager.Current.ClearCache, 90, 28, new Thickness(8, 0, 0, 0));
             cacheButton.Tag    = server.Id;
             cacheButton.Click += ClearOrynivoServerCacheButton_OnClick;
-            Grid.SetColumn(cacheButton, 3);
+            Grid.SetColumn(cacheButton, 4);
             row.Children.Add(cacheButton);
 
             var updateButton = CreateStyledButton(LocalizationManager.Current.UpdateServer, double.NaN, 28, new Thickness(8, 0, 0, 0));
             updateButton.Tag = server;
             updateButton.Click += UpdateOrynivoServerButton_OnClick;
-            Grid.SetColumn(updateButton, 4);
+            Grid.SetColumn(updateButton, 5);
             row.Children.Add(updateButton);
 
             var removeButton = CreateStyledButton(LocalizationManager.Current.OrynivoRemoveServer, 80, 28, new Thickness(8, 0, 0, 0));
             removeButton.Tag    = server.Id;
             removeButton.Click += RemoveOrynivoServerButton_OnClick;
-            Grid.SetColumn(removeButton, 5);
+            Grid.SetColumn(removeButton, 6);
             row.Children.Add(removeButton);
 
             OrynivoServersPanel.Children.Add(row);
 
             var orynivoServer = server;
-            CheckServerStatusAsync(statusBadge, statusDetail, orynivoServer.Id, ct => ProbeOrynivoServerAsync(orynivoServer, ct), statusToken);
+            CheckOrynivoServerStatusAsync(statusBadge, versionBadge, statusDetail, orynivoServer, statusToken);
             CheckServerCapabilitiesAsync(capabilityDetail, orynivoServer, statusToken);
         }
 

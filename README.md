@@ -671,10 +671,14 @@ own build time.
 The About window displays the embedded version and can download, verify, and
 launch a newer Windows installer. Settings > Orynivo Server offers the same
 signed update for supported DEB/RPM servers and relays the package from the
-desktop when the server itself cannot reach GitHub.
+desktop when the server itself cannot reach GitHub. Connected server rows show
+the version returned by their authenticated info endpoint, and the complete
+remote-cache action uses the standard Settings button treatment.
 Settings > Appearance > Updates controls whether the client checks the signed
-manifest in the background at startup and reports a newer Windows version; the
-check never downloads or installs an update automatically.
+manifest in the background at startup and reports a newer Windows version. The
+notification offers a localized **Download and install** action that starts the
+same verified update flow as the About window; no download begins without that
+explicit choice.
 Server package uploads use a route-specific one-GiB safety limit so self-contained
 DEB/RPM packages are not rejected by Kestrel's smaller default request limit.
 The server also reapplies `Kestrel:Limits:MaxRequestBodySize` after loading the
