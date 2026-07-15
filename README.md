@@ -287,6 +287,10 @@ byte-range streaming without FFmpeg.
 - Opening a remote server album from a selected artist initially scopes the
   album tracks to that artist, with the same checkbox used by local albums to
   show every track on the album.
+- File and directory context menus in an Orynivo Server Folder structure view
+  can append tracks to an existing mixed playlist or create a new shared local
+  playlist. Folder descendants are stored as stable `orynivo://` references;
+  authenticated playback URLs are never written as playlist entries.
 - Playlists live under the Library sidebar and can contain mixed local and
   Orynivo Server tracks. Server tracks are stored in local playlists as stable
   `orynivo://` references and resolved to authenticated stream URLs only when

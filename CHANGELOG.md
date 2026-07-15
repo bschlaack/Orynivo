@@ -4,6 +4,25 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.26.1] - 2026-07-15
+
+### Changed
+
+- Replaced the Dashboard hero summary glyphs with the same album, track, artist,
+  and favorite vector icons used by navigation, while retaining each tile's
+  colored circular badge.
+
+### Fixed
+
+- Enlarged the About window, placed its proportionally filled logo in a compact
+  vertically cropped header, and reserved a readable minimum height for the
+  scrollable license list after adding version and update controls.
+- Restored mixed-playlist actions for Orynivo Server file and directory nodes in
+  the Folder structure view. Remote folder selections now resolve their
+  registered server track IDs to stable `orynivo://` references and use the
+  shared local playlist list instead of obsolete hidden server playlists,
+  without persisting authenticated stream URLs.
+
 ## [0.26.0] - 2026-07-15
 
 ### Added
@@ -29,8 +48,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   background, the shared cyan-violet highlight gradient border, and a consistent
   14-pixel radius on all four corners. Compact hero icons now reuse the matching
   sidebar vectors inside accent-tinted circular badges.
-
-### Fixed
 
 ## [0.25.0] - 2026-07-15
 
