@@ -8,7 +8,7 @@ namespace Orynivo.Library;
 /// Normalises raw artist name strings for consistent display and identity comparison.
 /// Strips featured-artist suffixes and trailing separators; builds diacritic-free comparison keys.
 /// </summary>
-internal static partial class ArtistNameNormalizer
+public static partial class ArtistNameNormalizer
 {
     /// <summary>
     /// Returns the primary artist name with featured-artist annotations and trailing separators removed.

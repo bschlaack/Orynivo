@@ -21,6 +21,9 @@ and the ability to reach that library from any device on the local network.
 - CUE sheet support
 - ReplayGain and parametric EQ
 - Local library, playlists, smart playlists and full-text search
+- Unified local and Orynivo Server artist browsing: matching artists appear once
+  in Artists and search, and every artist link opens one combined album view
+  across those libraries regardless of which source the clicked item came from
 - AI control via local LLMs, LM Studio/Ollama/OpenAI-compatible endpoints
 - MCP server for external AI assistants
 - **Orynivo Server** — headless cross-platform music server (Linux, macOS, Windows)
@@ -338,10 +341,15 @@ byte-range streaming without FFmpeg.
   track lists
 - Artist and album views with table and virtualized artwork modes, including
   Favorites-only filtering in both modes
-- Dashboard with recently played cards, mixed local/server recently added
-  albums, most-listened album/artist/genre analytics, a shared period selector,
-  a second-precision playback calendar, and linked genres that open the matching
-  filtered track list
+- Dashboard with an artwork-backed greeting hero with a lightened-artwork rim, live
+  library counters (including local and configured Orynivo Server track
+  favorites), random
+  playback and queue shortcuts, parallel Recently Played/Recently Added artwork
+  strips, source and favorite state on history cards, a period-aware listening
+  seven-point labeled and smoothed listening-trend chart, compact proportional
+  genre/album/artist analytics, quick access, and a
+  clickable playback calendar. Album rankings retain artwork, and linked genres
+  open the matching filtered track list.
 - Clickable populated calendar days with a modal daily listening history;
   local title, album, and artist links open the corresponding library view,
   and title links immediately start playback
@@ -417,6 +425,19 @@ byte-range streaming without FFmpeg.
   missing local libraries, servers, radios, and podcasts, plus a mini context
   menu on the now-playing cover for opening the album/artist, searching cover
   art, and toggling the favorite state
+- Gradient hover outlines for interactive artwork cards, source-appropriate
+  vector icons throughout the main sidebar (including a matching orange vector
+  lightning icon for smart playlists), and smoothly arrow-controlled
+  20-item carousels for Recently Played and Recently Added; their arrows sit in
+  the section header beside Show all instead of covering artwork, and unavailable
+  directions stay in place as muted controls so the header never shifts
+- Edge-aligned equal-size Dashboard overview cards and a listening chart with
+  daily short-period points, readable sparse date labels, and a rounded Y-axis
+  ceiling above the curve peak; hovering any point shows its date and listened
+  minutes, while bounded curve smoothing keeps the plotted height proportional
+  to that Y-axis scale without overshooting measured values
+- Dashboard favorite totals match the unified Favorites view by counting only
+  currently resolvable local and Orynivo Server tracks
 - German, English, French, and Spanish user interfaces
 - Multiple Plex Media Server configurations with protected access tokens and
   music-library discovery, artist/album/track browsing, folder navigation, and

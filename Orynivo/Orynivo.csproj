@@ -43,6 +43,8 @@
 
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
+    <AvaloniaResource Include="..\Logo\orynivo.png" Link="Assets\DashboardLogo.png" />
+    <AvaloniaResource Include="..\Logo\bg.png" Link="Assets\DashboardHeroBackground.png" />
   </ItemGroup>
 
   <ItemGroup>

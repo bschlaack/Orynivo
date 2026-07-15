@@ -100,10 +100,18 @@ public partial class MainWindow : Window
     private StackPanel CreateSmartPlaylistSidebarContent(string text)
     {
         var sp = new StackPanel { Orientation = Orientation.Horizontal };
-        sp.Children.Add(new TextBlock
+        sp.Children.Add(new AvaloniaPath
         {
-            Text = "⚡ ",
-            Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0xCC, 0x00))
+            Width = 13,
+            Height = 13,
+            Margin = new Thickness(0, 0, 7, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Stretch = Stretch.Uniform,
+            Data = FindResource<Geometry>("IconSmartPlaylist"),
+            Fill = new SolidColorBrush(Color.FromRgb(0xFF, 0x8A, 0x2A)),
+            Stroke = new SolidColorBrush(Color.FromRgb(0xFF, 0xA0, 0x45)),
+            StrokeThickness = 0.7,
+            StrokeJoin = PenLineJoin.Round
         });
         sp.Children.Add(CreateSidebarEntryText(text));
         return sp;
@@ -111,11 +119,19 @@ public partial class MainWindow : Window
 
     private int InsertOrynivoServerNavItem(int index, string serverId, string view, string title, bool isEnabled = true)
     {
-        var text = CreateSidebarEntryText(title);
-        text.Margin = new Thickness(16, 0, 0, 0);
+        var icon = view switch
+        {
+            "Artists" => "IconArtist",
+            "Albums" => "IconAlbum",
+            "Tracks" => "IconTrack",
+            "Folders" => "IconFolder",
+            _ => "IconServer"
+        };
+        var content = CreateSidebarEntryContent(icon, title);
+        content.Margin = new Thickness(16, 0, 0, 0);
         NavListBox.Items.Insert(index, new ListBoxItem
         {
-            Content = text,
+            Content = content,
             Tag = $"OrynivoServer:{serverId}:{view}",
             IsEnabled = isEnabled,
             Theme = FindResource<ControlTheme>("NavItemTheme")

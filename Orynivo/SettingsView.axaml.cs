@@ -1553,6 +1553,30 @@ internal partial class SettingsView : UserControl
         }
     }
 
+    private async void CalculateReplayGainButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        CalculateReplayGainButton.IsEnabled = false;
+        ReplayGainCalculationStatusTextBlock.Text = LocalizationManager.Current.ReplayGainCalculating;
+        var progress = new Progress<ScanProgress>(p =>
+            ReplayGainCalculationStatusTextBlock.Text =
+                $"{LocalizationManager.Current.ReplayGainCalculating} {p.Current}/{p.Total} – {Path.GetFileName(p.CurrentFile)}");
+        try
+        {
+            var updated = await LibraryScanner.CalculateMissingReplayGainAsync(progress);
+            ReplayGainCalculationStatusTextBlock.Text =
+                string.Format(LocalizationManager.Current.ReplayGainCalculated, updated);
+        }
+        catch (Exception ex)
+        {
+            ReplayGainCalculationStatusTextBlock.Text =
+                string.Format(LocalizationManager.Current.ReplayGainCalculationFailed, ex.Message);
+        }
+        finally
+        {
+            CalculateReplayGainButton.IsEnabled = true;
+        }
+    }
+
     private async void ExportLibraryButton_OnClick(object? sender, RoutedEventArgs e)
     {
         if (!CanStartLibraryBackupOperation())

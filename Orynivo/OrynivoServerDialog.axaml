@@ -159,8 +159,9 @@
                            VerticalAlignment="Center"/>
                 <Button x:Name="TriggerServerScanButton"
                         Content="{DynamicResource L_OrynivoStartServerScan}"
-                        Width="130"
+                        MinWidth="140"
                         Height="30"
+                        Padding="12,0"
                         HorizontalAlignment="Right"
                         Theme="{StaticResource ServerDialogButtonTheme}"
                         Click="TriggerServerScanButton_OnClick"/>
@@ -182,8 +183,9 @@
         <Grid Grid.Row="10">
             <Button x:Name="TestConnectionButton"
                     Content="{DynamicResource L_OrynivoTestConnection}"
-                    Width="140"
+                    MinWidth="170"
                     Height="34"
+                    Padding="14,0"
                     HorizontalAlignment="Left"
                     Theme="{StaticResource ServerDialogButtonTheme}"
                     Click="TestConnectionButton_OnClick"/>
