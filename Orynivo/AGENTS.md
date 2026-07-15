@@ -44,6 +44,10 @@ the repository-wide `../AGENTS.md`.
   result is complete, unless a proven virtualized/paged strategy is used.
 - Use shared typography, brushes, vector icons, control themes, loading helpers,
   and context-menu patterns from the existing application resources.
+- Programmatically created confirmation dialogs use a restrained accent-soft
+  primary action with an accent border/text and explicitly centered content;
+  localized button labels must size through padding and minimum width rather
+  than fixed widths.
 - Main-window placement is persisted only from the normal state. When maximized
   startup is disabled, validate the saved rectangle against current screens and
   center the window if its previous monitor is no longer attached.

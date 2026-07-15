@@ -54,24 +54,32 @@ internal static class AppMessageBox
         var yes = new Button
         {
             Content = string.IsNullOrWhiteSpace(confirmText) ? "OK" : confirmText,
-            MinWidth = 90,
-            Height = 32,
-            Padding = new Thickness(12, 0),
-            Background = GetBrush("AppTransportPlayBrush", "#6C63FF"),
-            Foreground = GetBrush("AppButtonTextBrush", "#FFFFFF"),
-            BorderBrush = GetBrush("AppTransportPlayBrush", "#6C63FF"),
-            BorderThickness = new Thickness(1)
+            MinWidth = 120,
+            MinHeight = 40,
+            Padding = new Thickness(18, 8),
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Background = GetBrush("AppAccentSoftBrush", "#0B3442"),
+            Foreground = GetBrush("AppAccentBrush", "#20D9E8"),
+            BorderBrush = GetBrush("AppAccentBrush", "#20D9E8"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(6),
+            FontWeight = FontWeight.SemiBold
         };
         var no = new Button
         {
             Content = LocalizationManager.Current.Cancel,
-            Width = 90,
-            Height = 32,
+            MinWidth = 110,
+            MinHeight = 40,
+            Padding = new Thickness(18, 8),
             Margin = new Thickness(0, 0, 8, 0),
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center,
             Background = GetBrush("AppButtonBrush", "#252640"),
             Foreground = GetBrush("AppButtonTextBrush", "#FFFFFF"),
             BorderBrush = GetBrush("AppButtonBorderBrush", "#343654"),
-            BorderThickness = new Thickness(1)
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(6)
         };
         yes.Click += (_, _) => { result = true; dlg.Close(); };
         no.Click += (_, _) => dlg.Close();
