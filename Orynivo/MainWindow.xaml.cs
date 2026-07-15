@@ -560,7 +560,10 @@ public partial class MainWindow : Window
         using (StartupTimingLog.Time("MainWindow.RestorePlaybackQueueState"))
             RestorePlaybackQueueState();
         LogUiDiagnostics("MainWindow RestorePlaybackQueueState completed");
-        _libraryWatcher = new LibraryWatcherService(OnWatchedLibraryChanged, OnLibraryScanActivity);
+        _libraryWatcher = new LibraryWatcherService(
+            OnWatchedLibraryChanged,
+            OnLibraryScanActivity,
+            _settings.CalculateMissingReplayGainDuringScan);
         using (StartupTimingLog.Time("MainWindow.LibraryWatcher.UpdatePaths"))
             _libraryWatcher.UpdatePaths(_settings.LibraryPaths ?? []);
         LogUiDiagnostics("MainWindow LibraryWatcher.UpdatePaths completed");
@@ -14391,6 +14394,7 @@ public partial class MainWindow : Window
             _settings.SelectedWasapiDeviceId     = window.SelectedWasapiDeviceId;
             _settings.SelectedWasapiDeviceName   = window.SelectedWasapiDeviceName;
             _settings.ReplayGainMode        = window.SelectedReplayGainMode;
+            _settings.CalculateMissingReplayGainDuringScan = window.CalculateMissingReplayGainDuringScan;
             _settings.AlwaysConvertDsdToPcm = window.AlwaysConvertDsdToPcm;
             _settings.PcmOutputBoostEnabled = window.PcmOutputBoostEnabled;
             _settings.NonGaplessCrossfadeSeconds = window.NonGaplessCrossfadeSeconds;
@@ -14399,6 +14403,7 @@ public partial class MainWindow : Window
             _settings.EqualizerProfiles     = window.SelectedEqualizerProfiles.ToList();
             _settings.SelectedEqualizerProfileName = window.SelectedEqualizerProfileName;
             _settings.LibraryPaths           = window.SelectedLibraryPaths.ToList();
+            _libraryWatcher?.UpdateReplayGainAnalysis(_settings.CalculateMissingReplayGainDuringScan);
             _libraryWatcher?.UpdatePaths(_settings.LibraryPaths);
             if (libraryPathsChanged)
             {

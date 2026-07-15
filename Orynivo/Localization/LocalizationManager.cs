@@ -177,6 +177,7 @@ public static class LocalizationManager
         resources["L_OutputProfileDeleteConfirm"] = Current.OutputProfileDeleteConfirm;
         resources["L_ReplayGain"] = Current.ReplayGain;
         resources["L_ReplayGainHint"] = Current.ReplayGainHint;
+        resources["L_CalculateReplayGainDuringScan"] = Current.CalculateReplayGainDuringScan;
         resources["L_CalculateReplayGain"] = Current.CalculateReplayGain;
         resources["L_NonGaplessCrossfade"] = Current.NonGaplessCrossfade;
         resources["L_NonGaplessCrossfadeHint"] = Current.NonGaplessCrossfadeHint;
@@ -471,6 +472,7 @@ public static class LocalizationManager
         ReplayGainOff = "Aus",
         ReplayGainTrack = "Track",
         ReplayGainAlbum = "Album",
+        CalculateReplayGainDuringScan = "Fehlendes ReplayGain automatisch während Bibliotheksscans berechnen (langsamer)",
         CalculateReplayGain = "Fehlendes ReplayGain berechnen",
         ReplayGainCalculating = "ReplayGain wird berechnet …",
         ReplayGainCalculated = "ReplayGain berechnet: {0} Tracks aktualisiert.",
@@ -978,6 +980,7 @@ public static class LocalizationManager
         ReplayGain = "ReplayGain volume adjustment",
         ReplayGainHint = "Applies to PCM playback. Track mode prefers track gain; album mode prefers album gain. Native DSD output remains bit-perfect.",
         ReplayGainOff = "Off", ReplayGainTrack = "Track", ReplayGainAlbum = "Album",
+        CalculateReplayGainDuringScan = "Automatically calculate missing ReplayGain during library scans (slower)",
         CalculateReplayGain = "Calculate missing ReplayGain",
         ReplayGainCalculating = "Calculating ReplayGain …",
         ReplayGainCalculated = "ReplayGain calculated: {0} tracks updated.",
@@ -1482,6 +1485,7 @@ public static class LocalizationManager
         ReplayGain = "Ajustement du volume ReplayGain",
         ReplayGainHint = "S’applique à la lecture PCM. Le mode piste privilégie le gain de piste, le mode album le gain d’album. La sortie DSD native reste bit-perfect.",
         ReplayGainOff = "Désactivé", ReplayGainTrack = "Piste", ReplayGainAlbum = "Album",
+        CalculateReplayGainDuringScan = "Calculer automatiquement les ReplayGain manquants pendant l’analyse de la bibliothèque (plus lent)",
         CalculateReplayGain = "Calculer les ReplayGain manquants",
         ReplayGainCalculating = "Calcul des ReplayGain …",
         ReplayGainCalculated = "ReplayGain calculé : {0} pistes mises à jour.",
@@ -1983,6 +1987,7 @@ public static class LocalizationManager
         ReplayGain = "Ajuste de volumen ReplayGain",
         ReplayGainHint = "Se aplica a la reproducción PCM. El modo pista prioriza la ganancia de pista y el modo álbum la ganancia de álbum. La salida DSD nativa sigue siendo bit-perfect.",
         ReplayGainOff = "Desactivado", ReplayGainTrack = "Pista", ReplayGainAlbum = "Álbum",
+        CalculateReplayGainDuringScan = "Calcular automáticamente ReplayGain faltante durante el análisis de la biblioteca (más lento)",
         CalculateReplayGain = "Calcular ReplayGain faltante",
         ReplayGainCalculating = "Calculando ReplayGain …",
         ReplayGainCalculated = "ReplayGain calculado: {0} pistas actualizadas.",

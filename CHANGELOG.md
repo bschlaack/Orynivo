@@ -4,9 +4,14 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.26.4] - 2026-07-15
 
 ### Added
+
+- Added a Playback setting to make automatic FFmpeg calculation of missing
+  ReplayGain values during library scans optional and disabled by default;
+  embedded ReplayGain tags are still imported and manual calculation remains
+  available.
 
 ### Fixed
 

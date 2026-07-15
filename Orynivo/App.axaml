@@ -506,6 +506,7 @@
             <x:String x:Key="L_DeviceInfo">Geräteinformationen</x:String>
             <x:String x:Key="L_ReplayGain">ReplayGain-Lautstärkeanpassung</x:String>
             <x:String x:Key="L_ReplayGainHint">Gilt für PCM-Wiedergabe. Native DSD-Ausgabe bleibt bitgenau.</x:String>
+            <x:String x:Key="L_CalculateReplayGainDuringScan">Fehlendes ReplayGain automatisch während Bibliotheksscans berechnen (langsamer)</x:String>
             <x:String x:Key="L_CalculateReplayGain">Fehlendes ReplayGain berechnen</x:String>
             <x:String x:Key="L_NonGaplessCrossfade">Fade für nicht-gapless Queues (Sekunden)</x:String>
             <x:String x:Key="L_NonGaplessCrossfadeHint">0 deaktiviert den Übergang. Gilt nur für Queue-Wechsel, die nicht bereits über die Gapless-PCM-Engine laufen.</x:String>

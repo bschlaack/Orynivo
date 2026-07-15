@@ -844,6 +844,11 @@ fallback or allow client-provided commands/paths to reach the helper.
   but must not be edited independently of their profile.
 - `AppSettings.ReplayGainMode` selects disabled, track, or album ReplayGain for
   PCM playback; native ASIO DSD remains bit-perfect
+- `AppSettings.CalculateMissingReplayGainDuringScan` controls the optional
+  FFmpeg analysis of missing track and album ReplayGain values during desktop
+  manual, watcher, and reconciliation scans. It defaults to disabled for fast
+  library discovery; embedded ReplayGain tags are always imported, and the
+  explicit **Calculate missing ReplayGain** action remains available.
 - `AppSettings.NonGaplessCrossfadeSeconds` controls the optional fade transition
   used for queue advances that are not already covered by the continuous gapless
   PCM session. A value of `0` disables it; the UI caps it to 10 seconds. The

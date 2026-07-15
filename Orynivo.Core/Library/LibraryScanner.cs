@@ -52,12 +52,26 @@ public static class LibraryScanner
         string rootPath,
         IProgress<ScanProgress>? progress = null,
         CancellationToken cancellationToken = default)
+        => await ScanAsync(rootPath, progress, true, cancellationToken).ConfigureAwait(false);
+
+    /// <summary>
+    /// Asynchronously scans <paramref name="rootPath"/> with explicit control over analysis of missing ReplayGain values.
+    /// </summary>
+    /// <param name="rootPath">Root directory to scan recursively.</param>
+    /// <param name="progress">Optional progress callback.</param>
+    /// <param name="calculateMissingReplayGain">Whether FFmpeg should calculate ReplayGain values that are absent from file metadata.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public static async Task<ScanResult> ScanAsync(
+        string rootPath,
+        IProgress<ScanProgress>? progress,
+        bool calculateMissingReplayGain,
+        CancellationToken cancellationToken = default)
     {
         await ScanGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             return await Task.Run(
-                () => Scan(rootPath, progress, cancellationToken),
+                () => Scan(rootPath, progress, calculateMissingReplayGain, cancellationToken),
                 cancellationToken).ConfigureAwait(false);
         }
         finally
@@ -75,6 +89,17 @@ public static class LibraryScanner
     public static async Task<bool> ApplyFileChangesAsync(
         IEnumerable<string> paths,
         CancellationToken cancellationToken = default)
+        => await ApplyFileChangesAsync(paths, true, cancellationToken).ConfigureAwait(false);
+
+    /// <summary>Applies file-system changes with explicit control over analysis of missing ReplayGain values.</summary>
+    /// <param name="paths">Absolute paths reported by file-system watchers.</param>
+    /// <param name="calculateMissingReplayGain">Whether FFmpeg should calculate ReplayGain values that are absent from file metadata.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when database or search-index content changed.</returns>
+    public static async Task<bool> ApplyFileChangesAsync(
+        IEnumerable<string> paths,
+        bool calculateMissingReplayGain,
+        CancellationToken cancellationToken = default)
     {
         var pathList = paths
             .Where(IsSupportedPath)
@@ -87,7 +112,7 @@ public static class LibraryScanner
         try
         {
             return await Task.Run(
-                () => ApplyFileChanges(pathList, cancellationToken),
+                () => ApplyFileChanges(pathList, calculateMissingReplayGain, cancellationToken),
                 cancellationToken).ConfigureAwait(false);
         }
         finally
@@ -197,6 +222,7 @@ public static class LibraryScanner
     private static ScanResult Scan(
         string rootPath,
         IProgress<ScanProgress>? progress,
+        bool calculateMissingReplayGain,
         CancellationToken ct)
     {
         progress?.Report(new ScanProgress(0, 0, rootPath));
@@ -253,7 +279,7 @@ public static class LibraryScanner
 
                 bool isNew = !timestamps.ContainsKey(filePath);
                 var record = BuildRecord(filePath, fi, modifiedAt, now, out _);
-                if (metadataChanged)
+                if (metadataChanged && calculateMissingReplayGain)
                     EnsureReplayGain(record, ct);
                 db.Upsert(record);
                 changedTracks.Add(db.GetByPath(filePath) ?? record);
@@ -272,7 +298,7 @@ public static class LibraryScanner
             progress?.Report(new ScanProgress(files.Count + 1, total, cueGroup.Key));
             try
             {
-                var calculateReplayGain = cueGroup.Any(definition =>
+                var calculateReplayGain = calculateMissingReplayGain && cueGroup.Any(definition =>
                     db.GetByPath(definition.VirtualPath) is not { ReplayGainTrack: { Length: > 0 } });
                 var records = BuildCueRecords(cueGroup.Key, cueGroup.ToList(), now, ct, calculateReplayGain);
                 foreach (var record in records)
@@ -295,7 +321,8 @@ public static class LibraryScanner
             }
         }
 
-        changedTracks.AddRange(EnsureAlbumReplayGain(db, changedTracks, ct));
+        if (calculateMissingReplayGain)
+            changedTracks.AddRange(EnsureAlbumReplayGain(db, changedTracks, ct));
         if (changedTracks.Count > 0)
             TrackSearchIndex.UpdateMany(changedTracks);
         var existing = new HashSet<string>(
@@ -351,6 +378,7 @@ public static class LibraryScanner
 
     private static bool ApplyFileChanges(
         IReadOnlyList<string> paths,
+        bool calculateMissingReplayGain,
         CancellationToken cancellationToken)
     {
         var updatedTracks = new List<TrackRecord>();
@@ -374,7 +402,7 @@ public static class LibraryScanner
                 var definitions = CueSheetParser.Parse(path)
                     .Where(definition => System.IO.File.Exists(definition.SourcePath))
                     .ToList();
-                var records = BuildCueRecords(path, definitions, now, cancellationToken, calculateMissingReplayGain: true);
+                var records = BuildCueRecords(path, definitions, now, cancellationToken, calculateMissingReplayGain);
                 foreach (var cueRecord in records)
                 {
                     db.Upsert(cueRecord);
@@ -398,7 +426,7 @@ public static class LibraryScanner
                             .Where(definition => System.IO.File.Exists(definition.SourcePath))
                             .ToList()
                         : [];
-                    var records = BuildCueRecords(cuePath, definitions, now, cancellationToken, calculateMissingReplayGain: true);
+                    var records = BuildCueRecords(cuePath, definitions, now, cancellationToken, calculateMissingReplayGain);
                     foreach (var cueRecord in records)
                     {
                         db.Upsert(cueRecord);
@@ -440,7 +468,8 @@ public static class LibraryScanner
                         }
                         break;
                     }
-                    EnsureReplayGain(candidate, cancellationToken);
+                    if (calculateMissingReplayGain)
+                        EnsureReplayGain(candidate, cancellationToken);
                     record = candidate;
                 }
                 catch (IOException) when (attempt < 3)
@@ -460,7 +489,8 @@ public static class LibraryScanner
             updatedTracks.Add(db.GetByPath(path) ?? record);
         }
 
-        updatedTracks.AddRange(EnsureAlbumReplayGain(db, updatedTracks, cancellationToken));
+        if (calculateMissingReplayGain)
+            updatedTracks.AddRange(EnsureAlbumReplayGain(db, updatedTracks, cancellationToken));
 
         if (updatedTracks.Count > 0)
             TrackSearchIndex.UpdateMany(updatedTracks);

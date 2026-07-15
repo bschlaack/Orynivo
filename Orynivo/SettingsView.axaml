@@ -496,6 +496,9 @@
                                FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"/>
+                    <CheckBox x:Name="CalculateReplayGainDuringScanCheckBox"
+                              Content="{DynamicResource L_CalculateReplayGainDuringScan}"
+                              Margin="0,10,0,0"/>
                     <Button x:Name="CalculateReplayGainButton"
                             MinWidth="230"
                             Height="30"
