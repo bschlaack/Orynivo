@@ -82,7 +82,8 @@ search), `WebBrowsingOptions` (persisted config), `HtmlContentExtractor`
 enums, `PlexServerSettings`, and `OrynivoServerSettings`), `PlexServerClient`,
 `OrynivoServerClient` (HTTP client for browsing and streaming a remote Orynivo Server
 library — provides `GetArtistsAsync`, `GetAlbumsByArtistAsync`, `GetAlbumsAsync`,
-`GetTracksByAlbumAsync`, `GetTracksAsync`, `TestConnectionAsync`, and static URL
+`GetTracksByAlbumAsync`, `GetTracksAsync`, `GetLibrarySummaryAsync`,
+`TestConnectionAsync`, and static URL
 helpers `GetStreamUrl`/`GetAlbumArtworkUrl`/`GetArtistArtworkUrl`; also uploads
 client-selected album and artist artwork through `UploadAlbumArtworkAsync` and
 `UploadArtistImageAsync`; remote track DTOs mirror the local list metadata used
@@ -178,6 +179,9 @@ runtime dependency.
   and Lucene search endpoints; `GET /api/albums/recent` returns the most
   recently added albums (id, title, artist, `ArtistId`, `AddedAt`, `HasArtwork`)
   for the client dashboard's cross-library Recently Added widget;
+  `GET /api/library/summary` returns aggregate album, track, artist, and
+  favourite counts for cross-library Dashboard totals without materializing
+  complete library rows;
   `GET /api/artists/{id}` returns complete
   cached artist profile fields, `POST /api/artists/{id}/profile` stores
   client-refreshed biography/source fields plus optional image bytes, and
@@ -609,7 +613,7 @@ fallback or allow client-provided commands/paths to reach the helper.
   played Plex track can record a stable album/artist context in playback history
 - `Orynivo.Core/Streaming/OrynivoServerClient.cs`: HTTP client for a remote
   Orynivo Server; methods load artists, a single artist profile (`GetArtistAsync`),
-  albums by artist, albums, tracks by
+  aggregate library totals (`GetLibrarySummaryAsync`), albums by artist, albums, tracks by
   album, all tracks, tracks by ID list (`GetTracksByIdsAsync`), track facet rows
   (`GetTrackFacetsAsync`), lightweight folder-tree tracks, per-track cached lyrics
   (`GetTrackLyricsAsync`/`UploadTrackLyricsAsync`), remote artist rename/merge
@@ -673,7 +677,11 @@ fallback or allow client-provided commands/paths to reach the helper.
   combines the matching artist's albums from the local library and every
   configured Orynivo Server; each album row must retain its own source IDs and
   `OrynivoServer` context so album navigation, artwork, and favorites continue
-  to route correctly. Dashboard artist analytics use the same unified drill-down,
+  to route correctly. The unified row uses the best available cached biography
+  and image from any matching identity. New profile downloads and manual artist
+  image selections are synchronized to every matching local and reachable
+  Orynivo Server identity; automatic image synchronization must preserve manual
+  images. Dashboard artist analytics use the same unified drill-down,
   Back navigation restores it as `UnifiedArtistAlbums`, and changing the unified
   artist favorite applies to every matching local and remote artist identity.
   Plex artists remain separate and must not be folded into this identity.
@@ -1829,10 +1837,13 @@ asynchronous file I/O from the UI thread
   descriptive text (all explicitly left-aligned within the hero content column);
   working random-play and Up Next buttons; and four live
   album, track, artist, and favorite counters. Local aggregates come from
-  `AudioDatabase.GetDashboardLibrarySummary()`; the favorite counter additionally
+  `AudioDatabase.GetDashboardLibrarySummary()`; remote track and album totals
+  come from `/api/library/summary` (with lightweight fallbacks for older
+  servers), while artist names are normalized and unified exactly like the
+  shared Artists view. The favorite counter additionally
   includes only client-side track favorites that still occur in each configured
   Orynivo Server's current facets and resolve through `GetTracksByIdsAsync`
-  (`ResolveDashboardRemoteFavoriteTrackCountAsync`). Stale IDs and unavailable
+  (`ResolveDashboardRemoteLibrarySummaryAsync`). Stale IDs and unavailable
   servers must not make the hero/Quick Access count differ from the Favorites
   view. The database query returns only
   aggregate counts and must not materialize complete library lists. The four

@@ -31,6 +31,9 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
   size to the web host.
 - API additions must consider older clients/servers and the existing capability
   probing behavior.
+- `GET /api/library/summary` returns `DashboardLibrarySummary` directly from an
+  aggregate database query so dashboard counters never require complete track
+  or album payloads.
 - Remote package updates remain disabled by default. The server process may only
   stage a signed, matching DEB/RPM bundle beneath its data directory; installation
   belongs to the fixed-command root systemd helper, which independently verifies

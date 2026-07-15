@@ -33,7 +33,11 @@ the repository-wide `../AGENTS.md`.
   album drill-down combines every matching library while retaining each album's
   source context. Every non-Plex artist navigation entry point must use that
   unified drill-down even when the clicked track or row came from only one
-  source. Plex identities remain separate.
+  source. The unified row selects available biography and artwork from any
+  matching identity. Profile downloads and manual image selections propagate to
+  every matching local and reachable Orynivo Server identity; automatic profile
+  images must never overwrite a manually selected image. Plex identities remain
+  separate.
 - Navigation state must distinguish local, remote, Plex, and unified drill-downs;
   numeric IDs from different sources can collide.
 - Keep long mixed-library row composition off the visible `DataGrid` until the
@@ -75,6 +79,11 @@ the repository-wide `../AGENTS.md`.
 - Dashboard favorite counters must use the same currently resolvable local and
   Orynivo Server track set as the unified Favorites view; never count raw remote
   favorite keys from settings without validating current facets and track rows.
+- Dashboard album and track counters represent the same local-plus-Orynivo
+  Server row sets as the shared Albums and Tracks views. Use the remote
+  `/api/library/summary` aggregate endpoint, with lightweight-list fallbacks for
+  older servers. Artist totals must merge local and remote names through
+  `ArtistNameNormalizer.CreateComparisonKey`, matching the shared Artists view.
 - Dashboard hero summary badges reuse the shared album, track, artist, and
   favorite navigation vectors while retaining their individual tinted circles.
 - The four Dashboard overview cards use an edge-aligned equal-width/equal-height

@@ -4,6 +4,23 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.26.6] - 2026-07-15
+
+### Added
+
+- Added the authenticated Orynivo Server `/api/library/summary` endpoint and
+  client method for compact aggregate Dashboard counts without transferring
+  complete track or album rows.
+
+### Fixed
+
+- Corrected Dashboard library totals to include tracks and albums from all
+  configured Orynivo Servers and to unify artist identities consistently with
+  the shared Artists view, with lightweight fallbacks for older servers.
+- Unified artist rows now use available profile images and biographies from
+  either their local or Orynivo Server identity; newly downloaded profile data
+  and manually selected images are synchronized to every matching source.
+
 ## [0.26.5] - 2026-07-15
 
 ### Added

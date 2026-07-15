@@ -125,17 +125,25 @@ public partial class MainWindow : Window
             if (buildVersion != _dashboardBuildVersion)
                 return;
 
-            var librarySummary = await Task.Run(() =>
+            var localLibrary = await Task.Run(() =>
             {
                 using var db = AudioDatabase.OpenDefault();
-                return db.GetDashboardLibrarySummary();
+                return (
+                    Summary: db.GetDashboardLibrarySummary(),
+                    ArtistKeys: db.GetArtistsLite()
+                        .Select(artist => ArtistNameNormalizer.CreateComparisonKey(artist.Artist))
+                        .ToHashSet(StringComparer.Ordinal));
             });
-            var remoteFavoriteTrackCount = await ResolveDashboardRemoteFavoriteTrackCountAsync();
+            var remoteLibrary = await ResolveDashboardRemoteLibrarySummaryAsync();
             if (buildVersion != _dashboardBuildVersion)
                 return;
-            librarySummary = librarySummary with
+            localLibrary.ArtistKeys.UnionWith(remoteLibrary.ArtistKeys);
+            var librarySummary = localLibrary.Summary with
             {
-                FavoriteCount = librarySummary.FavoriteCount + remoteFavoriteTrackCount
+                AlbumCount = localLibrary.Summary.AlbumCount + remoteLibrary.AlbumCount,
+                TrackCount = localLibrary.Summary.TrackCount + remoteLibrary.TrackCount,
+                ArtistCount = localLibrary.ArtistKeys.Count,
+                FavoriteCount = localLibrary.Summary.FavoriteCount + remoteLibrary.FavoriteCount
             };
             if (buildVersion != _dashboardBuildVersion)
                 return;
@@ -924,7 +932,15 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task<int> ResolveDashboardRemoteFavoriteTrackCountAsync()
+    /// <summary>
+    /// Resolves aggregate counts from every reachable Orynivo Server. New servers provide
+    /// track and album totals through a compact summary endpoint; older servers fall back to
+    /// their lightweight facet and album lists. Artist names are retained so local and remote
+    /// identities can be unified with the same comparison key as the Artists view.
+    /// </summary>
+    /// <returns>Combined remote counts and normalized artist identity keys.</returns>
+    private async Task<(int AlbumCount, int TrackCount, int FavoriteCount, HashSet<string> ArtistKeys)>
+        ResolveDashboardRemoteLibrarySummaryAsync()
     {
         var tasks = (_settings.OrynivoServers ?? [])
             .Select(async server =>
@@ -932,27 +948,58 @@ public partial class MainWindow : Window
                 try
                 {
                     using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(8));
-                    var facets = await _orynivoClient.GetTrackFacetsAsync(server, timeout.Token);
+                    var summaryTask = _orynivoClient.GetLibrarySummaryAsync(server, timeout.Token);
+                    var artistsTask = _orynivoClient.GetArtistsAsync(server, timeout.Token);
+                    var facetsTask = _orynivoClient.GetTrackFacetsAsync(server, timeout.Token);
+                    await Task.WhenAll(summaryTask, artistsTask, facetsTask);
+
+                    var summary = await summaryTask;
+                    var artists = await artistsTask;
+                    var facets = await facetsTask;
+                    var albumCount = summary?.AlbumCount;
+                    if (!albumCount.HasValue)
+                        albumCount = (await _orynivoClient.GetAlbumsAsync(server, timeout.Token)).Count;
+
                     var favoriteIds = facets
                         .Where(facet => IsOrynivoFavorite(server, "Track", facet.Id))
                         .Select(facet => facet.Id)
                         .Distinct()
                         .ToList();
-                    if (favoriteIds.Count == 0)
-                        return 0;
+                    var favoriteCount = 0;
+                    if (favoriteIds.Count > 0)
+                    {
+                        var tracks = await CreateOrynivoCatalogProvider(server)
+                            .GetTracksByIdsAsync(favoriteIds, timeout.Token);
+                        favoriteCount = tracks.Select(track => track.Id).Distinct().Count();
+                    }
 
-                    var tracks = await CreateOrynivoCatalogProvider(server)
-                        .GetTracksByIdsAsync(favoriteIds, timeout.Token);
-                    return tracks.Select(track => track.Id).Distinct().Count();
+                    return (
+                        AlbumCount: albumCount.GetValueOrDefault(),
+                        TrackCount: summary?.TrackCount ?? facets.Count,
+                        FavoriteCount: favoriteCount,
+                        ArtistKeys: artists
+                            .Select(artist => ArtistNameNormalizer.CreateComparisonKey(artist.Name))
+                            .ToHashSet(StringComparer.Ordinal));
                 }
                 catch
                 {
-                    // The favorite view also omits a server that cannot resolve its rows.
-                    return 0;
+                    // Unified library views also omit a server that cannot resolve its rows.
+                    return (
+                        AlbumCount: 0,
+                        TrackCount: 0,
+                        FavoriteCount: 0,
+                        ArtistKeys: new HashSet<string>(StringComparer.Ordinal));
                 }
             });
-        var counts = await Task.WhenAll(tasks);
-        return counts.Sum();
+        var summaries = await Task.WhenAll(tasks);
+        var artistKeys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var summary in summaries)
+            artistKeys.UnionWith(summary.ArtistKeys);
+        return (
+            summaries.Sum(summary => summary.AlbumCount),
+            summaries.Sum(summary => summary.TrackCount),
+            summaries.Sum(summary => summary.FavoriteCount),
+            artistKeys);
     }
 
     private Button DashboardCreateCarouselButton(bool forward)

@@ -521,6 +521,27 @@ public sealed class OrynivoServerClient : IDisposable
     // Artists
     // ------------------------------------------------------------------
 
+    /// <summary>Returns aggregate library counters without downloading library rows.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The aggregate summary, or <see langword="null"/> when unavailable or unsupported.</returns>
+    public async Task<DashboardLibrarySummary?> GetLibrarySummaryAsync(
+        OrynivoServerSettings server,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await GetJsonAsync<DashboardLibrarySummary>(
+                server,
+                "/api/library/summary",
+                cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     /// <summary>
     /// Returns all artists in the server's library, sorted alphabetically.
     /// </summary>
