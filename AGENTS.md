@@ -259,6 +259,9 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
 `/usr/bin/orynivo-server` symlink, ship a default config at
 `/etc/orynivo-server/appsettings.json`, and register
 `orynivo-server.service` running as the `orynivo-server` system user.
+The signed update-manifest workflow waits for the Windows installer and all four
+server packages before signing, refuses partial manifests, and supports a
+manual tag input for rebuilding an already published release.
 
 The `orynivo-server` service user is created with `--no-create-home` and has no
 writable `$HOME`, so the default data directory (`$HOME/.local/share/Orynivo`)

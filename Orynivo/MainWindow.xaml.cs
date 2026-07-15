@@ -14436,6 +14436,7 @@ public partial class MainWindow : Window
             _settings.ShowInternetRadioItem   = window.ShowInternetRadioItem;
             _settings.ShowPodcastsItem        = window.ShowPodcastsItem;
             _settings.ShowQueueItem           = window.ShowQueueItem;
+            _settings.CheckForUpdatesOnStartup = window.CheckForUpdatesOnStartup;
             _settings.ShowLocalLibrarySection = window.ShowLocalLibrarySection;
             _settings.ShowOwnRadiosSection    = window.ShowOwnRadiosSection;
             _settings.ShowMyPodcastsSection   = window.ShowMyPodcastsSection;

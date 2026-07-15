@@ -53,6 +53,9 @@ the repository-wide `../AGENTS.md`.
   only from a correctly signed GitHub Release manifest. Settings may relay the
   matching verified DEB/RPM package to an update-enabled Orynivo Server; both
   client and server must verify it, and unsigned fallback is forbidden.
+  `AppSettings.CheckForUpdatesOnStartup` controls the optional background check
+  after the main window opens; it may notify about a newer signed desktop
+  release but must not download or install it without an explicit user action.
 - Dashboard Recently Played and Recently Added use 20-item horizontal
   carousels with smoothly animated vector previous/next controls placed in the
   header immediately before Show all; controls must never overlay the cards or

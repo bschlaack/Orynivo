@@ -149,6 +149,10 @@ public sealed record LocalizedStrings(
     public string VersionLabel { get; init; } = "";
     /// <summary>Gets the label for checking GitHub Releases for an update.</summary>
     public string CheckForUpdates { get; init; } = "";
+    /// <summary>Gets the Settings section label for application updates.</summary>
+    public string Updates { get; init; } = "";
+    /// <summary>Gets the option label for checking for signed updates during startup.</summary>
+    public string CheckForUpdatesOnStartup { get; init; } = "";
     /// <summary>Gets the status shown while checking for an update.</summary>
     public string CheckingForUpdates { get; init; } = "";
     /// <summary>Gets the status shown when a newer version is available.</summary>
