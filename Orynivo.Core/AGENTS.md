@@ -30,6 +30,9 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   redirect and size limits, text-only responses, timeouts, and audit logging.
 - Streaming URL builders may carry credentials for immediate playback, but such
   URLs must never be persisted, logged, documented, or returned to a model.
+- Shared release-update models verify the ECDSA P-256 signed manifest before an
+  asset is selected and verify its SHA-256 digest after download. Consumers must
+  never bypass either verification or accept an unsigned fallback.
 - `Orynivo.Server` has no `InternalsVisibleTo` grant; server-facing Core APIs must
   be deliberately public.
 

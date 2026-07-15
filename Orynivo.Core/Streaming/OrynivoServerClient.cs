@@ -1,7 +1,9 @@
 using System.Net.Http.Json;
+using System.IO.Compression;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Orynivo.Library;
+using Orynivo.Updates;
 
 namespace Orynivo.Streaming;
 
@@ -243,10 +245,38 @@ public sealed record OrynivoSmartCriteriaResolveRequest(string Criteria, IReadOn
 public sealed record OrynivoSmartCriteriaCount(int Count);
 
 /// <summary>Server info returned by <c>/api/info</c>.</summary>
+/// <param name="Name">Configured server display name.</param>
+/// <param name="Version">Build-time informational version.</param>
+/// <param name="ApiVersion">Server API compatibility version.</param>
+/// <param name="OperatingSystem">Runtime operating-system identifier.</param>
+/// <param name="Architecture">Runtime process architecture.</param>
+/// <param name="InstallType">Package/install type such as <c>deb</c>, <c>rpm</c>, or <c>portable</c>.</param>
+/// <param name="UpdateSupported">Whether this installation supports managed package updates.</param>
 public sealed record OrynivoServerInfo(
     string Name,
     string Version,
-    int ApiVersion);
+    int ApiVersion,
+    string? OperatingSystem = null,
+    string? Architecture = null,
+    string? InstallType = null,
+    bool UpdateSupported = false);
+
+/// <summary>Update state returned by a remote Orynivo Server.</summary>
+/// <param name="Enabled">Whether remote updates are enabled in server configuration.</param>
+/// <param name="Supported">Whether the installation supports managed updates.</param>
+/// <param name="InstallType">Server package type.</param>
+/// <param name="Architecture">Server architecture.</param>
+/// <param name="Staged">Whether an update package is staged.</param>
+/// <param name="Ready">Whether installation has been requested.</param>
+/// <param name="Status">Last privileged-updater status.</param>
+public sealed record OrynivoServerUpdateStatus(
+    bool Enabled,
+    bool Supported,
+    string InstallType,
+    string Architecture,
+    bool Staged,
+    bool Ready,
+    string? Status);
 
 /// <summary>
 /// Feature-support flags probed on a remote Orynivo Server so the client can warn when an
@@ -366,6 +396,69 @@ public sealed class OrynivoServerClient : IDisposable
             return await response.Content.ReadFromJsonAsync<OrynivoServerInfo>(JsonOptions, cancellationToken);
         }
         catch { return null; }
+    }
+
+    /// <summary>Gets managed-update state from a remote server.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Update state, or <see langword="null"/> when unavailable.</returns>
+    public async Task<OrynivoServerUpdateStatus?> GetUpdateStatusAsync(
+        OrynivoServerSettings server,
+        CancellationToken cancellationToken = default)
+    {
+        try { return await GetJsonAsync<OrynivoServerUpdateStatus>(server, "/api/update/status", cancellationToken); }
+        catch { return null; }
+    }
+
+    /// <summary>Relays a signed manifest and matching package to a remote server.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="release">Verified release manifest bytes.</param>
+    /// <param name="packagePath">Verified local package path.</param>
+    /// <param name="packageFileName">Original release asset name.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when the server staged the package.</returns>
+    public async Task<bool> UploadUpdateAsync(
+        OrynivoServerSettings server,
+        VerifiedReleaseManifest release,
+        string packagePath,
+        string packageFileName,
+        CancellationToken cancellationToken = default)
+    {
+        var bundlePath = Path.Combine(Path.GetTempPath(), $"orynivo-server-update-{Guid.NewGuid():N}.zip");
+        try
+        {
+            using (var archive = ZipFile.Open(bundlePath, ZipArchiveMode.Create))
+            {
+                var manifest = archive.CreateEntry("update-manifest.json", CompressionLevel.NoCompression);
+                using (var stream = manifest.Open()) stream.Write(release.ManifestBytes);
+                var signature = archive.CreateEntry("update-manifest.sig", CompressionLevel.NoCompression);
+                using (var stream = signature.Open()) stream.Write(release.SignatureBytes);
+                archive.CreateEntryFromFile(packagePath, Path.GetFileName(packageFileName), CompressionLevel.NoCompression);
+            }
+            using var uploadClient = new HttpClient { Timeout = TimeSpan.FromMinutes(30) };
+            await using var bundle = File.OpenRead(bundlePath);
+            using var request = new HttpRequestMessage(HttpMethod.Post, BuildUrl(server, "/api/update/package"))
+            {
+                Content = new StreamContent(bundle)
+            };
+            request.Headers.Add("X-Api-Key", server.ApiKey);
+            request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/zip");
+            using var response = await uploadClient.SendAsync(request, cancellationToken);
+            return response.IsSuccessStatusCode;
+        }
+        finally { File.Delete(bundlePath); }
+    }
+
+    /// <summary>Requests installation of the already staged server package.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when installation was queued.</returns>
+    public async Task<bool> ApplyUpdateAsync(OrynivoServerSettings server, CancellationToken cancellationToken = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, BuildUrl(server, "/api/update/apply"));
+        request.Headers.Add("X-Api-Key", server.ApiKey);
+        using var response = await _http.SendAsync(request, cancellationToken);
+        return response.IsSuccessStatusCode;
     }
 
     /// <summary>

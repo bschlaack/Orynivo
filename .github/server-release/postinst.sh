@@ -22,3 +22,4 @@ install -d -o orynivo-server -g orynivo-server /var/lib/orynivo-server
 
 # Register the systemd unit (do not auto-start — user must configure first)
 systemctl daemon-reload
+systemctl enable --now orynivo-server-updater.path

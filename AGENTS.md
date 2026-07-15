@@ -270,6 +270,15 @@ user). The server's SQLite database, caches, and downloaded artwork live there.
 Do not remove the data-directory override or the systemd unit will abort on
 startup with `UnauthorizedAccessException`/`SIGABRT`.
 
+**Signed updates:** Desktop and server release versions are injected only by
+GitHub release builds from semantic `v*` tags contained in `main`. Published
+releases receive an ECDSA P-256 signed manifest of SHA-256 asset digests. The
+desktop verifies it before self-update or server relay. Remote server updates are
+opt-in; `UpdateEndpoints` stages only matching bounded DEB/RPM bundles beneath
+the data root, and the fixed-command root systemd helper independently verifies
+the manifest/package before invoking the package manager. Never add an unsigned
+fallback or allow client-provided commands/paths to reach the helper.
+
 ## Important Architecture
 
 - `Orynivo/OutputProfile.cs`: named audio output configuration (backend, device

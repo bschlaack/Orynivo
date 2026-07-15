@@ -1,0 +1,12 @@
+[Unit]
+Description=Install a verified Orynivo Server package update
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/orynivo-server/orynivo-server-updater
+User=root
+Group=root
+PrivateTmp=true
+ProtectHome=true
+NoNewPrivileges=true

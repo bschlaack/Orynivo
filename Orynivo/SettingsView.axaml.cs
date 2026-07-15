@@ -16,6 +16,8 @@ using Orynivo.Library;
 using Orynivo.Localization;
 using Orynivo.Streaming;
 using Orynivo.Web;
+using Orynivo.Updates;
+using System.Reflection;
 using AvaloniaApp = Avalonia.Application;
 using UiLanguage = Orynivo.Localization.Language;
 
@@ -567,6 +569,7 @@ internal partial class SettingsView : UserControl
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             var description = new StackPanel();
             description.Children.Add(new TextBlock
@@ -605,10 +608,16 @@ internal partial class SettingsView : UserControl
             Grid.SetColumn(cacheButton, 3);
             row.Children.Add(cacheButton);
 
+            var updateButton = CreateStyledButton(LocalizationManager.Current.UpdateServer, double.NaN, 28, new Thickness(8, 0, 0, 0));
+            updateButton.Tag = server;
+            updateButton.Click += UpdateOrynivoServerButton_OnClick;
+            Grid.SetColumn(updateButton, 4);
+            row.Children.Add(updateButton);
+
             var removeButton = CreateStyledButton(LocalizationManager.Current.OrynivoRemoveServer, 80, 28, new Thickness(8, 0, 0, 0));
             removeButton.Tag    = server.Id;
             removeButton.Click += RemoveOrynivoServerButton_OnClick;
-            Grid.SetColumn(removeButton, 4);
+            Grid.SetColumn(removeButton, 5);
             row.Children.Add(removeButton);
 
             OrynivoServersPanel.Children.Add(row);
@@ -619,6 +628,49 @@ internal partial class SettingsView : UserControl
         }
 
         RefreshRemoteCacheSize();
+    }
+
+    /// <summary>Downloads, verifies, relays, and starts a supported Orynivo Server package update.</summary>
+    private async void UpdateOrynivoServerButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: OrynivoServerSettings server } button)
+            return;
+        button.IsEnabled = false;
+        button.Content = LocalizationManager.Current.UpdatingServer;
+        string? packagePath = null;
+        try
+        {
+            using var serverClient = new OrynivoServerClient();
+            var info = await serverClient.TestConnectionAsync(server);
+            var status = await serverClient.GetUpdateStatusAsync(server);
+            if (info is null || status is not { Enabled: true, Supported: true })
+                throw new InvalidOperationException();
+            var key = typeof(SettingsView).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
+                .FirstOrDefault(attribute => attribute.Key == "OrynivoUpdatePublicKey")?.Value ?? string.Empty;
+            using var releases = new ReleaseUpdateService(key);
+            var verified = await releases.GetLatestManifestBundleAsync();
+            if (!ReleaseUpdateService.IsNewer(info.Version, verified.Manifest.Version))
+                throw new InvalidOperationException();
+            var asset = verified.Manifest.Assets.FirstOrDefault(candidate =>
+                candidate.Component == "server" && candidate.OperatingSystem == "linux" &&
+                candidate.Architecture == status.Architecture && candidate.Type == status.InstallType)
+                ?? throw new InvalidOperationException();
+            packagePath = await releases.DownloadAssetAsync(asset);
+            if (!await serverClient.UploadUpdateAsync(server, verified, packagePath, asset.File) ||
+                !await serverClient.ApplyUpdateAsync(server))
+                throw new InvalidOperationException();
+            button.Content = LocalizationManager.Current.ServerUpdateQueued;
+        }
+        catch
+        {
+            button.Content = LocalizationManager.Current.ServerUpdateUnavailable;
+            button.IsEnabled = true;
+        }
+        finally
+        {
+            if (packagePath is not null)
+                File.Delete(packagePath);
+        }
     }
 
     /// <summary>

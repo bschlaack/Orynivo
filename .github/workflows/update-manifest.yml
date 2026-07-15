@@ -1,0 +1,71 @@
+name: Publish signed update manifest
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate release tag
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'
+
+      - name: Download release artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          mkdir assets
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir assets
+
+      - name: Build update manifest
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          VERSION="${TAG#v}"
+          printf '{"version":"%s","tag":"%s","assets":[' "$VERSION" "$TAG" > update-manifest.json
+          FIRST=1
+          for PATHNAME in assets/*; do
+            FILE="$(basename "$PATHNAME")"
+            COMPONENT="" OS="" ARCH="" TYPE=""
+            case "$FILE" in
+              Orynivo-*-win-x64-Setup.exe) COMPONENT=desktop; OS=windows; ARCH=x64; TYPE=installer ;;
+              orynivo-server_*_amd64.deb) COMPONENT=server; OS=linux; ARCH=x64; TYPE=deb ;;
+              orynivo-server_*_arm64.deb) COMPONENT=server; OS=linux; ARCH=arm64; TYPE=deb ;;
+              orynivo-server-*-1.x86_64.rpm) COMPONENT=server; OS=linux; ARCH=x64; TYPE=rpm ;;
+              orynivo-server-*-1.aarch64.rpm) COMPONENT=server; OS=linux; ARCH=arm64; TYPE=rpm ;;
+              *) continue ;;
+            esac
+            HASH="$(sha256sum "$PATHNAME" | cut -d' ' -f1)"
+            [ "$FIRST" -eq 1 ] || printf ',' >> update-manifest.json
+            FIRST=0
+            jq -cn --arg component "$COMPONENT" --arg operatingSystem "$OS" \
+              --arg architecture "$ARCH" --arg type "$TYPE" --arg file "$FILE" \
+              --arg sha256 "$HASH" \
+              '{component:$component,operatingSystem:$operatingSystem,architecture:$architecture,type:$type,file:$file,sha256:$sha256}' \
+              >> update-manifest.json
+          done
+          printf ']}' >> update-manifest.json
+          jq empty update-manifest.json
+
+      - name: Sign manifest
+        env:
+          UPDATE_SIGNING_PRIVATE_KEY_PEM: ${{ secrets.UPDATE_SIGNING_PRIVATE_KEY_PEM }}
+        run: |
+          test -n "$UPDATE_SIGNING_PRIVATE_KEY_PEM"
+          install -m 600 /dev/null signing-key.pem
+          printf '%s' "$UPDATE_SIGNING_PRIVATE_KEY_PEM" > signing-key.pem
+          openssl dgst -sha256 -sign signing-key.pem -out update-manifest.sig update-manifest.json
+          rm -f signing-key.pem
+
+      - name: Upload manifest and signature
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" update-manifest.json update-manifest.sig --repo "$GITHUB_REPOSITORY" --clobber

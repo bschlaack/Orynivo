@@ -846,6 +846,25 @@
         <Style Selector="Border.motionCard:pointerover Border.coverOverlay">
             <Setter Property="Opacity" Value="1"/>
         </Style>
+        <Style Selector="Border.heroIconBadge">
+            <Setter Property="Width" Value="56"/>
+            <Setter Property="Height" Value="56"/>
+            <Setter Property="CornerRadius" Value="28"/>
+            <Setter Property="Background" Value="{DynamicResource AppAccentSoftBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource CardHoverGradientBrush}"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+        </Style>
+        <Style Selector="Path.heroIcon">
+            <Setter Property="Width" Value="27"/>
+            <Setter Property="Height" Value="27"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="Stroke" Value="{DynamicResource AppAccentBrush}"/>
+            <Setter Property="StrokeThickness" Value="1.7"/>
+            <Setter Property="StrokeLineCap" Value="Round"/>
+            <Setter Property="StrokeJoin" Value="Round"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
         <Style Selector="ScrollViewer.viewSurface, Grid.viewSurface, DataGrid.viewSurface, ListBox.viewSurface, TreeView.viewSurface">
             <Setter Property="Transitions">
                 <Transitions>
@@ -1491,8 +1510,8 @@
                     Height="108"
                     Margin="28,18,28,12"
                     Padding="26,18"
-                    Background="{DynamicResource AppAccentSoftBrush}"
-                    BorderBrush="{DynamicResource AppAccentBrush}"
+                    Background="{DynamicResource AppSurfaceBrush}"
+                    BorderBrush="{StaticResource CardHoverGradientBrush}"
                     BorderThickness="1"
                     CornerRadius="14"
                     IsVisible="False">
@@ -1511,11 +1530,11 @@
                                    Foreground="{DynamicResource AppSecondaryTextBrush}"
                                    TextWrapping="Wrap"/>
                     </StackPanel>
-                    <TextBlock x:Name="LibraryIntroIconTextBlock"
-                               Grid.Column="1"
-                               FontSize="{DynamicResource FontSizeHeadline}"
-                               Foreground="{DynamicResource AppAccentBrush}"
-                               VerticalAlignment="Center"/>
+                    <Border Grid.Column="1"
+                            Classes="heroIconBadge"
+                            VerticalAlignment="Center">
+                        <Path x:Name="LibraryIntroIconPath" Classes="heroIcon"/>
+                    </Border>
                 </Grid>
             </Border>
 
@@ -1559,9 +1578,9 @@
                         Padding="24"
                         IsVisible="False"
                         Background="{DynamicResource AppSurfaceBrush}"
-                        BorderBrush="{DynamicResource AppAccentBrush}"
+                        BorderBrush="{StaticResource CardHoverGradientBrush}"
                         BorderThickness="1"
-                        CornerRadius="0,24,0,24">
+                        CornerRadius="14">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="160"/>
@@ -1617,9 +1636,9 @@
                         Margin="28,24,28,14"
                         Padding="24"
                         Background="{DynamicResource AppSurfaceBrush}"
-                        BorderBrush="{DynamicResource AppAccentBrush}"
+                        BorderBrush="{StaticResource CardHoverGradientBrush}"
                         BorderThickness="1"
-                        CornerRadius="0,24,0,24">
+                        CornerRadius="14">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -1635,15 +1654,11 @@
                                        Foreground="{DynamicResource AppSecondaryTextBrush}"
                                        TextWrapping="Wrap"/>
                         </StackPanel>
-                        <Path Grid.Column="1"
-                              Width="46"
-                              Height="46"
-                              Stretch="Uniform" Data="{StaticResource IconRadio}"
-                              Stroke="{DynamicResource AppAccentBrush}"
-                              StrokeThickness="1.7"
-                              StrokeLineCap="Round"
-                              StrokeJoin="Round"
-                              VerticalAlignment="Center"/>
+                        <Border Grid.Column="1"
+                                Classes="heroIconBadge"
+                                VerticalAlignment="Center">
+                            <Path Classes="heroIcon" Data="{StaticResource IconRadio}"/>
+                        </Border>
                     </Grid>
                 </Border>
 
@@ -1843,9 +1858,9 @@
                 <Border Margin="28,24,28,14"
                         Padding="24"
                         Background="{DynamicResource AppSurfaceBrush}"
-                        BorderBrush="{DynamicResource AppAccentBrush}"
+                        BorderBrush="{StaticResource CardHoverGradientBrush}"
                         BorderThickness="1"
-                        CornerRadius="0,24,0,24">
+                        CornerRadius="14">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -1861,15 +1876,11 @@
                                        Foreground="{DynamicResource AppSecondaryTextBrush}"
                                        TextWrapping="Wrap"/>
                         </StackPanel>
-                        <Path Grid.Column="1"
-                              Width="46"
-                              Height="46"
-                              Stretch="Uniform" Data="{StaticResource IconPodcast}"
-                              Stroke="{DynamicResource AppAccentBrush}"
-                              StrokeThickness="1.7"
-                              StrokeLineCap="Round"
-                              StrokeJoin="Round"
-                              VerticalAlignment="Center"/>
+                        <Border Grid.Column="1"
+                                Classes="heroIconBadge"
+                                VerticalAlignment="Center">
+                            <Path Classes="heroIcon" Data="{StaticResource IconPodcast}"/>
+                        </Border>
                     </Grid>
                 </Border>
 
@@ -2097,9 +2108,9 @@
                     <Border Margin="28,24,28,14"
                             Padding="24"
                             Background="{DynamicResource AppSurfaceBrush}"
-                            BorderBrush="{DynamicResource AppAccentBrush}"
+                            BorderBrush="{StaticResource CardHoverGradientBrush}"
                             BorderThickness="1"
-                            CornerRadius="0,24,0,24">
+                            CornerRadius="14">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -2214,9 +2225,9 @@
                         Padding="22"
                         HorizontalAlignment="Stretch"
                         Background="{DynamicResource AppSurfaceBrush}"
-                        BorderBrush="{DynamicResource AppAccentBrush}"
+                        BorderBrush="{StaticResource CardHoverGradientBrush}"
                         BorderThickness="1"
-                        CornerRadius="0,24,0,24">
+                        CornerRadius="14">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="240"/>

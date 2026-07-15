@@ -21,6 +21,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Resolve version
         id: ver
@@ -36,6 +38,19 @@ jobs:
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           "tag=$tag"         | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           Write-Host "Building version $version (tag $tag)"
+
+      - name: Validate release tag on main
+        shell: pwsh
+        run: |
+          $tag = '${{ steps.ver.outputs.tag }}'
+          if ($tag -notmatch '^v\d+\.\d+\.\d+$') { throw "Invalid release tag '$tag'." }
+          git fetch origin main --tags --force
+          git rev-parse --verify "refs/tags/$tag^{commit}"
+          if ($LASTEXITCODE -ne 0) { throw "Tag '$tag' does not exist." }
+          $tagCommit = (git rev-list -n 1 $tag).Trim()
+          git merge-base --is-ancestor $tagCommit origin/main
+          if ($LASTEXITCODE -ne 0) { throw "Tag '$tag' is not contained in origin/main." }
+          git checkout --detach $tag
 
       - name: Set up .NET 8
         uses: actions/setup-dotnet@v4
@@ -72,6 +87,9 @@ jobs:
           /p:AssemblyVersion=${{ steps.ver.outputs.version }}.0
           /p:FileVersion=${{ steps.ver.outputs.version }}.0
           /p:InformationalVersion=${{ steps.ver.outputs.version }}
+          /p:UpdatePublicKeyBase64=${{ vars.UPDATE_SIGNING_PUBLIC_KEY_BASE64 }}
+          /p:ReleaseVersionFromTag=true
+          /p:IncludeSourceRevisionInInformationalVersion=false
 
       - name: Create portable ZIP
         shell: pwsh

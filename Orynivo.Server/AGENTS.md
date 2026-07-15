@@ -28,6 +28,10 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
   defaults under `/usr/lib/orynivo-server` are read-only and replaceable.
 - API additions must consider older clients/servers and the existing capability
   probing behavior.
+- Remote package updates remain disabled by default. The server process may only
+  stage a signed, matching DEB/RPM bundle beneath its data directory; installation
+  belongs to the fixed-command root systemd helper, which independently verifies
+  the manifest and hash and never accepts client-provided commands or paths.
 
 Consult the detailed endpoint, configuration, scan, cache, and package rules in
 the root `AGENTS.md` before changing those areas.

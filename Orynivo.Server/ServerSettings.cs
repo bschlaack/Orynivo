@@ -24,6 +24,9 @@ public sealed class ServerSettings
     /// </summary>
     public bool ScanOnStartup { get; set; } = true;
 
+    /// <summary>Gets or sets whether authenticated clients may stage and request signed package updates.</summary>
+    public bool AllowRemoteUpdates { get; set; }
+
     /// <summary>
     /// Gets or sets the human-readable display name of this server instance,
     /// returned by the <c>/api/info</c> endpoint.
