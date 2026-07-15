@@ -136,18 +136,13 @@
                 <ControlTemplate>
                     <Grid Background="Transparent">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <ContentPresenter Content="{TemplateBinding Content}"
-                                          VerticalAlignment="Center"
-                                          TextBlock.FontSize="{TemplateBinding FontSize}"
-                                          TextBlock.Foreground="{TemplateBinding Foreground}"/>
                         <Border x:Name="Track"
-                                Grid.Column="1"
+                                Grid.Column="0"
                                 Width="40"
                                 Height="22"
-                                Margin="12,0,0,0"
                                 VerticalAlignment="Center"
                                 Background="{DynamicResource AppInputBrush}"
                                 BorderBrush="{DynamicResource AppInputBorderBrush}"
@@ -161,6 +156,12 @@
                                      VerticalAlignment="Center"
                                      Fill="{DynamicResource AppSecondaryTextBrush}"/>
                         </Border>
+                        <ContentPresenter Grid.Column="1"
+                                          Content="{TemplateBinding Content}"
+                                          Margin="10,0,0,0"
+                                          VerticalAlignment="Center"
+                                          TextBlock.FontSize="{TemplateBinding FontSize}"
+                                          TextBlock.Foreground="{TemplateBinding Foreground}"/>
                     </Grid>
                 </ControlTemplate>
             </Setter>
@@ -792,13 +793,16 @@
                                FontSize="{DynamicResource FontSizeBodyStrong}"
                                FontWeight="SemiBold"
                                Margin="0,28,0,8"/>
-                    <StackPanel Orientation="Horizontal" Spacing="12">
+                    <StackPanel Spacing="8">
                         <TextBlock x:Name="RemoteCacheSizeText"
                                    VerticalAlignment="Center"
                                    FontSize="{DynamicResource FontSizeMeta}"
                                    Foreground="{DynamicResource AppMutedTextBrush}"/>
                         <Button x:Name="ClearAllRemoteCacheButton"
-                                Height="28"
+                                MinWidth="140"
+                                Height="30"
+                                Padding="12,0"
+                                HorizontalAlignment="Left"
                                 Theme="{StaticResource SettingsButtonTheme}"
                                 Content="{DynamicResource L_ClearRemoteCacheAll}"
                                 Click="ClearAllRemoteCacheButton_OnClick"/>
@@ -923,6 +927,15 @@
                                Margin="0,0,0,6"/>
                     <CheckBox x:Name="CheckForUpdatesOnStartupCheckBox"
                               Content="{DynamicResource L_CheckForUpdatesOnStartup}"
+                              Theme="{StaticResource SettingsToggleTheme}"
+                              Margin="0,4,0,20"/>
+
+                    <TextBlock Text="{DynamicResource L_WindowBehavior}"
+                               FontSize="{DynamicResource FontSizeCaption}"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+                    <CheckBox x:Name="StartMaximizedCheckBox"
+                              Content="{DynamicResource L_StartMaximized}"
                               Theme="{StaticResource SettingsToggleTheme}"
                               Margin="0,4,0,20"/>
 

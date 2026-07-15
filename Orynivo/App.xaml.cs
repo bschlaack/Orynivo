@@ -5,6 +5,7 @@ using Avalonia.Threading;
 using Orynivo.Audio;
 using Orynivo.Library;
 using Orynivo.Localization;
+using Orynivo.Streaming;
 using Orynivo.Updates;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -91,7 +92,7 @@ public partial class App : Application
 
                 _ = EnsureSearchIndexAsync(main);
                 if (settings.CheckForUpdatesOnStartup)
-                    _ = CheckForUpdatesOnStartupAsync(main);
+                    _ = CheckForUpdatesOnStartupAsync(main, settings.OrynivoServers);
             }
         }
         catch (Exception ex)
@@ -106,8 +107,11 @@ public partial class App : Application
 
     /// <summary>Checks the latest signed release manifest and notifies the user when a newer desktop build exists.</summary>
     /// <param name="owner">Main window that owns the optional update notification.</param>
+    /// <param name="servers">Configured Orynivo Servers eligible for the matching signed update.</param>
     /// <returns>A task representing the asynchronous update check.</returns>
-    private static async Task CheckForUpdatesOnStartupAsync(Window owner)
+    private static async Task CheckForUpdatesOnStartupAsync(
+        Window owner,
+        IReadOnlyList<OrynivoServerSettings> servers)
     {
         try
         {
@@ -121,15 +125,22 @@ public partial class App : Application
 
             using var updates = new ReleaseUpdateService(publicKey);
             var manifest = await updates.GetLatestManifestAsync();
-            var hasDesktopInstaller = manifest.Assets.Any(asset =>
+            var installer = manifest.Assets.FirstOrDefault(asset =>
                 asset.Component == "desktop" && asset.OperatingSystem == "windows" &&
                 asset.Architecture == "x64" && asset.Type == "installer");
-            if (hasDesktopInstaller && ReleaseUpdateService.IsNewer(currentVersion, manifest.Version))
+            if (installer is not null && ReleaseUpdateService.IsNewer(currentVersion, manifest.Version))
             {
-                await AppMessageBox.ShowAsync(
+                var install = await AppMessageBox.ConfirmAsync(
                     string.Format(LocalizationManager.Current.UpdateAvailable, manifest.Version),
                     LocalizationManager.Current.Updates,
-                    owner);
+                    owner,
+                    LocalizationManager.Current.DownloadAndInstall);
+                if (install)
+                {
+                    var about = new AboutWindow(servers);
+                    about.Show(owner);
+                    await about.StartUpdateAsync(installer);
+                }
             }
         }
         catch (Exception ex)

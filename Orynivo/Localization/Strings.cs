@@ -153,6 +153,10 @@ public sealed record LocalizedStrings(
     public string Updates { get; init; } = "";
     /// <summary>Gets the option label for checking for signed updates during startup.</summary>
     public string CheckForUpdatesOnStartup { get; init; } = "";
+    /// <summary>Gets the Settings heading for main-window startup behavior.</summary>
+    public string WindowBehavior { get; init; } = "";
+    /// <summary>Gets the option label for starting the main window maximized.</summary>
+    public string StartMaximized { get; init; } = "";
     /// <summary>Gets the status shown while checking for an update.</summary>
     public string CheckingForUpdates { get; init; } = "";
     /// <summary>Gets the status shown when a newer version is available.</summary>

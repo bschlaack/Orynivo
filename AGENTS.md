@@ -1114,7 +1114,11 @@ fallback or allow client-provided commands/paths to reach the helper.
 - The album track detail header uses the same accent border and asymmetric
   `CornerRadius="0,24,0,24"` card shape as the radio, podcast, and shared
   library intro cards.
-- The main window starts maximized
+- `AppSettings.StartMaximized` defaults to maximized startup. When disabled,
+  the main window restores its last normal logical size and physical screen
+  position; saved bounds must be validated against current screen working areas
+  so removed-monitor positions fall back to centered startup. Never persist or
+  restore a minimized state.
 - `artwork_files_v1` exports legacy artwork BLOBs into the file cache;
   `artworks.data` remains for compatibility with old `NOT NULL` schemas
   Artwork file paths are also verified per current app-data artwork root; when
@@ -2164,7 +2168,8 @@ and move those entries into a dated version section when preparing a release.
 - Genuine on/off options use the pill toggle `SettingsToggleTheme` (still a
   `CheckBox`, so code that reads `IsChecked` is unchanged): DSD-to-PCM, equalizer
   enable, MCP server enable, AI chat enable, and the Appearance sidebar-visibility
-  options. The 19 MCP per-tool entries stay on `SettingsCheckBoxTheme` because
+  options. The toggle track is placed immediately before its label. The 19 MCP
+  per-tool entries stay on `SettingsCheckBoxTheme` because
   they form a permission checklist, not a single on/off switch.
 - Interactive settings inputs (TextBox, ComboBox, NumericUpDown, buttons) share
   a consistent 30 px height.
@@ -2172,3 +2177,4 @@ and move those entries into a dated version section when preparing a release.
   Steinberg ASIO, cwASIO in the Output section; MCP in the MCP section). Each
   configured Orynivo Server / Plex server row additionally shows a live
   connection badge probed asynchronously so opening Settings stays instant.
+  Reachable Orynivo Server rows also show the version returned by `/api/info`.

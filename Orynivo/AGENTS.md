@@ -40,6 +40,9 @@ the repository-wide `../AGENTS.md`.
   result is complete, unless a proven virtualized/paged strategy is used.
 - Use shared typography, brushes, vector icons, control themes, loading helpers,
   and context-menu patterns from the existing application resources.
+- Main-window placement is persisted only from the normal state. When maximized
+  startup is disabled, validate the saved rectangle against current screens and
+  center the window if its previous monitor is no longer attached.
 - Interactive cards use the shared cyan-violet gradient hover border. Main
   sidebar entries carry a source-appropriate shared vector icon; smart playlists
   use the shared 13-px icon footprint and spacing but retain a dedicated orange
@@ -56,6 +59,8 @@ the repository-wide `../AGENTS.md`.
   `AppSettings.CheckForUpdatesOnStartup` controls the optional background check
   after the main window opens; it may notify about a newer signed desktop
   release but must not download or install it without an explicit user action.
+  The startup update notification offers that explicit action and then reuses
+  the About window's verified download, server-relay, and installer flow.
   Server-update HTTP rejections must expose their status code in Settings rather
   than being collapsed into the "no update" state.
   Starting a desktop update from About first relays the matching signed release

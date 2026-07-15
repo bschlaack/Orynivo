@@ -539,6 +539,9 @@ public partial class MainWindow : Window
         };
         using (StartupTimingLog.Time("MainWindow.LoadSettings"))
             LoadSettings();
+        RestoreWindowPlacement();
+        PositionChanged += (_, _) => CaptureNormalWindowPlacement();
+        SizeChanged += (_, _) => CaptureNormalWindowPlacement();
         LogUiDiagnostics(
             $"MainWindow LoadSettings completed libraryPaths={_settings.LibraryPaths?.Count ?? 0} orynivoServers={_settings.OrynivoServers?.Count ?? 0} lastView={_settings.LastMainView}");
         using (StartupTimingLog.Time("MainWindow.InitMcpBridge"))
@@ -878,6 +881,7 @@ public partial class MainWindow : Window
         _libraryWatcher = null;
         DisposeEndpointVolumeSynchronizationInBackground();
         CaptureAllDataGridColumnWidths();
+        CaptureNormalWindowPlacement();
         PersistViewState();
         CancelAndDispose(ref _radioSearchCts);
         CancelAndDispose(ref _podcastSearchCts);
@@ -914,6 +918,68 @@ public partial class MainWindow : Window
         _settings.LastTrackPath = IsAvailableLocalTrack(_currentFilePath) ? _currentFilePath : null;
         CapturePlaybackQueueState();
         _settingsStore.Save(_settings);
+    }
+
+    /// <summary>Restores the configured startup state and the last usable normal window bounds.</summary>
+    private void RestoreWindowPlacement()
+    {
+        var width = Math.Clamp(_settings.MainWindowWidth, MinWidth, 4096);
+        var height = Math.Clamp(_settings.MainWindowHeight, MinHeight, 2160);
+        Width = width;
+        Height = height;
+
+        if (_settings.StartMaximized)
+        {
+            WindowState = WindowState.Maximized;
+            return;
+        }
+
+        WindowState = WindowState.Normal;
+        if (_settings.MainWindowX is int x &&
+            _settings.MainWindowY is int y &&
+            IsWindowPlacementVisible(x, y, width, height))
+        {
+            WindowStartupLocation = WindowStartupLocation.Manual;
+            Position = new PixelPoint(x, y);
+        }
+        else
+        {
+            WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        }
+    }
+
+    /// <summary>Captures the current bounds while the window is in its normal state.</summary>
+    private void CaptureNormalWindowPlacement()
+    {
+        if (WindowState != WindowState.Normal || ClientSize.Width < MinWidth || ClientSize.Height < MinHeight)
+            return;
+
+        _settings.MainWindowWidth = ClientSize.Width;
+        _settings.MainWindowHeight = ClientSize.Height;
+        _settings.MainWindowX = Position.X;
+        _settings.MainWindowY = Position.Y;
+    }
+
+    /// <summary>Checks whether a saved window rectangle still has a useful intersection with an attached screen.</summary>
+    /// <param name="x">Saved horizontal screen coordinate.</param>
+    /// <param name="y">Saved vertical screen coordinate.</param>
+    /// <param name="width">Saved logical width.</param>
+    /// <param name="height">Saved logical height.</param>
+    /// <returns><see langword="true"/> when at least 100 physical pixels remain visible in both dimensions.</returns>
+    private bool IsWindowPlacementVisible(int x, int y, double width, double height)
+    {
+        foreach (var screen in Screens.All)
+        {
+            var bounds = screen.WorkingArea;
+            var physicalWidth = width * screen.Scaling;
+            var physicalHeight = height * screen.Scaling;
+            var intersectionWidth = Math.Min(x + physicalWidth, bounds.Right) - Math.Max(x, bounds.X);
+            var intersectionHeight = Math.Min(y + physicalHeight, bounds.Bottom) - Math.Max(y, bounds.Y);
+            if (intersectionWidth >= 100 && intersectionHeight >= 100)
+                return true;
+        }
+
+        return false;
     }
 
     private void RestoreFixedDataGridColumnWidths()
@@ -14442,6 +14508,7 @@ public partial class MainWindow : Window
             _settings.ShowPodcastsItem        = window.ShowPodcastsItem;
             _settings.ShowQueueItem           = window.ShowQueueItem;
             _settings.CheckForUpdatesOnStartup = window.CheckForUpdatesOnStartup;
+            _settings.StartMaximized           = window.StartMaximized;
             _settings.ShowLocalLibrarySection = window.ShowLocalLibrarySection;
             _settings.ShowOwnRadiosSection    = window.ShowOwnRadiosSection;
             _settings.ShowMyPodcastsSection   = window.ShowMyPodcastsSection;

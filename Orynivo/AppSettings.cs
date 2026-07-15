@@ -97,6 +97,16 @@ public sealed class AppSettings
     public bool ShowQueueItem { get; set; } = true;
     /// <summary>Gets or sets a value indicating whether Orynivo checks for signed updates at startup.</summary>
     public bool CheckForUpdatesOnStartup { get; set; } = true;
+    /// <summary>Gets or sets a value indicating whether the main window starts maximized.</summary>
+    public bool StartMaximized { get; set; } = true;
+    /// <summary>Gets or sets the last normal main-window width in logical pixels.</summary>
+    public double MainWindowWidth { get; set; } = 1100;
+    /// <summary>Gets or sets the last normal main-window height in logical pixels.</summary>
+    public double MainWindowHeight { get; set; } = 760;
+    /// <summary>Gets or sets the last normal main-window horizontal screen coordinate.</summary>
+    public int? MainWindowX { get; set; }
+    /// <summary>Gets or sets the last normal main-window vertical screen coordinate.</summary>
+    public int? MainWindowY { get; set; }
     /// <summary>Gets or sets a value indicating whether the Library sidebar section is visible.</summary>
     public bool ShowLocalLibrarySection { get; set; } = true;
     /// <summary>Gets or sets a value indicating whether the Own Radios sidebar section is visible.</summary>
