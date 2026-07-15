@@ -82,7 +82,8 @@ search), `WebBrowsingOptions` (persisted config), `HtmlContentExtractor`
 enums, `PlexServerSettings`, and `OrynivoServerSettings`), `PlexServerClient`,
 `OrynivoServerClient` (HTTP client for browsing and streaming a remote Orynivo Server
 library — provides `GetArtistsAsync`, `GetAlbumsByArtistAsync`, `GetAlbumsAsync`,
-`GetTracksByAlbumAsync`, `GetTracksAsync`, `TestConnectionAsync`, and static URL
+`GetTracksByAlbumAsync`, `GetTracksAsync`, `GetLibrarySummaryAsync`,
+`TestConnectionAsync`, and static URL
 helpers `GetStreamUrl`/`GetAlbumArtworkUrl`/`GetArtistArtworkUrl`; also uploads
 client-selected album and artist artwork through `UploadAlbumArtworkAsync` and
 `UploadArtistImageAsync`; remote track DTOs mirror the local list metadata used
@@ -612,7 +613,7 @@ fallback or allow client-provided commands/paths to reach the helper.
   played Plex track can record a stable album/artist context in playback history
 - `Orynivo.Core/Streaming/OrynivoServerClient.cs`: HTTP client for a remote
   Orynivo Server; methods load artists, a single artist profile (`GetArtistAsync`),
-  albums by artist, albums, tracks by
+  aggregate library totals (`GetLibrarySummaryAsync`), albums by artist, albums, tracks by
   album, all tracks, tracks by ID list (`GetTracksByIdsAsync`), track facet rows
   (`GetTrackFacetsAsync`), lightweight folder-tree tracks, per-track cached lyrics
   (`GetTrackLyricsAsync`/`UploadTrackLyricsAsync`), remote artist rename/merge

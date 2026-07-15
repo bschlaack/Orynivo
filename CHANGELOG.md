@@ -6,11 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Added the authenticated Orynivo Server `/api/library/summary` endpoint and
+  client method for compact aggregate Dashboard counts without transferring
+  complete track or album rows.
+
 ### Fixed
 
 - Corrected Dashboard library totals to include tracks and albums from all
   configured Orynivo Servers and to unify artist identities consistently with
-  the shared Artists view.
+  the shared Artists view, with lightweight fallbacks for older servers.
 
 ## [0.26.5] - 2026-07-15
 
