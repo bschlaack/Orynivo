@@ -3,6 +3,11 @@ name: Publish signed update manifest
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Published release tag to rebuild (for example v0.26.1)'
+        required: true
 
 permissions:
   contents: write
@@ -10,23 +15,34 @@ permissions:
 jobs:
   manifest:
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
     steps:
       - name: Validate release tag
-        env:
-          TAG: ${{ github.event.release.tag_name }}
         run: printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'
 
       - name: Download release artifacts
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.event.release.tag_name }}
         run: |
           mkdir assets
-          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir assets
+          for ATTEMPT in $(seq 1 60); do
+            rm -f assets/*
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir assets
+            if compgen -G 'assets/Orynivo-*-win-x64-Setup.exe' > /dev/null \
+              && compgen -G 'assets/orynivo-server_*_amd64.deb' > /dev/null \
+              && compgen -G 'assets/orynivo-server_*_arm64.deb' > /dev/null \
+              && compgen -G 'assets/orynivo-server-*-1.x86_64.rpm' > /dev/null \
+              && compgen -G 'assets/orynivo-server-*-1.aarch64.rpm' > /dev/null; then
+              exit 0
+            fi
+            echo "Release assets are incomplete (attempt ${ATTEMPT}/60); waiting 20 seconds."
+            sleep 20
+          done
+          echo "Release assets remained incomplete; refusing to publish a partial update manifest." >&2
+          exit 1
 
       - name: Build update manifest
-        env:
-          TAG: ${{ github.event.release.tag_name }}
         run: |
           VERSION="${TAG#v}"
           printf '{"version":"%s","tag":"%s","assets":[' "$VERSION" "$TAG" > update-manifest.json
@@ -67,5 +83,4 @@ jobs:
       - name: Upload manifest and signature
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.event.release.tag_name }}
         run: gh release upload "$TAG" update-manifest.json update-manifest.sig --repo "$GITHUB_REPOSITORY" --clobber

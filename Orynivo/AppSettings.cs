@@ -93,6 +93,8 @@ public sealed class AppSettings
     public bool ShowPodcastsItem { get; set; } = true;
     /// <summary>Gets or sets a value indicating whether the Up Next sidebar item is visible.</summary>
     public bool ShowQueueItem { get; set; } = true;
+    /// <summary>Gets or sets a value indicating whether Orynivo checks for signed updates at startup.</summary>
+    public bool CheckForUpdatesOnStartup { get; set; } = true;
     /// <summary>Gets or sets a value indicating whether the Library sidebar section is visible.</summary>
     public bool ShowLocalLibrarySection { get; set; } = true;
     /// <summary>Gets or sets a value indicating whether the Own Radios sidebar section is visible.</summary>

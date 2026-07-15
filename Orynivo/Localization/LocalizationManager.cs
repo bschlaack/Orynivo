@@ -62,6 +62,8 @@ public static class LocalizationManager
         resources["L_About"] = Current.About;
         resources["L_VersionLabel"] = Current.VersionLabel;
         resources["L_CheckForUpdates"] = Current.CheckForUpdates;
+        resources["L_Updates"] = Current.Updates;
+        resources["L_CheckForUpdatesOnStartup"] = Current.CheckForUpdatesOnStartup;
         resources["L_DownloadAndInstall"] = Current.DownloadAndInstall;
         resources["L_UpdateServer"] = Current.UpdateServer;
         resources["L_Settings"] = Current.Settings;
@@ -734,6 +736,8 @@ public static class LocalizationManager
         , OrynivoServers = "ORYNIVO-SERVER"
         , VersionLabel = "Version {0}"
         , CheckForUpdates = "Nach Updates suchen"
+        , Updates = "Updates"
+        , CheckForUpdatesOnStartup = "Beim Programmstart nach Updates suchen"
         , CheckingForUpdates = "Updates werden gesucht …"
         , UpdateAvailable = "Version {0} ist verfügbar."
         , UpToDate = "Orynivo ist auf dem neuesten Stand."
@@ -1229,6 +1233,8 @@ public static class LocalizationManager
         , OrynivoServers = "ORYNIVO SERVER"
         , VersionLabel = "Version {0}"
         , CheckForUpdates = "Check for updates"
+        , Updates = "Updates"
+        , CheckForUpdatesOnStartup = "Check for updates when the application starts"
         , CheckingForUpdates = "Checking for updates…"
         , UpdateAvailable = "Version {0} is available."
         , UpToDate = "Orynivo is up to date."
@@ -1727,6 +1733,8 @@ public static class LocalizationManager
         , OrynivoServers = "SERVEURS ORYNIVO"
         , VersionLabel = "Version {0}"
         , CheckForUpdates = "Rechercher des mises à jour"
+        , Updates = "Mises à jour"
+        , CheckForUpdatesOnStartup = "Rechercher des mises à jour au démarrage de l’application"
         , CheckingForUpdates = "Recherche de mises à jour…"
         , UpdateAvailable = "La version {0} est disponible."
         , UpToDate = "Orynivo est à jour."
@@ -2222,6 +2230,8 @@ public static class LocalizationManager
         , OrynivoServers = "SERVIDORES ORYNIVO"
         , VersionLabel = "Versión {0}"
         , CheckForUpdates = "Buscar actualizaciones"
+        , Updates = "Actualizaciones"
+        , CheckForUpdatesOnStartup = "Buscar actualizaciones al iniciar la aplicación"
         , CheckingForUpdates = "Buscando actualizaciones…"
         , UpdateAvailable = "La versión {0} está disponible."
         , UpToDate = "Orynivo está actualizado."

@@ -5,6 +5,8 @@ using Avalonia.Threading;
 using Orynivo.Audio;
 using Orynivo.Library;
 using Orynivo.Localization;
+using Orynivo.Updates;
+using System.Reflection;
 using System.Runtime.InteropServices;
 
 namespace Orynivo;
@@ -88,6 +90,8 @@ public partial class App : Application
                 main.Show();
 
                 _ = EnsureSearchIndexAsync(main);
+                if (settings.CheckForUpdatesOnStartup)
+                    _ = CheckForUpdatesOnStartupAsync(main);
             }
         }
         catch (Exception ex)
@@ -97,6 +101,40 @@ public partial class App : Application
         finally
         {
             startup.Close();
+        }
+    }
+
+    /// <summary>Checks the latest signed release manifest and notifies the user when a newer desktop build exists.</summary>
+    /// <param name="owner">Main window that owns the optional update notification.</param>
+    /// <returns>A task representing the asynchronous update check.</returns>
+    private static async Task CheckForUpdatesOnStartupAsync(Window owner)
+    {
+        try
+        {
+            var assembly = typeof(App).Assembly;
+            var currentVersion = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+                ?.InformationalVersion ?? assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+            var publicKey = assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
+                .FirstOrDefault(attribute => attribute.Key == "OrynivoUpdatePublicKey")?.Value ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(publicKey))
+                return;
+
+            using var updates = new ReleaseUpdateService(publicKey);
+            var manifest = await updates.GetLatestManifestAsync();
+            var hasDesktopInstaller = manifest.Assets.Any(asset =>
+                asset.Component == "desktop" && asset.OperatingSystem == "windows" &&
+                asset.Architecture == "x64" && asset.Type == "installer");
+            if (hasDesktopInstaller && ReleaseUpdateService.IsNewer(currentVersion, manifest.Version))
+            {
+                await AppMessageBox.ShowAsync(
+                    string.Format(LocalizationManager.Current.UpdateAvailable, manifest.Version),
+                    LocalizationManager.Current.Updates,
+                    owner);
+            }
+        }
+        catch (Exception ex)
+        {
+            CrashLogger.Log(ex, "Startup update check");
         }
     }
 

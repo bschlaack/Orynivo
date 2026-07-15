@@ -631,6 +631,11 @@ P-256 public key through the `UPDATE_SIGNING_PUBLIC_KEY_BASE64` repository
 variable. Update functionality remains unavailable rather than accepting an
 unsigned release when those values are not configured.
 
+The manifest workflow waits for the Windows installer and all four supported
+DEB/RPM packages and fails instead of signing a partial asset list. To repair an
+already published release, run **Publish signed update manifest** manually and
+enter its existing tag.
+
 Configure signing once from a trusted administrator machine (never commit the
 private PEM):
 
@@ -665,6 +670,9 @@ The About window displays the embedded version and can download, verify, and
 launch a newer Windows installer. Settings > Orynivo Server offers the same
 signed update for supported DEB/RPM servers and relays the package from the
 desktop when the server itself cannot reach GitHub.
+Settings > Appearance > Updates controls whether the client checks the signed
+manifest in the background at startup and reports a newer Windows version; the
+check never downloads or installs an update automatically.
 
 Local development builds derive their base version from the newest semantic
 `v*` tag contained in `origin/main` and append `-dev+<commit>`; tags reachable

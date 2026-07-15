@@ -4,6 +4,20 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.26.2] - 2026-07-15
+
+### Added
+
+- Added an Appearance setting that optionally checks the signed GitHub Release
+  manifest in the background at application startup and notifies the user when
+  a newer Windows version is available.
+
+### Fixed
+
+- Prevented publication of incomplete signed update manifests by waiting for
+  the Windows installer and every supported DEB/RPM server package. The
+  manifest workflow can also be rerun manually for an existing release tag.
+
 ## [0.26.1] - 2026-07-15
 
 ### Changed
