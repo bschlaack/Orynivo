@@ -401,10 +401,10 @@ public partial class MainWindow : Window
         };
         var values = new[]
         {
-            ("♫", summary.AlbumCount, LocalizationManager.Current.Albums, Color.Parse("#C56CFF")),
-            ("♪", summary.TrackCount, LocalizationManager.Current.Tracks, Color.Parse("#20D9E8")),
-            ("●", summary.ArtistCount, LocalizationManager.Current.Artists, Color.Parse("#4FD58A")),
-            ("♡", summary.FavoriteCount, LocalizationManager.Current.Favorites, Color.Parse("#FF806C"))
+            (FindResource<Geometry>("IconAlbum")!, summary.AlbumCount, LocalizationManager.Current.Albums, Color.Parse("#C56CFF")),
+            (FindResource<Geometry>("IconTrack")!, summary.TrackCount, LocalizationManager.Current.Tracks, Color.Parse("#20D9E8")),
+            (FindResource<Geometry>("IconArtist")!, summary.ArtistCount, LocalizationManager.Current.Artists, Color.Parse("#4FD58A")),
+            (FindResource<Geometry>("IconFavorite")!, summary.FavoriteCount, LocalizationManager.Current.Favorites, Color.Parse("#FF806C"))
         };
         for (var i = 0; i < values.Length; i++)
         {
@@ -438,7 +438,7 @@ public partial class MainWindow : Window
         return button;
     }
 
-    private Border DashboardBuildHeroStatTile(string icon, int value, string label, Color accent)
+    private Border DashboardBuildHeroStatTile(Geometry icon, int value, string label, Color accent)
     {
         var stack = new StackPanel
         {
@@ -455,12 +455,16 @@ public partial class MainWindow : Window
             Background = new SolidColorBrush(Color.FromArgb(0x28, accent.R, accent.G, accent.B)),
             BorderBrush = new SolidColorBrush(Color.FromArgb(0x80, accent.R, accent.G, accent.B)),
             BorderThickness = new Thickness(1),
-            Child = new TextBlock
+            Child = new AvaloniaPath
             {
-                Text = icon,
-                FontSize = ResolveFontSize("FontSizeSubtitle"),
-                FontWeight = FontWeight.Bold,
-                Foreground = new SolidColorBrush(accent),
+                Data = icon,
+                Width = 20,
+                Height = 20,
+                Stretch = Stretch.Uniform,
+                Stroke = new SolidColorBrush(accent),
+                StrokeThickness = 1.7,
+                StrokeLineCap = PenLineCap.Round,
+                StrokeJoin = PenLineJoin.Round,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             }

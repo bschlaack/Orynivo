@@ -594,10 +594,10 @@ fallback or allow client-provided commands/paths to reach the helper.
   secrets and tokens in `%LOCALAPPDATA%\Orynivo\streaming-credentials.dat` using
   Windows DPAPI for the current user
 - `Orynivo/PlaylistProviders.cs`: provider-neutral playlist persistence for
-  local SQLite playlists and remote Orynivo Server playlists. Track, album, and
-  folder context menu actions should build a `PlaylistSelection` and route
-  add/create operations through `ILibraryPlaylistProvider` instead of branching
-  directly on local vs. server storage in UI handlers.
+  local SQLite mixed playlists plus retained legacy remote-server operations.
+  Current track, album, and folder context menus always target the local mixed
+  playlist list; remote selections persist stable `orynivo://` references while
+  their queue paths remain immediately playable authenticated URLs.
 - `Orynivo/Streaming/PlexServerClient.cs`: queries configured Plex Media Servers,
   exposes only music library sections (`type=artist`), pages
   artists/albums/tracks, resolves drill-down children, browses folders lazily,
@@ -643,21 +643,19 @@ fallback or allow client-provided commands/paths to reach the helper.
   Configured remote Orynivo
   Server entries are rendered in that same Library accordion, after the local
   media rows, as one collapsible server-name row followed by Artists, Albums,
-  Tracks, Folder structure, and a collapsible Playlists child group; server
-  playlists are downloaded when the sidebar navigation is built and are
-  displayed below that server's Playlists group. The local Playlists group is a
-  child of the Local node, indented to align with the local Artists/Albums/
-  Tracks/Folder rows, and its entries are indented one level deeper. Both the
-  local and each server's Playlists group are independently collapsible while
-  keeping their playlist entries nested. There is no separate Orynivo Server
-  sidebar accordion or separate Orynivo Server sidebar visibility setting;
+  Tracks, and Folder structure. Legacy server playlists are not displayed in
+  the current sidebar; all sources use the shared mixed playlist list. The local
+  Playlists group is a child of the Local node, indented to align with the local
+  Artists/Albums/Tracks/Folder rows, and its entries are indented one level
+  deeper. There is no separate Orynivo Server sidebar accordion or separate
+  Orynivo Server sidebar visibility setting;
   `ShowLocalLibrarySection` and `IsLocalLibrarySectionExpanded` control the
   complete Library accordion, including remote Orynivo Server rows.
   `IsLocalMediaLibraryGroupExpanded` persists the Local child group state,
   `IsPlaylistsSectionExpanded` persists the local Playlists child group state,
-  `CollapsedOrynivoServerLibraryGroups` persists collapsed server child groups,
-  and `CollapsedOrynivoServerPlaylistGroups` persists collapsed per-server
-  Playlists child groups.
+  `CollapsedOrynivoServerLibraryGroups` persists collapsed server child groups;
+  `CollapsedOrynivoServerPlaylistGroups` is retained only for persisted
+  settings compatibility.
   Remote
   Artists, Albums, and Tracks reuse the **same** local table/artwork column masks
   (`ApplyColumns("Artists"/"Albums"/"Tracks")`), intro card
@@ -697,12 +695,9 @@ fallback or allow client-provided commands/paths to reach the helper.
   plain track-list view. When a remote album is opened from a remote artist's
   album list, the detail view must initially scope tracks to that artist and
   expose the same **Show all album tracks** checkbox used by local album
-  details. Persisting remote album tracks as local playlists must
-  remain disabled because the paths contain credential-bearing server URLs.
-  Remote playlist actions must target the track's own server and persist
-  playlist entries on that server through `OrynivoServerClient`, using remote
-  track IDs. Local playlist actions remain SQLite-based and are displayed under
-  the Local Playlists group. Smart playlists work identically for local and
+  details. Persisting remote album tracks in mixed local playlists uses stable
+  `orynivo://serverId/track/trackId` references and must never store the
+  credential-bearing playback URL. Smart playlists work identically for local and
   remote libraries: the remote Tracks **Save smart playlist** action and the
   sidebar **Edit smart playlist** context entry persist criteria on the server
   through `CreateSmartPlaylistAsync`/`UpdateSmartPlaylistAsync`, while the server
@@ -741,9 +736,9 @@ fallback or allow client-provided commands/paths to reach the helper.
   Remote folder tree file nodes must register the same `ContentRow` metadata as
   remote Tracks rows before queuing playback. This is required so the transport
   shows title/artist/artwork instead of authenticated stream URLs and enables
-  lyrics, artist-info, favorite, and server-playlist actions. Remote folder
-  playlist persistence must use server-side track IDs through
-  `OrynivoServerPlaylistProvider`, never credential-bearing stream URLs. When
+  lyrics, artist-info, favorite, and mixed-playlist actions. Remote folder
+  playlist persistence must convert registered server track IDs to stable
+  `orynivo://` references in local SQLite, never credential-bearing stream URLs. When
   `/api/folders/tracks` lacks the newer playback metadata because an older
   server is connected, the client may batch-hydrate folder track metadata through
   `/api/tracks/by-ids` before registering the folder rows. Before loading remote
@@ -1222,10 +1217,9 @@ fallback or allow client-provided commands/paths to reach the helper.
   **New playlist...**. Plex tracks expose only the in-memory queue actions so
   authenticated URLs cannot be written to playlist or settings storage.
 - Local and remote Orynivo Server playlist context actions use
-  `ILibraryPlaylistProvider`, `LocalLibraryPlaylistProvider`,
-  `OrynivoServerPlaylistProvider`, and `PlaylistSelection`. Do not add separate
-  local/server add-to-playlist handlers; provider selection belongs in the
-  menu-building layer and mutation handlers should call the provider interface.
+  `LocalLibraryPlaylistProvider` and `PlaylistSelection` against the shared mixed
+  playlist list. Remote selections store stable `orynivo://` references; legacy
+  server playlist providers/endpoints are not exposed in current context menus.
 - Selecting a playlist immediately adds the track or all album tracks and
   updates the status bar
 - Track-row playlist `ContextFlyout` instances are rebuilt directly before they

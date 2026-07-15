@@ -53,7 +53,8 @@ and server rebuild with zero warnings/errors; development builds resolve to
 `0.25.0-dev+c676e862`, a simulated tagged build resolves exactly to `0.25.0`,
 `v0.25.0` was verified as contained in `origin/main`, the server info/update
 status endpoints passed a local smoke test, and all packaged shell scripts pass
-`bash -n`. Remaining work requires repository administration: configure the two
-GitHub signing values described above, run the three release workflows against a
-new test tag, install the produced DEB and RPM in disposable Linux systems, and
-exercise a real desktop-to-server update before removing this plan.
+`bash -n`. The GitHub signing values are configured, and a published release's
+manifest asset, ECDSA signature, and downloaded-asset SHA-256 checksum were
+successfully verified end to end. Remaining work is to install the produced DEB
+and RPM in disposable Linux systems and exercise real Windows self-update plus
+desktop-to-server relay before removing this plan.

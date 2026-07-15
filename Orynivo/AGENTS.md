@@ -22,6 +22,10 @@ the repository-wide `../AGENTS.md`.
 - Preserve source identity on mixed rows. Remote rows must carry their
   `OrynivoServer`, server-side IDs, and authenticated playback metadata; never
   persist credential-bearing URLs.
+- Playlist context actions for local and Orynivo Server rows use the shared local
+  mixed-playlist list. Remote selections retain playable URLs only for queue
+  actions and persist stable `orynivo://serverId/track/trackId` references;
+  hidden legacy server playlists must not be offered by these menus.
 - Shared local/remote Artists, Albums, and Tracks views use the common column
   masks and catalog abstractions. Do not create parallel remote-only UI surfaces.
 - Matching local and Orynivo Server artists use
@@ -58,6 +62,8 @@ the repository-wide `../AGENTS.md`.
 - Dashboard favorite counters must use the same currently resolvable local and
   Orynivo Server track set as the unified Favorites view; never count raw remote
   favorite keys from settings without validating current facets and track rows.
+- Dashboard hero summary badges reuse the shared album, track, artist, and
+  favorite navigation vectors while retaining their individual tinted circles.
 - The four Dashboard overview cards use an edge-aligned equal-width/equal-height
   grid. Listening trends use daily points for short/current-month periods,
   monthly points for the year, no more than seven X-axis labels, and a rounded

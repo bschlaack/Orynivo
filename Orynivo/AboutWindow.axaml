@@ -3,10 +3,10 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="{DynamicResource L_About}"
         Icon="avares://Orynivo/Assets/Orynivo.ico"
-        Width="560"
-        Height="620"
-        MinWidth="480"
-        MinHeight="440"
+        Width="620"
+        Height="720"
+        MinWidth="540"
+        MinHeight="620"
         Background="{DynamicResource AppContentBrush}"
         Foreground="{DynamicResource AppPrimaryTextBrush}">
     <Window.Styles>
@@ -18,10 +18,14 @@
     </Window.Styles>
     <Grid Margin="22"
           RowDefinitions="Auto,Auto,Auto,Auto,*">
-        <Image Grid.Row="0"
-               HorizontalAlignment="Stretch"
-               Source="{DynamicResource AppAboutLogoSource}"
-               Stretch="Uniform"/>
+        <Border Grid.Row="0"
+                Height="110"
+                ClipToBounds="True">
+            <Image HorizontalAlignment="Stretch"
+                   VerticalAlignment="Center"
+                   Source="{DynamicResource AppAboutLogoSource}"
+                   Stretch="UniformToFill"/>
+        </Border>
 
         <StackPanel Grid.Row="1"
                     Margin="0,18,0,0">
@@ -58,6 +62,7 @@
                    Text="{DynamicResource L_Licenses}"/>
 
         <ScrollViewer Grid.Row="4"
+                      MinHeight="240"
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="0,0,12,0">

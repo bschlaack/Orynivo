@@ -130,6 +130,19 @@ public partial class MainWindow : Window
         out ILibraryPlaylistProvider provider,
         out PlaylistSelection selection)
     {
+        if (TryGetOrynivoPlaylistTarget(paths, out var remoteServer, out var remoteTrackIds) &&
+            remoteServer is not null)
+        {
+            provider = _localPlaylistProvider;
+            selection = new PlaylistSelection(
+                paths,
+                remoteTrackIds
+                    .Select(trackId => BuildOrynivoPlaylistReference(remoteServer, trackId))
+                    .ToArray(),
+                []);
+            return true;
+        }
+
         provider = _localPlaylistProvider;
         selection = new PlaylistSelection(paths, paths, []);
         return paths.Count > 0 && paths.All(CanPersistQueuePath);
