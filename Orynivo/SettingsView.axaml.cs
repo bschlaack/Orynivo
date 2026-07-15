@@ -664,9 +664,18 @@ internal partial class SettingsView : UserControl
                 throw new InvalidOperationException();
             button.Content = LocalizationManager.Current.ServerUpdateQueued;
         }
-        catch
+        catch (HttpRequestException exception) when (exception.StatusCode.HasValue)
         {
-            button.Content = LocalizationManager.Current.ServerUpdateUnavailable;
+            CrashLogger.Log(exception, $"Server update rejected ({server.Name})");
+            button.Content = string.Format(
+                LocalizationManager.Current.ServerUpdateRejected,
+                (int)exception.StatusCode.Value);
+            button.IsEnabled = true;
+        }
+        catch (Exception exception)
+        {
+            CrashLogger.Log(exception, $"Server update failed ({server.Name})");
+            button.Content = LocalizationManager.Current.ServerUpdateFailed;
             button.IsEnabled = true;
         }
         finally

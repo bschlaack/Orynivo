@@ -17,6 +17,19 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddJsonFile(
     ConfigurationEndpoints.LinuxConfigFilePath, optional: true, reloadOnChange: true);
 
+// WebApplication.CreateBuilder wires Kestrel before the editable Linux file is
+// added above. Reapply the configured global body-size limit explicitly so a
+// value from /etc/orynivo-server is honoured as well as bundled/environment
+// configuration. The update-package route still owns its narrower streaming
+// safety bound independently.
+var configuredMaxRequestBodySize = builder.Configuration
+    .GetValue<long?>("Kestrel:Limits:MaxRequestBodySize");
+if (configuredMaxRequestBodySize.HasValue)
+{
+    builder.WebHost.ConfigureKestrel(options =>
+        options.Limits.MaxRequestBodySize = configuredMaxRequestBodySize.Value);
+}
+
 var settings = builder.Configuration
     .GetSection("Orynivo")
     .Get<ServerSettings>() ?? new ServerSettings();

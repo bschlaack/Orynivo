@@ -4,6 +4,24 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.26.3] - 2026-07-15
+
+### Added
+
+- Desktop updates now relay the same signed release to every reachable,
+  update-enabled Orynivo Server before launching the Windows installer; failed
+  servers are named and the user can explicitly continue the desktop update.
+
+### Fixed
+
+- Allowed signed server-update bundles up to the endpoint's verified one-GiB
+  safety limit instead of Kestrel's default request limit rejecting current
+  packages, and surfaced HTTP rejection codes in Settings.
+- Hidden the sidebar scan-activity dot whenever its status text is empty.
+- Applied Kestrel's global request-body limit again after layering the editable
+  Linux configuration, so `Kestrel:Limits:MaxRequestBodySize` from
+  `/etc/orynivo-server/appsettings.json` is actually honoured.
+
 ## [0.26.2] - 2026-07-15
 
 ### Added

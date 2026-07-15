@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http.Features;
 using Orynivo.Updates;
 using System.IO.Compression;
 using System.Reflection;
@@ -18,6 +19,17 @@ internal static class UpdateEndpoints
     /// <param name="settings">Bound server settings.</param>
     internal static void MapUpdateEndpoints(this WebApplication app, ServerSettings settings)
     {
+        app.Use(async (context, next) =>
+        {
+            if (context.Request.Path.Equals("/api/update/package", StringComparison.OrdinalIgnoreCase))
+            {
+                var sizeFeature = context.Features.Get<IHttpMaxRequestBodySizeFeature>();
+                if (sizeFeature is { IsReadOnly: false })
+                    sizeFeature.MaxRequestBodySize = MaximumBundleBytes;
+            }
+            await next(context);
+        });
+
         app.MapGet("/api/update/status", () =>
         {
             var paths = GetPaths();

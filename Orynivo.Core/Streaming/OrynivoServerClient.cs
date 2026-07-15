@@ -444,7 +444,8 @@ public sealed class OrynivoServerClient : IDisposable
             request.Headers.Add("X-Api-Key", server.ApiKey);
             request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/zip");
             using var response = await uploadClient.SendAsync(request, cancellationToken);
-            return response.IsSuccessStatusCode;
+            response.EnsureSuccessStatusCode();
+            return true;
         }
         finally { File.Delete(bundlePath); }
     }
@@ -458,7 +459,8 @@ public sealed class OrynivoServerClient : IDisposable
         using var request = new HttpRequestMessage(HttpMethod.Post, BuildUrl(server, "/api/update/apply"));
         request.Headers.Add("X-Api-Key", server.ApiKey);
         using var response = await _http.SendAsync(request, cancellationToken);
-        return response.IsSuccessStatusCode;
+        response.EnsureSuccessStatusCode();
+        return true;
     }
 
     /// <summary>

@@ -673,6 +673,15 @@ desktop when the server itself cannot reach GitHub.
 Settings > Appearance > Updates controls whether the client checks the signed
 manifest in the background at startup and reports a newer Windows version; the
 check never downloads or installs an update automatically.
+Server package uploads use a route-specific one-GiB safety limit so self-contained
+DEB/RPM packages are not rejected by Kestrel's smaller default request limit.
+The server also reapplies `Kestrel:Limits:MaxRequestBodySize` after loading the
+editable `/etc/orynivo-server/appsettings.json`, so that global override is
+effective despite the configuration file being layered after builder creation.
+When a desktop update is explicitly installed from About, Orynivo first relays
+the same signed release to every reachable update-enabled configured server. If
+a server update fails, its name is shown before the user chooses whether the
+Windows installer should continue.
 
 Local development builds derive their base version from the newest semantic
 `v*` tag contained in `origin/main` and append `-dev+<commit>`; tags reachable

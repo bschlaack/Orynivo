@@ -26,12 +26,17 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
   Do not fall back to the service user's non-writable home directory.
 - Editable Linux configuration belongs under `/etc/orynivo-server`; packaged
   defaults under `/usr/lib/orynivo-server` are read-only and replaceable.
+  Because this editable file is layered after `WebApplication.CreateBuilder`,
+  `Program.cs` explicitly reapplies its configured Kestrel maximum request-body
+  size to the web host.
 - API additions must consider older clients/servers and the existing capability
   probing behavior.
 - Remote package updates remain disabled by default. The server process may only
   stage a signed, matching DEB/RPM bundle beneath its data directory; installation
   belongs to the fixed-command root systemd helper, which independently verifies
   the manifest and hash and never accepts client-provided commands or paths.
+  The package endpoint disables Kestrel's smaller default request limit only for
+  that route and retains its own bounded one-GiB streaming limit.
 
 Consult the detailed endpoint, configuration, scan, cache, and package rules in
 the root `AGENTS.md` before changing those areas.
