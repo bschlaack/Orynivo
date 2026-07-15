@@ -677,7 +677,11 @@ fallback or allow client-provided commands/paths to reach the helper.
   combines the matching artist's albums from the local library and every
   configured Orynivo Server; each album row must retain its own source IDs and
   `OrynivoServer` context so album navigation, artwork, and favorites continue
-  to route correctly. Dashboard artist analytics use the same unified drill-down,
+  to route correctly. The unified row uses the best available cached biography
+  and image from any matching identity. New profile downloads and manual artist
+  image selections are synchronized to every matching local and reachable
+  Orynivo Server identity; automatic image synchronization must preserve manual
+  images. Dashboard artist analytics use the same unified drill-down,
   Back navigation restores it as `UnifiedArtistAlbums`, and changing the unified
   artist favorite applies to every matching local and remote artist identity.
   Plex artists remain separate and must not be folded into this identity.

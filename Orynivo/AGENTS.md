@@ -33,7 +33,11 @@ the repository-wide `../AGENTS.md`.
   album drill-down combines every matching library while retaining each album's
   source context. Every non-Plex artist navigation entry point must use that
   unified drill-down even when the clicked track or row came from only one
-  source. Plex identities remain separate.
+  source. The unified row selects available biography and artwork from any
+  matching identity. Profile downloads and manual image selections propagate to
+  every matching local and reachable Orynivo Server identity; automatic profile
+  images must never overwrite a manually selected image. Plex identities remain
+  separate.
 - Navigation state must distinguish local, remote, Plex, and unified drill-downs;
   numeric IDs from different sources can collide.
 - Keep long mixed-library row composition off the visible `DataGrid` until the

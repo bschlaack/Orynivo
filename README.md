@@ -23,7 +23,9 @@ and the ability to reach that library from any device on the local network.
 - Local library, playlists, smart playlists and full-text search
 - Unified local and Orynivo Server artist browsing: matching artists appear once
   in Artists and search, and every artist link opens one combined album view
-  across those libraries regardless of which source the clicked item came from
+  across those libraries regardless of which source the clicked item came from.
+  Cached biographies and images are shared across matching identities, and new
+  profile downloads or manual image selections are synchronized to each source
 - AI control via local LLMs, LM Studio/Ollama/OpenAI-compatible endpoints
 - MCP server for external AI assistants
 - **Orynivo Server** — headless cross-platform music server (Linux, macOS, Windows)
@@ -284,7 +286,9 @@ byte-range streaming without FFmpeg.
   restriction through stable source keys (`local`, `server:<id>`).
 - Remote Orynivo Server artist-info pages support renaming/merging artists and
   assigning Wikimedia artist images. The Windows client performs the image
-  search and uploads the selected image to the server.
+  search and uploads the selected image to the server. For a unified artist,
+  biographies and images are synchronized with the matching local and other
+  reachable Orynivo Server identities while manual images remain protected.
 - Opening a remote server album from a selected artist initially scopes the
   album tracks to that artist, with the same checkbox used by local albums to
   show every track on the album.
