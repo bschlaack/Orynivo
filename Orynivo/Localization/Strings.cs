@@ -175,6 +175,14 @@ public sealed record LocalizedStrings(
     public string ServerUpdateQueued { get; init; } = "";
     /// <summary>Gets the message for disabled or unsupported server updates.</summary>
     public string ServerUpdateUnavailable { get; init; } = "";
+    /// <summary>Gets the generic server-update failure message.</summary>
+    public string ServerUpdateFailed { get; init; } = "";
+    /// <summary>Gets the server-update rejection message containing an HTTP status code.</summary>
+    public string ServerUpdateRejected { get; init; } = "";
+    /// <summary>Gets the progress text used while updating a named Orynivo Server.</summary>
+    public string UpdatingNamedServer { get; init; } = "";
+    /// <summary>Gets the confirmation shown when server updates fail before a desktop update.</summary>
+    public string ServerUpdatesFailedContinue { get; init; } = "";
     public string OutputType { get; init; } = "";
     /// <summary>Gets the label for the local media node inside the library sidebar section.</summary>
     public string LocalMedia { get; init; } = "";

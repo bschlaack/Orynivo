@@ -1058,9 +1058,9 @@ public partial class MainWindow : Window
     private void UpdateLibraryActivityIndicator()
     {
         var text = _localScanText ?? _remoteScanText;
-        LibraryActivityPanel.IsVisible = text is not null;
-        if (text is not null)
-            LibraryActivityTextBlock.Text = text;
+        var visible = !string.IsNullOrWhiteSpace(text);
+        LibraryActivityPanel.IsVisible = visible;
+        LibraryActivityTextBlock.Text = visible ? text! : string.Empty;
     }
 
     /// <summary>
@@ -14554,7 +14554,7 @@ public partial class MainWindow : Window
     private async void AboutButton_OnClick(object? sender, RoutedEventArgs e)
     {
         CloseEmbeddedSettings();
-        await new AboutWindow().ShowDialog<object?>(this);
+        await new AboutWindow(_settings.OrynivoServers ?? []).ShowDialog<object?>(this);
     }
 
 }
