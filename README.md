@@ -135,6 +135,7 @@ works directly in FFmpeg and browser URLs.
 | `GET /api/tracks/{id}/lyrics` | Cached plain/synced lyrics for one track |
 | `PUT /api/tracks/{id}/lyrics` | Store client-downloaded lyrics on the server |
 | `GET /api/tracks/facets` | Lightweight facet rows (genre, format, bitrate) for the Tracks filter |
+| `GET /api/library/summary` | Aggregate album, track, artist, and favorite counts without materializing library rows |
 | `POST /api/tracks/by-ids` | Track rows for a list of track IDs (facet-filtered results) |
 | `GET /api/folders/tracks` | Lightweight track rows plus playback metadata for building a server library folder tree |
 | `GET /api/artwork/album/{id}?size=96` | Album artwork thumbnail or original image |

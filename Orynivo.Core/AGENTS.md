@@ -21,6 +21,9 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   sync and use the shared scanner gate.
 - Keep compact query models compact; do not add artwork BLOBs, lyrics, or full
   records to list/facet/folder queries.
+- Remote dashboard totals use `OrynivoServerClient.GetLibrarySummaryAsync` and
+  the server's aggregate `/api/library/summary` response; do not replace this
+  fast path with complete track or album payloads.
 - `AudioDatabase.GetListeningTrend` supports up to 366 equal chronological
   buckets so the client can request daily Dashboard points without materializing
   playback-history rows.

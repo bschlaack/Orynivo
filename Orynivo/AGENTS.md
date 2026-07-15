@@ -75,6 +75,11 @@ the repository-wide `../AGENTS.md`.
 - Dashboard favorite counters must use the same currently resolvable local and
   Orynivo Server track set as the unified Favorites view; never count raw remote
   favorite keys from settings without validating current facets and track rows.
+- Dashboard album and track counters represent the same local-plus-Orynivo
+  Server row sets as the shared Albums and Tracks views. Use the remote
+  `/api/library/summary` aggregate endpoint, with lightweight-list fallbacks for
+  older servers. Artist totals must merge local and remote names through
+  `ArtistNameNormalizer.CreateComparisonKey`, matching the shared Artists view.
 - Dashboard hero summary badges reuse the shared album, track, artist, and
   favorite navigation vectors while retaining their individual tinted circles.
 - The four Dashboard overview cards use an edge-aligned equal-width/equal-height

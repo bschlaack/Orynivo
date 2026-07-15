@@ -178,6 +178,9 @@ runtime dependency.
   and Lucene search endpoints; `GET /api/albums/recent` returns the most
   recently added albums (id, title, artist, `ArtistId`, `AddedAt`, `HasArtwork`)
   for the client dashboard's cross-library Recently Added widget;
+  `GET /api/library/summary` returns aggregate album, track, artist, and
+  favourite counts for cross-library Dashboard totals without materializing
+  complete library rows;
   `GET /api/artists/{id}` returns complete
   cached artist profile fields, `POST /api/artists/{id}/profile` stores
   client-refreshed biography/source fields plus optional image bytes, and
@@ -1829,10 +1832,13 @@ asynchronous file I/O from the UI thread
   descriptive text (all explicitly left-aligned within the hero content column);
   working random-play and Up Next buttons; and four live
   album, track, artist, and favorite counters. Local aggregates come from
-  `AudioDatabase.GetDashboardLibrarySummary()`; the favorite counter additionally
+  `AudioDatabase.GetDashboardLibrarySummary()`; remote track and album totals
+  come from `/api/library/summary` (with lightweight fallbacks for older
+  servers), while artist names are normalized and unified exactly like the
+  shared Artists view. The favorite counter additionally
   includes only client-side track favorites that still occur in each configured
   Orynivo Server's current facets and resolve through `GetTracksByIdsAsync`
-  (`ResolveDashboardRemoteFavoriteTrackCountAsync`). Stale IDs and unavailable
+  (`ResolveDashboardRemoteLibrarySummaryAsync`). Stale IDs and unavailable
   servers must not make the hero/Quick Access count differ from the Favorites
   view. The database query returns only
   aggregate counts and must not materialize complete library lists. The four

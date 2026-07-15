@@ -20,6 +20,14 @@ public static class LibraryEndpoints
     {
         var api = app.MapGroup("/api");
 
+        // --- Aggregate library summary ----------------------------------
+
+        api.MapGet("/library/summary", () =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            return Results.Ok(db.GetDashboardLibrarySummary());
+        });
+
         // --- Artists -------------------------------------------------------
 
         api.MapGet("/artists", () =>
