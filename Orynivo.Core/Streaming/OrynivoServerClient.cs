@@ -93,7 +93,7 @@ public sealed record OrynivoRecentAlbum(
 /// <param name="ReplayGainAlbum">Album ReplayGain value, or <see langword="null"/>.</param>
 /// <param name="Format">Audio format label, or <see langword="null"/>.</param>
 /// <param name="IsFavorite">Whether the track is marked as favorite on the server.</param>
-/// <param name="IsCueTrack">Whether the track is a CUE virtual track.</param>
+/// <param name="IsCueTrack">Whether the track is a CUE or chapter-based virtual segment; the legacy property name is retained for API compatibility.</param>
 /// <param name="ArtistId">Database ID of the primary artist, or <see langword="null"/>.</param>
 public sealed record OrynivoTrackInfo(
     long Id,

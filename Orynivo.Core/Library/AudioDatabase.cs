@@ -238,6 +238,7 @@ public sealed class AudioDatabase : IDisposable
     private readonly SqliteConnection _conn;
     private Dictionary<string, (long Id, string Name)>? _artistsByComparisonKey;
     private Dictionary<long, string>? _artistNamesById;
+    private Dictionary<string, string>? _trackTitleOverrides;
 
     /// <summary>
     /// Opens (or creates) the SQLite database at <paramref name="dbPath"/>,
@@ -315,6 +316,8 @@ public sealed class AudioDatabase : IDisposable
     /// <param name="track">The track record to upsert.</param>
     public void Upsert(TrackRecord track)
     {
+        if (GetTrackTitleOverrides().TryGetValue(track.Path, out var titleOverride))
+            track.Title = titleOverride;
         track.Title = TrimToNull(track.Title);
         track.SortTitle = TrimToNull(track.SortTitle);
         track.Artist = ArtistNameNormalizer.NormalizeDisplayName(track.Artist);
@@ -443,6 +446,70 @@ public sealed class AudioDatabase : IDisposable
             ClearArtistIdentityCache();
             throw;
         }
+    }
+
+    /// <summary>
+    /// Stores or removes a library-only title override for a track without changing the media file.
+    /// Stored overrides are reapplied whenever a later scan upserts the same stable track path.
+    /// </summary>
+    /// <param name="path">Stable local or virtual track path.</param>
+    /// <param name="title">Replacement title, or <see langword="null"/> to remove the override.</param>
+    public void SetTrackTitleOverride(string path, string? title)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        title = TrimToNull(title);
+        using var tx = _conn.BeginTransaction();
+        using (var command = _conn.CreateCommand())
+        {
+            command.Transaction = tx;
+            if (title is null)
+            {
+                command.CommandText = "DELETE FROM track_title_overrides WHERE path = $path;";
+            }
+            else
+            {
+                command.CommandText = """
+                    INSERT INTO track_title_overrides(path, title)
+                    VALUES ($path, $title)
+                    ON CONFLICT(path) DO UPDATE SET title = excluded.title;
+                    """;
+                Add(command, "$title", title);
+            }
+            Add(command, "$path", path);
+            command.ExecuteNonQuery();
+        }
+
+        if (title is not null)
+        {
+            using var command = _conn.CreateCommand();
+            command.Transaction = tx;
+            command.CommandText = "UPDATE tracks SET title = $title, sort_title = NULL WHERE path = $path;";
+            Add(command, "$title", title);
+            Add(command, "$path", path);
+            command.ExecuteNonQuery();
+        }
+        tx.Commit();
+
+        var overrides = GetTrackTitleOverrides();
+        if (title is null)
+            overrides.Remove(path);
+        else
+            overrides[path] = title;
+    }
+
+    private Dictionary<string, string> GetTrackTitleOverrides()
+    {
+        if (_trackTitleOverrides is not null)
+            return _trackTitleOverrides;
+
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        using var command = _conn.CreateCommand();
+        command.CommandText = "SELECT path, title FROM track_title_overrides;";
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+            result[reader.GetString(0)] = reader.GetString(1);
+        _trackTitleOverrides = result;
+        return result;
     }
 
     // ------------------------------------------------------------------
@@ -2513,6 +2580,11 @@ public sealed class AudioDatabase : IDisposable
             CREATE TABLE IF NOT EXISTS app_meta (
                 key   TEXT PRIMARY KEY,
                 value TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS track_title_overrides (
+                path  TEXT PRIMARY KEY,
+                title TEXT NOT NULL
             );
             """);
         }

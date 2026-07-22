@@ -1061,7 +1061,16 @@ fallback or allow client-provided commands/paths to reach the helper.
   from SQLite, Lucene, and the waveform cache through
   `LibraryScanner.RemoveTracksOutsideRoots`.
 - Metadata extraction supports ID3v1/v2, Vorbis Comments, APE tags, and embedded
-  artwork
+  artwork. The scanned PCM/container formats include Matroska Audio (`.mka`),
+  whose actual codec support is provided by FFmpeg.
+- Chaptered MKA files are probed through FFprobe and stored as stable
+  `mka://chapter/` virtual tracks sharing the physical MKA through
+  `source_path`; their time bounds reuse `segment_start` / `segment_end` and
+  the defining MKA path is stored in `cue_path` for lifecycle cleanup. The
+  physical file is exposed as a normal track only when no usable chapters exist.
+- `track_title_overrides` stores library-only title corrections keyed by stable
+  track path. `AudioDatabase.Upsert` reapplies them after every scan, so virtual
+  MKA chapter titles can be corrected without modifying the media container.
 - Library scans include `.cue` files. CUE `FILE`, `TRACK`, `INDEX 01`, `TITLE`,
   `PERFORMER`, `REM GENRE`, and `REM DATE` metadata produces independently
   searchable and queueable virtual tracks. PCM playback seeks and stops FFmpeg

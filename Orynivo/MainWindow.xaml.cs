@@ -257,7 +257,7 @@ public partial class MainWindow : Window
     private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".dsf", ".dff", ".flac", ".mp3", ".wav", ".aiff", ".aif",
-        ".m4a", ".aac", ".ogg", ".opus", ".wma"
+        ".m4a", ".mka", ".aac", ".ogg", ".opus", ".wma"
     };
     private static readonly string[] AlphabetIndexLabels =
         ["#", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",

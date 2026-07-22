@@ -54,7 +54,7 @@ public partial class DailyHistoryDialog : Window
         public bool CanOpenTrack =>
             Entry.TrackId.HasValue &&
             (File.Exists(Entry.Path) ||
-             Entry.Path.StartsWith("cue://", StringComparison.OrdinalIgnoreCase));
+             CueSheetParser.IsVirtualPath(Entry.Path));
         public bool CanOpenArtist =>
             Entry.ArtistId.HasValue ||
             (IsPotentialOrynivoTrack(Entry) && !string.IsNullOrWhiteSpace(Entry.Artist)) ||

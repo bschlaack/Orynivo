@@ -14,11 +14,11 @@ public sealed class TrackRecord
 
     /// <summary>
     /// Physical audio source. For ordinary tracks this equals <see cref="Path"/>;
-    /// CUE tracks use a stable virtual <see cref="Path"/> and share this source file.
+    /// CUE tracks and MKA chapters use a stable virtual <see cref="Path"/> and share this source file.
     /// </summary>
     public string SourcePath       { get; set; } = string.Empty;
 
-    /// <summary>Optional CUE sheet that defines this virtual track.</summary>
+    /// <summary>Optional CUE sheet or chapter-bearing MKA file that defines this virtual track.</summary>
     public string? CuePath         { get; set; }
 
     /// <summary>Zero-based segment start in the physical source, in seconds.</summary>

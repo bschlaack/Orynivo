@@ -32,7 +32,7 @@ public static class LibraryScanner
     private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".dsf", ".dff", ".flac", ".mp3", ".wav", ".aiff", ".aif",
-        ".m4a", ".aac", ".ogg", ".opus", ".wma", ".cue"
+        ".m4a", ".mka", ".aac", ".ogg", ".opus", ".wma", ".cue"
     };
 
     private static readonly EnumerationOptions RecursiveScanOptions = new()
@@ -242,15 +242,29 @@ public static class LibraryScanner
             })
             .Where(definition => System.IO.File.Exists(definition.SourcePath))
             .ToList();
-        var cueSources = cueDefinitions
+        var mkaDefinitions = discoveredFiles
+            .Where(path => Path.GetExtension(path).Equals(".mka", StringComparison.OrdinalIgnoreCase))
+            .SelectMany(path =>
+            {
+                try { return MatroskaChapterParser.Parse(path, ct); }
+                catch (OperationCanceledException) { throw; }
+                catch { return []; }
+            })
+            .ToList();
+        var segmentDefinitions = cueDefinitions.Concat(mkaDefinitions).ToList();
+        var segmentedSources = segmentDefinitions
             .Select(definition => definition.SourcePath)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var files = discoveredFiles
             .Where(path => !Path.GetExtension(path).Equals(".cue", StringComparison.OrdinalIgnoreCase))
-            .Where(path => !cueSources.Contains(path))
+            .Where(path => !segmentedSources.Contains(path))
             .ToList();
 
-        int total = files.Count + cueFiles.Count;
+        var segmentGroups = segmentDefinitions
+            .GroupBy(definition => definition.CuePath, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        int total = files.Count + cueFiles.Count + segmentGroups.Count(group =>
+            Path.GetExtension(group.Key).Equals(".mka", StringComparison.OrdinalIgnoreCase));
         int added = 0;
         int updated = 0;
         int failed = 0;
@@ -292,10 +306,11 @@ public static class LibraryScanner
             }
         }
 
-        foreach (var cueGroup in cueDefinitions.GroupBy(definition => definition.CuePath, StringComparer.OrdinalIgnoreCase))
+        for (var groupIndex = 0; groupIndex < segmentGroups.Count; groupIndex++)
         {
+            var cueGroup = segmentGroups[groupIndex];
             ct.ThrowIfCancellationRequested();
-            progress?.Report(new ScanProgress(files.Count + 1, total, cueGroup.Key));
+            progress?.Report(new ScanProgress(files.Count + groupIndex + 1, total, cueGroup.Key));
             try
             {
                 var calculateReplayGain = calculateMissingReplayGain && cueGroup.Any(definition =>
@@ -326,7 +341,7 @@ public static class LibraryScanner
         if (changedTracks.Count > 0)
             TrackSearchIndex.UpdateMany(changedTracks);
         var existing = new HashSet<string>(
-            files.Concat(cueDefinitions.Select(definition => definition.VirtualPath)),
+            files.Concat(segmentDefinitions.Select(definition => definition.VirtualPath)),
             StringComparer.OrdinalIgnoreCase);
         var missingPaths = db.GetTrackPathsUnderDirectory(rootPath)
             .Where(path => !existing.Contains(path))
@@ -389,6 +404,58 @@ public static class LibraryScanner
         foreach (var path in paths)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (Path.GetExtension(path).Equals(".mka", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!System.IO.File.Exists(path))
+                {
+                    var removedChapterPaths = db.GetTrackPathsByCue(path);
+                    DeleteCueTracksAndWaveforms(db, path);
+                    removedPaths.AddRange(removedChapterPaths);
+                    if (DeleteTrackAndWaveform(db, path))
+                        removedPaths.Add(path);
+                    continue;
+                }
+
+                IReadOnlyList<CueTrackDefinition>? definitions = null;
+                for (var attempt = 0; attempt < 4 && definitions is null; attempt++)
+                {
+                    try
+                    {
+                        definitions = MatroskaChapterParser.Parse(path, cancellationToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch when (attempt < 3)
+                    {
+                        WaitBeforeRetry(attempt, cancellationToken);
+                    }
+                }
+                if (definitions is null)
+                    continue;
+
+                var previousChapterPaths = db.GetTrackPathsByCue(path);
+                if (definitions.Count > 0)
+                {
+                    if (DeleteTrackAndWaveform(db, path))
+                        removedPaths.Add(path);
+                    var records = BuildCueRecords(path, definitions, now, cancellationToken, calculateMissingReplayGain);
+                    foreach (var chapterRecord in records)
+                    {
+                        db.Upsert(chapterRecord);
+                        updatedTracks.Add(db.GetByPath(chapterRecord.Path) ?? chapterRecord);
+                    }
+                    var currentPaths = records.Select(record => record.Path).ToList();
+                    DeleteCueTracksAndWaveforms(db, path, currentPaths);
+                    removedPaths.AddRange(previousChapterPaths.Except(currentPaths, StringComparer.OrdinalIgnoreCase));
+                    continue;
+                }
+
+                DeleteCueTracksAndWaveforms(db, path);
+                removedPaths.AddRange(previousChapterPaths);
+            }
+
             if (Path.GetExtension(path).Equals(".cue", StringComparison.OrdinalIgnoreCase))
             {
                 if (!System.IO.File.Exists(path))

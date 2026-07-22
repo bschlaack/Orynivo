@@ -127,8 +127,12 @@ internal static partial class CueSheetParser
         return result;
     }
 
+    /// <summary>Determines whether a path represents a virtual CUE track or MKA chapter.</summary>
+    /// <param name="path">Path to inspect.</param>
+    /// <returns><see langword="true"/> when the path identifies a virtual media segment.</returns>
     internal static bool IsVirtualPath(string path) =>
-        path.StartsWith("cue://", StringComparison.OrdinalIgnoreCase);
+        path.StartsWith("cue://", StringComparison.OrdinalIgnoreCase) ||
+        MatroskaChapterParser.IsVirtualPath(path);
 
     private static string CreateVirtualPath(string cuePath, int trackNumber) =>
         $"cue://track/{trackNumber.ToString("D3", CultureInfo.InvariantCulture)}?sheet={Uri.EscapeDataString(cuePath.Replace('\\', '/'))}";

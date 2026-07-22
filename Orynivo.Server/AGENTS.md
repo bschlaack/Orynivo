@@ -18,6 +18,8 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
 - Materialize SQLite-backed endpoint results before disposing their connection.
 - Preserve byte-range streaming and cancellation of FFmpeg/transcode processes
   when clients disconnect.
+- `cue://` tracks and `mka://chapter/` tracks are virtual source segments and
+  are transcoded from their stored physical source and time boundaries.
 - Keep external metadata/artwork searches on the client; the server stores and
   serves client-provided results.
 - Keep `SkiaSharp.NativeAssets.Linux.NoDependencies`; do not add an ImageMagick
