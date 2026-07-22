@@ -17,6 +17,12 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   clients, FFmpeg primitives, and web-fetching behavior here.
 - Preserve SQLite migrations, stable IDs, WAL behavior, CUE virtual-path
   identity, user favorites, artwork caches, ReplayGain data, and `added_at`.
+- Chaptered MKA containers use FFprobe-derived stable `mka://chapter/` virtual
+  paths and the existing segment columns; unchaptered MKA files remain ordinary
+  tracks.
+- Library-only title corrections live in `track_title_overrides` and must be
+  applied by every `AudioDatabase.Upsert`; never write these corrections back to
+  the source media.
 - Scanner, watcher, and reconciliation writes must keep SQLite and Lucene in
   sync and use the shared scanner gate.
 - Keep compact query models compact; do not add artwork BLOBs, lyrics, or full

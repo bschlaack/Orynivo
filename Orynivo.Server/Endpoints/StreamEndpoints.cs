@@ -171,8 +171,9 @@ public static class StreamEndpoints
         ILogger logger,
         double? seekSeconds = null)
     {
-        // CUE virtual track: transcode the segment to FLAC via FFmpeg
-        if (trackPath.StartsWith("cue://", StringComparison.OrdinalIgnoreCase)
+        // Virtual CUE/MKA track: transcode the segment to FLAC via FFmpeg
+        if ((trackPath.StartsWith("cue://", StringComparison.OrdinalIgnoreCase) ||
+             trackPath.StartsWith("mka://", StringComparison.OrdinalIgnoreCase))
             && sourcePath is not null)
         {
             return await TranscodeCueSegmentAsync(
@@ -387,6 +388,7 @@ public static class StreamEndpoints
             ".opus" => "audio/ogg",
             ".wav"  => "audio/wav",
             ".m4a"  => "audio/mp4",
+            ".mka"  => "audio/x-matroska",
             ".aiff" or ".aif" => "audio/aiff",
             ".dsf"  => "audio/x-dsf",
             ".dff"  => "audio/x-dff",

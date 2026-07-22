@@ -102,6 +102,8 @@ the repository-wide `../AGENTS.md`.
   must not replace the gradient through pointer-event assignments.
 - Audio routing invariants remain: native ASIO/cwASIO DSD is bit-perfect; volume,
   ReplayGain, PCM boost, and equalization affect PCM paths only.
+- Local `cue://` tracks and `mka://chapter/` tracks both resolve through the
+  shared segment-aware PCM playback, waveform, queue, and history paths.
 - Windows-specific code stays in this project; cross-platform behavior belongs
   in `Orynivo.Core`.
 

@@ -491,7 +491,7 @@ public static class LibraryEndpoints
         t.IsFavorite,
         t.ArtistId,
         t.AlbumId,
-        IsCueTrack = t.Path.StartsWith("cue://", StringComparison.OrdinalIgnoreCase)
+        IsCueTrack = IsVirtualSegmentPath(t.Path)
     };
 
     private static object TrackRecordDto(TrackRecord t) => new
@@ -520,8 +520,12 @@ public static class LibraryEndpoints
         t.Channels,
         t.Format,
         t.FileSize,
-        IsCueTrack = t.Path.StartsWith("cue://", StringComparison.OrdinalIgnoreCase)
+        IsCueTrack = IsVirtualSegmentPath(t.Path)
     };
+
+    private static bool IsVirtualSegmentPath(string path) =>
+        path.StartsWith("cue://", StringComparison.OrdinalIgnoreCase) ||
+        path.StartsWith("mka://", StringComparison.OrdinalIgnoreCase);
 
     private static object AlbumDto(AlbumInfo a) => new
     {

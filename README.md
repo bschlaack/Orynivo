@@ -476,14 +476,22 @@ byte-range streaming without FFmpeg.
 
 The user interface recognizes, among others:
 
-`DSF`, `DFF`, `FLAC`, `MP3`, `WAV`, `AIFF`, `M4A`, `AAC`, `OGG`, `Opus`,
-`WMA`, and CUE sheets referencing PCM source files such as FLAC or WAV.
+`DSF`, `DFF`, `FLAC`, `MP3`, `WAV`, `AIFF`, `M4A`, `MKA` (Matroska Audio),
+`AAC`, `OGG`, `Opus`, `WMA`, and CUE sheets referencing PCM source files such
+as FLAC or WAV.
 
 PCM formats are decoded by `ffmpeg`, which Orynivo downloads automatically on
 Windows into `%LOCALAPPDATA%\Orynivo\ffmpeg` on first start if not already
 installed. The Windows downloader resolves the current BtbN LGPL ZIP asset from
 the GitHub release API so it is not tied to one fixed archive name. Actual codec
 support depends on the build.
+MKA files containing Matroska chapters are expanded into individually
+searchable and playable library tracks. Chapter title, artist, album, album
+artist, genre, year, track number, and time boundaries are read through
+`ffprobe`; the physical MKA is not shown as an additional whole-file track. An
+MKA without usable chapters remains one ordinary library track.
+Library-only title corrections for virtual chapters are persisted separately in
+SQLite and survive later scans without changing the MKA container.
 For CUE sheets, Orynivo uses `INDEX 01` boundaries to seek and stop FFmpeg
 within the referenced source file; no temporary split files are created.
 When WASAPI is selected, DSD audio in DSF or DFF containers is converted to PCM

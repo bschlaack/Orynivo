@@ -4,9 +4,15 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.27.0] - 2026-07-15
 
 ### Added
+
+- Added Matroska Audio (`.mka`) files to library scanning, desktop file
+  recognition, and Orynivo Server streaming. Chaptered MKA albums are expanded
+  into individually searchable and playable tracks with embedded chapter tags
+  and boundaries. Library-only chapter-title corrections persist across scans
+  without modifying the MKA file.
 
 ### Fixed
 
