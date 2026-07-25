@@ -657,6 +657,8 @@ Both packages are self-contained (.NET 8 bundled, no prerequisites).
 
 The Linux packages are self-contained with respect to .NET. FFmpeg, ALSA, and
 OpenAL remain system runtime dependencies as described above.
+Tagged release builds validate that the Arch archive contains its required
+root-level `.PKGINFO` metadata before publishing it.
 
 ### Linux server
 

@@ -165,6 +165,7 @@ jobs:
         run: |
           VERSION="${{ steps.ver.outputs.version }}"
           PACKAGE_ROOT="arch-package"
+          PACKAGE_PATH="packages/orynivo-${VERSION}-1-${{ matrix.archlinux_arch }}.pkg.tar.zst"
           mkdir -p "${PACKAGE_ROOT}"
           cp -a "stage/${{ matrix.rid }}/." "${PACKAGE_ROOT}/"
           cat > "${PACKAGE_ROOT}/.PKGINFO" <<EOF
@@ -182,9 +183,13 @@ jobs:
           depend = alsa-lib
           depend = openal
           EOF
-          tar --zstd -cf \
-            "packages/orynivo-${VERSION}-1-${{ matrix.archlinux_arch }}.pkg.tar.zst" \
-            -C "${PACKAGE_ROOT}" .
+          tar --zstd --format=posix --numeric-owner --owner=0 --group=0 \
+            -cf "${PACKAGE_PATH}" \
+            -C "${PACKAGE_ROOT}" .PKGINFO usr
+
+          tar --zstd -tf "${PACKAGE_PATH}" | grep -Fxq '.PKGINFO'
+          tar --zstd -xOf "${PACKAGE_PATH}" .PKGINFO \
+            | grep -Fxq "pkgname = orynivo"
 
       - name: Upload packages to GitHub Release
         uses: softprops/action-gh-release@v2
