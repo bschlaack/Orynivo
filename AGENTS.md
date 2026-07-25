@@ -171,6 +171,10 @@ RPM packages, plus an Arch Linux `x86_64` package. These packages install the
 player under `/usr/lib/orynivo`, add `/usr/bin/orynivo`, and register its
 desktop launcher. Every Linux player artifact is required by and included in
 the signed release manifest.
+The Arch `.pkg.tar.zst` must store `.PKGINFO` as an exact root-level archive
+entry (not `./.PKGINFO`), and the workflow must validate that entry before
+uploading the package because `pacman -U` otherwise rejects the archive as
+missing package metadata.
 
 ## Orynivo.Server
 

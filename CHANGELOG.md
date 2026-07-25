@@ -4,6 +4,14 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.28.1] - 2026-07-25
+
+### Fixed
+
+- Fixed the Arch Linux player package layout so `.PKGINFO` is stored at the
+  archive root where `pacman -U` expects it. Release builds now validate the
+  package metadata before uploading the `.pkg.tar.zst` artifact.
+
 ## [0.28.0] - 2026-07-25
 
 ### Added
