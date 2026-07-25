@@ -4,7 +4,8 @@
 
 # Orynivo
 
-A native Windows music player and cross-platform music server for local Hi-Fi libraries.
+An Avalonia desktop music library for Windows and Linux, plus a cross-platform
+music server for local Hi-Fi libraries.
 
 cwASIO/Steinberg ASIO/WASAPI · DSD/DSF/DFF · Gapless Playback · ReplayGain · Parametric EQ
 Plex · Radio · Podcasts · AI Chat · MCP Server · Network Streaming
@@ -12,10 +13,11 @@ Plex · Radio · Podcasts · AI Chat · MCP Server · Network Streaming
 ## Why Orynivo?
 
 Orynivo is for people who still own and manage a local music library
-and want a modern Windows player with serious audio output support —
+and want a modern Windows or Linux player with serious audio output support —
 and the ability to reach that library from any device on the local network.
 
-- Bit-perfect/native DSD playback via cwASIO or the optional Steinberg ASIO bridge
+- Bit-perfect/native DSD playback through direct ALSA on Linux without a native
+  bridge, or through cwASIO/the optional Steinberg ASIO bridge on Windows
 - Exclusive WASAPI, cwASIO, and Steinberg ASIO output profiles
 - Gapless playback
 - CUE sheet support
@@ -33,9 +35,28 @@ and the ability to reach that library from any device on the local network.
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-A native Windows audio player with an Avalonia UI interface, local music
-library, cwASIO/Steinberg ASIO and WASAPI playback, and built-in AI control
-via an embedded chat and an MCP server.
+The Windows desktop includes cwASIO/Steinberg ASIO and WASAPI playback. The
+Linux desktop is a separately packaged player with direct ALSA hardware profiles
+for exact-rate PCM and native DSD output without resampling, alongside an OpenAL
+system route through PipeWire, PulseAudio, or ALSA. It supports FFmpeg-decoded
+local files, remote streams, CUE/MKA segments, gapless queues, seeking,
+ReplayGain, PCM boost, and the parametric equalizer. Only Windows System Media
+Transport Controls remain Windows-specific.
+
+Settings > Playback offers mutually exclusive DSD routing preferences for
+lossy DSD-to-PCM conversion and bit-perfect DSD over PCM (DoP). DoP requires a
+DoP-capable DAC and an exact-rate output path; PCM volume, ReplayGain, boost,
+and equalizer processing do not apply to the encapsulated DSD payload. The
+Linux path supports local and Orynivo-Server-streamed stereo DSF and
+uncompressed stereo DFF/DSDIFF through direct ALSA. When ALSA exposes the
+native `DSD_U32_BE` hardware format, Orynivo sends bit-perfect DSD directly to
+the DAC; otherwise it uses DoP as a fallback (for example a 176.4-kHz carrier
+for DSD64). Neither Linux DSD path requires cwASIO, the Steinberg SDK, or an
+Orynivo native bridge.
+
+On Linux, Plex and generic streaming credentials are retained only for the
+current process and are not persisted because the existing encrypted credential
+store uses Windows DPAPI. This avoids writing secrets in plaintext.
 
 The application uses the Orynivo wordmark in the startup screen, sidebar, and
 About dialog, plus a multi-resolution Windows application icon based on the
@@ -43,6 +64,56 @@ standalone logo.
 
 > This project is under active development. The database schema, user
 > interface, and available features may still change.
+
+## Desktop builds
+
+The desktop project selects its target from the build host:
+
+- Windows builds target `net8.0-windows10.0.19041.0` and include the existing
+  WASAPI/ASIO integrations.
+- Linux builds target `net8.0`; PCM audio is rendered through direct ALSA or
+  OpenAL, while
+  Windows endpoint-volume and system-media integrations are replaced by
+  compatibility services.
+- Linux output profiles expose OpenAL and direct exclusive ALSA as separate
+  output types. OpenAL lists only PipeWire/system-routed devices; direct ALSA
+  lists only `hw:` endpoints that require exclusive access. Selecting another
+  desktop default output does not release a card that PipeWire still owns; its
+  system sound-device profile must be disabled before direct ALSA can open it.
+- The Linux target pins Tmds.DBus.Protocol 0.92.0 so D-Bus observer cleanup
+  remains non-blocking while Avalonia's UI dispatcher is shutting down.
+
+Build the Linux desktop with .NET 8:
+
+```bash
+dotnet restore Orynivo/Orynivo.csproj
+dotnet build Orynivo/Orynivo.csproj --configuration Release
+dotnet run --project Orynivo/Orynivo.csproj
+```
+
+Create the same self-contained `linux-x64` output produced by CI:
+
+```bash
+dotnet restore Orynivo/Orynivo.csproj --runtime linux-x64
+dotnet publish Orynivo/Orynivo.csproj --configuration Release \
+  --runtime linux-x64 --self-contained true --no-restore \
+  --output artifacts/Orynivo-linux-x64
+```
+
+Version tags publish self-contained desktop releases for `linux-x64` and
+`linux-arm64`. Each architecture receives a portable `.tar.gz`, a DEB package,
+and an RPM package; Arch Linux additionally receives an
+`x86_64 .pkg.tar.zst`. Installed packages place Orynivo under
+`/usr/lib/orynivo`, add the `orynivo` command, and register a desktop launcher.
+All Linux player artifacts are covered by the signed release manifest.
+
+An X11 or Wayland desktop session is required to run the Avalonia UI. FFmpeg
+and FFprobe must be installed and available on `PATH` for playback, media
+probing, waveforms, ReplayGain analysis, and other FFmpeg-backed library
+functions. Settings checks the platform-appropriate executable names through
+the same locator used at startup. The ALSA runtime (`libasound.so.2`, commonly packaged as `libasound2`)
+is required for direct hardware output. The OpenAL runtime (`libopenal.so.1`,
+commonly packaged as `libopenal1`) is required for the system/default route.
 
 ## AI Integration
 
@@ -173,10 +244,16 @@ Edit `appsettings.json` before first use:
     "ApiKey": "change-this-to-a-long-random-string",
     "LibraryPaths": ["/music", "/mnt/nas/music"],
     "ScanOnStartup": true,
+    "CalculateMissingReplayGainDuringScan": false,
     "AllowRemoteUpdates": false
   }
 }
 ```
+
+`CalculateMissingReplayGainDuringScan` defaults to `false`. Embedded ReplayGain
+tags are still imported, while expensive FFmpeg analysis is skipped during
+normal discovery scans. Enabling it can substantially lengthen scans of large
+or chaptered files such as complete-concert MKA containers.
 
 `AllowRemoteUpdates` is disabled by default. When enabled on a packaged Linux
 server, an authenticated Orynivo desktop client can download the matching signed
@@ -233,15 +310,16 @@ byte-range streaming without FFmpeg.
 
 ## Features
 
-- Playback through cwASIO, the optional Steinberg ASIO bridge, or exclusive-mode WASAPI
+- Playback through direct ALSA or OpenAL on Linux, and through cwASIO, the
+  optional Steinberg ASIO bridge, or exclusive-mode WASAPI on Windows
 - Automatic PCM down-conversion through `ffmpeg` when the source sample rate
   exceeds the selected ASIO or WASAPI device's capabilities; WASAPI uses the
   highest supported 32-bit float, 24-bit PCM, or 16-bit PCM output format
-- Native stereo DSD playback for local DSF and uncompressed DFF files through
-  cwASIO or the optional Steinberg ASIO bridge, plus native DSF and uncompressed
-  DFF streaming from an Orynivo Server through HTTP byte ranges. The remote path
-  validates the file header before claiming native DSD output and falls back to
-  DSD-to-PCM when native playback cannot be opened.
+- Native stereo DSD playback for local and Orynivo-Server-streamed DSF and
+  uncompressed DFF files. Linux uses the kernel/ALSA `DSD_U32_BE` interface
+  directly, with DoP fallback and no cwASIO/Steinberg/native bridge dependency;
+  Windows uses cwASIO or the optional Steinberg ASIO bridge. Remote streams are
+  read incrementally through HTTP byte ranges.
 - Real-time DSF/DFF-to-PCM conversion for playback through WASAPI, with the
   active conversion and PCM sample rate shown in the transport and status bar
 - Optional forced DSF/DFF-to-PCM conversion with cwASIO or Steinberg ASIO,
@@ -490,6 +568,8 @@ searchable and playable library tracks. Chapter title, artist, album, album
 artist, genre, year, track number, and time boundaries are read through
 `ffprobe`; the physical MKA is not shown as an additional whole-file track. An
 MKA without usable chapters remains one ordinary library track.
+MKA chapter probing limits FFprobe's analysis window and times out after 30
+seconds per file so damaged or slow network media cannot block a complete scan.
 Library-only title corrections for virtual chapters are persisted separately in
 SQLite and survive later scans without changing the MKA container.
 For CUE sheets, Orynivo uses `INDEX 01` boundaries to seek and stop FFmpeg
@@ -498,10 +578,13 @@ When WASAPI is selected, DSD audio in DSF or DFF containers is converted to PCM
 in real time without creating a temporary file. When cwASIO or the optional
 Steinberg ASIO backend is selected, DSF and uncompressed stereo DFF can be sent
 as native DSD when the driver reports compatible DSD support; otherwise Orynivo
-can fall back to the same FFmpeg-backed DSD-to-PCM path. PCM and converted DSD
-are output at the highest supported endpoint sample rate that does not exceed
-the source rate; if the endpoint exposes only higher rates, its lowest supported
-rate is used. Unsupported sample rates and bit depths are converted by `ffmpeg`.
+can fall back to the same FFmpeg-backed DSD-to-PCM path. On Linux, DSF and
+uncompressed stereo DFF are sent directly through ALSA as native
+`DSD_U32_BE`, with DoP as the fallback when the DAC supports it; no ASIO bridge
+is involved. PCM and converted DSD are output at the highest supported endpoint
+sample rate that does not exceed the source rate; if the endpoint exposes only
+higher rates, its lowest supported rate is used. Unsupported sample rates and
+bit depths are converted by `ffmpeg`.
 
 ## Requirements
 
@@ -524,6 +607,19 @@ also checks `third_party\asiosdk`, `external\asiosdk`, and, for compatibility
 with older development environments, `C:\Dev\asiosdk_2.3`. When no SDK is
 found, only **cwASIO** is offered. When the SDK is available, Settings offers
 both **Steinberg ASIO** and **cwASIO**.
+
+### Linux player
+
+- Linux x86-64 or ARM64 with an X11 or Wayland desktop
+- FFmpeg and FFprobe available on `PATH`
+- ALSA runtime (`libasound.so.2`) for direct PCM, native DSD, and DoP output
+- OpenAL runtime (`libopenal.so.1`) for the optional system-routed output
+- A DAC/ALSA endpoint advertising `DSD_U32_BE` for native DSD, or a DoP-capable
+  DAC for fallback playback
+
+The Linux player does not build or load `AsioBridge.dll` or `CwAsioBridge.dll`.
+Native DSF and uncompressed DFF output is sent directly through ALSA, so neither
+the Steinberg ASIO SDK nor a platform-specific Orynivo bridge is required.
 
 ### Orynivo Server
 
@@ -548,6 +644,19 @@ Download the latest builds from [Releases](https://github.com/bschlaack/Orynivo/
 | `Orynivo-{version}-win-x64-Portable.zip` | Portable — extract anywhere and run `Orynivo.exe` |
 
 Both packages are self-contained (.NET 8 bundled, no prerequisites).
+
+### Linux player
+
+| Package | Description |
+| --- | --- |
+| `Orynivo-{version}-linux-x64.tar.gz` | Portable x86-64 archive |
+| `Orynivo-{version}-linux-arm64.tar.gz` | Portable ARM64 archive |
+| `orynivo_{version}_amd64.deb` / `orynivo_{version}_arm64.deb` | Debian / Ubuntu |
+| `orynivo-{version}-1.x86_64.rpm` / `orynivo-{version}-1.aarch64.rpm` | Fedora / Rocky / RHEL |
+| `orynivo-{version}-1-x86_64.pkg.tar.zst` | Arch Linux x86-64 |
+
+The Linux packages are self-contained with respect to .NET. FFmpeg, ALSA, and
+OpenAL remain system runtime dependencies as described above.
 
 ### Linux server
 
@@ -755,7 +864,7 @@ Orynivo/
 │   ├── Audio/               FFmpeg decoder, equalizer, ReplayGain utilities
 │   ├── Library/             SQLite database, scanner, Lucene search, models
 │   └── Streaming/           Provider-neutral streaming contracts and models
-├── Orynivo/                 Windows player (net8.0-windows, Avalonia UI)
+├── Orynivo/                 Windows/Linux desktop (Avalonia UI)
 │   ├── Audio/               ASIO, WASAPI, PCM, and DSD playback
 │   ├── Controls/            Custom Avalonia controls
 │   ├── Localization/        German, English, French, and Spanish resources
@@ -822,9 +931,21 @@ artwork, rebasing paths, and rebuilding the search index.
 
 ## Current Limitations
 
-- Native, bit-perfect DSD playback is available only through cwASIO or the
-  optional Steinberg ASIO bridge. WASAPI can play DSF/DFF by converting the
-  audio to PCM in real time.
+- Linux output profiles include direct ALSA `hw:` endpoints and endpoints
+  exposed by OpenAL. A direct ALSA profile opens the DAC at the track's PCM
+  sample rate with ALSA software resampling disabled; it fails explicitly when
+  the device is busy or cannot accept that exact rate. The OpenAL
+  system/default route may still be mixed or resampled by PipeWire, PulseAudio,
+  or OpenAL.
+- Linux supports stereo DSF and uncompressed stereo DFF/DSDIFF as native,
+  bit-perfect `DSD_U32_BE` through a compatible direct ALSA endpoint, including
+  authenticated Orynivo Server streams, with DoP as the fallback. DST-compressed
+  DFF remains unsupported for direct DSD output. DSD is not sent through OpenAL
+  because its mixing, gain, or format conversion could corrupt the payload or
+  DoP markers.
+- Native, bit-perfect DSD playback is available through compatible direct ALSA
+  hardware on Linux and through cwASIO or the optional Steinberg ASIO bridge on
+  Windows. WASAPI can play DSF/DFF by converting the audio to PCM in real time.
 - Builds without the optional Steinberg ASIO SDK still offer ASIO through the
   vendored MIT-licensed cwASIO bridge. ASIO disappears from Settings only when
   both native ASIO bridges are unavailable or intentionally skipped.

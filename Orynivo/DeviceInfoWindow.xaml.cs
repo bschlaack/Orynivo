@@ -17,6 +17,8 @@ public partial class DeviceInfoWindow : Window
         Opened += (_, _) => WindowChrome.ApplyTheme(this);
     }
 
+    /// <summary>Initializes the window with ASIO driver capabilities.</summary>
+    /// <param name="info">ASIO capability information to display.</param>
     public DeviceInfoWindow(AsioDeviceInfo info)
     {
         InitializeComponent();
@@ -57,12 +59,20 @@ public partial class DeviceInfoWindow : Window
                 : LocalizationManager.Current.DeviceProbeInconclusive;
     }
 
+    /// <summary>Initializes the window with Windows or Linux PCM-device capabilities.</summary>
+    /// <param name="info">PCM device capability information to display.</param>
     public DeviceInfoWindow(WasapiDeviceCapabilities info)
     {
         InitializeComponent();
         Opened += (_, _) => WindowChrome.ApplyTheme(this);
 
         DriverNameTextBlock.Text = info.Name;
+        if (OperatingSystem.IsLinux())
+        {
+            PopulateLinuxPcmDeviceInfo(info);
+            return;
+        }
+
         SummaryTextBlock.Text = string.Format(
             LocalizationManager.Current.WasapiEndpointSummary,
             info.MixFormatChannels,
@@ -84,6 +94,32 @@ public partial class DeviceInfoWindow : Window
             : string.Join(Environment.NewLine, info.ExclusivePcmFormats);
 
         DsdFormatsTextBlock.Text = LocalizationManager.Current.NativeDsdUsesAsio;
+    }
+
+    private void PopulateLinuxPcmDeviceInfo(WasapiDeviceCapabilities info)
+    {
+        var isDirectAlsa = info.Id.StartsWith("alsa:", StringComparison.Ordinal);
+        SummaryTextBlock.Text = string.Format(
+            isDirectAlsa
+                ? LocalizationManager.Current.LinuxAlsaEndpointSummary
+                : LocalizationManager.Current.LinuxOpenAlEndpointSummary,
+            info.MixFormatChannels,
+            info.MixFormatBitsPerSample);
+
+        PcmSampleRatesTextBlock.Text = info.ExclusivePcmSampleRates.Count == 0
+            ? LocalizationManager.Current.DriverProvidedNoInformation
+            : string.Join(" · ", info.ExclusivePcmSampleRates.Select(FormatPcmRate));
+
+        DsdRatesPanel.Children.Add(new TextBlock
+        {
+            Text = LocalizationManager.Current.LinuxDsdOutputUnavailable,
+            Foreground = AvaloniaApp.Current!.Resources["AppDsdUnsupportedBrush"] as IBrush
+        });
+
+        PcmFormatsTextBlock.Text = info.ExclusivePcmFormats.Count == 0
+            ? LocalizationManager.Current.DriverProvidedNoInformation
+            : string.Join(Environment.NewLine, info.ExclusivePcmFormats);
+        DsdFormatsTextBlock.Text = LocalizationManager.Current.LinuxDsdOutputUnavailable;
     }
 
     private static string DescribeFormat(string format) =>

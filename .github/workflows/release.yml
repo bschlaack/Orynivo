@@ -128,9 +128,15 @@ jobs:
             | --- | --- |
             | `Orynivo-${{ steps.ver.outputs.version }}-win-x64-Setup.exe` | Installer — adds Start Menu entry and uninstaller |
             | `Orynivo-${{ steps.ver.outputs.version }}-win-x64-Portable.zip` | Portable — extract anywhere and run `Orynivo.exe` |
+            | `Orynivo-${{ steps.ver.outputs.version }}-linux-x64.tar.gz` | Portable Linux archive for x86-64 |
+            | `Orynivo-${{ steps.ver.outputs.version }}-linux-arm64.tar.gz` | Portable Linux archive for ARM64 |
+            | `orynivo_${{ steps.ver.outputs.version }}_amd64.deb` / `arm64.deb` | Debian and Ubuntu package |
+            | `orynivo-${{ steps.ver.outputs.version }}-1.x86_64.rpm` / `aarch64.rpm` | Fedora, RHEL, and compatible distributions |
+            | `orynivo-${{ steps.ver.outputs.version }}-1-x86_64.pkg.tar.zst` | Arch Linux package |
 
-            Both packages are self-contained: .NET 8 is bundled,
-            no prerequisites required.
+            All desktop builds are self-contained and bundle .NET 8. Linux
+            playback additionally requires FFmpeg, ALSA, and OpenAL; the
+            distribution packages declare those runtime dependencies.
 
             > **Windows SmartScreen:** an unsigned build may show a warning on
             > first run. Click **More info → Run anyway** to proceed.

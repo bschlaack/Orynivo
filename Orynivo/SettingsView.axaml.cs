@@ -113,6 +113,8 @@ internal partial class SettingsView : UserControl
             ?? replayGainChoices[0];
         CalculateReplayGainDuringScanCheckBox.IsChecked = settings.CalculateMissingReplayGainDuringScan;
         AlwaysConvertDsdToPcmCheckBox.IsChecked = settings.AlwaysConvertDsdToPcm;
+        DsdOverPcmCheckBox.IsChecked = settings.DsdOverPcmEnabled;
+        AlwaysConvertDsdToPcmCheckBox.IsCheckedChanged += AlwaysConvertDsdToPcmCheckBox_OnIsCheckedChanged;
         PcmOutputBoostCheckBox.IsChecked = settings.PcmOutputBoostEnabled;
         NonGaplessCrossfadeNumericUpDown.Value = (decimal)Math.Clamp(
             settings.NonGaplessCrossfadeSeconds,
@@ -186,7 +188,7 @@ internal partial class SettingsView : UserControl
     {
         var loc = LocalizationManager.Current;
 
-        bool ffmpeg = IsFfmpegAvailable();
+        bool ffmpeg = FfmpegLocator.IsAvailable();
         FfmpegStatusBadge.State = ffmpeg ? StatusBadgeState.Ok : StatusBadgeState.Warning;
         FfmpegStatusBadge.Text = ffmpeg ? loc.StatusReady : loc.StatusUnavailable;
 
@@ -208,34 +210,6 @@ internal partial class SettingsView : UserControl
         bool enabled = McpServerEnabledCheckBox.IsChecked == true;
         McpStatusBadge.State = enabled ? StatusBadgeState.Ok : StatusBadgeState.Off;
         McpStatusBadge.Text = enabled ? loc.StatusEnabled : loc.StatusDisabled;
-    }
-
-    /// <summary>Checks whether an ffmpeg executable is resolvable in the known locations.</summary>
-    /// <returns><see langword="true"/> when ffmpeg is found in the app, per-user, or PATH directories.</returns>
-    private static bool IsFfmpegAvailable()
-    {
-        static bool HasFfmpeg(string? directory) =>
-            !string.IsNullOrWhiteSpace(directory) &&
-            File.Exists(Path.Combine(directory, "ffmpeg.exe"));
-
-        if (HasFfmpeg(AppContext.BaseDirectory))
-            return true;
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        if (HasFfmpeg(Path.Combine(localAppData, "Orynivo", "ffmpeg")))
-            return true;
-        foreach (var directory in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
-                     .Split(Path.PathSeparator))
-        {
-            try
-            {
-                if (HasFfmpeg(directory.Trim()))
-                    return true;
-            }
-            catch
-            {
-            }
-        }
-        return false;
     }
 
     /// <summary>Raised when the embedded settings view requests save or cancel.</summary>
@@ -263,8 +237,28 @@ internal partial class SettingsView : UserControl
     public bool CalculateMissingReplayGainDuringScan => CalculateReplayGainDuringScanCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether DSF and DFF sources should always be converted to PCM.</summary>
     public bool AlwaysConvertDsdToPcm => AlwaysConvertDsdToPcmCheckBox.IsChecked == true;
+    /// <summary>Gets a value indicating whether DSD should be transported through DoP.</summary>
+    public bool DsdOverPcmEnabled => DsdOverPcmCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether PCM playback should receive the additional output boost.</summary>
     public bool PcmOutputBoostEnabled => PcmOutputBoostCheckBox.IsChecked == true;
+
+    /// <summary>Disables forced PCM conversion when DoP is selected.</summary>
+    /// <param name="sender">DoP checkbox.</param>
+    /// <param name="e">Check-state event arguments.</param>
+    private void DsdOverPcmCheckBox_OnIsCheckedChanged(object? sender, RoutedEventArgs e)
+    {
+        if (DsdOverPcmCheckBox.IsChecked == true)
+            AlwaysConvertDsdToPcmCheckBox.IsChecked = false;
+    }
+
+    /// <summary>Disables DoP when lossy DSD-to-PCM conversion is selected.</summary>
+    /// <param name="sender">PCM-conversion checkbox.</param>
+    /// <param name="e">Check-state event arguments.</param>
+    private void AlwaysConvertDsdToPcmCheckBox_OnIsCheckedChanged(object? sender, RoutedEventArgs e)
+    {
+        if (AlwaysConvertDsdToPcmCheckBox.IsChecked == true)
+            DsdOverPcmCheckBox.IsChecked = false;
+    }
     /// <summary>Gets the configured non-gapless queue fade duration in seconds.</summary>
     public double NonGaplessCrossfadeSeconds => (double)(NonGaplessCrossfadeNumericUpDown.Value ?? 0);
     /// <summary>Gets a value indicating whether the imported equalizer profile is enabled.</summary>
@@ -997,7 +991,11 @@ internal partial class SettingsView : UserControl
         {
             OutputBackend.Asio   => LocalizationManager.Current.SteinbergAsio,
             OutputBackend.CwAsio => LocalizationManager.Current.CwAsio,
-            _                    => "WASAPI"
+            _                    => OperatingSystem.IsLinux()
+                ? profile.SelectedWasapiDeviceId?.StartsWith("alsa:", StringComparison.Ordinal) == true
+                    ? LocalizationManager.Current.DirectAlsa
+                    : LocalizationManager.Current.OpenAl
+                : "WASAPI"
         };
         var device = profile.Backend is OutputBackend.Asio or OutputBackend.CwAsio
             ? profile.SelectedDriverName

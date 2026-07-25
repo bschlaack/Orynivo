@@ -456,6 +456,15 @@
                                FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"/>
+                    <CheckBox x:Name="DsdOverPcmCheckBox"
+                              Theme="{StaticResource SettingsToggleTheme}"
+                              Content="{DynamicResource L_DsdOverPcm}"
+                              Margin="0,14,0,6"
+                              IsCheckedChanged="DsdOverPcmCheckBox_OnIsCheckedChanged"/>
+                    <TextBlock Text="{DynamicResource L_DsdOverPcmHint}"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"/>
                     <CheckBox x:Name="PcmOutputBoostCheckBox"
                               Theme="{StaticResource SettingsToggleTheme}"
                               Content="{DynamicResource L_PcmOutputBoost}"

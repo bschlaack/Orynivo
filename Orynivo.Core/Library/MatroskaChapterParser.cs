@@ -8,6 +8,8 @@ namespace Orynivo.Library;
 /// <summary>Reads chapter boundaries and tags from Matroska Audio containers.</summary>
 internal static class MatroskaChapterParser
 {
+    private static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(30);
+
     /// <summary>Reads playable chapter definitions from an MKA file through FFprobe.</summary>
     /// <param name="sourcePath">Absolute path of the Matroska Audio file.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -28,6 +30,8 @@ internal static class MatroskaChapterParser
             ArgumentList =
             {
                 "-v", "error",
+                "-analyzeduration", "1000000",
+                "-probesize", "5000000",
                 "-show_chapters",
                 "-show_format",
                 "-of", "json",
@@ -37,16 +41,20 @@ internal static class MatroskaChapterParser
         if (process is null)
             throw new InvalidOperationException("FFprobe could not be started.");
 
-        var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-        var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
+        using var probeCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        probeCancellation.CancelAfter(ProbeTimeout);
         try
         {
-            process.WaitForExitAsync(cancellationToken).GetAwaiter().GetResult();
+            process.WaitForExitAsync(probeCancellation.Token).GetAwaiter().GetResult();
         }
         catch (OperationCanceledException)
         {
             try { process.Kill(entireProcessTree: true); } catch { }
-            throw;
+            if (cancellationToken.IsCancellationRequested)
+                throw;
+            throw new TimeoutException($"FFprobe did not finish reading Matroska chapters within {ProbeTimeout.TotalSeconds:F0} seconds.");
         }
         var output = outputTask.GetAwaiter().GetResult();
         var error = errorTask.GetAwaiter().GetResult();

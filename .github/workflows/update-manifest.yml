@@ -30,6 +30,13 @@ jobs:
             rm -f assets/*
             gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir assets
             if compgen -G 'assets/Orynivo-*-win-x64-Setup.exe' > /dev/null \
+              && compgen -G 'assets/Orynivo-*-linux-x64.tar.gz' > /dev/null \
+              && compgen -G 'assets/Orynivo-*-linux-arm64.tar.gz' > /dev/null \
+              && compgen -G 'assets/orynivo_*_amd64.deb' > /dev/null \
+              && compgen -G 'assets/orynivo_*_arm64.deb' > /dev/null \
+              && compgen -G 'assets/orynivo-[0-9]*-1.x86_64.rpm' > /dev/null \
+              && compgen -G 'assets/orynivo-[0-9]*-1.aarch64.rpm' > /dev/null \
+              && compgen -G 'assets/orynivo-[0-9]*-1-x86_64.pkg.tar.zst' > /dev/null \
               && compgen -G 'assets/orynivo-server_*_amd64.deb' > /dev/null \
               && compgen -G 'assets/orynivo-server_*_arm64.deb' > /dev/null \
               && compgen -G 'assets/orynivo-server-*-1.x86_64.rpm' > /dev/null \
@@ -52,6 +59,13 @@ jobs:
             COMPONENT="" OS="" ARCH="" TYPE=""
             case "$FILE" in
               Orynivo-*-win-x64-Setup.exe) COMPONENT=desktop; OS=windows; ARCH=x64; TYPE=installer ;;
+              Orynivo-*-linux-x64.tar.gz) COMPONENT=desktop; OS=linux; ARCH=x64; TYPE=archive ;;
+              Orynivo-*-linux-arm64.tar.gz) COMPONENT=desktop; OS=linux; ARCH=arm64; TYPE=archive ;;
+              orynivo_*_amd64.deb) COMPONENT=desktop; OS=linux; ARCH=x64; TYPE=deb ;;
+              orynivo_*_arm64.deb) COMPONENT=desktop; OS=linux; ARCH=arm64; TYPE=deb ;;
+              orynivo-[0-9]*-1.x86_64.rpm) COMPONENT=desktop; OS=linux; ARCH=x64; TYPE=rpm ;;
+              orynivo-[0-9]*-1.aarch64.rpm) COMPONENT=desktop; OS=linux; ARCH=arm64; TYPE=rpm ;;
+              orynivo-[0-9]*-1-x86_64.pkg.tar.zst) COMPONENT=desktop; OS=linux; ARCH=x64; TYPE=arch ;;
               orynivo-server_*_amd64.deb) COMPONENT=server; OS=linux; ARCH=x64; TYPE=deb ;;
               orynivo-server_*_arm64.deb) COMPONENT=server; OS=linux; ARCH=arm64; TYPE=deb ;;
               orynivo-server-*-1.x86_64.rpm) COMPONENT=server; OS=linux; ARCH=x64; TYPE=rpm ;;
