@@ -268,7 +268,7 @@ public partial class SmartPlaylistDialog : Window
     private static List<string> ParseStringList(string? value) =>
         string.IsNullOrWhiteSpace(value)
             ? []
-            : value.Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            : value.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Distinct(StringComparer.CurrentCultureIgnoreCase)
                 .ToList();
 

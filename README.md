@@ -4,7 +4,8 @@
 
 # Orynivo
 
-A native Windows music player and cross-platform music server for local Hi-Fi libraries.
+An Avalonia desktop music library for Windows and Linux, plus a cross-platform
+music server for local Hi-Fi libraries.
 
 cwASIO/Steinberg ASIO/WASAPI · DSD/DSF/DFF · Gapless Playback · ReplayGain · Parametric EQ
 Plex · Radio · Podcasts · AI Chat · MCP Server · Network Streaming
@@ -33,9 +34,15 @@ and the ability to reach that library from any device on the local network.
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-A native Windows audio player with an Avalonia UI interface, local music
-library, cwASIO/Steinberg ASIO and WASAPI playback, and built-in AI control
-via an embedded chat and an MCP server.
+The Windows desktop includes cwASIO/Steinberg ASIO and WASAPI playback. The
+Linux desktop build currently provides the library, remote-server, playlist,
+radio, podcast, AI-chat, and MCP user interfaces, but does not yet provide an
+audio-output backend. Windows System Media Transport Controls are also omitted
+on Linux.
+
+On Linux, Plex and generic streaming credentials are retained only for the
+current process and are not persisted because the existing encrypted credential
+store uses Windows DPAPI. This avoids writing secrets in plaintext.
 
 The application uses the Orynivo wordmark in the startup screen, sidebar, and
 About dialog, plus a multi-resolution Windows application icon based on the
@@ -43,6 +50,38 @@ standalone logo.
 
 > This project is under active development. The database schema, user
 > interface, and available features may still change.
+
+## Desktop builds
+
+The desktop project selects its target from the build host:
+
+- Windows builds target `net8.0-windows10.0.19041.0` and include the existing
+  WASAPI/ASIO integrations.
+- Linux builds target `net8.0`; Windows audio, endpoint-volume, and system-media
+  integrations are replaced by non-persisting/no-op compatibility services.
+- The Linux target pins Tmds.DBus.Protocol 0.92.0 so D-Bus observer cleanup
+  remains non-blocking while Avalonia's UI dispatcher is shutting down.
+
+Build the Linux desktop with .NET 8:
+
+```bash
+dotnet restore Orynivo/Orynivo.csproj
+dotnet build Orynivo/Orynivo.csproj --configuration Release
+dotnet run --project Orynivo/Orynivo.csproj
+```
+
+Create the same self-contained `linux-x64` output produced by CI:
+
+```bash
+dotnet restore Orynivo/Orynivo.csproj --runtime linux-x64
+dotnet publish Orynivo/Orynivo.csproj --configuration Release \
+  --runtime linux-x64 --self-contained true --no-restore \
+  --output artifacts/Orynivo-linux-x64
+```
+
+An X11 or Wayland desktop session is required to run the Avalonia UI. FFmpeg
+and FFprobe must be installed and available on `PATH` for media probing,
+waveforms, ReplayGain analysis, and other FFmpeg-backed library functions.
 
 ## AI Integration
 
@@ -173,10 +212,16 @@ Edit `appsettings.json` before first use:
     "ApiKey": "change-this-to-a-long-random-string",
     "LibraryPaths": ["/music", "/mnt/nas/music"],
     "ScanOnStartup": true,
+    "CalculateMissingReplayGainDuringScan": false,
     "AllowRemoteUpdates": false
   }
 }
 ```
+
+`CalculateMissingReplayGainDuringScan` defaults to `false`. Embedded ReplayGain
+tags are still imported, while expensive FFmpeg analysis is skipped during
+normal discovery scans. Enabling it can substantially lengthen scans of large
+or chaptered files such as complete-concert MKA containers.
 
 `AllowRemoteUpdates` is disabled by default. When enabled on a packaged Linux
 server, an authenticated Orynivo desktop client can download the matching signed
@@ -490,6 +535,8 @@ searchable and playable library tracks. Chapter title, artist, album, album
 artist, genre, year, track number, and time boundaries are read through
 `ffprobe`; the physical MKA is not shown as an additional whole-file track. An
 MKA without usable chapters remains one ordinary library track.
+MKA chapter probing limits FFprobe's analysis window and times out after 30
+seconds per file so damaged or slow network media cannot block a complete scan.
 Library-only title corrections for virtual chapters are persisted separately in
 SQLite and survive later scans without changing the MKA container.
 For CUE sheets, Orynivo uses `INDEX 01` boundaries to seek and stop FFmpeg
@@ -755,7 +802,7 @@ Orynivo/
 │   ├── Audio/               FFmpeg decoder, equalizer, ReplayGain utilities
 │   ├── Library/             SQLite database, scanner, Lucene search, models
 │   └── Streaming/           Provider-neutral streaming contracts and models
-├── Orynivo/                 Windows player (net8.0-windows, Avalonia UI)
+├── Orynivo/                 Windows/Linux desktop (Avalonia UI)
 │   ├── Audio/               ASIO, WASAPI, PCM, and DSD playback
 │   ├── Controls/            Custom Avalonia controls
 │   ├── Localization/        German, English, French, and Spanish resources
@@ -822,6 +869,9 @@ artwork, rebasing paths, and rebuilding the search index.
 
 ## Current Limitations
 
+- The Linux desktop currently has no audio-output backend. It supports library
+  management and the network/UI features, while playback, endpoint volume, and
+  system media controls remain available only in the Windows desktop.
 - Native, bit-perfect DSD playback is available only through cwASIO or the
   optional Steinberg ASIO bridge. WASAPI can play DSF/DFF by converting the
   audio to PCM in real time.

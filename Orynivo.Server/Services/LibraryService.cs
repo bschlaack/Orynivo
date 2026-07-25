@@ -142,6 +142,7 @@ public sealed class LibraryService : IHostedService, IDisposable
                 var result = await LibraryScanner.ScanAsync(
                     path,
                     progress: progress,
+                    calculateMissingReplayGain: _settings.CalculateMissingReplayGainDuringScan,
                     cancellationToken: cancellationToken);
                 if (HasLibraryChanges(result))
                     _libraryChangeTracker.Touch();

@@ -233,7 +233,7 @@ public partial class MainWindow : Window
         if (string.IsNullOrWhiteSpace(tags))
             return [];
 
-        return tags.Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        return tags.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Select(NormalizeRadioGenre)
             .Where(genre => genre is not null)
             .Cast<string>()

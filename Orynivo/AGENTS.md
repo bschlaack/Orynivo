@@ -1,14 +1,16 @@
-# Orynivo Windows Client Instructions
+# Orynivo Desktop Client Instructions
 
-This file applies to the Windows Avalonia client under `Orynivo/` and supplements
-the repository-wide `../AGENTS.md`.
+This file applies to the Windows and Linux Avalonia desktop client under
+`Orynivo/` and supplements the repository-wide `../AGENTS.md`.
 
 ## Completion
 
 - Follow the root mandatory completion checklist. In particular, feature and UI
   changes require `CHANGELOG.md` and usually `README.md`; architectural or
   behavioral changes require this file or the root `AGENTS.md` to be updated.
-- Build with `dotnet build Orynivo/Orynivo.csproj` after client changes.
+- Build with `dotnet build Orynivo/Orynivo.csproj` after client changes. On
+  Linux this must compile the `net8.0` compatibility build; Windows continues to
+  target `net8.0-windows10.0.19041.0`.
 - New visible text must use `LocalizationManager` and exist in German, English,
   French, and Spanish.
 - Add or update English XML documentation for affected public/internal members.
@@ -104,8 +106,14 @@ the repository-wide `../AGENTS.md`.
   ReplayGain, PCM boost, and equalization affect PCM paths only.
 - Local `cue://` tracks and `mka://chapter/` tracks both resolve through the
   shared segment-aware PCM playback, waveform, queue, and history paths.
-- Windows-specific code stays in this project; cross-platform behavior belongs
-  in `Orynivo.Core`.
+- Windows-specific code stays in this project and must be excluded from the
+  Linux target in `Orynivo.csproj`. Matching Linux compatibility types live
+  under `Compatibility/Linux`; they must not persist credentials in plaintext
+  or claim unavailable WASAPI, ASIO, endpoint-volume, or SMTC capabilities.
+  Cross-platform behavior shared with the server belongs in `Orynivo.Core`.
+- Keep the Linux-only direct `Tmds.DBus.Protocol` dependency at 0.92.0 or newer
+  within the compatible package line: its non-blocking observer dispatch avoids
+  a shutdown race with Avalonia's stopped UI dispatcher.
 
 Consult the detailed matching sections in the root `AGENTS.md` before changing
 audio, queue, Dashboard, playlists, remote libraries, settings, or table/tree UI.

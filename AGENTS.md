@@ -39,11 +39,11 @@ completion checklist above.
 
 ## Project Overview
 
-Windows audio player with:
+Avalonia desktop music library with:
 
 - Cross-platform core library in `Orynivo.Core/`
   (library scan, database, search, streaming models)
-- Avalonia UI 11 frontend in `Orynivo/` (Windows-only; references `Orynivo.Core`)
+- Avalonia UI 11 frontend in `Orynivo/` (Windows and Linux; references `Orynivo.Core`)
 - Cross-platform headless music server in `Orynivo.Server/`
   (ASP.NET Core; references `Orynivo.Core`; exposes REST + streaming over the
   local network)
@@ -52,6 +52,13 @@ Windows audio player with:
 - PCM playback through `ffmpeg`
 - Native DSF/DFF DSD playback through ASIO
 - Real-time DSF/DFF-to-PCM conversion through `ffmpeg` for WASAPI playback
+
+The desktop project builds on Windows and Linux. Windows retains the complete
+WASAPI/ASIO playback implementation. The current Linux `net8.0` build supports
+the library and network/UI feature set but has no audio-output backend; it
+excludes Windows audio, endpoint-volume, and SMTC implementations and uses
+compatibility types under `Orynivo/Compatibility/Linux`. Linux credential
+compatibility is process-local only and must never persist secrets in plaintext.
 
 ## Orynivo.Core
 
@@ -113,7 +120,11 @@ Windows-only items that remain exclusively in `Orynivo/`:
 - `Audio/SteinbergAsioStream`, `FfmpegAudioPlayer`, `WasapiAudioPlayer`, `WasapiDeviceProvider`,
   `DsfAudioPlayer`, `DffAudioPlayer`, `WindowsEndpointVolumeSynchronizer`
 - `WindowsMediaTransportService`, `Streaming/WindowsStreamingCredentialStore`,
-  `Streaming/WindowsPlexCredentialStore`, all Avalonia UI files
+  and `Streaming/WindowsPlexCredentialStore` Windows implementations
+
+The Avalonia UI itself is now also compiled for Linux. The named Windows
+services above remain Windows-only implementations and are replaced by the
+limited compatibility types described above for the Linux target.
 
 ## Build and Run
 
@@ -134,10 +145,12 @@ builds without the Steinberg bridge; `-SkipAsio` forces that mode and
 the cwASIO bridge. Managed build properties remove disabled native DLLs from
 build and publish output.
 
-`.github/workflows/dotnet-desktop.yml` builds the cwASIO bridge and managed
-Avalonia project in Debug and Release. It intentionally excludes only the
-Steinberg bridge because that SDK is not stored in the repository. The Release
-artifact therefore contains cwASIO support without Steinberg SDK files.
+`.github/workflows/dotnet-desktop.yml` builds the Windows cwASIO bridge and
+managed Avalonia project in Debug and Release, and separately builds and
+publishes the self-contained `linux-x64` desktop artifact. The Windows job
+intentionally excludes only the Steinberg bridge because that SDK is not stored
+in the repository. Its Release artifact therefore contains cwASIO support
+without Steinberg SDK files.
 
 ## Orynivo.Server
 
@@ -155,6 +168,9 @@ runtime dependency.
   `?key=` query param; query param enables direct use in FFmpeg URLs)
 - `LibraryPaths` — list of root directories to scan
 - `ScanOnStartup` — run a full scan when the server starts (default `true`)
+- `CalculateMissingReplayGainDuringScan` — optionally run expensive FFmpeg
+  analysis for missing ReplayGain values during normal server scans (default
+  `false`; embedded values are always imported)
 - `ServerName` — display name returned by `/api/info`
 - Default bind: `http://0.0.0.0:5280`
 
@@ -1068,6 +1084,8 @@ fallback or allow client-provided commands/paths to reach the helper.
   `source_path`; their time bounds reuse `segment_start` / `segment_end` and
   the defining MKA path is stored in `cue_path` for lifecycle cleanup. The
   physical file is exposed as a normal track only when no usable chapters exist.
+  MKA probing caps FFprobe analysis and has a 30-second per-file timeout so a
+  malformed or slow network file cannot block a complete library scan.
 - `track_title_overrides` stores library-only title corrections keyed by stable
   track path. `AudioDatabase.Upsert` reapplies them after every scan, so virtual
   MKA chapter titles can be corrected without modifying the media container.

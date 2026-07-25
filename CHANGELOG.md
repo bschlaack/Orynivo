@@ -4,6 +4,30 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Added a `net8.0` Linux desktop build and a self-contained `linux-x64` CI
+  artifact. The Avalonia library, remote-server, playlist, radio, podcast,
+  AI-chat, and MCP surfaces now compile for Linux; Windows-only audio output and
+  system-media integration are explicitly isolated behind Linux compatibility
+  services.
+- Added non-persisting Linux credential-store compatibility so Plex and
+  streaming secrets remain process-local instead of being written without
+  Windows DPAPI protection.
+
+### Fixed
+
+- Prevented a Linux desktop shutdown crash in Avalonia's D-Bus cleanup by using
+  the non-blocking observer dispatch from Tmds.DBus.Protocol 0.92.0.
+- Prevented Orynivo Server library scans from appearing stuck on large or
+  chaptered media by disabling missing-ReplayGain FFmpeg analysis by default;
+  deployments can opt back in through configuration.
+- Bounded Matroska chapter probing to 30 seconds per file and limited FFprobe's
+  analysis window so a malformed or slow network-hosted MKA cannot stall the
+  complete server scan indefinitely.
+
 ## [0.27.0] - 2026-07-15
 
 ### Added

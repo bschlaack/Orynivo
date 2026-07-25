@@ -918,7 +918,7 @@ public static class LibraryScanner
 
     private static string? ParseReplayGainTrack(string stderr)
     {
-        foreach (var line in stderr.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+        foreach (var line in stderr.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
         {
             const string marker = "track_gain =";
             var markerIndex = line.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
