@@ -91,6 +91,42 @@ public static class FfmpegLocator
     }
 
     /// <summary>
+    /// Determines whether both FFmpeg command-line tools are installed in a location known to Orynivo.
+    /// </summary>
+    /// <returns>
+    /// <see langword="true"/> when <c>ffmpeg</c> and <c>ffprobe</c> exist in the application
+    /// directory, the per-user cache, or a directory on the current process PATH.
+    /// </returns>
+    public static bool IsAvailable()
+    {
+        static bool HasTools(string? directory)
+        {
+            if (string.IsNullOrWhiteSpace(directory))
+                return false;
+
+            try
+            {
+                return File.Exists(Path.Combine(directory, FfmpegBinary)) &&
+                       File.Exists(Path.Combine(directory, FfprobeBinary));
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        if (HasTools(AppContext.BaseDirectory) ||
+            HasTools(AppPaths.GetDataPath("ffmpeg")))
+        {
+            return true;
+        }
+
+        return (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
+            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+            .Any(HasTools);
+    }
+
+    /// <summary>
     /// Returns an existing directory that can safely be used as
     /// <see cref="System.Diagnostics.ProcessStartInfo.WorkingDirectory"/> for FFmpeg child processes.
     /// </summary>

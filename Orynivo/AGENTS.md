@@ -104,12 +104,45 @@ This file applies to the Windows and Linux Avalonia desktop client under
   must not replace the gradient through pointer-event assignments.
 - Audio routing invariants remain: native ASIO/cwASIO DSD is bit-perfect; volume,
   ReplayGain, PCM boost, and equalization affect PCM paths only.
+- The persisted DoP preference and forced DSD-to-PCM conversion are mutually
+  exclusive. DoP is bit-perfect encapsulation and must bypass PCM gain and
+  equalizer processing. Linux local and HTTP-range-streamed stereo DSF DoP uses
+  `Compatibility/Linux/DsfDopAudioPlayer` and
+  `Compatibility/Linux/RemoteDsfDopAudioPlayer` with direct ALSA only; preserve
+  their alternating marker bytes and DSD-rate/16 carrier-rate calculation.
+  Seeking must serialize ALSA `drop`/`prepare` against writes, discard blocks
+  read before the seek generation changed, and restart markers with `0x05`.
+  ALSA `S32_LE` DoP frames place low padding first, then two DSD bytes, and the
+  marker in the most-significant byte. Prefer ALSA `DSD_U32_BE` at DSD-rate/32
+  when the selected hardware endpoint supports it; use DoP as the fallback.
+  DSF files whose format chunk declares `bitsPerSample == 1` store each DSD byte
+  LSB-first; reverse every payload byte before either native ALSA or DoP output.
+  Files declaring `bitsPerSample == 8` are already MSB-first.
+  `Compatibility/Linux/DffDopAudioPlayer` handles local and HTTP-range-streamed
+  uncompressed stereo DFF. DFF payload is already interleaved and MSB-first:
+  regroup successive per-channel bytes into ALSA U32 words without bit reversal;
+  retain the same serialized seek/write and native-first/DoP-fallback rules.
 - Local `cue://` tracks and `mka://chapter/` tracks both resolve through the
   shared segment-aware PCM playback, waveform, queue, and history paths.
 - Windows-specific code stays in this project and must be excluded from the
   Linux target in `Orynivo.csproj`. Matching Linux compatibility types live
-  under `Compatibility/Linux`; they must not persist credentials in plaintext
-  or claim unavailable WASAPI, ASIO, endpoint-volume, or SMTC capabilities.
+  under `Compatibility/Linux`; PCM playback enumerates direct ALSA `hw:` devices
+  through `libasound.so.2` and selectable OpenAL devices through
+  `libopenal.so.1`. The output-profile dialog presents these as separate output
+  types and classifies persisted profiles by their device ID (`alsa:` means
+  direct ALSA); never mix direct ALSA hardware into the OpenAL device list.
+  Direct ALSA uses stereo signed 32-bit PCM, the source rate,
+  and `soft_resample=0`; failure to open that exact format/rate must be reported
+  rather than silently falling back to resampling. An `EBUSY` open failure must
+  identify PipeWire/other-process ownership and explain that changing the
+  desktop default does not release the card. The shared device-information
+  window must use ALSA/OpenAL terminology on Linux and must not expose its
+  historical WASAPI labels there. OpenAL requests the source rate when
+  creating the context, then queries the negotiated OpenAL mixer rate and uses
+  that value for FFmpeg decoding and transport output-rate reporting. Compatibility
+  types must not persist
+  credentials in plaintext or claim unavailable WASAPI, ASIO, endpoint-volume,
+  or SMTC capabilities.
   Cross-platform behavior shared with the server belongs in `Orynivo.Core`.
 - Keep the Linux-only direct `Tmds.DBus.Protocol` dependency at 0.92.0 or newer
   within the compatible package line: its non-blocking observer dispatch avoids

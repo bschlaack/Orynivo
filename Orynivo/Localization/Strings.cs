@@ -195,6 +195,24 @@ public sealed record LocalizedStrings(
     public string SteinbergAsio { get; init; } = "";
     public string CwAsio { get; init; } = "";
     public string WasapiOutputDevice { get; init; } = "";
+    /// <summary>Gets the OpenAL backend label.</summary>
+    public string OpenAl { get; init; } = "";
+    /// <summary>Gets the OpenAL output-device field label.</summary>
+    public string OpenAlOutputDevice { get; init; } = "";
+    /// <summary>Gets the direct ALSA backend label.</summary>
+    public string DirectAlsa { get; init; } = "";
+    /// <summary>Gets the direct ALSA output-device field label.</summary>
+    public string AlsaOutputDevice { get; init; } = "";
+    /// <summary>Gets the display name of the system-default Linux audio device.</summary>
+    public string LinuxDefaultAudioDevice { get; init; } = "";
+    /// <summary>Gets the message shown when Linux OpenAL initialization fails.</summary>
+    public string OpenAlInitializationFailed { get; init; } = "";
+    /// <summary>Gets the formatted message shown when exact-rate ALSA output cannot be opened.</summary>
+    public string AlsaExactOpenFailed { get; init; } = "";
+    /// <summary>Gets the formatted guidance shown when another process owns a direct ALSA device.</summary>
+    public string AlsaDeviceBusy { get; init; } = "";
+    /// <summary>Gets the message shown when ALSA cannot resume after seeking.</summary>
+    public string AlsaPrepareFailed { get; init; } = "";
     public string DeviceInfo { get; init; } = "";
     public string DatabaseOptimizeHint { get; init; } = "";
     /// <summary>Gets the normal-case Appearance navigation item label.</summary>
@@ -235,6 +253,10 @@ public sealed record LocalizedStrings(
     public string PlaybackThroughWithDsdConversion { get; init; } = "";
     public string NativeDsdOutput { get; init; } = "";
     public string DsdToPcmOutput { get; init; } = "";
+    /// <summary>Gets the short transport label for bit-perfect DoP output.</summary>
+    public string DopOutput { get; init; } = "";
+    /// <summary>Gets the message shown when DoP is selected without direct ALSA output.</summary>
+    public string DopRequiresDirectAlsa { get; init; } = "";
     /// <summary>Gets the ReplayGain settings label.</summary>
     public string ReplayGain { get; init; } = "";
     /// <summary>Gets the explanatory ReplayGain settings text.</summary>
@@ -267,6 +289,10 @@ public sealed record LocalizedStrings(
     public string AlwaysConvertDsdToPcm { get; init; } = "";
     /// <summary>Gets the explanatory text for forced DSD-to-PCM conversion.</summary>
     public string AlwaysConvertDsdToPcmHint { get; init; } = "";
+    /// <summary>Gets the option label for bit-perfect DSD over PCM transport.</summary>
+    public string DsdOverPcm { get; init; } = "";
+    /// <summary>Gets the explanatory text for bit-perfect DSD over PCM transport.</summary>
+    public string DsdOverPcmHint { get; init; } = "";
     /// <summary>Gets the option label for applying an additional PCM output boost.</summary>
     public string PcmOutputBoost { get; init; } = "";
     /// <summary>Gets the explanatory text for the additional PCM output boost.</summary>
@@ -499,6 +525,12 @@ public sealed record LocalizedStrings(
     public string WasapiEndpointSummary { get; init; } = "";
     public string WasapiNoExclusiveFormats { get; init; } = "";
     public string WasapiDsdNotRelevant { get; init; } = "";
+    /// <summary>Gets the formatted summary for a direct ALSA output device.</summary>
+    public string LinuxAlsaEndpointSummary { get; init; } = "";
+    /// <summary>Gets the formatted summary for an OpenAL output device.</summary>
+    public string LinuxOpenAlEndpointSummary { get; init; } = "";
+    /// <summary>Gets the Linux PCM-path native DSD availability message.</summary>
+    public string LinuxDsdOutputUnavailable { get; init; } = "";
     public string NativeDsdUsesAsio { get; init; } = "";
     public string Dashboard { get; init; } = "";
     public string DashboardIntroTitle { get; init; } = "";

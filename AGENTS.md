@@ -50,15 +50,28 @@ Avalonia desktop music library with:
 - Native Steinberg ASIO bridge in `Native/AsioBridge/`
 - MIT-licensed cwASIO bridge in `Native/CwAsioBridge/`
 - PCM playback through `ffmpeg`
-- Native DSF/DFF DSD playback through ASIO
+- Native DSF/DFF DSD playback through ASIO on Windows or direct ALSA on Linux
 - Real-time DSF/DFF-to-PCM conversion through `ffmpeg` for WASAPI playback
 
 The desktop project builds on Windows and Linux. Windows retains the complete
 WASAPI/ASIO playback implementation. The current Linux `net8.0` build supports
-the library and network/UI feature set but has no audio-output backend; it
-excludes Windows audio, endpoint-volume, and SMTC implementations and uses
-compatibility types under `Orynivo/Compatibility/Linux`. Linux credential
+PCM playback through selectable direct ALSA hardware and OpenAL output devices
+in addition to the
+library and network/UI feature set; it excludes Windows audio, endpoint-volume,
+and SMTC implementations and uses compatibility types under
+`Orynivo/Compatibility/Linux`. Linux credential
 compatibility is process-local only and must never persist secrets in plaintext.
+
+Linux native DSD does not use either Windows ASIO bridge. Local and
+HTTP-range-streamed stereo DSF and uncompressed stereo DFF/DSDIFF use the
+compatibility players under `Orynivo/Compatibility/Linux`, open ALSA
+`DSD_U32_BE` directly, and fall back to DoP when native DSD is unavailable.
+
+Linux output-profile editing presents OpenAL and direct exclusive ALSA as
+separate output types even though both retain the persisted
+`OutputBackend.Wasapi` compatibility value. The selected device ID remains the
+routing discriminator: `alsa:` identifies direct ALSA; every other Linux device
+ID uses OpenAL. Existing profiles must be classified from that ID.
 
 ## Orynivo.Core
 
@@ -151,6 +164,13 @@ publishes the self-contained `linux-x64` desktop artifact. The Windows job
 intentionally excludes only the Steinberg bridge because that SDK is not stored
 in the repository. Its Release artifact therefore contains cwASIO support
 without Steinberg SDK files.
+
+`.github/workflows/player-linux-release.yml` publishes tagged self-contained
+desktop builds for `linux-x64` and `linux-arm64` as portable tarballs, DEB, and
+RPM packages, plus an Arch Linux `x86_64` package. These packages install the
+player under `/usr/lib/orynivo`, add `/usr/bin/orynivo`, and register its
+desktop launcher. Every Linux player artifact is required by and included in
+the signed release manifest.
 
 ## Orynivo.Server
 
@@ -279,9 +299,10 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
 `/usr/bin/orynivo-server` symlink, ship a default config at
 `/etc/orynivo-server/appsettings.json`, and register
 `orynivo-server.service` running as the `orynivo-server` system user.
-The signed update-manifest workflow waits for the Windows installer and all four
-server packages before signing, refuses partial manifests, and supports a
-manual tag input for rebuilding an already published release.
+The signed update-manifest workflow waits for the Windows installer, every
+Linux desktop artifact, and all four server packages before signing, refuses
+partial manifests, and supports a manual tag input for rebuilding an already
+published release.
 
 The `orynivo-server` service user is created with `--no-create-home` and has no
 writable `$HOME`, so the default data directory (`$HOME/.local/share/Orynivo`)
@@ -344,7 +365,20 @@ fallback or allow client-provided commands/paths to reach the helper.
   `FfmpegLocator.GetSafeWorkingDirectory()` as their
   `ProcessStartInfo.WorkingDirectory`; stale installer shortcuts can otherwise
   leave the process current directory pointing to a deleted install path.
+  `FfmpegLocator.IsAvailable()` is the shared platform-aware availability
+  check used by Settings; do not duplicate Windows executable names in UI code.
 - `Orynivo/Audio/DsfAudioPlayer.cs`: native DSF-to-DSD path
+- `Orynivo/Compatibility/Linux/DsfDopAudioPlayer.cs`: local stereo DSF-to-DoP
+  path for direct ALSA. It preserves the DSF payload, alternates `0x05`/`0xFA`
+  marker bytes, derives the PCM carrier as DSD rate divided by 16, and bypasses
+  volume, ReplayGain, boost, and equalizer processing. Its ALSA `S32_LE` frame
+  order is low padding byte, two DSD bytes, then the marker in the most-
+  significant byte.
+  Direct ALSA DSF startup first tries the hardware-advertised `DSD_U32_BE`
+  format at DSD-rate/32 and falls back to `S32_LE` DoP at DSD-rate/16.
+- `Orynivo/Compatibility/Linux/RemoteDsfDopAudioPlayer.cs`: matching Linux DoP
+  path for authenticated HTTP-range DSF streams. It incrementally reads the
+  remote planar DSF blocks and applies the same direct-ALSA marker framing.
 - `Orynivo/Audio/RemoteDsfAudioPlayer.cs`: native DSF-to-DSD path for
   authenticated Orynivo Server streams. It reads DSF headers and audio blocks
   through HTTP byte ranges and feeds the existing ASIO/cwASIO DSD stream without
@@ -882,6 +916,9 @@ fallback or allow client-provided commands/paths to reach the helper.
 - `AppSettings.AlwaysConvertDsdToPcm` forces DSF/DFF sources through FFmpeg and
   the PCM output path even when ASIO/cwASIO native DSD is available, allowing
   volume, ReplayGain, and equalizer processing
+- `AppSettings.DsdOverPcmEnabled` persists the mutually exclusive DoP routing
+  preference. DoP is bit-perfect DSD encapsulation, not DSD-to-PCM conversion;
+  volume, PCM boost, ReplayGain, and equalizer processing must not alter it.
 - `AppSettings.PcmOutputBoostEnabled` applies an additional +6 dB linear gain to
   every PCM playback path (local, remote, Plex, radio, podcasts, and converted
   DSD). Native ASIO/cwASIO DSD remains bit-perfect and ignores the boost.
@@ -1454,7 +1491,8 @@ fallback or allow client-provided commands/paths to reach the helper.
 - DST-compressed `.dff` is not played natively
 - Output types represented by settings: Steinberg `ASIO`, `CwAsio`, `WASAPI`, `KernelStreaming`
 - Steinberg ASIO, cwASIO, and WASAPI are implemented; Kernel Streaming is not
-- WASAPI handles PCM only; native DSD remains ASIO-only
+- Windows WASAPI handles PCM only. Native DSD uses ASIO/cwASIO on Windows and
+  direct ALSA `DSD_U32_BE` on Linux; Linux DSD must not depend on either bridge.
 - WASAPI runs exclusively and selects the highest supported sample rate up to
   the source rate, then the first supported stereo format from 32-bit float,
   packed 24-bit PCM, and 16-bit PCM. Sources above the endpoint maximum are
@@ -1467,6 +1505,9 @@ fallback or allow client-provided commands/paths to reach the helper.
   ASIO/cwASIO. Forced conversion participates in gapless PCM playback and
   enables volume, ReplayGain, and equalizer processing; disabling the option
   restores native bit-perfect ASIO/cwASIO DSD routing.
+- Linux native DSF/DFF playback bypasses the ASIO/cwASIO selection entirely:
+  it writes native `DSD_U32_BE` or DoP directly to the selected ALSA hardware
+  profile and must not load or require either Windows bridge.
 - ASIO/cwASIO PCM playback queries the driver's reported sample rates before
   opening the stream and converts sources above or between supported rates to
   the highest available rate that does not exceed the source.

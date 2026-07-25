@@ -7,6 +7,7 @@
     <TargetFramework Condition="'$(OS)' != 'Windows_NT'">net8.0</TargetFramework>
     <NoWarn Condition="'$(OS)' != 'Windows_NT'">$(NoWarn);CS0067</NoWarn>
     <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Orynivo</AssemblyName>
     <RootNamespace>Orynivo</RootNamespace>

@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Orynivo
+Comment=Music library and audio player
+Comment[de]=Musikbibliothek und Audioplayer
+Comment[fr]=Bibliothèque musicale et lecteur audio
+Comment[es]=Biblioteca musical y reproductor de audio
+Exec=/usr/bin/orynivo
+Icon=orynivo
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+StartupNotify=true
