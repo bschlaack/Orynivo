@@ -40,6 +40,8 @@ public sealed class AppSettings
     public bool CalculateMissingReplayGainDuringScan { get; set; }
     /// <summary>Gets or sets a value indicating whether DSF and DFF sources always use the PCM playback path.</summary>
     public bool AlwaysConvertDsdToPcm { get; set; }
+    /// <summary>Gets or sets a value indicating whether DSD sources are transported as bit-perfect DoP frames.</summary>
+    public bool DsdOverPcmEnabled { get; set; }
     /// <summary>Gets or sets a value indicating whether PCM playback receives an additional +6 dB output boost.</summary>
     public bool PcmOutputBoostEnabled { get; set; }
     /// <summary>Gets or sets the fade duration used when advancing non-gapless queues, in seconds.</summary>

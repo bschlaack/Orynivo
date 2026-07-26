@@ -516,6 +516,8 @@
             <x:String x:Key="L_DsdPlayback">DSD-Wiedergabe</x:String>
             <x:String x:Key="L_AlwaysConvertDsdToPcm">DSD-Dateien immer in PCM umwandeln</x:String>
             <x:String x:Key="L_AlwaysConvertDsdToPcmHint">Verwendet auch mit ASIO/cwASIO den PCM-Pfad, damit Lautstärke, ReplayGain und Equalizer wirken.</x:String>
+            <x:String x:Key="L_DsdOverPcm">DSD über DoP ausgeben</x:String>
+            <x:String x:Key="L_DsdOverPcmHint">Verpackt DSD bitgenau in PCM-Frames. Erfordert einen DoP-fähigen DAC und eine Ausgabe ohne Resampling.</x:String>
             <x:String x:Key="L_Equalizer">Parametrischer Equalizer</x:String>
             <x:String x:Key="L_EqualizerHint">Gilt für PCM und DSD-zu-PCM. Native DSD-Ausgabe bleibt bitgenau.</x:String>
             <x:String x:Key="L_EqualizerEnabled">Equalizer aktivieren</x:String>

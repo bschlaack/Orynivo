@@ -9,7 +9,17 @@ namespace Orynivo;
 /// <summary>Dialog for creating or editing a named audio output profile.</summary>
 internal partial class OutputProfileDialog : Window
 {
-    private sealed record BackendChoice(OutputBackend Value, string Label)
+    private enum LinuxDeviceKind
+    {
+        Any,
+        OpenAl,
+        DirectAlsa
+    }
+
+    private sealed record BackendChoice(
+        OutputBackend Value,
+        string Label,
+        LinuxDeviceKind LinuxDeviceKind = LinuxDeviceKind.Any)
     {
         public override string ToString() => Label;
     }
@@ -42,31 +52,48 @@ internal partial class OutputProfileDialog : Window
             ? LocalizationManager.Current.OutputProfileConfigureTitle
             : LocalizationManager.Current.OutputProfileCreateTitle;
 
-        var availableBackends = new[]
+        var availableBackends = new List<BackendChoice>
         {
-            new BackendChoice(OutputBackend.Asio, LocalizationManager.Current.SteinbergAsio),
-            new BackendChoice(OutputBackend.CwAsio, LocalizationManager.Current.CwAsio),
-            new BackendChoice(OutputBackend.Wasapi, "WASAPI")
+            new(OutputBackend.Asio, LocalizationManager.Current.SteinbergAsio),
+            new(OutputBackend.CwAsio, LocalizationManager.Current.CwAsio)
+        };
+        if (OperatingSystem.IsLinux())
+        {
+            availableBackends.Add(
+                new(OutputBackend.Wasapi, LocalizationManager.Current.OpenAl, LinuxDeviceKind.OpenAl));
+            availableBackends.Add(
+                new(OutputBackend.Wasapi, LocalizationManager.Current.DirectAlsa, LinuxDeviceKind.DirectAlsa));
         }
+        else
+        {
+            availableBackends.Add(new(OutputBackend.Wasapi, "WASAPI"));
+        }
+        var filteredBackends = availableBackends
             .Where(c => c.Value != OutputBackend.Asio || SteinbergAsioStream.IsAvailable)
             .Where(c => c.Value != OutputBackend.CwAsio || SteinbergAsioStream.IsCwAsioAvailable)
             .ToArray();
-        BackendComboBox.ItemsSource = availableBackends;
+        BackendComboBox.ItemsSource = filteredBackends;
 
         if (profile is not null)
         {
             NameTextBox.Text = profile.Name;
             BackendComboBox.SelectedItem =
-                availableBackends.FirstOrDefault(c => c.Value == profile.Backend)
-                ?? availableBackends.FirstOrDefault(c => c.Value == OutputBackend.Wasapi)
-                ?? availableBackends.FirstOrDefault();
+                filteredBackends.FirstOrDefault(c =>
+                    c.Value == profile.Backend &&
+                    (!OperatingSystem.IsLinux() ||
+                     profile.Backend != OutputBackend.Wasapi ||
+                     c.LinuxDeviceKind == ResolveLinuxDeviceKind(profile.SelectedWasapiDeviceId)))
+                ?? filteredBackends.FirstOrDefault(c => c.Value == OutputBackend.Wasapi)
+                ?? filteredBackends.FirstOrDefault();
             _initialProfile = profile;
         }
         else
         {
             BackendComboBox.SelectedItem =
-                availableBackends.FirstOrDefault(c => c.Value == OutputBackend.Wasapi)
-                ?? availableBackends.FirstOrDefault();
+                filteredBackends.FirstOrDefault(c =>
+                    c.Value == OutputBackend.Wasapi &&
+                    c.LinuxDeviceKind != LinuxDeviceKind.DirectAlsa)
+                ?? filteredBackends.FirstOrDefault();
         }
 
         Opened += (_, _) =>
@@ -89,6 +116,16 @@ internal partial class OutputProfileDialog : Window
 
     private OutputBackend SelectedBackend =>
         BackendComboBox.SelectedItem is BackendChoice choice ? choice.Value : OutputBackend.Wasapi;
+
+    private LinuxDeviceKind SelectedLinuxDeviceKind =>
+        BackendComboBox.SelectedItem is BackendChoice choice
+            ? choice.LinuxDeviceKind
+            : LinuxDeviceKind.Any;
+
+    private static LinuxDeviceKind ResolveLinuxDeviceKind(string? deviceId) =>
+        deviceId?.StartsWith("alsa:", StringComparison.Ordinal) == true
+            ? LinuxDeviceKind.DirectAlsa
+            : LinuxDeviceKind.OpenAl;
 
     private void NameTextBox_OnTextChanged(object? sender, TextChangedEventArgs e) =>
         UpdateSaveButton();
@@ -121,7 +158,7 @@ internal partial class OutputProfileDialog : Window
             }
             else if (DeviceComboBox.SelectedItem is WasapiDeviceInfo wasapiDevice)
             {
-                var info = WasapiDeviceProvider.GetCapabilities(wasapiDevice.Id);
+                var info = await Task.Run(() => WasapiDeviceProvider.GetCapabilities(wasapiDevice.Id));
                 await new DeviceInfoWindow(info).ShowDialog(this);
             }
         }
@@ -152,7 +189,11 @@ internal partial class OutputProfileDialog : Window
 
             if (backend == OutputBackend.Wasapi)
             {
-                var devices = await Task.Run(WasapiDeviceProvider.GetRenderDevices);
+                var devices = (await Task.Run(WasapiDeviceProvider.GetRenderDevices))
+                    .Where(device =>
+                        SelectedLinuxDeviceKind == LinuxDeviceKind.Any ||
+                        ResolveLinuxDeviceKind(device.Id) == SelectedLinuxDeviceKind)
+                    .ToArray();
                 if (loadVersion != Volatile.Read(ref _deviceLoadVersion))
                     return;
                 DeviceComboBox.ItemsSource = devices;
@@ -160,8 +201,12 @@ internal partial class OutputProfileDialog : Window
                 DeviceComboBox.SelectedItem = devices.FirstOrDefault(d =>
                     string.Equals(d.Id, _initialProfile?.SelectedWasapiDeviceId, StringComparison.Ordinal))
                     ?? devices.FirstOrDefault();
-                DeviceLabelTextBlock.Text = LocalizationManager.Current.WasapiOutputDevice;
-                StatusTextBlock.Text = devices.Count == 0
+                DeviceLabelTextBlock.Text = OperatingSystem.IsLinux()
+                    ? SelectedLinuxDeviceKind == LinuxDeviceKind.DirectAlsa
+                        ? LocalizationManager.Current.AlsaOutputDevice
+                        : LocalizationManager.Current.OpenAlOutputDevice
+                    : LocalizationManager.Current.WasapiOutputDevice;
+                StatusTextBlock.Text = devices.Length == 0
                     ? LocalizationManager.Current.NoWasapiDevices
                     : string.Empty;
             }

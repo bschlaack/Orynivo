@@ -378,13 +378,15 @@
                                        Foreground="{DynamicResource AppMutedTextBrush}"/>
                             <controls:StatusBadge x:Name="FfmpegStatusBadge"/>
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,20,8" VerticalAlignment="Center">
+                        <StackPanel x:Name="AsioStatusPanel"
+                                    Orientation="Horizontal" Margin="0,0,20,8" VerticalAlignment="Center">
                             <TextBlock Text="Steinberg ASIO" VerticalAlignment="Center" Margin="0,0,8,0"
                                        FontSize="{DynamicResource FontSizeMeta}" FontWeight="SemiBold"
                                        Foreground="{DynamicResource AppMutedTextBrush}"/>
                             <controls:StatusBadge x:Name="AsioStatusBadge"/>
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8" VerticalAlignment="Center">
+                        <StackPanel x:Name="CwAsioStatusPanel"
+                                    Orientation="Horizontal" Margin="0,0,0,8" VerticalAlignment="Center">
                             <TextBlock Text="cwASIO" VerticalAlignment="Center" Margin="0,0,8,0"
                                        FontSize="{DynamicResource FontSizeMeta}" FontWeight="SemiBold"
                                        Foreground="{DynamicResource AppMutedTextBrush}"/>
@@ -453,6 +455,15 @@
                               Content="{DynamicResource L_AlwaysConvertDsdToPcm}"
                               Margin="0,0,0,6"/>
                     <TextBlock Text="{DynamicResource L_AlwaysConvertDsdToPcmHint}"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"/>
+                    <CheckBox x:Name="DsdOverPcmCheckBox"
+                              Theme="{StaticResource SettingsToggleTheme}"
+                              Content="{DynamicResource L_DsdOverPcm}"
+                              Margin="0,14,0,6"
+                              IsCheckedChanged="DsdOverPcmCheckBox_OnIsCheckedChanged"/>
+                    <TextBlock Text="{DynamicResource L_DsdOverPcmHint}"
                                FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"/>

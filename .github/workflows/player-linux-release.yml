@@ -1,0 +1,199 @@
+name: Linux Player Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number without v prefix (e.g. 0.28.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Linux player ${{ matrix.rid }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: linux-x64
+            deb_arch: amd64
+            rpm_arch: x86_64
+            archlinux_arch: x86_64
+          - rid: linux-arm64
+            deb_arch: arm64
+            rpm_arch: aarch64
+            archlinux_arch: ''
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            TAG="v${VERSION}"
+          else
+            TAG="${{ github.ref_name }}"
+            VERSION="${TAG#v}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate release tag on main
+        run: |
+          TAG="${{ steps.ver.outputs.tag }}"
+          printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || exit 1
+          git fetch origin main --tags --force
+          git rev-parse --verify "refs/tags/${TAG}^{commit}"
+          TAG_COMMIT="$(git rev-list -n 1 "$TAG")"
+          git merge-base --is-ancestor "$TAG_COMMIT" origin/main || {
+            echo "Tag '$TAG' is not contained in origin/main." >&2
+            exit 1
+          }
+          git checkout --detach "$TAG"
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore Linux player
+        run: dotnet restore Orynivo/Orynivo.csproj --runtime ${{ matrix.rid }}
+
+      - name: Publish Linux player
+        run: >
+          dotnet publish Orynivo/Orynivo.csproj
+          --configuration Release
+          --runtime ${{ matrix.rid }}
+          --self-contained true
+          --no-restore
+          --output publish/${{ matrix.rid }}
+          /p:AssemblyVersion=${{ steps.ver.outputs.version }}.0
+          /p:FileVersion=${{ steps.ver.outputs.version }}.0
+          /p:InformationalVersion=${{ steps.ver.outputs.version }}
+          /p:UpdatePublicKeyBase64=${{ vars.UPDATE_SIGNING_PUBLIC_KEY_BASE64 }}
+          /p:ReleaseVersionFromTag=true
+          /p:IncludeSourceRevisionInInformationalVersion=false
+
+      - name: Prepare portable archive and package tree
+        run: |
+          VERSION="${{ steps.ver.outputs.version }}"
+          RID="${{ matrix.rid }}"
+          PUB="publish/${RID}"
+          ARCHIVE_ROOT="archive/Orynivo-${VERSION}-${RID}"
+          STAGE="stage/${RID}"
+
+          chmod 755 "${PUB}/Orynivo"
+          mkdir -p packages "${ARCHIVE_ROOT}"
+          cp -a "${PUB}/." "${ARCHIVE_ROOT}/"
+          tar -czf "packages/Orynivo-${VERSION}-${RID}.tar.gz" \
+            -C archive "Orynivo-${VERSION}-${RID}"
+
+          mkdir -p "${STAGE}/usr/lib/orynivo"
+          mkdir -p "${STAGE}/usr/bin"
+          mkdir -p "${STAGE}/usr/share/applications"
+          mkdir -p "${STAGE}/usr/share/pixmaps"
+          cp -a "${PUB}/." "${STAGE}/usr/lib/orynivo/"
+          ln -s /usr/lib/orynivo/Orynivo "${STAGE}/usr/bin/orynivo"
+          cp .github/player-release/orynivo.desktop \
+            "${STAGE}/usr/share/applications/orynivo.desktop"
+          cp Logo/icon.png \
+            "${STAGE}/usr/share/pixmaps/orynivo.png"
+
+      - name: Install package tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes rpm zstd
+          sudo gem install fpm --no-document
+
+      - name: Create DEB package
+        run: |
+          VERSION="${{ steps.ver.outputs.version }}"
+          fpm \
+            --input-type dir \
+            --output-type deb \
+            --name orynivo \
+            --version "${VERSION}" \
+            --architecture "${{ matrix.deb_arch }}" \
+            --description "Orynivo desktop music library and audio player" \
+            --url "https://github.com/bschlaack/Orynivo" \
+            --vendor "Björn Schlaack" \
+            --maintainer "Björn Schlaack <bschlaack@gmail.com>" \
+            --license Apache-2.0 \
+            --category sound \
+            --depends ffmpeg \
+            --depends libasound2 \
+            --depends libopenal1 \
+            --package "packages/orynivo_${VERSION}_${{ matrix.deb_arch }}.deb" \
+            --chdir "stage/${{ matrix.rid }}" \
+            .
+
+      - name: Create RPM package
+        run: |
+          VERSION="${{ steps.ver.outputs.version }}"
+          fpm \
+            --input-type dir \
+            --output-type rpm \
+            --name orynivo \
+            --version "${VERSION}" \
+            --iteration 1 \
+            --architecture "${{ matrix.rpm_arch }}" \
+            --description "Orynivo desktop music library and audio player" \
+            --url "https://github.com/bschlaack/Orynivo" \
+            --vendor "Björn Schlaack" \
+            --license Apache-2.0 \
+            --category "Applications/Multimedia" \
+            --depends alsa-lib \
+            --depends openal-soft \
+            --package "packages/orynivo-${VERSION}-1.${{ matrix.rpm_arch }}.rpm" \
+            --chdir "stage/${{ matrix.rid }}" \
+            .
+
+      - name: Create Arch Linux package
+        if: matrix.archlinux_arch != ''
+        run: |
+          VERSION="${{ steps.ver.outputs.version }}"
+          PACKAGE_ROOT="arch-package"
+          PACKAGE_PATH="packages/orynivo-${VERSION}-1-${{ matrix.archlinux_arch }}.pkg.tar.zst"
+          mkdir -p "${PACKAGE_ROOT}"
+          cp -a "stage/${{ matrix.rid }}/." "${PACKAGE_ROOT}/"
+          cat > "${PACKAGE_ROOT}/.PKGINFO" <<EOF
+          pkgname = orynivo
+          pkgbase = orynivo
+          pkgver = ${VERSION}-1
+          pkgdesc = Orynivo desktop music library and audio player
+          url = https://github.com/bschlaack/Orynivo
+          builddate = $(date +%s)
+          packager = Orynivo GitHub Actions
+          size = $(du -sb "${PACKAGE_ROOT}" | cut -f1)
+          arch = ${{ matrix.archlinux_arch }}
+          license = Apache-2.0
+          depend = ffmpeg
+          depend = alsa-lib
+          depend = openal
+          EOF
+          tar --zstd --format=posix --numeric-owner --owner=0 --group=0 \
+            -cf "${PACKAGE_PATH}" \
+            -C "${PACKAGE_ROOT}" .PKGINFO usr
+
+          tar --zstd -tf "${PACKAGE_PATH}" | grep -Fxq '.PKGINFO'
+          tar --zstd -xOf "${PACKAGE_PATH}" .PKGINFO \
+            | grep -Fxq "pkgname = orynivo"
+
+      - name: Upload packages to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          draft: true
+          files: packages/*

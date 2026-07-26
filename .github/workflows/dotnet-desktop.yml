@@ -72,3 +72,42 @@ jobs:
           name: Orynivo-win-x64
           path: artifacts/Orynivo-win-x64
           if-no-files-found: error
+
+  linux:
+    name: Build Linux desktop
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore Linux desktop
+        run: dotnet restore Orynivo/Orynivo.csproj --runtime linux-x64
+
+      - name: Build Linux desktop
+        run: >
+          dotnet build Orynivo/Orynivo.csproj
+          --configuration Release
+          --no-restore
+          --warnaserror
+
+      - name: Publish Linux desktop
+        run: >
+          dotnet publish Orynivo/Orynivo.csproj
+          --configuration Release
+          --runtime linux-x64
+          --self-contained true
+          --no-restore
+          --output artifacts/Orynivo-linux-x64
+
+      - name: Upload Linux desktop
+        uses: actions/upload-artifact@v6
+        with:
+          name: Orynivo-linux-x64
+          path: artifacts/Orynivo-linux-x64
+          if-no-files-found: error

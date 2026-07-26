@@ -10,6 +10,97 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Settings now shows Steinberg ASIO and cwASIO availability only on Windows.
+  Linux direct-ALSA device information probes and reports native
+  `DSD_U32_BE` and DoP support for each DSD level, and explicitly reports when
+  the device is busy or its DSD capabilities cannot be queried. OpenAL profiles
+  are identified as PCM-only and point users to direct ALSA for DSD playback.
+  The enlarged capability window performs read-only ALSA hardware-parameter
+  checks, avoiding console errors for unsupported high sample rates.
+- Prevented Orynivo Server library scans from appearing stuck on large or
+  chaptered media by disabling missing-ReplayGain FFmpeg analysis by default;
+  deployments can opt back in through configuration.
+- Bounded Matroska chapter probing to 30 seconds per file and limited FFprobe's
+  analysis window so a malformed or slow network-hosted MKA cannot stall the
+  complete server scan indefinitely.
+
+## [0.28.1] - 2026-07-25
+
+### Fixed
+
+- Fixed the Arch Linux player package layout so `.PKGINFO` is stored at the
+  archive root where `pacman -U` expects it. Release builds now validate the
+  package metadata before uploading the `.pkg.tar.zst` artifact.
+
+## [0.28.0] - 2026-07-25
+
+### Added
+
+- Added bit-perfect DSF playback over DoP through direct ALSA on Linux.
+  Orynivo bypasses FFmpeg and PCM processing, adds alternating standard DoP
+  markers to the unchanged DSD payload, and opens the device at the derived
+  carrier rate (for example 176.4 kHz for DSD64). The persisted, localized DoP
+  preference and forced DSD-to-PCM conversion are mutually exclusive. Local
+  files and authenticated Orynivo Server streams both use this path; remote DSF
+  data is read incrementally through HTTP byte ranges.
+- Fixed Linux DoP seeking so an ALSA reset cannot race with an in-flight output
+  write; buffered pre-seek DSD blocks are discarded and marker framing restarts
+  cleanly at the selected position.
+- Corrected Linux DoP framing for ALSA `S32_LE`: the padding byte is now least
+  significant, followed by the 16-bit DSD payload and the `0x05`/`0xFA` marker
+  in the most-significant byte, allowing 32-bit USB DACs to detect DSD mode.
+- Linux direct ALSA DSD output now prefers the hardware-advertised
+  `DSD_U32_BE` native format and uses DoP as a fallback. DACs such as the
+  Topping D70 Pro SABRE therefore switch through their kernel-supported native
+  DSD endpoint instead of remaining in silent PCM mode.
+- Fixed noise during Linux DSF playback by honoring the DSF format chunk's bit
+  order. Common LSB-first DSF payload bytes are now bit-reversed before native
+  ALSA DSD or DoP output, whose chronological DSD bits are MSB-first.
+- Added direct ALSA playback for local and Orynivo-Server-streamed uncompressed
+  stereo DFF/DSDIFF on Linux. It prefers native `DSD_U32_BE`, falls back to DoP,
+  supports seeking, and preserves DFF's already MSB-first payload order.
+- Updated the project documentation to present Linux as a packaged desktop
+  player with bridge-free native DSF/DFF output through ALSA, including its
+  runtime requirements and portable, DEB, RPM, and Arch Linux downloads.
+- Added tagged Linux desktop release artifacts for `linux-x64` and
+  `linux-arm64`: self-contained portable tarballs, DEB and RPM packages, plus
+  an `x86_64` Arch Linux package. The signed release manifest now waits for and
+  hashes every Linux player artifact.
+- Added Linux PCM audio playback through OpenAL. FFmpeg-backed local files,
+  remote streams, CUE/MKA segments, pause, seeking, gapless queue transitions,
+  volume, ReplayGain, PCM boost, and the parametric equalizer now use the
+  system's PipeWire, PulseAudio, or ALSA-backed output. Linux output profiles
+  enumerate OpenAL devices so users can switch between DACs and sound cards.
+- Added selectable direct ALSA hardware profiles on Linux. They open stereo
+  32-bit PCM at the track's exact sample rate with ALSA software resampling
+  disabled, so a 96 kHz source reaches a compatible DAC at 96 kHz instead of
+  being silently mixed to 48 kHz.
+
+- Added a `net8.0` Linux desktop build and a self-contained `linux-x64` CI
+  artifact. The Avalonia library, remote-server, playlist, radio, podcast,
+  AI-chat, and MCP surfaces now compile for Linux; Windows-only audio output and
+  system-media integration are explicitly isolated behind Linux compatibility
+  services.
+- Added non-persisting Linux credential-store compatibility so Plex and
+  streaming secrets remain process-local instead of being written without
+  Windows DPAPI protection.
+
+### Fixed
+
+- Linux now detects the extensionless `ffmpeg` and `ffprobe` executables for
+  the Settings availability badge instead of looking only for Windows `.exe`
+  files. Direct ALSA ownership conflicts now explain that redirecting the
+  desktop output does not release hardware still held by PipeWire.
+- Linux output-profile editing now separates OpenAL/PipeWire devices from
+  direct exclusive ALSA hardware. Existing `alsa:hw:` profiles are identified
+  as direct ALSA instead of being misleadingly displayed as OpenAL.
+- Linux device information now identifies direct ALSA and OpenAL output paths
+  with their actual routing semantics instead of displaying WASAPI endpoint,
+  exclusive-format, and DSD wording.
+- Linux playback now reports and decodes at the actual OpenAL mixer rate instead
+  of displaying the source rate when OpenAL or PipeWire resamples the stream.
+- Prevented a Linux desktop shutdown crash in Avalonia's D-Bus cleanup by using
+  the non-blocking observer dispatch from Tmds.DBus.Protocol 0.92.0.
 - Prevented Orynivo Server library scans from appearing stuck on large or
   chaptered media by disabling missing-ReplayGain FFmpeg analysis by default;
   deployments can opt back in through configuration.

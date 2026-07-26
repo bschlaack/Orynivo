@@ -1290,7 +1290,11 @@ public partial class MainWindow : Window
             OutputBackend.CwAsio when !string.IsNullOrWhiteSpace(_settings.SelectedDriverName) =>
                 $"{_settings.SelectedDriverName}  ·  cwASIO",
             OutputBackend.Wasapi when !string.IsNullOrWhiteSpace(_settings.SelectedWasapiDeviceName) =>
-                $"{_settings.SelectedWasapiDeviceName}  ·  WASAPI",
+                $"{_settings.SelectedWasapiDeviceName}  ·  {(OperatingSystem.IsLinux()
+                    ? _settings.SelectedWasapiDeviceId?.StartsWith("alsa:", StringComparison.Ordinal) == true
+                        ? LocalizationManager.Current.DirectAlsa
+                        : LocalizationManager.Current.OpenAl
+                    : "WASAPI")}",
             OutputBackend.KernelStreaming => "KernelStreaming",
             _ => LocalizationManager.Current.NoDeviceSelected
         };
@@ -10794,6 +10798,41 @@ public partial class MainWindow : Window
                 StatusTextBlock.Text = LocalizationManager.Current.SelectWasapiDevice;
                 return;
             }
+#if !WINDOWS
+            if (_settings.DsdOverPcmEnabled &&
+                (ext.Equals(".dsf", StringComparison.OrdinalIgnoreCase) ||
+                 ext.Equals(".dff", StringComparison.OrdinalIgnoreCase) ||
+                 IsRemoteOrynivoDsdCandidate(filePath)))
+            {
+                if (Uri.TryCreate(filePath, UriKind.Absolute, out var dopUri) &&
+                    dopUri.Scheme is "http" or "https")
+                {
+                    if (IsRemoteOrynivoDffCandidate(filePath))
+                        (player, info) = await DffDopAudioPlayer.CreateRemoteAsync(
+                            filePath,
+                            _settings.SelectedWasapiDeviceId,
+                            _playbackCts.Token);
+                    else
+                        (player, info) = await RemoteDsfDopAudioPlayer.CreateAsync(
+                            filePath,
+                            _settings.SelectedWasapiDeviceId,
+                            _playbackCts.Token);
+                }
+                else if (ext.Equals(".dff", StringComparison.OrdinalIgnoreCase))
+                    (player, info) = await DffDopAudioPlayer.CreateLocalAsync(
+                        playbackTrack.PlaybackPath,
+                        _settings.SelectedWasapiDeviceId,
+                        _playbackCts.Token);
+                else
+                {
+                    (player, info) = await DsfDopAudioPlayer.CreateAsync(
+                        playbackTrack.PlaybackPath,
+                        _settings.SelectedWasapiDeviceId,
+                        _playbackCts.Token);
+                }
+            }
+            else
+#endif
             (player, info) = await WasapiAudioPlayer.CreateAsync(
                 gaplessItems,
                 _settings.SelectedWasapiDeviceId,
@@ -10865,8 +10904,23 @@ public partial class MainWindow : Window
                                          ? SelectedDriverTextBlock.Text
                                          : LocalizationManager.Current.InternetRadio);
         ClearNowPlayingAlbum();
-        var usesNativeDsd = player is DsfAudioPlayer or DffAudioPlayer or RemoteDsfAudioPlayer or RemoteDffAudioPlayer;
-        FileInfoTextBlock.Text = usesNativeDsd
+        var usesNativeDsd = player is DsfAudioPlayer or DffAudioPlayer or RemoteDsfAudioPlayer or RemoteDffAudioPlayer
+#if !WINDOWS
+                            || player is DsfDopAudioPlayer { UsesNativeDsd: true }
+                            || player is RemoteDsfDopAudioPlayer { UsesNativeDsd: true }
+                            || player is DffDopAudioPlayer { UsesNativeDsd: true }
+#endif
+            ;
+#if !WINDOWS
+        var usesDop = player is DsfDopAudioPlayer { UsesNativeDsd: false }
+                      or RemoteDsfDopAudioPlayer { UsesNativeDsd: false }
+                      or DffDopAudioPlayer { UsesNativeDsd: false };
+#else
+        const bool usesDop = false;
+#endif
+        FileInfoTextBlock.Text = usesDop
+            ? $"{info.ContainerName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz  ·  {LocalizationManager.Current.DopOutput} ({info.OutputSampleRate:N0} Hz)"
+            : usesNativeDsd
             ? $"{info.ContainerName.ToUpperInvariant()}  ·  {info.SourceSampleRate:N0} Hz  ·  {LocalizationManager.Current.NativeDsdOutput}"
             : info.IsDsd
                 ? $"{info.ContainerName.ToUpperInvariant()}  ·  {LocalizationManager.Current.DsdToPcmOutput}  ·  {info.OutputSampleRate:N0} Hz"
@@ -11295,6 +11349,38 @@ public partial class MainWindow : Window
             !string.IsNullOrWhiteSpace(sourceExtension) ||
             !string.IsNullOrWhiteSpace(fileNameExtension);
         return !hasKnownFormat && IsConfiguredOrynivoStreamUrl(path);
+    }
+
+    /// <summary>
+    /// Determines whether an Orynivo Server stream is specifically a DSF
+    /// candidate for Linux DoP playback.
+    /// </summary>
+    /// <param name="path">Remote stream URL of the track.</param>
+    /// <returns><see langword="true"/> for known DSF or metadata-less Orynivo streams.</returns>
+    private bool IsRemoteOrynivoDsfCandidate(string path)
+    {
+        if (!_orynivoTracksByUrl.TryGetValue(path, out var row))
+            return IsConfiguredOrynivoStreamUrl(path);
+
+        var format = row.Format?.Trim();
+        return string.Equals(format, "DSF", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(Path.GetExtension(row.SourcePath), ".dsf", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(Path.GetExtension(row.FileName), ".dsf", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Determines whether a remote Orynivo Server stream is a known DFF/DSDIFF track.</summary>
+    /// <param name="path">Remote stream URL of the track.</param>
+    /// <returns><see langword="true"/> when cached metadata identifies DFF/DSDIFF.</returns>
+    private bool IsRemoteOrynivoDffCandidate(string path)
+    {
+        if (!_orynivoTracksByUrl.TryGetValue(path, out var row))
+            return false;
+
+        var format = row.Format?.Trim();
+        return string.Equals(format, "DFF", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(format, "DSDIFF", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(Path.GetExtension(row.SourcePath), ".dff", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(Path.GetExtension(row.FileName), ".dff", StringComparison.OrdinalIgnoreCase);
     }
 
     private bool IsConfiguredOrynivoStreamUrl(string path)
@@ -14677,6 +14763,7 @@ public partial class MainWindow : Window
             var hadOrynivoServers = _settings.OrynivoServers.Count > 0;
             var outputChanged =
                 _settings.OutputBackend != window.SelectedOutputBackend ||
+                _settings.DsdOverPcmEnabled != window.DsdOverPcmEnabled ||
                 !string.Equals(
                     _settings.SelectedDriverName,
                     window.SelectedDriverName,
@@ -14697,6 +14784,7 @@ public partial class MainWindow : Window
             _settings.ReplayGainMode        = window.SelectedReplayGainMode;
             _settings.CalculateMissingReplayGainDuringScan = window.CalculateMissingReplayGainDuringScan;
             _settings.AlwaysConvertDsdToPcm = window.AlwaysConvertDsdToPcm;
+            _settings.DsdOverPcmEnabled = window.DsdOverPcmEnabled;
             _settings.PcmOutputBoostEnabled = window.PcmOutputBoostEnabled;
             _settings.NonGaplessCrossfadeSeconds = window.NonGaplessCrossfadeSeconds;
             _settings.EqualizerEnabled      = window.EqualizerEnabled;
@@ -14798,7 +14886,12 @@ public partial class MainWindow : Window
                         StringComparison.OrdinalIgnoreCase))
                 {
                     _player.ReplayGainFactor = replayGainFactor;
-                    UpdateReplayGainBadge(_player is DsfAudioPlayer or DffAudioPlayer or RemoteDsfAudioPlayer or RemoteDffAudioPlayer);
+                    UpdateReplayGainBadge(
+                        _player is DsfAudioPlayer or DffAudioPlayer or RemoteDsfAudioPlayer or RemoteDffAudioPlayer
+#if !WINDOWS
+                        or DsfDopAudioPlayer or RemoteDsfDopAudioPlayer or DffDopAudioPlayer
+#endif
+                    );
                 }
             }
             if (_player is IEqualizerAudioPlayer equalizerPlayer)
