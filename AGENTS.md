@@ -74,11 +74,17 @@ routing discriminator: `alsa:` identifies direct ALSA; every other Linux device
 ID uses OpenAL. Existing profiles must be classified from that ID.
 
 macOS desktop builds target `net8.0` for `osx-arm64` and `osx-x64`. PCM
-playback uses Apple's system OpenAL framework and FFmpeg/FFprobe from `PATH`.
+playback uses Apple's system OpenAL framework. FFmpeg/FFprobe discovery checks
+the application and per-user cache, inherited `PATH`, and conventional Homebrew,
+MacPorts, pkgsrc, Fink, and per-user binary directories because Finder-launched
+apps receive a minimal `PATH`; missing tools are downloaded for the current
+architecture into the per-user cache.
 ALSA and native DSD output remain Linux-only. Tagged releases package
 self-contained `Orynivo.app` bundles for both Mac architectures as installable
-PKGs, portable ZIPs, and tar archives; every package is included in the signed
-release manifest. The desktop updater selects the current process architecture's
+PKGs, portable ZIPs, and tar archives. Each bundle generates `Orynivo.icns` from
+`Logo/icon.png`, stores it under `Contents/Resources`, and declares it through
+`CFBundleIconFile`; every package is included in the signed release manifest.
+The desktop updater selects the current process architecture's
 signed `pkg`, verifies its digest, and opens it through `/usr/bin/open`; Orynivo
 must never invoke a privileged installer command directly.
 
@@ -826,7 +832,11 @@ fallback or allow client-provided commands/paths to reach the helper.
   sources into one tree: a top-level **Local** group (only when a local library
   directory is configured and has tracks) plus one group per configured Orynivo
   Server (only when it reports folder tracks), each built through
-  `AddFolderRootsInto`/`BuildUnifiedFolderTree`. `FolderTag` carries an optional
+  `AddFolderRootsInto`/`BuildUnifiedFolderTree`.
+  The sidebar item remains visible whenever either local media or at least one
+  Orynivo Server is configured; server-only setups must not require a local
+  library path to open this view.
+  `FolderTag` carries an optional
   `OrynivoServerSettings? Server` so remote directory nodes are resolved through
   the in-memory `FolderTree` (`_folderTreesBySource[sourceKey].AllFilePathsUnder`)
   instead of the local database — this is required because folder child nodes are

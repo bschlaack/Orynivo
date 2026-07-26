@@ -86,8 +86,22 @@ jobs:
           RID="${{ matrix.rid }}"
           APP="bundle/${RID}/Orynivo.app"
           mkdir -p "${APP}/Contents/MacOS"
+          mkdir -p "${APP}/Contents/Resources"
           cp -a "publish/${RID}/." "${APP}/Contents/MacOS/"
           cp .github/player-macos/Info.plist "${APP}/Contents/Info.plist"
+          ICONSET="bundle/${RID}/Orynivo.iconset"
+          mkdir -p "${ICONSET}"
+          sips -z 16 16 Logo/icon.png --out "${ICONSET}/icon_16x16.png"
+          sips -z 32 32 Logo/icon.png --out "${ICONSET}/icon_16x16@2x.png"
+          sips -z 32 32 Logo/icon.png --out "${ICONSET}/icon_32x32.png"
+          sips -z 64 64 Logo/icon.png --out "${ICONSET}/icon_32x32@2x.png"
+          sips -z 128 128 Logo/icon.png --out "${ICONSET}/icon_128x128.png"
+          sips -z 256 256 Logo/icon.png --out "${ICONSET}/icon_128x128@2x.png"
+          sips -z 256 256 Logo/icon.png --out "${ICONSET}/icon_256x256.png"
+          sips -z 512 512 Logo/icon.png --out "${ICONSET}/icon_256x256@2x.png"
+          sips -z 512 512 Logo/icon.png --out "${ICONSET}/icon_512x512.png"
+          sips -z 1024 1024 Logo/icon.png --out "${ICONSET}/icon_512x512@2x.png"
+          iconutil -c icns "${ICONSET}" -o "${APP}/Contents/Resources/Orynivo.icns"
           chmod 755 "${APP}/Contents/MacOS/Orynivo"
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" "${APP}/Contents/Info.plist"
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${VERSION}" "${APP}/Contents/Info.plist"
@@ -116,6 +130,10 @@ jobs:
           RID="${{ matrix.rid }}"
           plutil -lint "bundle/${{ matrix.rid }}/Orynivo.app/Contents/Info.plist"
           test -x "bundle/${{ matrix.rid }}/Orynivo.app/Contents/MacOS/Orynivo"
+          test -s "bundle/${{ matrix.rid }}/Orynivo.app/Contents/Resources/Orynivo.icns"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIconFile" \
+            "bundle/${{ matrix.rid }}/Orynivo.app/Contents/Info.plist" \
+            | grep -Fxq 'Orynivo.icns'
           file "bundle/${{ matrix.rid }}/Orynivo.app/Contents/MacOS/Orynivo"
           unzip -t "packages/Orynivo-${VERSION}-${RID}-Portable.zip"
           tar -tzf "packages/Orynivo-${VERSION}-${RID}.tar.gz" \

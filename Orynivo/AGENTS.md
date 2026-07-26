@@ -30,6 +30,9 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   hidden legacy server playlists must not be offered by these menus.
 - Shared local/remote Artists, Albums, and Tracks views use the common column
   masks and catalog abstractions. Do not create parallel remote-only UI surfaces.
+- The shared Folder structure sidebar item is visible when either local media
+  or at least one Orynivo Server is configured. Server-only setups must be able
+  to open `ShowUnifiedFolderTreeAsync` without configuring a local directory.
 - Matching local and Orynivo Server artists use
   `ArtistNameNormalizer.CreateComparisonKey` and one `UnifiedArtist` row. Its
   album drill-down combines every matching library while retaining each album's
@@ -79,7 +82,9 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 - Tagged macOS releases publish architecture-specific `osx-arm64` and
   `osx-x64` application bundles as installable PKGs, portable ZIPs, and tar
   archives. The PKG installs `Orynivo.app` beneath `/Applications`; all package
-  variants must remain required inputs to the signed release manifest. macOS
+  variants must remain required inputs to the signed release manifest. Each
+  bundle must contain `Contents/Resources/Orynivo.icns` generated from
+  `Logo/icon.png` and referenced by `CFBundleIconFile` in `Info.plist`. macOS
   automatic updates select the current architecture's signed PKG, verify its
   digest through `ReleaseUpdateService`, and open the verified file through
   `/usr/bin/open`; do not invoke `installer` or request privileges directly.
@@ -93,6 +98,12 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   OpenGL first and software second. Do not re-enable Metal without verifying
   Orynivo's gradient and rounded-surface shaders on both Intel and Apple
   Silicon Macs; Skia's Metal compiler can reject them after its 300-ms timeout.
+- FFmpeg discovery on macOS must not rely only on the inherited `PATH`, because
+  Finder-launched bundles omit common package-manager prefixes. Probe the
+  application and per-user cache plus conventional Homebrew, MacPorts, pkgsrc,
+  Fink, and per-user binary directories. When absent, download current-architecture
+  FFmpeg and FFprobe release assets into the per-user cache and restore executable
+  Unix permissions before prepending that cache to the process `PATH`.
 - Dashboard Recently Played and Recently Added use 20-item horizontal
   carousels with smoothly animated vector previous/next controls placed in the
   header immediately before Show all; controls must never overlay the cards or
