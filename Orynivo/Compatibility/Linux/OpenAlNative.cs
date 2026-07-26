@@ -2,10 +2,14 @@ using System.Runtime.InteropServices;
 
 namespace Orynivo.Audio;
 
-/// <summary>Minimal OpenAL interop used by the Linux PCM output implementation.</summary>
+/// <summary>Minimal OpenAL interop used by the Linux and macOS PCM output implementations.</summary>
 internal static class OpenAlNative
 {
+#if ORYNIVO_MACOS
+    private const string Library = "/System/Library/Frameworks/OpenAL.framework/OpenAL";
+#else
     private const string Library = "libopenal.so.1";
+#endif
     private const int AlcDeviceSpecifier = 0x1005;
     private const int AlcDefaultDeviceSpecifier = 0x1004;
     private const int AlcAllDevicesSpecifier = 0x1013;

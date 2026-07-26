@@ -971,6 +971,10 @@
                               Content="{DynamicResource L_UpNext}"
                               Theme="{StaticResource SettingsToggleTheme}"
                               Margin="0,4"/>
+                    <CheckBox x:Name="ShowAiChatItemCheckBox"
+                              Content="{DynamicResource L_AiChat}"
+                              Theme="{StaticResource SettingsToggleTheme}"
+                              Margin="0,4"/>
                     <CheckBox x:Name="ShowLocalLibrarySectionCheckBox"
                               Content="{DynamicResource L_LocalLibrary}"
                               Theme="{StaticResource SettingsToggleTheme}"

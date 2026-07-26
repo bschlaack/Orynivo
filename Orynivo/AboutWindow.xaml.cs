@@ -3,7 +3,6 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Orynivo.Localization;
 using Orynivo.Streaming;
 using Orynivo.Updates;
-using System.Diagnostics;
 using System.Reflection;
 
 namespace Orynivo;
@@ -44,9 +43,7 @@ public partial class AboutWindow : Window
         {
             using var updates = new ReleaseUpdateService(_updatePublicKey);
             var manifest = await updates.GetLatestManifestAsync();
-            _availableInstaller = manifest.Assets.FirstOrDefault(asset =>
-                asset.Component == "desktop" && asset.OperatingSystem == "windows" &&
-                asset.Architecture == "x64" && asset.Type == "installer");
+            _availableInstaller = DesktopUpdatePlatform.SelectInstaller(manifest.Assets);
             var available = _availableInstaller is not null && ReleaseUpdateService.IsNewer(_version, manifest.Version);
             UpdateStatusTextBlock.Text = available
                 ? string.Format(LocalizationManager.Current.UpdateAvailable, manifest.Version)
@@ -96,10 +93,9 @@ public partial class AboutWindow : Window
         {
             using var updates = new ReleaseUpdateService(_updatePublicKey);
             var verified = await updates.GetLatestManifestBundleAsync();
-            var installer = verified.Manifest.Assets.FirstOrDefault(asset =>
-                asset.Component == "desktop" && asset.OperatingSystem == "windows" &&
-                asset.Architecture == "x64" && asset.Type == "installer" &&
-                asset.File == availableInstaller.File)
+            var installer = DesktopUpdatePlatform.SelectInstaller(
+                verified.Manifest.Assets,
+                availableInstaller.File)
                 ?? throw new InvalidOperationException("The selected desktop installer is no longer available.");
             var installerPath = await updates.DownloadAssetAsync(installer);
             var failedServers = await UpdateServersAsync(updates, verified);
@@ -120,7 +116,7 @@ public partial class AboutWindow : Window
                     return;
                 }
             }
-            Process.Start(new ProcessStartInfo(installerPath) { UseShellExecute = true });
+            DesktopUpdatePlatform.LaunchInstaller(installerPath);
             if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                 desktop.Shutdown();
         }

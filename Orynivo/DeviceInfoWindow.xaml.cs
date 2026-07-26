@@ -59,7 +59,7 @@ public partial class DeviceInfoWindow : Window
                 : LocalizationManager.Current.DeviceProbeInconclusive;
     }
 
-    /// <summary>Initializes the window with Windows or Linux PCM-device capabilities.</summary>
+    /// <summary>Initializes the window with platform PCM-device capabilities.</summary>
     /// <param name="info">PCM device capability information to display.</param>
     public DeviceInfoWindow(WasapiDeviceCapabilities info)
     {
@@ -67,9 +67,9 @@ public partial class DeviceInfoWindow : Window
         Opened += (_, _) => WindowChrome.ApplyTheme(this);
 
         DriverNameTextBlock.Text = info.Name;
-        if (OperatingSystem.IsLinux())
+        if (!OperatingSystem.IsWindows())
         {
-            PopulateLinuxPcmDeviceInfo(info);
+            PopulateNonWindowsPcmDeviceInfo(info);
             return;
         }
 
@@ -96,11 +96,11 @@ public partial class DeviceInfoWindow : Window
         DsdFormatsTextBlock.Text = LocalizationManager.Current.NativeDsdUsesAsio;
     }
 
-    private void PopulateLinuxPcmDeviceInfo(WasapiDeviceCapabilities info)
+    /// <summary>Populates PCM device information for OpenAL and Linux direct ALSA outputs.</summary>
+    /// <param name="info">PCM device capabilities to display.</param>
+    private void PopulateNonWindowsPcmDeviceInfo(WasapiDeviceCapabilities info)
     {
         var isDirectAlsa = info.Id.StartsWith("alsa:", StringComparison.Ordinal);
-        var nativeRates = info.NativeDsdRates ?? [];
-        var dopRates = info.DopDsdRates ?? [];
         SummaryTextBlock.Text = string.Format(
             isDirectAlsa
                 ? LocalizationManager.Current.LinuxAlsaEndpointSummary
@@ -112,65 +112,16 @@ public partial class DeviceInfoWindow : Window
             ? LocalizationManager.Current.DriverProvidedNoInformation
             : string.Join(" · ", info.ExclusivePcmSampleRates.Select(FormatPcmRate));
 
-        if (!isDirectAlsa)
+        DsdRatesPanel.Children.Add(new TextBlock
         {
-            AddDsdStatusText(LocalizationManager.Current.LinuxOpenAlDsdRequiresAlsa, supported: false);
-        }
-        else if (!info.DsdProbeConclusive)
-        {
-            AddDsdStatusText(LocalizationManager.Current.LinuxDsdProbeInconclusive, supported: false);
-        }
-        else
-        {
-            foreach (var level in new[] { 64, 128, 256, 512, 1024 })
-            {
-                var supported = nativeRates.Contains(level) || dopRates.Contains(level);
-                DsdRatesPanel.Children.Add(new TextBlock
-                {
-                    Text = level.ToString(),
-                    Margin = new Avalonia.Thickness(0, 0, 12, 0),
-                    Foreground = AvaloniaApp.Current!.Resources[
-                        supported ? "AppDsdSupportedBrush" : "AppDsdUnsupportedBrush"] as IBrush
-                });
-            }
-        }
+            Text = LocalizationManager.Current.LinuxDsdOutputUnavailable,
+            Foreground = AvaloniaApp.Current!.Resources["AppDsdUnsupportedBrush"] as IBrush
+        });
 
         PcmFormatsTextBlock.Text = info.ExclusivePcmFormats.Count == 0
             ? LocalizationManager.Current.DriverProvidedNoInformation
             : string.Join(Environment.NewLine, info.ExclusivePcmFormats);
-        DsdFormatsTextBlock.Text = !isDirectAlsa
-            ? LocalizationManager.Current.LinuxOpenAlDsdRequiresAlsa
-            : !info.DsdProbeConclusive
-                ? LocalizationManager.Current.LinuxDsdProbeInconclusive
-                : BuildLinuxDsdFormats(nativeRates, dopRates);
-    }
-
-    private void AddDsdStatusText(string text, bool supported)
-    {
-        DsdRatesPanel.Children.Add(new TextBlock
-        {
-            Text = text,
-            Foreground = AvaloniaApp.Current!.Resources[
-                supported ? "AppDsdSupportedBrush" : "AppDsdUnsupportedBrush"] as IBrush
-        });
-    }
-
-    private static string BuildLinuxDsdFormats(
-        IReadOnlyList<int> nativeRates,
-        IReadOnlyList<int> dopRates)
-    {
-        var formats = new List<string>();
-        if (nativeRates.Count > 0)
-            formats.Add(string.Format(
-                LocalizationManager.Current.LinuxNativeDsdFormat,
-                string.Join(", ", nativeRates.Select(static rate => $"DSD{rate}"))));
-        if (dopRates.Count > 0)
-            formats.Add(string.Format(
-                LocalizationManager.Current.LinuxDopDsdFormat,
-                string.Join(", ", dopRates.Select(static rate => $"DSD{rate}"))));
-        return formats.Count == 0
-            ? LocalizationManager.Current.Unsupported
-            : string.Join(Environment.NewLine, formats);
+        DsdFormatsTextBlock.Text = LocalizationManager.Current.LinuxDsdOutputUnavailable;
     }
 
     private static string DescribeFormat(string format) =>

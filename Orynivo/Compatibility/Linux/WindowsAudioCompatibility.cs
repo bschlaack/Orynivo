@@ -3,19 +3,20 @@ using Orynivo.Localization;
 namespace Orynivo.Audio;
 
 /// <summary>
-/// Provides direct ALSA and OpenAL output devices through the shared output-profile UI.
+/// Provides platform OpenAL devices and, on Linux, direct ALSA devices through the shared output-profile UI.
 /// </summary>
 public static class WasapiDeviceProvider
 {
-    /// <summary>Returns direct ALSA hardware, OpenAL devices, and the system-default route.</summary>
-    /// <returns>Available Linux audio devices.</returns>
+    /// <summary>Returns OpenAL devices, the system-default route, and Linux direct ALSA hardware.</summary>
+    /// <returns>Available non-Windows audio devices.</returns>
     public static IReadOnlyList<WasapiDeviceInfo> GetRenderDevices()
     {
         var devices = new List<WasapiDeviceInfo>
         {
             new("default", LocalizationManager.Current.LinuxDefaultAudioDevice)
         };
-        devices.AddRange(GetDirectAlsaDevices());
+        if (OperatingSystem.IsLinux())
+            devices.AddRange(GetDirectAlsaDevices());
         devices.AddRange(
             OpenAlNative.GetOutputDeviceNames()
                 .Where(name => !string.IsNullOrWhiteSpace(name))
@@ -25,19 +26,16 @@ public static class WasapiDeviceProvider
     }
 
     /// <summary>Returns the system-default OpenAL output route.</summary>
-    /// <returns>The default Linux audio device.</returns>
+    /// <returns>The default non-Windows audio device.</returns>
     public static WasapiDeviceInfo? GetDefaultRenderDevice() =>
         new("default", LocalizationManager.Current.LinuxDefaultAudioDevice);
 
-    /// <summary>Returns the PCM formats supported by Orynivo's Linux output paths.</summary>
+    /// <summary>Returns the PCM formats supported by Orynivo's non-Windows output paths.</summary>
     /// <param name="id">Direct ALSA or OpenAL device identifier.</param>
-    /// <returns>Linux PCM output capabilities.</returns>
+    /// <returns>PCM output capabilities for the current platform.</returns>
     public static WasapiDeviceCapabilities GetCapabilities(string id)
     {
         var isAlsa = id.StartsWith("alsa:", StringComparison.Ordinal);
-        var dsdCapabilities = isAlsa
-            ? ProbeDsdCapabilities(id["alsa:".Length..])
-            : (Native: Array.Empty<int>(), Dop: Array.Empty<int>(), Conclusive: true);
         return new(
             ResolveDisplayName(id),
             id,
@@ -45,34 +43,7 @@ public static class WasapiDeviceProvider
             2,
             isAlsa ? 32 : 16,
             [44_100, 48_000, 88_200, 96_000, 176_400, 192_000],
-            [isAlsa ? "S32_LE · 2 ch" : "S16_LE · 2 ch"],
-            dsdCapabilities.Native,
-            dsdCapabilities.Dop,
-            dsdCapabilities.Conclusive);
-    }
-
-    private static (IReadOnlyList<int> Native, IReadOnlyList<int> Dop, bool Conclusive)
-        ProbeDsdCapabilities(string deviceName)
-    {
-        int[] levels = [64, 128, 256, 512, 1024];
-        var native = new List<int>();
-        var dop = new List<int>();
-        foreach (var level in levels)
-        {
-            var dsdRate = checked(level * 44_100);
-            var nativeResult = AlsaNative.ProbeExactFormat(deviceName, dsdRate / 32, nativeDsd: true);
-            if (nativeResult == AlsaNative.ExactFormatProbeResult.Inconclusive)
-                return (native, dop, false);
-            if (nativeResult == AlsaNative.ExactFormatProbeResult.Supported)
-                native.Add(level);
-
-            var dopResult = AlsaNative.ProbeExactFormat(deviceName, dsdRate / 16, nativeDsd: false);
-            if (dopResult == AlsaNative.ExactFormatProbeResult.Inconclusive)
-                return (native, dop, false);
-            if (dopResult == AlsaNative.ExactFormatProbeResult.Supported)
-                dop.Add(level);
-        }
-        return (native, dop, true);
+            [isAlsa ? "S32_LE · 2 ch" : "S16_LE · 2 ch"]);
     }
 
     private static string ResolveDisplayName(string id) =>

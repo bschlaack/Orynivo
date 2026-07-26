@@ -21,6 +21,7 @@
     <ApplicationIcon Condition="'$(OS)' == 'Windows_NT'">Assets\Orynivo.ico</ApplicationIcon>
     <UpdatePublicKeyBase64 Condition="'$(UpdatePublicKeyBase64)' == ''"></UpdatePublicKeyBase64>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <DefineConstants Condition="$([MSBuild]::IsOSPlatform('OSX'))">$(DefineConstants);ORYNIVO_MACOS</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
@@ -92,7 +93,7 @@
     <PackageReference Include="Avalonia.Controls.DataGrid" Version="11.2.0" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="11.2.0" />
     <PackageReference Include="Avalonia.Diagnostics" Version="11.2.0" Condition="'$(Configuration)' == 'Debug'" />
-    <PackageReference Include="Tmds.DBus.Protocol" Version="0.92.0" Condition="'$(OS)' != 'Windows_NT'" />
+    <PackageReference Include="Tmds.DBus.Protocol" Version="0.92.0" Condition="$([MSBuild]::IsOSPlatform('Linux'))" />
     <PackageReference Include="ModelContextProtocol" Version="1.4.0" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" Version="1.4.0" />
     <PackageReference Include="NAudio" Version="2.3.0" Condition="'$(OS)' == 'Windows_NT'" />
