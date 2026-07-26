@@ -4,6 +4,20 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+### Fixed
+
+- Settings now shows Steinberg ASIO and cwASIO availability only on Windows.
+  Linux direct-ALSA device information probes and reports native
+  `DSD_U32_BE` and DoP support for each DSD level, and explicitly reports when
+  the device is busy or its DSD capabilities cannot be queried. OpenAL profiles
+  are identified as PCM-only and point users to direct ALSA for DSD playback.
+  The enlarged capability window performs read-only ALSA hardware-parameter
+  checks, avoiding console errors for unsupported high sample rates.
+
 ## [0.28.1] - 2026-07-25
 
 ### Fixed

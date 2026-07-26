@@ -10,6 +10,9 @@ namespace Orynivo.Audio;
 /// <param name="MixFormatBitsPerSample">Bit depth of the shared mix format.</param>
 /// <param name="ExclusivePcmSampleRates">PCM sample rates supported in exclusive mode, sorted ascending in Hz.</param>
 /// <param name="ExclusivePcmFormats">PCM format labels supported in exclusive mode, sorted alphabetically.</param>
+/// <param name="NativeDsdRates">Native DSD rate multipliers reported for a direct ALSA device.</param>
+/// <param name="DopDsdRates">DSD rate multipliers supported through DoP on a direct ALSA device.</param>
+/// <param name="DsdProbeConclusive">Whether direct ALSA DSD capabilities could be queried conclusively.</param>
 public sealed record WasapiDeviceCapabilities(
     string Name,
     string Id,
@@ -17,4 +20,7 @@ public sealed record WasapiDeviceCapabilities(
     int MixFormatChannels,
     int MixFormatBitsPerSample,
     IReadOnlyList<int> ExclusivePcmSampleRates,
-    IReadOnlyList<string> ExclusivePcmFormats);
+    IReadOnlyList<string> ExclusivePcmFormats,
+    IReadOnlyList<int>? NativeDsdRates = null,
+    IReadOnlyList<int>? DopDsdRates = null,
+    bool DsdProbeConclusive = true);

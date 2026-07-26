@@ -35,6 +35,9 @@ public static class WasapiDeviceProvider
     public static WasapiDeviceCapabilities GetCapabilities(string id)
     {
         var isAlsa = id.StartsWith("alsa:", StringComparison.Ordinal);
+        var dsdCapabilities = isAlsa
+            ? ProbeDsdCapabilities(id["alsa:".Length..])
+            : (Native: Array.Empty<int>(), Dop: Array.Empty<int>(), Conclusive: true);
         return new(
             ResolveDisplayName(id),
             id,
@@ -42,7 +45,34 @@ public static class WasapiDeviceProvider
             2,
             isAlsa ? 32 : 16,
             [44_100, 48_000, 88_200, 96_000, 176_400, 192_000],
-            [isAlsa ? "S32_LE · 2 ch" : "S16_LE · 2 ch"]);
+            [isAlsa ? "S32_LE · 2 ch" : "S16_LE · 2 ch"],
+            dsdCapabilities.Native,
+            dsdCapabilities.Dop,
+            dsdCapabilities.Conclusive);
+    }
+
+    private static (IReadOnlyList<int> Native, IReadOnlyList<int> Dop, bool Conclusive)
+        ProbeDsdCapabilities(string deviceName)
+    {
+        int[] levels = [64, 128, 256, 512, 1024];
+        var native = new List<int>();
+        var dop = new List<int>();
+        foreach (var level in levels)
+        {
+            var dsdRate = checked(level * 44_100);
+            var nativeResult = AlsaNative.ProbeExactFormat(deviceName, dsdRate / 32, nativeDsd: true);
+            if (nativeResult == AlsaNative.ExactFormatProbeResult.Inconclusive)
+                return (native, dop, false);
+            if (nativeResult == AlsaNative.ExactFormatProbeResult.Supported)
+                native.Add(level);
+
+            var dopResult = AlsaNative.ProbeExactFormat(deviceName, dsdRate / 16, nativeDsd: false);
+            if (dopResult == AlsaNative.ExactFormatProbeResult.Inconclusive)
+                return (native, dop, false);
+            if (dopResult == AlsaNative.ExactFormatProbeResult.Supported)
+                dop.Add(level);
+        }
+        return (native, dop, true);
     }
 
     private static string ResolveDisplayName(string id) =>

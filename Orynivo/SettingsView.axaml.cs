@@ -183,7 +183,7 @@ internal partial class SettingsView : UserControl
         NavListBox.SelectedIndex = 1;
     }
 
-    /// <summary>Updates the FFmpeg, Steinberg ASIO, cwASIO, and MCP subsystem status badges.</summary>
+    /// <summary>Updates the cross-platform subsystem badges and Windows-only ASIO bridge badges.</summary>
     private void UpdateSubsystemStatusBadges()
     {
         var loc = LocalizationManager.Current;
@@ -192,13 +192,18 @@ internal partial class SettingsView : UserControl
         FfmpegStatusBadge.State = ffmpeg ? StatusBadgeState.Ok : StatusBadgeState.Warning;
         FfmpegStatusBadge.Text = ffmpeg ? loc.StatusReady : loc.StatusUnavailable;
 
-        bool asio = SteinbergAsioStream.IsAvailable;
-        AsioStatusBadge.State = asio ? StatusBadgeState.Ok : StatusBadgeState.Off;
-        AsioStatusBadge.Text = asio ? loc.StatusAvailable : loc.StatusUnavailable;
+        AsioStatusPanel.IsVisible = OperatingSystem.IsWindows();
+        CwAsioStatusPanel.IsVisible = OperatingSystem.IsWindows();
+        if (OperatingSystem.IsWindows())
+        {
+            bool asio = SteinbergAsioStream.IsAvailable;
+            AsioStatusBadge.State = asio ? StatusBadgeState.Ok : StatusBadgeState.Off;
+            AsioStatusBadge.Text = asio ? loc.StatusAvailable : loc.StatusUnavailable;
 
-        bool cwAsio = SteinbergAsioStream.IsCwAsioAvailable;
-        CwAsioStatusBadge.State = cwAsio ? StatusBadgeState.Ok : StatusBadgeState.Off;
-        CwAsioStatusBadge.Text = cwAsio ? loc.StatusAvailable : loc.StatusUnavailable;
+            bool cwAsio = SteinbergAsioStream.IsCwAsioAvailable;
+            CwAsioStatusBadge.State = cwAsio ? StatusBadgeState.Ok : StatusBadgeState.Off;
+            CwAsioStatusBadge.Text = cwAsio ? loc.StatusAvailable : loc.StatusUnavailable;
+        }
 
         UpdateMcpStatusBadge();
     }
