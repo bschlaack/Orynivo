@@ -1,0 +1,131 @@
+name: macOS Player Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number without v prefix (e.g. 0.29.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build macOS player ${{ matrix.rid }}
+    runs-on: macos-14
+
+    strategy:
+      fail-fast: false
+      matrix:
+        rid:
+          - osx-x64
+          - osx-arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            TAG="v${VERSION}"
+          else
+            TAG="${{ github.ref_name }}"
+            VERSION="${TAG#v}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate release tag on main
+        run: |
+          TAG="${{ steps.ver.outputs.tag }}"
+          printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || exit 1
+          git fetch origin main --tags --force
+          git rev-parse --verify "refs/tags/${TAG}^{commit}"
+          TAG_COMMIT="$(git rev-list -n 1 "$TAG")"
+          git merge-base --is-ancestor "$TAG_COMMIT" origin/main || {
+            echo "Tag '$TAG' is not contained in origin/main." >&2
+            exit 1
+          }
+          git checkout --detach "$TAG"
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore macOS player
+        run: dotnet restore Orynivo/Orynivo.csproj --runtime ${{ matrix.rid }}
+
+      - name: Publish macOS player
+        run: >
+          dotnet publish Orynivo/Orynivo.csproj
+          --configuration Release
+          --runtime ${{ matrix.rid }}
+          --self-contained true
+          --no-restore
+          --output publish/${{ matrix.rid }}
+          /p:AssemblyVersion=${{ steps.ver.outputs.version }}.0
+          /p:FileVersion=${{ steps.ver.outputs.version }}.0
+          /p:InformationalVersion=${{ steps.ver.outputs.version }}
+          /p:UpdatePublicKeyBase64=${{ vars.UPDATE_SIGNING_PUBLIC_KEY_BASE64 }}
+          /p:ReleaseVersionFromTag=true
+          /p:IncludeSourceRevisionInInformationalVersion=false
+
+      - name: Create application bundle and portable packages
+        run: |
+          VERSION="${{ steps.ver.outputs.version }}"
+          RID="${{ matrix.rid }}"
+          APP="bundle/${RID}/Orynivo.app"
+          mkdir -p "${APP}/Contents/MacOS"
+          cp -a "publish/${RID}/." "${APP}/Contents/MacOS/"
+          cp .github/player-macos/Info.plist "${APP}/Contents/Info.plist"
+          chmod 755 "${APP}/Contents/MacOS/Orynivo"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" "${APP}/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${VERSION}" "${APP}/Contents/Info.plist"
+          mkdir -p packages
+          ditto -c -k --sequesterRsrc --keepParent \
+            "${APP}" "packages/Orynivo-${VERSION}-${RID}-Portable.zip"
+          tar -czf "packages/Orynivo-${VERSION}-${RID}.tar.gz" -C "bundle/${RID}" Orynivo.app
+
+      - name: Create macOS installer package
+        run: |
+          VERSION="${{ steps.ver.outputs.version }}"
+          RID="${{ matrix.rid }}"
+          PACKAGE_ROOT="installer-root/${RID}"
+          mkdir -p "${PACKAGE_ROOT}/Applications"
+          ditto "bundle/${RID}/Orynivo.app" "${PACKAGE_ROOT}/Applications/Orynivo.app"
+          pkgbuild \
+            --root "${PACKAGE_ROOT}" \
+            --identifier com.bschlaack.orynivo \
+            --version "${VERSION}" \
+            --install-location / \
+            "packages/Orynivo-${VERSION}-${RID}.pkg"
+
+      - name: Validate application bundle
+        run: |
+          VERSION="${{ steps.ver.outputs.version }}"
+          RID="${{ matrix.rid }}"
+          plutil -lint "bundle/${{ matrix.rid }}/Orynivo.app/Contents/Info.plist"
+          test -x "bundle/${{ matrix.rid }}/Orynivo.app/Contents/MacOS/Orynivo"
+          file "bundle/${{ matrix.rid }}/Orynivo.app/Contents/MacOS/Orynivo"
+          unzip -t "packages/Orynivo-${VERSION}-${RID}-Portable.zip"
+          tar -tzf "packages/Orynivo-${VERSION}-${RID}.tar.gz" \
+            | grep -Fxq 'Orynivo.app/Contents/Info.plist'
+          pkgutil --payload-files "packages/Orynivo-${VERSION}-${RID}.pkg" \
+            | grep -Fxq './Applications/Orynivo.app/Contents/Info.plist'
+
+      - name: Upload package to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          draft: true
+          files: packages/*

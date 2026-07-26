@@ -111,3 +111,50 @@ jobs:
           name: Orynivo-linux-x64
           path: artifacts/Orynivo-linux-x64
           if-no-files-found: error
+
+  macos:
+    name: Build macOS desktop ${{ matrix.rid }}
+    runs-on: macos-14
+
+    strategy:
+      fail-fast: false
+      matrix:
+        rid:
+          - osx-x64
+          - osx-arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore macOS desktop
+        run: dotnet restore Orynivo/Orynivo.csproj --runtime ${{ matrix.rid }}
+
+      - name: Build macOS desktop
+        run: >
+          dotnet build Orynivo/Orynivo.csproj
+          --configuration Release
+          --runtime ${{ matrix.rid }}
+          --no-restore
+          --warnaserror
+
+      - name: Publish macOS desktop
+        run: >
+          dotnet publish Orynivo/Orynivo.csproj
+          --configuration Release
+          --runtime ${{ matrix.rid }}
+          --self-contained true
+          --no-restore
+          --output artifacts/Orynivo-${{ matrix.rid }}
+
+      - name: Upload macOS desktop
+        uses: actions/upload-artifact@v6
+        with:
+          name: Orynivo-${{ matrix.rid }}
+          path: artifacts/Orynivo-${{ matrix.rid }}
+          if-no-files-found: error
