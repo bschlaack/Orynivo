@@ -529,8 +529,14 @@ public sealed record LocalizedStrings(
     public string LinuxAlsaEndpointSummary { get; init; } = "";
     /// <summary>Gets the formatted summary for an OpenAL output device.</summary>
     public string LinuxOpenAlEndpointSummary { get; init; } = "";
-    /// <summary>Gets the Linux PCM-path native DSD availability message.</summary>
-    public string LinuxDsdOutputUnavailable { get; init; } = "";
+    /// <summary>Gets the message explaining that OpenAL is PCM-only and direct ALSA is required for DSD.</summary>
+    public string LinuxOpenAlDsdRequiresAlsa { get; init; } = "";
+    /// <summary>Gets the message shown when direct ALSA DSD capabilities could not be queried.</summary>
+    public string LinuxDsdProbeInconclusive { get; init; } = "";
+    /// <summary>Gets the native ALSA DSD format summary.</summary>
+    public string LinuxNativeDsdFormat { get; init; } = "";
+    /// <summary>Gets the ALSA DoP format summary.</summary>
+    public string LinuxDopDsdFormat { get; init; } = "";
     public string NativeDsdUsesAsio { get; init; } = "";
     public string Dashboard { get; init; } = "";
     public string DashboardIntroTitle { get; init; } = "";

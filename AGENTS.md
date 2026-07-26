@@ -195,6 +195,9 @@ runtime dependency.
 - `CalculateMissingReplayGainDuringScan` — optionally run expensive FFmpeg
   analysis for missing ReplayGain values during normal server scans (default
   `false`; embedded values are always imported)
+- `CalculateMissingReplayGainDuringScan` — optionally run expensive FFmpeg
+  analysis for missing ReplayGain values during normal server scans (default
+  `false`; embedded values are always imported)
 - `ServerName` — display name returned by `/api/info`
 - Default bind: `http://0.0.0.0:5280`
 

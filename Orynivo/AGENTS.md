@@ -131,6 +131,14 @@ This file applies to the Windows and Linux Avalonia desktop client under
   `libopenal.so.1`. The output-profile dialog presents these as separate output
   types and classifies persisted profiles by their device ID (`alsa:` means
   direct ALSA); never mix direct ALSA hardware into the OpenAL device list.
+  Settings shows the Steinberg ASIO and cwASIO subsystem badges only on Windows.
+  Linux direct-ALSA device information probes native `DSD_U32_BE` and DoP
+  support at each displayed DSD level through read-only ALSA hardware-parameter
+  constraints; do not configure the stream with `snd_pcm_set_params` during a
+  capability probe because rejected high rates are logged to stderr. A busy or
+  otherwise unqueryable device must be reported as inconclusive rather than unsupported. OpenAL device
+  information must identify it as a PCM path and direct users to a direct ALSA
+  profile for DSD.
   Direct ALSA uses stereo signed 32-bit PCM, the source rate,
   and `soft_resample=0`; failure to open that exact format/rate must be reported
   rather than silently falling back to resampling. An `EBUSY` open failure must

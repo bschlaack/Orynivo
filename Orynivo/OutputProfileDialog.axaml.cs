@@ -158,7 +158,7 @@ internal partial class OutputProfileDialog : Window
             }
             else if (DeviceComboBox.SelectedItem is WasapiDeviceInfo wasapiDevice)
             {
-                var info = WasapiDeviceProvider.GetCapabilities(wasapiDevice.Id);
+                var info = await Task.Run(() => WasapiDeviceProvider.GetCapabilities(wasapiDevice.Id));
                 await new DeviceInfoWindow(info).ShowDialog(this);
             }
         }

@@ -52,7 +52,11 @@ uncompressed stereo DFF/DSDIFF through direct ALSA. When ALSA exposes the
 native `DSD_U32_BE` hardware format, Orynivo sends bit-perfect DSD directly to
 the DAC; otherwise it uses DoP as a fallback (for example a 176.4-kHz carrier
 for DSD64). Neither Linux DSD path requires cwASIO, the Steinberg SDK, or an
-Orynivo native bridge.
+Orynivo native bridge. The direct-ALSA device-information view uses read-only
+ALSA hardware-parameter checks to probe native
+`DSD_U32_BE` and DoP support per DSD level; if ALSA cannot be opened for the
+probe, it reports the capabilities as not queryable instead of unsupported.
+OpenAL profiles remain PCM-only and refer DSD playback to direct ALSA.
 
 On Linux, Plex and generic streaming credentials are retained only for the
 current process and are not persisted because the existing encrypted credential

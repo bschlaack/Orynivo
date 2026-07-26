@@ -4,6 +4,44 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.29.0] - 2026-07-26
+
+### Added
+
+- Added macOS desktop support for Intel (`osx-x64`) and Apple Silicon
+  (`osx-arm64`). The Avalonia player now uses the macOS system OpenAL framework
+  for PCM playback and publishes self-contained `Orynivo.app` bundles as
+  installable PKG packages, portable ZIPs, and tar archives. Every
+  architecture-specific package is included in the signed release manifest.
+- Added signed automatic desktop updates on macOS. Startup and About-window
+  checks now select the architecture-matching `osx-arm64` or `osx-x64` PKG,
+  verify the manifest signature and package SHA-256 digest, and open the
+  verified package in the macOS Installer.
+
+### Fixed
+
+- Hidden the Steinberg ASIO and cwASIO subsystem badges on macOS and Linux,
+  where those Windows-only bridges cannot be used.
+- Added the missing Appearance setting for hiding or showing the AI Chat
+  sidebar item. The choice is persisted and applied immediately with the other
+  sidebar visibility options.
+- Avoided repeated macOS Skia/Metal shader-compilation timeouts on gradients
+  and rounded surfaces by selecting Avalonia's OpenGL renderer with a software
+  fallback on macOS. Windows and Linux renderer selection is unchanged.
+- Settings now shows Steinberg ASIO and cwASIO availability only on Windows.
+  Linux direct-ALSA device information probes and reports native
+  `DSD_U32_BE` and DoP support for each DSD level, and explicitly reports when
+  the device is busy or its DSD capabilities cannot be queried. OpenAL profiles
+  are identified as PCM-only and point users to direct ALSA for DSD playback.
+  The enlarged capability window performs read-only ALSA hardware-parameter
+  checks, avoiding console errors for unsupported high sample rates.
+- Prevented Orynivo Server library scans from appearing stuck on large or
+  chaptered media by disabling missing-ReplayGain FFmpeg analysis by default;
+  deployments can opt back in through configuration.
+- Bounded Matroska chapter probing to 30 seconds per file and limited FFprobe's
+  analysis window so a malformed or slow network-hosted MKA cannot stall the
+  complete server scan indefinitely.
+
 ## [0.28.1] - 2026-07-25
 
 ### Fixed
