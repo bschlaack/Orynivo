@@ -185,7 +185,7 @@ public sealed record LocalizedStrings(
     public string ServerUpdateRejected { get; init; } = "";
     /// <summary>Gets the progress text used while updating a named Orynivo Server.</summary>
     public string UpdatingNamedServer { get; init; } = "";
-    /// <summary>Gets the confirmation shown when server updates fail before a desktop update.</summary>
+    /// <summary>Gets the platform-neutral confirmation shown when server updates fail before a desktop update.</summary>
     public string ServerUpdatesFailedContinue { get; init; } = "";
     public string OutputType { get; init; } = "";
     /// <summary>Gets the label for the local media node inside the library sidebar section.</summary>
@@ -205,7 +205,7 @@ public sealed record LocalizedStrings(
     public string AlsaOutputDevice { get; init; } = "";
     /// <summary>Gets the display name of the system-default Linux audio device.</summary>
     public string LinuxDefaultAudioDevice { get; init; } = "";
-    /// <summary>Gets the message shown when Linux OpenAL initialization fails.</summary>
+    /// <summary>Gets the message shown when OpenAL initialization fails.</summary>
     public string OpenAlInitializationFailed { get; init; } = "";
     /// <summary>Gets the formatted message shown when exact-rate ALSA output cannot be opened.</summary>
     public string AlsaExactOpenFailed { get; init; } = "";
@@ -529,14 +529,8 @@ public sealed record LocalizedStrings(
     public string LinuxAlsaEndpointSummary { get; init; } = "";
     /// <summary>Gets the formatted summary for an OpenAL output device.</summary>
     public string LinuxOpenAlEndpointSummary { get; init; } = "";
-    /// <summary>Gets the message explaining that OpenAL is PCM-only and direct ALSA is required for DSD.</summary>
-    public string LinuxOpenAlDsdRequiresAlsa { get; init; } = "";
-    /// <summary>Gets the message shown when direct ALSA DSD capabilities could not be queried.</summary>
-    public string LinuxDsdProbeInconclusive { get; init; } = "";
-    /// <summary>Gets the native ALSA DSD format summary.</summary>
-    public string LinuxNativeDsdFormat { get; init; } = "";
-    /// <summary>Gets the ALSA DoP format summary.</summary>
-    public string LinuxDopDsdFormat { get; init; } = "";
+    /// <summary>Gets the non-Windows PCM-path native DSD availability message.</summary>
+    public string LinuxDsdOutputUnavailable { get; init; } = "";
     public string NativeDsdUsesAsio { get; init; } = "";
     public string Dashboard { get; init; } = "";
     public string DashboardIntroTitle { get; init; } = "";

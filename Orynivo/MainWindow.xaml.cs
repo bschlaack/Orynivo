@@ -1290,7 +1290,7 @@ public partial class MainWindow : Window
             OutputBackend.CwAsio when !string.IsNullOrWhiteSpace(_settings.SelectedDriverName) =>
                 $"{_settings.SelectedDriverName}  ·  cwASIO",
             OutputBackend.Wasapi when !string.IsNullOrWhiteSpace(_settings.SelectedWasapiDeviceName) =>
-                $"{_settings.SelectedWasapiDeviceName}  ·  {(OperatingSystem.IsLinux()
+                $"{_settings.SelectedWasapiDeviceName}  ·  {(!OperatingSystem.IsWindows()
                     ? _settings.SelectedWasapiDeviceId?.StartsWith("alsa:", StringComparison.Ordinal) == true
                         ? LocalizationManager.Current.DirectAlsa
                         : LocalizationManager.Current.OpenAl
@@ -1816,6 +1816,7 @@ public partial class MainWindow : Window
         SetSidebarItemVisibility(InternetRadioNavItem, _settings.ShowInternetRadioItem);
         SetSidebarItemVisibility(PodcastsNavItem, _settings.ShowPodcastsItem);
         SetSidebarItemVisibility(QueueNavItem, _settings.ShowQueueItem);
+        SetSidebarItemVisibility(AiChatNavItem, _settings.ShowAiChatItem);
         ApplyLibrarySectionVisibility();
         SetSidebarSectionVisibility(
             OwnRadiosHeaderItem,
@@ -10799,7 +10800,8 @@ public partial class MainWindow : Window
                 return;
             }
 #if !WINDOWS
-            if (_settings.DsdOverPcmEnabled &&
+            if (OperatingSystem.IsLinux() &&
+                _settings.DsdOverPcmEnabled &&
                 (ext.Equals(".dsf", StringComparison.OrdinalIgnoreCase) ||
                  ext.Equals(".dff", StringComparison.OrdinalIgnoreCase) ||
                  IsRemoteOrynivoDsdCandidate(filePath)))
@@ -14746,6 +14748,7 @@ public partial class MainWindow : Window
                 _settings.ShowInternetRadioItem != window.ShowInternetRadioItem ||
                 _settings.ShowPodcastsItem != window.ShowPodcastsItem ||
                 _settings.ShowQueueItem != window.ShowQueueItem ||
+                _settings.ShowAiChatItem != window.ShowAiChatItem ||
                 _settings.ShowLocalLibrarySection != window.ShowLocalLibrarySection ||
                 _settings.ShowOwnRadiosSection != window.ShowOwnRadiosSection ||
                 _settings.ShowMyPodcastsSection != window.ShowMyPodcastsSection ||
@@ -14830,6 +14833,7 @@ public partial class MainWindow : Window
             _settings.ShowInternetRadioItem   = window.ShowInternetRadioItem;
             _settings.ShowPodcastsItem        = window.ShowPodcastsItem;
             _settings.ShowQueueItem           = window.ShowQueueItem;
+            _settings.ShowAiChatItem          = window.ShowAiChatItem;
             _settings.CheckForUpdatesOnStartup = window.CheckForUpdatesOnStartup;
             _settings.StartMaximized           = window.StartMaximized;
             _settings.ShowLocalLibrarySection = window.ShowLocalLibrarySection;

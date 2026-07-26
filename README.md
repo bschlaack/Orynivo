@@ -4,17 +4,17 @@
 
 # Orynivo
 
-An Avalonia desktop music library for Windows and Linux, plus a cross-platform
-music server for local Hi-Fi libraries.
+An Avalonia desktop music library for Windows, Linux, and macOS, plus a
+cross-platform music server for local Hi-Fi libraries.
 
 cwASIO/Steinberg ASIO/WASAPI · DSD/DSF/DFF · Gapless Playback · ReplayGain · Parametric EQ
 Plex · Radio · Podcasts · AI Chat · MCP Server · Network Streaming
 
 ## Why Orynivo?
 
-Orynivo is for people who still own and manage a local music library
-and want a modern Windows or Linux player with serious audio output support —
-and the ability to reach that library from any device on the local network.
+Orynivo is for people who still own and manage a local music library and want a
+modern Windows, Linux, or macOS player with serious audio output support — and
+the ability to reach that library from any device on the local network.
 
 - Bit-perfect/native DSD playback through direct ALSA on Linux without a native
   bridge, or through cwASIO/the optional Steinberg ASIO bridge on Windows
@@ -40,8 +40,12 @@ Linux desktop is a separately packaged player with direct ALSA hardware profiles
 for exact-rate PCM and native DSD output without resampling, alongside an OpenAL
 system route through PipeWire, PulseAudio, or ALSA. It supports FFmpeg-decoded
 local files, remote streams, CUE/MKA segments, gapless queues, seeking,
-ReplayGain, PCM boost, and the parametric equalizer. Only Windows System Media
-Transport Controls remain Windows-specific.
+ReplayGain, PCM boost, and the parametric equalizer. The macOS desktop provides
+the same library, streaming, playlist, radio, podcast, AI Chat, MCP, and PCM
+processing features through the system OpenAL output path on Intel and Apple
+Silicon. Native DSD output remains available only through Windows ASIO/cwASIO
+or Linux direct ALSA, and Windows System Media Transport Controls remain
+Windows-specific.
 
 Settings > Playback offers mutually exclusive DSD routing preferences for
 lossy DSD-to-PCM conversion and bit-perfect DSD over PCM (DoP). DoP requires a
@@ -52,11 +56,7 @@ uncompressed stereo DFF/DSDIFF through direct ALSA. When ALSA exposes the
 native `DSD_U32_BE` hardware format, Orynivo sends bit-perfect DSD directly to
 the DAC; otherwise it uses DoP as a fallback (for example a 176.4-kHz carrier
 for DSD64). Neither Linux DSD path requires cwASIO, the Steinberg SDK, or an
-Orynivo native bridge. The direct-ALSA device-information view uses read-only
-ALSA hardware-parameter checks to probe native
-`DSD_U32_BE` and DoP support per DSD level; if ALSA cannot be opened for the
-probe, it reports the capabilities as not queryable instead of unsupported.
-OpenAL profiles remain PCM-only and refer DSD playback to direct ALSA.
+Orynivo native bridge.
 
 On Linux, Plex and generic streaming credentials are retained only for the
 current process and are not persisted because the existing encrypted credential
@@ -79,6 +79,10 @@ The desktop project selects its target from the build host:
   OpenAL, while
   Windows endpoint-volume and system-media integrations are replaced by
   compatibility services.
+- macOS builds target `net8.0`; PCM audio is rendered through Apple's system
+  OpenAL framework. Windows audio, endpoint-volume, and SMTC integrations are
+  replaced by compatibility services, and native DSD output is not currently
+  available.
 - Linux output profiles expose OpenAL and direct exclusive ALSA as separate
   output types. OpenAL lists only PipeWire/system-routed devices; direct ALSA
   lists only `hw:` endpoints that require exclusive access. Selecting another
@@ -111,6 +115,20 @@ and an RPM package; Arch Linux additionally receives an
 `/usr/lib/orynivo`, add the `orynivo` command, and register a desktop launcher.
 All Linux player artifacts are covered by the signed release manifest.
 
+Build and publish the macOS desktop for either supported architecture:
+
+```bash
+dotnet restore Orynivo/Orynivo.csproj --runtime osx-arm64
+dotnet publish Orynivo/Orynivo.csproj --configuration Release \
+  --runtime osx-arm64 --self-contained true --no-restore \
+  --output artifacts/Orynivo-osx-arm64
+```
+
+Use `osx-x64` instead on an Intel Mac. Tagged releases package both runtime
+identifiers as self-contained installable PKGs, portable `Orynivo.app` ZIPs,
+and tar archives. FFmpeg and FFprobe must be installed separately and available
+on `PATH`; OpenAL is provided by macOS.
+
 An X11 or Wayland desktop session is required to run the Avalonia UI. FFmpeg
 and FFprobe must be installed and available on `PATH` for playback, media
 probing, waveforms, ReplayGain analysis, and other FFmpeg-backed library
@@ -139,6 +157,9 @@ the results, and start playback, all in one turn.
 Configure the endpoint URL, optional API key, model name, and max-token limit
 under **Settings → Integration → KI-Chat/AI Chat**. LM Studio and Ollama work
 without an API key.
+The sidebar entry can be shown or hidden independently under
+**Settings → Appearance**, without disabling or deleting the saved AI Chat
+configuration.
 
 **Available tools:**
 
@@ -625,6 +646,20 @@ The Linux player does not build or load `AsioBridge.dll` or `CwAsioBridge.dll`.
 Native DSF and uncompressed DFF output is sent directly through ALSA, so neither
 the Steinberg ASIO SDK nor a platform-specific Orynivo bridge is required.
 
+### macOS player
+
+- macOS 10.15 or newer on Apple Silicon (`arm64`) or Intel (`x64`)
+- FFmpeg and FFprobe installed separately and available on `PATH`
+- The system OpenAL framework used for PCM output
+- Avalonia OpenGL rendering with a software fallback for Macs whose Metal
+  shader compiler exceeds Skia's compilation timeout
+- No ASIO, cwASIO, ALSA, or native DSD support
+
+Tagged releases provide self-contained PKG installers and portable app bundles,
+so the .NET runtime is not required. Development builds require the .NET 8 SDK.
+The signed update mechanism selects and verifies the PKG matching the running
+architecture before opening the normal macOS Installer.
+
 ### Orynivo Server
 
 - Linux, macOS, or Windows; x64 or ARM64
@@ -663,6 +698,30 @@ The Linux packages are self-contained with respect to .NET. FFmpeg, ALSA, and
 OpenAL remain system runtime dependencies as described above.
 Tagged release builds validate that the Arch archive contains its required
 root-level `.PKGINFO` metadata before publishing it.
+
+### macOS player
+
+| Package | Description |
+| --- | --- |
+| `Orynivo-{version}-osx-arm64.pkg` | Installer for Apple Silicon Macs |
+| `Orynivo-{version}-osx-x64.pkg` | Installer for Intel Macs |
+| `Orynivo-{version}-osx-arm64-Portable.zip` | Portable app for Apple Silicon Macs |
+| `Orynivo-{version}-osx-x64-Portable.zip` | Portable app for Intel Macs |
+| `Orynivo-{version}-osx-arm64.tar.gz` | Alternative app archive for Apple Silicon |
+| `Orynivo-{version}-osx-x64.tar.gz` | Alternative app archive for Intel |
+
+The PKG installs `Orynivo.app` under `/Applications`. For portable use, extract
+the ZIP and open `Orynivo.app` from any writable directory. The builds are
+self-contained with respect to .NET; FFmpeg and FFprobe must be installed and
+available on `PATH`. The current packages are not code-signed or notarized, so
+macOS Gatekeeper may require explicitly opening the app or installer from
+Finder's context menu.
+
+Orynivo's startup and About-window update checks support both Mac
+architectures. They select the matching PKG from the signed release manifest,
+verify its SHA-256 digest, and open it in the macOS Installer. Installation
+still requires the normal explicit macOS confirmation; Orynivo never invokes a
+privileged installation command itself.
 
 ### Linux server
 
@@ -744,27 +803,29 @@ git push origin v0.14.0
 | Workflow | Runner | Output |
 | --- | --- | --- |
 | `release.yml` | Windows | `Orynivo-{v}-win-x64-Setup.exe`, `Orynivo-{v}-win-x64-Portable.zip` |
+| `player-macos-release.yml` | macOS | Intel/Apple-Silicon PKGs, portable ZIPs, and tar archives |
 | `server-release.yml` | Ubuntu | `amd64`/`arm64` `.deb` and `x86_64`/`aarch64` `.rpm` packages |
 
-Both workflows upload to the same draft GitHub Release. Release workflows accept
+All release workflows upload to the same draft GitHub Release. Release workflows accept
 only semantic `vMAJOR.MINOR.PATCH` tags whose commit is contained in `main`; the
 tag version is embedded into desktop and server assemblies at build time. To
 trigger a release
 by pushing the tag. **Workflow dispatch** may only rebuild an already existing
 tag that passes the same `main` containment check.
 
-After the draft is published, `update-manifest.yml` hashes the supported Windows
-installer and Linux server packages, creates `update-manifest.json`, signs it
-with the `UPDATE_SIGNING_PRIVATE_KEY_PEM` Actions secret, and attaches the
-manifest/signature to the release. Release builds receive the matching ECDSA
-P-256 public key through the `UPDATE_SIGNING_PUBLIC_KEY_BASE64` repository
+After the draft is published, `update-manifest.yml` hashes the supported
+Windows, Linux, macOS, and server packages, creates `update-manifest.json`,
+signs it with the `UPDATE_SIGNING_PRIVATE_KEY_PEM` Actions secret, and attaches
+the manifest/signature to the release. Release builds receive the matching
+ECDSA P-256 public key through the `UPDATE_SIGNING_PUBLIC_KEY_BASE64` repository
 variable. Update functionality remains unavailable rather than accepting an
 unsigned release when those values are not configured.
 
-The manifest workflow waits for the Windows installer and all four supported
-DEB/RPM packages and fails instead of signing a partial asset list. To repair an
-already published release, run **Publish signed update manifest** manually and
-enter its existing tag.
+The manifest workflow waits for the Windows installer, every Linux and macOS
+desktop artifact, and all four supported server DEB/RPM packages. It fails
+instead of signing a partial asset list. To repair an already published
+release, run **Publish signed update manifest** manually and enter its existing
+tag.
 
 Configure signing once from a trusted administrator machine (never commit the
 private PEM):
@@ -797,16 +858,17 @@ release because already-installed builds trust the public key embedded at their
 own build time.
 
 The About window displays the embedded version and can download, verify, and
-launch a newer Windows installer. Settings > Orynivo Server offers the same
-signed update for supported DEB/RPM servers and relays the package from the
-desktop when the server itself cannot reach GitHub. Connected server rows show
-the version returned by their authenticated info endpoint, and the complete
-remote-cache action uses the standard Settings button treatment.
+launch a newer Windows installer or the architecture-matching macOS PKG.
+Settings > Orynivo Server offers the same signed update for supported DEB/RPM
+servers and relays the package from the desktop when the server itself cannot
+reach GitHub. Connected server rows show the version returned by their
+authenticated info endpoint, and the complete remote-cache action uses the
+standard Settings button treatment.
 Settings > Appearance > Updates controls whether the client checks the signed
-manifest in the background at startup and reports a newer Windows version. The
-notification offers a localized **Download and install** action that starts the
-same verified update flow as the About window; no download begins without that
-explicit choice.
+manifest in the background at startup and reports a newer matching desktop
+version. The notification offers a localized **Download and install** action
+that starts the same verified update flow as the About window; no download
+begins without that explicit choice.
 Settings > Appearance also controls whether the main window starts maximized.
 When maximized startup is disabled, Orynivo remembers the last normal window
 size and position and restores it only when that placement still intersects an
@@ -819,7 +881,7 @@ effective despite the configuration file being layered after builder creation.
 When a desktop update is explicitly installed from About, Orynivo first relays
 the same signed release to every reachable update-enabled configured server. If
 a server update fails, its name is shown before the user chooses whether the
-Windows installer should continue.
+platform installer should continue.
 
 Local development builds derive their base version from the newest semantic
 `v*` tag contained in `origin/main` and append `-dev+<commit>`; tags reachable

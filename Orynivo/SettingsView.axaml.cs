@@ -155,6 +155,7 @@ internal partial class SettingsView : UserControl
         ShowInternetRadioItemCheckBox.IsChecked = settings.ShowInternetRadioItem;
         ShowPodcastsItemCheckBox.IsChecked      = settings.ShowPodcastsItem;
         ShowQueueItemCheckBox.IsChecked         = settings.ShowQueueItem;
+        ShowAiChatItemCheckBox.IsChecked        = settings.ShowAiChatItem;
         CheckForUpdatesOnStartupCheckBox.IsChecked = settings.CheckForUpdatesOnStartup;
         StartMaximizedCheckBox.IsChecked             = settings.StartMaximized;
         ShowLocalLibrarySectionCheckBox.IsChecked = settings.ShowLocalLibrarySection;
@@ -183,7 +184,7 @@ internal partial class SettingsView : UserControl
         NavListBox.SelectedIndex = 1;
     }
 
-    /// <summary>Updates the cross-platform subsystem badges and Windows-only ASIO bridge badges.</summary>
+    /// <summary>Updates the platform-appropriate audio and MCP subsystem status badges.</summary>
     private void UpdateSubsystemStatusBadges()
     {
         var loc = LocalizationManager.Current;
@@ -192,18 +193,22 @@ internal partial class SettingsView : UserControl
         FfmpegStatusBadge.State = ffmpeg ? StatusBadgeState.Ok : StatusBadgeState.Warning;
         FfmpegStatusBadge.Text = ffmpeg ? loc.StatusReady : loc.StatusUnavailable;
 
-        AsioStatusPanel.IsVisible = OperatingSystem.IsWindows();
-        CwAsioStatusPanel.IsVisible = OperatingSystem.IsWindows();
-        if (OperatingSystem.IsWindows())
+        var showAsio = OperatingSystem.IsWindows();
+        AsioStatusPanel.IsVisible = showAsio;
+        CwAsioStatusPanel.IsVisible = showAsio;
+        if (!showAsio)
         {
-            bool asio = SteinbergAsioStream.IsAvailable;
-            AsioStatusBadge.State = asio ? StatusBadgeState.Ok : StatusBadgeState.Off;
-            AsioStatusBadge.Text = asio ? loc.StatusAvailable : loc.StatusUnavailable;
-
-            bool cwAsio = SteinbergAsioStream.IsCwAsioAvailable;
-            CwAsioStatusBadge.State = cwAsio ? StatusBadgeState.Ok : StatusBadgeState.Off;
-            CwAsioStatusBadge.Text = cwAsio ? loc.StatusAvailable : loc.StatusUnavailable;
+            UpdateMcpStatusBadge();
+            return;
         }
+
+        bool asio = SteinbergAsioStream.IsAvailable;
+        AsioStatusBadge.State = asio ? StatusBadgeState.Ok : StatusBadgeState.Off;
+        AsioStatusBadge.Text = asio ? loc.StatusAvailable : loc.StatusUnavailable;
+
+        bool cwAsio = SteinbergAsioStream.IsCwAsioAvailable;
+        CwAsioStatusBadge.State = cwAsio ? StatusBadgeState.Ok : StatusBadgeState.Off;
+        CwAsioStatusBadge.Text = cwAsio ? loc.StatusAvailable : loc.StatusUnavailable;
 
         UpdateMcpStatusBadge();
     }
@@ -326,6 +331,8 @@ internal partial class SettingsView : UserControl
     public bool ShowPodcastsItem => ShowPodcastsItemCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether the Up Next sidebar item should be visible.</summary>
     public bool ShowQueueItem => ShowQueueItemCheckBox.IsChecked == true;
+    /// <summary>Gets a value indicating whether the AI Chat sidebar item should be visible.</summary>
+    public bool ShowAiChatItem => ShowAiChatItemCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether signed updates should be checked at application startup.</summary>
     public bool CheckForUpdatesOnStartup => CheckForUpdatesOnStartupCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether the main window should start maximized.</summary>
@@ -996,7 +1003,7 @@ internal partial class SettingsView : UserControl
         {
             OutputBackend.Asio   => LocalizationManager.Current.SteinbergAsio,
             OutputBackend.CwAsio => LocalizationManager.Current.CwAsio,
-            _                    => OperatingSystem.IsLinux()
+            _                    => !OperatingSystem.IsWindows()
                 ? profile.SelectedWasapiDeviceId?.StartsWith("alsa:", StringComparison.Ordinal) == true
                     ? LocalizationManager.Current.DirectAlsa
                     : LocalizationManager.Current.OpenAl

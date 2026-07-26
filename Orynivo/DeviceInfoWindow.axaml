@@ -3,10 +3,10 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="{DynamicResource L_DeviceInfo}"
         Icon="avares://Orynivo/Assets/Orynivo.ico"
-        Height="600"
-        Width="720"
-        MinHeight="480"
-        MinWidth="600"
+        Height="420"
+        Width="560"
+        MinHeight="360"
+        MinWidth="480"
         Background="{DynamicResource AppContentBrush}"
         Foreground="{DynamicResource AppPrimaryTextBrush}">
     <ScrollViewer Padding="20">

@@ -57,12 +57,15 @@ internal partial class OutputProfileDialog : Window
             new(OutputBackend.Asio, LocalizationManager.Current.SteinbergAsio),
             new(OutputBackend.CwAsio, LocalizationManager.Current.CwAsio)
         };
-        if (OperatingSystem.IsLinux())
+        if (!OperatingSystem.IsWindows())
         {
             availableBackends.Add(
                 new(OutputBackend.Wasapi, LocalizationManager.Current.OpenAl, LinuxDeviceKind.OpenAl));
-            availableBackends.Add(
-                new(OutputBackend.Wasapi, LocalizationManager.Current.DirectAlsa, LinuxDeviceKind.DirectAlsa));
+            if (OperatingSystem.IsLinux())
+            {
+                availableBackends.Add(
+                    new(OutputBackend.Wasapi, LocalizationManager.Current.DirectAlsa, LinuxDeviceKind.DirectAlsa));
+            }
         }
         else
         {
@@ -80,7 +83,7 @@ internal partial class OutputProfileDialog : Window
             BackendComboBox.SelectedItem =
                 filteredBackends.FirstOrDefault(c =>
                     c.Value == profile.Backend &&
-                    (!OperatingSystem.IsLinux() ||
+                    (OperatingSystem.IsWindows() ||
                      profile.Backend != OutputBackend.Wasapi ||
                      c.LinuxDeviceKind == ResolveLinuxDeviceKind(profile.SelectedWasapiDeviceId)))
                 ?? filteredBackends.FirstOrDefault(c => c.Value == OutputBackend.Wasapi)
@@ -158,7 +161,7 @@ internal partial class OutputProfileDialog : Window
             }
             else if (DeviceComboBox.SelectedItem is WasapiDeviceInfo wasapiDevice)
             {
-                var info = await Task.Run(() => WasapiDeviceProvider.GetCapabilities(wasapiDevice.Id));
+                var info = WasapiDeviceProvider.GetCapabilities(wasapiDevice.Id);
                 await new DeviceInfoWindow(info).ShowDialog(this);
             }
         }
@@ -201,7 +204,7 @@ internal partial class OutputProfileDialog : Window
                 DeviceComboBox.SelectedItem = devices.FirstOrDefault(d =>
                     string.Equals(d.Id, _initialProfile?.SelectedWasapiDeviceId, StringComparison.Ordinal))
                     ?? devices.FirstOrDefault();
-                DeviceLabelTextBlock.Text = OperatingSystem.IsLinux()
+                DeviceLabelTextBlock.Text = !OperatingSystem.IsWindows()
                     ? SelectedLinuxDeviceKind == LinuxDeviceKind.DirectAlsa
                         ? LocalizationManager.Current.AlsaOutputDevice
                         : LocalizationManager.Current.OpenAlOutputDevice

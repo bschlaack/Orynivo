@@ -439,7 +439,7 @@ public static class LocalizationManager
         DirectAlsa = "ALSA (direkt, exklusiv)",
         AlsaOutputDevice = "Direktes ALSA-Ausgabegerät",
         LinuxDefaultAudioDevice = "Systemstandard (OpenAL)",
-        OpenAlInitializationFailed = "OpenAL konnte die Linux-Audioausgabe nicht initialisieren.",
+        OpenAlInitializationFailed = "OpenAL konnte die System-Audioausgabe nicht initialisieren.",
         AlsaExactOpenFailed = "Das ALSA-Gerät „{0}“ kann nicht ohne Resampling mit {1} Hz geöffnet werden: {2}",
         AlsaDeviceBusy = "Das direkte ALSA-Gerät „{0}“ ist bereits durch PipeWire oder eine andere Anwendung belegt. Das Umleiten der Systemausgabe gibt das Gerät nicht frei. Deaktivieren Sie das Sound-Geräteprofil im System oder wählen Sie den OpenAL-Ausgang.",
         AlsaPrepareFailed = "ALSA konnte das Ausgabegerät nach dem Spulen nicht vorbereiten.",
@@ -607,10 +607,7 @@ public static class LocalizationManager
         WasapiDsdNotRelevant = "Für WASAPI in Orynivo nicht relevant.",
         LinuxAlsaEndpointSummary = "Direktes ALSA-Gerät · {0} Kanäle\nPCM: {1} Bit · exakte Titel-Samplerate\nALSA-Resampling deaktiviert",
         LinuxOpenAlEndpointSummary = "OpenAL-Gerät · {0} Kanäle\nPCM: {1} Bit · Mixer-Samplerate wird beim Abspielen ermittelt",
-        LinuxOpenAlDsdRequiresAlsa = "OpenAL gibt PCM aus. Für native DSD- oder DoP-Wiedergabe ein direktes ALSA-Profil wählen.",
-        LinuxDsdProbeInconclusive = "DSD-Stufen konnten nicht ausgelesen werden. Das ALSA-Gerät ist möglicherweise belegt oder nicht abfragbar.",
-        LinuxNativeDsdFormat = "Nativ ALSA DSD_U32_BE · {0}",
-        LinuxDopDsdFormat = "DoP-Trägerraten über ALSA S32_LE · {0} (DAC-Erkennung nicht abfragbar)",
+        LinuxDsdOutputUnavailable = "Für diesen PCM-Ausgabepfad derzeit nicht verfügbar.",
         NativeDsdUsesAsio = "Native DSD-Wiedergabe läuft in Orynivo über ASIO.",
         Dashboard = "Dashboard", ThemeLight = "Hell", ThemeDark = "Dunkel",
         StatusAvailable = "Verfügbar", StatusUnavailable = "Nicht verfügbar",
@@ -779,7 +776,7 @@ public static class LocalizationManager
         , ServerUpdateFailed = "Server-Update fehlgeschlagen"
         , ServerUpdateRejected = "Server lehnt Update ab (HTTP {0})"
         , UpdatingNamedServer = "Server »{0}« wird aktualisiert …"
-        , ServerUpdatesFailedContinue = "Folgende Server konnten nicht aktualisiert werden: {0}. Windows-Update trotzdem fortsetzen?"
+        , ServerUpdatesFailedContinue = "Folgende Server konnten nicht aktualisiert werden: {0}. Desktop-Update trotzdem fortsetzen?"
         , SourceColumn = "Quelle"
         , LocalSource = "Lokal"
         , LocalSourceShort = "L"
@@ -975,7 +972,7 @@ public static class LocalizationManager
         OpenAl = "OpenAL", OpenAlOutputDevice = "OpenAL output device",
         DirectAlsa = "ALSA (direct, exclusive)", AlsaOutputDevice = "Direct ALSA output device",
         LinuxDefaultAudioDevice = "System default (OpenAL)",
-        OpenAlInitializationFailed = "OpenAL could not initialize Linux audio output.",
+        OpenAlInitializationFailed = "OpenAL could not initialize the system audio output.",
         AlsaExactOpenFailed = "ALSA device “{0}” cannot be opened at {1} Hz without resampling: {2}",
         AlsaDeviceBusy = "Direct ALSA device “{0}” is already owned by PipeWire or another application. Redirecting system output does not release the device. Disable the sound device profile in the system or select the OpenAL output.",
         AlsaPrepareFailed = "ALSA could not prepare the output device after seeking.",
@@ -1128,10 +1125,7 @@ public static class LocalizationManager
         WasapiDsdNotRelevant = "Not relevant for WASAPI in this player.",
         LinuxAlsaEndpointSummary = "Direct ALSA device · {0} channels\nPCM: {1} bit · exact track sample rate\nALSA resampling disabled",
         LinuxOpenAlEndpointSummary = "OpenAL device · {0} channels\nPCM: {1} bit · mixer sample rate detected during playback",
-        LinuxOpenAlDsdRequiresAlsa = "OpenAL outputs PCM. Select a direct ALSA profile for native DSD or DoP playback.",
-        LinuxDsdProbeInconclusive = "DSD levels could not be queried. The ALSA device may be busy or unavailable for probing.",
-        LinuxNativeDsdFormat = "Native ALSA DSD_U32_BE · {0}",
-        LinuxDopDsdFormat = "DoP carrier rates over ALSA S32_LE · {0} (DAC recognition cannot be queried)",
+        LinuxDsdOutputUnavailable = "Currently unavailable for this PCM output path.",
         NativeDsdUsesAsio = "Native DSD playback in this player uses ASIO.",
         Dashboard = "Dashboard", ThemeLight = "Light", ThemeDark = "Dark",
         StatusAvailable = "Available", StatusUnavailable = "Unavailable",
@@ -1300,7 +1294,7 @@ public static class LocalizationManager
         , ServerUpdateFailed = "Server update failed"
         , ServerUpdateRejected = "Server rejected update (HTTP {0})"
         , UpdatingNamedServer = "Updating server '{0}'…"
-        , ServerUpdatesFailedContinue = "The following servers could not be updated: {0}. Continue with the Windows update?"
+        , ServerUpdatesFailedContinue = "The following servers could not be updated: {0}. Continue with the desktop update?"
         , SourceColumn = "Source"
         , LocalSource = "Local"
         , LocalSourceShort = "L"
@@ -1499,7 +1493,7 @@ public static class LocalizationManager
         OpenAl = "OpenAL", OpenAlOutputDevice = "Périphérique de sortie OpenAL",
         DirectAlsa = "ALSA (direct, exclusif)", AlsaOutputDevice = "Périphérique de sortie ALSA direct",
         LinuxDefaultAudioDevice = "Périphérique système par défaut (OpenAL)",
-        OpenAlInitializationFailed = "OpenAL n’a pas pu initialiser la sortie audio Linux.",
+        OpenAlInitializationFailed = "OpenAL n’a pas pu initialiser la sortie audio du système.",
         AlsaExactOpenFailed = "Le périphérique ALSA « {0} » ne peut pas être ouvert à {1} Hz sans rééchantillonnage : {2}",
         AlsaDeviceBusy = "Le périphérique ALSA direct « {0} » est déjà utilisé par PipeWire ou une autre application. Rediriger la sortie système ne libère pas le périphérique. Désactivez le profil du périphérique audio dans le système ou sélectionnez la sortie OpenAL.",
         AlsaPrepareFailed = "ALSA n’a pas pu préparer le périphérique de sortie après le déplacement.",
@@ -1652,10 +1646,7 @@ public static class LocalizationManager
         WasapiDsdNotRelevant = "Non pertinent pour WASAPI dans ce lecteur.",
         LinuxAlsaEndpointSummary = "Périphérique ALSA direct · {0} canaux\nPCM : {1} bits · fréquence exacte du morceau\nRééchantillonnage ALSA désactivé",
         LinuxOpenAlEndpointSummary = "Périphérique OpenAL · {0} canaux\nPCM : {1} bits · fréquence du mélangeur détectée pendant la lecture",
-        LinuxOpenAlDsdRequiresAlsa = "OpenAL émet du PCM. Sélectionnez un profil ALSA direct pour la lecture DSD native ou DoP.",
-        LinuxDsdProbeInconclusive = "Les niveaux DSD n’ont pas pu être interrogés. Le périphérique ALSA est peut-être occupé ou impossible à sonder.",
-        LinuxNativeDsdFormat = "DSD_U32_BE ALSA natif · {0}",
-        LinuxDopDsdFormat = "Fréquences porteuses DoP via ALSA S32_LE · {0} (détection par le DAC non interrogeable)",
+        LinuxDsdOutputUnavailable = "Actuellement indisponible pour ce chemin de sortie PCM.",
         NativeDsdUsesAsio = "La lecture DSD native de ce lecteur utilise ASIO.",
         Dashboard = "Tableau de bord", ThemeLight = "Clair", ThemeDark = "Sombre",
         StatusAvailable = "Disponible", StatusUnavailable = "Indisponible",
@@ -1824,7 +1815,7 @@ public static class LocalizationManager
         , ServerUpdateFailed = "Échec de la mise à jour du serveur"
         , ServerUpdateRejected = "Le serveur a refusé la mise à jour (HTTP {0})"
         , UpdatingNamedServer = "Mise à jour du serveur « {0} »…"
-        , ServerUpdatesFailedContinue = "Les serveurs suivants n’ont pas pu être mis à jour : {0}. Continuer la mise à jour Windows ?"
+        , ServerUpdatesFailedContinue = "Les serveurs suivants n’ont pas pu être mis à jour : {0}. Continuer la mise à jour de l’application ?"
         , SourceColumn = "Source"
         , LocalSource = "Local"
         , LocalSourceShort = "L"
@@ -2020,7 +2011,7 @@ public static class LocalizationManager
         OpenAl = "OpenAL", OpenAlOutputDevice = "Dispositivo de salida OpenAL",
         DirectAlsa = "ALSA (directo, exclusivo)", AlsaOutputDevice = "Dispositivo de salida ALSA directo",
         LinuxDefaultAudioDevice = "Dispositivo predeterminado del sistema (OpenAL)",
-        OpenAlInitializationFailed = "OpenAL no pudo inicializar la salida de audio de Linux.",
+        OpenAlInitializationFailed = "OpenAL no pudo inicializar la salida de audio del sistema.",
         AlsaExactOpenFailed = "El dispositivo ALSA «{0}» no se puede abrir a {1} Hz sin remuestreo: {2}",
         AlsaDeviceBusy = "El dispositivo ALSA directo «{0}» ya está siendo utilizado por PipeWire u otra aplicación. Redirigir la salida del sistema no libera el dispositivo. Desactive el perfil del dispositivo de sonido en el sistema o seleccione la salida OpenAL.",
         AlsaPrepareFailed = "ALSA no pudo preparar el dispositivo de salida después de buscar.",
@@ -2173,10 +2164,7 @@ public static class LocalizationManager
         WasapiDsdNotRelevant = "No es relevante para WASAPI en este reproductor.",
         LinuxAlsaEndpointSummary = "Dispositivo ALSA directo · {0} canales\nPCM: {1} bits · frecuencia exacta de la pista\nRemuestreo de ALSA desactivado",
         LinuxOpenAlEndpointSummary = "Dispositivo OpenAL · {0} canales\nPCM: {1} bits · frecuencia del mezclador detectada durante la reproducción",
-        LinuxOpenAlDsdRequiresAlsa = "OpenAL emite PCM. Seleccione un perfil ALSA directo para reproducir DSD nativo o DoP.",
-        LinuxDsdProbeInconclusive = "No se pudieron consultar los niveles DSD. El dispositivo ALSA puede estar ocupado o no disponible para la consulta.",
-        LinuxNativeDsdFormat = "DSD_U32_BE ALSA nativo · {0}",
-        LinuxDopDsdFormat = "Frecuencias portadoras DoP mediante ALSA S32_LE · {0} (no se puede consultar el reconocimiento del DAC)",
+        LinuxDsdOutputUnavailable = "Actualmente no disponible para esta ruta de salida PCM.",
         NativeDsdUsesAsio = "La reproducción DSD nativa de este reproductor utiliza ASIO.",
         Dashboard = "Panel", ThemeLight = "Claro", ThemeDark = "Oscuro",
         StatusAvailable = "Disponible", StatusUnavailable = "No disponible",
@@ -2345,7 +2333,7 @@ public static class LocalizationManager
         , ServerUpdateFailed = "Error al actualizar el servidor"
         , ServerUpdateRejected = "El servidor rechazó la actualización (HTTP {0})"
         , UpdatingNamedServer = "Actualizando el servidor «{0}»…"
-        , ServerUpdatesFailedContinue = "No se pudieron actualizar los siguientes servidores: {0}. ¿Continuar con la actualización de Windows?"
+        , ServerUpdatesFailedContinue = "No se pudieron actualizar los siguientes servidores: {0}. ¿Continuar con la actualización de la aplicación?"
         , SourceColumn = "Origen"
         , LocalSource = "Local"
         , LocalSourceShort = "L"

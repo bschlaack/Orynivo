@@ -43,7 +43,7 @@ Avalonia desktop music library with:
 
 - Cross-platform core library in `Orynivo.Core/`
   (library scan, database, search, streaming models)
-- Avalonia UI 11 frontend in `Orynivo/` (Windows and Linux; references `Orynivo.Core`)
+- Avalonia UI 11 frontend in `Orynivo/` (Windows, Linux, and macOS; references `Orynivo.Core`)
 - Cross-platform headless music server in `Orynivo.Server/`
   (ASP.NET Core; references `Orynivo.Core`; exposes REST + streaming over the
   local network)
@@ -53,7 +53,7 @@ Avalonia desktop music library with:
 - Native DSF/DFF DSD playback through ASIO on Windows or direct ALSA on Linux
 - Real-time DSF/DFF-to-PCM conversion through `ffmpeg` for WASAPI playback
 
-The desktop project builds on Windows and Linux. Windows retains the complete
+The desktop project builds on Windows, Linux, and macOS. Windows retains the complete
 WASAPI/ASIO playback implementation. The current Linux `net8.0` build supports
 PCM playback through selectable direct ALSA hardware and OpenAL output devices
 in addition to the
@@ -72,6 +72,15 @@ separate output types even though both retain the persisted
 `OutputBackend.Wasapi` compatibility value. The selected device ID remains the
 routing discriminator: `alsa:` identifies direct ALSA; every other Linux device
 ID uses OpenAL. Existing profiles must be classified from that ID.
+
+macOS desktop builds target `net8.0` for `osx-arm64` and `osx-x64`. PCM
+playback uses Apple's system OpenAL framework and FFmpeg/FFprobe from `PATH`.
+ALSA and native DSD output remain Linux-only. Tagged releases package
+self-contained `Orynivo.app` bundles for both Mac architectures as installable
+PKGs, portable ZIPs, and tar archives; every package is included in the signed
+release manifest. The desktop updater selects the current process architecture's
+signed `pkg`, verifies its digest, and opens it through `/usr/bin/open`; Orynivo
+must never invoke a privileged installer command directly.
 
 ## Orynivo.Core
 
@@ -195,9 +204,6 @@ runtime dependency.
 - `CalculateMissingReplayGainDuringScan` — optionally run expensive FFmpeg
   analysis for missing ReplayGain values during normal server scans (default
   `false`; embedded values are always imported)
-- `CalculateMissingReplayGainDuringScan` — optionally run expensive FFmpeg
-  analysis for missing ReplayGain values during normal server scans (default
-  `false`; embedded values are always imported)
 - `ServerName` — display name returned by `/api/info`
 - Default bind: `http://0.0.0.0:5280`
 
@@ -307,9 +313,9 @@ scripts). The packages install to `/usr/lib/orynivo-server/`, expose a
 `/etc/orynivo-server/appsettings.json`, and register
 `orynivo-server.service` running as the `orynivo-server` system user.
 The signed update-manifest workflow waits for the Windows installer, every
-Linux desktop artifact, and all four server packages before signing, refuses
-partial manifests, and supports a manual tag input for rebuilding an already
-published release.
+Linux and macOS desktop artifact, and all four server packages before signing,
+refuses partial manifests, and supports a manual tag input for rebuilding an
+already published release.
 
 The `orynivo-server` service user is created with `--no-create-home` and has no
 writable `$HOME`, so the default data directory (`$HOME/.local/share/Orynivo`)
@@ -956,10 +962,10 @@ fallback or allow client-provided commands/paths to reach the helper.
   2048); any OpenAI-compatible provider works (LM Studio, Ollama, OpenAI,
   etc.); API key is stored in `settings.json`; the `AiChatView` re-reads
   `GetSettings` on every send so settings changes take effect immediately
-- `AppSettings.ShowInternetRadioItem`, `ShowPodcastsItem`, and `ShowQueueItem`
-  control the individual sidebar items for Internet Radio, Podcasts, and
-  **Up Next** from Settings > Appearance; they default to visible and are
-  independent of the accordion-section toggles
+- `AppSettings.ShowInternetRadioItem`, `ShowPodcastsItem`, `ShowQueueItem`, and
+  `ShowAiChatItem` control the individual sidebar items for Internet Radio,
+  Podcasts, **Up Next**, and AI Chat from Settings > Appearance; they default
+  to visible and are independent of the accordion-section toggles
 - `AppSettings.Theme` stores the `Light` or `Dark` theme
 - `AppSettings.Language` stores `German`, `English`, `French`, or `Spanish`
 - `Orynivo/Library/TrackRecord.cs`: database track model containing tags and
@@ -1653,9 +1659,9 @@ fallback or allow client-provided commands/paths to reach the helper.
   drops those values, which breaks the accordion groups (and is worsened by
   variable-height rows such as the empty-library hint). Do not reintroduce
   virtualization here.
-- `AppSettings.ShowInternetRadioItem`, `ShowPodcastsItem`, and `ShowQueueItem`
-  control visibility of the Internet Radio, Podcasts, and Up Next sidebar items
-  from Settings > Appearance and default to visible
+- `AppSettings.ShowInternetRadioItem`, `ShowPodcastsItem`, `ShowQueueItem`, and
+  `ShowAiChatItem` control visibility of the Internet Radio, Podcasts, Up Next,
+  and AI Chat sidebar items from Settings > Appearance and default to visible
 - `AppSettings.ShowLocalLibrarySection`, `ShowOwnRadiosSection`,
   `ShowMyPodcastsSection`, and `ShowPlexSection` control group visibility from
   Settings > Appearance and default to visible. (`ShowPlaylistsSection` is a

@@ -12,17 +12,6 @@ internal static class AlsaNative
     private const int Signed32LittleEndian = 10;
     private const int DsdUnsigned32BigEndian = 52;
 
-    /// <summary>Describes the result of an exact ALSA format and rate capability probe.</summary>
-    internal enum ExactFormatProbeResult
-    {
-        /// <summary>The device accepted the exact format and rate.</summary>
-        Supported,
-        /// <summary>The device was opened but rejected the format or rate.</summary>
-        Unsupported,
-        /// <summary>The device could not be queried, for example because another process owns it.</summary>
-        Inconclusive
-    }
-
     [DllImport(Library, EntryPoint = "snd_pcm_open", CallingConvention = CallingConvention.Cdecl)]
     private static extern int SndPcmOpen(out nint pcm, string name, int stream, int mode);
 
@@ -35,31 +24,6 @@ internal static class AlsaNative
         uint rate,
         int softResample,
         uint latency);
-
-    [DllImport(Library, EntryPoint = "snd_pcm_hw_params_malloc", CallingConvention = CallingConvention.Cdecl)]
-    private static extern int SndPcmHwParamsMalloc(out nint parameters);
-
-    [DllImport(Library, EntryPoint = "snd_pcm_hw_params_free", CallingConvention = CallingConvention.Cdecl)]
-    private static extern void SndPcmHwParamsFree(nint parameters);
-
-    [DllImport(Library, EntryPoint = "snd_pcm_hw_params_any", CallingConvention = CallingConvention.Cdecl)]
-    private static extern int SndPcmHwParamsAny(nint pcm, nint parameters);
-
-    [DllImport(Library, EntryPoint = "snd_pcm_hw_params_set_access", CallingConvention = CallingConvention.Cdecl)]
-    private static extern int SndPcmHwParamsSetAccess(nint pcm, nint parameters, int access);
-
-    [DllImport(Library, EntryPoint = "snd_pcm_hw_params_set_format", CallingConvention = CallingConvention.Cdecl)]
-    private static extern int SndPcmHwParamsSetFormat(nint pcm, nint parameters, int format);
-
-    [DllImport(Library, EntryPoint = "snd_pcm_hw_params_set_channels", CallingConvention = CallingConvention.Cdecl)]
-    private static extern int SndPcmHwParamsSetChannels(nint pcm, nint parameters, uint channels);
-
-    [DllImport(Library, EntryPoint = "snd_pcm_hw_params_set_rate", CallingConvention = CallingConvention.Cdecl)]
-    private static extern int SndPcmHwParamsSetRate(
-        nint pcm,
-        nint parameters,
-        uint rate,
-        int direction);
 
     [DllImport(Library, EntryPoint = "snd_pcm_writei", CallingConvention = CallingConvention.Cdecl)]
     private static extern long SndPcmWriteInterleaved(nint pcm, nint buffer, ulong frames);
@@ -98,56 +62,6 @@ internal static class AlsaNative
     /// <returns>Configured native DSD PCM handle.</returns>
     internal static nint OpenExactNativeDsd(string deviceName, int sampleRate)
         => OpenExact(deviceName, sampleRate, DsdUnsigned32BigEndian);
-
-    /// <summary>Tests an exact native DSD or DoP carrier format without playing audio.</summary>
-    /// <param name="deviceName">Direct ALSA hardware identifier.</param>
-    /// <param name="sampleRate">Required native frame or DoP carrier rate in hertz.</param>
-    /// <param name="nativeDsd"><see langword="true"/> for <c>DSD_U32_BE</c>; otherwise <c>S32_LE</c>.</param>
-    /// <returns>A conclusive support result when the device could be opened.</returns>
-    internal static ExactFormatProbeResult ProbeExactFormat(
-        string deviceName,
-        int sampleRate,
-        bool nativeDsd)
-    {
-        var result = SndPcmOpen(out var pcm, deviceName, PlaybackStream, 0);
-        if (result < 0)
-            return ExactFormatProbeResult.Inconclusive;
-
-        nint parameters = 0;
-        try
-        {
-            if (SndPcmHwParamsMalloc(out parameters) < 0 ||
-                SndPcmHwParamsAny(pcm, parameters) < 0)
-            {
-                return ExactFormatProbeResult.Inconclusive;
-            }
-
-            result = SndPcmHwParamsSetAccess(pcm, parameters, ReadWriteInterleaved);
-            if (result >= 0)
-                result = SndPcmHwParamsSetFormat(
-                    pcm,
-                    parameters,
-                    nativeDsd ? DsdUnsigned32BigEndian : Signed32LittleEndian);
-            if (result >= 0)
-                result = SndPcmHwParamsSetChannels(pcm, parameters, 2);
-            if (result >= 0)
-                result = SndPcmHwParamsSetRate(
-                    pcm,
-                    parameters,
-                    checked((uint)sampleRate),
-                    direction: 0);
-
-            return result >= 0
-                ? ExactFormatProbeResult.Supported
-                : ExactFormatProbeResult.Unsupported;
-        }
-        finally
-        {
-            if (parameters != 0)
-                SndPcmHwParamsFree(parameters);
-            Close(pcm);
-        }
-    }
 
     private static nint OpenExact(string deviceName, int sampleRate, int format)
     {

@@ -125,9 +125,7 @@ public partial class App : Application
 
             using var updates = new ReleaseUpdateService(publicKey);
             var manifest = await updates.GetLatestManifestAsync();
-            var installer = manifest.Assets.FirstOrDefault(asset =>
-                asset.Component == "desktop" && asset.OperatingSystem == "windows" &&
-                asset.Architecture == "x64" && asset.Type == "installer");
+            var installer = DesktopUpdatePlatform.SelectInstaller(manifest.Assets);
             if (installer is not null && ReleaseUpdateService.IsNewer(currentVersion, manifest.Version))
             {
                 var install = await AppMessageBox.ConfirmAsync(

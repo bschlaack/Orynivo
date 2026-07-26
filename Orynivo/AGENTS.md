@@ -1,6 +1,6 @@
 # Orynivo Desktop Client Instructions
 
-This file applies to the Windows and Linux Avalonia desktop client under
+This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 `Orynivo/` and supplements the repository-wide `../AGENTS.md`.
 
 ## Completion
@@ -8,8 +8,8 @@ This file applies to the Windows and Linux Avalonia desktop client under
 - Follow the root mandatory completion checklist. In particular, feature and UI
   changes require `CHANGELOG.md` and usually `README.md`; architectural or
   behavioral changes require this file or the root `AGENTS.md` to be updated.
-- Build with `dotnet build Orynivo/Orynivo.csproj` after client changes. On
-  Linux this must compile the `net8.0` compatibility build; Windows continues to
+- Build with `dotnet build Orynivo/Orynivo.csproj` after client changes. Linux
+  and macOS compile the `net8.0` compatibility build; Windows continues to
   target `net8.0-windows10.0.19041.0`.
 - New visible text must use `LocalizationManager` and exist in German, English,
   French, and Spanish.
@@ -75,7 +75,24 @@ This file applies to the Windows and Linux Avalonia desktop client under
   than being collapsed into the "no update" state.
   Starting a desktop update from About first relays the matching signed release
   to every reachable update-enabled configured server. Failed servers are named
-  and require an explicit choice before the Windows installer continues.
+  and require an explicit choice before the platform installer continues.
+- Tagged macOS releases publish architecture-specific `osx-arm64` and
+  `osx-x64` application bundles as installable PKGs, portable ZIPs, and tar
+  archives. The PKG installs `Orynivo.app` beneath `/Applications`; all package
+  variants must remain required inputs to the signed release manifest. macOS
+  automatic updates select the current architecture's signed PKG, verify its
+  digest through `ReleaseUpdateService`, and open the verified file through
+  `/usr/bin/open`; do not invoke `installer` or request privileges directly.
+- Settings must hide Steinberg ASIO and cwASIO subsystem badges on non-Windows
+  platforms. FFmpeg and other genuinely cross-platform subsystem badges remain
+  visible.
+- `AppSettings.ShowAiChatItem` controls the AI Chat sidebar item's visibility
+  from Settings > Appearance, defaults to visible, and is applied with the
+  existing Internet Radio, Podcasts, and Up Next item toggles.
+- macOS must configure `AvaloniaNativePlatformOptions.RenderingMode` with
+  OpenGL first and software second. Do not re-enable Metal without verifying
+  Orynivo's gradient and rounded-surface shaders on both Intel and Apple
+  Silicon Macs; Skia's Metal compiler can reject them after its 300-ms timeout.
 - Dashboard Recently Played and Recently Added use 20-item horizontal
   carousels with smoothly animated vector previous/next controls placed in the
   header immediately before Show all; controls must never overlay the cards or
@@ -125,20 +142,14 @@ This file applies to the Windows and Linux Avalonia desktop client under
 - Local `cue://` tracks and `mka://chapter/` tracks both resolve through the
   shared segment-aware PCM playback, waveform, queue, and history paths.
 - Windows-specific code stays in this project and must be excluded from the
-  Linux target in `Orynivo.csproj`. Matching Linux compatibility types live
-  under `Compatibility/Linux`; PCM playback enumerates direct ALSA `hw:` devices
+  Linux and macOS targets in `Orynivo.csproj`. The compatibility types currently
+  live under `Compatibility/Linux`; shared non-Windows PCM playback uses OpenAL,
+  loading `libopenal.so.1` on Linux and the system OpenAL framework on macOS.
+  Linux additionally enumerates direct ALSA `hw:` devices
   through `libasound.so.2` and selectable OpenAL devices through
   `libopenal.so.1`. The output-profile dialog presents these as separate output
   types and classifies persisted profiles by their device ID (`alsa:` means
   direct ALSA); never mix direct ALSA hardware into the OpenAL device list.
-  Settings shows the Steinberg ASIO and cwASIO subsystem badges only on Windows.
-  Linux direct-ALSA device information probes native `DSD_U32_BE` and DoP
-  support at each displayed DSD level through read-only ALSA hardware-parameter
-  constraints; do not configure the stream with `snd_pcm_set_params` during a
-  capability probe because rejected high rates are logged to stderr. A busy or
-  otherwise unqueryable device must be reported as inconclusive rather than unsupported. OpenAL device
-  information must identify it as a PCM path and direct users to a direct ALSA
-  profile for DSD.
   Direct ALSA uses stereo signed 32-bit PCM, the source rate,
   and `soft_resample=0`; failure to open that exact format/rate must be reported
   rather than silently falling back to resampling. An `EBUSY` open failure must
