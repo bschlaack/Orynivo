@@ -67,18 +67,25 @@ compatible modified build, subject to the LGPL and runtime compatibility.
 [FFmpeg](https://ffmpeg.org/) is not linked into Orynivo. Orynivo launches the
 separate `ffmpeg` and `ffprobe` executables as child processes. When those
 executables are absent, Orynivo downloads the BtbN
-`win64-lgpl-essentials` build from:
+`win64-lgpl-essentials` build on Windows from:
 
 https://github.com/BtbN/FFmpeg-Builds
 
+On macOS, Orynivo downloads the current-architecture `ffmpeg` and `ffprobe`
+release assets published by:
+
+https://github.com/eugeneware/ffmpeg-static
+
 FFmpeg is primarily licensed under LGPL-2.1-or-later, but the exact license of
 a binary depends on its build configuration and enabled external libraries.
-Orynivo deliberately requests the LGPL essentials build. The downloaded
-archive includes FFmpeg's applicable license information. Corresponding FFmpeg
-source and build scripts are available from:
+Orynivo deliberately requests the LGPL essentials build on Windows. macOS
+download assets retain the license and build information published alongside
+their upstream release. Corresponding FFmpeg source and build scripts are
+available from:
 
 - https://ffmpeg.org/download.html
 - https://github.com/BtbN/FFmpeg-Builds
+- https://github.com/eugeneware/ffmpeg-static
 
 FFmpeg is an independent work and is not covered by Orynivo's Apache License.
 

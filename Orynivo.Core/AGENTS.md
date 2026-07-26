@@ -42,6 +42,10 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
 - Shared release-update models verify the ECDSA P-256 signed manifest before an
   asset is selected and verify its SHA-256 digest after download. Consumers must
   never bypass either verification or accept an unsigned fallback.
+- `FfmpegLocator` searches platform-specific installation directories in
+  addition to the inherited `PATH`. Windows and macOS may download matching
+  FFmpeg/FFprobe binaries into the per-user cache; Linux remains
+  system-package-managed. Downloaded macOS tools must be marked executable.
 - `Orynivo.Server` has no `InternalsVisibleTo` grant; server-facing Core APIs must
   be deliberately public.
 

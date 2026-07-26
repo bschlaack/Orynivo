@@ -4,6 +4,21 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- macOS now finds FFmpeg and FFprobe installed in common Homebrew, MacPorts,
+  pkgsrc, Fink, and per-user locations even when Finder launches Orynivo with a
+  minimal `PATH`. When neither tool is installed, Orynivo downloads matching
+  Intel or Apple Silicon builds into its per-user cache.
+- macOS application bundles now include an `Orynivo.icns` application icon and
+  declare it in `Info.plist`, so Finder, the Dock, and Launchpad can display the
+  Orynivo icon.
+- The shared Folder structure navigation item now remains available when no
+  local library directory is configured but at least one Orynivo Server is
+  present, allowing server folders to be browsed as the only library source.
+
 ## [0.29.0] - 2026-07-26
 
 ### Added

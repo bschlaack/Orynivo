@@ -127,8 +127,10 @@ dotnet publish Orynivo/Orynivo.csproj --configuration Release \
 
 Use `osx-x64` instead on an Intel Mac. Tagged releases package both runtime
 identifiers as self-contained installable PKGs, portable `Orynivo.app` ZIPs,
-and tar archives. FFmpeg and FFprobe must be installed separately and available
-on `PATH`; OpenAL is provided by macOS.
+and tar archives. Orynivo detects FFmpeg and FFprobe in the normal Homebrew,
+MacPorts, pkgsrc, Fink, and per-user binary locations even when it is launched
+from Finder. If neither tool is installed, it downloads architecture-matching
+builds into the Orynivo per-user cache. OpenAL is provided by macOS.
 
 An X11 or Wayland desktop session is required to run the Avalonia UI. FFmpeg
 and FFprobe must be installed and available on `PATH` for playback, media
@@ -305,6 +307,9 @@ instead of aborting the complete scan.
 Configured Orynivo Server connections are merged into the main Artists, Albums,
 Tracks, and search-result library views. Rows from a server are marked with an
 optional `OS` source badge that shows the server name as a tooltip.
+The shared Folder structure view is also available with server-only
+configurations; a local library directory is not required to browse folders
+reported by an Orynivo Server.
 The Windows client probes server compatibility in Settings, reports missing
 newer endpoints explicitly, shows the last successful connection time when a
 server is unreachable, and can clear cached remote artwork, track lists, and
@@ -651,7 +656,8 @@ the Steinberg ASIO SDK nor a platform-specific Orynivo bridge is required.
 ### macOS player
 
 - macOS 10.15 or newer on Apple Silicon (`arm64`) or Intel (`x64`)
-- FFmpeg and FFprobe installed separately and available on `PATH`
+- FFmpeg and FFprobe from `PATH`, common package-manager locations, or Orynivo's
+  automatic per-user download
 - The system OpenAL framework used for PCM output
 - Avalonia OpenGL rendering with a software fallback for Macs whose Metal
   shader compiler exceeds Skia's compilation timeout
@@ -712,12 +718,13 @@ root-level `.PKGINFO` metadata before publishing it.
 | `Orynivo-{version}-osx-arm64.tar.gz` | Alternative app archive for Apple Silicon |
 | `Orynivo-{version}-osx-x64.tar.gz` | Alternative app archive for Intel |
 
-The PKG installs `Orynivo.app` under `/Applications`. For portable use, extract
+The PKG installs `Orynivo.app` under `/Applications`. The bundle includes the
+native Orynivo application icon. For portable use, extract
 the ZIP and open `Orynivo.app` from any writable directory. The builds are
-self-contained with respect to .NET; FFmpeg and FFprobe must be installed and
-available on `PATH`. The current packages are not code-signed or notarized, so
-macOS Gatekeeper may require explicitly opening the app or installer from
-Finder's context menu.
+self-contained with respect to .NET; FFmpeg and FFprobe are found in common
+package-manager locations or downloaded automatically when absent. The current
+packages are not code-signed or notarized, so macOS Gatekeeper may require
+explicitly opening the app or installer from Finder's context menu.
 
 Orynivo's startup and About-window update checks support both Mac
 architectures. They select the matching PKG from the signed release manifest,
@@ -1064,8 +1071,10 @@ outputs.
 
 FFmpeg is run as a separate executable. If it is not installed, Orynivo
 downloads the BtbN LGPL essentials build into `%LOCALAPPDATA%\Orynivo\ffmpeg`
-on Windows by resolving the current release asset through the GitHub API. FFmpeg
-remains subject to its own license and is not covered by the Orynivo license.
+on Windows by resolving the current release asset through the GitHub API. On
+macOS, the matching `eugeneware/ffmpeg-static` FFmpeg and FFprobe release assets
+are downloaded into Orynivo's per-user cache. FFmpeg remains subject to its own
+license and is not covered by the Orynivo license.
 
 ASIO is a trademark and software of Steinberg Media Technologies GmbH. The
 optional Steinberg ASIO SDK is not included in this repository and must be

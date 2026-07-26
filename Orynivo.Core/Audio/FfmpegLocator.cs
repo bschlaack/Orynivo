@@ -2,15 +2,16 @@ using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using System.Text.Json;
 
 namespace Orynivo.Audio;
 
 /// <summary>
-/// Locates <c>ffmpeg</c> and <c>ffprobe</c> binaries, downloading a pre-built package on Windows
-/// when the binaries are absent from the application directory, the user cache, and the system PATH.
-/// On Linux and macOS the binaries must be installed separately via the system package manager
-/// (e.g. <c>apt install ffmpeg</c>, <c>brew install ffmpeg</c>).
+/// Locates <c>ffmpeg</c> and <c>ffprobe</c> binaries, downloading pre-built packages on Windows
+/// and macOS when the binaries are absent from the application directory, the user cache, and
+/// known system installation directories. Linux binaries must be installed separately through
+/// the system package manager.
 /// After a successful locate or download the directory that contains the binaries is prepended
 /// to the current process PATH so all <see cref="System.Diagnostics.ProcessStartInfo"/> callers
 /// can reference them by bare name without modification.
@@ -19,6 +20,8 @@ public static class FfmpegLocator
 {
     private const string WindowsReleaseApiUrl =
         "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest";
+    private const string MacReleaseApiUrl =
+        "https://api.github.com/repos/eugeneware/ffmpeg-static/releases/latest";
 
     private static string FfmpegBinary =>
         RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "ffmpeg.exe" : "ffmpeg";
@@ -28,61 +31,66 @@ public static class FfmpegLocator
 
     /// <summary>
     /// Ensures that <c>ffmpeg</c> and <c>ffprobe</c> are reachable as child processes.
-    /// On Windows, downloads the BtbN LGPL-essential build when neither the application directory,
-    /// the per-user FFmpeg cache, nor the system PATH contains the binaries.
-    /// On Linux and macOS, returns <see langword="false"/> when the binaries are not already on PATH.
+    /// On Windows and macOS, downloads a matching pre-built package when neither the application
+    /// directory, the per-user FFmpeg cache, known platform installation directories, nor the
+    /// system PATH contains the binaries. On Linux, returns <see langword="false"/> when the
+    /// binaries are not already installed.
     /// </summary>
     /// <param name="progress">
-    /// Receives status strings during the Windows download. Pass a <see cref="Progress{T}"/>
+    /// Receives status strings during a download. Pass a <see cref="Progress{T}"/>
     /// constructed on the UI thread so callbacks are marshalled back automatically.
     /// </param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>
     /// <see langword="true"/> when the binaries are available; <see langword="false"/> when the
-    /// download failed or (on Linux/macOS) the binaries are not installed.
+    /// download failed or (on Linux) the binaries are not installed.
     /// </returns>
     public static async Task<bool> EnsureAvailableAsync(
         IProgress<string>? progress = null,
         CancellationToken cancellationToken = default)
     {
         EnsureValidCurrentDirectory();
-        var appDir = AppContext.BaseDirectory;
-        var localFfmpeg  = Path.Combine(appDir, FfmpegBinary);
-        var localFfprobe = Path.Combine(appDir, FfprobeBinary);
         var userDir = AppPaths.GetDataPath("ffmpeg");
         var userFfmpeg = Path.Combine(userDir, FfmpegBinary);
         var userFfprobe = Path.Combine(userDir, FfprobeBinary);
 
-        if (File.Exists(localFfmpeg) && File.Exists(localFfprobe))
+        var installedDirectory = FindToolsDirectory();
+        if (installedDirectory is not null)
         {
-            PrependToPath(appDir);
+            PrependToPath(installedDirectory);
             return true;
         }
 
-        if (File.Exists(userFfmpeg) && File.Exists(userFfprobe))
-        {
-            PrependToPath(userDir);
-            return true;
-        }
-
-        if (IsOnPath(FfmpegBinary) && IsOnPath(FfprobeBinary))
-            return true;
-
-        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        if (!OperatingSystem.IsWindows() && !OperatingSystem.IsMacOS())
             return false;
 
         try
         {
             progress?.Report("Downloading FFmpeg…");
             Directory.CreateDirectory(userDir);
-            await DownloadAndExtractWindowsAsync(userFfmpeg, userFfprobe, progress, cancellationToken)
-                .ConfigureAwait(false);
+            if (OperatingSystem.IsMacOS())
+            {
+                await DownloadAndExtractMacAsync(
+                    userFfmpeg,
+                    userFfprobe,
+                    progress,
+                    cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                await DownloadAndExtractWindowsAsync(
+                    userFfmpeg,
+                    userFfprobe,
+                    progress,
+                    cancellationToken).ConfigureAwait(false);
+            }
             PrependToPath(userDir);
             return true;
         }
         catch (Exception ex) when (ex is HttpRequestException
                                     or IOException
                                     or InvalidDataException
+                                    or UnauthorizedAccessException
                                     or OperationCanceledException)
         {
             _ = ex;
@@ -95,35 +103,12 @@ public static class FfmpegLocator
     /// </summary>
     /// <returns>
     /// <see langword="true"/> when <c>ffmpeg</c> and <c>ffprobe</c> exist in the application
-    /// directory, the per-user cache, or a directory on the current process PATH.
+    /// directory, the per-user cache, a known platform installation directory, or a directory
+    /// on the current process PATH.
     /// </returns>
     public static bool IsAvailable()
     {
-        static bool HasTools(string? directory)
-        {
-            if (string.IsNullOrWhiteSpace(directory))
-                return false;
-
-            try
-            {
-                return File.Exists(Path.Combine(directory, FfmpegBinary)) &&
-                       File.Exists(Path.Combine(directory, FfprobeBinary));
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        if (HasTools(AppContext.BaseDirectory) ||
-            HasTools(AppPaths.GetDataPath("ffmpeg")))
-        {
-            return true;
-        }
-
-        return (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
-            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
-            .Any(HasTools);
+        return FindToolsDirectory() is not null;
     }
 
     /// <summary>
@@ -176,16 +161,59 @@ public static class FfmpegLocator
         }
     }
 
-    private static bool IsOnPath(string fileName)
+    private static string? FindToolsDirectory()
     {
-        var pathEnv = Environment.GetEnvironmentVariable("PATH") ?? "";
-        return pathEnv
-            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
-            .Any(dir =>
+        foreach (var directory in GetSearchDirectories())
+        {
+            try
             {
-                try { return File.Exists(Path.Combine(dir, fileName)); }
-                catch { return false; }
-            });
+                if (File.Exists(Path.Combine(directory, FfmpegBinary)) &&
+                    File.Exists(Path.Combine(directory, FfprobeBinary)))
+                {
+                    return directory;
+                }
+            }
+            catch
+            {
+                // Ignore inaccessible or malformed PATH entries.
+            }
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<string> GetSearchDirectories()
+    {
+        yield return AppContext.BaseDirectory;
+        yield return AppPaths.GetDataPath("ffmpeg");
+
+        foreach (var directory in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)
+                     .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+        {
+            yield return directory;
+        }
+
+        if (!OperatingSystem.IsMacOS())
+            yield break;
+
+        // Finder-launched .app bundles receive a minimal PATH that normally omits package-manager
+        // prefixes, so probe the conventional Apple Silicon, Intel, MacPorts, pkgsrc, and Fink paths.
+        string[] macDirectories =
+        [
+            "/opt/homebrew/bin",
+            "/opt/homebrew/opt/ffmpeg/bin",
+            "/usr/local/bin",
+            "/usr/local/opt/ffmpeg/bin",
+            "/opt/local/bin",
+            "/opt/pkg/bin",
+            "/sw/bin"
+        ];
+        foreach (var directory in macDirectories)
+            yield return directory;
+
+        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (!string.IsNullOrWhiteSpace(userProfile))
+            yield return Path.Combine(userProfile, ".local", "bin");
     }
 
     private static void PrependToPath(string directory)
@@ -245,6 +273,129 @@ public static class FfmpegLocator
         {
             try { File.Delete(tempFile); } catch { /* best effort */ }
         }
+    }
+
+    [SupportedOSPlatform("macos")]
+    private static async Task DownloadAndExtractMacAsync(
+        string targetFfmpeg,
+        string targetFfprobe,
+        IProgress<string>? progress,
+        CancellationToken cancellationToken)
+    {
+        var architecture = RuntimeInformation.ProcessArchitecture switch
+        {
+            Architecture.Arm64 => "arm64",
+            Architecture.X64 => "x64",
+            _ => throw new PlatformNotSupportedException(
+                $"Automatic FFmpeg download is not available for macOS {RuntimeInformation.ProcessArchitecture}.")
+        };
+
+        using var client = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("Orynivo/1.0");
+        var downloads = await ResolveMacDownloadUrlsAsync(
+            client,
+            architecture,
+            cancellationToken).ConfigureAwait(false);
+        await DownloadMacBinaryAsync(
+            client,
+            downloads.Ffmpeg,
+            targetFfmpeg,
+            progress,
+            cancellationToken).ConfigureAwait(false);
+        await DownloadMacBinaryAsync(
+            client,
+            downloads.Ffprobe,
+            targetFfprobe,
+            progress,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    [SupportedOSPlatform("macos")]
+    private static async Task DownloadMacBinaryAsync(
+        HttpClient client,
+        string downloadUrl,
+        string targetPath,
+        IProgress<string>? progress,
+        CancellationToken cancellationToken)
+    {
+        progress?.Report("Downloading FFmpeg…");
+        using var response = await client.GetAsync(
+            downloadUrl,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            await using (var source = await response.Content
+                .ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
+            await using (var destination = new FileStream(
+                tempFile,
+                FileMode.Create,
+                FileAccess.Write,
+                FileShare.None,
+                81920,
+                useAsync: true))
+            {
+                await source.CopyToAsync(destination, cancellationToken).ConfigureAwait(false);
+            }
+
+            File.SetUnixFileMode(
+                tempFile,
+                UnixFileMode.UserRead |
+                UnixFileMode.UserWrite |
+                UnixFileMode.UserExecute |
+                UnixFileMode.GroupRead |
+                UnixFileMode.GroupExecute |
+                UnixFileMode.OtherRead |
+                UnixFileMode.OtherExecute);
+            File.Move(tempFile, targetPath, overwrite: true);
+        }
+        finally
+        {
+            try { File.Delete(tempFile); } catch { /* best effort */ }
+        }
+    }
+
+    private static async Task<(string Ffmpeg, string Ffprobe)> ResolveMacDownloadUrlsAsync(
+        HttpClient client,
+        string architecture,
+        CancellationToken cancellationToken)
+    {
+        using var releaseResponse = await client.GetAsync(MacReleaseApiUrl, cancellationToken)
+            .ConfigureAwait(false);
+        releaseResponse.EnsureSuccessStatusCode();
+        await using var releaseStream = await releaseResponse.Content
+            .ReadAsStreamAsync(cancellationToken)
+            .ConfigureAwait(false);
+        using var releaseJson = await JsonDocument.ParseAsync(
+            releaseStream,
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+
+        if (!releaseJson.RootElement.TryGetProperty("assets", out var assetsJson) ||
+            assetsJson.ValueKind != JsonValueKind.Array)
+        {
+            throw new InvalidDataException(
+                "ffmpeg-static release response does not contain an assets array.");
+        }
+
+        var assets = assetsJson
+            .EnumerateArray()
+            .Select(TryReadAsset)
+            .Where(asset => asset is not null)
+            .Select(asset => asset!.Value)
+            .ToDictionary(asset => asset.Name, asset => asset.Url, StringComparer.OrdinalIgnoreCase);
+        var ffmpegName = $"ffmpeg-darwin-{architecture}";
+        var ffprobeName = $"ffprobe-darwin-{architecture}";
+        if (!assets.TryGetValue(ffmpegName, out var ffmpegUrl) ||
+            !assets.TryGetValue(ffprobeName, out var ffprobeUrl))
+        {
+            throw new InvalidDataException(
+                $"The latest ffmpeg-static release does not contain {ffmpegName} and {ffprobeName}.");
+        }
+
+        return (ffmpegUrl, ffprobeUrl);
     }
 
     private static async Task<string> ResolveWindowsDownloadUrlAsync(

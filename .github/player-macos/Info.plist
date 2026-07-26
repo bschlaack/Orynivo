@@ -8,6 +8,8 @@
   <string>Orynivo</string>
   <key>CFBundleExecutable</key>
   <string>Orynivo</string>
+  <key>CFBundleIconFile</key>
+  <string>Orynivo.icns</string>
   <key>CFBundleIdentifier</key>
   <string>com.bschlaack.orynivo</string>
   <key>CFBundleInfoDictionaryVersion</key>

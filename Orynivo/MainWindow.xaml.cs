@@ -1894,7 +1894,7 @@ public partial class MainWindow : Window
         SetSidebarItemVisibility(ArtistsNavItem, showUnifiedLibraryItems);
         SetSidebarItemVisibility(AlbumsNavItem, showUnifiedLibraryItems);
         SetSidebarItemVisibility(TracksNavItem, showUnifiedLibraryItems);
-        SetSidebarItemVisibility(FoldersNavItem, showLibraryItems && hasLocalMedia);
+        SetSidebarItemVisibility(FoldersNavItem, showUnifiedLibraryItems);
 
         foreach (var item in NavListBox.Items.OfType<ListBoxItem>())
         {
