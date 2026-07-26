@@ -4,7 +4,7 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.29.1] - 2026-07-26
 
 ### Fixed
 
@@ -19,7 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   local library directory is configured but at least one Orynivo Server is
   present, allowing server folders to be browsed as the only library source.
 
-## [0.29.0] - 2026-07-26
+c
 
 ### Added
 
