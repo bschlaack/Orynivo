@@ -155,6 +155,9 @@ runtime dependency.
   `?key=` query param; query param enables direct use in FFmpeg URLs)
 - `LibraryPaths` — list of root directories to scan
 - `ScanOnStartup` — run a full scan when the server starts (default `true`)
+- `CalculateMissingReplayGainDuringScan` — optionally run expensive FFmpeg
+  analysis for missing ReplayGain values during normal server scans (default
+  `false`; embedded values are always imported)
 - `ServerName` — display name returned by `/api/info`
 - Default bind: `http://0.0.0.0:5280`
 
@@ -1068,6 +1071,8 @@ fallback or allow client-provided commands/paths to reach the helper.
   `source_path`; their time bounds reuse `segment_start` / `segment_end` and
   the defining MKA path is stored in `cue_path` for lifecycle cleanup. The
   physical file is exposed as a normal track only when no usable chapters exist.
+  MKA probing caps FFprobe analysis and has a 30-second per-file timeout so a
+  malformed or slow network file cannot block a complete library scan.
 - `track_title_overrides` stores library-only title corrections keyed by stable
   track path. `AudioDatabase.Upsert` reapplies them after every scan, so virtual
   MKA chapter titles can be corrected without modifying the media container.

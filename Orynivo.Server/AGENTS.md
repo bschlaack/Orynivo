@@ -20,6 +20,9 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
   when clients disconnect.
 - `cue://` tracks and `mka://chapter/` tracks are virtual source segments and
   are transcoded from their stored physical source and time boundaries.
+- Normal full scans and watcher updates use
+  `CalculateMissingReplayGainDuringScan`, which defaults to `false`; do not
+  reintroduce unconditional FFmpeg ReplayGain analysis into library discovery.
 - Keep external metadata/artwork searches on the client; the server stores and
   serves client-provided results.
 - Keep `SkiaSharp.NativeAssets.Linux.NoDependencies`; do not add an ImageMagick

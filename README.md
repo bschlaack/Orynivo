@@ -173,10 +173,16 @@ Edit `appsettings.json` before first use:
     "ApiKey": "change-this-to-a-long-random-string",
     "LibraryPaths": ["/music", "/mnt/nas/music"],
     "ScanOnStartup": true,
+    "CalculateMissingReplayGainDuringScan": false,
     "AllowRemoteUpdates": false
   }
 }
 ```
+
+`CalculateMissingReplayGainDuringScan` defaults to `false`. Embedded ReplayGain
+tags are still imported, while expensive FFmpeg analysis is skipped during
+normal discovery scans. Enabling it can substantially lengthen scans of large
+or chaptered files such as complete-concert MKA containers.
 
 `AllowRemoteUpdates` is disabled by default. When enabled on a packaged Linux
 server, an authenticated Orynivo desktop client can download the matching signed
@@ -490,6 +496,8 @@ searchable and playable library tracks. Chapter title, artist, album, album
 artist, genre, year, track number, and time boundaries are read through
 `ffprobe`; the physical MKA is not shown as an additional whole-file track. An
 MKA without usable chapters remains one ordinary library track.
+MKA chapter probing limits FFprobe's analysis window and times out after 30
+seconds per file so damaged or slow network media cannot block a complete scan.
 Library-only title corrections for virtual chapters are persisted separately in
 SQLite and survive later scans without changing the MKA container.
 For CUE sheets, Orynivo uses `INDEX 01` boundaries to seek and stop FFmpeg

@@ -4,6 +4,19 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+### Fixed
+
+- Prevented Orynivo Server library scans from appearing stuck on large or
+  chaptered media by disabling missing-ReplayGain FFmpeg analysis by default;
+  deployments can opt back in through configuration.
+- Bounded Matroska chapter probing to 30 seconds per file and limited FFprobe's
+  analysis window so a malformed or slow network-hosted MKA cannot stall the
+  complete server scan indefinitely.
+
 ## [0.27.0] - 2026-07-15
 
 ### Added

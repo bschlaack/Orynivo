@@ -24,6 +24,13 @@ public sealed class ServerSettings
     /// </summary>
     public bool ScanOnStartup { get; set; } = true;
 
+    /// <summary>
+    /// Gets or sets whether normal server scans should run FFmpeg analysis for
+    /// tracks without embedded ReplayGain values. Defaults to <see langword="false"/>
+    /// so large and chaptered media files do not hold up library discovery.
+    /// </summary>
+    public bool CalculateMissingReplayGainDuringScan { get; set; }
+
     /// <summary>Gets or sets whether authenticated clients may stage and request signed package updates.</summary>
     public bool AllowRemoteUpdates { get; set; }
 

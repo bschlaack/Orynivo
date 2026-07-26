@@ -49,7 +49,11 @@ using (var db = AudioDatabase.OpenDefault())
 
 // The file-system watcher notifies LibraryService via the hosted-service start path.
 builder.Services.AddSingleton(static services =>
-    new LibraryWatcherService(services.GetRequiredService<ServerLibraryChangeTracker>().Touch));
+    new LibraryWatcherService(
+        services.GetRequiredService<ServerLibraryChangeTracker>().Touch,
+        calculateMissingReplayGain: services
+            .GetRequiredService<ServerSettings>()
+            .CalculateMissingReplayGainDuringScan));
 
 builder.Services.AddSingleton<LibraryService>();
 builder.Services.AddHostedService(static services => services.GetRequiredService<LibraryService>());
