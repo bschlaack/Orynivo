@@ -19,7 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   local library directory is configured but at least one Orynivo Server is
   present, allowing server folders to be browsed as the only library source.
 
-c
+## [0.29.0] - 2026-07-26
 
 ### Added
 
