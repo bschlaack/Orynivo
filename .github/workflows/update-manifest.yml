@@ -32,6 +32,12 @@ jobs:
             if compgen -G 'assets/Orynivo-*-win-x64-Setup.exe' > /dev/null \
               && compgen -G 'assets/Orynivo-*-linux-x64.tar.gz' > /dev/null \
               && compgen -G 'assets/Orynivo-*-linux-arm64.tar.gz' > /dev/null \
+              && compgen -G 'assets/Orynivo-*-osx-x64.tar.gz' > /dev/null \
+              && compgen -G 'assets/Orynivo-*-osx-arm64.tar.gz' > /dev/null \
+              && compgen -G 'assets/Orynivo-*-osx-x64-Portable.zip' > /dev/null \
+              && compgen -G 'assets/Orynivo-*-osx-arm64-Portable.zip' > /dev/null \
+              && compgen -G 'assets/Orynivo-*-osx-x64.pkg' > /dev/null \
+              && compgen -G 'assets/Orynivo-*-osx-arm64.pkg' > /dev/null \
               && compgen -G 'assets/orynivo_*_amd64.deb' > /dev/null \
               && compgen -G 'assets/orynivo_*_arm64.deb' > /dev/null \
               && compgen -G 'assets/orynivo-[0-9]*-1.x86_64.rpm' > /dev/null \
@@ -61,6 +67,12 @@ jobs:
               Orynivo-*-win-x64-Setup.exe) COMPONENT=desktop; OS=windows; ARCH=x64; TYPE=installer ;;
               Orynivo-*-linux-x64.tar.gz) COMPONENT=desktop; OS=linux; ARCH=x64; TYPE=archive ;;
               Orynivo-*-linux-arm64.tar.gz) COMPONENT=desktop; OS=linux; ARCH=arm64; TYPE=archive ;;
+              Orynivo-*-osx-x64.tar.gz) COMPONENT=desktop; OS=macos; ARCH=x64; TYPE=archive ;;
+              Orynivo-*-osx-arm64.tar.gz) COMPONENT=desktop; OS=macos; ARCH=arm64; TYPE=archive ;;
+              Orynivo-*-osx-x64-Portable.zip) COMPONENT=desktop; OS=macos; ARCH=x64; TYPE=portable ;;
+              Orynivo-*-osx-arm64-Portable.zip) COMPONENT=desktop; OS=macos; ARCH=arm64; TYPE=portable ;;
+              Orynivo-*-osx-x64.pkg) COMPONENT=desktop; OS=macos; ARCH=x64; TYPE=pkg ;;
+              Orynivo-*-osx-arm64.pkg) COMPONENT=desktop; OS=macos; ARCH=arm64; TYPE=pkg ;;
               orynivo_*_amd64.deb) COMPONENT=desktop; OS=linux; ARCH=x64; TYPE=deb ;;
               orynivo_*_arm64.deb) COMPONENT=desktop; OS=linux; ARCH=arm64; TYPE=deb ;;
               orynivo-[0-9]*-1.x86_64.rpm) COMPONENT=desktop; OS=linux; ARCH=x64; TYPE=rpm ;;

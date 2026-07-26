@@ -130,13 +130,21 @@ jobs:
             | `Orynivo-${{ steps.ver.outputs.version }}-win-x64-Portable.zip` | Portable — extract anywhere and run `Orynivo.exe` |
             | `Orynivo-${{ steps.ver.outputs.version }}-linux-x64.tar.gz` | Portable Linux archive for x86-64 |
             | `Orynivo-${{ steps.ver.outputs.version }}-linux-arm64.tar.gz` | Portable Linux archive for ARM64 |
+            | `Orynivo-${{ steps.ver.outputs.version }}-osx-x64.pkg` | macOS installer for Intel Macs |
+            | `Orynivo-${{ steps.ver.outputs.version }}-osx-arm64.pkg` | macOS installer for Apple Silicon |
+            | `Orynivo-${{ steps.ver.outputs.version }}-osx-x64-Portable.zip` | Portable macOS app for Intel Macs |
+            | `Orynivo-${{ steps.ver.outputs.version }}-osx-arm64-Portable.zip` | Portable macOS app for Apple Silicon |
+            | `Orynivo-${{ steps.ver.outputs.version }}-osx-x64.tar.gz` | Alternative macOS app archive for Intel Macs |
+            | `Orynivo-${{ steps.ver.outputs.version }}-osx-arm64.tar.gz` | Alternative macOS app archive for Apple Silicon |
             | `orynivo_${{ steps.ver.outputs.version }}_amd64.deb` / `arm64.deb` | Debian and Ubuntu package |
             | `orynivo-${{ steps.ver.outputs.version }}-1.x86_64.rpm` / `aarch64.rpm` | Fedora, RHEL, and compatible distributions |
             | `orynivo-${{ steps.ver.outputs.version }}-1-x86_64.pkg.tar.zst` | Arch Linux package |
 
             All desktop builds are self-contained and bundle .NET 8. Linux
             playback additionally requires FFmpeg, ALSA, and OpenAL; the
-            distribution packages declare those runtime dependencies.
+            distribution packages declare those runtime dependencies. macOS
+            playback uses the system OpenAL framework and requires FFmpeg on
+            `PATH`.
 
             > **Windows SmartScreen:** an unsigned build may show a warning on
             > first run. Click **More info → Run anyway** to proceed.
