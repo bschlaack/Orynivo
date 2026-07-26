@@ -676,7 +676,8 @@ fallback or allow client-provided commands/paths to reach the helper.
   played Plex track can record a stable album/artist context in playback history
 - `Orynivo.Core/Streaming/OrynivoServerClient.cs`: HTTP client for a remote
   Orynivo Server; methods load artists, a single artist profile (`GetArtistAsync`),
-  aggregate library totals (`GetLibrarySummaryAsync`), albums by artist, albums, tracks by
+  aggregate library totals (`GetLibrarySummaryAsync`), albums by artist, albums,
+  tracks by
   album, all tracks, tracks by ID list (`GetTracksByIdsAsync`), track facet rows
   (`GetTrackFacetsAsync`), lightweight folder-tree tracks, per-track cached lyrics
   (`GetTrackLyricsAsync`/`UploadTrackLyricsAsync`), remote artist rename/merge
@@ -812,8 +813,8 @@ fallback or allow client-provided commands/paths to reach the helper.
   shows title/artist/artwork instead of authenticated stream URLs and enables
   lyrics, artist-info, favorite, and mixed-playlist actions. Remote folder
   playlist persistence must convert registered server track IDs to stable
-  `orynivo://` references in local SQLite, never credential-bearing stream URLs. When
-  `/api/folders/tracks` lacks the newer playback metadata because an older
+  `orynivo://` references in local SQLite, never credential-bearing stream URLs.
+  When `/api/folders/tracks` lacks the newer playback metadata because an older
   server is connected, the client may batch-hydrate folder track metadata through
   `/api/tracks/by-ids` before registering the folder rows. Before loading remote
   folder data, clear any existing local folder nodes and show the localized
@@ -1976,10 +1977,10 @@ asynchronous file I/O from the UI thread
   cyan line uses Catmull-Rom-derived cubic Bézier segments (never straight
   point-to-point joins). Clamp each segment's two Bézier control-point Y values
   to the range of that segment's real endpoints so smoothing can never invent a
-  peak or trough outside the measured values. The area under the line uses a vertical cyan-to-nearly-
-  transparent gradient; do not replace it with a flat fill. It compares with the
-  immediately preceding period where one exists. Quick access links to favorites,
-  Up Next, full recent history, and
+  peak or trough outside the measured values. The area under the line uses a
+  vertical cyan-to-nearly-transparent gradient; do not replace it with a flat
+  fill. It compares with the immediately preceding period where one exists.
+  Quick access links to favorites, Up Next, full recent history, and
   random local playback and shows short secondary labels/counts. The calendar
   keeps independent month navigation. On wide dashboards the four overview
   cards sit in one row; on narrow dashboards they form a 2 × 2 grid. The layout

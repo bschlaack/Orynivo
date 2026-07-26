@@ -7,7 +7,8 @@
 An Avalonia desktop music library for Windows, Linux, and macOS, plus a
 cross-platform music server for local Hi-Fi libraries.
 
-cwASIO/Steinberg ASIO/WASAPI · DSD/DSF/DFF · Gapless Playback · ReplayGain · Parametric EQ
+cwASIO/Steinberg ASIO/WASAPI · DSD/DSF/DFF · Gapless Playback · ReplayGain ·
+Parametric EQ
 Plex · Radio · Podcasts · AI Chat · MCP Server · Network Streaming
 
 ## Why Orynivo?
@@ -133,7 +134,8 @@ An X11 or Wayland desktop session is required to run the Avalonia UI. FFmpeg
 and FFprobe must be installed and available on `PATH` for playback, media
 probing, waveforms, ReplayGain analysis, and other FFmpeg-backed library
 functions. Settings checks the platform-appropriate executable names through
-the same locator used at startup. The ALSA runtime (`libasound.so.2`, commonly packaged as `libasound2`)
+the same locator used at startup. The ALSA runtime (`libasound.so.2`, commonly
+packaged as `libasound2`)
 is required for direct hardware output. The OpenAL runtime (`libopenal.so.1`,
 commonly packaged as `libopenal1`) is required for the system/default route.
 
@@ -507,8 +509,8 @@ byte-range streaming without FFmpeg.
 - UTF-8 M3U8 import and export for regular playlists, including relative local
   paths, retained missing-file entries, and HTTP/HTTPS streams; credentialed
   Plex URLs are excluded
-- Gapless sequential PCM playback through cwASIO, Steinberg ASIO, and exclusive WASAPI:
-  the next FFmpeg decoder is prefetched and handed to the existing output
+- Gapless sequential PCM playback through cwASIO, Steinberg ASIO, and exclusive
+  WASAPI: the next FFmpeg decoder is prefetched and handed to the existing output
   session without reopening the audio device
 - Theme-aware table highlighting follows the currently audible track across
   library, search, playlist, radio, podcast, and Plex views
@@ -517,9 +519,9 @@ byte-range streaming without FFmpeg.
 - Album cover changes and artist metadata/image updates retain the current
   selection and list position
 - Album track details provide an in-place favorite button and artist-info action
-  alongside the album metadata. Album identity uses album title plus physical album root, so equal
-  titles stored in different album folders have independent list entries,
-  covers, and favorites. Compilations remain together, and conventional
+  alongside the album metadata. Album identity uses album title plus physical
+  album root, so equal titles stored in different album folders have independent
+  list entries, covers, and favorites. Compilations remain together, and conventional
   `CD1`/`CD2` or `Disc 1`/`Disc 2` subfolders appear as separate groups inside
   one multi-disc album detail view. Disc tables expand fully without their own
   scrollbars, and row selection does not move the outer page.
@@ -806,10 +808,10 @@ git push origin v0.14.0
 | `player-macos-release.yml` | macOS | Intel/Apple-Silicon PKGs, portable ZIPs, and tar archives |
 | `server-release.yml` | Ubuntu | `amd64`/`arm64` `.deb` and `x86_64`/`aarch64` `.rpm` packages |
 
-All release workflows upload to the same draft GitHub Release. Release workflows accept
-only semantic `vMAJOR.MINOR.PATCH` tags whose commit is contained in `main`; the
-tag version is embedded into desktop and server assemblies at build time. To
-trigger a release
+All release workflows upload to the same draft GitHub Release. Release workflows
+accept only semantic `vMAJOR.MINOR.PATCH` tags whose commit is contained
+in `main`; the tag version is embedded into desktop and server assemblies at
+build time. To trigger a release
 by pushing the tag. **Workflow dispatch** may only rebuild an already existing
 tag that passes the same `main` containment check.
 
@@ -896,9 +898,9 @@ only from the development branch are intentionally ignored.
 Library directories and the desired output device can then be configured in
 Settings. When no output has been configured yet, Orynivo creates a `Default`
 WASAPI output from the Windows default multimedia output device so playback
-works without manual setup. Named output profiles allow saving multiple backend and device
-combinations; a quick-pick popup on the transport bar switches between them
-without opening Settings. ReplayGain can be disabled or switched to
+works without manual setup. Named output profiles allow saving multiple backend
+and device combinations; a quick-pick popup on the transport bar switches
+between them without opening Settings. ReplayGain can be disabled or switched to
 track/album mode under the output-device settings. Automatic calculation of
 missing ReplayGain values during library scans can be enabled separately; it is
 disabled by default because analysing complete audio files makes initial scans
