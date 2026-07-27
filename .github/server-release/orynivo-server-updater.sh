@@ -33,7 +33,7 @@ if [ "$PACKAGE_TYPE" = deb ]; then
     NEW_VERSION="$(dpkg-deb -f "$PACKAGE" Version)"
     CURRENT_VERSION="$(dpkg-query -W -f='${Version}' orynivo-server 2>/dev/null || printf '0')"
     dpkg --compare-versions "$NEW_VERSION" gt "$CURRENT_VERSION"
-    dpkg -i "$PACKAGE"
+    DEBIAN_FRONTEND=noninteractive dpkg --force-confold -i "$PACKAGE"
 else
     rpm -Uvh "$PACKAGE"
 fi

@@ -4,6 +4,14 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.29.3] - 2026-07-28
+
+### Fixed
+
+- Managed DEB server updates now retain the administrator's existing
+  `/etc/orynivo-server/appsettings.json` non-interactively instead of failing at
+  a conffile prompt and leaving the updater service incomplete.
+
 ## [0.29.2] - 2026-07-27
 
 ### Added
