@@ -298,6 +298,8 @@ DEB/RPM release, relay it to a server without internet access, and request its
 installation. The server verifies the signed manifest and package hash again;
 the unprivileged server process only stages the files. A narrowly scoped root
 systemd updater performs the package-manager operation and restarts the service.
+Automated DEB upgrades retain the existing administrator-edited
+`/etc/orynivo-server/appsettings.json` without prompting.
 Portable, development, Windows, and macOS server installations currently report
 managed updates as unsupported.
 

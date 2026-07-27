@@ -31,6 +31,9 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
   Do not fall back to the service user's non-writable home directory.
 - Editable Linux configuration belongs under `/etc/orynivo-server`; packaged
   defaults under `/usr/lib/orynivo-server` are read-only and replaceable.
+  Managed DEB upgrades must invoke `dpkg` non-interactively while retaining the
+  administrator-edited configuration; a conffile prompt would abort the
+  systemd updater and can leave the package partially configured.
   Because this editable file is layered after `WebApplication.CreateBuilder`,
   `Program.cs` explicitly reapplies its configured Kestrel maximum request-body
   size to the web host.
