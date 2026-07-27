@@ -273,6 +273,7 @@ public static class LibraryScanner
         using var db = AudioDatabase.OpenDefault();
         var timestamps = db.GetPathTimestamps();
         var refreshReplayGainMetadata = db.NeedsReplayGainMetadataScan(rootPath);
+        var refreshArtistAttribution = db.NeedsArtistAttributionScan(rootPath);
         long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
         for (int i = 0; i < files.Count; i++)
@@ -288,7 +289,7 @@ public static class LibraryScanner
 
                 var metadataChanged = !timestamps.TryGetValue(filePath, out long knownModified) ||
                                       knownModified != modifiedAt;
-                if (!refreshReplayGainMetadata && !metadataChanged)
+                if (!refreshReplayGainMetadata && !refreshArtistAttribution && !metadataChanged)
                     continue;
 
                 bool isNew = !timestamps.ContainsKey(filePath);
@@ -338,8 +339,6 @@ public static class LibraryScanner
 
         if (calculateMissingReplayGain)
             changedTracks.AddRange(EnsureAlbumReplayGain(db, changedTracks, ct));
-        if (changedTracks.Count > 0)
-            TrackSearchIndex.UpdateMany(changedTracks);
         var existing = new HashSet<string>(
             files.Concat(segmentDefinitions.Select(definition => definition.VirtualPath)),
             StringComparer.OrdinalIgnoreCase);
@@ -348,11 +347,16 @@ public static class LibraryScanner
             .ToList();
         foreach (var missingPath in missingPaths)
             DeleteTrackAndWaveform(db, missingPath);
+        AddReconciledTracks(db, changedTracks);
+        if (changedTracks.Count > 0)
+            TrackSearchIndex.UpdateMany(changedTracks);
         if (missingPaths.Count > 0)
             TrackSearchIndex.RemovePaths(missingPaths);
         TrackSearchIndex.RemoveMissingUnderRoot(rootPath, existing);
         if (refreshReplayGainMetadata)
             db.MarkReplayGainMetadataScanned(rootPath);
+        if (refreshArtistAttribution)
+            db.MarkArtistAttributionScanned(rootPath);
 
         return new ScanResult(total, added, updated, missingPaths.Count, failed);
     }
@@ -387,7 +391,13 @@ public static class LibraryScanner
         }
 
         if (removedPaths.Count > 0)
+        {
+            var reconciledTracks = new List<TrackRecord>();
+            AddReconciledTracks(db, reconciledTracks);
+            if (reconciledTracks.Count > 0)
+                TrackSearchIndex.UpdateMany(reconciledTracks);
             TrackSearchIndex.RemovePaths(removedPaths);
+        }
         return removedPaths.Count;
     }
 
@@ -559,11 +569,21 @@ public static class LibraryScanner
         if (calculateMissingReplayGain)
             updatedTracks.AddRange(EnsureAlbumReplayGain(db, updatedTracks, cancellationToken));
 
+        AddReconciledTracks(db, updatedTracks);
         if (updatedTracks.Count > 0)
             TrackSearchIndex.UpdateMany(updatedTracks);
         if (removedPaths.Count > 0)
             TrackSearchIndex.RemovePaths(removedPaths);
         return updatedTracks.Count > 0 || removedPaths.Count > 0;
+    }
+
+    private static void AddReconciledTracks(AudioDatabase db, ICollection<TrackRecord> tracks)
+    {
+        foreach (var path in db.ReconcileAlbumArtists())
+        {
+            if (db.GetByPath(path) is { } track)
+                tracks.Add(track);
+        }
     }
 
     private static int CalculateMissingReplayGain(
@@ -732,6 +752,7 @@ public static class LibraryScanner
             record.Title       = NullIfEmpty(tag.Title);
             record.Artist      = JoinArray(tag.Performers);
             record.AlbumArtist = JoinArray(tag.AlbumArtists);
+            record.AlbumArtistInferred = string.IsNullOrWhiteSpace(record.AlbumArtist);
             record.Album       = NullIfEmpty(tag.Album);
             record.Genre       = JoinArray(tag.Genres);
             record.Year        = tag.Year > 0 ? (int?)tag.Year : null;
@@ -744,6 +765,7 @@ public static class LibraryScanner
             record.Copyright   = NullIfEmpty(tag.Copyright);
             record.Lyrics      = NullIfEmpty(tag.Lyrics);
             record.Bpm         = tag.BeatsPerMinute > 0 ? (int?)tag.BeatsPerMinute : null;
+            record.Compilation = IsCompilation(tagFile);
 
             record.MusicBrainzTrackId   = NullIfEmpty(tag.MusicBrainzTrackId);
             record.MusicBrainzReleaseId = NullIfEmpty(tag.MusicBrainzReleaseId);
@@ -1110,6 +1132,11 @@ public static class LibraryScanner
         => arr is { Length: > 0 }
             ? NullIfEmpty(string.Join("; ", arr.Select(value => value.Trim()).Where(value => value.Length > 0)))
             : null;
+
+    private static bool IsCompilation(TagLib.File file) =>
+        (file.GetTag(TagTypes.Id3v2, false) as TagLib.Id3v2.Tag)?.IsCompilation == true ||
+        (file.GetTag(TagTypes.Apple, false) as TagLib.Mpeg4.AppleTag)?.IsCompilation == true ||
+        (file.GetTag(TagTypes.Xiph, false) as TagLib.Ogg.XiphComment)?.IsCompilation == true;
 
     private static string? FormatReplayGain(double gain) =>
         double.IsNaN(gain) || double.IsInfinity(gain)

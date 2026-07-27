@@ -3,12 +3,14 @@ using Orynivo.Audio;
 using Orynivo.Library;
 using Orynivo.Streaming;
 using Orynivo.Web;
+using System.Text.Json.Serialization;
 
 namespace Orynivo;
 
 /// <summary>
 /// Application settings persisted by <see cref="SettingsStore"/> as JSON.
-/// Covers output device selection, library paths, UI preferences, and third-party API keys.
+/// Covers output device selection, library paths, UI preferences, and permitted provider settings.
+/// Session-only secrets marked with <see cref="JsonIgnoreAttribute"/> are never persisted.
 /// </summary>
 public sealed class AppSettings
 {
@@ -77,6 +79,9 @@ public sealed class AppSettings
     public ArtistInfoSource ArtistInfoSource { get; set; } = ArtistInfoSource.Wikipedia;
     /// <summary>Gets or sets the Last.fm API key used when <see cref="ArtistInfoSource"/> is <see cref="ArtistInfoSource.LastFm"/>.</summary>
     public string LastFmApiKey { get; set; } = string.Empty;
+    /// <summary>Gets or sets the Fanart.tv API key used for preferred curated artist thumbnails.</summary>
+    [JsonIgnore]
+    public string FanartTvApiKey { get; set; } = string.Empty;
     /// <summary>Gets or sets the Qobuz application ID for the streaming integration.</summary>
     public string QobuzApplicationId { get; set; } = string.Empty;
     /// <summary>Gets or sets the configured Plex Media Servers.</summary>

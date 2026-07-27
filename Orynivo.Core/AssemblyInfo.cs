@@ -4,3 +4,4 @@ using System.Runtime.CompilerServices;
 // The server project (Orynivo.Server) intentionally does NOT have access
 // to audio-processing internals — it serves files via HTTP, not sample data.
 [assembly: InternalsVisibleTo("Orynivo")]
+[assembly: InternalsVisibleTo("Orynivo.Core.Tests")]

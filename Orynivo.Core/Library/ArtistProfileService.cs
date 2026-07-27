@@ -7,7 +7,7 @@ using Orynivo;
 
 namespace Orynivo.Library;
 
-/// <summary>Downloaded artist biography and optional image from Wikipedia or Last.fm.</summary>
+/// <summary>Downloaded artist biography and optional image from Wikipedia, Last.fm, or Fanart.tv.</summary>
 /// <param name="Biography">Extracted biography text.</param>
 /// <param name="ImagePath">Absolute path to the downloaded artist image, or <see langword="null"/>.</param>
 /// <param name="SourceUrl">Canonical URL of the source page.</param>
@@ -35,6 +35,9 @@ public static class ArtistProfileService
     /// <summary>Last.fm API key; required when <see cref="Source"/> is <see cref="ArtistInfoSource.LastFm"/>.</summary>
     public static string? LastFmApiKey { get; set; }
 
+    /// <summary>Fanart.tv API key used to prefer curated artist thumbnails when configured.</summary>
+    public static string? FanartTvApiKey { get; set; }
+
     /// <summary>Diagnostic message from the most recent image download attempt, or <see langword="null"/> on success.</summary>
     public static string? LastImageDiagnostic { get; private set; }
 
@@ -47,12 +50,14 @@ public static class ArtistProfileService
     /// <param name="language">Preferred content language (<c>en</c>, <c>de</c>, or <c>fr</c>).</param>
     /// <param name="downloadImage">Whether to also attempt downloading an artist image.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="musicBrainzArtistId">Known MusicBrainz artist ID used for exact Fanart.tv matching.</param>
     public static async Task<ArtistProfileDownload?> DownloadAsync(
         long artistId,
         string artistName,
         string language,
         bool downloadImage = true,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? musicBrainzArtistId = null)
         => await DownloadAsync(
             artistId,
             artistName,
@@ -60,7 +65,8 @@ public static class ArtistProfileService
             Source,
             LastFmApiKey,
             downloadImage,
-            cancellationToken);
+            cancellationToken,
+            musicBrainzArtistId);
 
     /// <summary>
     /// Downloads a biography and optional image for the given artist from the requested source.
@@ -73,6 +79,7 @@ public static class ArtistProfileService
     /// <param name="lastFmApiKey">Last.fm API key used when <paramref name="source"/> is <see cref="ArtistInfoSource.LastFm"/>.</param>
     /// <param name="downloadImage">Whether to also attempt downloading an artist image.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="musicBrainzArtistId">Known MusicBrainz artist ID used for exact Fanart.tv matching.</param>
     /// <returns>The downloaded profile, or <see langword="null"/> when no profile was found.</returns>
     public static async Task<ArtistProfileDownload?> DownloadAsync(
         long artistId,
@@ -81,26 +88,60 @@ public static class ArtistProfileService
         ArtistInfoSource source,
         string? lastFmApiKey,
         bool downloadImage = true,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? musicBrainzArtistId = null)
     {
         if (string.IsNullOrWhiteSpace(artistName))
             return null;
 
         language = language is "de" or "fr" ? language : "en";
 
+        ArtistProfileDownload? result;
         if (source == ArtistInfoSource.LastFm)
         {
-            var result = await DownloadFromLastFmAsync(
+            result = await DownloadFromLastFmAsync(
                 artistId, artistName, language, lastFmApiKey, downloadImage, cancellationToken);
-            if (result is not null)
-                return result;
-            // Last.fm hat den Künstler nicht gefunden ("+nodirect", leere Bio, etc.) → Wikipedia
-            return await DownloadFromWikipediaAsync(
+            if (result is null)
+            {
+                // Last.fm hat den Künstler nicht gefunden ("+nodirect", leere Bio, etc.) → Wikipedia
+                result = await DownloadFromWikipediaAsync(
+                    artistId, artistName, language, downloadImage, cancellationToken);
+            }
+        }
+        else
+        {
+            result = await DownloadFromWikipediaAsync(
                 artistId, artistName, language, downloadImage, cancellationToken);
         }
 
-        return await DownloadFromWikipediaAsync(
-            artistId, artistName, language, downloadImage, cancellationToken);
+        if (downloadImage && result is not null && !string.IsNullOrWhiteSpace(FanartTvApiKey))
+        {
+            try
+            {
+                var fanartPath = await FanartTvArtistImageService.DownloadBestAsync(
+                    artistId,
+                    artistName,
+                    musicBrainzArtistId,
+                    apiKey: FanartTvApiKey,
+                    cancellationToken: cancellationToken);
+                if (fanartPath is not null)
+                    result = result with { ImagePath = fanartPath };
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (HttpRequestException)
+            {
+                // Keep the biography source's image when Fanart.tv is temporarily unavailable.
+            }
+            catch (JsonException)
+            {
+                // Keep the biography source's image when a provider returns malformed metadata.
+            }
+        }
+
+        return result;
     }
 
     private static async Task<ArtistProfileDownload?> DownloadFromWikipediaAsync(

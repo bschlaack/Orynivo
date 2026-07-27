@@ -24,6 +24,14 @@ the ability to reach that library from any device on the local network.
 - CUE sheet support
 - ReplayGain and parametric EQ
 - Local library, playlists, smart playlists and full-text search
+- Album-artist-centered library attribution: explicit `ALBUMARTIST` metadata
+  wins, untagged multi-artist compilations are grouped under `Various Artists`,
+  featured track credits do not create extra library artists, and embedded
+  MusicBrainz artist IDs unify verified spelling variants
+- Optional curated Fanart.tv artist thumbnails. Enter a personal key for the
+  current session under Settings > Artist information, or set the
+  `FANART_TV_API_KEY` environment variable before starting Orynivo. The key is
+  not persisted by Orynivo. Manual artist images always take priority
 - Unified local and Orynivo Server artist browsing: matching artists appear once
   in Artists and search, and every artist link opens one combined album view
   across those libraries regardless of which source the clicked item came from.
@@ -402,6 +410,9 @@ byte-range streaming without FFmpeg.
 - Opening a remote server album from a selected artist initially scopes the
   album tracks to that artist, with the same checkbox used by local albums to
   show every track on the album.
+- Opening any local or remote album from a unified artist view retains that
+  album's source-specific artist identity, initially scopes the track list to
+  the selected artist, and offers the checkbox to show all album tracks.
 - File and directory context menus in an Orynivo Server Folder structure view
   can append tracks to an existing mixed playlist or create a new shared local
   playlist. Folder descendants are stored as stable `orynivo://` references;

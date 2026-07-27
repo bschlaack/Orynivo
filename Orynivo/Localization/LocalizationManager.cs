@@ -162,6 +162,8 @@ public static class LocalizationManager
         resources["L_ArtistInfoSourceSetting"] = Current.ArtistInfoSourceSetting;
         resources["L_LastFmApiKey"] = Current.LastFmApiKey;
         resources["L_LastFmApiKeyHint"] = Current.LastFmApiKeyHint;
+        resources["L_FanartTvApiKey"] = Current.FanartTvApiKey;
+        resources["L_FanartTvApiKeyHint"] = Current.FanartTvApiKeyHint;
         resources["L_ShowAllAlbumTracks"] = Current.ShowAllAlbumTracks;
         resources["L_OutputType"] = Current.OutputType;
         resources["L_AsioOutputDevice"] = Current.AsioOutputDevice;
@@ -423,6 +425,8 @@ public static class LocalizationManager
         "Quelle: Wikipedia", "Quelle: Last.fm",
         "Quelle für Künstlerinfos", "Last.fm API-Schlüssel",
         "Kostenlosen API-Schlüssel erstellen unter: last.fm/api/account/create",
+        "Fanart.tv API-Schlüssel",
+        "Bevorzugt kuratierte Künstlerbilder. Der Schlüssel gilt nur für diese Sitzung; dauerhaft kann FANART_TV_API_KEY gesetzt werden. Für bereits geladene Künstler »Künstlerinfo neu laden« wählen. Schlüssel unter fanart.tv/get-an-api-key/ erstellen.",
         "Alle Tracks des Albums anzeigen",
         "Orynivo ist abgestürzt",
         "Ein unerwarteter Fehler ist aufgetreten. Ein Fehlerbericht wurde hier gespeichert:\n\n{0}\n\nOrynivo wird beendet.",
@@ -962,6 +966,8 @@ public static class LocalizationManager
         "Source: Wikipedia", "Source: Last.fm",
         "Artist info source", "Last.fm API key",
         "Create a free API key at: last.fm/api/account/create",
+        "Fanart.tv API key",
+        "Prefers curated artist images. The key is session-only; set FANART_TV_API_KEY for persistent configuration. Use “Refresh artist information” for existing artists. Create a key at fanart.tv/get-an-api-key/.",
         "Show all album tracks",
         "Orynivo crashed",
         "An unexpected error occurred. A crash report was saved here:\n\n{0}\n\nOrynivo will now close.",
@@ -1483,6 +1489,8 @@ public static class LocalizationManager
         "Source : Wikipédia", "Source : Last.fm",
         "Source des informations artiste", "Clé API Last.fm",
         "Créez une clé API gratuite sur : last.fm/api/account/create",
+        "Clé API Fanart.tv",
+        "Préfère les images d’artistes sélectionnées. La clé reste limitée à cette session ; définissez FANART_TV_API_KEY pour une configuration permanente. Utilisez « Actualiser les informations artiste » pour les artistes existants. Créez une clé sur fanart.tv/get-an-api-key/.",
         "Afficher tous les titres de l’album",
         "Orynivo a cessé de fonctionner",
         "Une erreur inattendue s’est produite. Un rapport a été enregistré ici :\n\n{0}\n\nOrynivo va maintenant se fermer.",
@@ -2001,6 +2009,8 @@ public static class LocalizationManager
         "Fuente: Wikipedia", "Fuente: Last.fm",
         "Fuente de información del artista", "Clave de API de Last.fm",
         "Crea una clave de API gratuita en: last.fm/api/account/create",
+        "Clave API de Fanart.tv",
+        "Da prioridad a imágenes de artistas seleccionadas. La clave solo dura esta sesión; define FANART_TV_API_KEY para conservar la configuración. Usa «Actualizar información del artista» para artistas existentes. Crea una clave en fanart.tv/get-an-api-key/.",
         "Mostrar todas las pistas del álbum",
         "Orynivo se ha bloqueado",
         "Se produjo un error inesperado. Se guardó un informe aquí:\n\n{0}\n\nOrynivo se cerrará ahora.",

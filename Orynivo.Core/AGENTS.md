@@ -35,6 +35,19 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   playback-history rows.
 - `ArtistNameNormalizer.CreateComparisonKey` is the shared identity key for
   comparing artist names across local and Orynivo Server catalogs.
+- Local artist browsing is album-artist-centered. The scanner records whether
+  `ALBUMARTIST` was missing, imports supported compilation flags, and
+  `AudioDatabase.ReconcileAlbumArtists` resolves the complete album before the
+  Artists view is exposed. Explicit consistent album artists win; otherwise
+  compilation or differing inferred track artists resolve to `Various Artists`.
+  Primary track artists stay attached to their tracks. Featured suffixes remain
+  governed by `ArtistNameNormalizer`. Embedded MusicBrainz artist IDs take
+  precedence over name comparison when resolving a local artist identity.
+- `FanartTvArtistImageService` uses a known MusicBrainz artist ID or an
+  unambiguous exact MusicBrainz name match, accepts only HTTPS `artistthumb`
+  URLs, bounds image downloads, and never includes the Fanart.tv API key in
+  diagnostics. `ArtistProfileService` prefers that image only when automatic
+  image refresh is allowed; manual artist images must remain untouched.
 - Web page fetching must retain SSRF protection, connect-time address checks,
   redirect and size limits, text-only responses, timeouts, and audit logging.
 - Streaming URL builders may carry credentials for immediate playback, but such

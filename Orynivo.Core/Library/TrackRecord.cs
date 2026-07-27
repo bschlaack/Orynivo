@@ -156,6 +156,12 @@ public sealed class TrackRecord
     /// <summary><see langword="true"/> when part of a compilation (iTunes TCMP extension).</summary>
     public bool    Compilation     { get; set; }
 
+    /// <summary>
+    /// <see langword="true"/> when the album artist was absent from the file metadata and was
+    /// inferred from the track artist. Album-wide reconciliation may replace this fallback.
+    /// </summary>
+    public bool    AlbumArtistInferred { get; set; }
+
     /// <summary>International Standard Recording Code (ID3 TSRC).</summary>
     public string? Isrc            { get; set; }
 

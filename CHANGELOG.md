@@ -4,6 +4,35 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.29.2] - 2026-07-27
+
+### Added
+
+- Added optional Fanart.tv artist thumbnails. Orynivo uses embedded MusicBrainz
+  artist IDs when available, otherwise accepts only an unambiguous exact
+  MusicBrainz match, and selects the highest-rated HTTPS `artistthumb`.
+  Manually selected images remain protected. The personal API key is
+  session-only in Settings or can be supplied through `FANART_TV_API_KEY`; it
+  is never written to `settings.json`, logs, server requests, or model context.
+
+### Changed
+
+- Artist browsing is now album-artist-centered: explicit `ALBUMARTIST` tags take
+  precedence, untagged albums are reconciled across all of their tracks, and
+  compilations or albums with differing inferred track artists are grouped
+  under `Various Artists`. Primary track artists remain attached to their
+  tracks without automatically cluttering the Artists view.
+- MusicBrainz artist IDs now participate in local artist identity matching, so
+  differently spelled tags carrying the same stable ID resolve to one artist.
+  Existing libraries receive a one-time attribution metadata refresh during
+  their next scan.
+
+### Fixed
+
+- Opening a local or Orynivo Server album from a unified artist view once again
+  initially filters the album to that artist and shows the option to display all
+  tracks on the album.
+
 ## [0.29.1] - 2026-07-26
 
 ### Fixed
