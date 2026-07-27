@@ -13,6 +13,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   target `net8.0-windows10.0.19041.0`.
 - New visible text must use `LocalizationManager` and exist in German, English,
   French, and Spanish.
+- Fanart.tv artist artwork uses the session-only Settings value or the
+  `FANART_TV_API_KEY` environment variable. The personal key must remain
+  `[JsonIgnore]`, must never be written to `settings.json`, and must not appear
+  in logs, server payloads, diagnostics, or model context.
 - Add or update English XML documentation for affected public/internal members.
 
 ## Client Invariants
@@ -36,7 +40,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 - Matching local and Orynivo Server artists use
   `ArtistNameNormalizer.CreateComparisonKey` and one `UnifiedArtist` row. Its
   album drill-down combines every matching library while retaining each album's
-  source context. Every non-Plex artist navigation entry point must use that
+  source context. Opening one of those albums must pass the album row's
+  provider-local artist ID into the shared album detail so its tracks initially
+  remain scoped to the selected artist and the show-all-tracks checkbox remains
+  available. Every non-Plex artist navigation entry point must use that
   unified drill-down even when the clicked track or row came from only one
   source. The unified row selects available biography and artwork from any
   matching identity. Profile downloads and manual image selections propagate to

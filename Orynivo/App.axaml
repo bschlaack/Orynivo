@@ -477,6 +477,8 @@
             <x:String x:Key="L_RefreshArtistInfo">Künstlerinfo neu laden</x:String>
             <x:String x:Key="L_CloseArtistInfo">Künstlerinfo schließen</x:String>
             <x:String x:Key="L_ArtistInfoSource">Quelle: Wikipedia</x:String>
+            <x:String x:Key="L_FanartTvApiKey">Fanart.tv API-Schlüssel</x:String>
+            <x:String x:Key="L_FanartTvApiKeyHint">Bevorzugt kuratierte Künstlerbilder. Der Schlüssel gilt nur für diese Sitzung; dauerhaft kann FANART_TV_API_KEY gesetzt werden. Für bereits geladene Künstler »Künstlerinfo neu laden« wählen.</x:String>
             <x:String x:Key="L_SearchArtistImage">Künstlerbild suchen</x:String>
             <x:String x:Key="L_ArtistImageSearchTitle">Künstlerbild suchen</x:String>
             <x:String x:Key="L_ArtistImageSearchRunning">Passende Künstlerbilder werden gesucht …</x:String>

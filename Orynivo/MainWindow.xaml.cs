@@ -1059,6 +1059,10 @@ public partial class MainWindow : Window
     {
         ArtistProfileService.Source = _settings.ArtistInfoSource;
         ArtistProfileService.LastFmApiKey = _settings.LastFmApiKey;
+        ArtistProfileService.FanartTvApiKey =
+            string.IsNullOrWhiteSpace(_settings.FanartTvApiKey)
+                ? Environment.GetEnvironmentVariable("FANART_TV_API_KEY")
+                : _settings.FanartTvApiKey;
     }
 
     private void OnWatchedLibraryChanged()
@@ -7981,7 +7985,12 @@ public partial class MainWindow : Window
             return;
 
         var albumTitle = row.EntityType == "Album" ? row.Title : row.Album;
-        await ShowAlbumTracksAsync(id, albumTitle ?? LocalizationManager.Current.Unknown);
+        var (artistFilterId, artistFilterName) = GetAlbumArtistScope(row);
+        await ShowAlbumTracksAsync(
+            id,
+            albumTitle ?? LocalizationManager.Current.Unknown,
+            artistFilterId,
+            artistFilterName);
     }
 
     private async void NowPlayingArtistButton_OnClick(object? sender, RoutedEventArgs e)
@@ -8155,7 +8164,12 @@ public partial class MainWindow : Window
             row.EntityType is "Album" or null &&
             (row.AlbumId ?? row.Id) is long albumId)
         {
-            await ShowAlbumTracksAsync(albumId, row.Title ?? "(Unbekannt)");
+            var (artistFilterId, artistFilterName) = GetAlbumArtistScope(row);
+            await ShowAlbumTracksAsync(
+                albumId,
+                row.Title ?? "(Unbekannt)",
+                artistFilterId,
+                artistFilterName);
             return;
         }
 
@@ -8203,6 +8217,7 @@ public partial class MainWindow : Window
         if (row.Id is not long albumId)
             return;
 
+        var (artistFilterId, artistFilterName) = GetAlbumArtistScope(row);
         PushCurrentNavigationState();
         _orynivoNavigationStack.Push((_activeOrynivoView, null, null));
         BackButton.IsVisible = true;
@@ -8221,7 +8236,29 @@ public partial class MainWindow : Window
                         row.ThumbnailPath,
                         row.IsFavorite,
                         row.ArtistId);
-        await ShowProviderAlbumTracksAsync(provider, album, _activeArtistFilterId, _activeArtistFilterName);
+        await ShowProviderAlbumTracksAsync(provider, album, artistFilterId, artistFilterName);
+    }
+
+    /// <summary>
+    /// Resolves the provider-local artist scope to retain when an album is opened
+    /// from the unified artist album list.
+    /// </summary>
+    /// <param name="row">The selected album row.</param>
+    /// <returns>
+    /// The artist identifier and display name used to initially filter the album,
+    /// or the ambient scope when the album was opened from another view.
+    /// </returns>
+    private (long? ArtistId, string? ArtistName) GetAlbumArtistScope(ContentRow row)
+    {
+        var isUnifiedArtistAlbumList =
+            _activeAlbumFilterId is null &&
+            _activeArtistFilterId is null &&
+            !string.IsNullOrWhiteSpace(_activeArtistFilterName) &&
+            string.Equals(_currentTopLevelTag, "Albums", StringComparison.Ordinal);
+
+        return isUnifiedArtistAlbumList
+            ? (row.ArtistId, _activeArtistFilterName)
+            : (_activeArtistFilterId, _activeArtistFilterName);
     }
 
     private async Task RestoreOrynivoAlbumTracksAsync(
@@ -8370,11 +8407,17 @@ public partial class MainWindow : Window
         }
     }
 
-    private async Task ShowAlbumTracksAsync(long albumId, string albumTitle)
+    private async Task ShowAlbumTracksAsync(
+        long albumId,
+        string albumTitle,
+        long? artistFilterId = null,
+        string? artistFilterName = null)
     {
         PushCurrentNavigationState();
         _activeAlbumFilterId = albumId;
         _activeAlbumFilterTitle = albumTitle;
+        _activeArtistFilterId = artistFilterId;
+        _activeArtistFilterName = artistFilterName;
         _activeAlbumCatalogProvider = null;
         _activeCatalogAlbum = null;
         _showAllAlbumTracks = false;
@@ -9501,7 +9544,9 @@ public partial class MainWindow : Window
                     albumId,
                     string.IsNullOrWhiteSpace(state.SearchQuery)
                         ? LocalizationManager.Current.Unknown
-                        : state.SearchQuery);
+                        : state.SearchQuery,
+                    state.ArtistFilterId,
+                    state.ArtistFilterName);
                 return;
 
             case "ArtistAlbums" when state.ArtistFilterId is long artistId:
@@ -13629,7 +13674,8 @@ public partial class MainWindow : Window
                     artist.Artist,
                     language,
                     downloadImage: !artist.ImageIsManual,
-                    cancellationToken: cts.Token);
+                    cancellationToken: cts.Token,
+                    musicBrainzArtistId: artist.MusicBrainzArtistId);
                 cts.Token.ThrowIfCancellationRequested();
                 using (var db = AudioDatabase.OpenDefault())
                 {
@@ -14743,6 +14789,10 @@ public partial class MainWindow : Window
                 !string.Equals(
                     _settings.LastFmApiKey,
                     window.SelectedLastFmApiKey,
+                    StringComparison.Ordinal) ||
+                !string.Equals(
+                    _settings.FanartTvApiKey,
+                    window.SelectedFanartTvApiKey,
                     StringComparison.Ordinal);
             var sidebarChanged =
                 _settings.ShowInternetRadioItem != window.ShowInternetRadioItem ||
@@ -14816,6 +14866,7 @@ public partial class MainWindow : Window
             _settings.Language               = window.SelectedLanguage;
             _settings.ArtistInfoSource       = window.SelectedArtistInfoSource;
             _settings.LastFmApiKey           = window.SelectedLastFmApiKey;
+            _settings.FanartTvApiKey         = window.SelectedFanartTvApiKey;
             _settings.QobuzApplicationId      = window.SelectedQobuzApplicationId;
             _settings.PlexServers             = window.SelectedPlexServers.ToList();
             _settings.OrynivoServers          = window.SelectedOrynivoServers.ToList();

@@ -17,7 +17,11 @@ public sealed record ArtistInfo(
     string? SourceUrl,
     string? ProfileLanguage,
     long? ProfileFetchedAt,
-    bool ImageIsManual);
+    bool ImageIsManual)
+{
+    /// <summary>Gets the stable MusicBrainz artist identifier when embedded metadata provided one.</summary>
+    public string? MusicBrainzArtistId { get; init; }
+}
 
 /// <summary>Distinct album entry used by the album-grid and album-list views.</summary>
 public sealed record AlbumInfo(
@@ -321,13 +325,20 @@ public sealed class AudioDatabase : IDisposable
         track.Title = TrimToNull(track.Title);
         track.SortTitle = TrimToNull(track.SortTitle);
         track.Artist = ArtistNameNormalizer.NormalizeDisplayName(track.Artist);
+        track.AlbumArtistInferred |= string.IsNullOrWhiteSpace(track.AlbumArtist);
         track.AlbumArtist = ArtistNameNormalizer.NormalizeDisplayName(track.AlbumArtist ?? track.Artist);
         using var tx = _conn.BeginTransaction();
         try
         {
-            var artistId  = EnsureArtist(track.Artist, tx);
+            var artistId  = EnsureArtist(track.Artist, track.MusicBrainzArtistId, tx);
             track.Artist = GetCanonicalArtistName(artistId, track.Artist);
-            var albumArtistId = EnsureArtist(GetFirstArtist(track.AlbumArtist ?? track.Artist), tx);
+            var albumArtistName = GetFirstArtist(track.AlbumArtist ?? track.Artist);
+            var albumArtistMusicBrainzId =
+                ArtistNameNormalizer.CreateComparisonKey(albumArtistName) ==
+                ArtistNameNormalizer.CreateComparisonKey(track.Artist)
+                    ? track.MusicBrainzArtistId
+                    : null;
+            var albumArtistId = EnsureArtist(albumArtistName, albumArtistMusicBrainzId, tx);
             track.AlbumArtist = GetCanonicalArtistName(albumArtistId, track.AlbumArtist ?? track.Artist);
             var artworkId = EnsureArtwork(track.CoverData, track.CoverMimeType, tx);
             var albumId = EnsureAlbum(
@@ -355,7 +366,7 @@ public sealed class AudioDatabase : IDisposable
                 isrc, language, mood,
                 replay_gain_track, replay_gain_album,
                 musicbrainz_track_id, musicbrainz_release_id,
-                musicbrainz_artist_id, acoustid_fingerprint,
+                musicbrainz_artist_id, acoustid_fingerprint, album_artist_inferred,
                 has_cover, cover_mime_type, cover_data,
                 artist_id, album_id
             ) VALUES (
@@ -372,7 +383,7 @@ public sealed class AudioDatabase : IDisposable
                 $isrc, $language, $mood,
                 $replay_gain_track, $replay_gain_album,
                 $musicbrainz_track_id, $musicbrainz_release_id,
-                $musicbrainz_artist_id, $acoustid_fingerprint,
+                $musicbrainz_artist_id, $acoustid_fingerprint, $album_artist_inferred,
                 $has_cover, $cover_mime_type, $cover_data,
                 $artist_id, $album_id
             )
@@ -428,6 +439,7 @@ public sealed class AudioDatabase : IDisposable
                 musicbrainz_release_id  = excluded.musicbrainz_release_id,
                 musicbrainz_artist_id   = excluded.musicbrainz_artist_id,
                 acoustid_fingerprint    = excluded.acoustid_fingerprint,
+                album_artist_inferred   = excluded.album_artist_inferred,
                 has_cover           = excluded.has_cover,
                 cover_mime_type     = excluded.cover_mime_type,
                 cover_data          = excluded.cover_data,
@@ -554,6 +566,20 @@ public sealed class AudioDatabase : IDisposable
     public void MarkReplayGainMetadataScanned(string rootPath) =>
         SetMeta(GetReplayGainScanKey(rootPath), "done");
 
+    /// <summary>
+    /// Determines whether tracks below a library root need a one-time metadata refresh for
+    /// compilation and album-artist attribution.
+    /// </summary>
+    /// <param name="rootPath">Configured library root path.</param>
+    /// <returns><see langword="true"/> when the attribution refresh has not completed.</returns>
+    public bool NeedsArtistAttributionScan(string rootPath) =>
+        !string.Equals(GetMeta(GetArtistAttributionScanKey(rootPath)), "done", StringComparison.Ordinal);
+
+    /// <summary>Marks the one-time artist-attribution metadata refresh as complete.</summary>
+    /// <param name="rootPath">Configured library root path.</param>
+    public void MarkArtistAttributionScanned(string rootPath) =>
+        SetMeta(GetArtistAttributionScanKey(rootPath), "done");
+
     private static string GetReplayGainScanKey(string rootPath)
     {
         var normalizedPath = Path.GetFullPath(rootPath)
@@ -561,6 +587,15 @@ public sealed class AudioDatabase : IDisposable
             .ToUpperInvariant();
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalizedPath)));
         return $"replay_gain_metadata_v1_{hash}";
+    }
+
+    private static string GetArtistAttributionScanKey(string rootPath)
+    {
+        var normalizedPath = Path.GetFullPath(rootPath)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            .ToUpperInvariant();
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalizedPath)));
+        return $"artist_attribution_v1_{hash}";
     }
 
     public void UpdateDownloadedLyrics(
@@ -710,17 +745,19 @@ public sealed class AudioDatabase : IDisposable
         return result;
     }
 
-    /// <summary>Nur distinct artist – ohne Trackzeilen, BLOBs oder weitere Metadaten.</summary>
+    /// <summary>Loads distinct album artists without track rows, artwork BLOBs, or biography text.</summary>
+    /// <returns>Album artists ordered by display name.</returns>
     public List<ArtistInfo> GetArtistsLite()
     {
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = """
-            SELECT id, name, is_favorite, NULL AS biography, image_path,
+            SELECT ar.id, ar.name, ar.is_favorite, NULL AS biography, ar.image_path,
                    profile_source_url, profile_language, profile_fetched_at,
                    image_is_manual
-            FROM artists
-            ORDER BY CASE WHEN name = '' THEN 1 ELSE 0 END,
-                     name COLLATE NOCASE;
+            FROM artists ar
+            WHERE EXISTS (SELECT 1 FROM albums al WHERE al.artist_id = ar.id)
+            ORDER BY CASE WHEN ar.name = '' THEN 1 ELSE 0 END,
+                     ar.name COLLATE NOCASE;
             """;
         using var reader = cmd.ExecuteReader();
         var result = new List<ArtistInfo>();
@@ -738,18 +775,19 @@ public sealed class AudioDatabase : IDisposable
         return result;
     }
 
-    /// <summary>Loads compact artist rows including cached profile metadata but no track rows.</summary>
-    /// <returns>Artists ordered by display name.</returns>
+    /// <summary>Loads compact album-artist rows including cached profile metadata but no track rows.</summary>
+    /// <returns>Album artists ordered by display name.</returns>
     public List<ArtistInfo> GetArtistsWithProfiles()
     {
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = """
-            SELECT id, name, is_favorite, biography, image_path,
-                   profile_source_url, profile_language, profile_fetched_at,
-                   image_is_manual
-            FROM artists
-            ORDER BY CASE WHEN name = '' THEN 1 ELSE 0 END,
-                     name COLLATE NOCASE;
+            SELECT ar.id, ar.name, ar.is_favorite, ar.biography, ar.image_path,
+                   ar.profile_source_url, ar.profile_language, ar.profile_fetched_at,
+                   ar.image_is_manual
+            FROM artists ar
+            WHERE EXISTS (SELECT 1 FROM albums al WHERE al.artist_id = ar.id)
+            ORDER BY CASE WHEN ar.name = '' THEN 1 ELSE 0 END,
+                     ar.name COLLATE NOCASE;
             """;
         using var reader = cmd.ExecuteReader();
         var result = new List<ArtistInfo>();
@@ -766,6 +804,117 @@ public sealed class AudioDatabase : IDisposable
                 reader.GetInt32(8) != 0));
         return result;
     }
+
+    /// <summary>
+    /// Reconciles album artists across every track of an album. Explicit, consistent album-artist
+    /// tags win; albums with only inferred and differing track artists are assigned to
+    /// <c>Various Artists</c>. Primary track artists remain unchanged.
+    /// </summary>
+    /// <returns>Paths whose inferred album-artist value changed.</returns>
+    public IReadOnlyList<string> ReconcileAlbumArtists()
+    {
+        var albums = new Dictionary<long, List<AlbumArtistCandidate>>();
+        using (var cmd = _conn.CreateCommand())
+        {
+            cmd.CommandText = """
+                SELECT album_id, path, artist, album_artist, album_artist_inferred, compilation
+                FROM tracks
+                WHERE album_id IS NOT NULL
+                ORDER BY album_id, disc_number, track_number, id;
+                """;
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                var albumId = reader.GetInt64(0);
+                if (!albums.TryGetValue(albumId, out var candidates))
+                {
+                    candidates = [];
+                    albums.Add(albumId, candidates);
+                }
+
+                candidates.Add(new AlbumArtistCandidate(
+                    reader.GetString(1),
+                    reader.IsDBNull(2) ? string.Empty : reader.GetString(2),
+                    reader.IsDBNull(3) ? string.Empty : reader.GetString(3),
+                    reader.GetInt32(4) != 0,
+                    reader.GetInt32(5) != 0));
+            }
+        }
+
+        var changedPaths = new List<string>();
+        using var tx = _conn.BeginTransaction();
+        foreach (var (albumId, candidates) in albums)
+        {
+            var explicitAlbumArtists = DistinctArtistNames(
+                candidates.Where(candidate => !candidate.AlbumArtistInferred)
+                    .Select(candidate => candidate.AlbumArtist));
+            string targetName;
+            if (explicitAlbumArtists.Count == 1)
+            {
+                targetName = explicitAlbumArtists[0];
+            }
+            else if (explicitAlbumArtists.Count > 1)
+            {
+                targetName = "Various Artists";
+            }
+            else
+            {
+                var trackArtists = DistinctArtistNames(candidates.Select(candidate => candidate.Artist));
+                targetName = candidates.Any(candidate => candidate.Compilation)
+                    ? "Various Artists"
+                    : trackArtists.Count == 1
+                    ? trackArtists[0]
+                    : "Various Artists";
+            }
+
+            if (string.IsNullOrWhiteSpace(targetName))
+                continue;
+
+            var targetId = EnsureArtist(targetName, tx);
+            using (var updateAlbum = _conn.CreateCommand())
+            {
+                updateAlbum.Transaction = tx;
+                updateAlbum.CommandText = "UPDATE albums SET artist_id = $artist_id WHERE id = $album_id;";
+                Add(updateAlbum, "$artist_id", targetId);
+                Add(updateAlbum, "$album_id", albumId);
+                updateAlbum.ExecuteNonQuery();
+            }
+
+            using var updateTracks = _conn.CreateCommand();
+            updateTracks.Transaction = tx;
+            updateTracks.CommandText = """
+                UPDATE tracks
+                SET album_artist = $album_artist,
+                    sort_album_artist = NULL
+                WHERE album_id = $album_id
+                  AND album_artist_inferred = 1
+                  AND album_artist <> $album_artist COLLATE NOCASE
+                RETURNING path;
+                """;
+            Add(updateTracks, "$album_artist", targetName);
+            Add(updateTracks, "$album_id", albumId);
+            using var changedReader = updateTracks.ExecuteReader();
+            while (changedReader.Read())
+                changedPaths.Add(changedReader.GetString(0));
+        }
+
+        tx.Commit();
+        return changedPaths;
+    }
+
+    private static List<string> DistinctArtistNames(IEnumerable<string?> names) =>
+        names.Select(ArtistNameNormalizer.NormalizeDisplayName)
+            .Where(name => name.Length > 0)
+            .GroupBy(ArtistNameNormalizer.CreateComparisonKey, StringComparer.Ordinal)
+            .Select(group => group.First())
+            .ToList();
+
+    private sealed record AlbumArtistCandidate(
+        string Path,
+        string Artist,
+        string AlbumArtist,
+        bool AlbumArtistInferred,
+        bool Compilation);
 
     public ArtistInfo? GetArtistById(long artistId)
     {
@@ -773,7 +922,7 @@ public sealed class AudioDatabase : IDisposable
         cmd.CommandText = """
             SELECT id, name, is_favorite, biography, image_path,
                    profile_source_url, profile_language, profile_fetched_at,
-                   image_is_manual
+                   image_is_manual, musicbrainz_artist_id
             FROM artists
             WHERE id = $id
             LIMIT 1;
@@ -797,7 +946,7 @@ public sealed class AudioDatabase : IDisposable
         cmd.CommandText = $"""
             SELECT id, name, is_favorite, biography, image_path,
                    profile_source_url, profile_language, profile_fetched_at,
-                   image_is_manual
+                   image_is_manual, musicbrainz_artist_id
             FROM artists
             WHERE id IN ({string.Join(", ", parameters)})
             ORDER BY CASE WHEN name = '' THEN 1 ELSE 0 END,
@@ -816,7 +965,7 @@ public sealed class AudioDatabase : IDisposable
         cmd.CommandText = """
             SELECT ar.id, ar.name, ar.is_favorite, ar.biography, ar.image_path,
                    ar.profile_source_url, ar.profile_language, ar.profile_fetched_at,
-                   ar.image_is_manual
+                   ar.image_is_manual, ar.musicbrainz_artist_id
             FROM tracks t
             JOIN artists ar ON ar.id = t.artist_id
             WHERE t.path = $path
@@ -2467,6 +2616,7 @@ public sealed class AudioDatabase : IDisposable
                 musicbrainz_release_id  TEXT,
                 musicbrainz_artist_id   TEXT,
                 acoustid_fingerprint    TEXT,
+                album_artist_inferred   INTEGER NOT NULL DEFAULT 0,
 
                 -- Cover Art
                 has_cover               INTEGER NOT NULL DEFAULT 0,
@@ -2504,6 +2654,7 @@ public sealed class AudioDatabase : IDisposable
             EnsureColumn("tracks", "synced_lyrics", "TEXT");
             EnsureColumn("tracks", "lyrics_source", "TEXT");
             EnsureColumn("tracks", "lyrics_fetched_at", "INTEGER");
+            EnsureColumn("tracks", "album_artist_inferred", "INTEGER NOT NULL DEFAULT 0");
         }
 
         using (Orynivo.StartupDiagnostics.Time("AudioDatabase.EnsureSchema: core tables/indexes"))
@@ -2518,7 +2669,8 @@ public sealed class AudioDatabase : IDisposable
                 image_is_manual INTEGER NOT NULL DEFAULT 0,
                 profile_source_url TEXT,
                 profile_language TEXT,
-                profile_fetched_at INTEGER
+                profile_fetched_at INTEGER,
+                musicbrainz_artist_id TEXT
             );
 
             CREATE TABLE IF NOT EXISTS artist_aliases (
@@ -2601,6 +2753,12 @@ public sealed class AudioDatabase : IDisposable
             EnsureColumn("artists", "profile_source_url", "TEXT");
             EnsureColumn("artists", "profile_language", "TEXT");
             EnsureColumn("artists", "profile_fetched_at", "INTEGER");
+            EnsureColumn("artists", "musicbrainz_artist_id", "TEXT");
+            Execute("""
+                CREATE INDEX IF NOT EXISTS idx_artists_musicbrainz_artist_id
+                ON artists (musicbrainz_artist_id COLLATE NOCASE)
+                WHERE musicbrainz_artist_id IS NOT NULL;
+                """);
             EnsureColumn("albums", "is_favorite", "INTEGER NOT NULL DEFAULT 0");
             EnsureColumn("albums", "source_directory", "TEXT NOT NULL DEFAULT ''");
             EnsureColumn("artworks", "original_path", "TEXT");
@@ -3611,27 +3769,76 @@ public sealed class AudioDatabase : IDisposable
         tx.Commit();
     }
 
-    private long? EnsureArtist(string? name, SqliteTransaction tx)
+    private long? EnsureArtist(string? name, SqliteTransaction tx) =>
+        EnsureArtist(name, null, tx);
+
+    private long? EnsureArtist(string? name, string? musicBrainzArtistId, SqliteTransaction tx)
     {
         var normalized = ArtistNameNormalizer.NormalizeDisplayName(name);
         var key = ArtistNameNormalizer.CreateComparisonKey(normalized);
+        var normalizedMusicBrainzId = NormalizeMusicBrainzArtistId(musicBrainzArtistId);
         EnsureArtistComparisonCache(tx);
+        if (normalizedMusicBrainzId is not null)
+        {
+            using var musicBrainzLookup = _conn.CreateCommand();
+            musicBrainzLookup.Transaction = tx;
+            musicBrainzLookup.CommandText = """
+                SELECT id, name
+                FROM artists
+                WHERE musicbrainz_artist_id = $musicbrainz_artist_id COLLATE NOCASE
+                ORDER BY id
+                LIMIT 1;
+                """;
+            Add(musicBrainzLookup, "$musicbrainz_artist_id", normalizedMusicBrainzId);
+            using var reader = musicBrainzLookup.ExecuteReader();
+            if (reader.Read())
+            {
+                var matchedId = reader.GetInt64(0);
+                var matchedName = reader.GetString(1);
+                _artistsByComparisonKey![key] = (matchedId, matchedName);
+                _artistNamesById![matchedId] = matchedName;
+                return matchedId;
+            }
+        }
+
         if (_artistsByComparisonKey!.TryGetValue(key, out var existing))
+        {
+            if (normalizedMusicBrainzId is not null)
+            {
+                using var update = _conn.CreateCommand();
+                update.Transaction = tx;
+                update.CommandText = """
+                    UPDATE artists
+                    SET musicbrainz_artist_id = COALESCE(musicbrainz_artist_id, $musicbrainz_artist_id)
+                    WHERE id = $id;
+                    """;
+                Add(update, "$musicbrainz_artist_id", normalizedMusicBrainzId);
+                Add(update, "$id", existing.Id);
+                update.ExecuteNonQuery();
+            }
             return existing.Id;
+        }
 
         using var cmd = _conn.CreateCommand();
         cmd.Transaction = tx;
         cmd.CommandText = """
-            INSERT INTO artists (name) VALUES ($name)
+            INSERT INTO artists (name, musicbrainz_artist_id) VALUES ($name, $musicbrainz_artist_id)
             ON CONFLICT(name) DO NOTHING;
             SELECT id FROM artists WHERE name = $name COLLATE NOCASE LIMIT 1;
             """;
         Add(cmd, "$name", normalized);
+        Add(cmd, "$musicbrainz_artist_id", normalizedMusicBrainzId);
         var id = Convert.ToInt64(cmd.ExecuteScalar());
         _artistsByComparisonKey[key] = (id, normalized);
         _artistNamesById![id] = normalized;
         return id;
     }
+
+    private static string? NormalizeMusicBrainzArtistId(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? null
+            : value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .FirstOrDefault();
 
     private string GetCanonicalArtistName(long? artistId, string? fallback)
     {
@@ -3852,6 +4059,7 @@ public sealed class AudioDatabase : IDisposable
         Add(cmd, "$musicbrainz_release_id", (object?)t.MusicBrainzReleaseId ?? DBNull.Value);
         Add(cmd, "$musicbrainz_artist_id",  (object?)t.MusicBrainzArtistId ?? DBNull.Value);
         Add(cmd, "$acoustid_fingerprint",   (object?)t.AcoustIdFingerprint ?? DBNull.Value);
+        Add(cmd, "$album_artist_inferred",  t.AlbumArtistInferred ? 1 : 0);
         Add(cmd, "$has_cover",              t.HasCover ? 1 : 0);
         Add(cmd, "$cover_mime_type",        (object?)t.CoverMimeType ?? DBNull.Value);
         // Artwork wird dedupliziert in `artworks` gespeichert; in `tracks` bleibt kein Duplikat.
@@ -3911,6 +4119,7 @@ public sealed class AudioDatabase : IDisposable
             EncodingSettings      = NullableString(r, "encoding_settings"),
             Bpm                   = NullableInt(r, "bpm"),
             Compilation           = r.GetInt32(r.GetOrdinal("compilation")) != 0,
+            AlbumArtistInferred   = r.GetInt32(r.GetOrdinal("album_artist_inferred")) != 0,
             Isrc                  = NullableString(r, "isrc"),
             Language              = NullableString(r, "language"),
             Mood                  = NullableString(r, "mood"),
@@ -3937,7 +4146,10 @@ public sealed class AudioDatabase : IDisposable
         reader.IsDBNull(5) ? null : reader.GetString(5),
         reader.IsDBNull(6) ? null : reader.GetString(6),
         reader.IsDBNull(7) ? null : reader.GetInt64(7),
-        reader.GetInt32(8) != 0);
+        reader.GetInt32(8) != 0)
+    {
+        MusicBrainzArtistId = NullableStringIfPresent(reader, "musicbrainz_artist_id")
+    };
 
     private static void Add(SqliteCommand cmd, string name, object? value)
         => cmd.Parameters.AddWithValue(name, value ?? DBNull.Value);
@@ -3946,6 +4158,16 @@ public sealed class AudioDatabase : IDisposable
     {
         int ord = r.GetOrdinal(col);
         return r.IsDBNull(ord) ? null : r.GetString(ord);
+    }
+
+    private static string? NullableStringIfPresent(SqliteDataReader reader, string columnName)
+    {
+        for (var index = 0; index < reader.FieldCount; index++)
+        {
+            if (string.Equals(reader.GetName(index), columnName, StringComparison.OrdinalIgnoreCase))
+                return reader.IsDBNull(index) ? null : reader.GetString(index);
+        }
+        return null;
     }
 
     private static int? NullableInt(SqliteDataReader r, string col)

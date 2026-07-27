@@ -1042,8 +1042,13 @@ fallback or allow client-provided commands/paths to reach the helper.
   artist fields, candidate preview, and explicit replacement of the current
   track's downloaded lyrics cache
 - `Orynivo/Library/ArtistProfileService.cs`: configurable artist biography and
-  image lookup (Wikipedia or Last.fm); static `Source` and `LastFmApiKey`
-  properties set from `AppSettings`; images cached under `%LOCALAPPDATA%\Orynivo\artist-images\`
+  image lookup (Wikipedia or Last.fm) with preferred curated Fanart.tv
+  `artistthumb` artwork when a session-only key or `FANART_TV_API_KEY` is
+  available; static source/key properties are applied by the desktop, and
+  images are cached under `%LOCALAPPDATA%\Orynivo\artist-images\`. Fanart.tv
+  resolution uses embedded MusicBrainz IDs or an unambiguous exact MusicBrainz
+  match. The Fanart.tv key must never be persisted, logged, sent to an Orynivo
+  Server, or exposed to a model.
 - `Orynivo/Library/ArtistImageSearchService.cs` and
   `Orynivo/ArtistImageSearchWindow.*`: manual Wikimedia Commons artist-image
   search with editable query; selecting an image updates `artists.image_path`,
@@ -1313,6 +1318,13 @@ fallback or allow client-provided commands/paths to reach the helper.
 - Artist names are normalized when scanned: only the primary performer is
   retained, `feat.`/`ft.` suffixes are removed, and Unicode, whitespace, case,
   diacritic, and punctuation variants share one normalized artist identity
+- The local Artists view contains album artists rather than every track-only
+  credit. The scanner records missing `ALBUMARTIST` values and compilation
+  flags; album-wide reconciliation keeps a consistent explicit album artist,
+  uses the sole inferred track artist for single-artist albums, and assigns
+  `Various Artists` to compilations or albums with differing inferred artists.
+  MusicBrainz artist IDs, when embedded, are stronger identity evidence than
+  normalized spelling.
 - Settings includes **Normalize artist names**, which transactionally merges
   existing variants, preserves favorites and cached profile data, updates
   visible track and album-artist names without modifying audio files, and

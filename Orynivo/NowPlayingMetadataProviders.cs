@@ -171,7 +171,12 @@ internal sealed class LocalNowPlayingMetadataProvider : INowPlayingMetadataProvi
                 forceRefresh, info.Biography, info.ProfileLanguage, info.ProfileFetchedAt, language))
         {
             var profile = await ArtistProfileService.DownloadAsync(
-                artistId, info.Artist, language, downloadImage: !info.ImageIsManual, cancellationToken);
+                artistId,
+                info.Artist,
+                language,
+                downloadImage: !info.ImageIsManual,
+                cancellationToken,
+                musicBrainzArtistId: info.MusicBrainzArtistId);
             cancellationToken.ThrowIfCancellationRequested();
             using var db = AudioDatabase.OpenDefault();
             db.UpdateArtistProfile(artistId, profile?.Biography, profile?.ImagePath, profile?.SourceUrl, language);

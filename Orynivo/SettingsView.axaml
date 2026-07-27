@@ -906,6 +906,22 @@
                                    Foreground="{DynamicResource AppMutedTextBrush}"
                                    TextWrapping="Wrap"/>
                     </StackPanel>
+
+                    <TextBlock Text="{DynamicResource L_FanartTvApiKey}"
+                               FontSize="{DynamicResource FontSizeCaption}"
+                               FontWeight="SemiBold"
+                               Margin="0,18,0,6"/>
+                    <TextBox x:Name="FanartTvApiKeyTextBox"
+                             Height="30"
+                             HorizontalAlignment="Stretch"
+                             PasswordChar="●"
+                             Padding="8,0"
+                             VerticalContentAlignment="Center"
+                             Margin="0,0,0,8"/>
+                    <TextBlock Text="{DynamicResource L_FanartTvApiKeyHint}"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"/>
                 </StackPanel>
 
                 <StackPanel x:Name="AppearancePanel"

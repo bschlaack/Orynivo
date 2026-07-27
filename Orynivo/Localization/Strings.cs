@@ -140,6 +140,8 @@ public sealed record LocalizedStrings(
     string ArtistInfoSourceSetting,
     string LastFmApiKey,
     string LastFmApiKeyHint,
+    string FanartTvApiKey,
+    string FanartTvApiKeyHint,
     string ShowAllAlbumTracks,
     string CrashTitle,
     string CrashMessage,

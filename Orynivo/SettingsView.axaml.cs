@@ -165,6 +165,7 @@ internal partial class SettingsView : UserControl
         ArtistInfoSourceComboBox.ItemsSource = Enum.GetValues<ArtistInfoSource>();
         ArtistInfoSourceComboBox.SelectedItem = settings.ArtistInfoSource;
         LastFmApiKeyTextBox.Text = settings.LastFmApiKey ?? string.Empty;
+        FanartTvApiKeyTextBox.Text = settings.FanartTvApiKey ?? string.Empty;
         QobuzApplicationIdTextBox.Text = settings.QobuzApplicationId ?? string.Empty;
         LastFmPanel.IsVisible = settings.ArtistInfoSource == ArtistInfoSource.LastFm;
         _libraryPaths.AddRange(settings.LibraryPaths);
@@ -289,6 +290,8 @@ internal partial class SettingsView : UserControl
     public ArtistInfoSource SelectedArtistInfoSource =>
         ArtistInfoSourceComboBox.SelectedItem is ArtistInfoSource src ? src : ArtistInfoSource.Wikipedia;
     public string SelectedLastFmApiKey => LastFmApiKeyTextBox.Text?.Trim() ?? string.Empty;
+    /// <summary>Gets the configured Fanart.tv API key without surrounding whitespace.</summary>
+    public string SelectedFanartTvApiKey => FanartTvApiKeyTextBox.Text?.Trim() ?? string.Empty;
     public string SelectedQobuzApplicationId => QobuzApplicationIdTextBox.Text?.Trim() ?? string.Empty;
     public IReadOnlyList<PlexServerSettings> SelectedPlexServers =>
         _plexServers.Select(ClonePlexServer).ToList().AsReadOnly();
