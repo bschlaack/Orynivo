@@ -132,6 +132,13 @@ jobs:
           STAGE="stage/${{ matrix.rid }}"
           printf '%s\n' deb > "${STAGE}/usr/lib/orynivo-server/install-type"
 
+          sed -i 's/\r$//' \
+            .github/server-release/postinst.sh \
+            .github/server-release/prerm.sh \
+            .github/server-release/orynivo-server-updater.sh
+          bash -n .github/server-release/postinst.sh
+          bash -n .github/server-release/prerm.sh
+          bash -n .github/server-release/orynivo-server-updater.sh
           chmod +x .github/server-release/postinst.sh \
                    .github/server-release/prerm.sh
           mkdir -p packages
@@ -157,6 +164,15 @@ jobs:
             --package "packages/orynivo-server_${VERSION}_${{ matrix.deb_arch }}.deb" \
             --chdir "${STAGE}" \
             .
+
+          CONTROL_DIR="$(mktemp -d)"
+          dpkg-deb --control "packages/orynivo-server_${VERSION}_${{ matrix.deb_arch }}.deb" "${CONTROL_DIR}"
+          test "$(head -c 11 "${CONTROL_DIR}/postinst")" = '#!/bin/bash'
+          ! grep -q $'\r' "${CONTROL_DIR}/postinst"
+          ! grep -q $'\r' "${CONTROL_DIR}/prerm"
+          bash -n "${CONTROL_DIR}/postinst"
+          bash -n "${CONTROL_DIR}/prerm"
+          rm -rf "${CONTROL_DIR}"
 
       # ---- Red Hat / Fedora / Rocky (.rpm) -------------------------------
 

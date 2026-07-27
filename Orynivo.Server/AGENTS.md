@@ -34,6 +34,8 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
   Managed DEB upgrades must invoke `dpkg` non-interactively while retaining the
   administrator-edited configuration; a conffile prompt would abort the
   systemd updater and can leave the package partially configured.
+  The release workflow must normalize and validate the maintainer scripts and
+  updater as LF-only Bash before publishing a DEB.
   Because this editable file is layered after `WebApplication.CreateBuilder`,
   `Program.cs` explicitly reapplies its configured Kestrel maximum request-body
   size to the web host.

@@ -4,6 +4,13 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- Linux server release builds now normalize and validate packaged maintainer
+  scripts before upload, preventing CRLF shebang failures during DEB upgrades.
+
 ## [0.29.3] - 2026-07-28
 
 ### Fixed

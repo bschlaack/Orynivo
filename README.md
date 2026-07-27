@@ -300,6 +300,8 @@ the unprivileged server process only stages the files. A narrowly scoped root
 systemd updater performs the package-manager operation and restarts the service.
 Automated DEB upgrades retain the existing administrator-edited
 `/etc/orynivo-server/appsettings.json` without prompting.
+Release builds normalize and validate the packaged Bash maintainer scripts so
+DEB installation cannot fail because of Windows CRLF shebang line endings.
 Portable, development, Windows, and macOS server installations currently report
 managed updates as unsupported.
 
