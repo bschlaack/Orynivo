@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- GitHub release workflows now use the Node.js 24 action generations:
+  `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `softprops/action-gh-release@v3`.
+
 ### Fixed
 
 - Linux server release builds now normalize and validate packaged maintainer

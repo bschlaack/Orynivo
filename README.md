@@ -817,6 +817,9 @@ dotnet publish Orynivo.Server/Orynivo.Server.csproj \
 
 ### Release builds (GitHub Actions)
 
+The CI and release workflows use the Node.js 24 generations of GitHub's
+checkout/.NET setup actions and the GitHub Release upload action.
+
 Pushing a version tag triggers two parallel release workflows:
 
 ```powershell

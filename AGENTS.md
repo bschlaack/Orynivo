@@ -179,6 +179,10 @@ publishes the self-contained `linux-x64` desktop artifact. The Windows job
 intentionally excludes only the Steinberg bridge because that SDK is not stored
 in the repository. Its Release artifact therefore contains cwASIO support
 without Steinberg SDK files.
+All GitHub-hosted CI and release workflows use Node.js 24-compatible action
+generations (`actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+`softprops/action-gh-release@v3` where applicable); do not reintroduce their
+Node.js 20 predecessors.
 
 `.github/workflows/player-linux-release.yml` publishes tagged self-contained
 desktop builds for `linux-x64` and `linux-arm64` as portable tarballs, DEB, and
