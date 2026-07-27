@@ -300,6 +300,8 @@ the unprivileged server process only stages the files. A narrowly scoped root
 systemd updater performs the package-manager operation and restarts the service.
 Automated DEB upgrades retain the existing administrator-edited
 `/etc/orynivo-server/appsettings.json` without prompting.
+Release builds normalize and validate the packaged Bash maintainer scripts so
+DEB installation cannot fail because of Windows CRLF shebang line endings.
 Portable, development, Windows, and macOS server installations currently report
 managed updates as unsupported.
 
@@ -814,6 +816,9 @@ dotnet publish Orynivo.Server/Orynivo.Server.csproj \
 ```
 
 ### Release builds (GitHub Actions)
+
+The CI and release workflows use the Node.js 24 generations of GitHub's
+checkout/.NET setup actions and the GitHub Release upload action.
 
 Pushing a version tag triggers two parallel release workflows:
 
