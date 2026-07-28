@@ -64,6 +64,25 @@ public sealed record OrynivoRecentAlbum(
     long AddedAt,
     bool HasArtwork);
 
+/// <summary>Compact remote album metadata used for dashboard recommendations.</summary>
+/// <param name="Id">Database album identifier.</param>
+/// <param name="Title">Album title.</param>
+/// <param name="Artist">Album-artist display name.</param>
+/// <param name="ArtistId">Database album-artist identifier, or <see langword="null"/>.</param>
+/// <param name="Genres">Distinct semicolon-separated track genres.</param>
+/// <param name="AverageBpm">Average positive track BPM, or <see langword="null"/>.</param>
+/// <param name="ArtworkPath">Server-side artwork path when present.</param>
+/// <param name="IsFavorite">Server-side favorite state.</param>
+public sealed record OrynivoRecommendationAlbum(
+    long Id,
+    string Title,
+    string Artist,
+    long? ArtistId,
+    string? Genres,
+    double? AverageBpm,
+    string? ArtworkPath,
+    bool IsFavorite);
+
 /// <summary>Track entry returned by the Orynivo Server API.</summary>
 /// <param name="Id">Database ID of the track.</param>
 /// <param name="Path">Playable library path.</param>
@@ -644,6 +663,27 @@ public sealed class OrynivoServerClient : IDisposable
         catch { return []; }
     }
 
+    /// <summary>Loads compact album candidates for history-based recommendations.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Recommendation candidates, or an empty list for older/unreachable servers.</returns>
+    public async Task<List<OrynivoRecommendationAlbum>> GetRecommendationAlbumsAsync(
+        OrynivoServerSettings server,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await GetJsonAsync<List<OrynivoRecommendationAlbum>>(
+                       server,
+                       "/api/albums/recommendation-candidates",
+                       cancellationToken) ?? [];
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
     /// <summary>Stores a client-refreshed artist profile on the remote server.</summary>
     /// <param name="server">Server connection settings.</param>
     /// <param name="artistId">Database ID of the artist.</param>
@@ -734,6 +774,17 @@ public sealed class OrynivoServerClient : IDisposable
         string? mimeType,
         CancellationToken cancellationToken = default)
         => await UploadImageAsync(server, $"/api/artwork/album/{albumId}", imageData, mimeType, cancellationToken);
+
+    /// <summary>Deletes the assigned artwork for a remote album.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="albumId">Database ID of the album.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when the server accepted the deletion.</returns>
+    public Task<bool> DeleteAlbumArtworkAsync(
+        OrynivoServerSettings server,
+        long albumId,
+        CancellationToken cancellationToken = default)
+        => SendNoContentAsync(server, HttpMethod.Delete, $"/api/artwork/album/{albumId}", cancellationToken);
 
     // ------------------------------------------------------------------
     // Tracks
@@ -1220,6 +1271,17 @@ public sealed class OrynivoServerClient : IDisposable
         string? mimeType,
         CancellationToken cancellationToken = default)
         => await UploadImageAsync(server, $"/api/artwork/artist/{artistId}", imageData, mimeType, cancellationToken);
+
+    /// <summary>Deletes the cached image for a remote artist.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="artistId">Database ID of the artist.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when the server accepted the deletion.</returns>
+    public Task<bool> DeleteArtistImageAsync(
+        OrynivoServerSettings server,
+        long artistId,
+        CancellationToken cancellationToken = default)
+        => SendNoContentAsync(server, HttpMethod.Delete, $"/api/artwork/artist/{artistId}", cancellationToken);
 
     // ------------------------------------------------------------------
     // Server library configuration

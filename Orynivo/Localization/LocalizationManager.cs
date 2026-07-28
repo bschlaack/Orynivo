@@ -237,6 +237,10 @@ public static class LocalizationManager
         resources["L_QobuzIntegrationHint"] = Current.QobuzIntegrationHint;
         resources["L_QobuzCredentialsHint"] = Current.QobuzCredentialsHint;
         resources["L_SearchArtistImage"] = Current.SearchArtistImage;
+        resources["L_UploadArtistImage"] = Current.UploadArtistImage;
+        resources["L_DeleteArtistImage"] = Current.DeleteArtistImage;
+        resources["L_UploadCover"] = Current.UploadCover;
+        resources["L_ImageFileType"] = Current.ImageFileType;
         resources["L_ArtistImageSearchTitle"] = Current.ArtistImageSearchTitle;
         resources["L_ArtistImageSearchRunning"] = Current.ArtistImageSearchRunning;
         resources["L_ArtistImageSearchNoResults"] = Current.ArtistImageSearchNoResults;
@@ -545,6 +549,15 @@ public static class LocalizationManager
         Homepage = "Homepage", FeedUrl = "Feed-Adresse",
         SearchResultSummary = "{0:N0} Titel · {1:N0} Alben · {2:N0} Künstler",
         RecentAlbums = "Zuletzt hinzugefügte Alben",
+        AlbumRecommendations = "Album-Empfehlungen",
+        RecommendationMoodAll = "Alle Stimmungen",
+        RecommendationMoodRelaxed = "Entspannt",
+        RecommendationMoodEnergetic = "Energiegeladen",
+        RecommendationMoodHappy = "Fröhlich",
+        RecommendationMoodMelancholic = "Melancholisch",
+        RecommendationNoMatches = "Noch nicht genügend passende Hörhistorie für Empfehlungen.",
+        RecommendationListView = "Liste",
+        RecommendationStageView = "Bühne",
         Calendar = "Kalender – {0}",
         TopGenres = "Meistgehörte Genres",
         TopAlbums = "Meistgehörte Alben",
@@ -647,6 +660,10 @@ public static class LocalizationManager
         , QobuzIntegrationHint = "Die Qobuz-Integration ist vorbereitet. Katalog und Wiedergabe werden aktiviert, sobald ein genehmigter Partnerzugang und die offizielle API-Dokumentation vorliegen."
         , QobuzCredentialsHint = "Geheime Schlüssel und Anmeldetokens werden nicht in settings.json gespeichert, sondern benutzergebunden durch Windows geschützt."
         , SearchArtistImage = "Künstlerbild suchen"
+        , UploadArtistImage = "Künstlerbild hochladen"
+        , DeleteArtistImage = "Künstlerbild löschen"
+        , UploadCover = "Cover hochladen"
+        , ImageFileType = "Bilddateien"
         , ArtistImageSearchTitle = "Künstlerbild suchen"
         , ArtistImageSearchRunning = "Passende Künstlerbilder werden gesucht …"
         , ArtistImageSearchNoResults = "Keine Künstlerbilder gefunden."
@@ -1070,7 +1087,17 @@ public static class LocalizationManager
         ReplayGainAlbumColumn = "ReplayGain album", Codec = "Codec", Tags = "Tags",
         Homepage = "Homepage", FeedUrl = "Feed address",
         SearchResultSummary = "{0:N0} tracks · {1:N0} albums · {2:N0} artists",
-        RecentAlbums = "Recently added albums", Calendar = "Calendar – {0}", TopGenres = "Most listened genres",
+        RecentAlbums = "Recently added albums",
+        AlbumRecommendations = "Album recommendations",
+        RecommendationMoodAll = "All moods",
+        RecommendationMoodRelaxed = "Relaxed",
+        RecommendationMoodEnergetic = "Energetic",
+        RecommendationMoodHappy = "Happy",
+        RecommendationMoodMelancholic = "Melancholic",
+        RecommendationNoMatches = "Not enough matching listening history for recommendations yet.",
+        RecommendationListView = "List",
+        RecommendationStageView = "Stage",
+        Calendar = "Calendar – {0}", TopGenres = "Most listened genres",
         TopAlbums = "Most listened albums",
         TopArtists = "Most listened artists",
         ListeningStats = "Listening stats",
@@ -1167,6 +1194,10 @@ public static class LocalizationManager
         , QobuzIntegrationHint = "The Qobuz integration is prepared. Catalog and playback will be enabled when approved partner access and the official API documentation are available."
         , QobuzCredentialsHint = "Secrets and sign-in tokens are not stored in settings.json. Windows protects them for the current user."
         , SearchArtistImage = "Search artist image"
+        , UploadArtistImage = "Upload artist image"
+        , DeleteArtistImage = "Delete artist image"
+        , UploadCover = "Upload cover"
+        , ImageFileType = "Image files"
         , ArtistImageSearchTitle = "Search artist image"
         , ArtistImageSearchRunning = "Searching for matching artist images …"
         , ArtistImageSearchNoResults = "No artist images found."
@@ -1593,7 +1624,17 @@ public static class LocalizationManager
         ReplayGainAlbumColumn = "ReplayGain album", Codec = "Codec", Tags = "Tags",
         Homepage = "Page d’accueil", FeedUrl = "Adresse du flux",
         SearchResultSummary = "{0:N0} titres · {1:N0} albums · {2:N0} artistes",
-        RecentAlbums = "Albums ajoutés récemment", Calendar = "Calendrier – {0}", TopGenres = "Genres les plus écoutés",
+        RecentAlbums = "Albums ajoutés récemment",
+        AlbumRecommendations = "Recommandations d’albums",
+        RecommendationMoodAll = "Toutes les ambiances",
+        RecommendationMoodRelaxed = "Détendue",
+        RecommendationMoodEnergetic = "Énergique",
+        RecommendationMoodHappy = "Joyeuse",
+        RecommendationMoodMelancholic = "Mélancolique",
+        RecommendationNoMatches = "Pas encore assez d’historique d’écoute correspondant pour proposer des recommandations.",
+        RecommendationListView = "Liste",
+        RecommendationStageView = "Scène",
+        Calendar = "Calendrier – {0}", TopGenres = "Genres les plus écoutés",
         TopAlbums = "Albums les plus écoutés",
         TopArtists = "Artistes les plus écoutés",
         ListeningStats = "Statistiques d’écoute",
@@ -1690,6 +1731,10 @@ public static class LocalizationManager
         , QobuzIntegrationHint = "L’intégration Qobuz est préparée. Le catalogue et la lecture seront activés dès qu’un accès partenaire approuvé et la documentation officielle de l’API seront disponibles."
         , QobuzCredentialsHint = "Les secrets et jetons de connexion ne sont pas stockés dans settings.json. Windows les protège pour l’utilisateur actuel."
         , SearchArtistImage = "Rechercher une image d’artiste"
+        , UploadArtistImage = "Importer une image d’artiste"
+        , DeleteArtistImage = "Supprimer l’image d’artiste"
+        , UploadCover = "Importer une pochette"
+        , ImageFileType = "Fichiers image"
         , ArtistImageSearchTitle = "Rechercher une image d’artiste"
         , ArtistImageSearchRunning = "Recherche d’images d’artiste correspondantes …"
         , ArtistImageSearchNoResults = "Aucune image d’artiste trouvée."
@@ -2113,7 +2158,17 @@ public static class LocalizationManager
         ReplayGainAlbumColumn = "ReplayGain álbum", Codec = "Códec", Tags = "Etiquetas",
         Homepage = "Página principal", FeedUrl = "Dirección del feed",
         SearchResultSummary = "{0:N0} pistas · {1:N0} álbumes · {2:N0} artistas",
-        RecentAlbums = "Álbumes añadidos recientemente", Calendar = "Calendario – {0}", TopGenres = "Géneros más escuchados",
+        RecentAlbums = "Álbumes añadidos recientemente",
+        AlbumRecommendations = "Recomendaciones de álbumes",
+        RecommendationMoodAll = "Todos los estados de ánimo",
+        RecommendationMoodRelaxed = "Relajado",
+        RecommendationMoodEnergetic = "Enérgico",
+        RecommendationMoodHappy = "Alegre",
+        RecommendationMoodMelancholic = "Melancólico",
+        RecommendationNoMatches = "Aún no hay suficiente historial de escucha coincidente para ofrecer recomendaciones.",
+        RecommendationListView = "Lista",
+        RecommendationStageView = "Escenario",
+        Calendar = "Calendario – {0}", TopGenres = "Géneros más escuchados",
         TopAlbums = "Álbumes más escuchados",
         TopArtists = "Artistas más escuchados",
         ListeningStats = "Estadísticas de escucha",
@@ -2210,6 +2265,10 @@ public static class LocalizationManager
         , QobuzIntegrationHint = "La integración con Qobuz está preparada. El catálogo y la reproducción se activarán cuando estén disponibles un acceso de socio aprobado y la documentación oficial de la API."
         , QobuzCredentialsHint = "Los secretos y tokens de inicio de sesión no se guardan en settings.json. Windows los protege para el usuario actual."
         , SearchArtistImage = "Buscar imagen del artista"
+        , UploadArtistImage = "Subir imagen del artista"
+        , DeleteArtistImage = "Eliminar imagen del artista"
+        , UploadCover = "Subir portada"
+        , ImageFileType = "Archivos de imagen"
         , ArtistImageSearchTitle = "Buscar imagen del artista"
         , ArtistImageSearchRunning = "Buscando imágenes del artista …"
         , ArtistImageSearchNoResults = "No se encontraron imágenes del artista."

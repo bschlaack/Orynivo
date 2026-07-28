@@ -156,6 +156,18 @@ public static class ArtistImageSearchService
         return targetPath;
     }
 
+    /// <summary>Deletes every cached image variant belonging to an artist.</summary>
+    /// <param name="artistId">Database artist ID used as the cached file-name stem.</param>
+    public static void DeleteImage(long artistId)
+    {
+        var directory = AppPaths.GetDataPath("artist-images");
+        if (!Directory.Exists(directory))
+            return;
+
+        foreach (var path in Directory.EnumerateFiles(directory, artistId + ".*"))
+            File.Delete(path);
+    }
+
     private static string CleanTitle(string? title)
     {
         var value = title ?? string.Empty;

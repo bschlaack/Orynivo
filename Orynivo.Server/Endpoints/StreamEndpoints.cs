@@ -96,6 +96,15 @@ public static class StreamEndpoints
                 : Results.NotFound();
         });
 
+        /// <summary>Detaches the currently assigned artwork from an album.</summary>
+        api.MapDelete("/artwork/album/{albumId:long}", (long albumId) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            if (db.GetAlbumById(albumId) is null) return Results.NotFound();
+            db.ClearArtworkFromAlbum(albumId);
+            return Results.NoContent();
+        });
+
         /// <summary>
         /// Serves the manually cached artist image by artist database ID.
         /// </summary>
@@ -126,6 +135,16 @@ public static class StreamEndpoints
             return db.UpdateArtistImage(artistId, path)
                 ? Results.NoContent()
                 : Results.NotFound();
+        });
+
+        /// <summary>Clears the cached image and manual-image marker for an artist.</summary>
+        api.MapDelete("/artwork/artist/{artistId:long}", (long artistId) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            if (!db.ClearArtistImage(artistId))
+                return Results.NotFound();
+            ArtistImageSearchService.DeleteImage(artistId);
+            return Results.NoContent();
         });
 
         /// <summary>

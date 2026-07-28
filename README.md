@@ -411,6 +411,11 @@ byte-range streaming without FFmpeg.
   search and uploads the selected image to the server. For a unified artist,
   biographies and images are synchronized with the matching local and other
   reachable Orynivo Server identities while manual images remain protected.
+- Album and artist detail headers also accept JPEG, PNG, or WebP files selected
+  from the local device. Uploaded covers and artist images are stored in the
+  owning local or Orynivo Server cache; adjacent trash actions remove them.
+  Unified artist-image uploads and deletions are applied to every matching
+  reachable library identity.
 - Opening a remote server album from a selected artist initially scopes the
   album tracks to that artist, with the same checkbox used by local albums to
   show every track on the album.
@@ -493,7 +498,9 @@ byte-range streaming without FFmpeg.
   playback and queue shortcuts, parallel Recently Played/Recently Added artwork
   strips, source and favorite state on history cards, a period-aware listening
   seven-point labeled and smoothed listening-trend chart, compact proportional
-  genre/album/artist analytics, quick access, and a
+  genre/album/artist analytics, history-based album recommendations with
+  period and mood selectors plus a persisted List/animated cover-stage view,
+  quick access, and a
   clickable playback calendar. Album rankings retain artwork, and linked genres
   open the matching filtered track list.
 - Clickable populated calendar days with a modal daily listening history;

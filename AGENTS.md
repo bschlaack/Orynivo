@@ -241,6 +241,8 @@ runtime dependency.
   `GET /api/library/summary` returns aggregate album, track, artist, and
   favourite counts for cross-library Dashboard totals without materializing
   complete library rows;
+  `GET /api/albums/recommendation-candidates` returns compact album genre and
+  average-BPM metadata for client-side history-based Dashboard recommendations;
   `GET /api/artists/{id}` returns complete
   cached artist profile fields, `POST /api/artists/{id}/profile` stores
   client-refreshed biography/source fields plus optional image bytes, and
@@ -755,7 +757,11 @@ fallback or allow client-provided commands/paths to reach the helper.
   and image from any matching identity. New profile downloads and manual artist
   image selections are synchronized to every matching local and reachable
   Orynivo Server identity; automatic image synchronization must preserve manual
-  images. Dashboard artist analytics use the same unified drill-down,
+  images. Manual artist-image uploads and deletions use the same synchronized
+  identity set. Album and artist detail headers expose localized upload actions
+  plus contrast-safe vector trash buttons with explicit delete tooltips; local
+  and remote mutations use their owning artwork cache/API. Dashboard artist
+  analytics use the same unified drill-down,
   Back navigation restores it as `UnifiedArtistAlbums`, and changing the unified
   artist favorite applies to every matching local and remote artist identity.
   Plex artists remain separate and must not be folded into this identity.
@@ -908,6 +914,8 @@ fallback or allow client-provided commands/paths to reach the helper.
 - `AppSettings.LastMainView`, `AppSettings.AlbumArtworkView`, and
   `AppSettings.ArtistArtworkView` preserve the selected main view and entity
   artwork/table modes
+- `AppSettings.DashboardRecommendationStageView` defaults album recommendations
+  to the tall animated cover stage and persists the Dashboard List/Stage choice
 - `AppSettings.Volume` and `AppSettings.LastTrackPath` preserve volume and the
   last selected or played track; restoration requires both the file and database
   entry to exist
