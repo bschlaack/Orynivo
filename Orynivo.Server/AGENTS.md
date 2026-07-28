@@ -24,7 +24,8 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
   `CalculateMissingReplayGainDuringScan`, which defaults to `false`; do not
   reintroduce unconditional FFmpeg ReplayGain analysis into library discovery.
 - Keep external metadata/artwork searches on the client; the server stores and
-  serves client-provided results.
+  serves client-provided results. Authenticated album/artist artwork PUT and
+  DELETE endpoints are the shared remote upload/removal surface.
 - Keep `SkiaSharp.NativeAssets.Linux.NoDependencies`; do not add an ImageMagick
   runtime dependency.
 - Linux service data belongs under `ORYNIVO_DATA_DIR=/var/lib/orynivo-server`.

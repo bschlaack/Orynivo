@@ -755,7 +755,11 @@ fallback or allow client-provided commands/paths to reach the helper.
   and image from any matching identity. New profile downloads and manual artist
   image selections are synchronized to every matching local and reachable
   Orynivo Server identity; automatic image synchronization must preserve manual
-  images. Dashboard artist analytics use the same unified drill-down,
+  images. Manual artist-image uploads and deletions use the same synchronized
+  identity set. Album and artist detail headers expose localized upload actions
+  plus contrast-safe vector trash buttons with explicit delete tooltips; local
+  and remote mutations use their owning artwork cache/API. Dashboard artist
+  analytics use the same unified drill-down,
   Back navigation restores it as `UnifiedArtistAlbums`, and changing the unified
   artist favorite applies to every matching local and remote artist identity.
   Plex artists remain separate and must not be folded into this identity.

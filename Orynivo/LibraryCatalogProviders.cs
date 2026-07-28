@@ -197,6 +197,12 @@ internal interface ILibraryCatalogProvider
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns><see langword="true"/> when artwork was stored.</returns>
     Task<bool> SetAlbumArtworkAsync(long albumId, byte[] imageData, string? mimeType, CancellationToken cancellationToken = default);
+
+    /// <summary>Deletes album artwork from the provider.</summary>
+    /// <param name="albumId">Provider-local album identifier.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when artwork was deleted.</returns>
+    Task<bool> DeleteAlbumArtworkAsync(long albumId, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Local file-system-backed catalog provider.</summary>
@@ -283,6 +289,16 @@ internal sealed class LocalLibraryCatalogProvider : ILibraryCatalogProvider
     {
         using var db = AudioDatabase.OpenDefault();
         return Task.FromResult(db.AttachArtworkToAlbum(albumId, imageData, mimeType));
+    }
+
+    /// <inheritdoc/>
+    public Task<bool> DeleteAlbumArtworkAsync(long albumId, CancellationToken cancellationToken = default)
+    {
+        using var db = AudioDatabase.OpenDefault();
+        if (db.GetAlbumById(albumId) is null)
+            return Task.FromResult(false);
+        db.ClearArtworkFromAlbum(albumId);
+        return Task.FromResult(true);
     }
 
     private static LibraryCatalogArtist ToArtist(ArtistInfo artist) => new(
@@ -458,6 +474,10 @@ internal sealed class OrynivoServerLibraryCatalogProvider : ILibraryCatalogProvi
     /// <inheritdoc/>
     public async Task<bool> SetAlbumArtworkAsync(long albumId, byte[] imageData, string? mimeType, CancellationToken cancellationToken = default)
         => await _client.UploadAlbumArtworkAsync(_server, albumId, imageData, mimeType, cancellationToken);
+
+    /// <inheritdoc/>
+    public Task<bool> DeleteAlbumArtworkAsync(long albumId, CancellationToken cancellationToken = default)
+        => _client.DeleteAlbumArtworkAsync(_server, albumId, cancellationToken);
 
     private LibraryCatalogArtist ToArtist(OrynivoArtistInfo artist)
     {

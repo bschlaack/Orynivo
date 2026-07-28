@@ -2351,6 +2351,26 @@
                                         Padding="14,7"
                                         Theme="{StaticResource HeaderFilterButtonTheme}"
                                         Click="SearchCoverButton_OnClick"/>
+                                <Button Content="{DynamicResource L_UploadCover}"
+                                        Tag="{Binding}"
+                                        Padding="14,7"
+                                        Theme="{StaticResource HeaderFilterButtonTheme}"
+                                        Click="UploadCoverButton_OnClick"/>
+                                <Button Tag="{Binding}"
+                                        Width="34"
+                                        Height="34"
+                                        Theme="{StaticResource TransportBtnTheme}"
+                                        ToolTip.Tip="{DynamicResource L_DeleteCover}"
+                                        Click="DeleteCoverButton_OnClick">
+                                    <Path Width="17"
+                                          Height="17"
+                                          Stretch="Uniform"
+                                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                          StrokeThickness="1.7"
+                                          StrokeLineCap="Round"
+                                          StrokeJoin="Round"
+                                          Data="{StaticResource IconDelete}"/>
+                                </Button>
                                 <Button x:Name="AlbumSaveAsPlaylistButton"
                                         Content="{DynamicResource L_SaveAlbumAsPlaylist}"
                                         Padding="14,7"
@@ -2993,6 +3013,8 @@
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <Button x:Name="ArtistInfoTitleButton"
                                     FontSize="{DynamicResource FontSizeDisplay}"
@@ -3014,15 +3036,37 @@
                                     Theme="{StaticResource HeaderFilterButtonTheme}"
                                     Content="{DynamicResource L_SearchArtistImage}"
                                     Click="SearchArtistImageButton_OnClick"/>
-                            <Button x:Name="RefreshArtistInfoButton"
+                            <Button x:Name="UploadArtistImageButton"
                                     Grid.Column="3"
+                                    Margin="0,0,8,0"
+                                    Padding="12,6"
+                                    Theme="{StaticResource HeaderFilterButtonTheme}"
+                                    Content="{DynamicResource L_UploadArtistImage}"
+                                    Click="UploadArtistImageButton_OnClick"/>
+                            <Button x:Name="DeleteArtistImageButton"
+                                    Grid.Column="4"
+                                    Theme="{StaticResource TransportBtnTheme}"
+                                    Margin="0,0,8,0"
+                                    ToolTip.Tip="{DynamicResource L_DeleteArtistImage}"
+                                    Click="DeleteArtistImageButton_OnClick">
+                                <Path Width="17"
+                                      Height="17"
+                                      Stretch="Uniform"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                      StrokeThickness="1.7"
+                                      StrokeLineCap="Round"
+                                      StrokeJoin="Round"
+                                      Data="{StaticResource IconDelete}"/>
+                            </Button>
+                            <Button x:Name="RefreshArtistInfoButton"
+                                    Grid.Column="5"
                                     Theme="{StaticResource TransportBtnTheme}"
                                     Margin="0,0,8,0"
                                     ToolTip.Tip="{DynamicResource L_RefreshArtistInfo}"
                                     Click="RefreshArtistInfoButton_OnClick">
                                 <TextBlock Text="↻" FontSize="{DynamicResource FontSizeTitle}"/>
                             </Button>
-                            <Button Grid.Column="4"
+                            <Button Grid.Column="6"
                                     Theme="{StaticResource TransportBtnTheme}"
                                     ToolTip.Tip="{DynamicResource L_CloseArtistInfo}"
                                     Click="CloseArtistInfoButton_OnClick">

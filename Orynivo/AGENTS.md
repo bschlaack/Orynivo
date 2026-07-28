@@ -48,7 +48,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   source. The unified row selects available biography and artwork from any
   matching identity. Profile downloads and manual image selections propagate to
   every matching local and reachable Orynivo Server identity; automatic profile
-  images must never overwrite a manually selected image. Plex identities remain
+  images must never overwrite a manually selected image. Manual artist-image
+  uploads and deletions propagate through the same identity set. Album and
+  artist detail upload/delete actions route through the owning local or remote
+  artwork provider and use localized labels/tooltips. Plex identities remain
   separate.
 - Navigation state must distinguish local, remote, Plex, and unified drill-downs;
   numeric IDs from different sources can collide.

@@ -572,6 +572,10 @@ public sealed record LocalizedStrings(
     public string QobuzIntegrationHint { get; init; } = "";
     public string QobuzCredentialsHint { get; init; } = "";
     public string SearchArtistImage { get; init; } = "";
+    public string UploadArtistImage { get; init; } = "";
+    public string DeleteArtistImage { get; init; } = "";
+    public string UploadCover { get; init; } = "";
+    public string ImageFileType { get; init; } = "";
     public string ArtistImageSearchTitle { get; init; } = "";
     public string ArtistImageSearchRunning { get; init; } = "";
     public string ArtistImageSearchNoResults { get; init; } = "";

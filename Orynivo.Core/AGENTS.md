@@ -48,6 +48,8 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   URLs, bounds image downloads, and never includes the Fanart.tv API key in
   diagnostics. `ArtistProfileService` prefers that image only when automatic
   image refresh is allowed; manual artist images must remain untouched.
+  `ArtistImageSearchService` owns writes and explicit deletion of the
+  provider-local `artist-images/<id>.*` cache variants.
 - Web page fetching must retain SSRF protection, connect-time address checks,
   redirect and size limits, text-only responses, timeouts, and audit logging.
 - Streaming URL builders may carry credentials for immediate playback, but such

@@ -1023,6 +1023,22 @@ public sealed class AudioDatabase : IDisposable
         return cmd.ExecuteNonQuery() > 0;
     }
 
+    /// <summary>Clears the cached image and manual-image marker for an artist.</summary>
+    /// <param name="artistId">Artist identifier.</param>
+    /// <returns><see langword="true"/> when an artist row was updated.</returns>
+    public bool ClearArtistImage(long artistId)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            UPDATE artists
+            SET image_path = NULL,
+                image_is_manual = 0
+            WHERE id = $id;
+            """;
+        Add(cmd, "$id", artistId);
+        return cmd.ExecuteNonQuery() > 0;
+    }
+
     public ArtistInfo? FindArtistByName(string artistName, long? excludeArtistId = null)
     {
         var comparisonKey = ArtistNameNormalizer.CreateComparisonKey(artistName);
@@ -1575,6 +1591,8 @@ public sealed class AudioDatabase : IDisposable
         return changed;
     }
 
+    /// <summary>Detaches the currently assigned artwork from an album.</summary>
+    /// <param name="albumId">Album identifier.</param>
     public void ClearArtworkFromAlbum(long albumId)
     {
         using var cmd = _conn.CreateCommand();

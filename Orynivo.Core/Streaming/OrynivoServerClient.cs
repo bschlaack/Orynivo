@@ -735,6 +735,17 @@ public sealed class OrynivoServerClient : IDisposable
         CancellationToken cancellationToken = default)
         => await UploadImageAsync(server, $"/api/artwork/album/{albumId}", imageData, mimeType, cancellationToken);
 
+    /// <summary>Deletes the assigned artwork for a remote album.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="albumId">Database ID of the album.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when the server accepted the deletion.</returns>
+    public Task<bool> DeleteAlbumArtworkAsync(
+        OrynivoServerSettings server,
+        long albumId,
+        CancellationToken cancellationToken = default)
+        => SendNoContentAsync(server, HttpMethod.Delete, $"/api/artwork/album/{albumId}", cancellationToken);
+
     // ------------------------------------------------------------------
     // Tracks
     // ------------------------------------------------------------------
@@ -1220,6 +1231,17 @@ public sealed class OrynivoServerClient : IDisposable
         string? mimeType,
         CancellationToken cancellationToken = default)
         => await UploadImageAsync(server, $"/api/artwork/artist/{artistId}", imageData, mimeType, cancellationToken);
+
+    /// <summary>Deletes the cached image for a remote artist.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="artistId">Database ID of the artist.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when the server accepted the deletion.</returns>
+    public Task<bool> DeleteArtistImageAsync(
+        OrynivoServerSettings server,
+        long artistId,
+        CancellationToken cancellationToken = default)
+        => SendNoContentAsync(server, HttpMethod.Delete, $"/api/artwork/artist/{artistId}", cancellationToken);
 
     // ------------------------------------------------------------------
     // Server library configuration

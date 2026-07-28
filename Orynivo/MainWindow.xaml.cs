@@ -9005,6 +9005,112 @@ public partial class MainWindow : Window
         await OpenCoverSearchAsync(row);
     }
 
+    private async void UploadCoverButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: ContentRow { Id: long albumId } row } ||
+            await PickImageAsync() is not { } image)
+        {
+            return;
+        }
+
+        ILibraryCatalogProvider provider = row.EntityType == "OrynivoAlbum" &&
+                                           ResolveRowOrynivoServer(row) is { } server
+            ? CreateOrynivoCatalogProvider(server)
+            : _localCatalogProvider;
+        if (!await provider.SetAlbumArtworkAsync(albumId, image.Data, image.MimeType))
+        {
+            StatusTextBlock.Text = LocalizationManager.Current.OrynivoConnectionFailed;
+            return;
+        }
+
+        if (row.EntityType == "OrynivoAlbum" && ResolveRowOrynivoServer(row) is { } remoteServer)
+        {
+            row.ArtworkPath = OrynivoServerClient.GetAlbumArtworkUrl(remoteServer, albumId, 320);
+            row.ThumbnailPath = OrynivoServerClient.GetAlbumArtworkUrl(remoteServer, albumId, 96);
+            ApplyRemoteArtwork(row, image.Data);
+        }
+        else
+        {
+            UpdateRowArtworkFromBytes(row, image.Data);
+        }
+
+        if (_activeAlbumFilterId == albumId && row.EntityType != "OrynivoAlbum")
+            await ReloadAlbumDetailHeaderAsync(albumId);
+        StatusTextBlock.Text = string.Empty;
+    }
+
+    private async void DeleteCoverButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: ContentRow { Id: long albumId } row })
+            return;
+
+        ILibraryCatalogProvider provider = row.EntityType == "OrynivoAlbum" &&
+                                           ResolveRowOrynivoServer(row) is { } server
+            ? CreateOrynivoCatalogProvider(server)
+            : _localCatalogProvider;
+        if (!await provider.DeleteAlbumArtworkAsync(albumId))
+        {
+            StatusTextBlock.Text = LocalizationManager.Current.OrynivoConnectionFailed;
+            return;
+        }
+
+        InvalidateRemoteArtworkCache(row.ArtworkPath);
+        InvalidateRemoteArtworkCache(row.ThumbnailPath);
+        row.ArtworkPath = null;
+        row.ThumbnailPath = null;
+        UpdateRowArtworkFromBytes(row, null);
+        if (_activeAlbumFilterId == albumId && row.EntityType != "OrynivoAlbum")
+            await ReloadAlbumDetailHeaderAsync(albumId);
+        StatusTextBlock.Text = string.Empty;
+    }
+
+    /// <summary>Lets the user select and validates a bounded local image file.</summary>
+    /// <returns>The selected image bytes and MIME type, or <see langword="null"/> when cancelled or invalid.</returns>
+    private async Task<(byte[] Data, string MimeType)?> PickImageAsync()
+    {
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = LocalizationManager.Current.ImageFileType,
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType(LocalizationManager.Current.ImageFileType)
+                {
+                    Patterns = ["*.jpg", "*.jpeg", "*.png", "*.webp"]
+                }
+            ]
+        });
+        if (files.Count == 0)
+            return null;
+
+        const int maximumImageBytes = 20 * 1024 * 1024;
+        await using var input = await files[0].OpenReadAsync();
+        using var output = new MemoryStream();
+        var buffer = new byte[81_920];
+        int read;
+        while ((read = await input.ReadAsync(buffer)) > 0)
+        {
+            if (output.Length + read > maximumImageBytes)
+                return null;
+            await output.WriteAsync(buffer.AsMemory(0, read));
+        }
+        if (output.Length == 0)
+            return null;
+
+        var data = output.ToArray();
+        try
+        {
+            using var validationStream = new MemoryStream(data);
+            using var bitmap = new Bitmap(validationStream);
+        }
+        catch
+        {
+            return null;
+        }
+
+        return (data, GuessImageMimeType(files[0].Name));
+    }
+
     private async void DeleteCoverMenuItem_OnClick(object? sender, RoutedEventArgs e)
     {
         if (sender is not MenuItem { Tag: ContentRow { Id: long albumId } row })
@@ -13173,6 +13279,100 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void UploadArtistImageButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (!TryGetDisplayedArtistName(out var artistName) ||
+            await PickImageAsync() is not { } image)
+        {
+            return;
+        }
+
+        await SynchronizeUnifiedArtistImageAsync(artistName, image.Data, image.MimeType);
+        using var stream = new MemoryStream(image.Data);
+        ArtistInfoImage.Source = new Bitmap(stream);
+        ArtistInfoImagePlaceholder.IsVisible = false;
+        ArtistInfoImageStatusText.IsVisible = false;
+
+        if (_artistInfoDisplayedRemoteRow is { } remoteRow)
+        {
+            if (ResolveRowOrynivoServer(remoteRow) is { } server &&
+                remoteRow.Id is long artistId)
+            {
+                EnsureOrynivoArtistArtworkPaths(server, artistId, remoteRow);
+                ApplyRemoteArtwork(remoteRow, image.Data);
+                remoteRow.ImageIsManual = true;
+            }
+        }
+        else if (_artistInfoDisplayedId is long localArtistId)
+        {
+            ArtistInfo? artist;
+            using (var db = AudioDatabase.OpenDefault())
+                artist = db.GetArtistById(localArtistId);
+            if (artist is not null)
+                await RefreshVisibleArtistRowAsync(artist);
+        }
+
+        StatusTextBlock.Text = string.Empty;
+    }
+
+    private async void DeleteArtistImageButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (!TryGetDisplayedArtistName(out var artistName))
+            return;
+
+        await SynchronizeUnifiedArtistImageDeletionAsync(artistName);
+        ArtistInfoImage.Source = null;
+        ArtistInfoImagePlaceholder.IsVisible = true;
+        ArtistInfoImageStatusText.IsVisible = false;
+
+        if (_artistInfoDisplayedRemoteRow is { } remoteRow)
+        {
+            InvalidateRemoteArtworkCache(remoteRow.ArtworkPath);
+            InvalidateRemoteArtworkCache(remoteRow.ThumbnailPath);
+            remoteRow.ArtworkPath = null;
+            remoteRow.ThumbnailPath = null;
+            UpdateRowArtworkFromBytes(remoteRow, null);
+            remoteRow.ImageIsManual = false;
+        }
+        else if (_artistInfoDisplayedId is long localArtistId)
+        {
+            ArtistInfo? artist;
+            using (var db = AudioDatabase.OpenDefault())
+                artist = db.GetArtistById(localArtistId);
+            if (artist is not null)
+                await RefreshVisibleArtistRowAsync(artist);
+        }
+
+        StatusTextBlock.Text = string.Empty;
+    }
+
+    /// <summary>Resolves the artist currently displayed in the artist-information surface.</summary>
+    /// <param name="artistName">Receives the artist display name.</param>
+    /// <returns><see langword="true"/> when an artist context is available.</returns>
+    private bool TryGetDisplayedArtistName(out string artistName)
+    {
+        artistName = ArtistInfoTitleButton.Content as string ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(artistName))
+            return true;
+
+        if (_currentOrynivoTrackRow is { Artist: { } nowPlayingArtist })
+        {
+            artistName = nowPlayingArtist;
+            return !string.IsNullOrWhiteSpace(artistName);
+        }
+
+        return false;
+    }
+
+    /// <summary>Shows or hides the complete manual artist-image action group.</summary>
+    /// <param name="isVisible">Whether image search, upload, and deletion are available.</param>
+    private void SetArtistImageActionsVisible(bool isVisible)
+    {
+        SearchArtistImageButton.IsVisible = isVisible;
+        UploadArtistImageButton.IsVisible = isVisible;
+        DeleteArtistImageButton.IsVisible = isVisible;
+    }
+
     /// <summary>Opens manual artist-image search for the currently playing remote track's artist.</summary>
     /// <returns>A task representing the asynchronous search and upload flow.</returns>
     private async Task OpenNowPlayingRemoteArtistImageSearchAsync()
@@ -13212,6 +13412,54 @@ public partial class MainWindow : Window
             selected.ImageData,
             selected.MimeType);
         StatusTextBlock.Text = string.Empty;
+    }
+
+    /// <summary>Deletes the image from every local and reachable remote identity of an artist.</summary>
+    /// <param name="artistName">Artist display name used for normalized identity matching.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task representing the synchronized deletion.</returns>
+    private async Task SynchronizeUnifiedArtistImageDeletionAsync(
+        string artistName,
+        CancellationToken cancellationToken = default)
+    {
+        var comparisonKey = ArtistNameNormalizer.CreateComparisonKey(artistName);
+        if (comparisonKey.Length == 0)
+            return;
+
+        await Task.Run(() =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            foreach (var artist in db.GetArtistsLite().Where(candidate =>
+                         ArtistNameNormalizer.CreateComparisonKey(candidate.Artist) == comparisonKey))
+            {
+                if (db.ClearArtistImage(artist.Id))
+                    ArtistImageSearchService.DeleteImage(artist.Id);
+            }
+        }, cancellationToken);
+
+        foreach (var server in _settings.OrynivoServers)
+        {
+            try
+            {
+                var artists = await _orynivoClient.GetArtistsAsync(server, cancellationToken);
+                foreach (var artist in artists.Where(candidate =>
+                             ArtistNameNormalizer.CreateComparisonKey(candidate.Name) == comparisonKey))
+                {
+                    await _orynivoClient.DeleteArtistImageAsync(server, artist.Id, cancellationToken);
+                    var imageUrl = OrynivoServerClient.GetArtistArtworkUrl(server, artist.Id);
+                    InvalidateRemoteArtworkCache(imageUrl);
+                }
+                DeleteOrynivoArtistListCache(server);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch
+            {
+                // Deletion remains applied to every reachable matching library.
+            }
+        }
     }
 
     private async void EditArtistNameButton_OnClick(object? sender, RoutedEventArgs e)
@@ -13633,7 +13881,7 @@ public partial class MainWindow : Window
         var cts = new CancellationTokenSource();
         _artistProfileCts = cts;
         EditArtistNameButton.IsVisible = true;
-        SearchArtistImageButton.IsVisible = true;
+        SetArtistImageActionsVisible(true);
         RefreshArtistInfoButton.IsEnabled = false;
         ArtistInfoImage.Source = null;
         ArtistInfoImagePlaceholder.IsVisible = true;
@@ -13778,7 +14026,7 @@ public partial class MainWindow : Window
         var cts = new CancellationTokenSource();
         _artistProfileCts = cts;
         EditArtistNameButton.IsVisible = true;
-        SearchArtistImageButton.IsVisible = true;
+        SetArtistImageActionsVisible(true);
         RefreshArtistInfoButton.IsEnabled = false;
         ArtistInfoImage.Source = null;
         ArtistInfoImagePlaceholder.IsVisible = true;
@@ -13946,7 +14194,7 @@ public partial class MainWindow : Window
         var cts = new CancellationTokenSource();
         _artistProfileCts = cts;
         EditArtistNameButton.IsVisible = false;
-        SearchArtistImageButton.IsVisible = row.OrynivoServer is not null;
+        SetArtistImageActionsVisible(row.OrynivoServer is not null);
         RefreshArtistInfoButton.IsEnabled = false;
         ArtistInfoImage.Source = null;
         ArtistInfoImagePlaceholder.IsVisible = true;
