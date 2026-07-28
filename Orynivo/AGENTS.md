@@ -120,6 +120,16 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   change visibility. At either end they remain reserved, disabled, and visually
   muted so the header layout cannot shift. Keep a clear gap before Show all.
   Their Show all views contain up to 100 items.
+- Dashboard album recommendations rank compact local and Orynivo Server album
+  candidates against genre listening time from the selected history period.
+  Already-heard albums are de-emphasized, and the optional mood selector applies
+  a genre/BPM preference rather than excluding all non-matching candidates.
+  Recommendation cards retain their source context and use the shared album-card
+  navigation. Their default presentation is the taller circular cover stage:
+  the centered album is full-size, neighboring albums are progressively scaled,
+  angled, and faded, and navigation crossfades translated/rotated stage frames.
+  `AppSettings.DashboardRecommendationStageView` persists the List/Stage switch
+  immediately and defaults to Stage.
 - Dashboard favorite counters must use the same currently resolvable local and
   Orynivo Server track set as the unified Favorites view; never count raw remote
   favorite keys from settings without validating current facets and track rows.

@@ -415,6 +415,24 @@ public sealed record LocalizedStrings(
     public string FeedUrl { get; init; } = "";
     public string SearchResultSummary { get; init; } = "";
     public string RecentAlbums { get; init; } = "";
+    /// <summary>Gets the dashboard album-recommendations section title.</summary>
+    public string AlbumRecommendations { get; init; } = "";
+    /// <summary>Gets the recommendation mood option that applies no mood preference.</summary>
+    public string RecommendationMoodAll { get; init; } = "";
+    /// <summary>Gets the relaxed recommendation mood option.</summary>
+    public string RecommendationMoodRelaxed { get; init; } = "";
+    /// <summary>Gets the energetic recommendation mood option.</summary>
+    public string RecommendationMoodEnergetic { get; init; } = "";
+    /// <summary>Gets the happy recommendation mood option.</summary>
+    public string RecommendationMoodHappy { get; init; } = "";
+    /// <summary>Gets the melancholic recommendation mood option.</summary>
+    public string RecommendationMoodMelancholic { get; init; } = "";
+    /// <summary>Gets the message shown when listening history yields no matching recommendations.</summary>
+    public string RecommendationNoMatches { get; init; } = "";
+    /// <summary>Gets the recommendation view-mode label for the horizontal list.</summary>
+    public string RecommendationListView { get; init; } = "";
+    /// <summary>Gets the recommendation view-mode label for the cover stage.</summary>
+    public string RecommendationStageView { get; init; } = "";
     public string Calendar { get; init; } = "";
     public string TopGenres { get; init; } = "";
     /// <summary>Gets the dashboard "most listened albums" section title.</summary>

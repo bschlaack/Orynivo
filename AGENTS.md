@@ -241,6 +241,8 @@ runtime dependency.
   `GET /api/library/summary` returns aggregate album, track, artist, and
   favourite counts for cross-library Dashboard totals without materializing
   complete library rows;
+  `GET /api/albums/recommendation-candidates` returns compact album genre and
+  average-BPM metadata for client-side history-based Dashboard recommendations;
   `GET /api/artists/{id}` returns complete
   cached artist profile fields, `POST /api/artists/{id}/profile` stores
   client-refreshed biography/source fields plus optional image bytes, and
@@ -912,6 +914,8 @@ fallback or allow client-provided commands/paths to reach the helper.
 - `AppSettings.LastMainView`, `AppSettings.AlbumArtworkView`, and
   `AppSettings.ArtistArtworkView` preserve the selected main view and entity
   artwork/table modes
+- `AppSettings.DashboardRecommendationStageView` defaults album recommendations
+  to the tall animated cover stage and persists the Dashboard List/Stage choice
 - `AppSettings.Volume` and `AppSettings.LastTrackPath` preserve volume and the
   last selected or played track; restoration requires both the file and database
   entry to exist

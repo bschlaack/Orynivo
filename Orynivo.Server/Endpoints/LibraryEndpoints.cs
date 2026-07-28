@@ -131,6 +131,12 @@ public static class LibraryEndpoints
             return Results.Ok(db.GetRecentAlbums(limit).Select(RecentAlbumDto).ToList());
         });
 
+        api.MapGet("/albums/recommendation-candidates", () =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            return Results.Ok(db.GetRecommendationAlbums());
+        });
+
         api.MapGet("/albums/{albumId:long}/tracks", (long albumId) =>
         {
             using var db = AudioDatabase.OpenDefault();

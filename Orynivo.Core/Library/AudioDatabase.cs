@@ -168,6 +168,30 @@ public sealed record TrackLite(
 /// <param name="ArtworkPath">Local 320-px thumbnail path for a crisp artwork card, or <see langword="null"/>.</param>
 public sealed record RecentAlbumInfo(long Id, string Title, string Artist, string? ThumbPath, long? ArtistId = null, long AddedAt = 0, bool IsFavorite = false, string? ArtworkPath = null);
 
+/// <summary>Compact album metadata used for history-based dashboard recommendations.</summary>
+/// <param name="Id">Database album identifier.</param>
+/// <param name="Title">Album title.</param>
+/// <param name="Artist">Album-artist display name.</param>
+/// <param name="ArtistId">Database album-artist identifier, or <see langword="null"/>.</param>
+/// <param name="Genres">Distinct semicolon-separated track genres.</param>
+/// <param name="AverageBpm">Average positive track BPM, or <see langword="null"/>.</param>
+/// <param name="ArtworkPath">Local 320-px artwork path, or <see langword="null"/>.</param>
+/// <param name="IsFavorite">Whether the album is a favorite.</param>
+public sealed record RecommendationAlbumInfo(
+    long Id,
+    string Title,
+    string Artist,
+    long? ArtistId,
+    string? Genres,
+    double? AverageBpm,
+    string? ArtworkPath,
+    bool IsFavorite);
+
+/// <summary>Album identity observed in playback history.</summary>
+/// <param name="Album">Album title.</param>
+/// <param name="Artist">Artist display name.</param>
+public sealed record PlayedAlbumIdentity(string Album, string Artist);
+
 /// <summary>Compact library counters displayed in the dashboard hero.</summary>
 public sealed record DashboardLibrarySummary(int AlbumCount, int TrackCount, int ArtistCount, int FavoriteCount);
 
@@ -4336,6 +4360,69 @@ public sealed class AudioDatabase : IDisposable
                 r.IsDBNull(5) ? 0 : r.GetInt64(5),
                 !r.IsDBNull(6) && r.GetInt64(6) != 0,
                 r.IsDBNull(7) ? null : r.GetString(7)));
+        return result;
+    }
+
+    /// <summary>Returns compact album-level genre and tempo metadata for recommendations.</summary>
+    /// <returns>All albums that contain at least one indexed track.</returns>
+    public List<RecommendationAlbumInfo> GetRecommendationAlbums()
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT a.id,
+                   COALESCE(a.title, ''),
+                   COALESCE(ar.name, ''),
+                   a.artist_id,
+                   GROUP_CONCAT(DISTINCT NULLIF(TRIM(t.genre), '')),
+                   AVG(CASE WHEN t.bpm > 0 THEN t.bpm END),
+                   COALESCE(art.thumb_320_path, art.original_path),
+                   COALESCE(a.is_favorite, 0)
+            FROM albums a
+            JOIN tracks t ON t.album_id = a.id
+            LEFT JOIN artists ar ON ar.id = a.artist_id
+            LEFT JOIN artworks art ON art.id = a.artwork_id
+            GROUP BY a.id;
+            """;
+        using var reader = cmd.ExecuteReader();
+        var result = new List<RecommendationAlbumInfo>();
+        while (reader.Read())
+        {
+            result.Add(new RecommendationAlbumInfo(
+                reader.GetInt64(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetInt64(3),
+                reader.IsDBNull(4) ? null : reader.GetString(4).Replace(',', ';'),
+                reader.IsDBNull(5) ? null : reader.GetDouble(5),
+                reader.IsDBNull(6) ? null : reader.GetString(6),
+                reader.GetInt64(7) != 0));
+        }
+        return result;
+    }
+
+    /// <summary>Returns distinct album/artist identities heard within an optional period.</summary>
+    /// <param name="sinceUnix">Inclusive lower Unix-time bound, or <see langword="null"/> for all history.</param>
+    /// <returns>Distinct history album identities.</returns>
+    public List<PlayedAlbumIdentity> GetPlayedAlbumIdentities(long? sinceUnix = null)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT DISTINCT
+                   TRIM(COALESCE(a.title, t.album, ph.album, '')),
+                   TRIM(COALESCE(ar.name, t.artist, ph.subtitle, ''))
+            FROM play_history ph
+            LEFT JOIN tracks t ON t.id = ph.track_id
+            LEFT JOIN albums a ON a.id = t.album_id
+            LEFT JOIN artists ar ON ar.id = COALESCE(a.artist_id, t.artist_id)
+            WHERE ph.position_seconds > 0
+              AND COALESCE(a.title, t.album, ph.album, '') <> ''
+              AND ($since IS NULL OR ph.started_at >= $since);
+            """;
+        cmd.Parameters.AddWithValue("$since", (object?)sinceUnix ?? DBNull.Value);
+        using var reader = cmd.ExecuteReader();
+        var result = new List<PlayedAlbumIdentity>();
+        while (reader.Read())
+            result.Add(new PlayedAlbumIdentity(reader.GetString(0), reader.GetString(1)));
         return result;
     }
 

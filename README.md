@@ -498,7 +498,9 @@ byte-range streaming without FFmpeg.
   playback and queue shortcuts, parallel Recently Played/Recently Added artwork
   strips, source and favorite state on history cards, a period-aware listening
   seven-point labeled and smoothed listening-trend chart, compact proportional
-  genre/album/artist analytics, quick access, and a
+  genre/album/artist analytics, history-based album recommendations with
+  period and mood selectors plus a persisted List/animated cover-stage view,
+  quick access, and a
   clickable playback calendar. Album rankings retain artwork, and linked genres
   open the matching filtered track list.
 - Clickable populated calendar days with a modal daily listening history;

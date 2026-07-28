@@ -64,6 +64,25 @@ public sealed record OrynivoRecentAlbum(
     long AddedAt,
     bool HasArtwork);
 
+/// <summary>Compact remote album metadata used for dashboard recommendations.</summary>
+/// <param name="Id">Database album identifier.</param>
+/// <param name="Title">Album title.</param>
+/// <param name="Artist">Album-artist display name.</param>
+/// <param name="ArtistId">Database album-artist identifier, or <see langword="null"/>.</param>
+/// <param name="Genres">Distinct semicolon-separated track genres.</param>
+/// <param name="AverageBpm">Average positive track BPM, or <see langword="null"/>.</param>
+/// <param name="ArtworkPath">Server-side artwork path when present.</param>
+/// <param name="IsFavorite">Server-side favorite state.</param>
+public sealed record OrynivoRecommendationAlbum(
+    long Id,
+    string Title,
+    string Artist,
+    long? ArtistId,
+    string? Genres,
+    double? AverageBpm,
+    string? ArtworkPath,
+    bool IsFavorite);
+
 /// <summary>Track entry returned by the Orynivo Server API.</summary>
 /// <param name="Id">Database ID of the track.</param>
 /// <param name="Path">Playable library path.</param>
@@ -642,6 +661,27 @@ public sealed class OrynivoServerClient : IDisposable
                    ?? [];
         }
         catch { return []; }
+    }
+
+    /// <summary>Loads compact album candidates for history-based recommendations.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Recommendation candidates, or an empty list for older/unreachable servers.</returns>
+    public async Task<List<OrynivoRecommendationAlbum>> GetRecommendationAlbumsAsync(
+        OrynivoServerSettings server,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await GetJsonAsync<List<OrynivoRecommendationAlbum>>(
+                       server,
+                       "/api/albums/recommendation-candidates",
+                       cancellationToken) ?? [];
+        }
+        catch
+        {
+            return [];
+        }
     }
 
     /// <summary>Stores a client-refreshed artist profile on the remote server.</summary>

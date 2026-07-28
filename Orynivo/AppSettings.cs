@@ -34,6 +34,8 @@ public sealed class AppSettings
     public bool AlbumArtworkView { get; set; }
     /// <summary>Gets or sets a value indicating whether the artist list uses the artwork grid view.</summary>
     public bool ArtistArtworkView { get; set; }
+    /// <summary>Gets or sets a value indicating whether Dashboard album recommendations use the stage view instead of the list.</summary>
+    public bool DashboardRecommendationStageView { get; set; } = true;
     /// <summary>Gets or sets the master playback volume (0.0 – 1.0).</summary>
     public double Volume { get; set; } = 1.0;
     /// <summary>Gets or sets the ReplayGain mode used for PCM playback.</summary>

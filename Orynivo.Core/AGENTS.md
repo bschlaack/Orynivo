@@ -30,6 +30,9 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
 - Remote dashboard totals use `OrynivoServerClient.GetLibrarySummaryAsync` and
   the server's aggregate `/api/library/summary` response; do not replace this
   fast path with complete track or album payloads.
+- Dashboard recommendations use compact album-level genre/BPM candidates from
+  `AudioDatabase.GetRecommendationAlbums` and the matching server endpoint.
+  Keep this payload free of track rows, artwork bytes, and playback credentials.
 - `AudioDatabase.GetListeningTrend` supports up to 366 equal chronological
   buckets so the client can request daily Dashboard points without materializing
   playback-history rows.

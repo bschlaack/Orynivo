@@ -4,16 +4,22 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.30.0] - 2026-07-28
 
 ### Added
 
+- The Dashboard now suggests albums from local and Orynivo Server libraries by
+  matching album genres against the selected listening-history period. Users can
+  choose the last week, last month, or all history and bias the ranking toward a
+  relaxed, energetic, happy, or melancholic mood. Recommendations default to a
+  tall animated cover stage with perspective-angled neighboring albums and
+  circular navigation; a persisted List/Stage switch restores the user's choice.
 - Album and artist detail views can now upload local image files directly into
   Orynivo's artwork caches. Adjacent trash actions delete album covers or artist
   images for local and Orynivo Server libraries, with unified artist-image
   changes synchronized across matching sources.
 
-### Fixed
+
 
 ## [0.29.4] - 2026-07-28
 
