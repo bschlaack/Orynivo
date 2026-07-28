@@ -1167,6 +1167,10 @@ fallback or allow client-provided commands/paths to reach the helper.
 - `track_title_overrides` stores library-only title corrections keyed by stable
   track path. `AudioDatabase.Upsert` reapplies them after every scan, so virtual
   MKA chapter titles can be corrected without modifying the media container.
+- `track_metadata_overrides` stores confirmed MusicBrainz folder-repair values
+  for title, track/album artists, album, numbering, and MusicBrainz IDs.
+  `AudioDatabase.Upsert` reapplies them before normalization so later scans do
+  not restore bad embedded tags; the media files are never rewritten.
 - Library scans include `.cue` files. CUE `FILE`, `TRACK`, `INDEX 01`, `TITLE`,
   `PERFORMER`, `REM GENRE`, and `REM DATE` metadata produces independently
   searchable and queueable virtual tracks. PCM playback seeks and stops FFmpeg
@@ -2166,6 +2170,11 @@ asynchronous file I/O from the UI thread
   states retain both the selected entity and exact vertical offset; artwork
   restoration appends virtualized pages through the saved viewport and applies
   the offset only after the normal rebind reset and layout pass have completed.
+  Because local and remote numeric IDs can overlap, saved selection also carries
+  the row's stable source key. Restoring top-level Artists or Albums must call
+  the regular unified local/server view path and must never bind local
+  `QueryRows` directly; search restoration likewise preserves its selected
+  result source and outer result-page offset.
 - Visible artist and album names act as links across tables, search results,
   artwork cards, album headers, artist profiles, dashboard cards, and Now
   Playing; artist links open the artist's albums and album links open the

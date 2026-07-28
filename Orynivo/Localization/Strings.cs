@@ -433,6 +433,49 @@ public sealed record LocalizedStrings(
     public string RecommendationListView { get; init; } = "";
     /// <summary>Gets the recommendation view-mode label for the cover stage.</summary>
     public string RecommendationStageView { get; init; } = "";
+    /// <summary>Gets the library metadata-problems navigation and view title.</summary>
+    public string MetadataProblems { get; init; } = "";
+    /// <summary>Gets the uppercase Settings navigation group heading for metadata tools.</summary>
+    /// <summary>Gets the explanatory text for the metadata-problems view.</summary>
+    public string MetadataProblemsHint { get; init; } = "";
+    /// <summary>Gets the action that identifies a physical folder as an album.</summary>
+    public string IdentifyFolderAsAlbum { get; init; } = "";
+    /// <summary>Gets the physical-folder column label.</summary>
+    public string MetadataFolder { get; init; } = "";
+    /// <summary>Gets the detected-problems column label.</summary>
+    public string MetadataIssues { get; init; } = "";
+    /// <summary>Gets the track-count column label.</summary>
+    public string MetadataTrackCount { get; init; } = "";
+    /// <summary>Gets the metadata review dialog title.</summary>
+    public string MetadataReviewTitle { get; init; } = "";
+    /// <summary>Gets the status shown while MusicBrainz is queried.</summary>
+    public string MetadataSearching { get; init; } = "";
+    /// <summary>Gets the status shown when MusicBrainz returns no suitable release.</summary>
+    public string MetadataNoMatch { get; init; } = "";
+    /// <summary>Gets the message shown when MusicBrainz cannot complete a metadata search.</summary>
+    public string MetadataSearchFailed { get; init; } = "";
+    /// <summary>Gets the label introducing MusicBrainz release candidates.</summary>
+    public string MetadataFoundReleases { get; init; } = "";
+    /// <summary>Gets the action that applies a selected metadata correction.</summary>
+    public string MetadataApplyCorrection { get; init; } = "";
+    /// <summary>Gets the action that refreshes the metadata-problem analysis.</summary>
+    public string MetadataRefreshAnalysis { get; init; } = "";
+    /// <summary>Gets the editable MusicBrainz album-query label.</summary>
+    public string MetadataAlbumQuery { get; init; } = "";
+    /// <summary>Gets the editable MusicBrainz artist-query label.</summary>
+    public string MetadataArtistQuery { get; init; } = "";
+    /// <summary>Gets the success status after a folder correction.</summary>
+    public string MetadataRepairSuccess { get; init; } = "";
+    /// <summary>Gets the problem label for inconsistent album titles.</summary>
+    public string MetadataIssueAlbums { get; init; } = "";
+    /// <summary>Gets the problem label for inconsistent album artists.</summary>
+    public string MetadataIssueArtists { get; init; } = "";
+    /// <summary>Gets the problem label for missing titles.</summary>
+    public string MetadataIssueMissingTitles { get; init; } = "";
+    /// <summary>Gets the problem label for missing track numbers.</summary>
+    public string MetadataIssueMissingNumbers { get; init; } = "";
+    /// <summary>Gets the problem label for duplicate track numbers.</summary>
+    public string MetadataIssueDuplicateNumbers { get; init; } = "";
     public string Calendar { get; init; } = "";
     public string TopGenres { get; init; } = "";
     /// <summary>Gets the dashboard "most listened albums" section title.</summary>

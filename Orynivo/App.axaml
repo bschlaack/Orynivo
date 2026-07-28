@@ -444,6 +444,13 @@
             <x:String x:Key="L_Close">Schließen</x:String>
             <x:String x:Key="L_DailyHistoryNoEntries">Für diesen Tag sind keine Wiedergaben vorhanden.</x:String>
             <x:String x:Key="L_FolderStructure">Ordnerstruktur</x:String>
+            <x:String x:Key="L_MetadataProblems">Metadaten prüfen</x:String>
+            <x:String x:Key="L_MetadataProblemsHint">Physische Ordner auf fehlerhafte Metadaten prüfen.</x:String>
+            <x:String x:Key="L_MetadataFolder">Ordner</x:String>
+            <x:String x:Key="L_MetadataIssues">Erkannte Probleme</x:String>
+            <x:String x:Key="L_MetadataTrackCount">Titel</x:String>
+            <x:String x:Key="L_MetadataRefreshAnalysis">Analyse aktualisieren</x:String>
+            <x:String x:Key="L_IdentifyFolderAsAlbum">Ordner als Album identifizieren</x:String>
             <x:String x:Key="L_Playlists">Playlists</x:String>
             <x:String x:Key="L_Settings">Einstellungen</x:String>
             <x:String x:Key="L_Table">Tabelle</x:String>

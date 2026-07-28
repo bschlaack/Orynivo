@@ -33,6 +33,12 @@ internal partial class SettingsView : UserControl
         public override string ToString() => Label;
     }
 
+    private sealed record MetadataProblemRow(
+        string Folder,
+        string Issues,
+        int TrackCount,
+        MetadataFolderCandidate Candidate);
+
     private readonly AppSettings _settings;
     private readonly List<string> _libraryPaths = [];
     private readonly List<PlexServerSettings> _plexServers = [];
@@ -52,6 +58,7 @@ internal partial class SettingsView : UserControl
     private bool _rebuildingEqualizerEditor;
     private bool _settingsAccepted;
     private bool _plexCredentialsChanged;
+    private bool _metadataAnalysisLoaded;
 
     /// <summary>
     /// Initializes a runtime-loader instance with default settings.
@@ -903,11 +910,85 @@ internal partial class SettingsView : UserControl
         AudioDevicePanel.IsVisible             = tag == "AudioDevice";
         LibraryPanel.IsVisible                 = tag == "Library";
         OrynivoServersSettingsPanel.IsVisible  = tag == "OrynivoServers";
+        MetadataPanel.IsVisible                = tag == "Metadata";
         StreamingPanel.IsVisible               = tag == "Streaming";
         AppearancePanel.IsVisible              = tag == "Appearance";
         ArtistInfoPanel.IsVisible              = tag == "ArtistInfo";
         McpPanel.IsVisible                     = tag == "Mcp";
         AiChatPanel.IsVisible                  = tag == "AiChat";
+        if (tag == "Metadata" && !_metadataAnalysisLoaded)
+            _ = LoadMetadataProblemsAsync();
+    }
+
+    private async Task LoadMetadataProblemsAsync()
+    {
+        _metadataAnalysisLoaded = true;
+        MetadataStatusTextBlock.Text = LocalizationManager.Current.MetadataSearching;
+        var candidates = await Task.Run(() =>
+        {
+            using var database = AudioDatabase.OpenDefault();
+            return LibraryMetadataRepairService.Analyze(database.GetMetadataRepairTracks());
+        });
+        MetadataProblemsDataGrid.ItemsSource = candidates
+            .Select(candidate => new MetadataProblemRow(
+                candidate.FolderPath,
+                BuildMetadataIssueSummary(candidate),
+                candidate.Tracks.Count,
+                candidate))
+            .ToList();
+        MetadataStatusTextBlock.Text = candidates.Count == 0
+            ? LocalizationManager.Current.NoData
+            : LocalizationManager.FormatEntryCount(candidates.Count);
+    }
+
+    private static string BuildMetadataIssueSummary(MetadataFolderCandidate candidate)
+    {
+        var strings = LocalizationManager.Current;
+        var issues = new List<string>();
+        if (candidate.AlbumCount != 1)
+            issues.Add(strings.MetadataIssueAlbums);
+        if (candidate.AlbumArtistCount != 1)
+            issues.Add(strings.MetadataIssueArtists);
+        if (candidate.MissingTitleCount > 0)
+            issues.Add(strings.MetadataIssueMissingTitles);
+        if (candidate.MissingTrackNumberCount > 0)
+            issues.Add(strings.MetadataIssueMissingNumbers);
+        if (candidate.DuplicateTrackNumbers)
+            issues.Add(strings.MetadataIssueDuplicateNumbers);
+        return string.Join(" · ", issues);
+    }
+
+    private async Task OpenSelectedMetadataRepairAsync()
+    {
+        if (MetadataProblemsDataGrid.SelectedItem is not MetadataProblemRow row)
+            return;
+        var dialog = new MetadataRepairDialog(row.Candidate);
+        if (await dialog.ShowDialog<bool>(GetHostWindow()) != true || dialog.SelectedMatch is null)
+            return;
+        var overrides = LibraryMetadataRepairService.CreateOverrides(row.Candidate, dialog.SelectedMatch);
+        await Task.Run(() =>
+        {
+            using var database = AudioDatabase.OpenDefault();
+            database.ApplyTrackMetadataOverrides(overrides);
+            TrackSearchIndex.Rebuild(database.GetAll());
+        });
+        MetadataStatusTextBlock.Text = LocalizationManager.Current.MetadataRepairSuccess;
+        await LoadMetadataProblemsAsync();
+    }
+
+    private async void MetadataProblemsDataGrid_OnDoubleTapped(object? sender, Avalonia.Input.TappedEventArgs e) =>
+        await OpenSelectedMetadataRepairAsync();
+
+    private void MetadataProblemsDataGrid_OnSelectionChanged(object? sender, SelectionChangedEventArgs e) =>
+        OpenMetadataRepairButton.IsEnabled = MetadataProblemsDataGrid.SelectedItem is MetadataProblemRow;
+
+    private async void OpenMetadataRepairButton_OnClick(object? sender, RoutedEventArgs e) =>
+        await OpenSelectedMetadataRepairAsync();
+
+    private async void RefreshMetadataAnalysisButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        _metadataAnalysisLoaded = false;
+        await LoadMetadataProblemsAsync();
     }
 
     private void ArtistInfoSourceComboBox_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)

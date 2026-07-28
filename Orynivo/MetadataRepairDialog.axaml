@@ -1,0 +1,85 @@
+<Window x:Class="Orynivo.MetadataRepairDialog"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Width="940"
+        Height="720"
+        MinWidth="760"
+        MinHeight="560"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppContentBrush}"
+        Foreground="{DynamicResource AppPrimaryTextBrush}">
+    <Grid Margin="24" RowDefinitions="Auto,Auto,Auto,2*,Auto,2*,Auto">
+        <TextBlock Grid.Row="0"
+                   Text="{Binding FolderPath}"
+                   FontSize="{DynamicResource FontSizeTitle}"
+                   FontWeight="SemiBold"
+                   TextWrapping="Wrap"/>
+        <TextBlock x:Name="StatusTextBlock"
+                   Grid.Row="1"
+                   Margin="0,8,0,12"
+                   Foreground="{DynamicResource AppSecondaryTextBrush}"
+                   TextWrapping="Wrap"/>
+        <Grid Grid.Row="2" ColumnDefinitions="*,*,Auto" Margin="0,0,0,12">
+            <StackPanel Margin="0,0,8,0">
+                <TextBlock x:Name="AlbumQueryLabel"
+                           FontSize="{DynamicResource FontSizeMeta}"
+                           Foreground="{DynamicResource AppSecondaryTextBrush}"
+                           Margin="2,0,0,4"/>
+                <TextBox x:Name="AlbumQueryTextBox"/>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                <TextBlock x:Name="ArtistQueryLabel"
+                           FontSize="{DynamicResource FontSizeMeta}"
+                           Foreground="{DynamicResource AppSecondaryTextBrush}"
+                           Margin="2,0,0,4"/>
+                <TextBox x:Name="ArtistQueryTextBox"/>
+            </StackPanel>
+            <Button x:Name="SearchAgainButton"
+                    Grid.Column="2"
+                    MinWidth="130"
+                    Padding="18,9"
+                    VerticalAlignment="Bottom"
+                    Click="SearchAgainButton_OnClick"/>
+        </Grid>
+        <DataGrid x:Name="CurrentTracksDataGrid"
+                  Grid.Row="3"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  HeadersVisibility="Column"
+                  GridLinesVisibility="None">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="#" Binding="{Binding TrackNumber}" Width="55"/>
+                <DataGridTextColumn Header="{DynamicResource L_Title}" Binding="{Binding Title}" Width="2*"/>
+                <DataGridTextColumn Header="{DynamicResource L_Artist}" Binding="{Binding Artist}" Width="*"/>
+                <DataGridTextColumn Header="{DynamicResource L_Album}" Binding="{Binding Album}" Width="*"/>
+            </DataGrid.Columns>
+        </DataGrid>
+        <TextBlock Grid.Row="4"
+                   Margin="0,12,0,8"
+                   Text="{Binding FoundReleasesLabel}"
+                   FontSize="{DynamicResource FontSizeBodyStrong}"
+                   FontWeight="SemiBold"/>
+        <ListBox x:Name="ReleaseListBox"
+                 Grid.Row="5"
+                 SelectionChanged="ReleaseListBox_OnSelectionChanged"/>
+        <Grid Grid.Row="6" Margin="0,12,0,0" ColumnDefinitions="*,Auto,Auto">
+            <TextBlock x:Name="SelectionDetailTextBlock"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource AppSecondaryTextBrush}"
+                       TextWrapping="Wrap"/>
+            <Button Grid.Column="1"
+                    Margin="0,0,10,0"
+                    MinWidth="100"
+                    Padding="18,9"
+                    Content="{Binding CancelLabel}"
+                    Click="CancelButton_OnClick"/>
+            <Button x:Name="ApplyButton"
+                    Grid.Column="2"
+                    MinWidth="150"
+                    Padding="18,9"
+                    IsEnabled="False"
+                    Content="{Binding ApplyLabel}"
+                    Click="ApplyButton_OnClick"/>
+        </Grid>
+    </Grid>
+</Window>

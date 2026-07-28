@@ -4,6 +4,37 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Added **Library > Review metadata** to Settings. It detects
+  physically grouped folders split by inconsistent album titles or album artists,
+  missing titles or   track numbers, and duplicate track numbers. A folder can
+  also be identified directly from the Folder structure context menu. Orynivo
+  performs a fuzzy MusicBrainz CD-TOC lookup from track count and durations,
+  presents ranked releases for confirmation. Album and artist search terms are
+  editable before every lookup, allowing tag wording such as `Bravo Hits Vol. 42`
+  to be simplified to `Bravo Hits 42` while track count and durations still
+  validate the result.
+  Orynivo stores the selected titles, artists, album,
+  numbering, and MusicBrainz IDs as library-only overrides that survive scans
+  without modifying audio-file tags.
+
+### Fixed
+
+- Fixed metadata correction returning no candidates whenever one local or
+  MusicBrainz track duration was unavailable. Release lookup now combines exact
+  and relaxed title searches, ranks candidates using title similarity plus all
+  available duration evidence, and includes non-CD MusicBrainz media in fuzzy
+  TOC matching.
+- Fixed Back navigation restoring Artists or Albums from the local database
+  alone. Restored mixed-library views now run through the normal unified
+  local/server loader, retain the selected source when numeric IDs collide, and
+  restore the selected search result plus the search page's scroll position.
+- Fixed album-cover and artist-profile refreshes collapsing an already unified
+  Artists or Albums view back to local-only rows.
+
 ## [0.30.0] - 2026-07-28
 
 ### Added

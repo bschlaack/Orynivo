@@ -271,6 +271,15 @@
                     <TextBlock Text="{DynamicResource L_OrynivoServersSettings}" VerticalAlignment="Center"/>
                 </StackPanel>
             </ListBoxItem>
+            <ListBoxItem Tag="Metadata"
+                         FontSize="{DynamicResource FontSizeBody}"
+                         Theme="{StaticResource SettingsNavItemTheme}">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Path Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"
+                          Data="M4,4 L20,4 L20,20 L4,20 Z M8,8 L16,8 M8,12 L16,12 M8,16 L13,16"/>
+                    <TextBlock Text="{DynamicResource L_MetadataProblems}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </ListBoxItem>
 
             <ListBoxItem IsHitTestVisible="False"
                          Focusable="False"
@@ -818,6 +827,59 @@
                                 Content="{DynamicResource L_ClearRemoteCacheAll}"
                                 Click="ClearAllRemoteCacheButton_OnClick"/>
                     </StackPanel>
+                </StackPanel>
+
+                <StackPanel x:Name="MetadataPanel"
+                            IsVisible="False">
+                    <TextBlock Text="{DynamicResource L_MetadataProblems}"
+                               FontSize="{DynamicResource FontSizeBodyStrong}"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,8"/>
+                    <TextBlock Text="{DynamicResource L_MetadataProblemsHint}"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,12"/>
+                    <DataGrid x:Name="MetadataProblemsDataGrid"
+                              Height="420"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              HeadersVisibility="Column"
+                              GridLinesVisibility="None"
+                              SelectionChanged="MetadataProblemsDataGrid_OnSelectionChanged"
+                              DoubleTapped="MetadataProblemsDataGrid_OnDoubleTapped">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="{DynamicResource L_MetadataFolder}"
+                                                Binding="{Binding Folder}"
+                                                Width="2*"/>
+                            <DataGridTextColumn Header="{DynamicResource L_MetadataIssues}"
+                                                Binding="{Binding Issues}"
+                                                Width="2*"/>
+                            <DataGridTextColumn Header="{DynamicResource L_MetadataTrackCount}"
+                                                Binding="{Binding TrackCount}"
+                                                Width="80"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                        <Button Width="180"
+                                Height="30"
+                                Theme="{StaticResource SettingsButtonTheme}"
+                                Content="{DynamicResource L_MetadataRefreshAnalysis}"
+                                Click="RefreshMetadataAnalysisButton_OnClick"/>
+                        <Button x:Name="OpenMetadataRepairButton"
+                                Width="220"
+                                Height="30"
+                                Margin="8,0,0,0"
+                                IsEnabled="False"
+                                Theme="{StaticResource SettingsButtonTheme}"
+                                Content="{DynamicResource L_IdentifyFolderAsAlbum}"
+                                Click="OpenMetadataRepairButton_OnClick"/>
+                    </StackPanel>
+                    <TextBlock x:Name="MetadataStatusTextBlock"
+                               Margin="0,8,0,0"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppSecondaryTextBrush}"
+                               TextWrapping="Wrap"/>
                 </StackPanel>
 
                 <StackPanel x:Name="StreamingPanel"
