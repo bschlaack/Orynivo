@@ -753,7 +753,9 @@ distributions. After verifying the selected package digest it requests
 administrator authorization through PolicyKit and installs it with the native
 package manager. CachyOS is treated as Arch Linux and receives the signed
 `.pkg.tar.zst` package; the package file itself is never launched as an
-executable.
+executable. Orynivo remains open until the privileged package manager exits and
+closes only after a successful installation. Authentication cancellation or a
+package-manager error leaves the update window open with a failure status.
 
 ### macOS player
 

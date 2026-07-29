@@ -4,6 +4,17 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+### Fixed
+
+- Fixed Arch-family desktop updates (including CachyOS) closing Orynivo
+  immediately after starting PolicyKit. Orynivo now remains open while
+  `pacman -U` runs, closes only after a successful installer exit, and reports
+  and logs authentication or package-manager failures.
+
 # [0.30.3] - 2026-07-30
 
 ### Added
