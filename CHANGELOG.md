@@ -10,6 +10,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Masked the Last.fm API key in Settings so it is no longer displayed as
+  readable text, matching the Fanart.tv credential field.
+
 # [0.30.2] - 2026-07-28
 
 ### Added

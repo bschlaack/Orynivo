@@ -960,6 +960,7 @@
                         <TextBox x:Name="LastFmApiKeyTextBox"
                                  Height="30"
                                  HorizontalAlignment="Stretch"
+                                 PasswordChar="●"
                                  Padding="8,0"
                                  VerticalContentAlignment="Center"
                                  Margin="0,0,0,8"/>
