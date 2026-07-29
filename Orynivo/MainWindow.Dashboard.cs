@@ -825,7 +825,7 @@ public partial class MainWindow : Window
 
     private static IEnumerable<string> SplitRecommendationGenres(string? genres) =>
         (genres ?? string.Empty)
-        .Split([';', ',', '/', '|'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Split(new[] { ';', ',', '/', '|' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
         .Select(NormalizeRecommendationToken)
         .Where(value => value.Length > 0)
         .Distinct(StringComparer.Ordinal);

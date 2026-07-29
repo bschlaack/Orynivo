@@ -4,7 +4,7 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.30.1] - 2026-07-28
 
 ### Added
 
@@ -23,6 +23,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Fixed Linux desktop updates being unavailable or attempting to treat the
+  downloaded package as an executable file. Orynivo now selects the signed
+  DEB, RPM, or Arch package for the current distribution and requests the
+  required package-manager privileges through PolicyKit; CachyOS uses the
+  verified Arch package with `pacman`.
 - Fixed metadata correction returning no candidates whenever one local or
   MusicBrainz track duration was unavailable. Release lookup now combines exact
   and relaxed title searches, ranks candidates using title similarity plus all

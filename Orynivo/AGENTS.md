@@ -102,6 +102,11 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   Starting a desktop update from About first relays the matching signed release
   to every reachable update-enabled configured server. Failed servers are named
   and require an explicit choice before the platform installer continues.
+- Linux desktop updates map Arch-family distributions (including CachyOS) to
+  the signed `arch` package, Debian-family distributions to `deb`, and
+  RPM-family distributions to `rpm`. After digest verification, installation
+  must run through `/usr/bin/pkexec` and the distribution package manager; a
+  downloaded package must never be launched as an executable.
 - Tagged macOS releases publish architecture-specific `osx-arm64` and
   `osx-x64` application bundles as installable PKGs, portable ZIPs, and tar
   archives. The PKG installs `Orynivo.app` beneath `/Applications`; all package
