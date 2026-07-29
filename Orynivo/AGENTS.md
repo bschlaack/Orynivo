@@ -34,6 +34,15 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   hidden legacy server playlists must not be offered by these menus.
 - Shared local/remote Artists, Albums, and Tracks views use the common column
   masks and catalog abstractions. Do not create parallel remote-only UI surfaces.
+- Settings places the `Metadata` section as **Review metadata** in the
+  **LIBRARY** navigation group. It analyzes physical folders rather than
+  existing album rows, because incorrect tags may already have fragmented one
+  release. Double-click
+  opens `MetadataRepairDialog`; local directory nodes additionally expose
+  **Identify folder as album**. The dialog pre-fills but permits editing its album
+  and artist search terms before each MusicBrainz query, while track count and
+  durations remain match evidence. Only a user-confirmed match may be applied,
+  and media files remain unchanged.
 - The shared Folder structure sidebar item is visible when either local media
   or at least one Orynivo Server is configured. Server-only setups must be able
   to open `ShowUnifiedFolderTreeAsync` without configuring a local directory.
@@ -54,7 +63,11 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   artwork provider and use localized labels/tooltips. Plex identities remain
   separate.
 - Navigation state must distinguish local, remote, Plex, and unified drill-downs;
-  numeric IDs from different sources can collide.
+  numeric IDs from different sources can collide. Back restoration of the
+  top-level Artists and Albums views must use the normal unified loader rather
+  than binding `QueryRows` directly, and saved row selection must include its
+  stable source key. Search navigation also saves the selected result's source
+  and the outer result-page offset.
 - Keep long mixed-library row composition off the visible `DataGrid` until the
   result is complete, unless a proven virtualized/paged strategy is used.
 - Use shared typography, brushes, vector icons, control themes, loading helpers,
@@ -89,6 +102,11 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   Starting a desktop update from About first relays the matching signed release
   to every reachable update-enabled configured server. Failed servers are named
   and require an explicit choice before the platform installer continues.
+- Linux desktop updates map Arch-family distributions (including CachyOS) to
+  the signed `arch` package, Debian-family distributions to `deb`, and
+  RPM-family distributions to `rpm`. After digest verification, installation
+  must run through `/usr/bin/pkexec` and the distribution package manager; a
+  downloaded package must never be launched as an executable.
 - Tagged macOS releases publish architecture-specific `osx-arm64` and
   `osx-x64` application bundles as installable PKGs, portable ZIPs, and tar
   archives. The PKG installs `Orynivo.app` beneath `/Applications`; all package

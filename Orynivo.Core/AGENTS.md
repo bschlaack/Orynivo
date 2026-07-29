@@ -27,6 +27,16 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   sync and use the shared scanner gate.
 - Keep compact query models compact; do not add artwork BLOBs, lyrics, or full
   records to list/facet/folder queries.
+- `LibraryMetadataRepairService` groups tracks by their immediate physical
+  directory, detects inconsistent album metadata, and uses the MusicBrainz fuzzy
+  CD-TOC endpoint only when every candidate track has a duration. Confirmed
+  corrections are persisted in `track_metadata_overrides` and reapplied by every
+  `AudioDatabase.Upsert`; never write them into media files implicitly.
+  MusicBrainz matching accepts optional user-edited release and artist queries;
+  text-search results must still be fetched with their recording lists and
+  scored against available track durations plus title similarity before they
+  are offered. Text search must remain usable when local or MusicBrainz
+  durations are missing, and fuzzy TOC lookup includes all medium formats.
 - Remote dashboard totals use `OrynivoServerClient.GetLibrarySummaryAsync` and
   the server's aggregate `/api/library/summary` response; do not replace this
   fast path with complete track or album payloads.

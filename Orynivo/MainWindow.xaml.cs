@@ -303,7 +303,8 @@ public partial class MainWindow : Window
         string? ArtistFilterName,
         string? SearchQuery = null,
         double? VerticalOffset = null,
-        string? NavigationTag = null);
+        string? NavigationTag = null,
+        string? SelectedSourceKey = null);
 
     private sealed class RadioStationViewModel
     {
@@ -2137,14 +2138,16 @@ public partial class MainWindow : Window
 
     private NavigationState? CaptureCurrentNavigationState()
     {
+        var selectedRow = GetSelectedContentRow();
         if (SearchResultsScrollViewer.IsVisible)
             return new NavigationState(
                 "Search",
-                GetSelectedContentRowId(),
+                selectedRow?.Id,
                 null,
                 null,
                 SearchTextBox.Text ?? string.Empty,
-                CaptureCurrentVerticalOffset());
+                CaptureCurrentVerticalOffset(),
+                SelectedSourceKey: selectedRow?.SourceKey);
 
         if (_activeAlbumFilterId is long orynivoAlbumId &&
             _activeCatalogAlbum is { Source: LibraryCatalogSource.OrynivoServer } &&
@@ -2184,12 +2187,13 @@ public partial class MainWindow : Window
         {
             return new NavigationState(
                 "OrynivoArtistAlbums",
-                GetSelectedContentRowId(),
+                selectedRow?.Id,
                 remoteArtistId,
                 _activeArtistFilterName,
                 _activeArtistFilterName,
                 CaptureCurrentVerticalOffset(),
-                _currentTopLevelTag);
+                _currentTopLevelTag,
+                selectedRow?.SourceKey);
         }
 
         if (_activeAlbumFilterId is null &&
@@ -2199,11 +2203,12 @@ public partial class MainWindow : Window
         {
             return new NavigationState(
                 "ArtistAlbums",
-                GetSelectedContentRowId(),
+                selectedRow?.Id,
                 artistId,
                 _activeArtistFilterName,
                 _activeArtistFilterName,
-                CaptureCurrentVerticalOffset());
+                CaptureCurrentVerticalOffset(),
+                SelectedSourceKey: selectedRow?.SourceKey);
         }
 
         if (_activeAlbumFilterId is null &&
@@ -2213,11 +2218,12 @@ public partial class MainWindow : Window
         {
             return new NavigationState(
                 "UnifiedArtistAlbums",
-                GetSelectedContentRowId(),
+                selectedRow?.Id,
                 null,
                 _activeArtistFilterName,
                 _activeArtistFilterName,
-                CaptureCurrentVerticalOffset());
+                CaptureCurrentVerticalOffset(),
+                SelectedSourceKey: selectedRow?.SourceKey);
         }
 
         if (!string.IsNullOrWhiteSpace(_currentTopLevelTag) &&
@@ -2225,11 +2231,12 @@ public partial class MainWindow : Window
         {
             return new NavigationState(
                 _currentTopLevelTag,
-                GetSelectedContentRowId(),
+                selectedRow?.Id,
                 _activeArtistFilterId,
                 _activeArtistFilterName,
                 SearchTextBox.Text ?? string.Empty,
-                CaptureCurrentVerticalOffset());
+                CaptureCurrentVerticalOffset(),
+                SelectedSourceKey: selectedRow?.SourceKey);
         }
 
         return null;
@@ -2237,6 +2244,8 @@ public partial class MainWindow : Window
 
     private double? CaptureCurrentVerticalOffset()
     {
+        if (SearchResultsScrollViewer.IsVisible)
+            return SearchResultsScrollViewer.Offset.Y;
         if (ContentDataGrid.IsVisible)
         {
             AttachContentDataGridVerticalScrollBar();
@@ -2256,13 +2265,29 @@ public partial class MainWindow : Window
     }
 
     private long? GetSelectedContentRowId()
+        => GetSelectedContentRow()?.Id;
+
+    private ContentRow? GetSelectedContentRow()
     {
-        if (ContentDataGrid.SelectedItem is ContentRow { Id: long gridId })
-            return gridId;
-        if (AlbumArtworkListBox.SelectedItem is ContentRow { Id: long albumId })
-            return albumId;
-        if (ArtistArtworkListBox.SelectedItem is ContentRow { Id: long artistId })
-            return artistId;
+        if (SearchResultsScrollViewer.IsVisible)
+        {
+            if (SearchTracksDataGrid.SelectedItem is ContentRow searchTrack)
+                return searchTrack;
+            if (SearchAlbumsDataGrid.SelectedItem is ContentRow searchAlbum)
+                return searchAlbum;
+            if (SearchArtistsDataGrid.SelectedItem is ContentRow searchArtist)
+                return searchArtist;
+            return null;
+        }
+        if (ContentDataGrid.IsVisible &&
+            ContentDataGrid.SelectedItem is ContentRow gridRow)
+            return gridRow;
+        if (AlbumArtworkListBox.IsVisible &&
+            AlbumArtworkListBox.SelectedItem is ContentRow albumRow)
+            return albumRow;
+        if (ArtistArtworkListBox.IsVisible &&
+            ArtistArtworkListBox.SelectedItem is ContentRow artistRow)
+            return artistRow;
         return null;
     }
 
@@ -9577,15 +9602,14 @@ public partial class MainWindow : Window
         long? selectedAlbumId = null,
         double? verticalOffset = null)
     {
-        selectedAlbumId ??= GetSelectedContentRowId();
+        var selectedRow = GetSelectedContentRow();
+        selectedAlbumId ??= selectedRow?.Id;
         verticalOffset ??= CaptureCurrentVerticalOffset();
-        var rows = await Task.Run(() => QueryRows("Albums"));
-        ApplyColumns("Albums");
-        ContentDataGrid.ItemsSource = rows;
-        BindArtworkRows("Albums", rows);
-        UpdateAlphabetIndex(rows, true);
-        ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(rows.Count);
-        RestoreSelection(rows, selectedAlbumId, verticalOffset);
+        await BindLocalRowsAndStartRemoteAppendAsync("Albums");
+        RestoreSelectionFromCurrentItems(
+            selectedAlbumId,
+            verticalOffset,
+            selectedRow?.SourceKey);
     }
 
     private async void BackButton_OnClick(object? sender, RoutedEventArgs e)
@@ -9663,12 +9687,13 @@ public partial class MainWindow : Window
                         : state.SearchQuery);
                 RestoreSelectionFromCurrentItems(
                     state.SelectedId,
-                    state.VerticalOffset);
+                    state.VerticalOffset,
+                    state.SelectedSourceKey);
                 return;
 
             case "UnifiedArtistAlbums" when !string.IsNullOrWhiteSpace(state.ArtistFilterName):
                 await ShowUnifiedArtistAlbumsAsync(state.ArtistFilterName);
-                RestoreSelectionFromCurrentItems(state.SelectedId, state.VerticalOffset);
+                RestoreSelectionFromCurrentItems(state.SelectedId, state.VerticalOffset, state.SelectedSourceKey);
                 return;
 
             case "OrynivoAlbumTracks" when state.SelectedId is long albumId:
@@ -9693,52 +9718,26 @@ public partial class MainWindow : Window
             case "Search":
                 SearchTextBox.Text = state.SearchQuery ?? string.Empty;
                 await ShowSearchResultsAsync(state.SearchQuery ?? string.Empty);
+                RestoreSearchSelection(state.SelectedId, state.SelectedSourceKey, state.VerticalOffset);
                 return;
 
             case "Artists":
-                ContentTitleTextBlock.Text = LocalizationManager.Current.Artists;
-                UpdateLibraryIntroCard("Artists");
-                UpdateEntityFavoritesFilterToggle("Artists");
-                AlbumViewModeBorder.IsVisible = true;
-                SetViewModeButtons(_showArtistArtworkView);
-                ContentDataGrid.IsVisible = !(_showArtistArtworkView);
-                AlbumArtworkListBox.IsVisible = false;
-                ArtistArtworkListBox.IsVisible = _showArtistArtworkView;
-                var artists = await Task.Run(() => QueryRows("Artists"));
-                ApplyColumns("Artists");
-                ContentDataGrid.ItemsSource = artists;
-                BindArtworkRows("Artists", artists);
-                UpdateAlphabetIndex(artists, true);
-                ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(artists.Count);
-                RestoreSelection(artists, state.SelectedId, state.VerticalOffset);
-                break;
-
             case "Albums":
-                ContentTitleTextBlock.Text = _activeArtistFilterId is long
-                    ? $"{LocalizationManager.Current.Albums} · {_activeArtistFilterName}"
-                    : LocalizationManager.Current.Albums;
-                UpdateLibraryIntroCard("Albums");
-                UpdateEntityFavoritesFilterToggle("Albums");
-                AlbumViewModeBorder.IsVisible = true;
-                SetViewModeButtons(_showAlbumArtworkView);
-                ContentDataGrid.IsVisible = !(_showAlbumArtworkView);
-                AlbumArtworkListBox.IsVisible = _showAlbumArtworkView;
-                var albums = await Task.Run(() => QueryRows("Albums"));
-                ApplyColumns("Albums");
-                ContentDataGrid.ItemsSource = albums;
-                BindArtworkRows("Albums", albums);
-                ArtistArtworkListBox.IsVisible = false;
-                UpdateAlphabetIndex(albums, true);
-                ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(albums.Count);
-                RestoreSelection(albums, state.SelectedId, state.VerticalOffset);
-                break;
+                SelectNavigationItem(state.View);
+                await ShowTopLevelViewAsync(state.View);
+                RestoreSelectionFromCurrentItems(
+                    state.SelectedId,
+                    state.VerticalOffset,
+                    state.SelectedSourceKey);
+                return;
 
             default:
                 SelectNavigationItem(state.View);
                 await ShowTopLevelViewAsync(state.View);
                 RestoreSelectionFromCurrentItems(
                     state.SelectedId,
-                    state.VerticalOffset);
+                    state.VerticalOffset,
+                    state.SelectedSourceKey);
                 break;
         }
     }
@@ -9764,22 +9763,27 @@ public partial class MainWindow : Window
 
     private void RestoreSelectionFromCurrentItems(
         long? selectedId,
-        double? verticalOffset = null)
+        double? verticalOffset = null,
+        string? selectedSourceKey = null)
     {
         var rows = (ContentDataGrid.ItemsSource as IEnumerable<ContentRow>)?.ToList()
                    ?? (AlbumArtworkListBox.ItemsSource as IEnumerable<ContentRow>)?.ToList()
                    ?? (ArtistArtworkListBox.ItemsSource as IEnumerable<ContentRow>)?.ToList()
                    ?? [];
-        RestoreSelection(rows, selectedId, verticalOffset);
+        RestoreSelection(rows, selectedId, verticalOffset, selectedSourceKey);
     }
 
     private void RestoreSelection(
         List<ContentRow> rows,
         long? selectedId,
-        double? verticalOffset = null)
+        double? verticalOffset = null,
+        string? selectedSourceKey = null)
     {
         var row = selectedId is long id
-            ? rows.FirstOrDefault(candidate => candidate.Id == id)
+            ? rows.FirstOrDefault(candidate =>
+                candidate.Id == id &&
+                (selectedSourceKey is null ||
+                 string.Equals(candidate.SourceKey, selectedSourceKey, StringComparison.OrdinalIgnoreCase)))
             : null;
 
         if (ContentDataGrid.IsVisible)
@@ -9803,6 +9807,40 @@ public partial class MainWindow : Window
             listBox.SelectedItem = row;
         }
         RestoreArtworkPositionAfterLayout(listBox, row, verticalOffset);
+    }
+
+    private void RestoreSearchSelection(
+        long? selectedId,
+        string? selectedSourceKey,
+        double? verticalOffset)
+    {
+        if (selectedId is long id)
+        {
+            foreach (var grid in new[] { SearchTracksDataGrid, SearchAlbumsDataGrid, SearchArtistsDataGrid })
+            {
+                var row = (grid.ItemsSource as IEnumerable<ContentRow>)?.FirstOrDefault(candidate =>
+                    candidate.Id == id &&
+                    (selectedSourceKey is null ||
+                     string.Equals(candidate.SourceKey, selectedSourceKey, StringComparison.OrdinalIgnoreCase)));
+                if (row is null)
+                    continue;
+                grid.SelectedItem = row;
+                grid.ScrollIntoView(row, null);
+                break;
+            }
+        }
+        if (verticalOffset is double offset)
+        {
+            Dispatcher.UIThread.Post(
+                () => SearchResultsScrollViewer.Offset = new Vector(
+                    SearchResultsScrollViewer.Offset.X,
+                    Math.Clamp(
+                        offset,
+                        0,
+                        Math.Max(0, SearchResultsScrollViewer.Extent.Height -
+                                    SearchResultsScrollViewer.Viewport.Height))),
+                DispatcherPriority.Loaded);
+        }
     }
 
     private void RestoreDataGridPositionAfterLayout(
@@ -10075,12 +10113,26 @@ public partial class MainWindow : Window
             var paths = isPlexTrack
                 ? [((PlexFolderTag)treeItem.Tag!).Track!.FilePath]
                 : GetPathsForFolderItem(treeItem);
-            if (paths.Count == 0)
+            var localFolderPath = treeItem.Tag is FolderTag
+                {
+                    IsFile: false,
+                    Server: null,
+                    FolderPath.Length: > 0
+                } folderTag
+                ? folderTag.FolderPath
+                : null;
+            if (paths.Count == 0 && localFolderPath is null)
                 return;
             treeItem.IsSelected = true;
-            treeItem.ContextFlyout = isPlexTrack
+            var treeFlyout = isPlexTrack
                 ? BuildQueueContextFlyout(paths)
                 : BuildPlaylistContextFlyout(paths);
+            if (localFolderPath is not null)
+            {
+                treeFlyout.Items.Insert(0, new Separator());
+                treeFlyout.Items.Insert(0, CreateIdentifyFolderMenuItem(localFolderPath));
+            }
+            treeItem.ContextFlyout = treeFlyout;
         }
         else
         {
@@ -13683,15 +13735,14 @@ public partial class MainWindow : Window
         if (NavListBox.SelectedItem is not ListBoxItem { Tag: "Artists" })
             return;
 
-        selectedArtistId ??= GetSelectedContentRowId();
+        var selectedRow = GetSelectedContentRow();
+        selectedArtistId ??= selectedRow?.Id;
         var verticalOffset = CaptureCurrentVerticalOffset();
-        var rows = await Task.Run(() => QueryRows("Artists"));
-        ApplyColumns("Artists");
-        ContentDataGrid.ItemsSource = rows;
-        BindArtworkRows("Artists", rows);
-        UpdateAlphabetIndex(rows, true);
-        ContentCountTextBlock.Text = LocalizationManager.FormatEntryCount(rows.Count);
-        RestoreSelection(rows, selectedArtistId, verticalOffset);
+        await BindLocalRowsAndStartRemoteAppendAsync("Artists");
+        RestoreSelectionFromCurrentItems(
+            selectedArtistId,
+            verticalOffset,
+            selectedRow?.SourceKey);
     }
 
     private void ArtistInfoSourceButton_OnClick(object? sender, RoutedEventArgs e)

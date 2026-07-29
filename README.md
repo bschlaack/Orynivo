@@ -484,10 +484,17 @@ byte-range streaming without FFmpeg.
   album tracks
 - Session-wide Back navigation across sidebar views, search results, dashboard
   links, artist/album drill-downs, playlists, podcasts, radio, folders, and Plex
-  library views
+  library views. Mixed local/Orynivo Server artist and album views remain
+  unified when restored, including source-aware selection when IDs overlap
 - Conservative artist-name normalization for `feat.` credits and unambiguous
   case, accent, spacing, and punctuation variants, with a repair action for
   existing libraries
+- A physical-folder-based metadata review catches albums fragmented by bad tags,
+  missing or duplicate numbering, and inconsistent album artists. It can match
+  a folder from Settings > Library > Review metadata against MusicBrainz by
+  editable album/artist search terms, title similarity, and all available
+  approximate track durations, then apply a
+  confirmed release as persistent library-only metadata without rewriting files.
 - Live A-Z/# quick navigation beside alphabetically sorted artist, album, and
   track lists
 - Artist and album views with table and virtualized artwork modes, including
@@ -729,6 +736,13 @@ OpenAL remain system runtime dependencies as described above.
 Tagged release builds validate that the Arch archive contains its required
 root-level `.PKGINFO` metadata before publishing it.
 
+The signed desktop updater detects Debian-family, RPM-family, and Arch-family
+distributions. After verifying the selected package digest it requests
+administrator authorization through PolicyKit and installs it with the native
+package manager. CachyOS is treated as Arch Linux and receives the signed
+`.pkg.tar.zst` package; the package file itself is never launched as an
+executable.
+
 ### macOS player
 
 | Package | Description |
@@ -892,7 +906,8 @@ release because already-installed builds trust the public key embedded at their
 own build time.
 
 The About window displays the embedded version and can download, verify, and
-launch a newer Windows installer or the architecture-matching macOS PKG.
+launch a newer Windows installer, a distribution-matching Linux package, or the
+architecture-matching macOS PKG.
 Settings > Orynivo Server offers the same signed update for supported DEB/RPM
 servers and relays the package from the desktop when the server itself cannot
 reach GitHub. Connected server rows show the version returned by their

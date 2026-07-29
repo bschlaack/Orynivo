@@ -192,6 +192,56 @@ public sealed record RecommendationAlbumInfo(
 /// <param name="Artist">Artist display name.</param>
 public sealed record PlayedAlbumIdentity(string Album, string Artist);
 
+/// <summary>Compact physical-track metadata used to detect and repair inconsistent album folders.</summary>
+/// <param name="Id">Database track identifier.</param>
+/// <param name="Path">Stable library path.</param>
+/// <param name="SourcePath">Physical audio source path.</param>
+/// <param name="Title">Current library title.</param>
+/// <param name="Artist">Current primary artist.</param>
+/// <param name="Album">Current album title.</param>
+/// <param name="AlbumArtist">Current album artist.</param>
+/// <param name="Duration">Duration in seconds.</param>
+/// <param name="TrackNumber">Current track number.</param>
+/// <param name="DiscNumber">Current disc number.</param>
+public sealed record MetadataRepairTrack(
+    long Id,
+    string Path,
+    string SourcePath,
+    string? Title,
+    string? Artist,
+    string? Album,
+    string? AlbumArtist,
+    double? Duration,
+    int? TrackNumber,
+    int? DiscNumber);
+
+/// <summary>Library-only metadata values that survive subsequent media-file scans.</summary>
+/// <param name="Path">Stable library path.</param>
+/// <param name="Title">Replacement track title.</param>
+/// <param name="Artist">Replacement track artist.</param>
+/// <param name="AlbumArtist">Replacement album artist.</param>
+/// <param name="Album">Replacement album title.</param>
+/// <param name="TrackNumber">Replacement track number.</param>
+/// <param name="TrackTotal">Replacement track total.</param>
+/// <param name="DiscNumber">Replacement disc number.</param>
+/// <param name="DiscTotal">Replacement disc total.</param>
+/// <param name="MusicBrainzTrackId">MusicBrainz recording identifier.</param>
+/// <param name="MusicBrainzReleaseId">MusicBrainz release identifier.</param>
+/// <param name="MusicBrainzArtistId">MusicBrainz primary-artist identifier.</param>
+public sealed record TrackMetadataOverride(
+    string Path,
+    string? Title,
+    string? Artist,
+    string? AlbumArtist,
+    string? Album,
+    int? TrackNumber,
+    int? TrackTotal,
+    int? DiscNumber,
+    int? DiscTotal,
+    string? MusicBrainzTrackId,
+    string? MusicBrainzReleaseId,
+    string? MusicBrainzArtistId);
+
 /// <summary>Compact library counters displayed in the dashboard hero.</summary>
 public sealed record DashboardLibrarySummary(int AlbumCount, int TrackCount, int ArtistCount, int FavoriteCount);
 
@@ -267,6 +317,7 @@ public sealed class AudioDatabase : IDisposable
     private Dictionary<string, (long Id, string Name)>? _artistsByComparisonKey;
     private Dictionary<long, string>? _artistNamesById;
     private Dictionary<string, string>? _trackTitleOverrides;
+    private Dictionary<string, TrackMetadataOverride>? _trackMetadataOverrides;
 
     /// <summary>
     /// Opens (or creates) the SQLite database at <paramref name="dbPath"/>,
@@ -344,6 +395,8 @@ public sealed class AudioDatabase : IDisposable
     /// <param name="track">The track record to upsert.</param>
     public void Upsert(TrackRecord track)
     {
+        if (GetTrackMetadataOverrides().TryGetValue(track.Path, out var metadataOverride))
+            ApplyTrackMetadataOverride(track, metadataOverride);
         if (GetTrackTitleOverrides().TryGetValue(track.Path, out var titleOverride))
             track.Title = titleOverride;
         track.Title = TrimToNull(track.Title);
@@ -2780,6 +2833,21 @@ public sealed class AudioDatabase : IDisposable
                 path  TEXT PRIMARY KEY,
                 title TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS track_metadata_overrides (
+                path TEXT PRIMARY KEY,
+                title TEXT,
+                artist TEXT,
+                album_artist TEXT,
+                album TEXT,
+                track_number INTEGER,
+                track_total INTEGER,
+                disc_number INTEGER,
+                disc_total INTEGER,
+                musicbrainz_track_id TEXT,
+                musicbrainz_release_id TEXT,
+                musicbrainz_artist_id TEXT
+            );
             """);
         }
 
@@ -4361,6 +4429,189 @@ public sealed class AudioDatabase : IDisposable
                 !r.IsDBNull(6) && r.GetInt64(6) != 0,
                 r.IsDBNull(7) ? null : r.GetString(7)));
         return result;
+    }
+
+    /// <summary>Returns compact metadata for every indexed physical or virtual audio track.</summary>
+    /// <returns>Tracks suitable for grouping into physical album-folder candidates.</returns>
+    public List<MetadataRepairTrack> GetMetadataRepairTracks()
+    {
+        using var command = _conn.CreateCommand();
+        command.CommandText = """
+            SELECT id, path, COALESCE(NULLIF(source_path, ''), path),
+                   title, artist, album, album_artist, duration, track_number, disc_number
+            FROM tracks
+            ORDER BY COALESCE(NULLIF(source_path, ''), path);
+            """;
+        using var reader = command.ExecuteReader();
+        var result = new List<MetadataRepairTrack>();
+        while (reader.Read())
+        {
+            result.Add(new MetadataRepairTrack(
+                reader.GetInt64(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetString(3),
+                reader.IsDBNull(4) ? null : reader.GetString(4),
+                reader.IsDBNull(5) ? null : reader.GetString(5),
+                reader.IsDBNull(6) ? null : reader.GetString(6),
+                reader.IsDBNull(7) ? null : reader.GetDouble(7),
+                reader.IsDBNull(8) ? null : reader.GetInt32(8),
+                reader.IsDBNull(9) ? null : reader.GetInt32(9)));
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Stores library-only metadata corrections, reapplies them to the affected tracks,
+    /// and rebuilds album assignments without modifying media-file tags.
+    /// </summary>
+    /// <param name="overrides">Confirmed per-track metadata corrections.</param>
+    public void ApplyTrackMetadataOverrides(IReadOnlyList<TrackMetadataOverride> overrides)
+    {
+        ArgumentNullException.ThrowIfNull(overrides);
+        if (overrides.Count == 0)
+            return;
+
+        using (var transaction = _conn.BeginTransaction())
+        {
+            foreach (var item in overrides)
+            {
+                using var command = _conn.CreateCommand();
+                command.Transaction = transaction;
+                command.CommandText = """
+                    INSERT INTO track_metadata_overrides(
+                        path, title, artist, album_artist, album,
+                        track_number, track_total, disc_number, disc_total,
+                        musicbrainz_track_id, musicbrainz_release_id, musicbrainz_artist_id)
+                    VALUES(
+                        $path, $title, $artist, $album_artist, $album,
+                        $track_number, $track_total, $disc_number, $disc_total,
+                        $musicbrainz_track_id, $musicbrainz_release_id, $musicbrainz_artist_id)
+                    ON CONFLICT(path) DO UPDATE SET
+                        title = excluded.title,
+                        artist = excluded.artist,
+                        album_artist = excluded.album_artist,
+                        album = excluded.album,
+                        track_number = excluded.track_number,
+                        track_total = excluded.track_total,
+                        disc_number = excluded.disc_number,
+                        disc_total = excluded.disc_total,
+                        musicbrainz_track_id = excluded.musicbrainz_track_id,
+                        musicbrainz_release_id = excluded.musicbrainz_release_id,
+                        musicbrainz_artist_id = excluded.musicbrainz_artist_id;
+                    """;
+                Add(command, "$path", item.Path);
+                Add(command, "$title", (object?)item.Title ?? DBNull.Value);
+                Add(command, "$artist", (object?)item.Artist ?? DBNull.Value);
+                Add(command, "$album_artist", (object?)item.AlbumArtist ?? DBNull.Value);
+                Add(command, "$album", (object?)item.Album ?? DBNull.Value);
+                Add(command, "$track_number", (object?)item.TrackNumber ?? DBNull.Value);
+                Add(command, "$track_total", (object?)item.TrackTotal ?? DBNull.Value);
+                Add(command, "$disc_number", (object?)item.DiscNumber ?? DBNull.Value);
+                Add(command, "$disc_total", (object?)item.DiscTotal ?? DBNull.Value);
+                Add(command, "$musicbrainz_track_id", (object?)item.MusicBrainzTrackId ?? DBNull.Value);
+                Add(command, "$musicbrainz_release_id", (object?)item.MusicBrainzReleaseId ?? DBNull.Value);
+                Add(command, "$musicbrainz_artist_id", (object?)item.MusicBrainzArtistId ?? DBNull.Value);
+                command.ExecuteNonQuery();
+
+                var artistId = string.IsNullOrWhiteSpace(item.Artist)
+                    ? (long?)null
+                    : EnsureArtist(item.Artist, item.MusicBrainzArtistId, transaction);
+                if (!string.IsNullOrWhiteSpace(item.AlbumArtist))
+                    EnsureArtist(item.AlbumArtist, item.MusicBrainzArtistId, transaction);
+                using var update = _conn.CreateCommand();
+                update.Transaction = transaction;
+                update.CommandText = """
+                    UPDATE tracks
+                    SET title = COALESCE($title, title),
+                        sort_title = CASE WHEN $title IS NULL THEN sort_title ELSE NULL END,
+                        artist = COALESCE($artist, artist),
+                        sort_artist = CASE WHEN $artist IS NULL THEN sort_artist ELSE NULL END,
+                        album_artist = COALESCE($album_artist, album_artist),
+                        sort_album_artist = CASE WHEN $album_artist IS NULL THEN sort_album_artist ELSE NULL END,
+                        album = COALESCE($album, album),
+                        sort_album = CASE WHEN $album IS NULL THEN sort_album ELSE NULL END,
+                        track_number = COALESCE($track_number, track_number),
+                        track_total = COALESCE($track_total, track_total),
+                        disc_number = COALESCE($disc_number, disc_number),
+                        disc_total = COALESCE($disc_total, disc_total),
+                        musicbrainz_track_id = COALESCE($musicbrainz_track_id, musicbrainz_track_id),
+                        musicbrainz_release_id = COALESCE($musicbrainz_release_id, musicbrainz_release_id),
+                        musicbrainz_artist_id = COALESCE($musicbrainz_artist_id, musicbrainz_artist_id),
+                        album_artist_inferred = 0,
+                        artist_id = COALESCE($artist_id, artist_id)
+                    WHERE path = $path;
+                    """;
+                Add(update, "$path", item.Path);
+                Add(update, "$title", (object?)item.Title ?? DBNull.Value);
+                Add(update, "$artist", (object?)item.Artist ?? DBNull.Value);
+                Add(update, "$album_artist", (object?)item.AlbumArtist ?? DBNull.Value);
+                Add(update, "$album", (object?)item.Album ?? DBNull.Value);
+                Add(update, "$track_number", (object?)item.TrackNumber ?? DBNull.Value);
+                Add(update, "$track_total", (object?)item.TrackTotal ?? DBNull.Value);
+                Add(update, "$disc_number", (object?)item.DiscNumber ?? DBNull.Value);
+                Add(update, "$disc_total", (object?)item.DiscTotal ?? DBNull.Value);
+                Add(update, "$musicbrainz_track_id", (object?)item.MusicBrainzTrackId ?? DBNull.Value);
+                Add(update, "$musicbrainz_release_id", (object?)item.MusicBrainzReleaseId ?? DBNull.Value);
+                Add(update, "$musicbrainz_artist_id", (object?)item.MusicBrainzArtistId ?? DBNull.Value);
+                Add(update, "$artist_id", (object?)artistId ?? DBNull.Value);
+                update.ExecuteNonQuery();
+            }
+            transaction.Commit();
+        }
+
+        _trackMetadataOverrides = null;
+        RebuildAlbumsFromAlbumArtists();
+    }
+
+    private Dictionary<string, TrackMetadataOverride> GetTrackMetadataOverrides()
+    {
+        if (_trackMetadataOverrides is not null)
+            return _trackMetadataOverrides;
+        var result = new Dictionary<string, TrackMetadataOverride>(StringComparer.OrdinalIgnoreCase);
+        using var command = _conn.CreateCommand();
+        command.CommandText = """
+            SELECT path, title, artist, album_artist, album,
+                   track_number, track_total, disc_number, disc_total,
+                   musicbrainz_track_id, musicbrainz_release_id, musicbrainz_artist_id
+            FROM track_metadata_overrides;
+            """;
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            var item = new TrackMetadataOverride(
+                reader.GetString(0),
+                reader.IsDBNull(1) ? null : reader.GetString(1),
+                reader.IsDBNull(2) ? null : reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetString(3),
+                reader.IsDBNull(4) ? null : reader.GetString(4),
+                reader.IsDBNull(5) ? null : reader.GetInt32(5),
+                reader.IsDBNull(6) ? null : reader.GetInt32(6),
+                reader.IsDBNull(7) ? null : reader.GetInt32(7),
+                reader.IsDBNull(8) ? null : reader.GetInt32(8),
+                reader.IsDBNull(9) ? null : reader.GetString(9),
+                reader.IsDBNull(10) ? null : reader.GetString(10),
+                reader.IsDBNull(11) ? null : reader.GetString(11));
+            result[item.Path] = item;
+        }
+        _trackMetadataOverrides = result;
+        return result;
+    }
+
+    private static void ApplyTrackMetadataOverride(TrackRecord track, TrackMetadataOverride item)
+    {
+        track.Title = item.Title ?? track.Title;
+        track.Artist = item.Artist ?? track.Artist;
+        track.AlbumArtist = item.AlbumArtist ?? track.AlbumArtist;
+        track.Album = item.Album ?? track.Album;
+        track.TrackNumber = item.TrackNumber ?? track.TrackNumber;
+        track.TrackTotal = item.TrackTotal ?? track.TrackTotal;
+        track.DiscNumber = item.DiscNumber ?? track.DiscNumber;
+        track.DiscTotal = item.DiscTotal ?? track.DiscTotal;
+        track.MusicBrainzTrackId = item.MusicBrainzTrackId ?? track.MusicBrainzTrackId;
+        track.MusicBrainzReleaseId = item.MusicBrainzReleaseId ?? track.MusicBrainzReleaseId;
+        track.MusicBrainzArtistId = item.MusicBrainzArtistId ?? track.MusicBrainzArtistId;
+        track.AlbumArtistInferred = false;
     }
 
     /// <summary>Returns compact album-level genre and tempo metadata for recommendations.</summary>
