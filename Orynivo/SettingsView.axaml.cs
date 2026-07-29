@@ -1938,6 +1938,11 @@ internal partial class SettingsView : UserControl
                         autoAcceptFanartTv);
                     accepted = await suggestionDialog.ShowDialog<bool>(GetHostWindow());
                     autoAcceptFanartTv = suggestionDialog.AutoAcceptFanartTv;
+                    if (suggestionDialog.WasCancelled)
+                    {
+                        cancellation.Cancel();
+                        cancellation.Token.ThrowIfCancellationRequested();
+                    }
                     if (!accepted)
                     {
                         rejected++;

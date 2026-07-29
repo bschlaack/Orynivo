@@ -9367,7 +9367,9 @@ public partial class MainWindow : Window
         long artistId,
         ContentRow row)
     {
-        var dialog = new ArtistImageSearchWindow(row.Title ?? string.Empty);
+        var dialog = new ArtistImageSearchWindow(
+            row.Title ?? string.Empty,
+            _settings.FanartTvApiKey);
         if (await dialog.ShowDialog<bool>(this) == false || dialog.SelectedResult is not { } selected)
             return;
 
@@ -13307,13 +13309,18 @@ public partial class MainWindow : Window
         if (artist is null)
             return;
 
-        var dialog = new ArtistImageSearchWindow(artist.Artist) ;
+        var dialog = new ArtistImageSearchWindow(
+            artist.Artist,
+            _settings.FanartTvApiKey);
         if (await dialog.ShowDialog<bool>(this) == false || dialog.SelectedResult is not { } selected)
             return;
 
         try
         {
-            var imagePath = await ArtistImageSearchService.SaveAsync(artistId, selected);
+            var imagePath = await ArtistImageSearchService.SaveImageAsync(
+                artistId,
+                selected.ImageData,
+                selected.MimeType);
             using (var db = AudioDatabase.OpenDefault())
             {
                 db.UpdateArtistImage(artistId, imagePath);
@@ -13444,7 +13451,9 @@ public partial class MainWindow : Window
         if (string.IsNullOrWhiteSpace(artistName))
             artistName = _currentOrynivoTrackRow.Artist ?? string.Empty;
 
-        var dialog = new ArtistImageSearchWindow(artistName);
+        var dialog = new ArtistImageSearchWindow(
+            artistName,
+            _settings.FanartTvApiKey);
         if (await dialog.ShowDialog<bool>(this) == false || dialog.SelectedResult is not { } selected)
             return;
 

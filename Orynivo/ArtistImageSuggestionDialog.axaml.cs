@@ -48,6 +48,15 @@ public partial class ArtistImageSuggestionDialog : Window
     /// <summary>Gets whether future Fanart.tv results should be accepted automatically.</summary>
     public bool AutoAcceptFanartTv => AutoAcceptFanartTvCheckBox.IsChecked == true;
 
+    /// <summary>Gets whether the user requested cancellation of the complete assignment run.</summary>
+    public bool WasCancelled { get; private set; }
+
+    private void CancelButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        WasCancelled = true;
+        Close(false);
+    }
+
     private void RejectButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) =>
         Close(false);
 

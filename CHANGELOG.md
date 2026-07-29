@@ -4,6 +4,21 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- The review dialog for missing artist images can cancel the complete
+  assignment run.
+- Extended manual artist-image search with an editable artist query and the
+  same provider order as batch discovery: Fanart.tv first when a key is
+  configured, then Wikimedia Commons when Fanart.tv has no usable result.
+
+### Fixed
+
+- Masked the Last.fm API key in Settings so it is no longer displayed as
+  readable text, matching the Fanart.tv credential field.
+
 # [0.30.2] - 2026-07-28
 
 ### Added
@@ -14,15 +29,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Wikimedia Commons, shows progress and an estimated remaining time, and
   offers an API-key-gated option to accept Fanart.tv results automatically.
   Wikimedia candidates always require explicit acceptance or rejection before
-  storing them in their owning library.
+  storing them in their owning library. 
 - Added one cross-platform encrypted credential container for Last.fm,
   Fanart.tv, AI Chat, Orynivo Server, Plex, and streaming-provider secrets.
   Windows uses current-user DPAPI; Linux and macOS use AES-GCM with a separate
   random key file restricted to the current OS user. Existing plaintext
   `settings.json` secrets and older Windows credential files are migrated
   automatically, and remote track caches no longer persist authenticated URLs.
-
-### Fixed
 
 # [0.30.1] - 2026-07-28
 
