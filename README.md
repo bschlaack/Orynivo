@@ -28,10 +28,17 @@ the ability to reach that library from any device on the local network.
   wins, untagged multi-artist compilations are grouped under `Various Artists`,
   featured track credits do not create extra library artists, and embedded
   MusicBrainz artist IDs unify verified spelling variants
-- Optional curated Fanart.tv artist thumbnails. Enter a personal key for the
-  current session under Settings > Artist information, or set the
-  `FANART_TV_API_KEY` environment variable before starting Orynivo. The key is
-  not persisted by Orynivo. Manual artist images always take priority
+- Optional curated Fanart.tv artist thumbnails. Enter a personal key under
+  Settings > Artist information, or set the `FANART_TV_API_KEY` environment
+  variable before starting Orynivo. Entered keys are stored in Orynivo's
+  encrypted current-user credential container. Manual artist images always
+  take priority. The same Settings section can fill missing artist images in
+  the local library and every configured Orynivo Server sequentially, trying
+  Fanart.tv first when a key is available and Wikimedia Commons as the fallback.
+  With a configured Fanart.tv key, the review dialog can automatically accept
+  Fanart.tv results for the remainder of the run. Wikimedia candidates always
+  remain subject to individual acceptance or rejection. The batch displays
+  progress and an estimated remaining time
 - Unified local and Orynivo Server artist browsing: matching artists appear once
   in Artists and search, and every artist link opens one combined album view
   across those libraries regardless of which source the clicked item came from.
@@ -67,9 +74,12 @@ the DAC; otherwise it uses DoP as a fallback (for example a 176.4-kHz carrier
 for DSD64). Neither Linux DSD path requires cwASIO, the Steinberg SDK, or an
 Orynivo native bridge.
 
-On Linux, Plex and generic streaming credentials are retained only for the
-current process and are not persisted because the existing encrypted credential
-store uses Windows DPAPI. This avoids writing secrets in plaintext.
+API keys and access tokens for Last.fm, Fanart.tv, AI Chat, Orynivo Server,
+Plex, and streaming providers are kept out of `settings.json`. Orynivo stores
+them in one current-user encrypted credential container: Windows uses
+current-user DPAPI; Linux and macOS use AES-GCM with a separate random key file
+restricted to the current operating-system user. Existing plaintext settings
+and the older Windows Plex/streaming credential files are migrated automatically.
 
 The application uses the Orynivo wordmark in the startup screen, sidebar, and
 About dialog, plus a multi-resolution Windows application icon based on the
@@ -1005,9 +1015,11 @@ Orynivo/
 
 Orynivo stores its local data under `%LOCALAPPDATA%\Orynivo\`:
 
-- `settings.json`: application settings
-- `streaming-credentials.dat`: Windows user-bound encrypted streaming secrets
-- `plex-credentials.dat`: Windows user-bound encrypted Plex access tokens
+- `settings.json`: non-secret application settings
+- `credentials.dat`: encrypted Last.fm, Fanart.tv, AI Chat, Orynivo Server,
+  Plex, and streaming-provider credentials
+- `credentials.key`: Linux/macOS AES-GCM key, readable and writable only by the
+  current operating-system user (Windows uses DPAPI and does not create it)
 - `library.db`: SQLite music library and playback history
 - `logs\`: timestamped crash reports for unhandled application errors
 - `artworks\`: original artwork and generated thumbnails

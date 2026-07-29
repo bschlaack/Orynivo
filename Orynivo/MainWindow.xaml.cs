@@ -3096,7 +3096,12 @@ public partial class MainWindow : Window
             var cache = JsonSerializer.Deserialize<OrynivoTrackListCache>(File.ReadAllText(path));
             if (cache?.Tracks is null || cache.LibraryChangedAt != libraryChangedAt)
                 return false;
-            tracks = cache.Tracks;
+            tracks = cache.Tracks
+                .Select(track => track with
+                {
+                    PlaybackPath = OrynivoServerClient.GetStreamUrl(server, track.Id)
+                })
+                .ToList();
             return true;
         }
         catch
@@ -3117,7 +3122,10 @@ public partial class MainWindow : Window
             var cache = new OrynivoTrackListCache(
                 libraryChangedAt,
                 DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-                tracks.ToList());
+                tracks.Select(track => track with
+                {
+                    PlaybackPath = $"orynivo://{server.Id}/track/{track.Id}"
+                }).ToList());
             File.WriteAllText(path, JsonSerializer.Serialize(cache));
         }
         catch
@@ -3265,7 +3273,7 @@ public partial class MainWindow : Window
 
     /// <summary>Deletes the cached remote artist list for a server after profile or image metadata changes.</summary>
     /// <param name="server">Server whose artist list cache should be removed.</param>
-    private static void DeleteOrynivoArtistListCache(OrynivoServerSettings server)
+    internal static void DeleteOrynivoArtistListCache(OrynivoServerSettings server)
     {
         try
         {

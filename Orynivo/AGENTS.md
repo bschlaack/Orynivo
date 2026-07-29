@@ -13,10 +13,25 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   target `net8.0-windows10.0.19041.0`.
 - New visible text must use `LocalizationManager` and exist in German, English,
   French, and Spanish.
-- Fanart.tv artist artwork uses the session-only Settings value or the
-  `FANART_TV_API_KEY` environment variable. The personal key must remain
-  `[JsonIgnore]`, must never be written to `settings.json`, and must not appear
-  in logs, server payloads, diagnostics, or model context.
+- `ApplicationCredentialStore` is the only persistent client credential
+  container. It uses current-user DPAPI on Windows and AES-GCM plus a
+  current-user-only random key file on Linux/macOS. Last.fm, Fanart.tv,
+  AI Chat, Orynivo Server, Plex, and generic streaming secrets must remain
+  `[JsonIgnore]` in JSON settings models and must not appear in caches, logs,
+  server payloads, diagnostics, documentation examples, or model context.
+- Fanart.tv artist artwork uses the encrypted Settings value or the
+  `FANART_TV_API_KEY` environment variable. The environment variable remains
+  an optional runtime override and is never copied into persistent settings.
+- The Artist information Settings action for missing artist images combines the
+  local library and every configured Orynivo Server, runs strictly sequentially,
+  skips every manually selected image, tries Fanart.tv first only when a key is
+  available, then falls back to Wikimedia Commons, and remains cancellable.
+  When an API key is configured, the preview may enable automatic acceptance
+  for Fanart.tv results for the current run only. This must never automatically
+  accept Wikimedia results. Other candidates stay in memory until the user
+  accepts or rejects their preview; accepted remote images are uploaded only to
+  their owning server. Progress in Settings and the preview includes a
+  remaining-time estimate based only on completed provider-search durations.
 - Add or update English XML documentation for affected public/internal members.
 
 ## Client Invariants

@@ -142,6 +142,21 @@ public sealed record LocalizedStrings(
     string LastFmApiKeyHint,
     string FanartTvApiKey,
     string FanartTvApiKeyHint,
+    string DownloadMissingArtistImages,
+    string DownloadMissingArtistImagesHint,
+    string MissingArtistImageDownloading,
+    string MissingArtistImagesDownloaded,
+    string MissingArtistImagesDownloadFailed,
+    string MissingArtistImagesDownloadCancelled,
+    string MissingArtistImageReviewing,
+    string MissingArtistImagesLoadingSources,
+    string RemainingTimeEstimating,
+    string RemainingTimeEstimate,
+    string ArtistImageSuggestionTitle,
+    string ArtistImageSuggestionSource,
+    string ArtistImageSuggestionHint,
+    string AcceptArtistImage,
+    string RejectArtistImage,
     string ShowAllAlbumTracks,
     string CrashTitle,
     string CrashMessage,
@@ -1008,4 +1023,6 @@ public sealed record LocalizedStrings(
     public string AiChatEmptyResponse { get; init; } = "";
     /// <summary>Gets the prefix shown before a tool result when the model returns no final answer.</summary>
     public string AiChatToolResultFallback { get; init; } = "";
+    /// <summary>Gets the option for automatically accepting Fanart.tv artist-image results.</summary>
+    public string AutoAcceptFanartTvImages { get; init; } = "";
 }

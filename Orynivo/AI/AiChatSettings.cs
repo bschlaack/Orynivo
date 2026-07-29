@@ -1,7 +1,10 @@
+using System.Text.Json.Serialization;
+
 namespace Orynivo.AI;
 
 /// <summary>
-/// Settings for the embedded AI chat, persisted as part of <see cref="AppSettings"/>.
+/// Settings for the embedded AI chat. Non-secret values are persisted as part of
+/// <see cref="AppSettings"/> while the API key is stored in the application credential container.
 /// </summary>
 public sealed class AiChatSettings
 {
@@ -12,6 +15,7 @@ public sealed class AiChatSettings
     public string EndpointUrl { get; set; } = "http://localhost:1234/v1";
 
     /// <summary>Gets or sets the API key. Leave empty when using local models that do not require authentication.</summary>
+    [JsonIgnore]
     public string ApiKey { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the model identifier sent with each chat request.</summary>
