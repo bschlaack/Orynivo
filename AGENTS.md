@@ -1069,8 +1069,9 @@ fallback or allow client-provided commands/paths to reach the helper.
   `ApplicationCredentialStore`; it must never be written to JSON or caches,
   logged, sent to an Orynivo Server, or exposed to a model.
 - `Orynivo/Library/ArtistImageSearchService.cs` and
-  `Orynivo/ArtistImageSearchWindow.*`: manual Wikimedia Commons artist-image
-  search with editable query; selecting an image updates `artists.image_path`,
+  `Orynivo/ArtistImageSearchWindow.*`: manual artist-image search with an
+  editable query; it tries Fanart.tv first when a key is configured and falls
+  back to Wikimedia Commons. Selecting an image updates `artists.image_path`,
   sets `image_is_manual`, and preserves the biography source; automatic profile
   refreshes must not download over manually selected image files. The Artist
   information Settings action processes missing images from the local library

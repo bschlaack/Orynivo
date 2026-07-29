@@ -37,8 +37,10 @@ the ability to reach that library from any device on the local network.
   Fanart.tv first when a key is available and Wikimedia Commons as the fallback.
   With a configured Fanart.tv key, the review dialog can automatically accept
   Fanart.tv results for the remainder of the run. Wikimedia candidates always
-  remain subject to individual acceptance or rejection. The batch displays
-  progress and an estimated remaining time
+  remain subject to individual acceptance or rejection, and the complete run
+  can be cancelled from the review dialog. Manual image searches from artist
+  information use an editable query and the same Fanart.tv-first, Wikimedia-
+  fallback order. The batch displays progress and an estimated remaining time
 - Unified local and Orynivo Server artist browsing: matching artists appear once
   in Artists and search, and every artist link opens one combined album view
   across those libraries regardless of which source the clicked item came from.

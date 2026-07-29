@@ -39,7 +39,7 @@
                   Margin="0,14,0,0"
                   Content="{DynamicResource L_AutoAcceptFanartTvImages}"
                   FontSize="{DynamicResource FontSizeBody}"/>
-        <Grid Grid.Row="3" Margin="0,16,0,0" ColumnDefinitions="*,Auto,Auto">
+        <Grid Grid.Row="3" Margin="0,16,0,0" ColumnDefinitions="*,Auto,Auto,Auto">
             <TextBlock Text="{DynamicResource L_ArtistImageSuggestionHint}"
                        VerticalAlignment="Center"
                        FontSize="{DynamicResource FontSizeMeta}"
@@ -49,9 +49,15 @@
                     MinWidth="105"
                     Margin="12,0,8,0"
                     Theme="{StaticResource SettingsButtonTheme}"
+                    Content="{DynamicResource L_Cancel}"
+                    Click="CancelButton_OnClick"/>
+            <Button Grid.Column="2"
+                    MinWidth="105"
+                    Margin="0,0,8,0"
+                    Theme="{StaticResource SettingsButtonTheme}"
                     Content="{DynamicResource L_RejectArtistImage}"
                     Click="RejectButton_OnClick"/>
-            <Button Grid.Column="2"
+            <Button Grid.Column="3"
                     MinWidth="105"
                     Theme="{StaticResource SettingsButtonTheme}"
                     Content="{DynamicResource L_AcceptArtistImage}"

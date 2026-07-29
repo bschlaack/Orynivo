@@ -29,9 +29,12 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   When an API key is configured, the preview may enable automatic acceptance
   for Fanart.tv results for the current run only. This must never automatically
   accept Wikimedia results. Other candidates stay in memory until the user
-  accepts or rejects their preview; accepted remote images are uploaded only to
-  their owning server. Progress in Settings and the preview includes a
-  remaining-time estimate based only on completed provider-search durations.
+  accepts or rejects their preview, and cancelling the preview cancels the
+  complete run; accepted remote images are uploaded only to their owning server.
+  Progress in Settings and the preview includes a remaining-time estimate based
+  only on completed provider-search durations. Manual artist-image searches use
+  an editable query, try Fanart.tv first when a key exists, and use Wikimedia
+  Commons only as the fallback.
 - Add or update English XML documentation for affected public/internal members.
 
 ## Client Invariants
