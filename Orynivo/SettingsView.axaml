@@ -984,6 +984,24 @@
                                FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"/>
+                    <Button x:Name="DownloadMissingArtistImagesButton"
+                            Width="260"
+                            Height="30"
+                            HorizontalAlignment="Left"
+                            Margin="0,18,0,0"
+                            Theme="{StaticResource SettingsButtonTheme}"
+                            Content="{DynamicResource L_DownloadMissingArtistImages}"
+                            Click="DownloadMissingArtistImagesButton_OnClick"/>
+                    <TextBlock Text="{DynamicResource L_DownloadMissingArtistImagesHint}"
+                               Margin="0,8,0,0"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"/>
+                    <TextBlock x:Name="MissingArtistImagesStatusTextBlock"
+                               Margin="0,8,0,0"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"/>
                 </StackPanel>
 
                 <StackPanel x:Name="AppearancePanel"

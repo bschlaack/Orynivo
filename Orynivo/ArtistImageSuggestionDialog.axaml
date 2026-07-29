@@ -1,0 +1,61 @@
+<Window x:Class="Orynivo.ArtistImageSuggestionDialog"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{DynamicResource L_ArtistImageSuggestionTitle}"
+        Icon="avares://Orynivo/Assets/Orynivo.ico"
+        Width="480"
+        Height="560"
+        MinWidth="420"
+        MinHeight="460"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppContentBrush}"
+        Foreground="{DynamicResource AppPrimaryTextBrush}">
+    <Grid Margin="20" RowDefinitions="Auto,*,Auto,Auto">
+        <StackPanel>
+            <TextBlock x:Name="ArtistNameTextBlock"
+                       FontSize="{DynamicResource FontSizeTitle}"
+                       FontWeight="SemiBold"
+                       TextWrapping="Wrap"/>
+            <TextBlock x:Name="SourceTextBlock"
+                       Margin="0,5,0,3"
+                       FontSize="{DynamicResource FontSizeCaption}"
+                       Foreground="{DynamicResource AppSecondaryTextBrush}"
+                       TextWrapping="Wrap"/>
+            <TextBlock x:Name="ProgressTextBlock"
+                       Margin="0,0,0,14"
+                       FontSize="{DynamicResource FontSizeMeta}"
+                       Foreground="{DynamicResource AppMutedTextBrush}"
+                       TextWrapping="Wrap"/>
+        </StackPanel>
+        <Border Grid.Row="1"
+                Background="{DynamicResource AppArtworkPlaceholderBrush}"
+                CornerRadius="10"
+                ClipToBounds="True">
+            <Image x:Name="SuggestionImage"
+                   Stretch="Uniform"/>
+        </Border>
+        <CheckBox x:Name="AutoAcceptFanartTvCheckBox"
+                  Grid.Row="2"
+                  Margin="0,14,0,0"
+                  Content="{DynamicResource L_AutoAcceptFanartTvImages}"
+                  FontSize="{DynamicResource FontSizeBody}"/>
+        <Grid Grid.Row="3" Margin="0,16,0,0" ColumnDefinitions="*,Auto,Auto">
+            <TextBlock Text="{DynamicResource L_ArtistImageSuggestionHint}"
+                       VerticalAlignment="Center"
+                       FontSize="{DynamicResource FontSizeMeta}"
+                       Foreground="{DynamicResource AppMutedTextBrush}"
+                       TextWrapping="Wrap"/>
+            <Button Grid.Column="1"
+                    MinWidth="105"
+                    Margin="12,0,8,0"
+                    Theme="{StaticResource SettingsButtonTheme}"
+                    Content="{DynamicResource L_RejectArtistImage}"
+                    Click="RejectButton_OnClick"/>
+            <Button Grid.Column="2"
+                    MinWidth="105"
+                    Theme="{StaticResource SettingsButtonTheme}"
+                    Content="{DynamicResource L_AcceptArtistImage}"
+                    Click="AcceptButton_OnClick"/>
+        </Grid>
+    </Grid>
+</Window>

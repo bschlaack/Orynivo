@@ -18,17 +18,21 @@ internal static class RemoteServerCache
     private static string TrackCacheDir => AppPaths.GetDataPath("remote-track-cache");
     private static string FolderCacheDir => AppPaths.GetDataPath("remote-folder-cache");
 
-    /// <summary>Returns the cache file path for a server's full track list.</summary>
+    /// <summary>Returns the cache file path for a server's credential-free full track list.</summary>
     /// <param name="server">The remote server.</param>
     /// <returns>The absolute cache file path.</returns>
     public static string TrackListCachePath(OrynivoServerSettings server)
     {
-        // The API key is part of the key: cached playback paths embed the key, so a key
-        // change must invalidate the cache to avoid stale URLs.
         var key = Convert.ToHexString(
-            SHA256.HashData(Encoding.UTF8.GetBytes($"{server.Id}|{server.BaseUrl}|{server.ApiKey}")));
+            SHA256.HashData(Encoding.UTF8.GetBytes($"{server.Id}|{server.BaseUrl}")));
         return Path.Combine(TrackCacheDir, $"{key}.json");
     }
+
+    /// <summary>
+    /// Removes legacy track-list caches whose serialized playback URLs could contain API keys.
+    /// </summary>
+    public static void ClearLegacyCredentialBearingTrackLists() =>
+        DeleteDirectoryContents(TrackCacheDir);
 
     /// <summary>Returns the cache file path for a server's folder-tree track list.</summary>
     /// <param name="server">The remote server.</param>

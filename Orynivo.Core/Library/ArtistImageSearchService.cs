@@ -34,15 +34,37 @@ public static class ArtistImageSearchService
     public static async Task<List<ArtistImageSearchResult>> SearchAsync(
         string query,
         CancellationToken cancellationToken = default)
+        => await SearchAsync(query, 12, cancellationToken);
+
+    /// <summary>Finds the first Wikimedia Commons image candidate without persisting it.</summary>
+    /// <param name="artistName">Artist name used for the Wikimedia Commons search.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The first candidate, or <see langword="null"/> when no image was found.</returns>
+    public static async Task<ArtistImageSearchResult?> FindBestAsync(
+        string artistName,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(artistName))
+            return null;
+
+        var results = await SearchAsync($"\"{artistName.Trim()}\" musician", 1, cancellationToken);
+        return results.FirstOrDefault();
+    }
+
+    private static async Task<List<ArtistImageSearchResult>> SearchAsync(
+        string query,
+        int maximumResults,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(query))
             return [];
 
         var encodedQuery = Uri.EscapeDataString(query.Trim());
+        var resultLimit = Math.Clamp(maximumResults, 1, 12);
         var uri =
             "https://commons.wikimedia.org/w/api.php" +
             $"?action=query&generator=search&gsrsearch={encodedQuery}" +
-            "&gsrnamespace=6&gsrlimit=12&prop=imageinfo" +
+            $"&gsrnamespace=6&gsrlimit={resultLimit}&prop=imageinfo" +
             "&iiprop=url%7Cmime%7Cextmetadata&iiurlwidth=600" +
             "&format=json&formatversion=2&origin=*";
 

@@ -171,6 +171,13 @@ public static class LocalizationManager
         resources["L_LastFmApiKeyHint"] = Current.LastFmApiKeyHint;
         resources["L_FanartTvApiKey"] = Current.FanartTvApiKey;
         resources["L_FanartTvApiKeyHint"] = Current.FanartTvApiKeyHint;
+        resources["L_DownloadMissingArtistImages"] = Current.DownloadMissingArtistImages;
+        resources["L_DownloadMissingArtistImagesHint"] = Current.DownloadMissingArtistImagesHint;
+        resources["L_ArtistImageSuggestionTitle"] = Current.ArtistImageSuggestionTitle;
+        resources["L_ArtistImageSuggestionHint"] = Current.ArtistImageSuggestionHint;
+        resources["L_AutoAcceptFanartTvImages"] = Current.AutoAcceptFanartTvImages;
+        resources["L_AcceptArtistImage"] = Current.AcceptArtistImage;
+        resources["L_RejectArtistImage"] = Current.RejectArtistImage;
         resources["L_ShowAllAlbumTracks"] = Current.ShowAllAlbumTracks;
         resources["L_OutputType"] = Current.OutputType;
         resources["L_AsioOutputDevice"] = Current.AsioOutputDevice;
@@ -437,12 +444,28 @@ public static class LocalizationManager
         "Quelle für Künstlerinfos", "Last.fm API-Schlüssel",
         "Kostenlosen API-Schlüssel erstellen unter: last.fm/api/account/create",
         "Fanart.tv API-Schlüssel",
-        "Bevorzugt kuratierte Künstlerbilder. Der Schlüssel gilt nur für diese Sitzung; dauerhaft kann FANART_TV_API_KEY gesetzt werden. Für bereits geladene Künstler »Künstlerinfo neu laden« wählen. Schlüssel unter fanart.tv/get-an-api-key/ erstellen.",
+        "Bevorzugt kuratierte Künstlerbilder. Der Schlüssel wird verschlüsselt im benutzergebundenen Zugangsdaten-Tresor gespeichert; alternativ kann FANART_TV_API_KEY gesetzt werden. Für bereits geladene Künstler »Künstlerinfo neu laden« wählen. Schlüssel unter fanart.tv/get-an-api-key/ erstellen.",
+        "Fehlende Künstlerbilder herunterladen",
+        "Durchsucht die lokale Bibliothek und alle konfigurierten Orynivo Server sequentiell. Pro Künstler wird zuerst Fanart.tv (mit API-Schlüssel), danach Wikimedia versucht. Fanart.tv-Funde können automatisch übernommen werden; Wikimedia-Funde müssen immer bestätigt werden.",
+        "Künstlerbild {0}/{1} wird gesucht: {2} · {3}",
+        "{0:N0} Künstlerbilder angenommen, {1:N0} abgelehnt; {2:N0} Abfragen fehlgeschlagen.",
+        "Künstlerbild-Download fehlgeschlagen: {0}",
+        "Künstlerbild-Download abgebrochen.",
+        "Vorschlag {0}/{1}: {2} · {3}",
+        "Lokale und Server-Künstler werden geladen …",
+        "Restzeit wird ermittelt …",
+        "Geschätzte Restzeit: {0}",
+        "Künstlerbild-Vorschlag",
+        "Quelle: {0}",
+        "Dieses Bild wird erst nach Ihrer Bestätigung gespeichert.",
+        "Annehmen",
+        "Ablehnen",
         "Alle Tracks des Albums anzeigen",
         "Orynivo ist abgestürzt",
         "Ein unerwarteter Fehler ist aufgetreten. Ein Fehlerbericht wurde hier gespeichert:\n\n{0}\n\nOrynivo wird beendet.",
         "Ein unerwarteter Fehler ist aufgetreten. Der Fehlerbericht konnte nicht gespeichert werden. Orynivo wird beendet.")
     {
+        AutoAcceptFanartTvImages = "Fanart.tv-Funde automatisch übernehmen",
         OutputType = "Ausgabeart",
         AsioOutputDevice = "ASIO-Ausgabegerät",
         CwAsioOutputDevice = "cwASIO-Ausgabegerät",
@@ -830,7 +853,7 @@ public static class LocalizationManager
         , LocalSource = "Lokal"
         , LocalSourceShort = "L"
         , OrynivoServersSettings = "Orynivo-Server"
-        , OrynivoServersHint = "Verbinde den Player mit einem oder mehreren Orynivo-Server-Instanzen im lokalen Netzwerk. Der API-Key wird in der settings.json gespeichert."
+        , OrynivoServersHint = "Verbinde den Player mit einem oder mehreren Orynivo-Server-Instanzen im lokalen Netzwerk. Der API-Key wird verschlüsselt im benutzergebundenen Zugangsdaten-Tresor gespeichert."
         , AddOrynivoServer = "Server hinzufügen"
         , OrynivoServerDialogTitle = "Orynivo-Server"
         , OrynivoServerName = "Anzeigename"
@@ -1012,12 +1035,28 @@ public static class LocalizationManager
         "Artist info source", "Last.fm API key",
         "Create a free API key at: last.fm/api/account/create",
         "Fanart.tv API key",
-        "Prefers curated artist images. The key is session-only; set FANART_TV_API_KEY for persistent configuration. Use “Refresh artist information” for existing artists. Create a key at fanart.tv/get-an-api-key/.",
+        "Prefers curated artist images. The key is stored encrypted in the current user's credential vault; alternatively set FANART_TV_API_KEY. Use “Refresh artist information” for existing artists. Create a key at fanart.tv/get-an-api-key/.",
+        "Download missing artist images",
+        "Searches the local library and all configured Orynivo Servers sequentially. For each artist it tries Fanart.tv first (with an API key), then Wikimedia. Fanart.tv results can be accepted automatically; Wikimedia results always require confirmation.",
+        "Searching for artist image {0}/{1}: {2} · {3}",
+        "Accepted {0:N0} artist images, rejected {1:N0}; {2:N0} requests failed.",
+        "Artist image download failed: {0}",
+        "Artist image download cancelled.",
+        "Suggestion {0}/{1}: {2} · {3}",
+        "Loading local and server artists …",
+        "Estimating remaining time …",
+        "Estimated remaining time: {0}",
+        "Artist image suggestion",
+        "Source: {0}",
+        "This image will only be saved after you confirm it.",
+        "Accept",
+        "Reject",
         "Show all album tracks",
         "Orynivo crashed",
         "An unexpected error occurred. A crash report was saved here:\n\n{0}\n\nOrynivo will now close.",
         "An unexpected error occurred. The crash report could not be saved. Orynivo will now close.")
     {
+        AutoAcceptFanartTvImages = "Automatically accept Fanart.tv results",
         OutputType = "Output type", AsioOutputDevice = "ASIO output device", WasapiOutputDevice = "WASAPI output device",
         CwAsioOutputDevice = "cwASIO output device", SteinbergAsio = "Steinberg ASIO", CwAsio = "cwASIO",
         OpenAl = "OpenAL", OpenAlOutputDevice = "OpenAL output device",
@@ -1385,7 +1424,7 @@ public static class LocalizationManager
         , LocalSource = "Local"
         , LocalSourceShort = "L"
         , OrynivoServersSettings = "Orynivo servers"
-        , OrynivoServersHint = "Connect the player to one or more Orynivo Server instances on your local network. The API key is stored in settings.json."
+        , OrynivoServersHint = "Connect the player to one or more Orynivo Server instances on your local network. The API key is stored encrypted in the current user's credential vault."
         , AddOrynivoServer = "Add server"
         , OrynivoServerDialogTitle = "Orynivo Server"
         , OrynivoServerName = "Display name"
@@ -1570,12 +1609,28 @@ public static class LocalizationManager
         "Source des informations artiste", "Clé API Last.fm",
         "Créez une clé API gratuite sur : last.fm/api/account/create",
         "Clé API Fanart.tv",
-        "Préfère les images d’artistes sélectionnées. La clé reste limitée à cette session ; définissez FANART_TV_API_KEY pour une configuration permanente. Utilisez « Actualiser les informations artiste » pour les artistes existants. Créez une clé sur fanart.tv/get-an-api-key/.",
+        "Préfère les images d’artistes sélectionnées. La clé est chiffrée dans le coffre d’identifiants de l’utilisateur actuel ; vous pouvez aussi définir FANART_TV_API_KEY. Utilisez « Actualiser les informations artiste » pour les artistes existants. Créez une clé sur fanart.tv/get-an-api-key/.",
+        "Télécharger les images d’artistes manquantes",
+        "Parcourt séquentiellement la bibliothèque locale et tous les serveurs Orynivo configurés. Pour chaque artiste, Fanart.tv est essayé en premier (avec une clé API), puis Wikimedia. Les résultats Fanart.tv peuvent être acceptés automatiquement ; ceux de Wikimedia doivent toujours être confirmés.",
+        "Recherche de l’image d’artiste {0}/{1} : {2} · {3}",
+        "{0:N0} images d’artistes acceptées, {1:N0} refusées ; {2:N0} requêtes ont échoué.",
+        "Échec du téléchargement des images d’artistes : {0}",
+        "Téléchargement des images d’artistes annulé.",
+        "Suggestion {0}/{1} : {2} · {3}",
+        "Chargement des artistes locaux et des serveurs …",
+        "Estimation du temps restant …",
+        "Temps restant estimé : {0}",
+        "Suggestion d’image d’artiste",
+        "Source : {0}",
+        "Cette image ne sera enregistrée qu’après votre confirmation.",
+        "Accepter",
+        "Refuser",
         "Afficher tous les titres de l’album",
         "Orynivo a cessé de fonctionner",
         "Une erreur inattendue s’est produite. Un rapport a été enregistré ici :\n\n{0}\n\nOrynivo va maintenant se fermer.",
         "Une erreur inattendue s’est produite. Le rapport n’a pas pu être enregistré. Orynivo va maintenant se fermer.")
     {
+        AutoAcceptFanartTvImages = "Accepter automatiquement les résultats Fanart.tv",
         OutputType = "Type de sortie", AsioOutputDevice = "Périphérique de sortie ASIO", WasapiOutputDevice = "Périphérique de sortie WASAPI",
         CwAsioOutputDevice = "Périphérique de sortie cwASIO", SteinbergAsio = "Steinberg ASIO", CwAsio = "cwASIO",
         OpenAl = "OpenAL", OpenAlOutputDevice = "Périphérique de sortie OpenAL",
@@ -1943,7 +1998,7 @@ public static class LocalizationManager
         , LocalSource = "Local"
         , LocalSourceShort = "L"
         , OrynivoServersSettings = "Serveurs Orynivo"
-        , OrynivoServersHint = "Connectez le lecteur à une ou plusieurs instances Orynivo Server sur votre réseau local. La clé API est stockée dans settings.json."
+        , OrynivoServersHint = "Connectez le lecteur à une ou plusieurs instances Orynivo Server sur votre réseau local. La clé API est chiffrée dans le coffre d'identifiants de l'utilisateur actuel."
         , AddOrynivoServer = "Ajouter un serveur"
         , OrynivoServerDialogTitle = "Orynivo Server"
         , OrynivoServerName = "Nom d'affichage"
@@ -2125,12 +2180,28 @@ public static class LocalizationManager
         "Fuente de información del artista", "Clave de API de Last.fm",
         "Crea una clave de API gratuita en: last.fm/api/account/create",
         "Clave API de Fanart.tv",
-        "Da prioridad a imágenes de artistas seleccionadas. La clave solo dura esta sesión; define FANART_TV_API_KEY para conservar la configuración. Usa «Actualizar información del artista» para artistas existentes. Crea una clave en fanart.tv/get-an-api-key/.",
+        "Da prioridad a imágenes de artistas seleccionadas. La clave se guarda cifrada en el almacén de credenciales del usuario actual; también puedes definir FANART_TV_API_KEY. Usa «Actualizar información del artista» para artistas existentes. Crea una clave en fanart.tv/get-an-api-key/.",
+        "Descargar imágenes de artistas que faltan",
+        "Busca secuencialmente en la biblioteca local y en todos los servidores Orynivo configurados. Para cada artista intenta primero Fanart.tv (con una clave API) y después Wikimedia. Los resultados de Fanart.tv pueden aceptarse automáticamente; los de Wikimedia siempre requieren confirmación.",
+        "Buscando imagen del artista {0}/{1}: {2} · {3}",
+        "Se aceptaron {0:N0} imágenes de artistas y se rechazaron {1:N0}; fallaron {2:N0} solicitudes.",
+        "Error al descargar imágenes de artistas: {0}",
+        "Descarga de imágenes de artistas cancelada.",
+        "Sugerencia {0}/{1}: {2} · {3}",
+        "Cargando artistas locales y de servidores …",
+        "Calculando el tiempo restante …",
+        "Tiempo restante estimado: {0}",
+        "Sugerencia de imagen del artista",
+        "Fuente: {0}",
+        "Esta imagen solo se guardará después de confirmarla.",
+        "Aceptar",
+        "Rechazar",
         "Mostrar todas las pistas del álbum",
         "Orynivo se ha bloqueado",
         "Se produjo un error inesperado. Se guardó un informe aquí:\n\n{0}\n\nOrynivo se cerrará ahora.",
         "Se produjo un error inesperado. No se pudo guardar el informe. Orynivo se cerrará ahora.")
     {
+        AutoAcceptFanartTvImages = "Aceptar automáticamente los resultados de Fanart.tv",
         OutputType = "Tipo de salida", AsioOutputDevice = "Dispositivo de salida ASIO", WasapiOutputDevice = "Dispositivo de salida WASAPI",
         CwAsioOutputDevice = "Dispositivo de salida cwASIO", SteinbergAsio = "Steinberg ASIO", CwAsio = "cwASIO",
         OpenAl = "OpenAL", OpenAlOutputDevice = "Dispositivo de salida OpenAL",
@@ -2498,7 +2569,7 @@ public static class LocalizationManager
         , LocalSource = "Local"
         , LocalSourceShort = "L"
         , OrynivoServersSettings = "Servidores Orynivo"
-        , OrynivoServersHint = "Conecta el reproductor a una o varias instancias de Orynivo Server en tu red local. La clave API se almacena en settings.json."
+        , OrynivoServersHint = "Conecta el reproductor a una o varias instancias de Orynivo Server en tu red local. La clave API se guarda cifrada en el almacén de credenciales del usuario actual."
         , AddOrynivoServer = "Agregar servidor"
         , OrynivoServerDialogTitle = "Orynivo Server"
         , OrynivoServerName = "Nombre para mostrar"

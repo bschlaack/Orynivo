@@ -39,6 +39,13 @@ internal partial class SettingsView : UserControl
         int TrackCount,
         MetadataFolderCandidate Candidate);
 
+    private sealed record MissingArtistImageTarget(
+        long ArtistId,
+        string ArtistName,
+        string? MusicBrainzArtistId,
+        string SourceName,
+        OrynivoServerSettings? Server);
+
     private readonly AppSettings _settings;
     private readonly List<string> _libraryPaths = [];
     private readonly List<PlexServerSettings> _plexServers = [];
@@ -59,6 +66,7 @@ internal partial class SettingsView : UserControl
     private bool _settingsAccepted;
     private bool _plexCredentialsChanged;
     private bool _metadataAnalysisLoaded;
+    private CancellationTokenSource? _missingArtistImagesCts;
 
     /// <summary>
     /// Initializes a runtime-loader instance with default settings.
@@ -883,6 +891,7 @@ internal partial class SettingsView : UserControl
             cts.Cancel();
         _orynivoStatusCts?.Cancel();
         _plexStatusCts?.Cancel();
+        _missingArtistImagesCts?.Cancel();
         Interlocked.Increment(ref _equalizerPreviewVersion);
         if (!_settingsAccepted)
         {
@@ -1773,6 +1782,236 @@ internal partial class SettingsView : UserControl
             DownloadMissingArtworkButton.IsEnabled = true;
             UpdateBackupButtonAvailability();
         }
+    }
+
+    private async void DownloadMissingArtistImagesButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (_missingArtistImagesCts is not null)
+        {
+            _missingArtistImagesCts.Cancel();
+            return;
+        }
+
+        var cancellation = new CancellationTokenSource();
+        _missingArtistImagesCts = cancellation;
+        DownloadMissingArtistImagesButton.Content = LocalizationManager.Current.Cancel;
+        var downloaded = 0;
+        var rejected = 0;
+        var failed = 0;
+        var completedSearchDuration = TimeSpan.Zero;
+        var hasFanartTvApiKey = !string.IsNullOrWhiteSpace(SelectedFanartTvApiKey);
+        var autoAcceptFanartTv = false;
+
+        try
+        {
+            MissingArtistImagesStatusTextBlock.Text =
+                LocalizationManager.Current.MissingArtistImagesLoadingSources;
+            var artists = await Task.Run(() =>
+            {
+                using var db = AudioDatabase.OpenDefault();
+                return db.GetArtistsLite()
+                    .Where(artist =>
+                        !artist.ImageIsManual &&
+                        (string.IsNullOrWhiteSpace(artist.ImagePath) || !File.Exists(artist.ImagePath)))
+                    .Select(artist => db.GetArtistById(artist.Id))
+                    .OfType<ArtistInfo>()
+                    .Select(artist => new MissingArtistImageTarget(
+                        artist.Id,
+                        artist.Artist,
+                        artist.MusicBrainzArtistId,
+                        LocalizationManager.Current.LocalSource,
+                        null))
+                    .ToList();
+            }, cancellation.Token);
+
+            using var serverClient = new OrynivoServerClient();
+            foreach (var server in _orynivoServers)
+            {
+                cancellation.Token.ThrowIfCancellationRequested();
+                var remoteArtists = await serverClient.GetArtistsAsync(server, cancellation.Token);
+                artists.AddRange(remoteArtists
+                    .Where(artist => !artist.HasImage && !artist.ImageIsManual)
+                    .Select(artist => new MissingArtistImageTarget(
+                        artist.Id,
+                        artist.Name,
+                        null,
+                        server.Name,
+                        server)));
+            }
+
+            for (var index = 0; index < artists.Count; index++)
+            {
+                cancellation.Token.ThrowIfCancellationRequested();
+                var artist = artists[index];
+                var estimatedRemaining = index == 0
+                    ? LocalizationManager.Current.RemainingTimeEstimating
+                    : string.Format(
+                        LocalizationManager.Current.RemainingTimeEstimate,
+                        FormatRemainingTime(TimeSpan.FromTicks(
+                            completedSearchDuration.Ticks / index * (artists.Count - index))));
+                MissingArtistImagesStatusTextBlock.Text = string.Format(
+                    LocalizationManager.Current.MissingArtistImageDownloading,
+                    index + 1,
+                    artists.Count,
+                    $"{artist.ArtistName} · {artist.SourceName}",
+                    estimatedRemaining);
+
+                var searchStarted = DateTimeOffset.UtcNow;
+                byte[]? imageData = null;
+                string? mimeType = null;
+                var sourceName = string.Empty;
+                var isFanartTvResult = false;
+                if (hasFanartTvApiKey)
+                {
+                    try
+                    {
+                        var fanartResult = await FanartTvArtistImageService.FindBestAsync(
+                            artist.ArtistName,
+                            artist.MusicBrainzArtistId,
+                            SelectedFanartTvApiKey,
+                            cancellation.Token);
+                        if (fanartResult is not null)
+                        {
+                            imageData = fanartResult.ImageData;
+                            mimeType = fanartResult.MimeType;
+                            sourceName = "Fanart.tv";
+                            isFanartTvResult = true;
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch
+                    {
+                        failed++;
+                    }
+                }
+
+                if (imageData is null)
+                {
+                    try
+                    {
+                        var wikimediaResult = await ArtistImageSearchService.FindBestAsync(
+                            artist.ArtistName,
+                            cancellation.Token);
+                        if (wikimediaResult is not null)
+                        {
+                            imageData = wikimediaResult.ImageData;
+                            mimeType = wikimediaResult.MimeType;
+                            sourceName = "Wikimedia Commons";
+                        }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch
+                    {
+                        failed++;
+                    }
+                }
+                completedSearchDuration += DateTimeOffset.UtcNow - searchStarted;
+
+                if (imageData is null)
+                    continue;
+
+                var reviewRemaining = string.Format(
+                    LocalizationManager.Current.RemainingTimeEstimate,
+                    FormatRemainingTime(TimeSpan.FromTicks(
+                        completedSearchDuration.Ticks / (index + 1) * (artists.Count - index - 1))));
+                MissingArtistImagesStatusTextBlock.Text = string.Format(
+                    LocalizationManager.Current.MissingArtistImageReviewing,
+                    index + 1,
+                    artists.Count,
+                    $"{artist.ArtistName} · {artist.SourceName}",
+                    reviewRemaining);
+                var accepted = isFanartTvResult && autoAcceptFanartTv;
+                if (!accepted)
+                {
+                    var suggestionDialog = new ArtistImageSuggestionDialog(
+                        $"{artist.ArtistName} · {artist.SourceName}",
+                        sourceName,
+                        MissingArtistImagesStatusTextBlock.Text ?? string.Empty,
+                        imageData,
+                        hasFanartTvApiKey,
+                        autoAcceptFanartTv);
+                    accepted = await suggestionDialog.ShowDialog<bool>(GetHostWindow());
+                    autoAcceptFanartTv = suggestionDialog.AutoAcceptFanartTv;
+                    if (!accepted)
+                    {
+                        rejected++;
+                        continue;
+                    }
+                }
+
+                if (artist.Server is null)
+                {
+                    var imagePath = await ArtistImageSearchService.SaveImageAsync(
+                        artist.ArtistId,
+                        imageData,
+                        mimeType,
+                        cancellation.Token);
+                    await Task.Run(() =>
+                        {
+                            using var db = AudioDatabase.OpenDefault();
+                            db.UpdateArtistImage(artist.ArtistId, imagePath);
+                        },
+                        cancellation.Token);
+                }
+                else if (!await serverClient.UploadArtistImageAsync(
+                             artist.Server,
+                             artist.ArtistId,
+                             imageData,
+                             mimeType,
+                             cancellation.Token))
+                {
+                    failed++;
+                    continue;
+                }
+                else
+                {
+                    MainWindow.DeleteOrynivoArtistListCache(artist.Server);
+                }
+                downloaded++;
+            }
+
+            MissingArtistImagesStatusTextBlock.Text = string.Format(
+                LocalizationManager.Current.MissingArtistImagesDownloaded,
+                downloaded,
+                rejected,
+                failed);
+        }
+        catch (OperationCanceledException)
+        {
+            MissingArtistImagesStatusTextBlock.Text =
+                LocalizationManager.Current.MissingArtistImagesDownloadCancelled;
+        }
+        catch (Exception ex)
+        {
+            MissingArtistImagesStatusTextBlock.Text = string.Format(
+                LocalizationManager.Current.MissingArtistImagesDownloadFailed,
+                ex.Message);
+        }
+        finally
+        {
+            cancellation.Dispose();
+            if (ReferenceEquals(_missingArtistImagesCts, cancellation))
+                _missingArtistImagesCts = null;
+            DownloadMissingArtistImagesButton.Content =
+                LocalizationManager.Current.DownloadMissingArtistImages;
+        }
+    }
+
+    private static string FormatRemainingTime(TimeSpan remaining)
+    {
+        if (remaining <= TimeSpan.Zero)
+            return "00:00";
+
+        remaining = TimeSpan.FromSeconds(Math.Ceiling(remaining.TotalSeconds));
+        return remaining.TotalHours >= 1
+            ? remaining.ToString(@"h\:mm\:ss", CultureInfo.InvariantCulture)
+            : remaining.ToString(@"m\:ss", CultureInfo.InvariantCulture);
     }
 
     private async void CalculateReplayGainButton_OnClick(object? sender, RoutedEventArgs e)

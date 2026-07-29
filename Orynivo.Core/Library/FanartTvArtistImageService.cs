@@ -3,6 +3,12 @@ using System.Text.Json;
 
 namespace Orynivo.Library;
 
+/// <summary>Contains a downloaded artist image that has not yet been persisted.</summary>
+/// <param name="ImageData">Raw image bytes.</param>
+/// <param name="MimeType">Image MIME type.</param>
+/// <param name="SourceUrl">Public source URL of the image.</param>
+public sealed record ArtistImageDownload(byte[] ImageData, string? MimeType, string SourceUrl);
+
 /// <summary>
 /// Resolves artists through MusicBrainz and downloads curated artist thumbnails from Fanart.tv.
 /// API keys are used only in authenticated Fanart.tv requests and are never included in diagnostics.
@@ -25,6 +31,32 @@ public static class FanartTvArtistImageService
     /// <returns>The cached image path, or <see langword="null"/> when no unambiguous image is available.</returns>
     public static async Task<string?> DownloadBestAsync(
         long artistId,
+        string artistName,
+        string? musicBrainzArtistId,
+        string? apiKey,
+        CancellationToken cancellationToken = default)
+    {
+        var download = await FindBestAsync(
+            artistName,
+            musicBrainzArtistId,
+            apiKey,
+            cancellationToken);
+        return download is null
+            ? null
+            : await ArtistImageSearchService.SaveImageAsync(
+                artistId,
+                download.ImageData,
+                download.MimeType,
+                cancellationToken);
+    }
+
+    /// <summary>Downloads the highest-rated Fanart.tv artist thumbnail without persisting it.</summary>
+    /// <param name="artistName">Artist display name used for conservative MusicBrainz resolution.</param>
+    /// <param name="musicBrainzArtistId">Known MusicBrainz artist ID, or <see langword="null"/> to resolve by name.</param>
+    /// <param name="apiKey">Fanart.tv personal API key.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The downloaded image, or <see langword="null"/> when no unambiguous image is available.</returns>
+    public static async Task<ArtistImageDownload?> FindBestAsync(
         string artistName,
         string? musicBrainzArtistId,
         string? apiKey,
@@ -70,11 +102,7 @@ public static class FanartTvArtistImageService
         if (imageData.Length is 0 or > MaximumImageBytes)
             return null;
 
-        return await ArtistImageSearchService.SaveImageAsync(
-            artistId,
-            imageData,
-            mediaType,
-            cancellationToken);
+        return new ArtistImageDownload(imageData, mediaType, imageUrl);
     }
 
     internal static string? SelectBestArtistThumbnailUrl(JsonElement root)

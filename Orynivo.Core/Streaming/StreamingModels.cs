@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Orynivo.Streaming;
 
 /// <summary>Identifies a supported streaming provider.</summary>
@@ -94,7 +96,7 @@ public sealed class PlexServerSettings
     public string BaseUrl { get; set; } = string.Empty;
 }
 
-/// <summary>Persisted connection settings for one remote Orynivo Server instance.</summary>
+/// <summary>Connection settings for one remote Orynivo Server instance.</summary>
 public sealed class OrynivoServerSettings
 {
     /// <summary>Gets or sets the unique server identifier (GUID, no dashes).</summary>
@@ -104,5 +106,6 @@ public sealed class OrynivoServerSettings
     /// <summary>Gets or sets the base URL of the server (e.g. <c>http://192.168.1.10:5280</c>).</summary>
     public string BaseUrl { get; set; } = string.Empty;
     /// <summary>Gets or sets the pre-shared API key required by every request.</summary>
+    [JsonIgnore]
     public string ApiKey { get; set; } = string.Empty;
 }

@@ -59,8 +59,8 @@ PCM playback through selectable direct ALSA hardware and OpenAL output devices
 in addition to the
 library and network/UI feature set; it excludes Windows audio, endpoint-volume,
 and SMTC implementations and uses compatibility types under
-`Orynivo/Compatibility/Linux`. Linux credential
-compatibility is process-local only and must never persist secrets in plaintext.
+`Orynivo/Compatibility/Linux`. Linux credentials use the desktop client's
+AES-GCM current-user credential container and must never persist secrets in plaintext.
 
 Linux native DSD does not use either Windows ASIO bridge. Local and
 HTTP-range-streamed stereo DSF and uncompressed stereo DFF/DSDIFF use the
@@ -667,14 +667,19 @@ fallback or allow client-provided commands/paths to reach the helper.
   that day get a chip. Album/artist links are available for local, remote Orynivo
   Server, and Plex entries; Plex clickability requires the stored Plex context
   (album/artist rating keys) and a still-configured Plex server
-- `Orynivo/SettingsStore.cs`: persists `%LOCALAPPDATA%\Orynivo\settings.json`
+- `Orynivo/SettingsStore.cs`: persists non-secret settings in
+  `%LOCALAPPDATA%\Orynivo\settings.json`, overlays secrets from
+  `ApplicationCredentialStore`, and migrates legacy plaintext JSON credentials
+- `Orynivo/ApplicationCredentialStore.cs`: the single encrypted current-user
+  credential container for Last.fm, Fanart.tv, AI Chat, Orynivo Server, Plex,
+  and generic streaming credentials. Windows uses current-user DPAPI; Linux and
+  macOS use AES-GCM with a separate random key restricted to user read/write.
 - `Orynivo/Streaming/IStreamingCatalog.cs` and `IStreamingPlaybackProvider.cs`:
   provider-neutral contracts for future streaming catalog and playback integrations
 - `Orynivo/Streaming/QobuzStreamingProvider.cs`: inactive Qobuz scaffold; do not
   add unofficial endpoints, enable it only with approved partner API documentation
-- `Orynivo/Streaming/WindowsStreamingCredentialStore.cs`: stores future provider
-  secrets and tokens in `%LOCALAPPDATA%\Orynivo\streaming-credentials.dat` using
-  Windows DPAPI for the current user
+- `Orynivo/Streaming/WindowsStreamingCredentialStore.cs`: compatibility facade
+  that stores future provider secrets through `ApplicationCredentialStore`
 - `Orynivo/PlaylistProviders.cs`: provider-neutral playlist persistence for
   local SQLite mixed playlists plus retained legacy remote-server operations.
   Current track, album, and folder context menus always target the local mixed
@@ -896,17 +901,17 @@ fallback or allow client-provided commands/paths to reach the helper.
 - `Orynivo/RemoteDirectoryBrowserDialog.axaml/.cs`: browses the remote server
   filesystem through `/api/files/directories?path=` and returns a server-side
   directory path for `OrynivoServerDialog`
-- `AppSettings.OrynivoServers` stores configured remote server connections; API
-  keys are stored in `settings.json` (same policy as AI chat key);
+- `AppSettings.OrynivoServers` stores configured remote server connections;
+  API keys are overlaid from `ApplicationCredentialStore` and excluded from
+  `settings.json`;
   `AppSettings.OrynivoServerFavorites` stores client-side favorite keys for
   remote artists, albums, and tracks. Legacy `ShowOrynivoServerSection` and
   `IsOrynivoServerSectionExpanded` settings may still exist in persisted JSON
   for compatibility, but the current sidebar renders remote servers under the
   main Library accordion controlled by `ShowLocalLibrarySection` and
   `IsLocalLibrarySectionExpanded`.
-- `Orynivo/Streaming/WindowsPlexCredentialStore.cs`: stores per-server Plex
-  access tokens in `%LOCALAPPDATA%\Orynivo\plex-credentials.dat` using Windows
-  DPAPI for the current user
+- `Orynivo/Streaming/WindowsPlexCredentialStore.cs`: compatibility facade that
+  stores per-server Plex access tokens through `ApplicationCredentialStore`
 - `AppSettings.PlexServers` stores Plex server IDs, display names, and base
   URLs; Plex tokens must not be added to `settings.json`
 - `AppSettings.QobuzApplicationId` stores only the non-secret Qobuz application
@@ -983,7 +988,8 @@ fallback or allow client-provided commands/paths to reach the helper.
   (`AiChatSettings`): `Enabled`, `EndpointUrl` (default
   `http://localhost:1234/v1`), `ApiKey`, `ModelName`, and `MaxTokens` (default
   2048); any OpenAI-compatible provider works (LM Studio, Ollama, OpenAI,
-  etc.); API key is stored in `settings.json`; the `AiChatView` re-reads
+  etc.); the API key is excluded from JSON and overlaid from
+  `ApplicationCredentialStore`; the `AiChatView` re-reads
   `GetSettings` on every send so settings changes take effect immediately
 - `AppSettings.ShowInternetRadioItem`, `ShowPodcastsItem`, `ShowQueueItem`, and
   `ShowAiChatItem` control the individual sidebar items for Internet Radio,
@@ -1055,17 +1061,24 @@ fallback or allow client-provided commands/paths to reach the helper.
   track's downloaded lyrics cache
 - `Orynivo/Library/ArtistProfileService.cs`: configurable artist biography and
   image lookup (Wikipedia or Last.fm) with preferred curated Fanart.tv
-  `artistthumb` artwork when a session-only key or `FANART_TV_API_KEY` is
+  `artistthumb` artwork when an encrypted stored key or `FANART_TV_API_KEY` is
   available; static source/key properties are applied by the desktop, and
   images are cached under `%LOCALAPPDATA%\Orynivo\artist-images\`. Fanart.tv
   resolution uses embedded MusicBrainz IDs or an unambiguous exact MusicBrainz
-  match. The Fanart.tv key must never be persisted, logged, sent to an Orynivo
-  Server, or exposed to a model.
+  match. The Fanart.tv key may only be persisted in
+  `ApplicationCredentialStore`; it must never be written to JSON or caches,
+  logged, sent to an Orynivo Server, or exposed to a model.
 - `Orynivo/Library/ArtistImageSearchService.cs` and
   `Orynivo/ArtistImageSearchWindow.*`: manual Wikimedia Commons artist-image
   search with editable query; selecting an image updates `artists.image_path`,
   sets `image_is_manual`, and preserves the biography source; automatic profile
-  refreshes must not download over manually selected image files
+  refreshes must not download over manually selected image files. The Artist
+  information Settings action processes missing images from the local library
+  and every configured Orynivo Server strictly sequentially, remains cancellable,
+  tries Fanart.tv first only when a key is available, and then falls back to
+  Wikimedia Commons. Every in-memory candidate must be explicitly accepted or
+  rejected in a preview before it may be saved to its owning local or remote
+  library; progress includes a provider-search-based remaining-time estimate.
 - `Orynivo/EditArtistNameDialog.*` and `Orynivo/ArtistMergeDialog.*`:
   artist-info rename flow; collisions require an explicit merge-profile
   priority choice

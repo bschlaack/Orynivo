@@ -10,7 +10,8 @@ namespace Orynivo;
 /// <summary>
 /// Application settings persisted by <see cref="SettingsStore"/> as JSON.
 /// Covers output device selection, library paths, UI preferences, and permitted provider settings.
-/// Session-only secrets marked with <see cref="JsonIgnoreAttribute"/> are never persisted.
+/// Secrets marked with <see cref="JsonIgnoreAttribute"/> are persisted separately by
+/// <see cref="ApplicationCredentialStore"/> and never written to the JSON settings file.
 /// </summary>
 public sealed class AppSettings
 {
@@ -80,6 +81,7 @@ public sealed class AppSettings
     /// <summary>Gets or sets the source used to fetch artist biography text.</summary>
     public ArtistInfoSource ArtistInfoSource { get; set; } = ArtistInfoSource.Wikipedia;
     /// <summary>Gets or sets the Last.fm API key used when <see cref="ArtistInfoSource"/> is <see cref="ArtistInfoSource.LastFm"/>.</summary>
+    [JsonIgnore]
     public string LastFmApiKey { get; set; } = string.Empty;
     /// <summary>Gets or sets the Fanart.tv API key used for preferred curated artist thumbnails.</summary>
     [JsonIgnore]

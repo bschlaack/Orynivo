@@ -1,89 +1,65 @@
-using System.Collections.Concurrent;
-
 namespace Orynivo.Streaming;
 
 /// <summary>
-/// Holds Plex credentials in process memory on platforms where Windows DPAPI is
-/// unavailable. Credentials are deliberately not written to disk.
+/// Persists Plex access tokens in the shared current-user application credential container.
+/// The compatibility type retains its historical name for cross-platform callers.
 /// </summary>
 public sealed class WindowsPlexCredentialStore
 {
-    private static readonly ConcurrentDictionary<string, string> Credentials = new();
+    private readonly ApplicationCredentialStore _store = new();
 
-    /// <summary>Returns the credentials retained for this process.</summary>
+    /// <summary>Loads all Plex access tokens asynchronously.</summary>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>A copy of the current in-memory credential map.</returns>
+    /// <returns>Tokens keyed by Plex server ID.</returns>
     public Task<Dictionary<string, string>> LoadAllAsync(
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(LoadAll());
-    }
+        CancellationToken cancellationToken = default) =>
+        Task.Run(LoadAll, cancellationToken);
 
-    /// <summary>Returns the credentials retained for this process.</summary>
-    /// <returns>A copy of the current in-memory credential map.</returns>
-    public Dictionary<string, string> LoadAll() =>
-        new(Credentials, StringComparer.Ordinal);
+    /// <summary>Loads all Plex access tokens.</summary>
+    /// <returns>Tokens keyed by Plex server ID.</returns>
+    public Dictionary<string, string> LoadAll() => _store.LoadPlexTokens();
 
-    /// <summary>Replaces the process-local credentials without persisting secrets.</summary>
-    /// <param name="credentials">Credentials to retain until the process exits.</param>
+    /// <summary>Replaces all Plex access tokens asynchronously.</summary>
+    /// <param name="credentials">Tokens keyed by Plex server ID.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>A completed task.</returns>
+    /// <returns>A task representing the save operation.</returns>
     public Task SaveAllAsync(
         IReadOnlyDictionary<string, string> credentials,
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        SaveAll(credentials);
-        return Task.CompletedTask;
-    }
+        CancellationToken cancellationToken = default) =>
+        Task.Run(() => SaveAll(credentials), cancellationToken);
 
-    /// <summary>Replaces the process-local credentials without persisting secrets.</summary>
-    /// <param name="credentials">Credentials to retain until the process exits.</param>
-    public void SaveAll(IReadOnlyDictionary<string, string> credentials)
-    {
-        Credentials.Clear();
-        foreach (var pair in credentials)
-            Credentials[pair.Key] = pair.Value;
-    }
+    /// <summary>Replaces all Plex access tokens.</summary>
+    /// <param name="credentials">Tokens keyed by Plex server ID.</param>
+    public void SaveAll(IReadOnlyDictionary<string, string> credentials) =>
+        _store.SavePlexTokens(credentials);
 }
 
 /// <summary>
-/// Holds generic streaming credentials in memory when Windows DPAPI is
-/// unavailable. Values are never persisted in plaintext.
+/// Persists generic streaming-provider credentials in the shared current-user
+/// application credential container.
 /// </summary>
 public sealed class WindowsStreamingCredentialStore : IStreamingCredentialStore
 {
-    private static readonly ConcurrentDictionary<StreamingProvider, StreamingCredential> Credentials = new();
+    private readonly ApplicationCredentialStore _store = new();
 
     /// <inheritdoc/>
     public Task<StreamingCredential?> LoadAsync(
         StreamingProvider provider,
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        Credentials.TryGetValue(provider, out var credential);
-        return Task.FromResult<StreamingCredential?>(credential);
-    }
+        CancellationToken cancellationToken = default) =>
+        Task.Run(() => _store.LoadStreamingCredential(provider), cancellationToken);
 
     /// <inheritdoc/>
     public Task SaveAsync(
         StreamingProvider provider,
         StreamingCredential credential,
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        Credentials[provider] = credential;
-        return Task.CompletedTask;
-    }
+        CancellationToken cancellationToken = default) =>
+        Task.Run(
+            () => _store.SaveStreamingCredential(provider, credential),
+            cancellationToken);
 
     /// <inheritdoc/>
     public Task RemoveAsync(
         StreamingProvider provider,
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        Credentials.TryRemove(provider, out _);
-        return Task.CompletedTask;
-    }
+        CancellationToken cancellationToken = default) =>
+        Task.Run(() => _store.RemoveStreamingCredential(provider), cancellationToken);
 }
