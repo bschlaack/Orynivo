@@ -4,7 +4,7 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+# [0.30.3] - 2026-07-30
 
 ### Added
 
@@ -19,7 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Masked the Last.fm API key in Settings so it is no longer displayed as
   readable text, matching the Fanart.tv credential field.
 
-# [0.30.2] - 2026-07-28
+# [0.30.2] - 2026-07-29
 
 ### Added
 
