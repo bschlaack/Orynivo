@@ -1,0 +1,151 @@
+.install-heading {
+  max-width: none;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 30px;
+}
+
+.install-heading h2 {
+  margin-bottom: 0;
+}
+
+.docs-link {
+  flex: none;
+  margin-bottom: 12px;
+  padding: 11px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--cyan);
+  font-size: 12px;
+  font-weight: 700;
+  transition: .2s;
+}
+
+.docs-link:hover {
+  border-color: var(--cyan);
+  transform: translateY(-2px);
+}
+
+.language-switcher {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .02);
+}
+
+.language-switcher button {
+  min-width: 28px;
+  padding: 4px 5px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #8295a8;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.language-switcher button.active {
+  background: #15283c;
+  color: var(--cyan);
+}
+
+.language-callout {
+  max-width: 1240px;
+  margin: 70px auto 0;
+  padding: 30px 34px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 26px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: radial-gradient(circle at 0 50%, rgba(32, 217, 232, .12), transparent 28%), linear-gradient(120deg, rgba(18, 36, 56, .95), rgba(10, 25, 41, .95));
+}
+
+.language-callout-icon {
+  width: 66px;
+  height: 66px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  background: rgba(32, 217, 232, .1);
+  color: var(--cyan);
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.language-callout .eyebrow {
+  margin: 0 0 3px;
+}
+
+.language-callout h2 {
+  margin: 0;
+  font-size: clamp(24px, 3vw, 36px);
+  letter-spacing: -.035em;
+}
+
+.language-callout p:last-child {
+  margin: 5px 0 0;
+  color: var(--muted);
+}
+
+.app-language-list {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #c8d4df;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.app-language-list i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--cyan);
+}
+
+.legal-links {
+  display: inline-flex;
+  gap: 18px;
+}
+
+.privacy-note a {
+  color: var(--cyan);
+}
+
+@media (max-width: 720px) {
+  .install-heading {
+    display: block;
+  }
+
+  .docs-link {
+    display: inline-flex;
+    margin-top: 18px;
+  }
+
+  .language-switcher {
+    width: max-content;
+  }
+
+  .language-callout {
+    margin: 45px 20px 0;
+    padding: 25px;
+    grid-template-columns: auto 1fr;
+    gap: 18px;
+  }
+
+  .language-callout-icon {
+    width: 54px;
+    height: 54px;
+  }
+
+  .app-language-list {
+    grid-column: 1 / -1;
+    flex-wrap: wrap;
+  }
+}

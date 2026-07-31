@@ -44,6 +44,9 @@ the ability to reach that library from any device on the local network.
 - Unified local and Orynivo Server artist browsing: matching artists appear once
   in Artists and search, and every artist link opens one combined album view
   across those libraries regardless of which source the clicked item came from.
+  Renaming a unified artist applies the new name to its matching local identity
+  and to its matching artists on every reachable configured Orynivo Server;
+  local merge-priority choices are applied to equivalent server collisions.
   Cached biographies and images are shared across matching identities, and new
   profile downloads or manual image selections are synchronized to each source
 - AI control via local LLMs, LM Studio/Ollama/OpenAI-compatible endpoints
@@ -52,6 +55,14 @@ the ability to reach that library from any device on the local network.
   that exposes the same library over the local network via REST and HTTP streaming
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
+## Product website
+
+The self-contained responsive product website lives in [`html/`](html/). It
+defaults to English, can switch to German, French, or Spanish, and includes
+current application screenshots, feature and installation guides, and download
+links that resolve through GitHub's latest public release API. See
+[`html/README.md`](html/README.md) for local preview and publishing notes.
 
 The Windows desktop includes cwASIO/Steinberg ASIO and WASAPI playback. The
 Linux desktop is a separately packaged player with direct ALSA hardware profiles
@@ -753,7 +764,9 @@ distributions. After verifying the selected package digest it requests
 administrator authorization through PolicyKit and installs it with the native
 package manager. CachyOS is treated as Arch Linux and receives the signed
 `.pkg.tar.zst` package; the package file itself is never launched as an
-executable.
+executable. Orynivo remains open until the privileged package manager exits and
+closes only after a successful installation. Authentication cancellation or a
+package-manager error leaves the update window open with a failure status.
 
 ### macOS player
 

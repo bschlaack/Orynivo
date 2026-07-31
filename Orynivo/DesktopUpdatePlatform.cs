@@ -31,7 +31,11 @@ internal static class DesktopUpdatePlatform
 
     /// <summary>Launches the verified installer through the current platform's normal installation UI.</summary>
     /// <param name="installerPath">Absolute path of the downloaded and hash-verified installer.</param>
-    internal static void LaunchInstaller(string installerPath)
+    /// <param name="cancellationToken">Token that can cancel waiting for Linux package installation.</param>
+    /// <returns>A task that completes after Linux installation exits or after another platform opens its installer.</returns>
+    internal static async Task LaunchInstallerAsync(
+        string installerPath,
+        CancellationToken cancellationToken = default)
     {
         if (OperatingSystem.IsMacOS())
         {
@@ -54,7 +58,7 @@ internal static class DesktopUpdatePlatform
 
         if (OperatingSystem.IsLinux())
         {
-            LaunchLinuxInstaller(installerPath);
+            await LaunchLinuxInstallerAsync(installerPath, cancellationToken);
             return;
         }
 
@@ -63,7 +67,11 @@ internal static class DesktopUpdatePlatform
 
     /// <summary>Launches a verified Linux package through PolicyKit and the distribution package manager.</summary>
     /// <param name="installerPath">Absolute path of the verified package.</param>
-    private static void LaunchLinuxInstaller(string installerPath)
+    /// <param name="cancellationToken">Token that can cancel waiting for package installation.</param>
+    /// <returns>A task that completes only when the privileged package manager exits successfully.</returns>
+    private static async Task LaunchLinuxInstallerAsync(
+        string installerPath,
+        CancellationToken cancellationToken)
     {
         var packageType = GetLinuxPackageType()
             ?? throw new PlatformNotSupportedException("The Linux package manager is unsupported.");
@@ -104,8 +112,15 @@ internal static class DesktopUpdatePlatform
                 break;
         }
         startInfo.ArgumentList.Add(installerPath);
-        if (Process.Start(startInfo) is null)
+        using var process = Process.Start(startInfo);
+        if (process is null)
             throw new InvalidOperationException("The Linux package installer could not be started.");
+        await process.WaitForExitAsync(cancellationToken);
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException(
+                $"The Linux package installer exited with code {process.ExitCode}.");
+        }
     }
 
     private static (string OperatingSystem, string Architecture, string PackageType)? GetCurrentTarget()

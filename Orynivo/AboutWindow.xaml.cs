@@ -116,12 +116,14 @@ public partial class AboutWindow : Window
                     return;
                 }
             }
-            DesktopUpdatePlatform.LaunchInstaller(installerPath);
+            UpdateStatusTextBlock.Text = LocalizationManager.Current.InstallingUpdate;
+            await DesktopUpdatePlatform.LaunchInstallerAsync(installerPath);
             if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                 desktop.Shutdown();
         }
-        catch
+        catch (Exception exception)
         {
+            CrashLogger.Log(exception, "Desktop update installation");
             UpdateStatusTextBlock.Text = LocalizationManager.Current.UpdateFailed;
             CheckForUpdatesButton.IsEnabled = true;
             InstallUpdateButton.IsEnabled = true;

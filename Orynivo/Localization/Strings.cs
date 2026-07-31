@@ -186,6 +186,8 @@ public sealed record LocalizedStrings(
     public string DownloadAndInstall { get; init; } = "";
     /// <summary>Gets the status shown while downloading an update.</summary>
     public string DownloadingUpdate { get; init; } = "";
+    /// <summary>Gets the status shown while the platform package installer is running.</summary>
+    public string InstallingUpdate { get; init; } = "";
     /// <summary>Gets the generic update failure message.</summary>
     public string UpdateFailed { get; init; } = "";
     /// <summary>Gets the action label for updating a configured Orynivo Server.</summary>

@@ -76,7 +76,12 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   matching identity. Profile downloads and manual image selections propagate to
   every matching local and reachable Orynivo Server identity; automatic profile
   images must never overwrite a manually selected image. Manual artist-image
-  uploads and deletions propagate through the same identity set. Album and
+  uploads and deletions propagate through the same identity set. Renaming a
+  local or remote identity likewise renames every normalized matching artist in
+  the local library and on reachable Orynivo Servers; target-name collisions
+  remain unresolved until the user explicitly chooses a merge. A local merge's
+  survivor choice must be mapped by identity role (current versus existing
+  target) to equivalent collisions on every matching server. Album and
   artist detail upload/delete actions route through the owning local or remote
   artwork provider and use localized labels/tooltips. Plex identities remain
   separate.
@@ -124,7 +129,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   the signed `arch` package, Debian-family distributions to `deb`, and
   RPM-family distributions to `rpm`. After digest verification, installation
   must run through `/usr/bin/pkexec` and the distribution package manager; a
-  downloaded package must never be launched as an executable.
+  downloaded package must never be launched as an executable. The client must
+  await the privileged package-manager exit and shut down only after exit code
+  zero; authentication cancellation and package-manager failures keep Orynivo
+  open and are logged.
 - Tagged macOS releases publish architecture-specific `osx-arm64` and
   `osx-x64` application bundles as installable PKGs, portable ZIPs, and tar
   archives. The PKG installs `Orynivo.app` beneath `/Applications`; all package
