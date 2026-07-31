@@ -28,10 +28,19 @@ the ability to reach that library from any device on the local network.
   wins, untagged multi-artist compilations are grouped under `Various Artists`,
   featured track credits do not create extra library artists, and embedded
   MusicBrainz artist IDs unify verified spelling variants
-- Optional curated Fanart.tv artist thumbnails. Enter a personal key for the
-  current session under Settings > Artist information, or set the
-  `FANART_TV_API_KEY` environment variable before starting Orynivo. The key is
-  not persisted by Orynivo. Manual artist images always take priority
+- Optional curated Fanart.tv artist thumbnails. Enter a personal key under
+  Settings > Artist information, or set the `FANART_TV_API_KEY` environment
+  variable before starting Orynivo. Entered keys are stored in Orynivo's
+  encrypted current-user credential container. Manual artist images always
+  take priority. The same Settings section can fill missing artist images in
+  the local library and every configured Orynivo Server sequentially, trying
+  Fanart.tv first when a key is available and Wikimedia Commons as the fallback.
+  With a configured Fanart.tv key, the review dialog can automatically accept
+  Fanart.tv results for the remainder of the run. Wikimedia candidates always
+  remain subject to individual acceptance or rejection, and the complete run
+  can be cancelled from the review dialog. Manual image searches from artist
+  information use an editable query and the same Fanart.tv-first, Wikimedia-
+  fallback order. The batch displays progress and an estimated remaining time
 - Unified local and Orynivo Server artist browsing: matching artists appear once
   in Artists and search, and every artist link opens one combined album view
   across those libraries regardless of which source the clicked item came from.
@@ -70,9 +79,12 @@ the DAC; otherwise it uses DoP as a fallback (for example a 176.4-kHz carrier
 for DSD64). Neither Linux DSD path requires cwASIO, the Steinberg SDK, or an
 Orynivo native bridge.
 
-On Linux, Plex and generic streaming credentials are retained only for the
-current process and are not persisted because the existing encrypted credential
-store uses Windows DPAPI. This avoids writing secrets in plaintext.
+API keys and access tokens for Last.fm, Fanart.tv, AI Chat, Orynivo Server,
+Plex, and streaming providers are kept out of `settings.json`. Orynivo stores
+them in one current-user encrypted credential container: Windows uses
+current-user DPAPI; Linux and macOS use AES-GCM with a separate random key file
+restricted to the current operating-system user. Existing plaintext settings
+and the older Windows Plex/streaming credential files are migrated automatically.
 
 The application uses the Orynivo wordmark in the startup screen, sidebar, and
 About dialog, plus a multi-resolution Windows application icon based on the
@@ -739,6 +751,15 @@ OpenAL remain system runtime dependencies as described above.
 Tagged release builds validate that the Arch archive contains its required
 root-level `.PKGINFO` metadata before publishing it.
 
+The signed desktop updater detects Debian-family, RPM-family, and Arch-family
+distributions. After verifying the selected package digest it requests
+administrator authorization through PolicyKit and installs it with the native
+package manager. CachyOS is treated as Arch Linux and receives the signed
+`.pkg.tar.zst` package; the package file itself is never launched as an
+executable. Orynivo remains open until the privileged package manager exits and
+closes only after a successful installation. Authentication cancellation or a
+package-manager error leaves the update window open with a failure status.
+
 ### macOS player
 
 | Package | Description |
@@ -902,7 +923,8 @@ release because already-installed builds trust the public key embedded at their
 own build time.
 
 The About window displays the embedded version and can download, verify, and
-launch a newer Windows installer or the architecture-matching macOS PKG.
+launch a newer Windows installer, a distribution-matching Linux package, or the
+architecture-matching macOS PKG.
 Settings > Orynivo Server offers the same signed update for supported DEB/RPM
 servers and relays the package from the desktop when the server itself cannot
 reach GitHub. Connected server rows show the version returned by their
@@ -1000,9 +1022,11 @@ Orynivo/
 
 Orynivo stores its local data under `%LOCALAPPDATA%\Orynivo\`:
 
-- `settings.json`: application settings
-- `streaming-credentials.dat`: Windows user-bound encrypted streaming secrets
-- `plex-credentials.dat`: Windows user-bound encrypted Plex access tokens
+- `settings.json`: non-secret application settings
+- `credentials.dat`: encrypted Last.fm, Fanart.tv, AI Chat, Orynivo Server,
+  Plex, and streaming-provider credentials
+- `credentials.key`: Linux/macOS AES-GCM key, readable and writable only by the
+  current operating-system user (Windows uses DPAPI and does not create it)
 - `library.db`: SQLite music library and playback history
 - `logs\`: timestamped crash reports for unhandled application errors
 - `artworks\`: original artwork and generated thumbnails

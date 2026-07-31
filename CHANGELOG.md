@@ -8,6 +8,50 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+### Fixed
+
+- Fixed Arch-family desktop updates (including CachyOS) closing Orynivo
+  immediately after starting PolicyKit. Orynivo now remains open while
+  `pacman -U` runs, closes only after a successful installer exit, and reports
+  and logs authentication or package-manager failures.
+
+# [0.30.3] - 2026-07-30
+
+### Added
+
+- The review dialog for missing artist images can cancel the complete
+  assignment run.
+- Extended manual artist-image search with an editable artist query and the
+  same provider order as batch discovery: Fanart.tv first when a key is
+  configured, then Wikimedia Commons when Fanart.tv has no usable result.
+
+### Fixed
+
+- Masked the Last.fm API key in Settings so it is no longer displayed as
+  readable text, matching the Fanart.tv credential field.
+
+# [0.30.2] - 2026-07-29
+
+### Added
+
+- Added a cancellable Settings action that searches sequentially for missing
+  artist images in the local library and every configured Orynivo Server. It
+  tries Fanart.tv first when an API key is configured, then falls back to
+  Wikimedia Commons, shows progress and an estimated remaining time, and
+  offers an API-key-gated option to accept Fanart.tv results automatically.
+  Wikimedia candidates always require explicit acceptance or rejection before
+  storing them in their owning library. 
+- Added one cross-platform encrypted credential container for Last.fm,
+  Fanart.tv, AI Chat, Orynivo Server, Plex, and streaming-provider secrets.
+  Windows uses current-user DPAPI; Linux and macOS use AES-GCM with a separate
+  random key file restricted to the current OS user. Existing plaintext
+  `settings.json` secrets and older Windows credential files are migrated
+  automatically, and remote track caches no longer persist authenticated URLs.
+
+# [0.30.1] - 2026-07-28
+
+### Added
+
 - Added **Library > Review metadata** to Settings. It detects
   physically grouped folders split by inconsistent album titles or album artists,
   missing titles or   track numbers, and duplicate track numbers. A folder can
@@ -27,6 +71,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   also renames matching identities in the local library and on configured
   Orynivo Servers. A local merge decision now selects the equivalent surviving
   identity for matching server-side merge collisions.
+- Fixed Linux desktop updates being unavailable or attempting to treat the
+  downloaded package as an executable file. Orynivo now selects the signed
+  DEB, RPM, or Arch package for the current distribution and requests the
+  required package-manager privileges through PolicyKit; CachyOS uses the
+  verified Arch package with `pacman`.
 - Fixed metadata correction returning no candidates whenever one local or
   MusicBrainz track duration was unavailable. Release lookup now combines exact
   and relaxed title searches, ranks candidates using title similarity plus all

@@ -9,36 +9,45 @@ using Orynivo.Localization;
 
 namespace Orynivo;
 
-/// <summary>Dialog for manually searching and selecting a Wikimedia artist image.</summary>
+/// <summary>
+/// Dialog for manually searching Fanart.tv first and Wikimedia Commons as a fallback,
+/// using an editable artist query.
+/// </summary>
 public partial class ArtistImageSearchWindow : Window
 {
-    private sealed record ResultViewModel(ArtistImageSearchResult Result, Bitmap Image)
+    private sealed record ResultViewModel(
+        ArtistImageDownload Result,
+        Bitmap Image,
+        string Title,
+        string? Attribution,
+        string? License)
     {
-        public string Title => Result.Title;
-        public string? Attribution => Result.Attribution;
-        public string? License => Result.License;
     }
 
     private readonly ObservableCollection<ResultViewModel> _results = [];
     private readonly DispatcherTimer _busyTimer;
     private readonly string[] _busyFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+    private readonly string _fanartTvApiKey;
     private int _busyFrameIndex;
 
-    public ArtistImageSearchResult? SelectedResult { get; private set; }
+    /// <summary>Gets the image selected by the user, or <see langword="null"/>.</summary>
+    public ArtistImageDownload? SelectedResult { get; private set; }
 
     /// <summary>
     /// Initializes a runtime-loader instance with an empty artist query.
     /// </summary>
     public ArtistImageSearchWindow()
-        : this(string.Empty)
+        : this(string.Empty, null)
     {
     }
 
     /// <summary>Initializes a new artist-image search dialog with an editable initial query.</summary>
     /// <param name="artistName">Initial artist-image search query.</param>
-    public ArtistImageSearchWindow(string artistName)
+    /// <param name="fanartTvApiKey">Optional Fanart.tv API key used before the Wikimedia fallback.</param>
+    public ArtistImageSearchWindow(string artistName, string? fanartTvApiKey)
     {
         InitializeComponent();
+        _fanartTvApiKey = fanartTvApiKey?.Trim() ?? string.Empty;
         QueryTextBox.Text = artistName;
         ResultsListBox.ItemsSource = _results;
         _busyTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(90) };
@@ -77,9 +86,43 @@ public partial class ArtistImageSearchWindow : Window
         _busyTimer.Start();
         try
         {
-            var results = await ArtistImageSearchService.SearchAsync(QueryTextBox.Text ?? string.Empty);
+            var query = QueryTextBox.Text?.Trim() ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(_fanartTvApiKey))
+            {
+                try
+                {
+                    var fanartResult = await FanartTvArtistImageService.FindBestAsync(
+                        query,
+                        null,
+                        _fanartTvApiKey);
+                    if (fanartResult is not null)
+                    {
+                        _results.Add(new ResultViewModel(
+                            fanartResult,
+                            CreateBitmap(fanartResult.ImageData),
+                            query,
+                            "Fanart.tv",
+                            null));
+                        StatusTextBlock.Text = string.Empty;
+                        return;
+                    }
+                }
+                catch
+                {
+                    // Fanart.tv is preferred, but a provider failure must not prevent the Wikimedia fallback.
+                }
+            }
+
+            var results = await ArtistImageSearchService.SearchAsync(query);
             foreach (var result in results)
-                _results.Add(new ResultViewModel(result, CreateBitmap(result.ImageData)));
+            {
+                _results.Add(new ResultViewModel(
+                    new ArtistImageDownload(result.ImageData, result.MimeType, result.SourceUrl),
+                    CreateBitmap(result.ImageData),
+                    result.Title,
+                    result.Attribution ?? "Wikimedia Commons",
+                    result.License));
+            }
 
             StatusTextBlock.Text = _results.Count == 0
                 ? LocalizationManager.Current.ArtistImageSearchNoResults

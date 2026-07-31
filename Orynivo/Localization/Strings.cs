@@ -142,6 +142,21 @@ public sealed record LocalizedStrings(
     string LastFmApiKeyHint,
     string FanartTvApiKey,
     string FanartTvApiKeyHint,
+    string DownloadMissingArtistImages,
+    string DownloadMissingArtistImagesHint,
+    string MissingArtistImageDownloading,
+    string MissingArtistImagesDownloaded,
+    string MissingArtistImagesDownloadFailed,
+    string MissingArtistImagesDownloadCancelled,
+    string MissingArtistImageReviewing,
+    string MissingArtistImagesLoadingSources,
+    string RemainingTimeEstimating,
+    string RemainingTimeEstimate,
+    string ArtistImageSuggestionTitle,
+    string ArtistImageSuggestionSource,
+    string ArtistImageSuggestionHint,
+    string AcceptArtistImage,
+    string RejectArtistImage,
     string ShowAllAlbumTracks,
     string CrashTitle,
     string CrashMessage,
@@ -171,6 +186,8 @@ public sealed record LocalizedStrings(
     public string DownloadAndInstall { get; init; } = "";
     /// <summary>Gets the status shown while downloading an update.</summary>
     public string DownloadingUpdate { get; init; } = "";
+    /// <summary>Gets the status shown while the platform package installer is running.</summary>
+    public string InstallingUpdate { get; init; } = "";
     /// <summary>Gets the generic update failure message.</summary>
     public string UpdateFailed { get; init; } = "";
     /// <summary>Gets the action label for updating a configured Orynivo Server.</summary>
@@ -1008,4 +1025,6 @@ public sealed record LocalizedStrings(
     public string AiChatEmptyResponse { get; init; } = "";
     /// <summary>Gets the prefix shown before a tool result when the model returns no final answer.</summary>
     public string AiChatToolResultFallback { get; init; } = "";
+    /// <summary>Gets the option for automatically accepting Fanart.tv artist-image results.</summary>
+    public string AutoAcceptFanartTvImages { get; init; } = "";
 }

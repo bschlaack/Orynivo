@@ -3096,7 +3096,12 @@ public partial class MainWindow : Window
             var cache = JsonSerializer.Deserialize<OrynivoTrackListCache>(File.ReadAllText(path));
             if (cache?.Tracks is null || cache.LibraryChangedAt != libraryChangedAt)
                 return false;
-            tracks = cache.Tracks;
+            tracks = cache.Tracks
+                .Select(track => track with
+                {
+                    PlaybackPath = OrynivoServerClient.GetStreamUrl(server, track.Id)
+                })
+                .ToList();
             return true;
         }
         catch
@@ -3117,7 +3122,10 @@ public partial class MainWindow : Window
             var cache = new OrynivoTrackListCache(
                 libraryChangedAt,
                 DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-                tracks.ToList());
+                tracks.Select(track => track with
+                {
+                    PlaybackPath = $"orynivo://{server.Id}/track/{track.Id}"
+                }).ToList());
             File.WriteAllText(path, JsonSerializer.Serialize(cache));
         }
         catch
@@ -3265,7 +3273,7 @@ public partial class MainWindow : Window
 
     /// <summary>Deletes the cached remote artist list for a server after profile or image metadata changes.</summary>
     /// <param name="server">Server whose artist list cache should be removed.</param>
-    private static void DeleteOrynivoArtistListCache(OrynivoServerSettings server)
+    internal static void DeleteOrynivoArtistListCache(OrynivoServerSettings server)
     {
         try
         {
@@ -9359,7 +9367,9 @@ public partial class MainWindow : Window
         long artistId,
         ContentRow row)
     {
-        var dialog = new ArtistImageSearchWindow(row.Title ?? string.Empty);
+        var dialog = new ArtistImageSearchWindow(
+            row.Title ?? string.Empty,
+            _settings.FanartTvApiKey);
         if (await dialog.ShowDialog<bool>(this) == false || dialog.SelectedResult is not { } selected)
             return;
 
@@ -13299,13 +13309,18 @@ public partial class MainWindow : Window
         if (artist is null)
             return;
 
-        var dialog = new ArtistImageSearchWindow(artist.Artist) ;
+        var dialog = new ArtistImageSearchWindow(
+            artist.Artist,
+            _settings.FanartTvApiKey);
         if (await dialog.ShowDialog<bool>(this) == false || dialog.SelectedResult is not { } selected)
             return;
 
         try
         {
-            var imagePath = await ArtistImageSearchService.SaveAsync(artistId, selected);
+            var imagePath = await ArtistImageSearchService.SaveImageAsync(
+                artistId,
+                selected.ImageData,
+                selected.MimeType);
             using (var db = AudioDatabase.OpenDefault())
             {
                 db.UpdateArtistImage(artistId, imagePath);
@@ -13436,7 +13451,9 @@ public partial class MainWindow : Window
         if (string.IsNullOrWhiteSpace(artistName))
             artistName = _currentOrynivoTrackRow.Artist ?? string.Empty;
 
-        var dialog = new ArtistImageSearchWindow(artistName);
+        var dialog = new ArtistImageSearchWindow(
+            artistName,
+            _settings.FanartTvApiKey);
         if (await dialog.ShowDialog<bool>(this) == false || dialog.SelectedResult is not { } selected)
             return;
 
