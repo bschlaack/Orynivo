@@ -58,7 +58,12 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   matching identity. Profile downloads and manual image selections propagate to
   every matching local and reachable Orynivo Server identity; automatic profile
   images must never overwrite a manually selected image. Manual artist-image
-  uploads and deletions propagate through the same identity set. Album and
+  uploads and deletions propagate through the same identity set. Renaming a
+  local or remote identity likewise renames every normalized matching artist in
+  the local library and on reachable Orynivo Servers; target-name collisions
+  remain unresolved until the user explicitly chooses a merge. A local merge's
+  survivor choice must be mapped by identity role (current versus existing
+  target) to equivalent collisions on every matching server. Album and
   artist detail upload/delete actions route through the owning local or remote
   artwork provider and use localized labels/tooltips. Plex identities remain
   separate.

@@ -23,6 +23,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Fixed unified artist renaming so renaming either its local or remote identity
+  also renames matching identities in the local library and on configured
+  Orynivo Servers. A local merge decision now selects the equivalent surviving
+  identity for matching server-side merge collisions.
 - Fixed metadata correction returning no candidates whenever one local or
   MusicBrainz track duration was unavailable. Release lookup now combines exact
   and relaxed title searches, ranks candidates using title similarity plus all

@@ -13537,6 +13537,7 @@ public partial class MainWindow : Window
 
         var result = editDialog.Result;
         long? matchingArtistId = null;
+        bool? preferCurrentArtistOnMerge = null;
         if (result is null && editDialog.MatchingArtist is { } matchingArtist)
         {
             matchingArtistId = matchingArtist.Id;
@@ -13547,6 +13548,8 @@ public partial class MainWindow : Window
                 matchingArtist.Artist);
             if (await mergeDialog.ShowDialog<bool>(this) == false)
                 return;
+
+            preferCurrentArtistOnMerge = mergeDialog.PreferredArtistId == artist.Id;
 
             try
             {
@@ -13572,6 +13575,11 @@ public partial class MainWindow : Window
         if (result is null)
             return;
 
+        var remoteRenameSucceeded = await RenameMatchingOrynivoArtistsAsync(
+            artist.Artist,
+            result.ArtistName,
+            preferCurrentArtistOnMerge);
+
         if (_currentArtistId == artistId || _currentArtistId == matchingArtistId)
         {
             _currentArtistId = result.ArtistId;
@@ -13590,6 +13598,72 @@ public partial class MainWindow : Window
         await ReloadVisibleArtistListAsync(result.ArtistId);
         await ShowArtistInfoAsync(result.ArtistId, forceRefresh: false);
         _ = UpdateSearchIndexAfterArtistRenameAsync(result.ArtistId);
+        if (!remoteRenameSucceeded)
+        {
+            ArtistInfoStatusTextBlock.Text = LocalizationManager.Current.OrynivoConnectionFailed;
+            ArtistInfoStatusTextBlock.IsVisible = true;
+        }
+    }
+
+    /// <summary>
+    /// Renames every reachable Orynivo Server artist whose normalized identity matches the
+    /// artist's previous local name. When the local rename required a merge, the same choice
+    /// of surviving identity is applied to an equivalent collision on every server.
+    /// </summary>
+    /// <param name="previousArtistName">Display name used to find matching remote identities.</param>
+    /// <param name="artistName">New display name to apply.</param>
+    /// <param name="preferCurrentArtistOnMerge">
+    /// <see langword="true"/> to retain the identity being renamed,
+    /// <see langword="false"/> to retain the existing target-name identity, or
+    /// <see langword="null"/> when no merge decision was made.
+    /// </param>
+    /// <returns><see langword="true"/> when every matching reachable identity was renamed.</returns>
+    private async Task<bool> RenameMatchingOrynivoArtistsAsync(
+        string? previousArtistName,
+        string artistName,
+        bool? preferCurrentArtistOnMerge = null)
+    {
+        var comparisonKey = ArtistNameNormalizer.CreateComparisonKey(previousArtistName);
+        if (comparisonKey.Length == 0)
+            return true;
+
+        var succeeded = true;
+        foreach (var server in _settings.OrynivoServers)
+        {
+            try
+            {
+                var artists = await _orynivoClient.GetArtistsAsync(server);
+                foreach (var artist in artists.Where(candidate =>
+                             ArtistNameNormalizer.CreateComparisonKey(candidate.Name) == comparisonKey))
+                {
+                    var response = await _orynivoClient.RenameArtistAsync(
+                        server,
+                        artist.Id,
+                        artistName,
+                        preferredArtistId: null);
+                    if (response?.Result is null &&
+                        response?.MatchingArtist is { } matchingArtist &&
+                        preferCurrentArtistOnMerge is bool preferCurrent)
+                    {
+                        response = await _orynivoClient.RenameArtistAsync(
+                            server,
+                            artist.Id,
+                            artistName,
+                            preferCurrent ? artist.Id : matchingArtist.Id);
+                    }
+                    if (response?.Result is null)
+                        succeeded = false;
+                }
+                DeleteOrynivoArtistListCache(server);
+            }
+            catch (Exception ex)
+            {
+                CrashLogger.Log(ex, "Unified remote artist rename");
+                succeeded = false;
+            }
+        }
+
+        return succeeded;
     }
 
     private async Task EditOrynivoArtistNameAsync(ContentRow row)
@@ -13641,6 +13715,14 @@ public partial class MainWindow : Window
         if (result is null)
             return;
 
+        var previousArtistName = row.Title;
+        var localRenameSucceeded = await RenameMatchingLocalArtistAsync(
+            previousArtistName,
+            result.ArtistName);
+        var otherRemoteRenamesSucceeded = await RenameMatchingOrynivoArtistsAsync(
+            previousArtistName,
+            result.ArtistName);
+
         row.ArtistId = result.ArtistId;
         ArtistInfoTitleButton.Content = result.ArtistName;
         ArtistInfoStatusTextBlock.IsVisible = false;
@@ -13675,7 +13757,40 @@ public partial class MainWindow : Window
         if (_activeOrynivoView == "Artists")
             await LoadOrynivoViewAsync();
         await ShowOrynivoArtistInfoAsync(detailRow, forceRefresh: false);
+        if (!localRenameSucceeded || !otherRemoteRenamesSucceeded)
+        {
+            ArtistInfoStatusTextBlock.Text = LocalizationManager.Current.OrynivoConnectionFailed;
+            ArtistInfoStatusTextBlock.IsVisible = true;
+        }
     }
+
+    /// <summary>
+    /// Renames the local artist whose normalized identity matches a remotely renamed artist.
+    /// A target-name collision is left unresolved because a merge requires an explicit choice.
+    /// </summary>
+    /// <param name="previousArtistName">Display name used to find the local identity.</param>
+    /// <param name="artistName">New display name to apply.</param>
+    /// <returns><see langword="true"/> when no local match exists or the match was renamed.</returns>
+    private static Task<bool> RenameMatchingLocalArtistAsync(
+        string? previousArtistName,
+        string artistName) => Task.Run(() =>
+    {
+        var comparisonKey = ArtistNameNormalizer.CreateComparisonKey(previousArtistName);
+        if (comparisonKey.Length == 0)
+            return true;
+
+        using var db = AudioDatabase.OpenDefault();
+        var localArtist = db.GetArtistsLite().FirstOrDefault(candidate =>
+            ArtistNameNormalizer.CreateComparisonKey(candidate.Artist) == comparisonKey);
+        if (localArtist is null)
+            return true;
+        if (db.FindArtistByName(artistName, localArtist.Id) is not null)
+            return false;
+
+        db.RenameArtist(localArtist.Id, artistName);
+        TrackSearchIndex.UpdateMany(db.GetTracksForArtistSearchIndex(localArtist.Id));
+        return true;
+    });
 
     private async Task<(ArtistRenameResult? Result, ArtistInfo? MatchingArtist)> CommitOrynivoArtistRenameAsync(
         OrynivoServerSettings server,

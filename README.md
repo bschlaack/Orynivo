@@ -35,6 +35,9 @@ the ability to reach that library from any device on the local network.
 - Unified local and Orynivo Server artist browsing: matching artists appear once
   in Artists and search, and every artist link opens one combined album view
   across those libraries regardless of which source the clicked item came from.
+  Renaming a unified artist applies the new name to its matching local identity
+  and to its matching artists on every reachable configured Orynivo Server;
+  local merge-priority choices are applied to equivalent server collisions.
   Cached biographies and images are shared across matching identities, and new
   profile downloads or manual image selections are synchronized to each source
 - AI control via local LLMs, LM Studio/Ollama/OpenAI-compatible endpoints
