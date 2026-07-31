@@ -4,11 +4,35 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.31.0] - 2026-08-01
 
 ### Added
 
+- Added a complete responsive multilingual product website under `html/`, including
+  current in-app screenshots, feature and privacy information, installation
+  guides, prominent Wiki documentation links, and release downloads that
+  resolve against GitHub's latest release.
+- Added complete English, German, French, and Spanish language switching to the
+  product website, with English as the default and the visitor's explicit
+  selection retained locally. The site now also prominently communicates that
+  the complete Orynivo desktop app is available in the same four languages.
+- Added preliminary operator contact details and expanded the product website's
+  privacy notice to cover hosting connection data, local language preferences,
+  the self-hosted origin, Cloudflare reverse proxy, the GitHub Releases API,
+  GDPR data-subject rights, and the nginx log retention period.
+- Added international SEO for the product website with static localized URLs,
+  canonical and hreflang metadata, an XML sitemap, complete social metadata,
+  SoftwareApplication structured data, and optimized screenshot assets.
+
 ### Fixed
+
+- Fixed SEO image dimensions stretching the product screenshots and brand
+  artwork vertically when CSS constrained their displayed width.
+- Fixed the screenshot gallery cropping the left and right edges at narrow CSS
+  viewport widths by preserving each screenshot's natural aspect ratio.
+- Fixed the product website's **Set up server** link so it activates the Server
+  installation tab before scrolling to its instructions, including direct
+  `#server-install` links.
 
 - Fixed Arch-family desktop updates (including CachyOS) closing Orynivo
   immediately after starting PolicyKit. Orynivo now remains open while
@@ -19,7 +43,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Orynivo Servers. A local merge decision now selects the equivalent surviving
   identity for matching server-side merge collisions.
 
-# [0.30.3] - 2026-07-30
+## [0.30.3] - 2026-07-30
 
 ### Added
 
@@ -34,7 +58,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Masked the Last.fm API key in Settings so it is no longer displayed as
   readable text, matching the Fanart.tv credential field.
 
-# [0.30.2] - 2026-07-29
+## [0.30.2] - 2026-07-29
 
 ### Added
 
@@ -52,7 +76,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `settings.json` secrets and older Windows credential files are migrated
   automatically, and remote track caches no longer persist authenticated URLs.
 
-# [0.30.1] - 2026-07-28
+## [0.30.1] - 2026-07-28
 
 ### Added
 

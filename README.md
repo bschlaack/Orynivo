@@ -56,6 +56,14 @@ the ability to reach that library from any device on the local network.
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
+## Product website
+
+The self-contained responsive product website lives in [`html/`](html/). It
+defaults to English, can switch to German, French, or Spanish, and includes
+current application screenshots, feature and installation guides, and download
+links that resolve through GitHub's latest public release API. See
+[`html/README.md`](html/README.md) for local preview and publishing notes.
+
 The Windows desktop includes cwASIO/Steinberg ASIO and WASAPI playback. The
 Linux desktop is a separately packaged player with direct ALSA hardware profiles
 for exact-rate PCM and native DSD output without resampling, alongside an OpenAL
