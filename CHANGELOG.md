@@ -14,6 +14,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   immediately after starting PolicyKit. Orynivo now remains open while
   `pacman -U` runs, closes only after a successful installer exit, and reports
   and logs authentication or package-manager failures.
+- Fixed unified artist renaming so renaming either its local or remote identity
+  also renames matching identities in the local library and on configured
+  Orynivo Servers. A local merge decision now selects the equivalent surviving
+  identity for matching server-side merge collisions.
 
 # [0.30.3] - 2026-07-30
 
@@ -67,10 +71,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- Fixed unified artist renaming so renaming either its local or remote identity
-  also renames matching identities in the local library and on configured
-  Orynivo Servers. A local merge decision now selects the equivalent surviving
-  identity for matching server-side merge collisions.
 - Fixed Linux desktop updates being unavailable or attempting to treat the
   downloaded package as an executable file. Orynivo now selects the signed
   DEB, RPM, or Arch package for the current distribution and requests the
