@@ -1,32 +1,30 @@
-# Orynivo Programmwebsite
+# Orynivo Product Website
 
-Statische, responsive Produktwebsite für Orynivo. Englisch ist die
-Standardsprache; Deutsch, Französisch und Spanisch sind direkt umschaltbar.
-Alle Dateien und verwendeten Medien liegen in diesem Verzeichnis. Für
-Suchmaschinen stehen statische Sprachfassungen unter `/`, `/de/`, `/fr/` und
-`/es/` mit Canonical-, hreflang- und strukturierten Softwaredaten bereit.
+Static, responsive product website for Orynivo. English is the default
+language; German, French, and Spanish are directly selectable. All required
+files and media assets live in this directory. Search engines receive static
+localized pages at `/`, `/de/`, `/fr/`, and `/es/`, complete with canonical
+URLs, hreflang references, and structured software data.
 
-Nach Änderungen an gemeinsamen Inhalten oder Übersetzungen werden die
-Sprachfassungen neu erzeugt:
+After changing shared content or translations, regenerate the localized pages:
 
 ```powershell
 node html/generate-localized-pages.js
 ```
 
-## Lokal ansehen
+## Local Preview
 
 ```powershell
 python -m http.server 8080 --directory html
 ```
 
-Danach `http://localhost:8080` öffnen. Ein lokaler Webserver ist sinnvoll, weil
-die Seite die öffentliche GitHub-API abfragt, um Version und Downloadlinks des
-jeweils neuesten Releases einzusetzen. Fällt die Abfrage aus, führen alle
-Download-Schaltflächen weiterhin zur aktuellen GitHub-Release-Seite.
+Then open `http://localhost:8080`. Using a local web server is recommended
+because the site requests the public GitHub API to populate the current version
+and download links for the latest release. If the request fails, all download
+buttons continue to link to the latest GitHub Releases page.
 
-## Veröffentlichung
+## Publishing
 
-Der komplette Ordner kann unverändert auf den vorhandenen nginx-Webserver
-hochgeladen werden. Als Dokumentenwurzel muss dabei `html/` verwendet werden.
-Die `sitemap.xml` sollte anschließend in der Google Search Console und bei
-Bing Webmaster Tools eingereicht werden.
+The complete directory can be uploaded unchanged to the existing nginx web
+server. Configure `html/` as the document root. After publishing, submit
+`sitemap.xml` to Google Search Console and Bing Webmaster Tools.
