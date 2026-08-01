@@ -834,7 +834,12 @@ public sealed class AudioDatabase : IDisposable
                    profile_source_url, profile_language, profile_fetched_at,
                    image_is_manual
             FROM artists ar
-            WHERE EXISTS (SELECT 1 FROM albums al WHERE al.artist_id = ar.id)
+            WHERE EXISTS (
+                SELECT 1
+                FROM albums al
+                JOIN tracks t ON t.album_id = al.id
+                WHERE al.artist_id = ar.id
+            )
             ORDER BY CASE WHEN ar.name = '' THEN 1 ELSE 0 END,
                      ar.name COLLATE NOCASE;
             """;
@@ -864,7 +869,12 @@ public sealed class AudioDatabase : IDisposable
                    ar.profile_source_url, ar.profile_language, ar.profile_fetched_at,
                    ar.image_is_manual
             FROM artists ar
-            WHERE EXISTS (SELECT 1 FROM albums al WHERE al.artist_id = ar.id)
+            WHERE EXISTS (
+                SELECT 1
+                FROM albums al
+                JOIN tracks t ON t.album_id = al.id
+                WHERE al.artist_id = ar.id
+            )
             ORDER BY CASE WHEN ar.name = '' THEN 1 ELSE 0 END,
                      ar.name COLLATE NOCASE;
             """;
@@ -1327,6 +1337,7 @@ public sealed class AudioDatabase : IDisposable
             FROM albums al
             LEFT JOIN artists ar ON ar.id = al.artist_id
             LEFT JOIN artworks aw ON aw.id = al.artwork_id
+            WHERE EXISTS (SELECT 1 FROM tracks t WHERE t.album_id = al.id)
             ORDER BY
                 CASE WHEN al.title = '' THEN 1 ELSE 0 END,
                 al.title COLLATE NOCASE,
@@ -1343,6 +1354,7 @@ public sealed class AudioDatabase : IDisposable
                 al.artist_id
             FROM albums al
             LEFT JOIN artists ar ON ar.id = al.artist_id
+            WHERE EXISTS (SELECT 1 FROM tracks t WHERE t.album_id = al.id)
             ORDER BY
                 CASE WHEN al.title = '' THEN 1 ELSE 0 END,
                 al.title COLLATE NOCASE,
@@ -1383,6 +1395,7 @@ public sealed class AudioDatabase : IDisposable
             LEFT JOIN artists ar ON ar.id = al.artist_id
             LEFT JOIN artworks aw ON aw.id = al.artwork_id
             WHERE al.id = $album_id
+              AND EXISTS (SELECT 1 FROM tracks t WHERE t.album_id = al.id)
             LIMIT 1;
             """;
         Add(cmd, "$album_id", albumId);
@@ -1699,13 +1712,14 @@ public sealed class AudioDatabase : IDisposable
             FROM albums al
             LEFT JOIN artists ar ON ar.id = al.artist_id
             LEFT JOIN artworks aw ON aw.id = al.artwork_id
-            WHERE al.artist_id = $artist_id
+            WHERE EXISTS (SELECT 1 FROM tracks t WHERE t.album_id = al.id)
+              AND (al.artist_id = $artist_id
                OR al.id IN (
                     SELECT DISTINCT album_id
                     FROM tracks
                     WHERE artist_id = $artist_id
                       AND album_id IS NOT NULL
-               )
+               ))
             ORDER BY
                 CASE WHEN al.title = '' THEN 1 ELSE 0 END,
                 al.title COLLATE NOCASE;
@@ -1720,13 +1734,14 @@ public sealed class AudioDatabase : IDisposable
                 al.is_favorite
             FROM albums al
             LEFT JOIN artists ar ON ar.id = al.artist_id
-            WHERE al.artist_id = $artist_id
+            WHERE EXISTS (SELECT 1 FROM tracks t WHERE t.album_id = al.id)
+              AND (al.artist_id = $artist_id
                OR al.id IN (
                     SELECT DISTINCT album_id
                     FROM tracks
                     WHERE artist_id = $artist_id
                       AND album_id IS NOT NULL
-               )
+               ))
             ORDER BY
                 CASE WHEN al.title = '' THEN 1 ELSE 0 END,
                 al.title COLLATE NOCASE;
@@ -4332,9 +4347,15 @@ public sealed class AudioDatabase : IDisposable
     {
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = """
-            SELECT (SELECT COUNT(*) FROM albums),
+            SELECT (SELECT COUNT(*) FROM albums a
+                    WHERE EXISTS (SELECT 1 FROM tracks t WHERE t.album_id = a.id)),
                    (SELECT COUNT(*) FROM tracks),
-                   (SELECT COUNT(*) FROM artists),
+                   (SELECT COUNT(*) FROM artists ar
+                    WHERE EXISTS (
+                        SELECT 1 FROM albums a
+                        JOIN tracks t ON t.album_id = a.id
+                        WHERE a.artist_id = ar.id
+                    )),
                    (SELECT COUNT(*) FROM tracks WHERE is_favorite != 0);
             """;
         using var reader = cmd.ExecuteReader();
@@ -4415,7 +4436,7 @@ public sealed class AudioDatabase : IDisposable
             FROM albums a
             LEFT JOIN artists  ar  ON ar.id  = a.artist_id
             LEFT JOIN artworks art ON art.id  = a.artwork_id
-            LEFT JOIN tracks   t   ON t.album_id = a.id
+            JOIN tracks        t   ON t.album_id = a.id
             GROUP BY a.id
             ORDER BY last_added DESC
             LIMIT $limit;

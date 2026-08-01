@@ -316,19 +316,52 @@ public partial class MainWindow : Window
         if (!string.IsNullOrEmpty(row.FilePath))
             return [GetPersistablePlaylistPath(row)];
 
+        if (row.EntityType == "UnifiedAlbum" && row.LogicalAlbumParts is { Count: > 0 } parts)
+        {
+            try
+            {
+                var paths = new List<string>();
+                var localIds = parts.Where(part => part.Server is null).Select(part => part.AlbumId);
+                using (var db = AudioDatabase.OpenDefault())
+                {
+                    foreach (var id in localIds)
+                        paths.AddRange(db.GetTrackListByAlbum(id).Select(track => track.Path));
+                }
+                foreach (var part in parts.Where(part => part.Server is not null))
+                {
+                    var partServer = part.Server!;
+                    var provider = CreateOrynivoCatalogProvider(partServer);
+                    paths.AddRange(provider.GetTracksByAlbumAsync(part.AlbumId)
+                        .GetAwaiter()
+                        .GetResult()
+                        .Select(track => BuildOrynivoPlaylistReference(partServer, track.Id)));
+                }
+                return paths;
+            }
+            catch { return []; }
+        }
+
         if (row.Id is not long albumId)
             return [];
+
+        var albumIds = row.LogicalAlbumIds is { Count: > 0 }
+            ? row.LogicalAlbumIds
+            : [albumId];
 
         if (row.EntityType == "OrynivoAlbum" && row.OrynivoServer is { } server)
         {
             try
             {
                 var provider = CreateOrynivoCatalogProvider(server);
-                return provider.GetTracksByAlbumAsync(albumId)
-                    .GetAwaiter()
-                    .GetResult()
-                    .Select(track => BuildOrynivoPlaylistReference(server, track.Id))
-                    .ToList();
+                var paths = new List<string>();
+                foreach (var id in albumIds)
+                {
+                    paths.AddRange(provider.GetTracksByAlbumAsync(id)
+                        .GetAwaiter()
+                        .GetResult()
+                        .Select(track => BuildOrynivoPlaylistReference(server, track.Id)));
+                }
+                return paths;
             }
             catch { return []; }
         }
@@ -336,7 +369,10 @@ public partial class MainWindow : Window
         try
         {
             using var db = AudioDatabase.OpenDefault();
-            return db.GetTrackListByAlbum(albumId).Select(t => t.Path).ToList();
+            return albumIds
+                .SelectMany(id => db.GetTrackListByAlbum(id))
+                .Select(track => track.Path)
+                .ToList();
         }
         catch { return []; }
     }

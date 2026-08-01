@@ -4,9 +4,29 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.33.1] - 2026-08-01
+## [0.33.2] - 2026-08-02
 
-### Added
+### Fixed
+
+- Added the complete album title as a tooltip on shared artwork cards so
+  truncated local, unified, Dashboard, Genre Cloud, and Orynivo Server album
+  names remain readable.
+- Combined local and Orynivo Server album entries with the same normalized
+  artist and album title into one source-aware logical album with an `L+OS`
+  badge in album views,
+  Dashboard recommendations, and Recently Added carousels. Opening that album
+  now loads every underlying physical album record and separates tracks into
+  clearly labelled directory/edition groups without discarding duplicate titles
+  or different masterings.
+- Hid untitled and explicitly unknown album records from album catalogs,
+  Dashboard album sections, Genre Cloud album suggestions, and album search
+  results while keeping their tracks available in track views and searches.
+- Hid orphaned album and album-artist records with no remaining indexed tracks
+  from local and Orynivo Server catalogs, detail lookup, recent albums, and
+  Dashboard totals. Versioned client album caches prevent stale server rows
+  from remaining visible after the fix.
+
+## [0.33.1] - 2026-08-01
 
 ### Fixed
 

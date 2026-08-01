@@ -52,6 +52,29 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   hidden legacy server playlists must not be offered by these menus.
 - Shared local/remote Artists, Albums, and Tracks views use the common column
   masks and catalog abstractions. Do not create parallel remote-only UI surfaces.
+- Album overview rows are logically coalesced across the local library and all
+  Orynivo Server providers when normalized artist and trimmed album title match.
+  Mixed rows show `L+OS` and retain every source-aware provider-local album ID;
+  opening one loads all of those records and uses
+  the shared album folder-group surface to keep physical releases/directories
+  separate. Never discard duplicate track titles because they may be different
+  masterings. Conventional CD/disc directory labels include their parent folder
+  for context, while other groups display the leaf directory rather than a full
+  private path. Dashboard recommendations and Recently Added album displays use
+  the same cross-provider logical identity and carry the complete album-ID set
+  into the shared card navigation.
+- Album catalog/card surfaces, Dashboard album sections, Genre Cloud album
+  recommendations, and album search results omit blank or localized explicit
+  unknown album titles. This is presentation filtering only: never remove or
+  hide the underlying tracks from track lists, folders, playlists, or track
+  search.
+- Album list caches are versioned when their visibility semantics change.
+  Catalog and detail surfaces must not expose provider-local album records that
+  have no remaining indexed tracks; local and updated Orynivo Server providers
+  enforce the same rule through the shared Core queries.
+- The shared album artwork card binds its title tooltip to the complete album
+  title so truncated labels remain readable across local, unified, Dashboard,
+  Genre Cloud, and Orynivo Server usages.
 - Settings places the `Metadata` section as **Review metadata** in the
   **LIBRARY** navigation group. It analyzes physical folders rather than
   existing album rows, because incorrect tags may already have fragmented one
