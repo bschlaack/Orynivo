@@ -174,6 +174,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 - `AppSettings.ShowAiChatItem` controls the AI Chat sidebar item's visibility
   from Settings > Appearance, defaults to visible, and is applied with the
   existing Internet Radio, Podcasts, and Up Next item toggles.
+- `RefreshQueueRows` must copy a registered remote track's `OrynivoServer`
+  context together with its display metadata. Otherwise the shared source
+  column mislabels that queue row as local. Keep this context memory-only and
+  never persist its authenticated playback URL or API key.
 - macOS must configure `AvaloniaNativePlatformOptions.RenderingMode` with
   OpenGL first and software second. Do not re-enable Metal without verifying
   Orynivo's gradient and rounded-surface shaders on both Intel and Apple

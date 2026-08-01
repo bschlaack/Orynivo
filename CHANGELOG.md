@@ -4,6 +4,16 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+### Fixed
+
+- Fixed remote Orynivo Server tracks appearing with the local `L` source badge
+  in **Up Next**. Queue rows now retain the registered server context used by
+  the source-aware list that created the queue.
+
 ## [0.32.0] - 2026-08-01
 
 ### Added
@@ -85,7 +95,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Fixed the product website's **Set up server** link so it activates the Server
   installation tab before scrolling to its instructions, including direct
   `#server-install` links.
-
 - Fixed Arch-family desktop updates (including CachyOS) closing Orynivo
   immediately after starting PolicyKit. Orynivo now remains open while
   `pacman -U` runs, closes only after a successful installer exit, and reports
@@ -120,7 +129,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Wikimedia Commons, shows progress and an estimated remaining time, and
   offers an API-key-gated option to accept Fanart.tv results automatically.
   Wikimedia candidates always require explicit acceptance or rejection before
-  storing them in their owning library. 
+  storing them in their owning library.
 - Added one cross-platform encrypted credential container for Last.fm,
   Fanart.tv, AI Chat, Orynivo Server, Plex, and streaming-provider secrets.
   Windows uses current-user DPAPI; Linux and macOS use AES-GCM with a separate
@@ -178,8 +187,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Orynivo's artwork caches. Adjacent trash actions delete album covers or artist
   images for local and Orynivo Server libraries, with unified artist-image
   changes synchronized across matching sources.
-
-
 
 ## [0.29.4] - 2026-07-28
 

@@ -7299,7 +7299,8 @@ public partial class MainWindow : Window
                     Album = orynivoRow.Album,
                     Duration = orynivoRow.Duration,
                     Format = orynivoRow.Format,
-                    FilePath = item.FilePath
+                    FilePath = item.FilePath,
+                    OrynivoServer = orynivoRow.OrynivoServer
                 };
             }
             else
