@@ -7453,9 +7453,7 @@ public partial class MainWindow : Window
         var path = _currentFilePath;
         var position = _player.Position;
         var wasPaused = _player.IsPaused;
-        await StartPlaybackAsync(path);
-        if (_player?.CanSeek == true && position > TimeSpan.Zero)
-            await _player.SeekAsync(position);
+        await StartPlaybackAsync(path, initialPosition: position);
         if (wasPaused)
             PausePlayback();
     }

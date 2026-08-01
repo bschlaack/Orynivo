@@ -4,6 +4,21 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.33.1] - 2026-08-01
+
+### Added
+
+### Fixed
+
+- Prevented concurrent platform release jobs from creating duplicate GitHub
+  draft releases for the same version; one canonical draft now owns every
+  Windows, Linux, macOS, and server asset upload.
+- Fixed starting Infinite Mix while a track is already playing leaving its
+  preparation overlay visible and restarting the audible track from the
+  beginning. The current item now remains at queue position one, recommendations
+  are appended behind it, and a required gapless-session refresh resumes at the
+  exact audible position only after the overlay has closed.
+
 ## [0.33.0] - 2026-08-01
 
 ### Added

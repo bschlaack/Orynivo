@@ -192,6 +192,11 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   Queue stop automatic refill. Initial generation must show
   `InfiniteMixLoadingOverlay` with staged progress and block duplicate
   interaction; threshold refills remain unobtrusive in the background.
+  Starting a mix during active playback must retain the audible item at queue
+  position zero and append recommendations behind it. Initial refill must not
+  refresh the active gapless session while the blocking overlay is visible;
+  after the overlay closes, refresh through `StartPlaybackAsync` with its
+  `initialPosition` argument so no audio from position zero is replayed.
   The profile dialog is resizable with a bounded minimum size, and its scroll
   content reserves a right-side gutter so overlay scrollbars never cover text
   or inputs at any supported display scale. Included and excluded genres use

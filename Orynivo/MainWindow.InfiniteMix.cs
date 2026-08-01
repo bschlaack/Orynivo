@@ -36,24 +36,38 @@ public partial class MainWindow
         _infiniteMixEnabled = true;
         _infiniteMixPaused = false;
         _infiniteMixIdentitiesByPath.Clear();
+        var hasActivePlayback = _player is not null && !string.IsNullOrWhiteSpace(_currentFilePath);
+        var activeItem = hasActivePlayback
+            ? GetPlaylistMetadata(_currentFilePath) ?? CreatePlaylistItem(_currentFilePath)
+            : null;
         UpdateInfiniteMixUi();
         if (_currentTopLevelTag == "Queue")
             UpdateRestoreQueueButtonState("Queue");
         _queue.Clear();
-        _queueIndex = -1;
-        await RefillInfiniteMixAsync(force: true);
-        if (_queue.Count == 0)
+        if (activeItem is not null)
+            _queue.Add(activeItem);
+        _queueIndex = activeItem is null ? -1 : 0;
+        await RefillInfiniteMixAsync(force: true, refreshActivePlayback: false);
+        var recommendationCount = _queue.Count - (activeItem is null ? 0 : 1);
+        if (recommendationCount == 0)
         {
             StopInfiniteMix();
             StatusTextBlock.Text = LocalizationManager.Current.NoData;
             return;
         }
 
-        _queueIndex = 0;
+        if (_queueIndex < 0)
+            _queueIndex = 0;
         PersistPlaybackQueue();
         RefreshQueueRowsIfVisible();
         RefreshQueueNavigationButtons();
-        try { await StartPlaybackAsync(_queue[0].FilePath); }
+        try
+        {
+            if (hasActivePlayback)
+                await RefreshActiveGaplessQueueAsync();
+            else
+                await StartPlaybackAsync(_queue[0].FilePath);
+        }
         catch (Exception exception) { CrashLogger.Log(exception, "Infinite Mix playback"); }
     }
 
@@ -96,7 +110,12 @@ public partial class MainWindow
 
     /// <summary>Ranks unified local/server candidates and appends a diverse batch to the queue.</summary>
     /// <param name="force">Whether to refill regardless of the current remaining count.</param>
-    private async Task RefillInfiniteMixAsync(bool force, int batchSize = InfiniteMixBatchSize)
+    /// <param name="batchSize">Maximum number of recommendations to append.</param>
+    /// <param name="refreshActivePlayback">Whether an active immutable gapless session must adopt the revised queue immediately.</param>
+    private async Task RefillInfiniteMixAsync(
+        bool force,
+        int batchSize = InfiniteMixBatchSize,
+        bool refreshActivePlayback = true)
     {
         if (_infiniteMixLoading || !_infiniteMixEnabled || _infiniteMixPaused)
             return;
@@ -189,7 +208,8 @@ public partial class MainWindow
             PersistPlaybackQueue();
             RefreshQueueRowsIfVisible();
             RefreshQueueNavigationButtons();
-            await RefreshActiveGaplessQueueAsync();
+            if (refreshActivePlayback)
+                await RefreshActiveGaplessQueueAsync();
         }
         catch (Exception exception)
         {

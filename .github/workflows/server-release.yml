@@ -208,8 +208,11 @@ jobs:
       # ---- Upload to GitHub Release (draft) ------------------------------
 
       - name: Upload packages to GitHub Release
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: ${{ steps.ver.outputs.tag }}
-          draft: true
-          files: packages/*
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          bash .github/scripts/upload-release-assets.sh
+          '${{ steps.ver.outputs.tag }}'
+          'Orynivo ${{ steps.ver.outputs.version }}'
+          false
+          packages/*

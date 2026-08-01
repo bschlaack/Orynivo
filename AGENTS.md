@@ -184,6 +184,11 @@ All GitHub-hosted CI and release workflows use Node.js 24-compatible action
 generations (`actions/checkout@v6`, `actions/setup-dotnet@v5`, and
 `softprops/action-gh-release@v3` where applicable); do not reintroduce their
 Node.js 20 predecessors.
+The Windows `.github/workflows/release.yml` workflow is the sole creator of the
+canonical `Orynivo <version>` draft release. Linux, macOS, and server matrix
+jobs must locate that exact draft through its numeric release ID and upload
+their assets to it; they must never independently create a draft by tag because
+concurrent draft lookup can create duplicate releases.
 
 `.github/workflows/player-linux-release.yml` publishes tagged self-contained
 desktop builds for `linux-x64` and `linux-arm64` as portable tarballs, DEB, and
