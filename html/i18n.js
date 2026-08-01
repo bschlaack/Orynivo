@@ -194,10 +194,10 @@ const pageMetadata = {
 };
 
 const galleryTitles = {
-  en: ['Discover artists', 'Browse albums', 'Manage tracks', 'Folder structure', 'Internet radio', 'Discover podcasts', 'Built-in AI chat', 'Personal dashboard'],
-  de: ['Künstler entdecken', 'Alben durchsuchen', 'Tracks verwalten', 'Ordnerstruktur', 'Internet Radio', 'Podcasts entdecken', 'Integrierter KI-Chat', 'Persönliches Dashboard'],
-  fr: ['Découvrir les artistes', 'Parcourir les albums', 'Gérer les titres', 'Arborescence', 'Radio Internet', 'Découvrir les podcasts', 'Chat IA intégré', 'Tableau de bord personnel'],
-  es: ['Descubrir artistas', 'Explorar álbumes', 'Gestionar pistas', 'Estructura de carpetas', 'Radio por Internet', 'Descubrir pódcasts', 'Chat de IA integrado', 'Panel personal']
+  en: ['Discover artists', 'Browse albums', 'Manage tracks', 'Explore genres', 'Folder structure', 'Internet radio', 'Discover podcasts', 'Built-in AI chat', 'Personal dashboard'],
+  de: ['Künstler entdecken', 'Alben durchsuchen', 'Tracks verwalten', 'Genres entdecken', 'Ordnerstruktur', 'Internet Radio', 'Podcasts entdecken', 'Integrierter KI-Chat', 'Persönliches Dashboard'],
+  fr: ['Découvrir les artistes', 'Parcourir les albums', 'Gérer les titres', 'Explorer les genres', 'Arborescence', 'Radio Internet', 'Découvrir les podcasts', 'Chat IA intégré', 'Tableau de bord personnel'],
+  es: ['Descubrir artistas', 'Explorar álbumes', 'Gestionar pistas', 'Explorar géneros', 'Estructura de carpetas', 'Radio por Internet', 'Descubrir pódcasts', 'Chat de IA integrado', 'Panel personal']
 };
 
 function applyLanguage(language, persist = true) {

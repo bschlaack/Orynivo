@@ -6,6 +6,10 @@ files and media assets live in this directory. Search engines receive static
 localized pages at `/`, `/de/`, `/fr/`, and `/es/`, complete with canonical
 URLs, hreflang references, and structured software data.
 
+All application screenshots use the fictional Neon Harbor demo library. Keep
+future website captures free of real library names, covers, playback history,
+server names, device identifiers, and filesystem paths.
+
 After changing shared content or translations, regenerate the localized pages:
 
 ```powershell
