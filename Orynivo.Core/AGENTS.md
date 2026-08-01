@@ -27,6 +27,10 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   sync and use the shared scanner gate.
 - Keep compact query models compact; do not add artwork BLOBs, lyrics, or full
   records to list/facet/folder queries.
+- Album catalog queries, recent-album queries, detail lookup, and Dashboard
+  album totals expose only albums referenced by at least one indexed track.
+  Artist catalog rows and artist totals likewise require a track-backed album;
+  never surface orphaned normalization rows as usable library entities.
 - `LibraryMetadataRepairService` groups tracks by their immediate physical
   directory, detects inconsistent album metadata, and uses the MusicBrainz fuzzy
   CD-TOC endpoint only when every candidate track has a duration. Confirmed

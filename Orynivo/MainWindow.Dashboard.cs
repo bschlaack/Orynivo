@@ -655,6 +655,8 @@ public partial class MainWindow : Window
     /// <param name="ArtworkPath">Local artwork file path or authenticated remote artwork URL, or <see langword="null"/>.</param>
     /// <param name="HasArtwork">Whether artwork is available for the album.</param>
     /// <param name="IsFavorite">Whether the album is flagged as a favorite (local flag or client-side remote favorite).</param>
+    /// <param name="LogicalAlbumIds">All provider-local album identifiers represented by this logical album.</param>
+    /// <param name="LogicalAlbumParts">Source-aware album identities represented by this logical album.</param>
     private sealed record DashboardAlbum(
         long Id,
         string Title,
@@ -664,7 +666,9 @@ public partial class MainWindow : Window
         OrynivoServerSettings? Server,
         string? ArtworkPath,
         bool HasArtwork,
-        bool IsFavorite);
+        bool IsFavorite,
+        IReadOnlyList<long>? LogicalAlbumIds = null,
+        IReadOnlyList<LogicalAlbumPart>? LogicalAlbumParts = null);
 
     /// <summary>
     /// Loads the recently added albums for the dashboard, merging the local library with every
@@ -709,7 +713,7 @@ public partial class MainWindow : Window
             }
         }
 
-        return combined
+        return MergeDashboardAlbums(combined)
             .OrderByDescending(a => a.AddedAt)
             .Take(perSource)
             .ToList();
@@ -782,6 +786,8 @@ public partial class MainWindow : Window
                     album.AverageBpm)));
         }
 
+        candidates = MergeDashboardRecommendationCandidates(candidates);
+
         if (localProfile.Genres.Count == 0)
             return [];
 
@@ -838,6 +844,66 @@ public partial class MainWindow : Window
 
     private static string RecommendationAlbumKey(string? album, string? artist) =>
         $"{NormalizeRecommendationToken(album)}\u001f{NormalizeRecommendationToken(artist)}";
+
+    private static List<DashboardAlbum> MergeDashboardAlbums(IEnumerable<DashboardAlbum> albums) =>
+        albums
+            .Where(album => IsKnownAlbumTitle(album.Title))
+            .GroupBy(
+                album => RecommendationAlbumKey(album.Title, album.Artist),
+                StringComparer.Ordinal)
+            .Select(group => MergeDashboardAlbumGroup(group.ToList()))
+            .ToList();
+
+    private static DashboardAlbum MergeDashboardAlbumGroup(IReadOnlyList<DashboardAlbum> albums)
+    {
+        var representative = albums
+            .OrderByDescending(album => album.Server is null)
+            .ThenByDescending(album => album.HasArtwork)
+            .ThenByDescending(album => album.AddedAt)
+            .ThenBy(album => album.Id)
+            .First();
+        var artworkSource = albums.FirstOrDefault(album => album.HasArtwork);
+        return representative with
+        {
+            AddedAt = albums.Max(album => album.AddedAt),
+            IsFavorite = albums.Any(album => album.IsFavorite),
+            ArtworkPath = artworkSource?.ArtworkPath ?? representative.ArtworkPath,
+            HasArtwork = artworkSource is not null || representative.HasArtwork,
+            LogicalAlbumIds = albums
+                .SelectMany(album => album.LogicalAlbumIds ?? [album.Id])
+                .Distinct()
+                .ToList(),
+            LogicalAlbumParts = albums
+                .SelectMany(album => album.LogicalAlbumParts ??
+                    [new LogicalAlbumPart(album.Id, album.ArtistId, album.Server)])
+                .DistinctBy(part => $"{part.Server?.Id ?? LocalSourceKey}:{part.AlbumId}")
+                .ToList()
+        };
+    }
+
+    private static List<DashboardRecommendationCandidate> MergeDashboardRecommendationCandidates(
+        IEnumerable<DashboardRecommendationCandidate> candidates) =>
+        candidates
+            .Where(candidate => IsKnownAlbumTitle(candidate.Album.Title))
+            .GroupBy(
+                candidate => RecommendationAlbumKey(candidate.Album.Title, candidate.Album.Artist),
+                StringComparer.Ordinal)
+            .Select(group =>
+            {
+                var values = group.ToList();
+                var bpms = values
+                    .Select(value => value.AverageBpm)
+                    .OfType<double>()
+                    .Where(value => value > 0)
+                    .ToList();
+                return new DashboardRecommendationCandidate(
+                    MergeDashboardAlbumGroup(values.Select(value => value.Album).ToList()),
+                    string.Join(';', values
+                        .SelectMany(value => SplitRecommendationGenres(value.Genres))
+                        .Distinct(StringComparer.Ordinal)),
+                    bpms.Count == 0 ? null : bpms.Average());
+            })
+            .ToList();
 
     private static double RecommendationMoodFactor(
         RecommendationMood mood,
@@ -1375,16 +1441,24 @@ public partial class MainWindow : Window
     private ContentRow BuildRecentAlbumRow(DashboardAlbum album)
     {
         var isRemote = album.Server is not null;
+        var parts = album.LogicalAlbumParts;
+        var isUnified = parts?
+            .Select(part => part.Server?.Id ?? LocalSourceKey)
+            .Distinct(StringComparer.Ordinal)
+            .Skip(1)
+            .Any() == true;
         var row = new ContentRow
         {
             Id = album.Id,
             AlbumId = album.Id,
+            LogicalAlbumIds = album.LogicalAlbumIds,
+            LogicalAlbumParts = parts,
             ArtistId = album.ArtistId,
             Title = string.IsNullOrWhiteSpace(album.Title) ? LocalizationManager.Current.Unknown : album.Title,
             Artist = string.IsNullOrWhiteSpace(album.Artist) ? null : album.Artist,
             ArtworkPath = album.ArtworkPath,
             IsFavorite = album.IsFavorite,
-            EntityType = isRemote ? "OrynivoAlbum" : "Album",
+            EntityType = isUnified ? "UnifiedAlbum" : isRemote ? "OrynivoAlbum" : "Album",
             ExternalId = isRemote ? album.Id.ToString(CultureInfo.InvariantCulture) : null,
             OrynivoServer = album.Server,
             FilePath = ""
@@ -1405,16 +1479,23 @@ public partial class MainWindow : Window
         if (sender is not Control { DataContext: ContentRow { Id: long albumId } row })
             return;
 
-        if (row.EntityType == "OrynivoAlbum")
+        if (row.EntityType == "UnifiedAlbum")
+        {
+            await OpenLogicalAlbumTracksAsync(row);
+        }
+        else if (row.EntityType == "OrynivoAlbum")
         {
             _activeArtistFilterId = null;
             _activeArtistFilterName = null;
             _activeOrynivoServer = row.OrynivoServer;
-            await OpenOrynivoAlbumTracksAsync(albumId, row.Title, row.Artist);
+            await OpenOrynivoAlbumTracksAsync(row);
         }
         else
         {
-            await ShowAlbumTracksAsync(albumId, row.Title ?? LocalizationManager.Current.Unknown);
+            await ShowAlbumTracksAsync(
+                albumId,
+                row.Title ?? LocalizationManager.Current.Unknown,
+                logicalAlbumIds: row.LogicalAlbumIds);
         }
     }
 

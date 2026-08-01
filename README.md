@@ -455,6 +455,21 @@ byte-range streaming without FFmpeg.
 - Opening any local or remote album from a unified artist view retains that
   album's source-specific artist identity, initially scopes the track list to
   the selected artist, and offers the checkbox to show all album tracks.
+- Album views, Dashboard recommendations, and Recently Added displays combine
+  local and Orynivo Server records with the same artist and album title into one
+  source-aware logical album (`L+OS` when both contribute). When matching tags
+  occur in several physical folders
+  (for example an original release, a sampler, and a hi-res collection), the
+  detail view retains every track and presents each folder as a separate
+  edition group; similarly named tracks are never silently deduplicated.
+  Untitled or explicitly unknown albums are omitted from album-card/catalog
+  surfaces because they cannot be identified usefully; their tracks remain
+  available through Tracks, folders, playlists, and track search.
+  Album database records without any remaining indexed tracks are also omitted
+  from local and Orynivo Server catalogs, detail views, recent lists, and
+  aggregate counts.
+  Artwork cards show the complete album title in a tooltip when the visible
+  card label is shortened to fit.
 - File and directory context menus in an Orynivo Server Folder structure view
   can append tracks to an existing mixed playlist or create a new shared local
   playlist. Folder descendants are stored as stable `orynivo://` references;

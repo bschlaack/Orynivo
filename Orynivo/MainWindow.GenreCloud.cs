@@ -264,6 +264,7 @@ public partial class MainWindow
             .GroupBy(item => item.Key)
             .ToDictionary(group => group.Key, group => group.Min(item => item.Index));
         return result
+            .Where(row => IsKnownAlbumTitle(row.Title))
             .DistinctBy(row => (row.OrynivoServer?.Id ?? "local", row.AlbumId ?? row.Id ?? 0))
             .OrderBy(row => rank.GetValueOrDefault((
                 row.OrynivoServer?.Id ?? "local",
