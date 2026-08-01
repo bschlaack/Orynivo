@@ -4,6 +4,7 @@ const vm = require('vm');
 const root = __dirname;
 const sourcePath = fs.existsSync(path.join(root, 'de', 'index.html')) ? path.join(root, 'de', 'index.html') : path.join(root, 'index.html');
 const source = fs.readFileSync(sourcePath, 'utf8')
+  .replace(/\r\n?/g, '\n')
   .replace(/^\s*<meta property="og:(?:site_name|url|locale)"[^>]*>\r?\n/gm, '')
   .replace(/^\s*<meta name="twitter:(?:title|description|image)"[^>]*>\r?\n/gm, '')
   .replace(/^\s*<link rel="(?:canonical|alternate)"[^>]*>\r?\n/gm, '')

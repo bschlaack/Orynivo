@@ -2402,6 +2402,7 @@ public partial class MainWindow : Window
         SaveSmartPlaylistButton.IsVisible = tag == "Tracks" ? true : false;
         ClearQueueButton.IsVisible = tag == "Queue";
         ClearQueueButton.IsEnabled = _queue.Count > 0;
+        InfiniteMixButton.IsVisible = tag == "Queue";
         SaveQueueAsPlaylistButton.IsVisible = tag == "Queue";
         SaveQueueAsPlaylistButton.IsEnabled =
             _queue.Any(item => CanPersistQueuePath(item.FilePath));
@@ -7396,6 +7397,7 @@ public partial class MainWindow : Window
     /// <summary>Clears the editable playback queue without stopping the currently playing item.</summary>
     private void ClearPlaybackQueue()
     {
+        StopInfiniteMix();
         _queue.Clear();
         _queueIndex = -1;
         ResetQueuePlaybackState();
@@ -8417,6 +8419,7 @@ public partial class MainWindow : Window
         if (string.IsNullOrEmpty(row.FilePath))
             return;
 
+        StopInfiniteMix();
         _queue.Clear();
         foreach (var r in allRows.Where(r => !string.IsNullOrEmpty(r.FilePath)))
             _queue.Add(ToPlaylistItem(r));
@@ -12696,6 +12699,7 @@ public partial class MainWindow : Window
 
     private void RefreshQueueNavigationButtons()
     {
+        EnsureInfiniteMixQueue();
         if (_shuffleEnabled)
         {
             PreviousButton.IsEnabled = _shuffleHistoryPosition > 0;

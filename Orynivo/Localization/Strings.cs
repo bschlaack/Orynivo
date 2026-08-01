@@ -582,6 +582,14 @@ public sealed record LocalizedStrings(
     public string DashboardHeroHint { get; init; } = "";
     /// <summary>Gets the dashboard random-play action label.</summary>
     public string DashboardRandomPlayback { get; init; } = "";
+    /// <summary>Gets the action label that starts the automatically replenished history-informed mix.</summary>
+    public string InfiniteMixStart { get; init; } = "";
+    /// <summary>Gets the action label that stops automatic Infinite Mix replenishment.</summary>
+    public string InfiniteMixStop { get; init; } = "";
+    /// <summary>Gets the queue status shown while Infinite Mix is active.</summary>
+    public string InfiniteMixActive { get; init; } = "";
+    /// <summary>Gets the message shown while the initial Infinite Mix queue is calculated.</summary>
+    public string InfiniteMixCalculating { get; init; } = "";
     /// <summary>Gets the dashboard quick-access section title.</summary>
     public string DashboardQuickAccess { get; init; } = "";
     /// <summary>Gets the dashboard total-minutes statistic label.</summary>

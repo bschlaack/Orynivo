@@ -110,6 +110,8 @@ public static class LocalizationManager
         resources["L_DownloadMissingArtworkHint"] = Current.DownloadMissingArtworkHint;
         resources["L_CoverNotFound"] = Current.CoverNotFound;
         resources["L_SearchCover"] = Current.SearchCover;
+        resources["L_InfiniteMixStart"] = Current.InfiniteMixStart;
+        resources["L_InfiniteMixCalculating"] = Current.InfiniteMixCalculating;
         resources["L_CoverSearchTitle"] = Current.CoverSearchTitle;
         resources["L_CoverSearchRunning"] = Current.CoverSearchRunning;
         resources["L_CoverSearchNoResults"] = Current.CoverSearchNoResults;
@@ -661,6 +663,10 @@ public static class LocalizationManager
         DashboardWelcomeBack = "WILLKOMMEN ZURÜCK",
         DashboardHeroHint = "Bereit für großartige Musik? Entdecke neue Klänge oder höre deine Favoriten.",
         DashboardRandomPlayback = "Zufällige Wiedergabe",
+        InfiniteMixStart = "Endlos-Mix starten",
+        InfiniteMixStop = "Endlos-Mix stoppen",
+        InfiniteMixActive = "Endlos-Mix aktiv · wird automatisch ergänzt",
+        InfiniteMixCalculating = "Dein Endlos-Mix wird gerade berechnet …",
         DashboardQuickAccess = "Schnellzugriff",
         DashboardTotalMinutes = "Gesamtminuten",
         DashboardMinutesShort = "Min.",
@@ -1241,6 +1247,10 @@ public static class LocalizationManager
         DashboardWelcomeBack = "WELCOME BACK",
         DashboardHeroHint = "Ready for great music? Discover something new or return to your favorites.",
         DashboardRandomPlayback = "Random playback",
+        InfiniteMixStart = "Start Infinite Mix",
+        InfiniteMixStop = "Stop Infinite Mix",
+        InfiniteMixActive = "Infinite Mix active · replenishes automatically",
+        InfiniteMixCalculating = "Your Infinite Mix is being prepared …",
         DashboardQuickAccess = "Quick access",
         DashboardTotalMinutes = "Total minutes",
         DashboardMinutesShort = "min",
@@ -1822,6 +1832,10 @@ public static class LocalizationManager
         DashboardWelcomeBack = "BON RETOUR",
         DashboardHeroHint = "Prêt pour de la bonne musique ? Découvrez de nouveaux sons ou retrouvez vos favoris.",
         DashboardRandomPlayback = "Lecture aléatoire",
+        InfiniteMixStart = "Démarrer le mix infini",
+        InfiniteMixStop = "Arrêter le mix infini",
+        InfiniteMixActive = "Mix infini actif · complété automatiquement",
+        InfiniteMixCalculating = "Votre mix infini est en cours de préparation …",
         DashboardQuickAccess = "Accès rapide",
         DashboardTotalMinutes = "Minutes au total",
         DashboardMinutesShort = "min",
@@ -2400,6 +2414,10 @@ public static class LocalizationManager
         DashboardWelcomeBack = "TE DAMOS LA BIENVENIDA",
         DashboardHeroHint = "¿Listo para disfrutar de buena música? Descubre nuevos sonidos o vuelve a tus favoritos.",
         DashboardRandomPlayback = "Reproducción aleatoria",
+        InfiniteMixStart = "Iniciar mezcla infinita",
+        InfiniteMixStop = "Detener mezcla infinita",
+        InfiniteMixActive = "Mezcla infinita activa · se completa automáticamente",
+        InfiniteMixCalculating = "Se está preparando tu mezcla infinita …",
         DashboardQuickAccess = "Acceso rápido",
         DashboardTotalMinutes = "Minutos totales",
         DashboardMinutesShort = "min",

@@ -8,6 +8,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Added an Infinite Mix that builds a source-aware queue from the last 14 days
+  of listening affinities, favorites, local tracks, and every reachable Orynivo
+  Server. It avoids queued tracks and immediate artist/album repetition,
+  appends 20 recommendations at a time, and automatically refills when five
+  tracks remain. It can be started from the Dashboard or controlled in Up Next.
+- Starting Infinite Mix now immediately shows a localized blocking preparation
+  overlay with staged percentage progress while libraries, listening affinity,
+  candidates, and the initial queue are calculated.
+
+### Changed
+
+- Expanded the main README, multilingual product website, and GitHub Wiki with
+  current Genre Cloud and Infinite Mix behavior, usage, server integration, and
+  local cache/data-location documentation.
+
 ### Fixed
 
 - Fixed remote Orynivo Server tracks appearing with the local `L` source badge

@@ -178,6 +178,15 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   context together with its display metadata. Otherwise the shared source
   column mislabels that queue row as local. Keep this context memory-only and
   never persist its authenticated playback URL or API key.
+- Infinite Mix (`MainWindow.InfiniteMix.cs`) uses the most recent 14 days of
+  genre listening time, favorite state, and bounded Genre Cloud candidates from
+  the local library and every reachable Orynivo Server. It appends batches of
+  20 and refills at five remaining items, preserves source-aware `ContentRow`
+  metadata, excludes queued paths, and limits immediate artist/album repeats.
+  Normal explicit queue replacement and Clear Queue stop automatic refill.
+  Initial generation must show `InfiniteMixLoadingOverlay` with staged progress
+  and block duplicate interaction; threshold refills remain unobtrusive in the
+  background.
 - Remote album lists are cached by `LibraryChangedAt`, but artwork mutations do
   not advance that scan timestamp. Every successful remote album artwork upload,
   reassignment, or deletion must therefore call `DeleteOrynivoAlbumListCache`
