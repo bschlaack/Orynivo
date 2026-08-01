@@ -7,6 +7,10 @@
 An Avalonia desktop music library for Windows, Linux, and macOS, plus a
 cross-platform music server for local Hi-Fi libraries.
 
+**Official website:** [orynivo.app](https://orynivo.app/) ·
+**Documentation:** [GitHub Wiki](https://github.com/bschlaack/Orynivo/wiki) ·
+**Downloads:** [Latest release](https://github.com/bschlaack/Orynivo/releases/latest)
+
 cwASIO/Steinberg ASIO/WASAPI · DSD/DSF/DFF · Gapless Playback · ReplayGain ·
 Parametric EQ
 Plex · Radio · Podcasts · AI Chat · MCP Server · Network Streaming
@@ -62,7 +66,8 @@ the ability to reach that library from any device on the local network.
 
 ## Product website
 
-The self-contained responsive product website lives in [`html/`](html/). It
+The official website is available at [orynivo.app](https://orynivo.app/). Its
+self-contained responsive source lives in [`html/`](html/). It
 defaults to English, can switch to German, French, or Spanish, and includes
 current application screenshots, feature and installation guides, and download
 links that resolve through GitHub's latest public release API. See

@@ -1,10 +1,10 @@
-# Orynivo product website
+# Orynivo Product Website
 
 Static, responsive product website for Orynivo. English is the default
-language; German, French, and Spanish can be selected directly. All files and
-media used by the site live in this directory. Static localized versions are
-available under `/`, `/de/`, `/fr/`, and `/es/`, including canonical,
-`hreflang`, and structured software metadata for search engines.
+language; German, French, and Spanish are directly selectable. All required
+files and media assets live in this directory. Search engines receive static
+localized pages at `/`, `/de/`, `/fr/`, and `/es/`, complete with canonical
+URLs, hreflang references, and structured software data.
 
 After changing shared content or translations, regenerate the localized pages:
 
@@ -12,19 +12,19 @@ After changing shared content or translations, regenerate the localized pages:
 node html/generate-localized-pages.js
 ```
 
-## Preview locally
+## Local Preview
 
 ```powershell
 python -m http.server 8080 --directory html
 ```
 
-Then open `http://localhost:8080`. A local web server is recommended because the
-site queries the public GitHub API to populate the current version and download
-links for the latest release. If that request fails, all download buttons still
-lead to the current GitHub Releases page.
+Then open `http://localhost:8080`. Using a local web server is recommended
+because the site requests the public GitHub API to populate the current version
+and download links for the latest release. If the request fails, all download
+buttons continue to link to the latest GitHub Releases page.
 
-## Deployment
+## Publishing
 
-The complete directory can be uploaded unchanged to the existing nginx server.
-Use `html/` as the document root. Submit `sitemap.xml` to Google Search Console
-and Bing Webmaster Tools after deployment.
+The complete directory can be uploaded unchanged to the existing nginx web
+server. Configure `html/` as the document root. After publishing, submit
+`sitemap.xml` to Google Search Console and Bing Webmaster Tools.
