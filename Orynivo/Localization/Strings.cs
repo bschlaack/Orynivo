@@ -937,6 +937,18 @@ public sealed record LocalizedStrings(
     public string AlbumPath { get; init; } = "";
     /// <summary>Gets the title of the editable playback queue view.</summary>
     public string UpNext { get; init; } = "";
+    /// <summary>Gets the title of the interactive genre explorer.</summary>
+    public string GenreExplorer { get; init; } = "";
+    /// <summary>Gets the explanatory text shown above the genre cloud.</summary>
+    public string GenreCloudHint { get; init; } = "";
+    /// <summary>Gets the root breadcrumb label of the genre cloud.</summary>
+    public string AllGenres { get; init; } = "";
+    /// <summary>Gets the heading for genre-based track recommendations.</summary>
+    public string GenreRecommendations { get; init; } = "";
+    /// <summary>Gets the empty-state text for a genre cloud without tagged tracks.</summary>
+    public string GenreCloudEmpty { get; init; } = "";
+    /// <summary>Gets the label for dynamically preserved tags not yet mapped by the curated taxonomy.</summary>
+    public string MoreGenres { get; init; } = "";
     /// <summary>Gets the action label for inserting tracks after the current queue item.</summary>
     public string PlayNext { get; init; } = "";
     /// <summary>Gets the action label for appending tracks to the playback queue.</summary>

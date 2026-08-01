@@ -4,6 +4,58 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.32.0] - 2026-08-01
+
+### Added
+
+- Added an interactive, count-scaled genre cloud with hierarchical drill-down
+  and listening-history-based track recommendations. It merges the local
+  library with every configured Orynivo Server and preserves each recommended
+  track's source for playback, favorites, and navigation.
+- Replaced the fixed single-parent genre tree with a curated, embedded JSON
+  genre graph inspired by RYM-style navigation. Genres can be top-level while
+  also belonging to multiple parents, and counts remain deduplicated per node.
+- Replaced the catch-all Other bucket with a localized **More genres** branch
+  that preserves and exposes the library's actual unmapped genre names.
+- Added the compact authenticated Orynivo Server endpoint
+  `GET /api/genres/cloud`; clients fall back to track facets when connected to
+  an older server.
+- Expanded the genre hierarchy with a dedicated Electronic → Dance/EDM branch,
+  major dance, pop, jazz, classical, hip-hop, soul, country, folk, reggae,
+  world, soundtrack, spoken-word, New Age, easy-listening, and experimental
+  subgenres. Compound genre tags now resolve to their most specific recognized
+  category instead of falling into Other.
+- Split the Genre Cloud presentation into a compact explanatory hero and a
+  separate elliptical cloud surface. Drill-downs now cross-fade and reveal the
+  newly arranged genre nodes with a staggered scale animation.
+- Enlarged the cloud surface and added collision-aware spacing so genre labels
+  remain readable. Genre recommendations can now switch between the playable
+  track table and a source-aware album artwork grid.
+
+### Fixed
+
+- Fixed Genre Cloud drill-downs reverting to all root genres when a connected
+  server recognizes the endpoint but has an older taxonomy. The client now
+  validates the returned level and rebuilds it from remote facets when needed.
+- Leaf genres now remain visibly selected as a large centered label instead of
+  showing the misleading no-genres empty state.
+- Fixed overlapping genre labels by replacing bounded spiral retries with
+  centered, measured, collision-free rows and a vertically scrollable cloud
+  when all rows exceed the viewport.
+- Fixed the Track/Album recommendation switch by using the same segmented
+  `ViewModeRadioTheme` controls as the Artists/Albums table/artwork selector.
+- Fixed the Genre Cloud surface covering recommendation rows by giving it a
+  dedicated Auto-sized content-grid row instead of overlaying the shared result
+  row with `ZIndex` and compensating margins. Track/Album mode clicks now
+  explicitly switch the visible result host.
+- Fixed Genre Cloud album recommendations opening beneath the still-visible
+  cloud. Double-clicking an album now opens the normal full-height album detail,
+  and Back restores the selected genre, recommendation mode, selection, and
+  scroll position.
+- Genre Cloud labels and their relative sizes now switch from matching-track
+  counts to distinct matching-album counts while Album recommendations are
+  selected.
+
 ## [0.31.0] - 2026-08-01
 
 ### Added

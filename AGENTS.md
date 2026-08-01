@@ -94,7 +94,8 @@ must never invoke a privileged installer command directly.
 It holds everything needed to scan, store, index, and serve the music library:
 
 **Orynivo.Core/Library/**: `AudioDatabase`, `LibraryScanner`, `LibraryWatcherService`,
-`LibraryBackupService`, `TrackSearchIndex`, `CueSheetParser`, `M3u8PlaylistService`,
+`LibraryBackupService`, `TrackSearchIndex`, `GenreCloudService` plus its embedded
+`GenreTaxonomy.json` multi-parent graph, `CueSheetParser`, `M3u8PlaylistService`,
 `LyricsService`, `RadioBrowserService`, `RadioStreamMetadataService`, `PodcastService`,
 `ArtistProfileService`, `ArtistImageSearchService`, `ArtistNameNormalizer`,
 `ArtworkCache`, `MusicBrainzCoverSearch`, model records, `ArtistInfoSource` enum.
@@ -718,6 +719,12 @@ fallback or allow client-provided commands/paths to reach the helper.
   `GetTrackArtworkUrl` are pure URL builders that include `?key=` so the URLs can
   be passed directly to FFmpeg or Avalonia's image loader
 - The main sidebar library accordion is labelled **Library**/**Bibliothek**.
+  Its shared Genre Cloud view merges compact snapshots from the local library
+  and every configured Orynivo Server; remote recommendations retain their
+  server context and client-side favorite state. Older servers fall back to
+  `/api/tracks/facets` when `/api/genres/cloud` is unavailable. Genre nodes carry
+  both matching-track and distinct matching-album counts; the desktop chooses
+  the count matching its current recommendation mode.
   Local media live under a collapsible **Local** child node followed by local
   Artists, Albums, Tracks, Folder structure, and a nested local Playlists group.
   The complete **Local** child node (and its rows/playlists) is hidden whenever
