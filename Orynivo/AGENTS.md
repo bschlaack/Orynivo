@@ -64,6 +64,11 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 - The shared Folder structure sidebar item is visible when either local media
   or at least one Orynivo Server is configured. Server-only setups must be able
   to open `ShowUnifiedFolderTreeAsync` without configuring a local directory.
+- The Genre Cloud item follows the same unified-library visibility. It loads
+  the local snapshot and every configured Orynivo Server concurrently, merges
+  counts by stable taxonomy key, applies client-side remote favorites and
+  cross-source listening-history affinity, and resolves recommendations to
+  ordinary source-aware `ContentRow` track rows.
 - Matching local and Orynivo Server artists use
   `ArtistNameNormalizer.CreateComparisonKey` and one `UnifiedArtist` row. Its
   album drill-down combines every matching library while retaining each album's

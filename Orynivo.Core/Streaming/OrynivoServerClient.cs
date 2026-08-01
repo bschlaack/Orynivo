@@ -1132,6 +1132,32 @@ public sealed class OrynivoServerClient : IDisposable
         catch { return []; }
     }
 
+    /// <summary>Returns one compact genre-cloud level and bounded recommendation candidates.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="parentKey">Selected taxonomy key, or <see langword="null"/> for root genres.</param>
+    /// <param name="maximumCandidates">Maximum candidate track identifiers requested from the server.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The genre-cloud snapshot, or an empty root snapshot when unavailable.</returns>
+    public async Task<GenreCloudSnapshot> GetGenreCloudAsync(
+        OrynivoServerSettings server,
+        string? parentKey = null,
+        int maximumCandidates = 250,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var query = $"?candidates={Math.Clamp(maximumCandidates, 1, 2000)}";
+            if (!string.IsNullOrWhiteSpace(parentKey))
+                query += $"&parent={Uri.EscapeDataString(parentKey)}";
+            return await GetJsonAsync<GenreCloudSnapshot>(server, $"/api/genres/cloud{query}", cancellationToken)
+                   ?? new GenreCloudSnapshot(null, [], [], []);
+        }
+        catch
+        {
+            return new GenreCloudSnapshot(parentKey, [], [], []);
+        }
+    }
+
     /// <summary>
     /// Returns full track rows for the specified track identifiers, preserving the requested order.
     /// </summary>

@@ -1899,6 +1899,7 @@ public partial class MainWindow : Window
         SetSidebarItemVisibility(ArtistsNavItem, showUnifiedLibraryItems);
         SetSidebarItemVisibility(AlbumsNavItem, showUnifiedLibraryItems);
         SetSidebarItemVisibility(TracksNavItem, showUnifiedLibraryItems);
+        SetSidebarItemVisibility(GenreCloudNavItem, showUnifiedLibraryItems);
         SetSidebarItemVisibility(FoldersNavItem, showUnifiedLibraryItems);
 
         foreach (var item in NavListBox.Items.OfType<ListBoxItem>())
@@ -2321,6 +2322,7 @@ public partial class MainWindow : Window
             "Artists" => LocalizationManager.Current.Artists,
             "Albums"  => LocalizationManager.Current.Albums,
             "Tracks"  => LocalizationManager.Current.Tracks,
+            "GenreCloud" => LocalizationManager.Current.GenreExplorer,
             "Folders" => LocalizationManager.Current.FolderStructure,
             "Queue" => LocalizationManager.Current.UpNext,
             "AiChat" => LocalizationManager.Current.AiChat,
@@ -2341,6 +2343,7 @@ public partial class MainWindow : Window
         // Stop any in-flight unified folder-tree load so a late completion cannot mutate
         // the tree or the count of the view the user is switching to.
         CancelAndDispose(ref _folderViewCts);
+        CancelAndDispose(ref _genreCloudCts);
         ContentDataGrid.ItemsSource = null;
         AlbumArtworkListBox.ItemsSource = null;
         ArtistArtworkListBox.ItemsSource = null;
@@ -2351,6 +2354,7 @@ public partial class MainWindow : Window
         UpdateAlphabetIndex(null, false);
         SearchResultsScrollViewer.IsVisible = false;
         DashboardScrollViewer.IsVisible = false;
+        GenreCloudPanel.IsVisible = false;
         AiChatViewControl.IsVisible = false;
         InternetRadioView.IsVisible = false;
         PodcastView.IsVisible = false;
@@ -2362,7 +2366,7 @@ public partial class MainWindow : Window
         var isOrynivoTracksTag = TryParseOrynivoServerTag(tag, out _, out var orynivoViewForHeader) &&
                                  orynivoViewForHeader == "Tracks";
         SearchTextBox.IsVisible = isOrynivoTracksTag ||
-                                   !(tag is "InternetRadio" or "Podcasts" or "Queue" or "AiChat"
+                                   !(tag is "InternetRadio" or "Podcasts" or "Queue" or "AiChat" or "GenreCloud"
                                         or "RecentAlbumsAll" or "RecentlyPlayedAll" ||
                                     tag.StartsWith("Radio:", StringComparison.Ordinal) ||
                                     tag.StartsWith("Podcast:", StringComparison.Ordinal) ||
@@ -2459,6 +2463,16 @@ public partial class MainWindow : Window
                 ArtistArtworkListBox.IsVisible = false;
                 ApplyColumns("Queue");
                 RefreshQueueRows();
+            }
+            else if (tag == "GenreCloud")
+            {
+                ContentDataGrid.IsVisible = true;
+                FolderTreeView.IsVisible = false;
+                AlbumArtworkListBox.IsVisible = false;
+                ArtistArtworkListBox.IsVisible = false;
+                GenreCloudPanel.IsVisible = true;
+                ApplyColumns("Tracks");
+                await ShowGenreCloudAsync(null);
             }
             else if (tag.StartsWith("Podcast:", StringComparison.Ordinal) &&
                      long.TryParse(tag.AsSpan("Podcast:".Length), out var podcastId))

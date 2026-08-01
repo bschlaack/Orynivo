@@ -4,6 +4,18 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Added an interactive, count-scaled genre cloud with hierarchical drill-down
+  and listening-history-based track recommendations. It merges the local
+  library with every configured Orynivo Server and preserves each recommended
+  track's source for playback, favorites, and navigation.
+- Added the compact authenticated Orynivo Server endpoint
+  `GET /api/genres/cloud`; clients fall back to track facets when connected to
+  an older server.
+
 ## [0.31.0] - 2026-08-01
 
 ### Added

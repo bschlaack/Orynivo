@@ -268,6 +268,7 @@ works directly in FFmpeg and browser URLs.
 | `GET /api/tracks/{id}/lyrics` | Cached plain/synced lyrics for one track |
 | `PUT /api/tracks/{id}/lyrics` | Store client-downloaded lyrics on the server |
 | `GET /api/tracks/facets` | Lightweight facet rows (genre, format, bitrate) for the Tracks filter |
+| `GET /api/genres/cloud` | Compact hierarchical genre counts and bounded recommendation candidates |
 | `GET /api/library/summary` | Aggregate album, track, artist, and favorite counts without materializing library rows |
 | `POST /api/tracks/by-ids` | Track rows for a list of track IDs (facet-filtered results) |
 | `GET /api/folders/tracks` | Lightweight track rows plus playback metadata for building a server library folder tree |
@@ -522,6 +523,9 @@ byte-range streaming without FFmpeg.
   track lists
 - Artist and album views with table and virtualized artwork modes, including
   Favorites-only filtering in both modes
+- Interactive count-scaled genre cloud with hierarchical drill-down and
+  listening-history-based track suggestions, aggregated across the local
+  library and every configured Orynivo Server
 - Dashboard with an artwork-backed greeting hero with a lightened-artwork rim, live
   library counters (including local and configured Orynivo Server track
   favorites), random

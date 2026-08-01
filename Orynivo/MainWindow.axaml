@@ -1081,6 +1081,7 @@
                 <ListBoxItem x:Name="ArtistsNavItem" Tag="Artists" Theme="{StaticResource NavItemTheme}"><StackPanel Orientation="Horizontal"><Path Data="{DynamicResource IconArtist}" Width="13" Height="13" Margin="0,0,7,0" Stretch="Uniform" StrokeThickness="1.6"/><TextBlock Text="{DynamicResource L_Artists}" Classes="navItemText"/></StackPanel></ListBoxItem>
                 <ListBoxItem x:Name="AlbumsNavItem" Tag="Albums" Theme="{StaticResource NavItemTheme}"><StackPanel Orientation="Horizontal"><Path Data="{DynamicResource IconAlbum}" Width="13" Height="13" Margin="0,0,7,0" Stretch="Uniform" StrokeThickness="1.6"/><TextBlock Text="{DynamicResource L_Albums}" Classes="navItemText"/></StackPanel></ListBoxItem>
                 <ListBoxItem x:Name="TracksNavItem" Tag="Tracks" Theme="{StaticResource NavItemTheme}"><StackPanel Orientation="Horizontal"><Path Data="{DynamicResource IconTrack}" Width="13" Height="13" Margin="0,0,7,0" Stretch="Uniform" StrokeThickness="1.6"/><TextBlock Text="{DynamicResource L_Tracks}" Classes="navItemText"/></StackPanel></ListBoxItem>
+                <ListBoxItem x:Name="GenreCloudNavItem" Tag="GenreCloud" Theme="{StaticResource NavItemTheme}"><StackPanel Orientation="Horizontal"><Path Data="{DynamicResource IconAlbum}" Width="13" Height="13" Margin="0,0,7,0" Stretch="Uniform" StrokeThickness="1.6"/><TextBlock Text="{DynamicResource L_GenreExplorer}" Classes="navItemText"/></StackPanel></ListBoxItem>
                 <ListBoxItem x:Name="FoldersNavItem" Tag="Folders" Theme="{StaticResource NavItemTheme}"><StackPanel Orientation="Horizontal"><Path Data="{DynamicResource IconFolder}" Width="13" Height="13" Margin="0,0,7,0" Stretch="Uniform" StrokeThickness="1.6"/><TextBlock Text="{DynamicResource L_FolderStructure}" Classes="navItemText"/></StackPanel></ListBoxItem>
 
                 <ListBoxItem x:Name="OwnRadiosHeaderItem"
@@ -1531,6 +1532,37 @@
                         <Path x:Name="LibraryIntroIconPath" Classes="heroIcon"/>
                     </Border>
                 </Grid>
+            </Border>
+
+            <Border x:Name="GenreCloudPanel"
+                    Grid.Row="1"
+                    Margin="28,18,28,12"
+                    Padding="24,18"
+                    Background="{DynamicResource AppSurfaceBrush}"
+                    BorderBrush="{StaticResource CardHoverGradientBrush}"
+                    BorderThickness="1"
+                    CornerRadius="14"
+                    IsVisible="False">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="{DynamicResource L_GenreCloudHint}"
+                               FontSize="{DynamicResource FontSizeBody}"
+                               Foreground="{DynamicResource AppSecondaryTextBrush}"
+                               TextWrapping="Wrap"/>
+                    <WrapPanel x:Name="GenreCloudBreadcrumbPanel" Orientation="Horizontal"/>
+                    <ScrollViewer MaxHeight="180" VerticalScrollBarVisibility="Auto">
+                        <WrapPanel x:Name="GenreCloudNodesPanel" Orientation="Horizontal"/>
+                    </ScrollViewer>
+                    <TextBlock x:Name="GenreCloudEmptyTextBlock"
+                               Text="{DynamicResource L_GenreCloudEmpty}"
+                               FontSize="{DynamicResource FontSizeBody}"
+                               Foreground="{DynamicResource AppSecondaryTextBrush}"
+                               IsVisible="False"/>
+                    <TextBlock Text="{DynamicResource L_GenreRecommendations}"
+                               Margin="0,4,0,0"
+                               FontSize="{DynamicResource FontSizeSubtitle}"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource AppPrimaryTextBrush}"/>
+                </StackPanel>
             </Border>
 
             <!-- Dashboard -->

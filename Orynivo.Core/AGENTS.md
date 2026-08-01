@@ -43,6 +43,9 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
 - Dashboard recommendations use compact album-level genre/BPM candidates from
   `AudioDatabase.GetRecommendationAlbums` and the matching server endpoint.
   Keep this payload free of track rows, artwork bytes, and playback credentials.
+- `GenreCloudService` owns the stable hierarchical genre taxonomy, tag
+  normalization, count aggregation, breadcrumbs, and bounded provider-local
+  candidate selection. The desktop merges snapshots across providers.
 - `AudioDatabase.GetListeningTrend` supports up to 366 equal chronological
   buckets so the client can request daily Dashboard points without materializing
   playback-history rows.
