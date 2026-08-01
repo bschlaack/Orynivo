@@ -304,7 +304,9 @@ public partial class MainWindow : Window
         string? SearchQuery = null,
         double? VerticalOffset = null,
         string? NavigationTag = null,
-        string? SelectedSourceKey = null);
+        string? SelectedSourceKey = null,
+        string? GenreKey = null,
+        bool? GenreAlbums = null);
 
     private sealed class RadioStationViewModel
     {
@@ -2150,6 +2152,20 @@ public partial class MainWindow : Window
                 CaptureCurrentVerticalOffset(),
                 SelectedSourceKey: selectedRow?.SourceKey);
 
+        if (string.Equals(_currentTopLevelTag, "GenreCloud", StringComparison.Ordinal) &&
+            GenreCloudPanel.IsVisible)
+        {
+            return new NavigationState(
+                "GenreCloud",
+                selectedRow?.Id,
+                null,
+                null,
+                VerticalOffset: CaptureCurrentVerticalOffset(),
+                SelectedSourceKey: selectedRow?.SourceKey,
+                GenreKey: _genreCloudSelectedKey,
+                GenreAlbums: GenreAlbumRecommendationsRadioButton.IsChecked == true);
+        }
+
         if (_activeAlbumFilterId is long orynivoAlbumId &&
             _activeCatalogAlbum is { Source: LibraryCatalogSource.OrynivoServer } &&
             _activeOrynivoServer is { } orynivoAlbumServer)
@@ -2355,6 +2371,9 @@ public partial class MainWindow : Window
         SearchResultsScrollViewer.IsVisible = false;
         DashboardScrollViewer.IsVisible = false;
         GenreCloudPanel.IsVisible = false;
+        GenreCloudSurface.IsVisible = false;
+        ContentDataGrid.Margin = new Thickness(0);
+        AlbumArtworkListBox.Margin = new Thickness(0);
         AiChatViewControl.IsVisible = false;
         InternetRadioView.IsVisible = false;
         PodcastView.IsVisible = false;
@@ -2471,8 +2490,11 @@ public partial class MainWindow : Window
                 AlbumArtworkListBox.IsVisible = false;
                 ArtistArtworkListBox.IsVisible = false;
                 GenreCloudPanel.IsVisible = true;
+                GenreCloudSurface.IsVisible = true;
                 ApplyColumns("Tracks");
-                await ShowGenreCloudAsync(null);
+                if (!_restoringNavigationHistory)
+                    _genreCloudSelectedKey = null;
+                await ShowGenreCloudAsync(_genreCloudSelectedKey);
             }
             else if (tag.StartsWith("Podcast:", StringComparison.Ordinal) &&
                      long.TryParse(tag.AsSpan("Podcast:".Length), out var podcastId))
@@ -4955,7 +4977,10 @@ public partial class MainWindow : Window
         ReplayGainAlbum = FormatReplayGainDisplay(t.ReplayGainAlbum),
         FilePath = t.Path,
         SourcePath = t.Path,
-        IsFavorite = t.IsFavorite
+        IsFavorite = t.IsFavorite,
+        ArtistId = t.ArtistId,
+        AlbumId = t.AlbumId,
+        EntityType = "Track"
     };
 
     private ContentRow ToCatalogTrackContentRow(LibraryCatalogTrack track, OrynivoServerSettings? server = null)
@@ -5874,7 +5899,8 @@ public partial class MainWindow : Window
             track.Genre,
             track.Format,
             track.Bitrate,
-            GetServerSourceKey(server.Id));
+            GetServerSourceKey(server.Id),
+            track.AlbumId);
         return MatchesTrackFilters(facet);
     }
 
@@ -8207,7 +8233,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (AlbumViewModeBorder.IsVisible &&
+        if ((AlbumViewModeBorder.IsVisible ||
+             string.Equals(_currentTopLevelTag, "GenreCloud", StringComparison.Ordinal)) &&
             row.EntityType is "Album" or null &&
             (row.AlbumId ?? row.Id) is long albumId)
         {
@@ -8468,6 +8495,7 @@ public partial class MainWindow : Window
         _activeAlbumCatalogProvider = null;
         _activeCatalogAlbum = null;
         _showAllAlbumTracks = false;
+        HideGenreCloudForDetailView();
         UpdateLibraryIntroCard(null);
         UpdateEntityFavoritesFilterToggle(null);
         _updatingAlbumTrackScope = true;
@@ -8580,6 +8608,7 @@ public partial class MainWindow : Window
         _activeAlbumCatalogProvider = provider;
         _activeCatalogAlbum = album;
         _showAllAlbumTracks = false;
+        HideGenreCloudForDetailView();
         UpdateLibraryIntroCard(null);
         UpdateEntityFavoritesFilterToggle(null);
         _updatingAlbumTrackScope = true;
@@ -9743,6 +9772,18 @@ public partial class MainWindow : Window
                 SearchTextBox.Text = state.SearchQuery ?? string.Empty;
                 await ShowSearchResultsAsync(state.SearchQuery ?? string.Empty);
                 RestoreSearchSelection(state.SelectedId, state.SelectedSourceKey, state.VerticalOffset);
+                return;
+
+            case "GenreCloud":
+                _genreCloudSelectedKey = state.GenreKey;
+                GenreAlbumRecommendationsRadioButton.IsChecked = state.GenreAlbums == true;
+                GenreTrackRecommendationsRadioButton.IsChecked = state.GenreAlbums != true;
+                SelectNavigationItem("GenreCloud");
+                await ShowTopLevelViewAsync("GenreCloud");
+                RestoreSelectionFromCurrentItems(
+                    state.SelectedId,
+                    state.VerticalOffset,
+                    state.SelectedSourceKey);
                 return;
 
             case "Artists":

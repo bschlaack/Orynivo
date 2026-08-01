@@ -102,13 +102,15 @@ public sealed record TrackListInfo(
 /// <param name="Format">Lowercase container format.</param>
 /// <param name="Bitrate">Encoded bitrate in kbps.</param>
 /// <param name="SourceKey">Stable source key, currently <c>local</c> for database rows.</param>
+/// <param name="AlbumId">Provider-local album identifier, when assigned.</param>
 public sealed record TrackFacetInfo(
     long Id,
     bool IsFavorite,
     string? Genre,
     string? Format,
     int? Bitrate,
-    string SourceKey = "local");
+    string SourceKey = "local",
+    long? AlbumId = null);
 
 /// <summary>Compact metadata and playback-history values used to resolve smart playlists.</summary>
 /// <param name="Id">Track database identifier.</param>
@@ -2074,7 +2076,7 @@ public sealed class AudioDatabase : IDisposable
     public List<TrackFacetInfo> GetTrackFacets()
     {
         using var cmd = _conn.CreateCommand();
-        cmd.CommandText = "SELECT id, is_favorite, genre, format, bitrate FROM tracks;";
+        cmd.CommandText = "SELECT id, is_favorite, genre, format, bitrate, album_id FROM tracks;";
         using var reader = cmd.ExecuteReader();
         var result = new List<TrackFacetInfo>();
         while (reader.Read())
@@ -2083,7 +2085,8 @@ public sealed class AudioDatabase : IDisposable
                 reader.GetInt32(1) != 0,
                 reader.IsDBNull(2) ? null : reader.GetString(2),
                 reader.IsDBNull(3) ? null : reader.GetString(3),
-                reader.IsDBNull(4) ? null : reader.GetInt32(4)));
+                reader.IsDBNull(4) ? null : reader.GetInt32(4),
+                AlbumId: reader.IsDBNull(5) ? null : reader.GetInt64(5)));
         return result;
     }
 

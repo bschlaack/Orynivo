@@ -1242,6 +1242,7 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
@@ -1536,6 +1537,7 @@
 
             <Border x:Name="GenreCloudPanel"
                     Grid.Row="1"
+                    Height="96"
                     Margin="28,18,28,12"
                     Padding="24,18"
                     Background="{DynamicResource AppSurfaceBrush}"
@@ -1543,32 +1545,107 @@
                     BorderThickness="1"
                     CornerRadius="14"
                     IsVisible="False">
-                <StackPanel Spacing="10">
+                <StackPanel>
+                    <TextBlock Text="{DynamicResource L_GenreExplorer}"
+                               FontSize="{DynamicResource FontSizeTitle}"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource AppPrimaryTextBrush}"/>
                     <TextBlock Text="{DynamicResource L_GenreCloudHint}"
+                               Margin="0,6,0,0"
                                FontSize="{DynamicResource FontSizeBody}"
                                Foreground="{DynamicResource AppSecondaryTextBrush}"
                                TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <Border x:Name="GenreCloudSurface"
+                    Grid.Row="2"
+                    Height="406"
+                    Margin="28,0,28,0"
+                    Padding="20,12,20,10"
+                    VerticalAlignment="Top"
+                    Background="{DynamicResource AppSurfaceBrush}"
+                    BorderBrush="{DynamicResource AppInputBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="18"
+                    IsVisible="False">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
                     <WrapPanel x:Name="GenreCloudBreadcrumbPanel" Orientation="Horizontal"/>
-                    <ScrollViewer MaxHeight="180" VerticalScrollBarVisibility="Auto">
-                        <WrapPanel x:Name="GenreCloudNodesPanel" Orientation="Horizontal"/>
+                    <ScrollViewer Grid.Row="1"
+                                  Height="330"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  VerticalScrollBarVisibility="Auto">
+                        <Canvas x:Name="GenreCloudNodesCanvas"
+                                MinHeight="330"
+                                HorizontalAlignment="Stretch">
+                            <Canvas.Transitions>
+                                <Transitions>
+                                    <DoubleTransition Property="Opacity" Duration="0:0:0.14"/>
+                                </Transitions>
+                            </Canvas.Transitions>
+                        </Canvas>
                     </ScrollViewer>
                     <TextBlock x:Name="GenreCloudEmptyTextBlock"
+                               Grid.Row="1"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
                                Text="{DynamicResource L_GenreCloudEmpty}"
                                FontSize="{DynamicResource FontSizeBody}"
                                Foreground="{DynamicResource AppSecondaryTextBrush}"
                                IsVisible="False"/>
-                    <TextBlock Text="{DynamicResource L_GenreRecommendations}"
-                               Margin="0,4,0,0"
-                               FontSize="{DynamicResource FontSizeSubtitle}"
+                    <TextBlock x:Name="GenreCloudLeafTextBlock"
+                               Grid.Row="1"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               FontSize="{DynamicResource FontSizeDisplayLarge}"
                                FontWeight="SemiBold"
-                               Foreground="{DynamicResource AppPrimaryTextBrush}"/>
-                </StackPanel>
+                               Foreground="{DynamicResource AppPrimaryTextBrush}"
+                               IsVisible="False"/>
+                    <Grid Grid.Row="2" Margin="0,4,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{DynamicResource L_GenreRecommendations}"
+                                   VerticalAlignment="Center"
+                                   FontSize="{DynamicResource FontSizeSubtitle}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource AppPrimaryTextBrush}"/>
+                        <Border Grid.Column="1"
+                                Padding="3"
+                                Background="{DynamicResource AppButtonBrush}"
+                                BorderBrush="{DynamicResource AppButtonBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="14">
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton x:Name="GenreTrackRecommendationsRadioButton"
+                                             GroupName="GenreRecommendationMode"
+                                             Content="{DynamicResource L_Tracks}"
+                                             MinWidth="104"
+                                             IsChecked="True"
+                                             Theme="{StaticResource ViewModeRadioTheme}"
+                                             Click="GenreRecommendationMode_OnClick"/>
+                                <RadioButton x:Name="GenreAlbumRecommendationsRadioButton"
+                                             GroupName="GenreRecommendationMode"
+                                             Content="{DynamicResource L_Albums}"
+                                             MinWidth="104"
+                                             Theme="{StaticResource ViewModeRadioTheme}"
+                                             Click="GenreRecommendationMode_OnClick"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Grid>
             </Border>
 
             <!-- Dashboard -->
             <ScrollViewer x:Name="DashboardScrollViewer"
                           Classes="viewSurface"
-                          Grid.Row="2"
+                          Grid.Row="3"
                           IsVisible="False"
                           Background="{DynamicResource AppContentBrush}"
                           VerticalScrollBarVisibility="Auto">
@@ -1582,14 +1659,14 @@
                  space so the input overlaps the newest messages. The intro card in
                  row 1 is hidden for the AI chat, so row 2 alone is correct. -->
             <ai:AiChatView x:Name="AiChatViewControl"
-                           Grid.Row="2"
+                           Grid.Row="3"
                            IsVisible="False"
                            ZIndex="15"/>
 
             <Grid x:Name="InternetRadioView"
                   Classes="viewSurface"
                   Grid.Row="1"
-                  Grid.RowSpan="2"
+                  Grid.RowSpan="3"
                   IsVisible="False"
                   Background="{DynamicResource AppContentBrush}"
                   ZIndex="15">
@@ -1872,7 +1949,7 @@
             <Grid x:Name="PodcastView"
                   Classes="viewSurface"
                   Grid.Row="1"
-                  Grid.RowSpan="2"
+                  Grid.RowSpan="3"
                   IsVisible="False"
                   Background="{DynamicResource AppContentBrush}"
                   ZIndex="15">
@@ -2239,7 +2316,7 @@
                 </Grid>
             </Grid>
 
-            <Grid Grid.Row="2">
+            <Grid Grid.Row="3">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
@@ -2454,7 +2531,7 @@
 
             <ScrollViewer x:Name="SearchResultsScrollViewer"
                           Classes="viewSurface"
-                          Grid.Row="2"
+                          Grid.Row="3"
                           IsVisible="False"
                           Background="{DynamicResource AppContentBrush}"
                           VerticalScrollBarVisibility="Auto">
@@ -2559,7 +2636,7 @@
             <!-- Folder TreeView -->
             <TreeView x:Name="FolderTreeView"
                       Classes="viewSurface"
-                      Grid.Row="2"
+                      Grid.Row="3"
                       Background="{DynamicResource AppContentBrush}"
                       BorderThickness="0"
                       FontSize="{DynamicResource FontSizeBody}"
@@ -2569,7 +2646,7 @@
             <!-- Album artwork view -->
             <ListBox x:Name="AlbumArtworkListBox"
                      Classes="viewSurface"
-                     Grid.Row="2"
+                     Grid.Row="3"
                      IsVisible="False"
                      Background="{DynamicResource AppContentBrush}"
                      BorderThickness="0"
@@ -2597,7 +2674,7 @@
             <!-- Artist artwork view -->
             <ListBox x:Name="ArtistArtworkListBox"
                      Classes="viewSurface"
-                     Grid.Row="2"
+                     Grid.Row="3"
                      IsVisible="False"
                      Background="{DynamicResource AppContentBrush}"
                      BorderThickness="0"
@@ -2742,7 +2819,7 @@
             </ListBox>
 
             <Border x:Name="AlphabetIndexBorder"
-                    Grid.Row="2"
+                    Grid.Row="3"
                     Width="30"
                     Margin="0,0,8,0"
                     HorizontalAlignment="Right"
@@ -2762,7 +2839,7 @@
 
             <Border x:Name="ContentLoadingOverlay"
                     Grid.Row="1"
-                    Grid.RowSpan="2"
+                    Grid.RowSpan="3"
                     IsVisible="False"
                     IsHitTestVisible="False"
                     Background="{DynamicResource AppContentBrush}"
@@ -2833,7 +2910,7 @@
             <!-- Lyrics view -->
             <Grid x:Name="LyricsView"
                   Grid.Row="1"
-                  Grid.RowSpan="2"
+                  Grid.RowSpan="3"
                   IsVisible="False"
                   Background="{DynamicResource AppContentBrush}"
                   ZIndex="20"
@@ -2935,7 +3012,7 @@
             <!-- Podcast info view -->
             <Grid x:Name="PodcastInfoView"
                   Grid.Row="1"
-                  Grid.RowSpan="2"
+                  Grid.RowSpan="3"
                   IsVisible="False"
                   Background="{DynamicResource AppContentBrush}"
                   ZIndex="21">
@@ -3024,7 +3101,7 @@
             <!-- Artist info view -->
             <Grid x:Name="ArtistInfoView"
                   Grid.Row="1"
-                  Grid.RowSpan="2"
+                  Grid.RowSpan="3"
                   IsVisible="False"
                   Background="{DynamicResource AppContentBrush}"
                   ZIndex="21">

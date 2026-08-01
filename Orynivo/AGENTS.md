@@ -68,7 +68,28 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   the local snapshot and every configured Orynivo Server concurrently, merges
   counts by stable taxonomy key, applies client-side remote favorites and
   cross-source listening-history affinity, and resolves recommendations to
-  ordinary source-aware `ContentRow` track rows.
+  ordinary source-aware `ContentRow` track rows. Its explanatory hero remains
+  separate from the elliptical cloud surface below it; drill-down transitions
+  cross-fade the old level and stagger the new count-scaled nodes. Cloud nodes
+  use measured, centered rows with explicit horizontal/vertical gaps and must
+  never overlap; excess rows scroll vertically. The recommendation mode uses
+  the same segmented `ViewModeRadioTheme` controls as the Artists/Albums view
+  selector and switches between the shared track table and source-aware album
+  artwork cards. The cloud surface owns a dedicated Auto-sized main-content row
+  between the intro hero and the shared star-sized result row; never overlay it
+  on results or compensate with large result margins. Mode-button clicks must
+  explicitly update both radio states and the visible result host. Opening an
+  album recommendation must collapse both Genre Cloud rows and use the normal
+  star-sized album detail surface. Its navigation state retains the selected
+  taxonomy key and Tracks/Albums mode so Back restores the same cloud context,
+  selection, and scroll offset. Node labels and font scaling use track counts in
+  Tracks mode and distinct provider-local album counts in Albums mode; changing
+  the mode must rebuild the existing nodes without reloading the libraries.
+  A remote snapshot whose `ParentKey` differs from the requested key is stale
+  taxonomy data and must be rebuilt from that server's track facets. A selected
+  leaf with candidates but no child nodes displays its own name centrally; it
+  is not an empty-library state. The virtual `more-genres` node is localized
+  while its dynamic children retain the actual unmapped library tag names.
 - Matching local and Orynivo Server artists use
   `ArtistNameNormalizer.CreateComparisonKey` and one `UnifiedArtist` row. Its
   album drill-down combines every matching library while retaining each album's

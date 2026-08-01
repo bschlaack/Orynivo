@@ -61,6 +61,7 @@ public static class LocalizationManager
         resources["L_AllGenres"] = Current.AllGenres;
         resources["L_GenreRecommendations"] = Current.GenreRecommendations;
         resources["L_GenreCloudEmpty"] = Current.GenreCloudEmpty;
+        resources["L_MoreGenres"] = Current.MoreGenres;
         resources["L_FolderStructure"] = Current.FolderStructure;
         resources["L_MetadataProblems"] = Current.MetadataProblems;
         resources["L_MetadataProblemsHint"] = Current.MetadataProblemsHint;
@@ -944,6 +945,7 @@ public static class LocalizationManager
         , AllGenres = "Alle Genres"
         , GenreRecommendations = "Passende Titel"
         , GenreCloudEmpty = "Noch keine Genres gefunden. Prüfe, ob deine Titel Genre-Tags enthalten."
+        , MoreGenres = "Weitere Genres"
         , PlayNext = "Als Nächstes abspielen"
         , AppendToQueue = "An Warteschlange anhängen"
         , RemoveFromQueue = "Aus Warteschlange entfernen"
@@ -1521,6 +1523,7 @@ public static class LocalizationManager
         , AllGenres = "All genres"
         , GenreRecommendations = "Recommended tracks"
         , GenreCloudEmpty = "No genres found yet. Check whether your tracks contain genre tags."
+        , MoreGenres = "More genres"
         , PlayNext = "Play next"
         , AppendToQueue = "Append to queue"
         , RemoveFromQueue = "Remove from queue"
@@ -2101,6 +2104,7 @@ public static class LocalizationManager
         , AllGenres = "Tous les genres"
         , GenreRecommendations = "Titres recommandés"
         , GenreCloudEmpty = "Aucun genre trouvé. Vérifiez que vos titres contiennent des balises de genre."
+        , MoreGenres = "Autres genres"
         , PlayNext = "Lire ensuite"
         , AppendToQueue = "Ajouter à la file d’attente"
         , RemoveFromQueue = "Retirer de la file d’attente"
@@ -2678,6 +2682,7 @@ public static class LocalizationManager
         , AllGenres = "Todos los géneros"
         , GenreRecommendations = "Pistas recomendadas"
         , GenreCloudEmpty = "Todavía no se encontraron géneros. Comprueba que tus pistas tengan etiquetas de género."
+        , MoreGenres = "Más géneros"
         , PlayNext = "Reproducir a continuación"
         , AppendToQueue = "Añadir a la cola"
         , RemoveFromQueue = "Quitar de la cola"

@@ -525,7 +525,13 @@ byte-range streaming without FFmpeg.
   Favorites-only filtering in both modes
 - Interactive count-scaled genre cloud with hierarchical drill-down and
   listening-history-based track suggestions, aggregated across the local
-  library and every configured Orynivo Server
+  library and every configured Orynivo Server; recommendations can be viewed
+  as playable tracks or as album artwork cards. Its curated graph supports
+  genres with multiple parents, while unknown tags remain discoverable by
+  their real names under **More genres**. Opening a suggested album uses the
+  full album detail view; Back returns to the previous cloud level and mode.
+  Cloud counts and label sizes represent tracks in Tracks mode and distinct
+  albums in Albums mode.
 - Dashboard with an artwork-backed greeting hero with a lightened-artwork rim, live
   library counters (including local and configured Orynivo Server track
   favorites), random

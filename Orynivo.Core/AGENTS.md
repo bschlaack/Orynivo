@@ -45,7 +45,16 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   Keep this payload free of track rows, artwork bytes, and playback credentials.
 - `GenreCloudService` owns the stable hierarchical genre taxonomy, tag
   normalization, count aggregation, breadcrumbs, and bounded provider-local
-  candidate selection. The desktop merges snapshots across providers.
+  candidate selection. Its curated data lives in the embedded
+  `Library/GenreTaxonomy.json`; definitions may be top-level and have multiple
+  parents, so traversal must be cycle-safe and node counts must deduplicate a
+  track even when several graph paths reach the same ancestor. Every node also
+  carries a distinct provider-local album count derived from the compact facet
+  row's optional `AlbumId`; cross-provider merging sums those counts. Controlled
+  compound-name matching resolves recognized descriptive tags without guessing
+  from arbitrary substrings. Unmapped tags retain dynamic `unmapped:` keys and
+  appear by their actual names beneath `more-genres`; never collapse them into
+  an Other bucket. The desktop merges snapshots across providers.
 - `AudioDatabase.GetListeningTrend` supports up to 366 equal chronological
   buckets so the client can request daily Dashboard points without materializing
   playback-history rows.

@@ -947,6 +947,8 @@ public sealed record LocalizedStrings(
     public string GenreRecommendations { get; init; } = "";
     /// <summary>Gets the empty-state text for a genre cloud without tagged tracks.</summary>
     public string GenreCloudEmpty { get; init; } = "";
+    /// <summary>Gets the label for dynamically preserved tags not yet mapped by the curated taxonomy.</summary>
+    public string MoreGenres { get; init; } = "";
     /// <summary>Gets the action label for inserting tracks after the current queue item.</summary>
     public string PlayNext { get; init; } = "";
     /// <summary>Gets the action label for appending tracks to the playback queue.</summary>
