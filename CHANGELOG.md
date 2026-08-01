@@ -23,6 +23,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Replaced the product website screenshots with a consistent fictional demo
+  library so published imagery no longer exposes real artists, albums, playback
+  history, server names, folder paths, or now-playing metadata. The fictional
+  Genre Cloud capture is available as a dedicated gallery tab in all four
+  website languages.
 - Replaced the Infinite Mix comma-separated genre fields with removable chips
   and type-ahead suggestions sourced from the currently enabled local and
   Orynivo Server libraries, while retaining support for custom genre values.
