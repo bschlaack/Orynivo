@@ -13,6 +13,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Fixed remote Orynivo Server tracks appearing with the local `L` source badge
   in **Up Next**. Queue rows now retain the registered server context used by
   the source-aware list that created the queue.
+- Fixed newly assigned Orynivo Server album covers disappearing after reopening
+  the Genre Cloud or another album list. Remote cover upload, reassignment, and
+  deletion now invalidate the scan-timestamp-based remote album-list cache.
 
 ## [0.32.0] - 2026-08-01
 

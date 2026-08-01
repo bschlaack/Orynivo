@@ -178,6 +178,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   context together with its display metadata. Otherwise the shared source
   column mislabels that queue row as local. Keep this context memory-only and
   never persist its authenticated playback URL or API key.
+- Remote album lists are cached by `LibraryChangedAt`, but artwork mutations do
+  not advance that scan timestamp. Every successful remote album artwork upload,
+  reassignment, or deletion must therefore call `DeleteOrynivoAlbumListCache`
+  so Genre Cloud and other later album views reload current artwork metadata.
 - macOS must configure `AvaloniaNativePlatformOptions.RenderingMode` with
   OpenGL first and software second. Do not re-enable Metal without verifying
   Orynivo's gradient and rounded-surface shaders on both Intel and Apple

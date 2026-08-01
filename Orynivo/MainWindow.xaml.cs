@@ -8314,6 +8314,21 @@ public partial class MainWindow : Window
         await ShowProviderAlbumTracksAsync(provider, album, artistFilterId, artistFilterName);
     }
 
+    /// <summary>Deletes the cached remote album list after album artwork metadata changes.</summary>
+    /// <param name="server">Server whose album list cache should be removed.</param>
+    internal static void DeleteOrynivoAlbumListCache(OrynivoServerSettings server)
+    {
+        try
+        {
+            var path = GetOrynivoAlbumListCachePath(server);
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch
+        {
+        }
+    }
+
     /// <summary>
     /// Resolves the provider-local artist scope to retain when an album is opened
     /// from the unified artist album list.
@@ -9105,6 +9120,7 @@ public partial class MainWindow : Window
             row.ArtworkPath = OrynivoServerClient.GetAlbumArtworkUrl(remoteServer, albumId, 320);
             row.ThumbnailPath = OrynivoServerClient.GetAlbumArtworkUrl(remoteServer, albumId, 96);
             ApplyRemoteArtwork(row, image.Data);
+            DeleteOrynivoAlbumListCache(remoteServer);
         }
         else
         {
@@ -9136,6 +9152,8 @@ public partial class MainWindow : Window
         row.ArtworkPath = null;
         row.ThumbnailPath = null;
         UpdateRowArtworkFromBytes(row, null);
+        if (row.EntityType == "OrynivoAlbum" && ResolveRowOrynivoServer(row) is { } remoteServer)
+            DeleteOrynivoAlbumListCache(remoteServer);
         if (_activeAlbumFilterId == albumId && row.EntityType != "OrynivoAlbum")
             await ReloadAlbumDetailHeaderAsync(albumId);
         StatusTextBlock.Text = string.Empty;
@@ -9393,6 +9411,7 @@ public partial class MainWindow : Window
         row.ArtworkPath ??= OrynivoServerClient.GetAlbumArtworkUrl(server, albumId, 320);
         row.ThumbnailPath ??= OrynivoServerClient.GetAlbumArtworkUrl(server, albumId, 96);
         ApplyRemoteArtwork(row, selected.ImageData);
+        DeleteOrynivoAlbumListCache(server);
         StatusTextBlock.Text = string.Empty;
     }
 
