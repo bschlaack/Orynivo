@@ -2402,10 +2402,15 @@ public partial class MainWindow : Window
         SaveSmartPlaylistButton.IsVisible = tag == "Tracks" ? true : false;
         ClearQueueButton.IsVisible = tag == "Queue";
         ClearQueueButton.IsEnabled = _queue.Count > 0;
+        InfiniteMixButton.IsVisible = tag == "Queue";
+        InfiniteMixActionsPanel.IsVisible = tag == "Queue" && _infiniteMixEnabled;
+        InfiniteMixStatusTextBlock.IsVisible = tag == "Queue" && _infiniteMixEnabled;
         SaveQueueAsPlaylistButton.IsVisible = tag == "Queue";
         SaveQueueAsPlaylistButton.IsEnabled =
             _queue.Any(item => CanPersistQueuePath(item.FilePath));
         UpdateRestoreQueueButtonState(tag);
+        if (tag == "Queue" && _infiniteMixEnabled)
+            RestoreQueueButton.IsVisible = false;
         if (tag == "Tracks") UpdateSaveSmartPlaylistButtonState();
         TrackFilterPopup.IsOpen = false;
         try
@@ -7132,7 +7137,7 @@ public partial class MainWindow : Window
             grid.Columns.Add(new DataGridTemplateColumn
             {
                 Header = "",
-                Width = new DataGridLength(132),
+                Width = new DataGridLength(244),
                 CellTemplate = new FuncDataTemplate<ContentRow>((row, _) =>
                 {
                     var panel = new StackPanel
@@ -7156,6 +7161,15 @@ public partial class MainWindow : Window
                         LocalizationManager.Current.RemoveFromQueue,
                         row,
                         QueueRemoveButton_OnClick));
+                    var mixActionsVisible = _infiniteMixEnabled && row.QueueItem is not null &&
+                        _infiniteMixIdentitiesByPath.ContainsKey(row.QueueItem.FilePath);
+                    var more = CreateQueueActionButton("+", LocalizationManager.Current.InfiniteMixMoreLikeThis, row, InfiniteMixMoreButton_OnClick);
+                    var less = CreateQueueActionButton("−", LocalizationManager.Current.InfiniteMixLessLikeThis, row, InfiniteMixLessButton_OnClick);
+                    var exclude = CreateQueueActionButton("⊘", LocalizationManager.Current.InfiniteMixExcludeTrack, row, InfiniteMixExcludeButton_OnClick);
+                    more.IsVisible = less.IsVisible = exclude.IsVisible = mixActionsVisible;
+                    panel.Children.Add(more);
+                    panel.Children.Add(less);
+                    panel.Children.Add(exclude);
                     return panel;
                 })
             });
@@ -7299,7 +7313,8 @@ public partial class MainWindow : Window
                     Album = orynivoRow.Album,
                     Duration = orynivoRow.Duration,
                     Format = orynivoRow.Format,
-                    FilePath = item.FilePath
+                    FilePath = item.FilePath,
+                    OrynivoServer = orynivoRow.OrynivoServer
                 };
             }
             else
@@ -7395,6 +7410,7 @@ public partial class MainWindow : Window
     /// <summary>Clears the editable playback queue without stopping the currently playing item.</summary>
     private void ClearPlaybackQueue()
     {
+        StopInfiniteMix();
         _queue.Clear();
         _queueIndex = -1;
         ResetQueuePlaybackState();
@@ -8313,6 +8329,21 @@ public partial class MainWindow : Window
         await ShowProviderAlbumTracksAsync(provider, album, artistFilterId, artistFilterName);
     }
 
+    /// <summary>Deletes the cached remote album list after album artwork metadata changes.</summary>
+    /// <param name="server">Server whose album list cache should be removed.</param>
+    internal static void DeleteOrynivoAlbumListCache(OrynivoServerSettings server)
+    {
+        try
+        {
+            var path = GetOrynivoAlbumListCachePath(server);
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch
+        {
+        }
+    }
+
     /// <summary>
     /// Resolves the provider-local artist scope to retain when an album is opened
     /// from the unified artist album list.
@@ -8401,6 +8432,7 @@ public partial class MainWindow : Window
         if (string.IsNullOrEmpty(row.FilePath))
             return;
 
+        StopInfiniteMix();
         _queue.Clear();
         foreach (var r in allRows.Where(r => !string.IsNullOrEmpty(r.FilePath)))
             _queue.Add(ToPlaylistItem(r));
@@ -9104,6 +9136,7 @@ public partial class MainWindow : Window
             row.ArtworkPath = OrynivoServerClient.GetAlbumArtworkUrl(remoteServer, albumId, 320);
             row.ThumbnailPath = OrynivoServerClient.GetAlbumArtworkUrl(remoteServer, albumId, 96);
             ApplyRemoteArtwork(row, image.Data);
+            DeleteOrynivoAlbumListCache(remoteServer);
         }
         else
         {
@@ -9135,6 +9168,8 @@ public partial class MainWindow : Window
         row.ArtworkPath = null;
         row.ThumbnailPath = null;
         UpdateRowArtworkFromBytes(row, null);
+        if (row.EntityType == "OrynivoAlbum" && ResolveRowOrynivoServer(row) is { } remoteServer)
+            DeleteOrynivoAlbumListCache(remoteServer);
         if (_activeAlbumFilterId == albumId && row.EntityType != "OrynivoAlbum")
             await ReloadAlbumDetailHeaderAsync(albumId);
         StatusTextBlock.Text = string.Empty;
@@ -9325,7 +9360,6 @@ public partial class MainWindow : Window
         if (row.Id is not long albumId)
             return;
 
-        var verticalOffset = CaptureCurrentVerticalOffset();
         var dialog = new CoverSearchWindow(row.Title ?? string.Empty, GetCoverSearchArtist(row));
         if (await dialog.ShowDialog<bool>(this) == false || dialog.SelectedResult is not { } selected)
             return;
@@ -9342,8 +9376,6 @@ public partial class MainWindow : Window
             return;
         if (_activeAlbumFilterId == albumId)
             await ReloadAlbumDetailHeaderAsync(albumId);
-        else
-            await ReloadAlbumRowsAsync(albumId, verticalOffset);
     }
 
     /// <summary>Decodes image bytes and assigns them to a row's artwork/thumbnail in place.</summary>
@@ -9392,6 +9424,7 @@ public partial class MainWindow : Window
         row.ArtworkPath ??= OrynivoServerClient.GetAlbumArtworkUrl(server, albumId, 320);
         row.ThumbnailPath ??= OrynivoServerClient.GetAlbumArtworkUrl(server, albumId, 96);
         ApplyRemoteArtwork(row, selected.ImageData);
+        DeleteOrynivoAlbumListCache(server);
         StatusTextBlock.Text = string.Empty;
     }
 
@@ -12679,6 +12712,7 @@ public partial class MainWindow : Window
 
     private void RefreshQueueNavigationButtons()
     {
+        EnsureInfiniteMixQueue();
         if (_shuffleEnabled)
         {
             PreviousButton.IsEnabled = _shuffleHistoryPosition > 0;

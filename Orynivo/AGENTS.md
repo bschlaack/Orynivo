@@ -174,6 +174,39 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 - `AppSettings.ShowAiChatItem` controls the AI Chat sidebar item's visibility
   from Settings > Appearance, defaults to visible, and is applied with the
   existing Internet Radio, Podcasts, and Up Next item toggles.
+- `RefreshQueueRows` must copy a registered remote track's `OrynivoServer`
+  context together with its display metadata. Otherwise the shared source
+  column mislabels that queue row as local. Keep this context memory-only and
+  never persist its authenticated playback URL or API key.
+- Infinite Mix (`MainWindow.InfiniteMix.cs`) uses the persisted
+  `AppSettings.InfiniteMix` profile: calm/balanced/energetic mood,
+  familiar-to-adventurous discovery, 3/7/30/90-day history, local and selected
+  Orynivo Server sources, favorite/rare-track weighting, and explicit genre
+  includes/excludes. It appends batches of 20 and refills at five remaining
+  items, preserves source-aware `ContentRow` metadata, excludes queued paths,
+  and limits immediate artist/album repeats. Up Next owns the persistent
+  active/paused status, profile editor, next replacement, genre-level more/less
+  feedback, and permanent credential-free track exclusions. Never persist an
+  authenticated URL as feedback identity: use `local:<trackId>` or
+  `server:<serverId>:<trackId>`. Normal explicit queue replacement and Clear
+  Queue stop automatic refill. Initial generation must show
+  `InfiniteMixLoadingOverlay` with staged progress and block duplicate
+  interaction; threshold refills remain unobtrusive in the background.
+  The profile dialog is resizable with a bounded minimum size, and its scroll
+  content reserves a right-side gutter so overlay scrollbars never cover text
+  or inputs at any supported display scale. Included and excluded genres use
+  removable chips. Their type-ahead suggestions load asynchronously from the
+  currently checked local/server sources; unavailable servers must not block
+  the dialog, and arbitrary custom genre values remain valid.
+- Remote album lists are cached by `LibraryChangedAt`, but artwork mutations do
+  not advance that scan timestamp. Every successful remote album artwork upload,
+  reassignment, or deletion must therefore call `DeleteOrynivoAlbumListCache`
+  so Genre Cloud and other later album views reload current artwork metadata.
+- Local album artwork writes generate cache files and Skia thumbnails and must
+  run off the UI thread through `LocalLibraryCatalogProvider`. After assignment,
+  update the bound `ContentRow` in place; do not rebuild the complete unified
+  Albums view merely to display the new bitmap. Album detail may reload only its
+  compact header row.
 - macOS must configure `AvaloniaNativePlatformOptions.RenderingMode` with
   OpenGL first and software second. Do not re-enable Metal without verifying
   Orynivo's gradient and rounded-surface shaders on both Intel and Apple

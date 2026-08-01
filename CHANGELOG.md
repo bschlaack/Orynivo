@@ -4,6 +4,48 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.33.0] - 2026-08-01
+
+### Added
+
+- Added an Infinite Mix that builds a source-aware queue from configurable
+  recent listening affinities, favorites, local tracks, and selected reachable
+  Orynivo Servers. Its profile covers mood, discovery level, 3/7/30/90-day
+  history, source selection, favorite/rare-track weighting, and included or
+  excluded genres. It avoids queued tracks and immediate artist/album
+  repetition, appends 20 recommendations at a time, and automatically refills
+  when five tracks remain. Up Next exposes active/paused status, profile
+  adjustment, next-suggestion replacement, more/less-like-this feedback, and
+  persistent credential-free track exclusion.
+- Starting Infinite Mix now immediately shows a localized blocking preparation
+  overlay with staged percentage progress while libraries, listening affinity,
+  candidates, and the initial queue are calculated.
+
+### Changed
+
+- Replaced the Infinite Mix comma-separated genre fields with removable chips
+  and type-ahead suggestions sourced from the currently enabled local and
+  Orynivo Server libraries, while retaining support for custom genre values.
+- Expanded the main README, multilingual product website, and GitHub Wiki with
+  current Genre Cloud and Infinite Mix behavior, usage, server integration, and
+  local cache/data-location documentation.
+
+### Fixed
+
+- Enlarged the Infinite Mix profile dialog, made it resizable, and reserved a
+  dedicated right-side gutter so its vertical scrollbar no longer covers
+  labels or input content.
+- Fixed remote Orynivo Server tracks appearing with the local `L` source badge
+  in **Up Next**. Queue rows now retain the registered server context used by
+  the source-aware list that created the queue.
+- Fixed newly assigned Orynivo Server album covers disappearing after reopening
+  the Genre Cloud or another album list. Remote cover upload, reassignment, and
+  deletion now invalidate the scan-timestamp-based remote album-list cache.
+- Fixed intermittent 10–30 second UI stalls after assigning local album covers.
+  Artwork hashing, file/thumbnail generation, and SQLite attachment now run off
+  the UI thread, and the already-updated card no longer triggers a complete
+  local-plus-remote Albums view rebuild.
+
 ## [0.32.0] - 2026-08-01
 
 ### Added
@@ -85,7 +127,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Fixed the product website's **Set up server** link so it activates the Server
   installation tab before scrolling to its instructions, including direct
   `#server-install` links.
-
 - Fixed Arch-family desktop updates (including CachyOS) closing Orynivo
   immediately after starting PolicyKit. Orynivo now remains open while
   `pacman -U` runs, closes only after a successful installer exit, and reports
@@ -120,7 +161,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Wikimedia Commons, shows progress and an estimated remaining time, and
   offers an API-key-gated option to accept Fanart.tv results automatically.
   Wikimedia candidates always require explicit acceptance or rejection before
-  storing them in their owning library. 
+  storing them in their owning library.
 - Added one cross-platform encrypted credential container for Last.fm,
   Fanart.tv, AI Chat, Orynivo Server, Plex, and streaming-provider secrets.
   Windows uses current-user DPAPI; Linux and macOS use AES-GCM with a separate
@@ -178,8 +219,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Orynivo's artwork caches. Adjacent trash actions delete album covers or artist
   images for local and Orynivo Server libraries, with unified artist-image
   changes synchronized across matching sources.
-
-
 
 ## [0.29.4] - 2026-07-28
 

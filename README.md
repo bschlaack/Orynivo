@@ -28,6 +28,10 @@ the ability to reach that library from any device on the local network.
 - CUE sheet support
 - ReplayGain and parametric EQ
 - Local library, playlists, smart playlists and full-text search
+- Hierarchical Genre Cloud with source-aware track and album recommendations
+  across the local library and connected Orynivo Servers
+- Infinite Mix, which turns recent listening habits and favorites into a
+  continuously replenished mixed-source queue
 - Album-artist-centered library attribution: explicit `ALBUMARTIST` metadata
   wins, untagged multi-artist compilations are grouped under `Various Artists`,
   featured track credits do not create extra library artists, and embedded
@@ -537,6 +541,11 @@ byte-range streaming without FFmpeg.
   full album detail view; Back returns to the previous cloud level and mode.
   Cloud counts and label sizes represent tracks in Tracks mode and distinct
   albums in Albums mode.
+- Infinite Mix builds a continuously replenished Up Next queue from recent
+  listening habits, favorites, the local library, and all reachable Orynivo
+  Servers. It balances discovery with genre affinity and suppresses immediate
+  track, album, and artist repetition. Initial preparation is surfaced through
+  a progress overlay; later refills happen automatically in the background.
 - Dashboard with an artwork-backed greeting hero with a lightened-artwork rim, live
   library counters (including local and configured Orynivo Server track
   favorites), random
@@ -648,6 +657,49 @@ byte-range streaming without FFmpeg.
   and controlled web-browsing tools to any MCP-compatible AI assistant (e.g.
   Claude Desktop). Tools can be individually enabled or disabled, the server
   binds to `localhost` only, and the TCP port is configurable (default 49200).
+
+### Genre discovery and Infinite Mix
+
+Open **Genre Cloud** from the Library section to explore the genres found in
+the local library and every configured Orynivo Server. The first level groups
+the library into broad families. Selecting a label reveals its more specific
+genres and immediately updates the recommendations below the cloud. The
+breadcrumb buttons return to an earlier level. A leaf without further children
+remains visible as the large center label instead of producing an empty view.
+
+The selector above the recommendations changes both the result presentation and
+the numbers in the cloud:
+
+- **Tracks** shows playable, source-aware track suggestions. Counts and label
+  sizes represent matching tracks.
+- **Albums** shows artwork cards. Counts and label sizes represent distinct
+  matching albums. Double-clicking a card opens the normal album detail page;
+  Back restores the selected genre, mode, selection, and scroll position.
+
+Unknown or unusually specific tags are retained under **More genres** rather
+than being collapsed into a generic Other bucket. Suggestions use listening
+history when available, but the cloud remains usable with a new or empty play
+history. Remote results retain their owning server for playback, favorites,
+artwork, and album/artist navigation.
+
+**Infinite Mix** can be started from the Dashboard or from **Up next**. Before
+starting, its compact profile editor selects a calm, balanced, or energetic
+mood; familiar-to-adventurous discovery level; 3, 7, 30, or 90-day history
+period; local and individual Orynivo Server sources; favorite and rarely-played
+weighting; and optional included or excluded genres. Initial creation shows a
+blocking progress overlay so the start action cannot be mistaken for an
+unresponsive button. The first 20 tracks are added to Up next; another batch is
+prepared automatically in the background when five tracks remain. Existing
+queue entries and immediate track, album, and artist repetitions are avoided.
+Genre rules use removable chips with type-ahead suggestions gathered from the
+currently enabled local and Orynivo Server libraries; custom genre text remains
+possible when a library does not offer a matching suggestion.
+
+While the mix is active, Up next shows a persistent active/paused status and
+actions to pause or resume replenishment, adjust the profile, replace the next
+suggestion, request more or less music like a selected suggestion, or exclude a
+track from future mixes. The profile, genre feedback, and credential-free local
+or server track exclusions are persisted in `settings.json`.
 
 ## Supported Formats
 
@@ -1043,7 +1095,10 @@ Orynivo/
 
 ## Local Data
 
-Orynivo stores its local data under `%LOCALAPPDATA%\Orynivo\`:
+Orynivo stores player data under `%LOCALAPPDATA%\Orynivo\` on Windows and the
+operating system's local application-data directory (normally
+`$HOME/.local/share/Orynivo/`) on Linux and macOS. `ORYNIVO_DATA_DIR` can
+override that root; packaged Linux servers use `/var/lib/orynivo-server`.
 
 - `settings.json`: non-secret application settings
 - `credentials.dat`: encrypted Last.fm, Fanart.tv, AI Chat, Orynivo Server,
@@ -1052,9 +1107,17 @@ Orynivo stores its local data under `%LOCALAPPDATA%\Orynivo\`:
   current operating-system user (Windows uses DPAPI and does not create it)
 - `library.db`: SQLite music library and playback history
 - `logs\`: timestamped crash reports for unhandled application errors
+- `logs\seek.log`: sanitized playback-seek, decoder, and server-transcode
+  diagnostics
 - `artworks\`: original artwork and generated thumbnails
 - `artist-images\`: cached Wikipedia/Wikimedia artist images
+- `remote-artworks\`: artwork downloaded from connected Orynivo Servers
+- `remote-track-cache\` and `remote-folder-cache\`: bounded remote-library
+  metadata caches, invalidated when the server reports a newer library scan
+- `server-status.json`: last successful connection time for configured Orynivo
+  Servers
 - `search-index\`: Lucene.NET search index
+- `waveforms\`: compact cached peak data for the transport waveform
 - `catalog-filter-cache.json`: cached radio genres and podcast categories/languages
 - `radio-logos\`: cached internet-radio station logos used for robust Windows
   media-overlay artwork updates

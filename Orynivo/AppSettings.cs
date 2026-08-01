@@ -94,6 +94,8 @@ public sealed class AppSettings
     public List<OrynivoServerSettings> OrynivoServers { get; set; } = [];
     /// <summary>Gets or sets client-side favorite identifiers for remote Orynivo Server entities.</summary>
     public HashSet<string> OrynivoServerFavorites { get; set; } = [];
+    /// <summary>Gets or sets persisted Infinite Mix preferences and recommendation feedback.</summary>
+    public InfiniteMixSettings InfiniteMix { get; set; } = new();
     /// <summary>Gets or sets a value indicating whether the MCP server is enabled.</summary>
     public bool McpServerEnabled { get; set; }
     /// <summary>Gets or sets the TCP port the MCP server listens on.</summary>

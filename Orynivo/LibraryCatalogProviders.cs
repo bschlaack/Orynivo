@@ -285,21 +285,25 @@ internal sealed class LocalLibraryCatalogProvider : ILibraryCatalogProvider
     }
 
     /// <inheritdoc/>
-    public Task<bool> SetAlbumArtworkAsync(long albumId, byte[] imageData, string? mimeType, CancellationToken cancellationToken = default)
-    {
-        using var db = AudioDatabase.OpenDefault();
-        return Task.FromResult(db.AttachArtworkToAlbum(albumId, imageData, mimeType));
-    }
+    public Task<bool> SetAlbumArtworkAsync(long albumId, byte[] imageData, string? mimeType, CancellationToken cancellationToken = default) =>
+        Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            using var db = AudioDatabase.OpenDefault();
+            return db.AttachArtworkToAlbum(albumId, imageData, mimeType);
+        }, cancellationToken);
 
     /// <inheritdoc/>
-    public Task<bool> DeleteAlbumArtworkAsync(long albumId, CancellationToken cancellationToken = default)
-    {
-        using var db = AudioDatabase.OpenDefault();
-        if (db.GetAlbumById(albumId) is null)
-            return Task.FromResult(false);
-        db.ClearArtworkFromAlbum(albumId);
-        return Task.FromResult(true);
-    }
+    public Task<bool> DeleteAlbumArtworkAsync(long albumId, CancellationToken cancellationToken = default) =>
+        Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            using var db = AudioDatabase.OpenDefault();
+            if (db.GetAlbumById(albumId) is null)
+                return false;
+            db.ClearArtworkFromAlbum(albumId);
+            return true;
+        }, cancellationToken);
 
     private static LibraryCatalogArtist ToArtist(ArtistInfo artist) => new(
         LibraryCatalogSource.Local,

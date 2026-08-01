@@ -429,6 +429,9 @@ public partial class MainWindow : Window
         var randomButton = DashboardHeroButton(LocalizationManager.Current.DashboardRandomPlayback, primary: true);
         randomButton.Click += DashboardRandomPlayback_OnClick;
         actions.Children.Add(randomButton);
+        var infiniteMixButton = DashboardHeroButton(LocalizationManager.Current.InfiniteMixStart, primary: false);
+        infiniteMixButton.Click += InfiniteMixButton_OnClick;
+        actions.Children.Add(infiniteMixButton);
         var queueButton = DashboardHeroButton(LocalizationManager.Current.UpNext, primary: false);
         queueButton.Click += async (_, e) =>
         {
@@ -3076,6 +3079,7 @@ public partial class MainWindow : Window
 
     private async Task DashboardPlayRandomAsync()
     {
+        StopInfiniteMix();
         var path = await Task.Run(() =>
         {
             using var db = AudioDatabase.OpenDefault();

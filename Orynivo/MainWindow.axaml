@@ -1290,6 +1290,12 @@
                                        Margin="14,0,0,0"
                                        FontSize="{DynamicResource FontSizeCaption}" Foreground="{DynamicResource AppMutedTextBrush}"
                                        VerticalAlignment="Center"/>
+                            <TextBlock x:Name="InfiniteMixStatusTextBlock"
+                                       Margin="14,0,0,0"
+                                       IsVisible="False"
+                                       FontSize="{DynamicResource FontSizeCaption}"
+                                       Foreground="{DynamicResource AppAccentBrush}"
+                                       VerticalAlignment="Center"/>
                             <Button x:Name="LibraryRefreshButton"
                                     Margin="14,0,0,0"
                                     Padding="10,4"
@@ -1346,6 +1352,33 @@
                                 ToolTip.Tip="{DynamicResource L_RestoreQueueTooltip}"
                                 Content="{DynamicResource L_RestoreQueue}"
                                 Click="RestoreQueueButton_OnClick"/>
+                        <Button x:Name="InfiniteMixButton"
+                                Grid.Column="3"
+                                Margin="8,0,0,0"
+                                Padding="12,5"
+                                VerticalAlignment="Center"
+                                IsVisible="False"
+                                Theme="{StaticResource HeaderFilterButtonTheme}"
+                                Content="{DynamicResource L_InfiniteMixStart}"
+                                Click="InfiniteMixButton_OnClick"/>
+                        <StackPanel x:Name="InfiniteMixActionsPanel"
+                                    Grid.Column="4"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center"
+                                    IsVisible="False">
+                            <Button x:Name="InfiniteMixAdjustButton"
+                                    Margin="8,0,0,0"
+                                    Padding="12,5"
+                                    Theme="{StaticResource HeaderFilterButtonTheme}"
+                                    Content="{DynamicResource L_InfiniteMixAdjust}"
+                                    Click="InfiniteMixAdjustButton_OnClick"/>
+                            <Button x:Name="InfiniteMixReplaceNextButton"
+                                    Margin="8,0,0,0"
+                                    Padding="12,5"
+                                    Theme="{StaticResource HeaderFilterButtonTheme}"
+                                    Content="{DynamicResource L_InfiniteMixReplaceNext}"
+                                    Click="InfiniteMixReplaceNextButton_OnClick"/>
+                        </StackPanel>
                         <Button x:Name="ClearQueueButton"
                                 Grid.Column="5"
                                 Margin="8,0,0,0"
@@ -2905,6 +2938,42 @@
                                 Opacity="0.7"/>
                     </UniformGrid>
                 </StackPanel>
+            </Border>
+            <Border x:Name="InfiniteMixLoadingOverlay"
+                    Grid.Row="1"
+                    Grid.RowSpan="3"
+                    IsVisible="False"
+                    IsHitTestVisible="True"
+                    Background="#B8091523"
+                    ZIndex="50">
+                <Border Width="430"
+                        Padding="28,24"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Background="{DynamicResource AppSurfaceBrush}"
+                        BorderBrush="{DynamicResource AppAccentBrush}"
+                        BorderThickness="1"
+                        CornerRadius="16">
+                    <StackPanel Spacing="14">
+                        <TextBlock Text="{DynamicResource L_InfiniteMixCalculating}"
+                                   FontSize="{DynamicResource FontSizeSubtitle}"
+                                   FontWeight="SemiBold"
+                                   TextAlignment="Center"
+                                   TextWrapping="Wrap"/>
+                        <ProgressBar x:Name="InfiniteMixProgressBar"
+                                     Height="8"
+                                     Minimum="0"
+                                     Maximum="100"
+                                     Value="0"
+                                     Background="{DynamicResource AppGridLineBrush}"
+                                     Foreground="{DynamicResource AppAccentBrush}"/>
+                        <TextBlock x:Name="InfiniteMixProgressTextBlock"
+                                   Text="0 %"
+                                   FontSize="{DynamicResource FontSizeCaption}"
+                                   Foreground="{DynamicResource AppMutedTextBrush}"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
             </Border>
 
             <!-- Lyrics view -->
