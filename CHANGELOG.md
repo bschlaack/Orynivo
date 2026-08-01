@@ -16,6 +16,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Fixed newly assigned Orynivo Server album covers disappearing after reopening
   the Genre Cloud or another album list. Remote cover upload, reassignment, and
   deletion now invalidate the scan-timestamp-based remote album-list cache.
+- Fixed intermittent 10–30 second UI stalls after assigning local album covers.
+  Artwork hashing, file/thumbnail generation, and SQLite attachment now run off
+  the UI thread, and the already-updated card no longer triggers a complete
+  local-plus-remote Albums view rebuild.
 
 ## [0.32.0] - 2026-08-01
 

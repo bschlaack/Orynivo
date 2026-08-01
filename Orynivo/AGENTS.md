@@ -182,6 +182,11 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   not advance that scan timestamp. Every successful remote album artwork upload,
   reassignment, or deletion must therefore call `DeleteOrynivoAlbumListCache`
   so Genre Cloud and other later album views reload current artwork metadata.
+- Local album artwork writes generate cache files and Skia thumbnails and must
+  run off the UI thread through `LocalLibraryCatalogProvider`. After assignment,
+  update the bound `ContentRow` in place; do not rebuild the complete unified
+  Albums view merely to display the new bitmap. Album detail may reload only its
+  compact header row.
 - macOS must configure `AvaloniaNativePlatformOptions.RenderingMode` with
   OpenGL first and software second. Do not re-enable Metal without verifying
   Orynivo's gradient and rounded-surface shaders on both Intel and Apple

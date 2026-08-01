@@ -9344,7 +9344,6 @@ public partial class MainWindow : Window
         if (row.Id is not long albumId)
             return;
 
-        var verticalOffset = CaptureCurrentVerticalOffset();
         var dialog = new CoverSearchWindow(row.Title ?? string.Empty, GetCoverSearchArtist(row));
         if (await dialog.ShowDialog<bool>(this) == false || dialog.SelectedResult is not { } selected)
             return;
@@ -9361,8 +9360,6 @@ public partial class MainWindow : Window
             return;
         if (_activeAlbumFilterId == albumId)
             await ReloadAlbumDetailHeaderAsync(albumId);
-        else
-            await ReloadAlbumRowsAsync(albumId, verticalOffset);
     }
 
     /// <summary>Decodes image bytes and assigns them to a row's artwork/thumbnail in place.</summary>
