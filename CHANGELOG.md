@@ -4,27 +4,37 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.33.0] - 2026-08-01
 
 ### Added
 
-- Added an Infinite Mix that builds a source-aware queue from the last 14 days
-  of listening affinities, favorites, local tracks, and every reachable Orynivo
-  Server. It avoids queued tracks and immediate artist/album repetition,
-  appends 20 recommendations at a time, and automatically refills when five
-  tracks remain. It can be started from the Dashboard or controlled in Up Next.
+- Added an Infinite Mix that builds a source-aware queue from configurable
+  recent listening affinities, favorites, local tracks, and selected reachable
+  Orynivo Servers. Its profile covers mood, discovery level, 3/7/30/90-day
+  history, source selection, favorite/rare-track weighting, and included or
+  excluded genres. It avoids queued tracks and immediate artist/album
+  repetition, appends 20 recommendations at a time, and automatically refills
+  when five tracks remain. Up Next exposes active/paused status, profile
+  adjustment, next-suggestion replacement, more/less-like-this feedback, and
+  persistent credential-free track exclusion.
 - Starting Infinite Mix now immediately shows a localized blocking preparation
   overlay with staged percentage progress while libraries, listening affinity,
   candidates, and the initial queue are calculated.
 
 ### Changed
 
+- Replaced the Infinite Mix comma-separated genre fields with removable chips
+  and type-ahead suggestions sourced from the currently enabled local and
+  Orynivo Server libraries, while retaining support for custom genre values.
 - Expanded the main README, multilingual product website, and GitHub Wiki with
   current Genre Cloud and Infinite Mix behavior, usage, server integration, and
   local cache/data-location documentation.
 
 ### Fixed
 
+- Enlarged the Infinite Mix profile dialog, made it resizable, and reserved a
+  dedicated right-side gutter so its vertical scrollbar no longer covers
+  labels or input content.
 - Fixed remote Orynivo Server tracks appearing with the local `L` source badge
   in **Up Next**. Queue rows now retain the registered server context used by
   the source-aware list that created the queue.

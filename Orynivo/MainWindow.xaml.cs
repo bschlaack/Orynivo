@@ -2403,10 +2403,14 @@ public partial class MainWindow : Window
         ClearQueueButton.IsVisible = tag == "Queue";
         ClearQueueButton.IsEnabled = _queue.Count > 0;
         InfiniteMixButton.IsVisible = tag == "Queue";
+        InfiniteMixActionsPanel.IsVisible = tag == "Queue" && _infiniteMixEnabled;
+        InfiniteMixStatusTextBlock.IsVisible = tag == "Queue" && _infiniteMixEnabled;
         SaveQueueAsPlaylistButton.IsVisible = tag == "Queue";
         SaveQueueAsPlaylistButton.IsEnabled =
             _queue.Any(item => CanPersistQueuePath(item.FilePath));
         UpdateRestoreQueueButtonState(tag);
+        if (tag == "Queue" && _infiniteMixEnabled)
+            RestoreQueueButton.IsVisible = false;
         if (tag == "Tracks") UpdateSaveSmartPlaylistButtonState();
         TrackFilterPopup.IsOpen = false;
         try
@@ -7133,7 +7137,7 @@ public partial class MainWindow : Window
             grid.Columns.Add(new DataGridTemplateColumn
             {
                 Header = "",
-                Width = new DataGridLength(132),
+                Width = new DataGridLength(244),
                 CellTemplate = new FuncDataTemplate<ContentRow>((row, _) =>
                 {
                     var panel = new StackPanel
@@ -7157,6 +7161,15 @@ public partial class MainWindow : Window
                         LocalizationManager.Current.RemoveFromQueue,
                         row,
                         QueueRemoveButton_OnClick));
+                    var mixActionsVisible = _infiniteMixEnabled && row.QueueItem is not null &&
+                        _infiniteMixIdentitiesByPath.ContainsKey(row.QueueItem.FilePath);
+                    var more = CreateQueueActionButton("+", LocalizationManager.Current.InfiniteMixMoreLikeThis, row, InfiniteMixMoreButton_OnClick);
+                    var less = CreateQueueActionButton("−", LocalizationManager.Current.InfiniteMixLessLikeThis, row, InfiniteMixLessButton_OnClick);
+                    var exclude = CreateQueueActionButton("⊘", LocalizationManager.Current.InfiniteMixExcludeTrack, row, InfiniteMixExcludeButton_OnClick);
+                    more.IsVisible = less.IsVisible = exclude.IsVisible = mixActionsVisible;
+                    panel.Children.Add(more);
+                    panel.Children.Add(less);
+                    panel.Children.Add(exclude);
                     return panel;
                 })
             });

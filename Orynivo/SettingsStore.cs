@@ -38,6 +38,7 @@ public sealed class SettingsStore
             ApplyCredentials(defaultSettings, _credentialStore.Load());
             NormalizeEqualizerProfiles(defaultSettings);
             NormalizeOutputProfiles(defaultSettings);
+            NormalizeInfiniteMix(defaultSettings);
             return defaultSettings;
         }
 
@@ -51,6 +52,7 @@ public sealed class SettingsStore
             ApplyCredentials(settings, credentials);
             NormalizeEqualizerProfiles(settings);
             NormalizeOutputProfiles(settings);
+            NormalizeInfiniteMix(settings);
             if (migrated)
             {
                 _credentialStore.Save(credentials);
@@ -65,6 +67,7 @@ public sealed class SettingsStore
             var defaultSettings = new AppSettings();
             NormalizeEqualizerProfiles(defaultSettings);
             NormalizeOutputProfiles(defaultSettings);
+            NormalizeInfiniteMix(defaultSettings);
             return defaultSettings;
         }
     }
@@ -76,10 +79,26 @@ public sealed class SettingsStore
         ArgumentNullException.ThrowIfNull(settings);
         NormalizeEqualizerProfiles(settings);
         NormalizeOutputProfiles(settings);
+        NormalizeInfiniteMix(settings);
         var credentials = _credentialStore.Load();
         CaptureCredentials(settings, credentials);
         _credentialStore.Save(credentials);
         SaveSettingsJson(settings);
+    }
+
+    /// <summary>Repairs missing or malformed Infinite Mix collection values from older settings files.</summary>
+    /// <param name="settings">Settings whose Infinite Mix profile is normalized.</param>
+    private static void NormalizeInfiniteMix(AppSettings settings)
+    {
+        settings.InfiniteMix ??= new InfiniteMixSettings();
+        settings.InfiniteMix.EnabledServerIds ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        settings.InfiniteMix.IncludedGenres ??= [];
+        settings.InfiniteMix.ExcludedGenres ??= [];
+        settings.InfiniteMix.GenreFeedback ??= new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        settings.InfiniteMix.ExcludedTrackKeys ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        settings.InfiniteMix.DiscoveryLevel = Math.Clamp(settings.InfiniteMix.DiscoveryLevel, 0, 100);
+        if (settings.InfiniteMix.HistoryDays is not (3 or 7 or 30 or 90))
+            settings.InfiniteMix.HistoryDays = 30;
     }
 
     /// <summary>Copies decrypted credentials into their runtime settings objects.</summary>

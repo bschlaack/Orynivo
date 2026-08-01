@@ -1,0 +1,95 @@
+<Window x:Class="Orynivo.InfiniteMixDialog"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{DynamicResource L_InfiniteMixSettingsTitle}"
+        Icon="avares://Orynivo/Assets/Orynivo.ico"
+        Width="680" Height="760"
+        MinWidth="560" MinHeight="600"
+        CanResize="True"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppSurfaceBrush}">
+  <Grid RowDefinitions="*,Auto" Margin="24,20,24,24">
+    <ScrollViewer Grid.Row="0"
+                  VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Margin="0,0,28,0" Spacing="14">
+        <TextBlock Text="{DynamicResource L_InfiniteMixSettingsHint}" TextWrapping="Wrap"
+                   FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource AppMutedTextBrush}"/>
+        <TextBlock Text="{DynamicResource L_InfiniteMixMood}" FontWeight="SemiBold"/>
+        <ComboBox x:Name="MoodComboBox" HorizontalAlignment="Stretch"/>
+        <TextBlock Text="{DynamicResource L_InfiniteMixDiscovery}" FontWeight="SemiBold"/>
+        <Grid ColumnDefinitions="*,Auto">
+          <Slider x:Name="DiscoverySlider" Minimum="0" Maximum="100" TickFrequency="10"
+                  ValueChanged="DiscoverySlider_OnValueChanged"/>
+          <TextBlock x:Name="DiscoveryValueText" Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center"/>
+        </Grid>
+        <Grid ColumnDefinitions="*,*">
+          <TextBlock Text="{DynamicResource L_InfiniteMixFamiliar}" Foreground="{DynamicResource AppMutedTextBrush}"/>
+          <TextBlock Grid.Column="1" Text="{DynamicResource L_InfiniteMixAdventurous}" HorizontalAlignment="Right" Foreground="{DynamicResource AppMutedTextBrush}"/>
+        </Grid>
+        <TextBlock Text="{DynamicResource L_InfiniteMixPeriod}" FontWeight="SemiBold"/>
+        <ComboBox x:Name="PeriodComboBox" HorizontalAlignment="Stretch"/>
+        <TextBlock Text="{DynamicResource L_InfiniteMixSources}" FontWeight="SemiBold"/>
+        <StackPanel x:Name="SourcesPanel" Spacing="6"/>
+        <CheckBox x:Name="WeightFavoritesCheckBox" Content="{DynamicResource L_InfiniteMixWeightFavorites}"/>
+        <CheckBox x:Name="PreferRareCheckBox" Content="{DynamicResource L_InfiniteMixPreferRare}"/>
+        <TextBlock Text="{DynamicResource L_InfiniteMixIncludeGenres}" FontWeight="SemiBold"/>
+        <ItemsControl x:Name="IncludedGenreChips">
+          <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Margin="0,0,7,7" Padding="10,4,4,4" CornerRadius="12"
+                      Background="{DynamicResource AppAccentSoftBrush}"
+                      BorderBrush="{DynamicResource AppAccentBrush}" BorderThickness="1">
+                <StackPanel Orientation="Horizontal" Spacing="5">
+                  <TextBlock Text="{Binding}" VerticalAlignment="Center" FontSize="{DynamicResource FontSizeCaption}"/>
+                  <Button Content="×" Tag="{Binding}" Padding="5,0" MinWidth="22"
+                          ToolTip.Tip="{DynamicResource L_InfiniteMixRemoveGenre}"
+                          Click="RemoveIncludedGenreButton_OnClick"/>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBox x:Name="IncludedGenreInput" Watermark="{DynamicResource L_InfiniteMixGenresWatermark}"
+                   TextChanged="IncludedGenreInput_OnTextChanged" KeyDown="IncludedGenreInput_OnKeyDown"/>
+          <Button Grid.Column="1" Margin="8,0,0,0" Padding="12,5"
+                  Content="{DynamicResource L_InfiniteMixAddGenre}" Click="AddIncludedGenreButton_OnClick"/>
+        </Grid>
+        <ListBox x:Name="IncludedGenreSuggestions" MaxHeight="150" IsVisible="False"
+                 SelectionChanged="IncludedGenreSuggestions_OnSelectionChanged"/>
+        <TextBlock Text="{DynamicResource L_InfiniteMixExcludeGenres}" FontWeight="SemiBold"/>
+        <ItemsControl x:Name="ExcludedGenreChips">
+          <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Margin="0,0,7,7" Padding="10,4,4,4" CornerRadius="12"
+                      Background="{DynamicResource AppAccentSoftBrush}"
+                      BorderBrush="{DynamicResource AppAccentBrush}" BorderThickness="1">
+                <StackPanel Orientation="Horizontal" Spacing="5">
+                  <TextBlock Text="{Binding}" VerticalAlignment="Center" FontSize="{DynamicResource FontSizeCaption}"/>
+                  <Button Content="×" Tag="{Binding}" Padding="5,0" MinWidth="22"
+                          ToolTip.Tip="{DynamicResource L_InfiniteMixRemoveGenre}"
+                          Click="RemoveExcludedGenreButton_OnClick"/>
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBox x:Name="ExcludedGenreInput" Watermark="{DynamicResource L_InfiniteMixGenresWatermark}"
+                   TextChanged="ExcludedGenreInput_OnTextChanged" KeyDown="ExcludedGenreInput_OnKeyDown"/>
+          <Button Grid.Column="1" Margin="8,0,0,0" Padding="12,5"
+                  Content="{DynamicResource L_InfiniteMixAddGenre}" Click="AddExcludedGenreButton_OnClick"/>
+        </Grid>
+        <ListBox x:Name="ExcludedGenreSuggestions" MaxHeight="150" IsVisible="False"
+                 SelectionChanged="ExcludedGenreSuggestions_OnSelectionChanged"/>
+      </StackPanel>
+    </ScrollViewer>
+    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0" Spacing="8">
+      <Button Content="{DynamicResource L_Cancel}" MinWidth="100" Padding="16,8" Click="CancelButton_OnClick"/>
+      <Button Content="{DynamicResource L_Save}" MinWidth="100" Padding="16,8" Click="SaveButton_OnClick"/>
+    </StackPanel>
+  </Grid>
+</Window>

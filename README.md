@@ -677,16 +677,24 @@ history when available, but the cloud remains usable with a new or empty play
 history. Remote results retain their owning server for playback, favorites,
 artwork, and album/artist navigation.
 
-**Infinite Mix** can be started from the Dashboard or from **Up next**. Orynivo
-analyses the previous 14 days of listening, combines those affinities with
-favorites, and selects candidates from the local library and every reachable
-Orynivo Server. Initial creation shows a blocking progress overlay so the start
-action cannot be mistaken for an unresponsive button. The first 20 tracks are
-added to Up next; another batch is prepared automatically in the background
-when five tracks remain. Existing queue entries and immediate track, album, and
-artist repetitions are avoided, while a controlled discovery component keeps
-the result from becoming too repetitive. The Up next view contains the controls
-for stopping the automatic refill or starting a new Infinite Mix.
+**Infinite Mix** can be started from the Dashboard or from **Up next**. Before
+starting, its compact profile editor selects a calm, balanced, or energetic
+mood; familiar-to-adventurous discovery level; 3, 7, 30, or 90-day history
+period; local and individual Orynivo Server sources; favorite and rarely-played
+weighting; and optional included or excluded genres. Initial creation shows a
+blocking progress overlay so the start action cannot be mistaken for an
+unresponsive button. The first 20 tracks are added to Up next; another batch is
+prepared automatically in the background when five tracks remain. Existing
+queue entries and immediate track, album, and artist repetitions are avoided.
+Genre rules use removable chips with type-ahead suggestions gathered from the
+currently enabled local and Orynivo Server libraries; custom genre text remains
+possible when a library does not offer a matching suggestion.
+
+While the mix is active, Up next shows a persistent active/paused status and
+actions to pause or resume replenishment, adjust the profile, replace the next
+suggestion, request more or less music like a selected suggestion, or exclude a
+track from future mixes. The profile, genre feedback, and credential-free local
+or server track exclusions are persisted in `settings.json`.
 
 ## Supported Formats
 

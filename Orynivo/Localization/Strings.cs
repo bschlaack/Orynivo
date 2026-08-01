@@ -590,6 +590,58 @@ public sealed record LocalizedStrings(
     public string InfiniteMixActive { get; init; } = "";
     /// <summary>Gets the message shown while the initial Infinite Mix queue is calculated.</summary>
     public string InfiniteMixCalculating { get; init; } = "";
+    /// <summary>Gets the Infinite Mix settings dialog title.</summary>
+    public string InfiniteMixSettingsTitle { get; init; } = "";
+    /// <summary>Gets the Infinite Mix settings explanation.</summary>
+    public string InfiniteMixSettingsHint { get; init; } = "";
+    /// <summary>Gets the Infinite Mix mood field label.</summary>
+    public string InfiniteMixMood { get; init; } = "";
+    /// <summary>Gets the calm mood label.</summary>
+    public string InfiniteMixMoodCalm { get; init; } = "";
+    /// <summary>Gets the balanced mood label.</summary>
+    public string InfiniteMixMoodBalanced { get; init; } = "";
+    /// <summary>Gets the energetic mood label.</summary>
+    public string InfiniteMixMoodEnergetic { get; init; } = "";
+    /// <summary>Gets the discovery-level field label.</summary>
+    public string InfiniteMixDiscovery { get; init; } = "";
+    /// <summary>Gets the familiar end label.</summary>
+    public string InfiniteMixFamiliar { get; init; } = "";
+    /// <summary>Gets the adventurous end label.</summary>
+    public string InfiniteMixAdventurous { get; init; } = "";
+    /// <summary>Gets the history-period field label.</summary>
+    public string InfiniteMixPeriod { get; init; } = "";
+    /// <summary>Gets the source-selection field label.</summary>
+    public string InfiniteMixSources { get; init; } = "";
+    /// <summary>Gets the favorite-weight option.</summary>
+    public string InfiniteMixWeightFavorites { get; init; } = "";
+    /// <summary>Gets the rare-track option.</summary>
+    public string InfiniteMixPreferRare { get; init; } = "";
+    /// <summary>Gets the included-genres field label.</summary>
+    public string InfiniteMixIncludeGenres { get; init; } = "";
+    /// <summary>Gets the excluded-genres field label.</summary>
+    public string InfiniteMixExcludeGenres { get; init; } = "";
+    /// <summary>Gets the genre-list input hint.</summary>
+    public string InfiniteMixGenresWatermark { get; init; } = "";
+    /// <summary>Gets the action label for adding one genre chip.</summary>
+    public string InfiniteMixAddGenre { get; init; } = "";
+    /// <summary>Gets the tooltip for removing one genre chip.</summary>
+    public string InfiniteMixRemoveGenre { get; init; } = "";
+    /// <summary>Gets the paused Infinite Mix status.</summary>
+    public string InfiniteMixPaused { get; init; } = "";
+    /// <summary>Gets the pause action label.</summary>
+    public string InfiniteMixPause { get; init; } = "";
+    /// <summary>Gets the resume action label.</summary>
+    public string InfiniteMixResume { get; init; } = "";
+    /// <summary>Gets the adjust-mix action label.</summary>
+    public string InfiniteMixAdjust { get; init; } = "";
+    /// <summary>Gets the replace-next-suggestion action label.</summary>
+    public string InfiniteMixReplaceNext { get; init; } = "";
+    /// <summary>Gets the positive-feedback action label.</summary>
+    public string InfiniteMixMoreLikeThis { get; init; } = "";
+    /// <summary>Gets the negative-feedback action label.</summary>
+    public string InfiniteMixLessLikeThis { get; init; } = "";
+    /// <summary>Gets the permanent track-exclusion action label.</summary>
+    public string InfiniteMixExcludeTrack { get; init; } = "";
     /// <summary>Gets the dashboard quick-access section title.</summary>
     public string DashboardQuickAccess { get; init; } = "";
     /// <summary>Gets the dashboard total-minutes statistic label.</summary>

@@ -112,6 +112,23 @@ public static class LocalizationManager
         resources["L_SearchCover"] = Current.SearchCover;
         resources["L_InfiniteMixStart"] = Current.InfiniteMixStart;
         resources["L_InfiniteMixCalculating"] = Current.InfiniteMixCalculating;
+        resources["L_InfiniteMixSettingsTitle"] = Current.InfiniteMixSettingsTitle;
+        resources["L_InfiniteMixSettingsHint"] = Current.InfiniteMixSettingsHint;
+        resources["L_InfiniteMixMood"] = Current.InfiniteMixMood;
+        resources["L_InfiniteMixDiscovery"] = Current.InfiniteMixDiscovery;
+        resources["L_InfiniteMixFamiliar"] = Current.InfiniteMixFamiliar;
+        resources["L_InfiniteMixAdventurous"] = Current.InfiniteMixAdventurous;
+        resources["L_InfiniteMixPeriod"] = Current.InfiniteMixPeriod;
+        resources["L_InfiniteMixSources"] = Current.InfiniteMixSources;
+        resources["L_InfiniteMixWeightFavorites"] = Current.InfiniteMixWeightFavorites;
+        resources["L_InfiniteMixPreferRare"] = Current.InfiniteMixPreferRare;
+        resources["L_InfiniteMixIncludeGenres"] = Current.InfiniteMixIncludeGenres;
+        resources["L_InfiniteMixExcludeGenres"] = Current.InfiniteMixExcludeGenres;
+        resources["L_InfiniteMixGenresWatermark"] = Current.InfiniteMixGenresWatermark;
+        resources["L_InfiniteMixAddGenre"] = Current.InfiniteMixAddGenre;
+        resources["L_InfiniteMixRemoveGenre"] = Current.InfiniteMixRemoveGenre;
+        resources["L_InfiniteMixAdjust"] = Current.InfiniteMixAdjust;
+        resources["L_InfiniteMixReplaceNext"] = Current.InfiniteMixReplaceNext;
         resources["L_CoverSearchTitle"] = Current.CoverSearchTitle;
         resources["L_CoverSearchRunning"] = Current.CoverSearchRunning;
         resources["L_CoverSearchNoResults"] = Current.CoverSearchNoResults;
@@ -667,6 +684,16 @@ public static class LocalizationManager
         InfiniteMixStop = "Endlos-Mix stoppen",
         InfiniteMixActive = "Endlos-Mix aktiv · wird automatisch ergänzt",
         InfiniteMixCalculating = "Dein Endlos-Mix wird gerade berechnet …",
+        InfiniteMixSettingsTitle = "Endlos-Mix anpassen",
+        InfiniteMixSettingsHint = "Lege fest, wie Orynivo deine nächste fortlaufende Mischung zusammenstellt.",
+        InfiniteMixMood = "Stimmung", InfiniteMixMoodCalm = "Ruhig", InfiniteMixMoodBalanced = "Ausgewogen", InfiniteMixMoodEnergetic = "Energiegeladen",
+        InfiniteMixDiscovery = "Entdeckungsgrad", InfiniteMixFamiliar = "Vertraut", InfiniteMixAdventurous = "Abenteuerlich",
+        InfiniteMixPeriod = "Hörverlauf", InfiniteMixSources = "Quellen",
+        InfiniteMixWeightFavorites = "Favoriten stärker gewichten", InfiniteMixPreferRare = "Selten gehörte Titel bevorzugen",
+        InfiniteMixIncludeGenres = "Genres einschließen", InfiniteMixExcludeGenres = "Genres ausschließen", InfiniteMixGenresWatermark = "Genre eingeben …", InfiniteMixAddGenre = "Hinzufügen", InfiniteMixRemoveGenre = "Genre entfernen",
+        InfiniteMixPaused = "Endlos-Mix pausiert", InfiniteMixPause = "Endlos-Mix pausieren", InfiniteMixResume = "Endlos-Mix fortsetzen",
+        InfiniteMixAdjust = "Mischung anpassen", InfiniteMixReplaceNext = "Nächsten Vorschlag neu wählen",
+        InfiniteMixMoreLikeThis = "Mehr davon", InfiniteMixLessLikeThis = "Weniger davon", InfiniteMixExcludeTrack = "Titel künftig ausschließen",
         DashboardQuickAccess = "Schnellzugriff",
         DashboardTotalMinutes = "Gesamtminuten",
         DashboardMinutesShort = "Min.",
@@ -1251,6 +1278,16 @@ public static class LocalizationManager
         InfiniteMixStop = "Stop Infinite Mix",
         InfiniteMixActive = "Infinite Mix active · replenishes automatically",
         InfiniteMixCalculating = "Your Infinite Mix is being prepared …",
+        InfiniteMixSettingsTitle = "Adjust Infinite Mix",
+        InfiniteMixSettingsHint = "Choose how Orynivo should build your next continuously replenished mix.",
+        InfiniteMixMood = "Mood", InfiniteMixMoodCalm = "Calm", InfiniteMixMoodBalanced = "Balanced", InfiniteMixMoodEnergetic = "Energetic",
+        InfiniteMixDiscovery = "Discovery level", InfiniteMixFamiliar = "Familiar", InfiniteMixAdventurous = "Adventurous",
+        InfiniteMixPeriod = "Listening history", InfiniteMixSources = "Sources",
+        InfiniteMixWeightFavorites = "Give favorites more weight", InfiniteMixPreferRare = "Prefer rarely played tracks",
+        InfiniteMixIncludeGenres = "Include genres", InfiniteMixExcludeGenres = "Exclude genres", InfiniteMixGenresWatermark = "Enter a genre…", InfiniteMixAddGenre = "Add", InfiniteMixRemoveGenre = "Remove genre",
+        InfiniteMixPaused = "Infinite Mix paused", InfiniteMixPause = "Pause Infinite Mix", InfiniteMixResume = "Resume Infinite Mix",
+        InfiniteMixAdjust = "Adjust mix", InfiniteMixReplaceNext = "Replace next suggestion",
+        InfiniteMixMoreLikeThis = "More like this", InfiniteMixLessLikeThis = "Less like this", InfiniteMixExcludeTrack = "Exclude track in future",
         DashboardQuickAccess = "Quick access",
         DashboardTotalMinutes = "Total minutes",
         DashboardMinutesShort = "min",
@@ -1836,6 +1873,16 @@ public static class LocalizationManager
         InfiniteMixStop = "Arrêter le mix infini",
         InfiniteMixActive = "Mix infini actif · complété automatiquement",
         InfiniteMixCalculating = "Votre mix infini est en cours de préparation …",
+        InfiniteMixSettingsTitle = "Ajuster le mix infini",
+        InfiniteMixSettingsHint = "Choisissez comment Orynivo doit composer votre prochain mix alimenté en continu.",
+        InfiniteMixMood = "Ambiance", InfiniteMixMoodCalm = "Calme", InfiniteMixMoodBalanced = "Équilibrée", InfiniteMixMoodEnergetic = "Énergique",
+        InfiniteMixDiscovery = "Niveau de découverte", InfiniteMixFamiliar = "Familier", InfiniteMixAdventurous = "Aventureux",
+        InfiniteMixPeriod = "Historique d’écoute", InfiniteMixSources = "Sources",
+        InfiniteMixWeightFavorites = "Renforcer le poids des favoris", InfiniteMixPreferRare = "Préférer les titres rarement écoutés",
+        InfiniteMixIncludeGenres = "Inclure les genres", InfiniteMixExcludeGenres = "Exclure les genres", InfiniteMixGenresWatermark = "Saisir un genre…", InfiniteMixAddGenre = "Ajouter", InfiniteMixRemoveGenre = "Supprimer le genre",
+        InfiniteMixPaused = "Mix infini en pause", InfiniteMixPause = "Mettre le mix en pause", InfiniteMixResume = "Reprendre le mix infini",
+        InfiniteMixAdjust = "Ajuster le mix", InfiniteMixReplaceNext = "Remplacer la prochaine suggestion",
+        InfiniteMixMoreLikeThis = "Plus comme ceci", InfiniteMixLessLikeThis = "Moins comme ceci", InfiniteMixExcludeTrack = "Exclure ce titre à l’avenir",
         DashboardQuickAccess = "Accès rapide",
         DashboardTotalMinutes = "Minutes au total",
         DashboardMinutesShort = "min",
@@ -2418,6 +2465,16 @@ public static class LocalizationManager
         InfiniteMixStop = "Detener mezcla infinita",
         InfiniteMixActive = "Mezcla infinita activa · se completa automáticamente",
         InfiniteMixCalculating = "Se está preparando tu mezcla infinita …",
+        InfiniteMixSettingsTitle = "Ajustar mezcla infinita",
+        InfiniteMixSettingsHint = "Elige cómo debe crear Orynivo tu próxima mezcla que se repone continuamente.",
+        InfiniteMixMood = "Estado de ánimo", InfiniteMixMoodCalm = "Tranquilo", InfiniteMixMoodBalanced = "Equilibrado", InfiniteMixMoodEnergetic = "Enérgico",
+        InfiniteMixDiscovery = "Nivel de descubrimiento", InfiniteMixFamiliar = "Familiar", InfiniteMixAdventurous = "Aventurero",
+        InfiniteMixPeriod = "Historial de escucha", InfiniteMixSources = "Fuentes",
+        InfiniteMixWeightFavorites = "Dar más peso a los favoritos", InfiniteMixPreferRare = "Preferir pistas poco escuchadas",
+        InfiniteMixIncludeGenres = "Incluir géneros", InfiniteMixExcludeGenres = "Excluir géneros", InfiniteMixGenresWatermark = "Introduce un género…", InfiniteMixAddGenre = "Añadir", InfiniteMixRemoveGenre = "Eliminar género",
+        InfiniteMixPaused = "Mezcla infinita en pausa", InfiniteMixPause = "Pausar mezcla infinita", InfiniteMixResume = "Reanudar mezcla infinita",
+        InfiniteMixAdjust = "Ajustar mezcla", InfiniteMixReplaceNext = "Cambiar la siguiente sugerencia",
+        InfiniteMixMoreLikeThis = "Más de esto", InfiniteMixLessLikeThis = "Menos de esto", InfiniteMixExcludeTrack = "Excluir pista en el futuro",
         DashboardQuickAccess = "Acceso rápido",
         DashboardTotalMinutes = "Minutos totales",
         DashboardMinutesShort = "min",

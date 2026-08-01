@@ -1290,6 +1290,12 @@
                                        Margin="14,0,0,0"
                                        FontSize="{DynamicResource FontSizeCaption}" Foreground="{DynamicResource AppMutedTextBrush}"
                                        VerticalAlignment="Center"/>
+                            <TextBlock x:Name="InfiniteMixStatusTextBlock"
+                                       Margin="14,0,0,0"
+                                       IsVisible="False"
+                                       FontSize="{DynamicResource FontSizeCaption}"
+                                       Foreground="{DynamicResource AppAccentBrush}"
+                                       VerticalAlignment="Center"/>
                             <Button x:Name="LibraryRefreshButton"
                                     Margin="14,0,0,0"
                                     Padding="10,4"
@@ -1355,6 +1361,24 @@
                                 Theme="{StaticResource HeaderFilterButtonTheme}"
                                 Content="{DynamicResource L_InfiniteMixStart}"
                                 Click="InfiniteMixButton_OnClick"/>
+                        <StackPanel x:Name="InfiniteMixActionsPanel"
+                                    Grid.Column="4"
+                                    Orientation="Horizontal"
+                                    VerticalAlignment="Center"
+                                    IsVisible="False">
+                            <Button x:Name="InfiniteMixAdjustButton"
+                                    Margin="8,0,0,0"
+                                    Padding="12,5"
+                                    Theme="{StaticResource HeaderFilterButtonTheme}"
+                                    Content="{DynamicResource L_InfiniteMixAdjust}"
+                                    Click="InfiniteMixAdjustButton_OnClick"/>
+                            <Button x:Name="InfiniteMixReplaceNextButton"
+                                    Margin="8,0,0,0"
+                                    Padding="12,5"
+                                    Theme="{StaticResource HeaderFilterButtonTheme}"
+                                    Content="{DynamicResource L_InfiniteMixReplaceNext}"
+                                    Click="InfiniteMixReplaceNextButton_OnClick"/>
+                        </StackPanel>
                         <Button x:Name="ClearQueueButton"
                                 Grid.Column="5"
                                 Margin="8,0,0,0"
