@@ -221,6 +221,8 @@ public static class LocalizationManager
         resources["L_ReplayGain"] = Current.ReplayGain;
         resources["L_ReplayGainHint"] = Current.ReplayGainHint;
         resources["L_CalculateReplayGainDuringScan"] = Current.CalculateReplayGainDuringScan;
+        resources["L_RefreshAllMetadata"] = Current.RefreshAllMetadata;
+        resources["L_RefreshAllMetadataHint"] = Current.RefreshAllMetadataHint;
         resources["L_CalculateReplayGain"] = Current.CalculateReplayGain;
         resources["L_NonGaplessCrossfade"] = Current.NonGaplessCrossfade;
         resources["L_NonGaplessCrossfadeHint"] = Current.NonGaplessCrossfadeHint;
@@ -346,6 +348,9 @@ public static class LocalizationManager
         resources["L_OrynivoSelectServerDirectory"] = Current.OrynivoSelectServerDirectory;
         resources["L_OrynivoServerScan"] = Current.OrynivoServerScan;
         resources["L_OrynivoStartServerScan"] = Current.OrynivoStartServerScan;
+        resources["L_OrynivoServerBackup"] = Current.OrynivoServerBackup;
+        resources["L_OrynivoDownloadBackup"] = Current.OrynivoDownloadBackup;
+        resources["L_OrynivoRestoreBackup"] = Current.OrynivoRestoreBackup;
         resources["L_LoadMore"] = Current.LoadMore;
         resources["L_PodcastInfo"] = Current.PodcastInfo;
         resources["L_ClosePodcastInfo"] = Current.ClosePodcastInfo;
@@ -526,6 +531,8 @@ public static class LocalizationManager
         AddMusicDirectory = "Musikverzeichnis hinzufügen",
         TrackCountTooltip = "Anzahl Titel in der Datenbank",
         Scan = "Scannen",
+        RefreshAllMetadata = "Metadaten neu einlesen",
+        RefreshAllMetadataHint = "Liest die Metadaten aller Dateien erneut ein, auch wenn ihr Zeitstempel unverändert ist. Dies kann deutlich länger dauern.",
         RemoveDirectory = "Verzeichnis entfernen",
         ScanCompleted = "Fertig: {0} Dateien · {1} neu · {2} aktualisiert · {3} entfernt{4}",
         ScanFailed = "Fehler: {0}",
@@ -932,6 +939,15 @@ public static class LocalizationManager
         , OrynivoServerScanProgress = "{0}/{1} · {2}"
         , OrynivoServerScanCompleted = "Scan abgeschlossen: {0} Dateien, {1} neu, {2} aktualisiert, {3} entfernt, {4} fehlgeschlagen."
         , OrynivoServerScanFailed = "Server-Scan fehlgeschlagen: {0}"
+        , OrynivoServerBackup = "Server-Bibliothek sichern"
+        , OrynivoDownloadBackup = "Sicherung herunterladen"
+        , OrynivoRestoreBackup = "Sicherung einspielen"
+        , OrynivoBackupDownloading = "Server-Sicherung wird heruntergeladen …"
+        , OrynivoBackupDownloaded = "Server-Sicherung wurde gespeichert: {0}"
+        , OrynivoBackupRestoring = "Server-Sicherung wird geprüft und eingespielt …"
+        , OrynivoBackupRestored = "Server-Sicherung wurde erfolgreich eingespielt."
+        , OrynivoBackupFailed = "Server-Sicherung fehlgeschlagen: {0}"
+        , OrynivoRestoreBackupConfirm = "Der Import ersetzt Datenbank, Playlists, Verlauf, Cover, Künstlerbilder und Verzeichnisliste des Servers. Audiodateien bleiben unverändert. Fortfahren?"
         , LoadMore = "Mehr laden"
         , FfmpegDownloading = "FFmpeg wird heruntergeladen …"
         , FfmpegDownloadFailed = "FFmpeg konnte nicht heruntergeladen werden. Bitte manuell installieren: ffmpeg.org"
@@ -1128,7 +1144,10 @@ public static class LocalizationManager
         AsioBridgeMissing = "This build does not include ASIO support. Please use WASAPI.",
         KernelStreamingUnavailable = "Kernel Streaming can be selected but is not implemented as a playback backend yet.",
         AddMusicDirectory = "Add music directory", TrackCountTooltip = "Number of tracks in the database",
-        Scan = "Scan", RemoveDirectory = "Remove directory",
+        Scan = "Scan",
+        RefreshAllMetadata = "Re-read metadata",
+        RefreshAllMetadataHint = "Re-reads metadata from every file even when its timestamp is unchanged. This can take considerably longer.",
+        RemoveDirectory = "Remove directory",
         ScanCompleted = "Finished: {0} files · {1} new · {2} updated · {3} removed{4}", ScanFailed = "Error: {0}",
         StartupPreparingLibrary = "Preparing library …",
         StartupCheckingSearchIndex = "Checking search index …",
@@ -1524,6 +1543,15 @@ public static class LocalizationManager
         , OrynivoServerScanProgress = "{0}/{1} · {2}"
         , OrynivoServerScanCompleted = "Scan complete: {0} files, {1} added, {2} updated, {3} removed, {4} failed."
         , OrynivoServerScanFailed = "Server scan failed: {0}"
+        , OrynivoServerBackup = "Back up server library"
+        , OrynivoDownloadBackup = "Download backup"
+        , OrynivoRestoreBackup = "Restore backup"
+        , OrynivoBackupDownloading = "Downloading server backup…"
+        , OrynivoBackupDownloaded = "Server backup saved: {0}"
+        , OrynivoBackupRestoring = "Validating and restoring server backup…"
+        , OrynivoBackupRestored = "Server backup restored successfully."
+        , OrynivoBackupFailed = "Server backup failed: {0}"
+        , OrynivoRestoreBackupConfirm = "Import replaces the server database, playlists, history, artwork, artist images, and directory list. Audio files remain unchanged. Continue?"
         , LoadMore = "Load more"
         , FfmpegDownloading = "Downloading FFmpeg …"
         , FfmpegDownloadFailed = "FFmpeg could not be downloaded. Please install it manually: ffmpeg.org"
@@ -1723,7 +1751,10 @@ public static class LocalizationManager
         AsioBridgeMissing = "Cette version ne comprend pas la prise en charge ASIO. Utilisez WASAPI.",
         KernelStreamingUnavailable = "Kernel Streaming peut être sélectionné, mais ce mode de lecture n’est pas encore implémenté.",
         AddMusicDirectory = "Ajouter un dossier musical", TrackCountTooltip = "Nombre de titres dans la base",
-        Scan = "Analyser", RemoveDirectory = "Supprimer le dossier",
+        Scan = "Analyser",
+        RefreshAllMetadata = "Relire les métadonnées",
+        RefreshAllMetadataHint = "Relit les métadonnées de chaque fichier, même si son horodatage est inchangé. Cette opération peut être nettement plus longue.",
+        RemoveDirectory = "Supprimer le dossier",
         ScanCompleted = "Terminé : {0} fichiers · {1} nouveaux · {2} actualisés · {3} supprimés{4}", ScanFailed = "Erreur : {0}",
         StartupPreparingLibrary = "Préparation de la bibliothèque …",
         StartupCheckingSearchIndex = "Vérification de l’index de recherche …",
@@ -2119,6 +2150,15 @@ public static class LocalizationManager
         , OrynivoServerScanProgress = "{0}/{1} · {2}"
         , OrynivoServerScanCompleted = "Analyse terminée : {0} fichiers, {1} ajoutés, {2} mis à jour, {3} supprimés, {4} échecs."
         , OrynivoServerScanFailed = "Échec de l'analyse du serveur : {0}"
+        , OrynivoServerBackup = "Sauvegarder la bibliothèque du serveur"
+        , OrynivoDownloadBackup = "Télécharger la sauvegarde"
+        , OrynivoRestoreBackup = "Restaurer la sauvegarde"
+        , OrynivoBackupDownloading = "Téléchargement de la sauvegarde du serveur…"
+        , OrynivoBackupDownloaded = "Sauvegarde du serveur enregistrée : {0}"
+        , OrynivoBackupRestoring = "Validation et restauration de la sauvegarde du serveur…"
+        , OrynivoBackupRestored = "Sauvegarde du serveur restaurée avec succès."
+        , OrynivoBackupFailed = "Échec de la sauvegarde du serveur : {0}"
+        , OrynivoRestoreBackupConfirm = "L'importation remplace la base, les playlists, l'historique, les pochettes, les images d'artistes et la liste des dossiers du serveur. Les fichiers audio restent inchangés. Continuer ?"
         , LoadMore = "Charger plus"
         , FfmpegDownloading = "Téléchargement de FFmpeg …"
         , FfmpegDownloadFailed = "FFmpeg n'a pas pu être téléchargé. Veuillez l'installer manuellement : ffmpeg.org"
@@ -2315,7 +2355,10 @@ public static class LocalizationManager
         AsioBridgeMissing = "Esta compilación no incluye compatibilidad con ASIO. Utiliza WASAPI.",
         KernelStreamingUnavailable = "Kernel Streaming se puede seleccionar, pero todavía no está implementado como backend de reproducción.",
         AddMusicDirectory = "Agregar directorio de música", TrackCountTooltip = "Número de pistas en la base de datos",
-        Scan = "Analizar", RemoveDirectory = "Eliminar directorio",
+        Scan = "Analizar",
+        RefreshAllMetadata = "Volver a leer metadatos",
+        RefreshAllMetadataHint = "Vuelve a leer los metadatos de todos los archivos aunque su marca de tiempo no haya cambiado. Puede tardar bastante más.",
+        RemoveDirectory = "Eliminar directorio",
         ScanCompleted = "Finalizado: {0} archivos · {1} nuevos · {2} actualizados · {3} eliminados{4}", ScanFailed = "Error: {0}",
         StartupPreparingLibrary = "Preparando biblioteca …",
         StartupCheckingSearchIndex = "Comprobando índice de búsqueda …",
@@ -2711,6 +2754,15 @@ public static class LocalizationManager
         , OrynivoServerScanProgress = "{0}/{1} · {2}"
         , OrynivoServerScanCompleted = "Escaneo completado: {0} archivos, {1} agregados, {2} actualizados, {3} eliminados, {4} errores."
         , OrynivoServerScanFailed = "Error en el escaneo del servidor: {0}"
+        , OrynivoServerBackup = "Guardar biblioteca del servidor"
+        , OrynivoDownloadBackup = "Descargar copia"
+        , OrynivoRestoreBackup = "Restaurar copia"
+        , OrynivoBackupDownloading = "Descargando la copia del servidor…"
+        , OrynivoBackupDownloaded = "Copia del servidor guardada: {0}"
+        , OrynivoBackupRestoring = "Validando y restaurando la copia del servidor…"
+        , OrynivoBackupRestored = "Copia del servidor restaurada correctamente."
+        , OrynivoBackupFailed = "Error en la copia del servidor: {0}"
+        , OrynivoRestoreBackupConfirm = "La importación reemplaza la base de datos, listas, historial, carátulas, imágenes de artistas y lista de directorios del servidor. Los archivos de audio no cambian. ¿Continuar?"
         , LoadMore = "Cargar más"
         , FfmpegDownloading = "Descargando FFmpeg …"
         , FfmpegDownloadFailed = "No se pudo descargar FFmpeg. Instálelo manualmente: ffmpeg.org"

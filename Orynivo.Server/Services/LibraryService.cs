@@ -76,7 +76,7 @@ public sealed class LibraryService : IHostedService, IDisposable
         _watcher.UpdatePaths(_settings.LibraryPaths);
 
         if (_settings.ScanOnStartup && _settings.LibraryPaths.Count > 0)
-            _ = Task.Run(() => RunScanAsync(cancellationToken), cancellationToken);
+            _ = Task.Run(() => RunScanAsync(forceMetadataRefresh: false, cancellationToken), cancellationToken);
 
         await Task.CompletedTask;
     }
@@ -92,21 +92,73 @@ public sealed class LibraryService : IHostedService, IDisposable
     /// Triggers a full library scan of all configured paths in the background,
     /// unless a scan is already in progress.
     /// </summary>
+    /// <param name="forceMetadataRefresh">Whether unchanged files must be read again with TagLib.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>
     /// <see langword="true"/> when a new scan was started;
     /// <see langword="false"/> when a scan was already running.
     /// </returns>
-    public bool TriggerScan(CancellationToken cancellationToken = default)
+    public bool TriggerScan(
+        bool forceMetadataRefresh = false,
+        CancellationToken cancellationToken = default)
     {
         if (_scanning) return false;
         _scanning = true;
         SetScanStatus(new ServerScanStatus(true, null, 0, 0, null, null, null));
-        _ = Task.Run(() => RunScanAsync(cancellationToken), cancellationToken);
+        _ = Task.Run(() => RunScanAsync(forceMetadataRefresh, cancellationToken), cancellationToken);
         return true;
     }
 
-    private async Task RunScanAsync(CancellationToken cancellationToken)
+    /// <summary>Creates a consistent ZIP backup while excluding concurrent scans.</summary>
+    /// <param name="destinationPath">Temporary destination path owned by the caller.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task that completes when the backup is ready.</returns>
+    public async Task ExportBackupAsync(string destinationPath, CancellationToken cancellationToken)
+    {
+        await _scanGate.WaitAsync(cancellationToken);
+        try
+        {
+            await LibraryBackupService.ExportAsync(
+                destinationPath,
+                _settings.LibraryPaths,
+                AppPaths.DataRoot,
+                cancellationToken: cancellationToken);
+        }
+        finally
+        {
+            _scanGate.Release();
+        }
+    }
+
+    /// <summary>Imports a validated ZIP backup while excluding concurrent scans and watcher writes.</summary>
+    /// <param name="archivePath">Temporary uploaded archive path owned by the caller.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Library paths restored from the backup manifest.</returns>
+    public async Task<IReadOnlyList<string>> ImportBackupAsync(
+        string archivePath,
+        CancellationToken cancellationToken)
+    {
+        await _scanGate.WaitAsync(cancellationToken);
+        try
+        {
+            _watcher.UpdatePaths([]);
+            var paths = await LibraryBackupService.ImportAsync(
+                archivePath,
+                AppPaths.DataRoot,
+                rebuildSearchIndex: true,
+                cancellationToken: cancellationToken);
+            UpdateLibraryPaths(paths);
+            _libraryChangeTracker.Touch();
+            return paths;
+        }
+        finally
+        {
+            _watcher.UpdatePaths(_settings.LibraryPaths);
+            _scanGate.Release();
+        }
+    }
+
+    private async Task RunScanAsync(bool forceMetadataRefresh, CancellationToken cancellationToken)
     {
         if (!await _scanGate.WaitAsync(0))
         {
@@ -118,7 +170,10 @@ public sealed class LibraryService : IHostedService, IDisposable
         SetScanStatus(new ServerScanStatus(true, null, 0, 0, null, null, null));
         try
         {
-            _logger.LogInformation("Library scan started ({Count} paths)", _settings.LibraryPaths.Count);
+            _logger.LogInformation(
+                "Library scan started ({Count} paths, force metadata refresh: {ForceMetadataRefresh})",
+                _settings.LibraryPaths.Count,
+                forceMetadataRefresh);
 
             foreach (var path in _settings.LibraryPaths)
             {
@@ -139,11 +194,17 @@ public sealed class LibraryService : IHostedService, IDisposable
                         value.CurrentFile,
                         null,
                         null)));
-                var result = await LibraryScanner.ScanAsync(
-                    path,
-                    progress: progress,
-                    calculateMissingReplayGain: _settings.CalculateMissingReplayGainDuringScan,
-                    cancellationToken: cancellationToken);
+                var result = forceMetadataRefresh
+                    ? await LibraryScanner.RefreshMetadataAsync(
+                        path,
+                        progress: progress,
+                        calculateMissingReplayGain: _settings.CalculateMissingReplayGainDuringScan,
+                        cancellationToken: cancellationToken)
+                    : await LibraryScanner.ScanAsync(
+                        path,
+                        progress: progress,
+                        calculateMissingReplayGain: _settings.CalculateMissingReplayGainDuringScan,
+                        cancellationToken: cancellationToken);
                 if (HasLibraryChanges(result))
                     _libraryChangeTracker.Touch();
                 SetScanStatus(new ServerScanStatus(

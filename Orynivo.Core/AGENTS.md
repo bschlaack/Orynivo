@@ -17,6 +17,10 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   clients, FFmpeg primitives, and web-fetching behavior here.
 - Preserve SQLite migrations, stable IDs, WAL behavior, CUE virtual-path
   identity, user favorites, artwork caches, ReplayGain data, and `added_at`.
+- `LibraryBackupService` supports both the process data root and an explicit
+  server data root. Backups remain versioned, exclude audio and credentials,
+  use a consistent SQLite snapshot, validate staged imports, and roll back
+  partial replacements before rebuilding the search index.
 - Chaptered MKA containers use FFprobe-derived stable `mka://chapter/` virtual
   paths and the existing segment columns; unchaptered MKA files remain ordinary
   tracks. Each probe uses bounded analysis and a 30-second timeout.
@@ -25,6 +29,13 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   the source media.
 - Scanner, watcher, and reconciliation writes must keep SQLite and Lucene in
   sync and use the shared scanner gate.
+- `LibraryScanner.RefreshMetadataAsync` is the explicit maintenance path that
+  bypasses timestamp skipping and re-reads every supported file. It shares the
+  normal scanner gate and reconciliation/indexing pipeline, preserves
+  library-only overrides, and never changes source media.
+- When an upsert changes a track's album identity inside the same physical album
+  directory, carry the previous album's artwork and favorite flag to the target.
+  Existing target artwork wins; favorites are combined rather than cleared.
 - Keep compact query models compact; do not add artwork BLOBs, lyrics, or full
   records to list/facet/folder queries.
 - Album catalog queries, recent-album queries, detail lookup, and Dashboard

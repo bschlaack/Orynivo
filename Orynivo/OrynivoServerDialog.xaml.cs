@@ -5,6 +5,7 @@ using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Styling;
+using Avalonia.Platform.Storage;
 using Orynivo.Localization;
 using Orynivo.Streaming;
 
@@ -88,16 +89,137 @@ public partial class OrynivoServerDialog : Window
         await LoadServerLibraryPathsAsync();
 
     private async void TriggerServerScanButton_OnClick(object? sender, RoutedEventArgs e)
+        => await TriggerServerScanAsync(forceMetadataRefresh: false);
+
+    private async void RefreshServerMetadataButton_OnClick(object? sender, RoutedEventArgs e)
+        => await TriggerServerScanAsync(forceMetadataRefresh: true);
+
+    private async void DownloadServerBackupButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (!TryCreateServer(out var server))
+            return;
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = LocalizationManager.Current.OrynivoDownloadBackup,
+            FileTypeChoices = [new FilePickerFileType("ZIP") { Patterns = ["*.zip"] }],
+            DefaultExtension = "zip",
+            SuggestedFileName = $"Orynivo-server-library-{DateTime.Now:yyyyMMdd-HHmm}.zip"
+        });
+        var path = file?.TryGetLocalPath();
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+
+        SetBackupControlsEnabled(false);
+        ServerBackupProgressBar.IsVisible = true;
+        ServerBackupProgressBar.IsIndeterminate = true;
+        ServerBackupStatusTextBlock.Text = LocalizationManager.Current.OrynivoBackupDownloading;
+        try
+        {
+            using var client = new OrynivoServerClient();
+            var progress = new Progress<double?>(value =>
+            {
+                ServerBackupProgressBar.IsIndeterminate = !value.HasValue;
+                if (value.HasValue)
+                    ServerBackupProgressBar.Value = value.Value;
+            });
+            await client.DownloadLibraryBackupAsync(server, path, progress);
+            ServerBackupProgressBar.IsIndeterminate = false;
+            ServerBackupProgressBar.Value = 100;
+            ServerBackupStatusTextBlock.Text = string.Format(
+                LocalizationManager.Current.OrynivoBackupDownloaded,
+                path);
+        }
+        catch (Exception exception)
+        {
+            ServerBackupProgressBar.IsVisible = false;
+            ServerBackupStatusTextBlock.Text = string.Format(
+                LocalizationManager.Current.OrynivoBackupFailed,
+                exception.Message);
+        }
+        finally
+        {
+            SetBackupControlsEnabled(true);
+        }
+    }
+
+    private async void RestoreServerBackupButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (!TryCreateServer(out var server))
+            return;
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = LocalizationManager.Current.OrynivoRestoreBackup,
+            FileTypeFilter = [new FilePickerFileType("ZIP") { Patterns = ["*.zip"] }],
+            AllowMultiple = false
+        });
+        var path = files.FirstOrDefault()?.TryGetLocalPath();
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+        if (!await AppMessageBox.ConfirmAsync(
+                LocalizationManager.Current.OrynivoRestoreBackupConfirm,
+                LocalizationManager.Current.OrynivoRestoreBackup,
+                this))
+        {
+            return;
+        }
+
+        SetBackupControlsEnabled(false);
+        ServerBackupProgressBar.IsVisible = true;
+        ServerBackupProgressBar.IsIndeterminate = false;
+        ServerBackupProgressBar.Value = 0;
+        ServerBackupStatusTextBlock.Text = LocalizationManager.Current.OrynivoBackupRestoring;
+        try
+        {
+            using var client = new OrynivoServerClient();
+            var progress = new Progress<double?>(value =>
+            {
+                ServerBackupProgressBar.IsIndeterminate = !value.HasValue;
+                if (value.HasValue)
+                    ServerBackupProgressBar.Value = value.Value;
+            });
+            var paths = await client.RestoreLibraryBackupAsync(server, path, progress);
+            _serverLibraryPaths.Clear();
+            _serverLibraryPaths.AddRange(paths);
+            _serverLibraryPathsLoaded = true;
+            _serverLibraryPathsChanged = false;
+            RebuildServerDirectoryList();
+            ServerBackupProgressBar.IsIndeterminate = false;
+            ServerBackupProgressBar.Value = 100;
+            ServerBackupStatusTextBlock.Text = LocalizationManager.Current.OrynivoBackupRestored;
+        }
+        catch (Exception exception)
+        {
+            ServerBackupProgressBar.IsVisible = false;
+            ServerBackupStatusTextBlock.Text = string.Format(
+                LocalizationManager.Current.OrynivoBackupFailed,
+                exception.Message);
+        }
+        finally
+        {
+            SetBackupControlsEnabled(true);
+        }
+    }
+
+    private void SetBackupControlsEnabled(bool enabled)
+    {
+        DownloadServerBackupButton.IsEnabled = enabled;
+        RestoreServerBackupButton.IsEnabled = enabled;
+        TriggerServerScanButton.IsEnabled = enabled;
+        RefreshServerMetadataButton.IsEnabled = enabled;
+    }
+
+    private async Task TriggerServerScanAsync(bool forceMetadataRefresh)
     {
         if (!TryCreateServer(out var server))
             return;
 
         TriggerServerScanButton.IsEnabled = false;
+        RefreshServerMetadataButton.IsEnabled = false;
         StatusTextBlock.Text = LocalizationManager.Current.OrynivoServerScanStarting;
         try
         {
             using var client = new OrynivoServerClient();
-            if (!await client.TriggerScanAsync(server))
+            if (!await client.TriggerScanAsync(server, forceMetadataRefresh))
             {
                 StatusTextBlock.Text = LocalizationManager.Current.OrynivoServerScanStartFailed;
                 return;
@@ -108,6 +230,7 @@ public partial class OrynivoServerDialog : Window
         finally
         {
             TriggerServerScanButton.IsEnabled = true;
+            RefreshServerMetadataButton.IsEnabled = true;
         }
     }
 

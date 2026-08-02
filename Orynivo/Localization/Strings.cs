@@ -248,6 +248,10 @@ public sealed record LocalizedStrings(
     public string AddMusicDirectory { get; init; } = "";
     public string TrackCountTooltip { get; init; } = "";
     public string Scan { get; init; } = "";
+    /// <summary>Gets the command label for re-reading metadata from every file.</summary>
+    public string RefreshAllMetadata { get; init; } = "";
+    /// <summary>Gets the warning that a complete metadata refresh is slower than a normal scan.</summary>
+    public string RefreshAllMetadataHint { get; init; } = "";
     public string RemoveDirectory { get; init; } = "";
     public string ScanCompleted { get; init; } = "";
     public string ScanFailed { get; init; } = "";
@@ -918,6 +922,15 @@ public sealed record LocalizedStrings(
     public string OrynivoServerScanCompleted { get; init; } = "";
     /// <summary>Gets the remote server scan failure format.</summary>
     public string OrynivoServerScanFailed { get; init; } = "";
+    public string OrynivoServerBackup { get; init; } = "";
+    public string OrynivoDownloadBackup { get; init; } = "";
+    public string OrynivoRestoreBackup { get; init; } = "";
+    public string OrynivoBackupDownloading { get; init; } = "";
+    public string OrynivoBackupDownloaded { get; init; } = "";
+    public string OrynivoBackupRestoring { get; init; } = "";
+    public string OrynivoBackupRestored { get; init; } = "";
+    public string OrynivoBackupFailed { get; init; } = "";
+    public string OrynivoRestoreBackupConfirm { get; init; } = "";
     public string LoadMore { get; init; } = "";
     public string FfmpegDownloading { get; init; } = "";
     public string FfmpegDownloadFailed { get; init; } = "";

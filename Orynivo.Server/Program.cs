@@ -113,6 +113,15 @@ app.MapPost("/api/scan", (LibraryService svc) =>
         : Results.Ok(new { Status = "already_running" });
 });
 
+// Explicit metadata refresh; kept separate so older servers reject the unsupported operation.
+app.MapPost("/api/scan/metadata", (LibraryService svc) =>
+{
+    var started = svc.TriggerScan(forceMetadataRefresh: true);
+    return started
+        ? Results.Accepted("/api/scan/metadata", new { Status = "started" })
+        : Results.Ok(new { Status = "already_running" });
+});
+
 // Scan status
 app.MapGet("/api/scan", (LibraryService svc) =>
     Results.Ok(svc.ScanStatus));
@@ -120,6 +129,7 @@ app.MapGet("/api/scan", (LibraryService svc) =>
 app.MapLibraryEndpoints();
 app.MapStreamEndpoints();
 app.MapConfigurationEndpoints();
+app.MapBackupEndpoints();
 app.MapUpdateEndpoints(settings);
 
 // ---- Start ----------------------------------------------------------------
