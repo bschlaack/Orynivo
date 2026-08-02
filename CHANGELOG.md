@@ -4,6 +4,13 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.34.1] - 2026-08-02
+
+### Fixed
+
+- Fixed server-library backup downloads failing on Windows because the completed
+  temporary ZIP was renamed before its output stream had been closed.
+
 ## [0.34.0] - 2026-08-02
 
 ### Added
