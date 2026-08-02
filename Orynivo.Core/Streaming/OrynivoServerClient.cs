@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Net;
 using System.IO.Compression;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -1406,6 +1407,132 @@ public sealed class OrynivoServerClient : IDisposable
             return response.IsSuccessStatusCode;
         }
         catch { return false; }
+    }
+
+    /// <summary>Downloads a complete server library backup to a local ZIP file.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="destinationPath">Local destination ZIP path.</param>
+    /// <param name="progress">Optional byte-transfer progress callback.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task that completes after the destination has been atomically published.</returns>
+    public async Task DownloadLibraryBackupAsync(
+        OrynivoServerSettings server,
+        string destinationPath,
+        IProgress<double?>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        var temporaryPath = destinationPath + ".tmp";
+        try
+        {
+            using var transferClient = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+            using var request = new HttpRequestMessage(HttpMethod.Get, BuildUrl(server, "/api/library/backup"));
+            request.Headers.Add("X-Api-Key", server.ApiKey);
+            using var response = await transferClient.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
+            response.EnsureSuccessStatusCode();
+            var total = response.Content.Headers.ContentLength;
+            await using var input = await response.Content.ReadAsStreamAsync(cancellationToken);
+            await using var output = new FileStream(
+                temporaryPath,
+                FileMode.Create,
+                FileAccess.Write,
+                FileShare.None,
+                128 * 1024,
+                FileOptions.Asynchronous | FileOptions.SequentialScan);
+            await CopyWithProgressAsync(input, output, total, progress, cancellationToken);
+            File.Move(temporaryPath, destinationPath, overwrite: true);
+        }
+        catch
+        {
+            if (File.Exists(temporaryPath))
+                File.Delete(temporaryPath);
+            throw;
+        }
+    }
+
+    /// <summary>Uploads and restores a complete server library backup.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="archivePath">Local source ZIP path.</param>
+    /// <param name="progress">Optional byte-transfer progress callback.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Library root paths restored by the server.</returns>
+    public async Task<IReadOnlyList<string>> RestoreLibraryBackupAsync(
+        OrynivoServerSettings server,
+        string archivePath,
+        IProgress<double?>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        using var transferClient = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+        await using var input = new FileStream(
+            archivePath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            128 * 1024,
+            FileOptions.Asynchronous | FileOptions.SequentialScan);
+        using var content = new ProgressStreamContent(input, progress, cancellationToken);
+        content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/zip");
+        content.Headers.ContentLength = input.Length;
+        using var request = new HttpRequestMessage(HttpMethod.Put, BuildUrl(server, "/api/library/backup"))
+        {
+            Content = content
+        };
+        request.Headers.Add("X-Api-Key", server.ApiKey);
+        using var response = await transferClient.SendAsync(request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<OrynivoLibraryPaths>(JsonOptions, cancellationToken);
+        return result?.Paths ?? [];
+    }
+
+    private static async Task CopyWithProgressAsync(
+        Stream input,
+        Stream output,
+        long? totalBytes,
+        IProgress<double?>? progress,
+        CancellationToken cancellationToken)
+    {
+        var buffer = new byte[128 * 1024];
+        long transferred = 0;
+        int count;
+        while ((count = await input.ReadAsync(buffer, cancellationToken)) > 0)
+        {
+            await output.WriteAsync(buffer.AsMemory(0, count), cancellationToken);
+            transferred += count;
+            progress?.Report(totalBytes is > 0 ? transferred * 100d / totalBytes.Value : null);
+        }
+    }
+
+    private sealed class ProgressStreamContent : HttpContent
+    {
+        private readonly Stream _source;
+        private readonly IProgress<double?>? _progress;
+        private readonly CancellationToken _cancellationToken;
+
+        public ProgressStreamContent(
+            Stream source,
+            IProgress<double?>? progress,
+            CancellationToken cancellationToken)
+        {
+            _source = source;
+            _progress = progress;
+            _cancellationToken = cancellationToken;
+        }
+
+        protected override async Task SerializeToStreamAsync(Stream stream, TransportContext? context)
+            => await CopyWithProgressAsync(
+                _source,
+                stream,
+                _source.CanSeek ? _source.Length : null,
+                _progress,
+                _cancellationToken);
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = _source.CanSeek ? _source.Length : 0;
+            return _source.CanSeek;
+        }
     }
 
     /// <summary>

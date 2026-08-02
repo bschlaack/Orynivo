@@ -71,6 +71,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <TextBlock Text="{DynamicResource L_OrynivoServerName}"
@@ -190,7 +191,33 @@
                        TextWrapping="Wrap"/>
         </StackPanel>
 
-        <Grid Grid.Row="10">
+        <StackPanel Grid.Row="10" Margin="0,0,0,16">
+            <TextBlock Text="{DynamicResource L_OrynivoServerBackup}"
+                       Foreground="{DynamicResource AppMutedTextBrush}"
+                       Margin="0,0,0,6"/>
+            <StackPanel Orientation="Horizontal">
+                <Button x:Name="DownloadServerBackupButton"
+                        Content="{DynamicResource L_OrynivoDownloadBackup}"
+                        MinWidth="180" Height="30" Padding="12,0" Margin="0,0,8,0"
+                        Theme="{StaticResource ServerDialogButtonTheme}"
+                        Click="DownloadServerBackupButton_OnClick"/>
+                <Button x:Name="RestoreServerBackupButton"
+                        Content="{DynamicResource L_OrynivoRestoreBackup}"
+                        MinWidth="170" Height="30" Padding="12,0"
+                        Theme="{StaticResource ServerDialogButtonTheme}"
+                        Click="RestoreServerBackupButton_OnClick"/>
+            </StackPanel>
+            <ProgressBar x:Name="ServerBackupProgressBar"
+                         IsVisible="False" Height="6" Minimum="0" Maximum="100"
+                         Margin="0,8,0,6"
+                         Foreground="{DynamicResource AppTransportPlayBrush}"
+                         Background="{DynamicResource AppInputBrush}"/>
+            <TextBlock x:Name="ServerBackupStatusTextBlock"
+                       Foreground="{DynamicResource AppMutedTextBrush}"
+                       TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <Grid Grid.Row="11">
             <Button x:Name="TestConnectionButton"
                     Content="{DynamicResource L_OrynivoTestConnection}"
                     MinWidth="170"

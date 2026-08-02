@@ -109,6 +109,55 @@ public sealed class LibraryService : IHostedService, IDisposable
         return true;
     }
 
+    /// <summary>Creates a consistent ZIP backup while excluding concurrent scans.</summary>
+    /// <param name="destinationPath">Temporary destination path owned by the caller.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task that completes when the backup is ready.</returns>
+    public async Task ExportBackupAsync(string destinationPath, CancellationToken cancellationToken)
+    {
+        await _scanGate.WaitAsync(cancellationToken);
+        try
+        {
+            await LibraryBackupService.ExportAsync(
+                destinationPath,
+                _settings.LibraryPaths,
+                AppPaths.DataRoot,
+                cancellationToken: cancellationToken);
+        }
+        finally
+        {
+            _scanGate.Release();
+        }
+    }
+
+    /// <summary>Imports a validated ZIP backup while excluding concurrent scans and watcher writes.</summary>
+    /// <param name="archivePath">Temporary uploaded archive path owned by the caller.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Library paths restored from the backup manifest.</returns>
+    public async Task<IReadOnlyList<string>> ImportBackupAsync(
+        string archivePath,
+        CancellationToken cancellationToken)
+    {
+        await _scanGate.WaitAsync(cancellationToken);
+        try
+        {
+            _watcher.UpdatePaths([]);
+            var paths = await LibraryBackupService.ImportAsync(
+                archivePath,
+                AppPaths.DataRoot,
+                rebuildSearchIndex: true,
+                cancellationToken: cancellationToken);
+            UpdateLibraryPaths(paths);
+            _libraryChangeTracker.Touch();
+            return paths;
+        }
+        finally
+        {
+            _watcher.UpdatePaths(_settings.LibraryPaths);
+            _scanGate.Release();
+        }
+    }
+
     private async Task RunScanAsync(bool forceMetadataRefresh, CancellationToken cancellationToken)
     {
         if (!await _scanGate.WaitAsync(0))

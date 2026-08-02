@@ -114,7 +114,11 @@ public static class ConfigurationEndpoints
         return Path.Combine(contentRootPath, "appsettings.json");
     }
 
-    private static void PersistLibraryPaths(string contentRootPath, ServerSettings settings, IReadOnlyList<string> paths)
+    /// <summary>Persists normalized library roots to the server's editable configuration file.</summary>
+    /// <param name="contentRootPath">Application content root used outside packaged Linux installations.</param>
+    /// <param name="settings">Live server settings whose non-secret values are retained.</param>
+    /// <param name="paths">Library root paths to persist.</param>
+    internal static void PersistLibraryPaths(string contentRootPath, ServerSettings settings, IReadOnlyList<string> paths)
     {
         var appSettingsPath = ResolveWritableSettingsPath(contentRootPath);
         lock (AppSettingsWriteLock)

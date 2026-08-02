@@ -4,9 +4,16 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.34.0] - 2026-08-02
 
 ### Added
+
+- Added authenticated Orynivo Server library backup download and restore. The
+  versioned ZIP contains a consistent SQLite snapshot, playlists, playback
+  history, album artwork, artist images, and configured server library paths,
+  but excludes audio files and credentials. Restore validates and stages the
+  archive, rolls back partial replacements, rebuilds the search index, refreshes
+  watchers, and invalidates connected-client caches.
 
 - Added an explicit full metadata refresh for local library directories and
   Orynivo Servers. Unlike a normal incremental scan, it re-reads unchanged

@@ -17,6 +17,10 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   clients, FFmpeg primitives, and web-fetching behavior here.
 - Preserve SQLite migrations, stable IDs, WAL behavior, CUE virtual-path
   identity, user favorites, artwork caches, ReplayGain data, and `added_at`.
+- `LibraryBackupService` supports both the process data root and an explicit
+  server data root. Backups remain versioned, exclude audio and credentials,
+  use a consistent SQLite snapshot, validate staged imports, and roll back
+  partial replacements before rebuilding the search index.
 - Chaptered MKA containers use FFprobe-derived stable `mka://chapter/` virtual
   paths and the existing segment columns; unchaptered MKA files remain ordinary
   tracks. Each probe uses bounded analysis and a 30-second timeout.

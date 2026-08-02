@@ -129,6 +129,7 @@ app.MapGet("/api/scan", (LibraryService svc) =>
 app.MapLibraryEndpoints();
 app.MapStreamEndpoints();
 app.MapConfigurationEndpoints();
+app.MapBackupEndpoints();
 app.MapUpdateEndpoints(settings);
 
 // ---- Start ----------------------------------------------------------------

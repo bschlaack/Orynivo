@@ -264,6 +264,8 @@ works directly in FFmpeg and browser URLs.
 | `GET /api/files/directories?path=` | Browse server-side directories for remote path selection |
 | `POST /api/scan` | Trigger a full library scan |
 | `POST /api/scan/metadata` | Re-read metadata from every supported file, including timestamp-unchanged files |
+| `GET /api/library/backup` | Download a versioned ZIP backup of the server library and artwork caches |
+| `PUT /api/library/backup` | Validate and restore a server library backup (maximum 2 GiB) |
 | `GET /api/scan` | Scan status with current root, processed/total counts, current file, last result, errors, and `LibraryChangedAt` for client cache invalidation |
 | `GET /api/artists` | All artists (id, name, favorite, biography/image flags) |
 | `GET /api/artists/{id}` | Complete artist metadata, including cached biography/source fields |
@@ -359,6 +361,11 @@ instead of aborting the complete scan.
 Configured Orynivo Server connections are merged into the main Artists, Albums,
 Tracks, and search-result library views. Rows from a server are marked with an
 optional `OS` source badge that shows the server name as a tooltip.
+The same connection dialog can download or restore a complete server-library
+backup. It includes the SQLite database, playlists, history, album artwork,
+artist images, and configured server directory list. Audio files and API keys
+are never included. Restore validates the ZIP before replacing data, rebuilds
+the search index, and leaves the original library in place if installation fails.
 The shared Folder structure view is also available with server-only
 configurations; a local library directory is not required to browse folders
 reported by an Orynivo Server.

@@ -42,6 +42,23 @@ public static class LibraryBackupService
             () => Export(destinationPath, libraryPaths, DataRoot, progress, cancellationToken),
             cancellationToken);
 
+    /// <summary>Exports a library stored beneath an explicitly supplied application data directory.</summary>
+    /// <param name="destinationPath">Target ZIP archive path.</param>
+    /// <param name="libraryPaths">Library root paths to include in the manifest.</param>
+    /// <param name="dataRoot">Application data directory containing the database and artwork caches.</param>
+    /// <param name="progress">Optional export progress callback.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task that completes after the archive has been published.</returns>
+    public static Task ExportAsync(
+        string destinationPath,
+        IReadOnlyList<string> libraryPaths,
+        string dataRoot,
+        IProgress<LibraryExportProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+        => Task.Run(
+            () => Export(destinationPath, libraryPaths, dataRoot, progress, cancellationToken),
+            cancellationToken);
+
     /// <summary>
     /// Asynchronously validates and imports a library archive, replacing the current database and artwork.
     /// Rolls back all changes when any step fails.
@@ -61,6 +78,23 @@ public static class LibraryBackupService
                 rebuildSearchIndex: true,
                 progress,
                 cancellationToken),
+            cancellationToken);
+
+    /// <summary>Validates and imports a library into an explicitly supplied application data directory.</summary>
+    /// <param name="archivePath">Source ZIP archive path.</param>
+    /// <param name="dataRoot">Application data directory to replace.</param>
+    /// <param name="rebuildSearchIndex">Whether to rebuild the Lucene index after installation.</param>
+    /// <param name="progress">Optional import progress callback.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Library root paths stored in the archive manifest.</returns>
+    public static Task<IReadOnlyList<string>> ImportAsync(
+        string archivePath,
+        string dataRoot,
+        bool rebuildSearchIndex,
+        IProgress<LibraryImportProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+        => Task.Run(
+            () => Import(archivePath, dataRoot, rebuildSearchIndex, progress, cancellationToken),
             cancellationToken);
 
     private static void Export(

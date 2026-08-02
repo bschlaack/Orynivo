@@ -77,6 +77,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   `LibraryScanner.RefreshMetadataAsync`, remains cancellable, shows per-file
   progress, and warns that unchanged files are re-read and the operation is
   slower. It must never modify source media.
+- The Orynivo Server connection dialog downloads and restores the authenticated
+  versioned server-library ZIP with transfer progress and explicit destructive
+  confirmation. Restored server paths refresh the dialog; audio files and API
+  credentials are never part of the archive.
 - The shared album artwork card binds its title tooltip to the complete album
   title so truncated labels remain readable across local, unified, Dashboard,
   Genre Cloud, and Orynivo Server usages.

@@ -34,6 +34,10 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
   runtime dependency.
 - Linux service data belongs under `ORYNIVO_DATA_DIR=/var/lib/orynivo-server`.
   Do not fall back to the service user's non-writable home directory.
+- Authenticated `GET`/`PUT /api/library/backup` transfer the Core versioned
+  library ZIP. Transfers are bounded to 2 GiB, serialized against server scans,
+  staged beneath the data root, exclude credentials/audio files, and restore
+  watchers, persisted library paths, the Lucene index, and cache invalidation.
 - Editable Linux configuration belongs under `/etc/orynivo-server`; packaged
   defaults under `/usr/lib/orynivo-server` are read-only and replaceable.
   Managed DEB upgrades must invoke `dpkg` non-interactively while retaining the
