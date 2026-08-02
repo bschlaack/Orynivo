@@ -72,6 +72,11 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   Catalog and detail surfaces must not expose provider-local album records that
   have no remaining indexed tracks; local and updated Orynivo Server providers
   enforce the same rule through the shared Core queries.
+- Local directory settings expose both the normal incremental scan and an
+  explicit complete metadata refresh. The latter calls
+  `LibraryScanner.RefreshMetadataAsync`, remains cancellable, shows per-file
+  progress, and warns that unchanged files are re-read and the operation is
+  slower. It must never modify source media.
 - The shared album artwork card binds its title tooltip to the complete album
   title so truncated labels remain readable across local, unified, Dashboard,
   Genre Cloud, and Orynivo Server usages.

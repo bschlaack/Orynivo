@@ -88,16 +88,23 @@ public partial class OrynivoServerDialog : Window
         await LoadServerLibraryPathsAsync();
 
     private async void TriggerServerScanButton_OnClick(object? sender, RoutedEventArgs e)
+        => await TriggerServerScanAsync(forceMetadataRefresh: false);
+
+    private async void RefreshServerMetadataButton_OnClick(object? sender, RoutedEventArgs e)
+        => await TriggerServerScanAsync(forceMetadataRefresh: true);
+
+    private async Task TriggerServerScanAsync(bool forceMetadataRefresh)
     {
         if (!TryCreateServer(out var server))
             return;
 
         TriggerServerScanButton.IsEnabled = false;
+        RefreshServerMetadataButton.IsEnabled = false;
         StatusTextBlock.Text = LocalizationManager.Current.OrynivoServerScanStarting;
         try
         {
             using var client = new OrynivoServerClient();
-            if (!await client.TriggerScanAsync(server))
+            if (!await client.TriggerScanAsync(server, forceMetadataRefresh))
             {
                 StatusTextBlock.Text = LocalizationManager.Current.OrynivoServerScanStartFailed;
                 return;
@@ -108,6 +115,7 @@ public partial class OrynivoServerDialog : Window
         finally
         {
             TriggerServerScanButton.IsEnabled = true;
+            RefreshServerMetadataButton.IsEnabled = true;
         }
     }
 

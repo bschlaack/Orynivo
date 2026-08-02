@@ -157,14 +157,24 @@
                 <TextBlock Text="{DynamicResource L_OrynivoServerScan}"
                            Foreground="{DynamicResource AppMutedTextBrush}"
                            VerticalAlignment="Center"/>
-                <Button x:Name="TriggerServerScanButton"
-                        Content="{DynamicResource L_OrynivoStartServerScan}"
-                        MinWidth="140"
-                        Height="30"
-                        Padding="12,0"
-                        HorizontalAlignment="Right"
-                        Theme="{StaticResource ServerDialogButtonTheme}"
-                        Click="TriggerServerScanButton_OnClick"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="TriggerServerScanButton"
+                            Content="{DynamicResource L_OrynivoStartServerScan}"
+                            MinWidth="140"
+                            Height="30"
+                            Padding="12,0"
+                            Margin="0,0,8,0"
+                            Theme="{StaticResource ServerDialogButtonTheme}"
+                            Click="TriggerServerScanButton_OnClick"/>
+                    <Button x:Name="RefreshServerMetadataButton"
+                            Content="{DynamicResource L_RefreshAllMetadata}"
+                            ToolTip.Tip="{DynamicResource L_RefreshAllMetadataHint}"
+                            MinWidth="170"
+                            Height="30"
+                            Padding="12,0"
+                            Theme="{StaticResource ServerDialogButtonTheme}"
+                            Click="RefreshServerMetadataButton_OnClick"/>
+                </StackPanel>
             </Grid>
             <ProgressBar x:Name="ServerScanProgressBar"
                          Height="6"

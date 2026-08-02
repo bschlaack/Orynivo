@@ -409,6 +409,7 @@ public sealed class AudioDatabase : IDisposable
         using var tx = _conn.BeginTransaction();
         try
         {
+            var previousAlbumState = GetTrackAlbumPresentationState(track.Path, tx);
             var artistId  = EnsureArtist(track.Artist, track.MusicBrainzArtistId, tx);
             track.Artist = GetCanonicalArtistName(artistId, track.Artist);
             var albumArtistName = GetFirstArtist(track.AlbumArtist ?? track.Artist);
@@ -420,13 +421,15 @@ public sealed class AudioDatabase : IDisposable
             var albumArtistId = EnsureArtist(albumArtistName, albumArtistMusicBrainzId, tx);
             track.AlbumArtist = GetCanonicalArtistName(albumArtistId, track.AlbumArtist ?? track.Artist);
             var artworkId = EnsureArtwork(track.CoverData, track.CoverMimeType, tx);
+            var physicalAlbumDirectory = GetPhysicalAlbumDirectory(track.SourcePath ?? track.Path);
             var albumId = EnsureAlbum(
                 track.Album,
                 track.AlbumArtist ?? track.Artist,
                 track.Year,
                 artworkId,
-                GetPhysicalAlbumDirectory(track.SourcePath ?? track.Path),
+                physicalAlbumDirectory,
                 tx);
+            PreserveAlbumPresentationState(albumId, physicalAlbumDirectory, previousAlbumState, tx);
 
             using var cmd = _conn.CreateCommand();
             cmd.Transaction = tx;
@@ -4100,6 +4103,64 @@ public sealed class AudioDatabase : IDisposable
         Add(cmd, "$artwork_id", artworkId);
         return Convert.ToInt64(cmd.ExecuteScalar());
     }
+
+    private AlbumPresentationState? GetTrackAlbumPresentationState(
+        string trackPath,
+        SqliteTransaction transaction)
+    {
+        using var command = _conn.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT al.id, al.source_directory, al.artwork_id, COALESCE(al.is_favorite, 0)
+            FROM tracks t
+            JOIN albums al ON al.id = t.album_id
+            WHERE t.path = $path
+            LIMIT 1;
+            """;
+        Add(command, "$path", trackPath);
+        using var reader = command.ExecuteReader();
+        return reader.Read()
+            ? new AlbumPresentationState(
+                reader.GetInt64(0),
+                reader.GetString(1),
+                reader.IsDBNull(2) ? null : reader.GetInt64(2),
+                reader.GetInt32(3) != 0)
+            : null;
+    }
+
+    private void PreserveAlbumPresentationState(
+        long? targetAlbumId,
+        string targetSourceDirectory,
+        AlbumPresentationState? previousState,
+        SqliteTransaction transaction)
+    {
+        if (targetAlbumId is not long albumId ||
+            previousState is not { } state ||
+            state.AlbumId == albumId ||
+            !string.Equals(state.SourceDirectory, targetSourceDirectory, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        using var command = _conn.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            UPDATE albums
+            SET artwork_id = COALESCE(artwork_id, $artwork_id),
+                is_favorite = MAX(is_favorite, $is_favorite)
+            WHERE id = $album_id;
+            """;
+        Add(command, "$artwork_id", state.ArtworkId);
+        Add(command, "$is_favorite", state.IsFavorite ? 1 : 0);
+        Add(command, "$album_id", albumId);
+        command.ExecuteNonQuery();
+    }
+
+    private sealed record AlbumPresentationState(
+        long AlbumId,
+        string SourceDirectory,
+        long? ArtworkId,
+        bool IsFavorite);
 
     private static string GetPhysicalAlbumDirectory(string? sourcePath)
     {

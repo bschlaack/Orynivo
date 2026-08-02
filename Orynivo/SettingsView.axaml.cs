@@ -1560,6 +1560,7 @@ internal partial class SettingsView : UserControl
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
         var pathBlock = new TextBlock
         {
@@ -1585,14 +1586,23 @@ internal partial class SettingsView : UserControl
         var scanBtn = CreateStyledButton(LocalizationManager.Current.Scan, 80, 26, new Thickness(0, 0, 4, 0));
         Grid.SetColumn(scanBtn, 2);
 
+        var refreshMetadataBtn = CreateStyledButton(
+            LocalizationManager.Current.RefreshAllMetadata,
+            150,
+            26,
+            new Thickness(0, 0, 4, 0));
+        ToolTip.SetTip(refreshMetadataBtn, LocalizationManager.Current.RefreshAllMetadataHint);
+        Grid.SetColumn(refreshMetadataBtn, 3);
+
         var removeBtn = CreateStyledButton("×", 26, 26);
         removeBtn.FontSize = 14;
         ToolTip.SetTip(removeBtn, LocalizationManager.Current.RemoveDirectory);
-        Grid.SetColumn(removeBtn, 3);
+        Grid.SetColumn(removeBtn, 4);
 
         grid.Children.Add(pathBlock);
         grid.Children.Add(countBlock);
         grid.Children.Add(scanBtn);
+        grid.Children.Add(refreshMetadataBtn);
         grid.Children.Add(removeBtn);
 
         _ = RefreshCountAsync(path, countBlock);
@@ -1606,7 +1616,7 @@ internal partial class SettingsView : UserControl
             IsVisible = false
         };
 
-        scanBtn.Click += async (_, _) =>
+        async Task RunScanAsync(bool forceMetadataRefresh, Button activeButton, Button otherButton)
         {
             if (_activeScans.ContainsKey(path))
             {
@@ -1622,18 +1632,25 @@ internal partial class SettingsView : UserControl
             var cts = new CancellationTokenSource();
             _activeScans[path] = cts;
             UpdateBackupButtonAvailability();
-            scanBtn.Content = LocalizationManager.Current.Cancel;
+            activeButton.Content = LocalizationManager.Current.Cancel;
+            otherButton.IsEnabled = false;
             statusBlock.IsVisible = true;
             statusBlock.Text = LocalizationManager.Current.ScanRunning;
             var progress = new Progress<ScanProgress>(p =>
                 statusBlock.Text = $"{p.Current}/{p.Total} – {Path.GetFileName(p.CurrentFile)}");
             try
             {
-                var result = await LibraryScanner.ScanAsync(
-                    path,
-                    progress,
-                    CalculateMissingReplayGainDuringScan,
-                    cts.Token);
+                var result = forceMetadataRefresh
+                    ? await LibraryScanner.RefreshMetadataAsync(
+                        path,
+                        progress,
+                        CalculateMissingReplayGainDuringScan,
+                        cts.Token)
+                    : await LibraryScanner.ScanAsync(
+                        path,
+                        progress,
+                        CalculateMissingReplayGainDuringScan,
+                        cts.Token);
                 var failed = result.Failed > 0
                     ? $" · {string.Format(LocalizationManager.Current.ScanFailed, result.Failed)}"
                     : string.Empty;
@@ -1653,11 +1670,19 @@ internal partial class SettingsView : UserControl
             {
                 _activeScans.Remove(path);
                 cts.Dispose();
-                scanBtn.Content = LocalizationManager.Current.Scan;
+                activeButton.Content = forceMetadataRefresh
+                    ? LocalizationManager.Current.RefreshAllMetadata
+                    : LocalizationManager.Current.Scan;
+                otherButton.IsEnabled = true;
                 UpdateBackupButtonAvailability();
                 _ = RefreshCountAsync(path, countBlock);
             }
-        };
+        }
+
+        scanBtn.Click += async (_, _) =>
+            await RunScanAsync(forceMetadataRefresh: false, scanBtn, refreshMetadataBtn);
+        refreshMetadataBtn.Click += async (_, _) =>
+            await RunScanAsync(forceMetadataRefresh: true, refreshMetadataBtn, scanBtn);
 
         removeBtn.Click += (_, _) =>
         {

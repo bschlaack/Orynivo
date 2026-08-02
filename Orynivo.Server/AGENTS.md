@@ -23,6 +23,10 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
 - Normal full scans and watcher updates use
   `CalculateMissingReplayGainDuringScan`, which defaults to `false`; do not
   reintroduce unconditional FFmpeg ReplayGain analysis into library discovery.
+- `POST /api/scan/metadata` explicitly requests the slower forced metadata
+  refresh. Keep it separate from `POST /api/scan` so older servers return 404
+  instead of silently treating the request as an incremental scan; both paths
+  share scan serialization, progress status, and cache invalidation.
 - Keep external metadata/artwork searches on the client; the server stores and
   serves client-provided results. Authenticated album/artist artwork PUT and
   DELETE endpoints are the shared remote upload/removal surface.

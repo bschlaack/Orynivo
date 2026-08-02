@@ -263,6 +263,7 @@ works directly in FFmpeg and browser URLs.
 | `PUT /api/settings/library-paths` | Replace configured library root paths, persist them, refresh watchers, and start a scan |
 | `GET /api/files/directories?path=` | Browse server-side directories for remote path selection |
 | `POST /api/scan` | Trigger a full library scan |
+| `POST /api/scan/metadata` | Re-read metadata from every supported file, including timestamp-unchanged files |
 | `GET /api/scan` | Scan status with current root, processed/total counts, current file, last result, errors, and `LibraryChangedAt` for client cache invalidation |
 | `GET /api/artists` | All artists (id, name, favorite, biography/image flags) |
 | `GET /api/artists/{id}` | Complete artist metadata, including cached biography/source fields |
@@ -346,7 +347,13 @@ directories can also be managed from the Orynivo Server connection dialog in
 Settings → Library → Orynivo Server. The directory browser shows the server
 filesystem, not the local Windows filesystem: Unix-like servers open at `/`,
 while Windows servers expose their drive roots. The same dialog can start a
-server scan and shows live progress while large directories are being scanned.
+normal incremental server scan or explicitly re-read metadata from every file,
+and shows live progress while large directories are being scanned. The metadata
+refresh is slower because it bypasses timestamp-based skipping, but it does not
+modify the audio files and retains confirmed library-only metadata corrections.
+Track favorites and artist profiles remain untouched; when corrected tags create
+a replacement album identity in the same physical directory, downloaded album
+artwork and the album favorite flag are carried forward as well.
 Inaccessible subdirectories such as Linux `lost+found` folders are skipped
 instead of aborting the complete scan.
 Configured Orynivo Server connections are merged into the main Artists, Albums,
@@ -1076,6 +1083,11 @@ cwASIO or Steinberg ASIO native DSD is available.
 Available library roots are monitored automatically after configuration.
 File-system events are debounced before updating the database and search index;
 periodic full scans reconcile changes that a watcher may have missed.
+Each local directory also offers **Re-read metadata** in Settings. This explicit
+maintenance scan processes timestamp-unchanged files again and is useful when a
+database contains stale tags from an older scan. It preserves track favorites
+and artist profiles, and carries downloaded album artwork plus album favorites
+to a corrected album identity within the same physical directory.
 
 ## Project Structure
 

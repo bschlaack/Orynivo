@@ -25,6 +25,13 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   the source media.
 - Scanner, watcher, and reconciliation writes must keep SQLite and Lucene in
   sync and use the shared scanner gate.
+- `LibraryScanner.RefreshMetadataAsync` is the explicit maintenance path that
+  bypasses timestamp skipping and re-reads every supported file. It shares the
+  normal scanner gate and reconciliation/indexing pipeline, preserves
+  library-only overrides, and never changes source media.
+- When an upsert changes a track's album identity inside the same physical album
+  directory, carry the previous album's artwork and favorite flag to the target.
+  Existing target artwork wins; favorites are combined rather than cleared.
 - Keep compact query models compact; do not add artwork BLOBs, lyrics, or full
   records to list/facet/folder queries.
 - Album catalog queries, recent-album queries, detail lookup, and Dashboard

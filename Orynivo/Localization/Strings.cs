@@ -248,6 +248,10 @@ public sealed record LocalizedStrings(
     public string AddMusicDirectory { get; init; } = "";
     public string TrackCountTooltip { get; init; } = "";
     public string Scan { get; init; } = "";
+    /// <summary>Gets the command label for re-reading metadata from every file.</summary>
+    public string RefreshAllMetadata { get; init; } = "";
+    /// <summary>Gets the warning that a complete metadata refresh is slower than a normal scan.</summary>
+    public string RefreshAllMetadataHint { get; init; } = "";
     public string RemoveDirectory { get; init; } = "";
     public string ScanCompleted { get; init; } = "";
     public string ScanFailed { get; init; } = "";

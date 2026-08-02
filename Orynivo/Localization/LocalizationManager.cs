@@ -221,6 +221,8 @@ public static class LocalizationManager
         resources["L_ReplayGain"] = Current.ReplayGain;
         resources["L_ReplayGainHint"] = Current.ReplayGainHint;
         resources["L_CalculateReplayGainDuringScan"] = Current.CalculateReplayGainDuringScan;
+        resources["L_RefreshAllMetadata"] = Current.RefreshAllMetadata;
+        resources["L_RefreshAllMetadataHint"] = Current.RefreshAllMetadataHint;
         resources["L_CalculateReplayGain"] = Current.CalculateReplayGain;
         resources["L_NonGaplessCrossfade"] = Current.NonGaplessCrossfade;
         resources["L_NonGaplessCrossfadeHint"] = Current.NonGaplessCrossfadeHint;
@@ -526,6 +528,8 @@ public static class LocalizationManager
         AddMusicDirectory = "Musikverzeichnis hinzufügen",
         TrackCountTooltip = "Anzahl Titel in der Datenbank",
         Scan = "Scannen",
+        RefreshAllMetadata = "Metadaten neu einlesen",
+        RefreshAllMetadataHint = "Liest die Metadaten aller Dateien erneut ein, auch wenn ihr Zeitstempel unverändert ist. Dies kann deutlich länger dauern.",
         RemoveDirectory = "Verzeichnis entfernen",
         ScanCompleted = "Fertig: {0} Dateien · {1} neu · {2} aktualisiert · {3} entfernt{4}",
         ScanFailed = "Fehler: {0}",
@@ -1128,7 +1132,10 @@ public static class LocalizationManager
         AsioBridgeMissing = "This build does not include ASIO support. Please use WASAPI.",
         KernelStreamingUnavailable = "Kernel Streaming can be selected but is not implemented as a playback backend yet.",
         AddMusicDirectory = "Add music directory", TrackCountTooltip = "Number of tracks in the database",
-        Scan = "Scan", RemoveDirectory = "Remove directory",
+        Scan = "Scan",
+        RefreshAllMetadata = "Re-read metadata",
+        RefreshAllMetadataHint = "Re-reads metadata from every file even when its timestamp is unchanged. This can take considerably longer.",
+        RemoveDirectory = "Remove directory",
         ScanCompleted = "Finished: {0} files · {1} new · {2} updated · {3} removed{4}", ScanFailed = "Error: {0}",
         StartupPreparingLibrary = "Preparing library …",
         StartupCheckingSearchIndex = "Checking search index …",
@@ -1723,7 +1730,10 @@ public static class LocalizationManager
         AsioBridgeMissing = "Cette version ne comprend pas la prise en charge ASIO. Utilisez WASAPI.",
         KernelStreamingUnavailable = "Kernel Streaming peut être sélectionné, mais ce mode de lecture n’est pas encore implémenté.",
         AddMusicDirectory = "Ajouter un dossier musical", TrackCountTooltip = "Nombre de titres dans la base",
-        Scan = "Analyser", RemoveDirectory = "Supprimer le dossier",
+        Scan = "Analyser",
+        RefreshAllMetadata = "Relire les métadonnées",
+        RefreshAllMetadataHint = "Relit les métadonnées de chaque fichier, même si son horodatage est inchangé. Cette opération peut être nettement plus longue.",
+        RemoveDirectory = "Supprimer le dossier",
         ScanCompleted = "Terminé : {0} fichiers · {1} nouveaux · {2} actualisés · {3} supprimés{4}", ScanFailed = "Erreur : {0}",
         StartupPreparingLibrary = "Préparation de la bibliothèque …",
         StartupCheckingSearchIndex = "Vérification de l’index de recherche …",
@@ -2315,7 +2325,10 @@ public static class LocalizationManager
         AsioBridgeMissing = "Esta compilación no incluye compatibilidad con ASIO. Utiliza WASAPI.",
         KernelStreamingUnavailable = "Kernel Streaming se puede seleccionar, pero todavía no está implementado como backend de reproducción.",
         AddMusicDirectory = "Agregar directorio de música", TrackCountTooltip = "Número de pistas en la base de datos",
-        Scan = "Analizar", RemoveDirectory = "Eliminar directorio",
+        Scan = "Analizar",
+        RefreshAllMetadata = "Volver a leer metadatos",
+        RefreshAllMetadataHint = "Vuelve a leer los metadatos de todos los archivos aunque su marca de tiempo no haya cambiado. Puede tardar bastante más.",
+        RemoveDirectory = "Eliminar directorio",
         ScanCompleted = "Finalizado: {0} archivos · {1} nuevos · {2} actualizados · {3} eliminados{4}", ScanFailed = "Error: {0}",
         StartupPreparingLibrary = "Preparando biblioteca …",
         StartupCheckingSearchIndex = "Comprobando índice de búsqueda …",

@@ -1387,15 +1387,20 @@ public sealed class OrynivoServerClient : IDisposable
     /// Starts a full scan on the remote server.
     /// </summary>
     /// <param name="server">Server connection settings.</param>
+    /// <param name="forceMetadataRefresh">Whether the server should re-read metadata from unchanged files.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns><see langword="true"/> when the server accepted the request.</returns>
     public async Task<bool> TriggerScanAsync(
         OrynivoServerSettings server,
+        bool forceMetadataRefresh = false,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Post, BuildUrl(server, "/api/scan"));
+            var path = forceMetadataRefresh
+                ? "/api/scan/metadata"
+                : "/api/scan";
+            using var request = new HttpRequestMessage(HttpMethod.Post, BuildUrl(server, path));
             request.Headers.Add("X-Api-Key", server.ApiKey);
             using var response = await _http.SendAsync(request, cancellationToken);
             return response.IsSuccessStatusCode;

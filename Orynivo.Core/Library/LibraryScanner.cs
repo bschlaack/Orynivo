@@ -66,12 +66,51 @@ public static class LibraryScanner
         IProgress<ScanProgress>? progress,
         bool calculateMissingReplayGain,
         CancellationToken cancellationToken = default)
+        => await ScanAsync(
+            rootPath,
+            progress,
+            calculateMissingReplayGain,
+            forceMetadataRefresh: false,
+            cancellationToken).ConfigureAwait(false);
+
+    /// <summary>
+    /// Asynchronously scans <paramref name="rootPath"/> and re-reads metadata for every discovered file,
+    /// including files whose timestamps have not changed.
+    /// </summary>
+    /// <param name="rootPath">Root directory to scan recursively.</param>
+    /// <param name="progress">Optional progress callback.</param>
+    /// <param name="calculateMissingReplayGain">Whether FFmpeg should calculate ReplayGain values that are absent from changed file metadata.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A summary of the completed metadata refresh.</returns>
+    public static async Task<ScanResult> RefreshMetadataAsync(
+        string rootPath,
+        IProgress<ScanProgress>? progress = null,
+        bool calculateMissingReplayGain = false,
+        CancellationToken cancellationToken = default)
+        => await ScanAsync(
+            rootPath,
+            progress,
+            calculateMissingReplayGain,
+            forceMetadataRefresh: true,
+            cancellationToken).ConfigureAwait(false);
+
+    private static async Task<ScanResult> ScanAsync(
+        string rootPath,
+        IProgress<ScanProgress>? progress,
+        bool calculateMissingReplayGain,
+        bool forceMetadataRefresh,
+        CancellationToken cancellationToken)
     {
         await ScanGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             return await Task.Run(
-                () => Scan(rootPath, progress, calculateMissingReplayGain, cancellationToken),
+                () => Scan(
+                    rootPath,
+                    progress,
+                    calculateMissingReplayGain,
+                    forceMetadataRefresh,
+                    cancellationToken),
                 cancellationToken).ConfigureAwait(false);
         }
         finally
@@ -223,6 +262,7 @@ public static class LibraryScanner
         string rootPath,
         IProgress<ScanProgress>? progress,
         bool calculateMissingReplayGain,
+        bool forceMetadataRefresh,
         CancellationToken ct)
     {
         progress?.Report(new ScanProgress(0, 0, rootPath));
@@ -289,7 +329,11 @@ public static class LibraryScanner
 
                 var metadataChanged = !timestamps.TryGetValue(filePath, out long knownModified) ||
                                       knownModified != modifiedAt;
-                if (!refreshReplayGainMetadata && !refreshArtistAttribution && !metadataChanged)
+                if (!ShouldReadMetadata(
+                        forceMetadataRefresh,
+                        refreshReplayGainMetadata,
+                        refreshArtistAttribution,
+                        metadataChanged))
                     continue;
 
                 bool isNew = !timestamps.ContainsKey(filePath);
@@ -360,6 +404,22 @@ public static class LibraryScanner
 
         return new ScanResult(total, added, updated, missingPaths.Count, failed);
     }
+
+    /// <summary>Determines whether a discovered regular file must be read and upserted during a scan.</summary>
+    /// <param name="forceMetadataRefresh">Whether the caller explicitly requested all metadata to be re-read.</param>
+    /// <param name="refreshReplayGainMetadata">Whether a one-time embedded ReplayGain refresh is pending.</param>
+    /// <param name="refreshArtistAttribution">Whether a one-time artist-attribution refresh is pending.</param>
+    /// <param name="metadataChanged">Whether the file timestamp differs from the stored value.</param>
+    /// <returns><see langword="true"/> when the file must be read and upserted.</returns>
+    internal static bool ShouldReadMetadata(
+        bool forceMetadataRefresh,
+        bool refreshReplayGainMetadata,
+        bool refreshArtistAttribution,
+        bool metadataChanged) =>
+        forceMetadataRefresh ||
+        refreshReplayGainMetadata ||
+        refreshArtistAttribution ||
+        metadataChanged;
 
     /// <summary>Removes database and index entries that no longer belong to any configured library root.</summary>
     /// <param name="rootPaths">Currently configured library roots.</param>
