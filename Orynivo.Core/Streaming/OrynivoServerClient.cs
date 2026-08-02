@@ -1421,7 +1421,6 @@ public sealed class OrynivoServerClient : IDisposable
         IProgress<double?>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        var temporaryPath = destinationPath + ".tmp";
         try
         {
             using var transferClient = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
@@ -1434,22 +1433,48 @@ public sealed class OrynivoServerClient : IDisposable
             response.EnsureSuccessStatusCode();
             var total = response.Content.Headers.ContentLength;
             await using var input = await response.Content.ReadAsStreamAsync(cancellationToken);
-            await using var output = new FileStream(
-                temporaryPath,
-                FileMode.Create,
-                FileAccess.Write,
-                FileShare.None,
-                128 * 1024,
-                FileOptions.Asynchronous | FileOptions.SequentialScan);
-            await CopyWithProgressAsync(input, output, total, progress, cancellationToken);
-            File.Move(temporaryPath, destinationPath, overwrite: true);
+            await WriteDownloadAtomicallyAsync(
+                input,
+                destinationPath,
+                total,
+                progress,
+                cancellationToken);
         }
         catch
         {
+            var temporaryPath = destinationPath + ".tmp";
             if (File.Exists(temporaryPath))
                 File.Delete(temporaryPath);
             throw;
         }
+    }
+
+    /// <summary>Writes a downloaded stream to a temporary file and closes it before publishing the destination.</summary>
+    /// <param name="input">Downloaded response stream.</param>
+    /// <param name="destinationPath">Final local destination path.</param>
+    /// <param name="totalBytes">Expected byte count, when known.</param>
+    /// <param name="progress">Optional percentage callback.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task that completes after the temporary file has been atomically renamed.</returns>
+    internal static async Task WriteDownloadAtomicallyAsync(
+        Stream input,
+        string destinationPath,
+        long? totalBytes,
+        IProgress<double?>? progress,
+        CancellationToken cancellationToken)
+    {
+        var temporaryPath = destinationPath + ".tmp";
+        await using (var output = new FileStream(
+                         temporaryPath,
+                         FileMode.Create,
+                         FileAccess.Write,
+                         FileShare.None,
+                         128 * 1024,
+                         FileOptions.Asynchronous | FileOptions.SequentialScan))
+        {
+            await CopyWithProgressAsync(input, output, totalBytes, progress, cancellationToken);
+        }
+        File.Move(temporaryPath, destinationPath, overwrite: true);
     }
 
     /// <summary>Uploads and restores a complete server library backup.</summary>
