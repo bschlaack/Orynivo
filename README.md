@@ -29,7 +29,8 @@ the ability to reach that library from any device on the local network.
 - ReplayGain and parametric EQ
 - Local library, playlists, smart playlists and full-text search
 - Hierarchical Genre Cloud with source-aware track and album recommendations
-  across the local library and connected Orynivo Servers
+  across the local library and connected Orynivo Servers, backed by a subtle
+  cached grayscale mosaic of matching artist images
 - Infinite Mix, which turns recent listening habits and favorites into a
   continuously replenished mixed-source queue
 - Album-artist-centered library attribution: explicit `ALBUMARTIST` metadata
@@ -711,6 +712,24 @@ history when available, but the cloud remains usable with a new or empty play
 history. Remote results retain their owning server for playback, favorites,
 artwork, and album/artist navigation.
 
+The current level uses available images from its recommended local and remote
+artists as a muted grayscale tile background. Images are proportionally fitted
+inside their tiles so portraits and landscape artwork remain complete. Orynivo
+caches only the rendered mosaic for 24 hours; authenticated server artwork URLs
+are never stored in that Genre Cloud cache. The generated backgrounds can be
+cleared independently under **Settings > Appearance** without removing
+downloaded artist images or other artwork. In the same section, the background
+can be disabled entirely or switched between album covers and artist images.
+If only a few matching images are available,
+Orynivo centers that set instead of repeating it across the complete surface.
+The number of requested tiles follows the current cloud width (up to 32), while
+a perceptual image fingerprint removes duplicate pictures even when local and
+server copies use different files or encodings. Sparse sets automatically use
+larger tiles: one row receives the complete background height and divides the
+available width only among its actual images, without cropping or distortion.
+The same Appearance block stores a 0–100% image-visibility slider, defaults it
+to 50%, and provides the independent background-cache clear action.
+
 **Infinite Mix** can be started from the Dashboard or from **Up next**. Before
 starting, its compact profile editor selects a calm, balanced, or energetic
 mood; familiar-to-adventurous discovery level; 3, 7, 30, or 90-day history
@@ -1094,7 +1113,9 @@ Each local directory also offers **Re-read metadata** in Settings. This explicit
 maintenance scan processes timestamp-unchanged files again and is useful when a
 database contains stale tags from an older scan. It preserves track favorites
 and artist profiles, and carries downloaded album artwork plus album favorites
-to a corrected album identity within the same physical directory.
+to a corrected album identity within the same physical directory. Transient
+metadata-read failures are retried and reported as failed files; they never
+replace an existing track's tags with empty values.
 
 ## Project Structure
 

@@ -33,6 +33,9 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   bypasses timestamp skipping and re-reads every supported file. It shares the
   normal scanner gate and reconciliation/indexing pipeline, preserves
   library-only overrides, and never changes source media.
+- A failed TagLib read must never upsert the file-system-only fallback record.
+  Full, forced, watcher, and reconciliation scans retry boundedly, count a final
+  failure, and preserve the existing database metadata unchanged.
 - When an upsert changes a track's album identity inside the same physical album
   directory, carry the previous album's artwork and favorite flag to the target.
   Existing target artwork wins; favorites are combined rather than cleared.

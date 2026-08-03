@@ -39,6 +39,7 @@ public sealed class SettingsStore
             NormalizeEqualizerProfiles(defaultSettings);
             NormalizeOutputProfiles(defaultSettings);
             NormalizeInfiniteMix(defaultSettings);
+            NormalizeAppearance(defaultSettings);
             return defaultSettings;
         }
 
@@ -53,6 +54,7 @@ public sealed class SettingsStore
             NormalizeEqualizerProfiles(settings);
             NormalizeOutputProfiles(settings);
             NormalizeInfiniteMix(settings);
+            NormalizeAppearance(settings);
             if (migrated)
             {
                 _credentialStore.Save(credentials);
@@ -68,6 +70,7 @@ public sealed class SettingsStore
             NormalizeEqualizerProfiles(defaultSettings);
             NormalizeOutputProfiles(defaultSettings);
             NormalizeInfiniteMix(defaultSettings);
+            NormalizeAppearance(defaultSettings);
             return defaultSettings;
         }
     }
@@ -80,6 +83,7 @@ public sealed class SettingsStore
         NormalizeEqualizerProfiles(settings);
         NormalizeOutputProfiles(settings);
         NormalizeInfiniteMix(settings);
+        NormalizeAppearance(settings);
         var credentials = _credentialStore.Load();
         CaptureCredentials(settings, credentials);
         _credentialStore.Save(credentials);
@@ -99,6 +103,17 @@ public sealed class SettingsStore
         settings.InfiniteMix.DiscoveryLevel = Math.Clamp(settings.InfiniteMix.DiscoveryLevel, 0, 100);
         if (settings.InfiniteMix.HistoryDays is not (3 or 7 or 30 or 90))
             settings.InfiniteMix.HistoryDays = 30;
+    }
+
+    /// <summary>Repairs malformed persisted appearance enum values.</summary>
+    /// <param name="settings">Settings whose appearance values are normalized.</param>
+    private static void NormalizeAppearance(AppSettings settings)
+    {
+        if (!Enum.IsDefined(settings.GenreCloudBackground))
+            settings.GenreCloudBackground = GenreCloudBackgroundMode.Artists;
+        settings.GenreCloudBackgroundOpacity = double.IsFinite(settings.GenreCloudBackgroundOpacity)
+            ? Math.Clamp(settings.GenreCloudBackgroundOpacity, 0, 1)
+            : 0.5;
     }
 
     /// <summary>Copies decrypted credentials into their runtime settings objects.</summary>

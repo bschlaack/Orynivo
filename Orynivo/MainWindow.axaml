@@ -1602,6 +1602,7 @@
                     BorderBrush="{DynamicResource AppInputBorderBrush}"
                     BorderThickness="1"
                     CornerRadius="18"
+                    ClipToBounds="True"
                     IsVisible="False">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -1609,6 +1610,30 @@
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
+                    <Image x:Name="GenreCloudBackgroundImage"
+                           Grid.RowSpan="2"
+                           Stretch="Uniform"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           Opacity="0"
+                           IsHitTestVisible="False">
+                        <Image.Transitions>
+                            <Transitions>
+                                <DoubleTransition Property="Opacity" Duration="0:0:0.35"/>
+                            </Transitions>
+                        </Image.Transitions>
+                    </Image>
+                    <Border x:Name="GenreCloudBackgroundShade"
+                            Grid.RowSpan="2"
+                            Background="#0A1422"
+                            Opacity="0"
+                            IsHitTestVisible="False">
+                        <Border.Transitions>
+                            <Transitions>
+                                <DoubleTransition Property="Opacity" Duration="0:0:0.35"/>
+                            </Transitions>
+                        </Border.Transitions>
+                    </Border>
                     <WrapPanel x:Name="GenreCloudBreadcrumbPanel" Orientation="Horizontal"/>
                     <ScrollViewer Grid.Row="1"
                                   Height="330"

@@ -234,6 +234,26 @@ public sealed record LocalizedStrings(
     public string AlsaPrepareFailed { get; init; } = "";
     public string DeviceInfo { get; init; } = "";
     public string DatabaseOptimizeHint { get; init; } = "";
+    /// <summary>Gets the Genre Cloud background-cache section heading.</summary>
+    public string GenreCloudCache { get; init; } = "";
+    /// <summary>Gets the explanation for the Genre Cloud background cache.</summary>
+    public string GenreCloudCacheHint { get; init; } = "";
+    /// <summary>Gets the confirmation shown after the Genre Cloud background cache was cleared.</summary>
+    public string GenreCloudCacheCleared { get; init; } = "";
+    /// <summary>Gets the Genre Cloud background setting label.</summary>
+    public string GenreCloudBackground { get; init; } = "";
+    /// <summary>Gets the Genre Cloud background setting explanation.</summary>
+    public string GenreCloudBackgroundHint { get; init; } = "";
+    /// <summary>Gets the option that disables Genre Cloud backgrounds.</summary>
+    public string GenreCloudBackgroundNone { get; init; } = "";
+    /// <summary>Gets the option that uses album covers behind the Genre Cloud.</summary>
+    public string GenreCloudBackgroundAlbums { get; init; } = "";
+    /// <summary>Gets the option that uses artist images behind the Genre Cloud.</summary>
+    public string GenreCloudBackgroundArtists { get; init; } = "";
+    /// <summary>Gets the label for the Genre Cloud tile-opacity slider.</summary>
+    public string GenreCloudVisibility { get; init; } = "";
+    /// <summary>Gets the button label for clearing rendered Genre Cloud backgrounds.</summary>
+    public string ClearGenreCloudCache { get; init; } = "";
     /// <summary>Gets the normal-case Appearance navigation item label.</summary>
     public string AppearanceNavItem { get; init; } = "";
     /// <summary>Gets the normal-case artist information navigation item label.</summary>

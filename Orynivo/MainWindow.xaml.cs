@@ -15693,6 +15693,11 @@ public partial class MainWindow : Window
     {
             var themeChanged = _settings.Theme != window.SelectedTheme;
             var languageChanged = _settings.Language != window.SelectedLanguage;
+            var genreCloudBackgroundChanged =
+                _settings.GenreCloudBackground != window.SelectedGenreCloudBackground ||
+                Math.Abs(
+                    _settings.GenreCloudBackgroundOpacity -
+                    window.SelectedGenreCloudBackgroundOpacity) > 0.0001;
             var replayGainChanged =
                 _settings.ReplayGainMode != window.SelectedReplayGainMode ||
                 _settings.PcmOutputBoostEnabled != window.PcmOutputBoostEnabled;
@@ -15776,6 +15781,8 @@ public partial class MainWindow : Window
             }
             _settings.Theme                  = window.SelectedTheme;
             _settings.Language               = window.SelectedLanguage;
+            _settings.GenreCloudBackground   = window.SelectedGenreCloudBackground;
+            _settings.GenreCloudBackgroundOpacity = window.SelectedGenreCloudBackgroundOpacity;
             _settings.ArtistInfoSource       = window.SelectedArtistInfoSource;
             _settings.LastFmApiKey           = window.SelectedLastFmApiKey;
             _settings.FanartTvApiKey         = window.SelectedFanartTvApiKey;
@@ -15831,6 +15838,12 @@ public partial class MainWindow : Window
             }
             if (languageChanged)
                 LocalizationManager.Apply(_settings.Language);
+            if (genreCloudBackgroundChanged)
+            {
+                GenreCloudBackgroundImage.Source = null;
+                GenreCloudBackgroundImage.Opacity = 0;
+                GenreCloudBackgroundShade.Opacity = 0;
+            }
             if (artistInfoChanged)
                 ApplyArtistInfoSettings();
             if (outputChanged)

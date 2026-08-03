@@ -4,6 +4,36 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.35.0] - 2026-08-03
+
+### Added
+
+- Added a muted grayscale artist-image mosaic behind each Genre Cloud level.
+  Images follow the selected genre's recommendations across local and Orynivo
+  Server libraries, while rendered mosaics are cached for 24 hours without
+  persisting authenticated server URLs. Images remain proportionally complete
+  at both tile and surface level, and Settings can clear the generated
+  background cache independently of the original artist artwork. Appearance
+  settings can disable backgrounds for lower system load or select album covers
+  instead of artist images. The mosaic derives its column and image count from
+  the current cloud width, centers sparse sets, and uses perceptual fingerprints
+  to suppress visually identical local/server image copies. Sparse rows expand
+  to the available mosaic height and divide its width by their actual column
+  count, making a lone or small image set substantially larger without cropping.
+  The Appearance section now keeps the cache-clear action beside the background
+  selector and persists a 0–100% tile-visibility slider, defaulting to 50%.
+
+### Fixed
+
+- Fixed Windows identifying Orynivo as an unknown application in the system
+  media flyout by assigning the installed Start menu and optional desktop
+  shortcuts the same explicit application user model ID as the running player.
+
+- Fixed full and forced-metadata scans overwriting valid track tags with empty
+  values when TagLib temporarily failed to read a file. Metadata reads now use
+  bounded retries, retain the existing database row after a final failure, and
+  count that file as failed instead of updated.
+
 ## [0.34.1] - 2026-08-02
 
 ### Fixed
