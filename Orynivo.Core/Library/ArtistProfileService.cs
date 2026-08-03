@@ -47,7 +47,7 @@ public static class ArtistProfileService
     /// </summary>
     /// <param name="artistId">Database artist ID used to name the image file on disk.</param>
     /// <param name="artistName">Artist name to search for.</param>
-    /// <param name="language">Preferred content language (<c>en</c>, <c>de</c>, or <c>fr</c>).</param>
+    /// <param name="language">Preferred content language (<c>en</c>, <c>de</c>, <c>fr</c>, or <c>es</c>).</param>
     /// <param name="downloadImage">Whether to also attempt downloading an artist image.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <param name="musicBrainzArtistId">Known MusicBrainz artist ID used for exact Fanart.tv matching.</param>
@@ -74,7 +74,7 @@ public static class ArtistProfileService
     /// </summary>
     /// <param name="artistId">Database artist ID used to name the image file on disk.</param>
     /// <param name="artistName">Artist name to search for.</param>
-    /// <param name="language">Preferred content language (<c>en</c>, <c>de</c>, or <c>fr</c>).</param>
+    /// <param name="language">Preferred content language (<c>en</c>, <c>de</c>, <c>fr</c>, or <c>es</c>).</param>
     /// <param name="source">Biography source to query first.</param>
     /// <param name="lastFmApiKey">Last.fm API key used when <paramref name="source"/> is <see cref="ArtistInfoSource.LastFm"/>.</param>
     /// <param name="downloadImage">Whether to also attempt downloading an artist image.</param>
@@ -94,7 +94,7 @@ public static class ArtistProfileService
         if (string.IsNullOrWhiteSpace(artistName))
             return null;
 
-        language = language is "de" or "fr" ? language : "en";
+        language = language is "de" or "fr" or "es" ? language : "en";
 
         ArtistProfileDownload? result;
         if (source == ArtistInfoSource.LastFm)

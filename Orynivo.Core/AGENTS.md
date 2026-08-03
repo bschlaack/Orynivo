@@ -78,6 +78,8 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   playback-history rows.
 - `ArtistNameNormalizer.CreateComparisonKey` is the shared identity key for
   comparing artist names across local and Orynivo Server catalogs.
+- `ArtistProfileService` accepts `de`, `en`, `fr`, and `es` profile language
+  codes; supported UI languages must not silently fall back to another language.
 - Local artist browsing is album-artist-centered. The scanner records whether
   `ALBUMARTIST` was missing, imports supported compilation flags, and
   `AudioDatabase.ReconcileAlbumArtists` resolves the complete album before the

@@ -133,6 +133,7 @@ public partial class MainWindow : Window
     private ContentRow? _artistInfoDisplayedRemoteRow;
     private string? _artistInfoUnifiedArtistName;
     private bool _artistInfoIsFavorite;
+    private int _artistDetailLoadVersion;
     private bool _nowPlayingRemoteArtistInfo;
     private string? _currentArtistName;
     private string? _artistInfoSourceUrl;
@@ -9290,8 +9291,14 @@ public partial class MainWindow : Window
     private Task ShowArtistAlbumsAsync(long artistId, string artistName) =>
         ShowUnifiedArtistAlbumsAsync(artistName);
 
+    private bool IsCurrentArtistDetailLoad(int loadVersion, string artistName) =>
+        loadVersion == _artistDetailLoadVersion &&
+        ArtistInfoView.IsVisible &&
+        string.Equals(_artistInfoUnifiedArtistName, artistName, StringComparison.Ordinal);
+
     private async Task ShowUnifiedArtistAlbumsAsync(string artistName)
     {
+        var loadVersion = ++_artistDetailLoadVersion;
         CancelArtistProfileLoad();
         PushCurrentNavigationState();
         _currentTopLevelTag = "UnifiedArtistAlbums";
@@ -9318,42 +9325,71 @@ public partial class MainWindow : Window
         _artistInfoUnifiedArtistName = artistName;
         var comparisonKey = ArtistNameNormalizer.CreateComparisonKey(artistName);
         var albumSources = new List<(LibraryCatalogAlbum Album, OrynivoServerSettings? Server)>();
-        var localArtists = await _localCatalogProvider.GetArtistsAsync();
+        var localArtists = await Task.Run(async () =>
+            await _localCatalogProvider.GetArtistsAsync());
+        if (!IsCurrentArtistDetailLoad(loadVersion, artistName))
+            return;
         var matchingLocalArtists = localArtists.Where(candidate =>
                 ArtistNameNormalizer.CreateComparisonKey(candidate.Name) == comparisonKey)
             .ToList();
         var isFavorite = matchingLocalArtists.Any(artist => artist.IsFavorite);
-        foreach (var artist in matchingLocalArtists)
+        var localAlbumLists = await Task.Run(async () =>
         {
-            var albums = await _localCatalogProvider.GetAlbumsByArtistAsync(artist.Id, includeArtwork: true);
+            var lists = new List<IReadOnlyList<LibraryCatalogAlbum>>();
+            foreach (var artist in matchingLocalArtists)
+                lists.Add(await _localCatalogProvider.GetAlbumsByArtistAsync(artist.Id, includeArtwork: true));
+            return lists;
+        });
+        if (!IsCurrentArtistDetailLoad(loadVersion, artistName))
+            return;
+        foreach (var albums in localAlbumLists)
             albumSources.AddRange(albums.Select(album => (album, (OrynivoServerSettings?)null)));
-        }
         PopulateUnifiedArtistInfoAlbums(albumSources);
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
 
         ContentRow? matchingRemoteRow = null;
-        foreach (var server in _settings.OrynivoServers ?? [])
-        {
-            try
+        var remoteLoads = (_settings.OrynivoServers ?? [])
+            .Select(async server =>
             {
-                var provider = CreateOrynivoCatalogProvider(server);
-                var artists = await provider.GetArtistsAsync();
-                foreach (var artist in artists.Where(candidate =>
-                             ArtistNameNormalizer.CreateComparisonKey(candidate.Name) == comparisonKey))
+                try
                 {
-                    isFavorite |= artist.IsFavorite;
-                    matchingRemoteRow ??= ToCatalogArtistContentRow(artist, server);
-                    var albums = await provider.GetAlbumsByArtistAsync(artist.Id, includeArtwork: true);
-                    albumSources.AddRange(albums.Select(album => (
-                        album,
-                        (OrynivoServerSettings?)server)));
-                    PopulateUnifiedArtistInfoAlbums(albumSources);
+                    var provider = CreateOrynivoCatalogProvider(server);
+                    var artists = await provider.GetArtistsAsync();
+                    var matches = artists.Where(candidate =>
+                            ArtistNameNormalizer.CreateComparisonKey(candidate.Name) == comparisonKey)
+                        .ToList();
+                    var albums = new List<LibraryCatalogAlbum>();
+                    foreach (var artist in matches)
+                    {
+                        albums.AddRange(await provider.GetAlbumsByArtistAsync(
+                            artist.Id,
+                            includeArtwork: true));
+                    }
+                    return (Server: server, Artists: matches, Albums: albums);
                 }
-            }
-            catch
+                catch
+                {
+                    return (Server: server, Artists: new List<LibraryCatalogArtist>(), Albums: new List<LibraryCatalogAlbum>());
+                }
+            })
+            .ToList();
+        foreach (var remote in await Task.WhenAll(remoteLoads))
+        {
+            if (!IsCurrentArtistDetailLoad(loadVersion, artistName))
+                return;
+            foreach (var artist in remote.Artists)
             {
-                // An unavailable server must not hide albums from the other libraries.
+                isFavorite |= artist.IsFavorite;
+                matchingRemoteRow ??= ToCatalogArtistContentRow(artist, remote.Server);
             }
+            albumSources.AddRange(remote.Albums.Select(album => (
+                album,
+                (OrynivoServerSettings?)remote.Server)));
+            PopulateUnifiedArtistInfoAlbums(albumSources);
         }
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
+        if (!IsCurrentArtistDetailLoad(loadVersion, artistName))
+            return;
 
         if (matchingLocalArtists.FirstOrDefault() is { } localArtist)
             await ShowArtistInfoAsync(localArtist.Id, forceRefresh: false);
@@ -14571,14 +14607,7 @@ public partial class MainWindow : Window
                     ? album.ArtworkPath
                     : null;
             if (localPath is not null)
-            {
-                try
-                {
-                    using var bmpStream = File.OpenRead(localPath);
-                    image.Source = new Bitmap(bmpStream);
-                }
-                catch { image.Source = null; }
-            }
+                _ = LoadDashboardLocalArtworkAsync(image, localPath);
         }
         else
         {
@@ -14655,7 +14684,8 @@ public partial class MainWindow : Window
         _artistInfoDisplayedRemoteRow = null;
         _nowPlayingRemoteArtistInfo = false;
         _artistInfoDisplayedId = artistId;
-        ResetArtistInfoAlbums();
+        if (string.IsNullOrWhiteSpace(_artistInfoUnifiedArtistName))
+            ResetArtistInfoAlbums();
         CancelArtistProfileLoad();
         var cts = new CancellationTokenSource();
         _artistProfileCts = cts;
@@ -14673,9 +14703,11 @@ public partial class MainWindow : Window
 
         try
         {
-            ArtistInfo? artist;
-            using (var db = AudioDatabase.OpenDefault())
-                artist = db.GetArtistById(artistId);
+            var artist = await Task.Run(() =>
+            {
+                using var db = AudioDatabase.OpenDefault();
+                return db.GetArtistById(artistId);
+            }, cts.Token);
             if (artist is null)
             {
                 ArtistInfoStatusTextBlock.Text = LocalizationManager.Current.ArtistInfoNotFound;
@@ -14705,16 +14737,17 @@ public partial class MainWindow : Window
                     cancellationToken: cts.Token,
                     musicBrainzArtistId: artist.MusicBrainzArtistId);
                 cts.Token.ThrowIfCancellationRequested();
-                using (var db = AudioDatabase.OpenDefault())
+                artist = await Task.Run(() =>
                 {
+                    using var db = AudioDatabase.OpenDefault();
                     db.UpdateArtistProfile(
                         artist.Id,
                         profile?.Biography,
                         profile?.ImagePath,
                         profile?.SourceUrl,
                         language);
-                    artist = db.GetArtistById(artist.Id);
-                }
+                    return db.GetArtistById(artist.Id);
+                }, cts.Token);
 
                 byte[]? imageData = null;
                 string? imageMimeType = null;
@@ -14737,7 +14770,9 @@ public partial class MainWindow : Window
                 return;
 
             ArtistInfoBiographyTextBlock.Text = artist.Biography ?? string.Empty;
-            ArtistInfoImage.Source = CreateArtworkImage(artist.ImagePath, 1000, ignoreCache: true);
+            ArtistInfoImage.Source = await Task.Run(
+                () => CreateArtworkImage(artist.ImagePath, 1000, ignoreCache: true),
+                cts.Token);
             if (ArtistInfoImage.Source is null)
             {
                 ArtistInfoImagePlaceholder.IsVisible = true;
@@ -15033,7 +15068,9 @@ public partial class MainWindow : Window
             }
 
             ArtistInfoBiographyTextBlock.Text = profile?.Biography ?? string.Empty;
-            ArtistInfoImage.Source = CreateArtworkImage(profile?.ImagePath, 1000, ignoreCache: true);
+            ArtistInfoImage.Source = await Task.Run(
+                () => CreateArtworkImage(profile?.ImagePath, 1000, ignoreCache: true),
+                cts.Token);
             if (ArtistInfoImage.Source is null)
             {
                 ArtistInfoImagePlaceholder.IsVisible = true;
@@ -15190,6 +15227,7 @@ public partial class MainWindow : Window
     {
         Orynivo.Localization.Language.German => "de",
         Orynivo.Localization.Language.French => "fr",
+        Orynivo.Localization.Language.Spanish => "es",
         _ => "en"
     };
 

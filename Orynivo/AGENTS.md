@@ -196,6 +196,12 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 - The artist detail hero intentionally has a roughly 420 px minimum height and
   320 px image; its biography remains independently scrollable and the album
   strip starts below the hero.
+- `ShowUnifiedArtistAlbumsAsync` renders local albums before remote/profile
+  work, loads server album sets concurrently, yields the dispatcher so cards
+  paint, and starts profile/image resolution last. Its load version discards
+  superseded results. Synchronous local provider calls and bitmap decoding must
+  run through `Task.Run`; `ShowArtistInfoAsync` must never reset albums while a
+  unified artist context is active.
 - Navigation state must distinguish local, remote, Plex, and unified drill-downs;
   numeric IDs from different sources can collide. Back restoration of the
   top-level Artists and Albums views must use the normal unified loader rather
