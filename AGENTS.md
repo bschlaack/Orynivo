@@ -1008,6 +1008,12 @@ fallback or allow client-provided commands/paths to reach the helper.
   Podcasts, **Up Next**, and AI Chat from Settings > Appearance; they default
   to visible and are independent of the accordion-section toggles
 - `AppSettings.Theme` stores the `Light` or `Dark` theme
+- `AppSettings.GenreCloudBackground` stores whether Genre Cloud background
+  rendering is disabled or uses recommendation-ranked album covers or artist
+  images; artist images remain the default
+- `AppSettings.GenreCloudBackgroundOpacity` stores the persisted Genre Cloud
+  tile visibility from zero to one; Settings presents it as a percentage slider
+  and defaults new profiles to 50 percent
 - `AppSettings.Language` stores `German`, `English`, `French`, or `Spanish`
 - `Orynivo/Library/TrackRecord.cs`: database track model containing tags and
   technical metadata

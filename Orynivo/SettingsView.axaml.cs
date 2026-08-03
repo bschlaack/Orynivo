@@ -4,6 +4,7 @@ using System.IO;
 using Avalonia;
 using Avalonia.Threading;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Styling;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Interactivity;
@@ -116,6 +117,19 @@ internal partial class SettingsView : UserControl
         };
         LanguageComboBox.ItemsSource = languageChoices;
         LanguageComboBox.SelectedItem = languageChoices.First(choice => choice.Value == settings.Language);
+        var genreCloudBackgroundChoices = new[]
+        {
+            new SettingChoice<GenreCloudBackgroundMode>(GenreCloudBackgroundMode.None, LocalizationManager.Current.GenreCloudBackgroundNone),
+            new SettingChoice<GenreCloudBackgroundMode>(GenreCloudBackgroundMode.Albums, LocalizationManager.Current.GenreCloudBackgroundAlbums),
+            new SettingChoice<GenreCloudBackgroundMode>(GenreCloudBackgroundMode.Artists, LocalizationManager.Current.GenreCloudBackgroundArtists)
+        };
+        GenreCloudBackgroundComboBox.ItemsSource = genreCloudBackgroundChoices;
+        GenreCloudBackgroundComboBox.SelectedItem = genreCloudBackgroundChoices.FirstOrDefault(
+            choice => choice.Value == settings.GenreCloudBackground) ?? genreCloudBackgroundChoices[2];
+        GenreCloudVisibilitySlider.Value = Math.Round(
+            Math.Clamp(settings.GenreCloudBackgroundOpacity, 0, 1) * 100);
+        UpdateGenreCloudVisibilityText();
+        UpdateGenreCloudVisibilityEnabled();
         var replayGainChoices = new[]
         {
             new SettingChoice<ReplayGainMode>(ReplayGainMode.Off, LocalizationManager.Current.ReplayGainOff),
@@ -302,6 +316,14 @@ internal partial class SettingsView : UserControl
         ThemeComboBox.SelectedItem is SettingChoice<AppTheme> theme ? theme.Value : AppTheme.Dark;
     public UiLanguage SelectedLanguage =>
         LanguageComboBox.SelectedItem is SettingChoice<UiLanguage> language ? language.Value : UiLanguage.German;
+    /// <summary>Gets the selected artwork source for Genre Cloud backgrounds.</summary>
+    public GenreCloudBackgroundMode SelectedGenreCloudBackground =>
+        GenreCloudBackgroundComboBox.SelectedItem is SettingChoice<GenreCloudBackgroundMode> choice
+            ? choice.Value
+            : GenreCloudBackgroundMode.Artists;
+    /// <summary>Gets the selected Genre Cloud tile opacity from zero to one.</summary>
+    public double SelectedGenreCloudBackgroundOpacity =>
+        Math.Clamp(GenreCloudVisibilitySlider.Value / 100d, 0, 1);
     public ArtistInfoSource SelectedArtistInfoSource =>
         ArtistInfoSourceComboBox.SelectedItem is ArtistInfoSource src ? src : ArtistInfoSource.Wikipedia;
     public string SelectedLastFmApiKey => LastFmApiKeyTextBox.Text?.Trim() ?? string.Empty;
@@ -1725,6 +1747,52 @@ internal partial class SettingsView : UserControl
             OptimizeDatabaseButton.IsEnabled = true;
             UpdateBackupButtonAvailability();
         }
+    }
+
+    /// <summary>Deletes every rendered Genre Cloud mosaic from the current user's cache.</summary>
+    /// <param name="sender">The clear-cache button.</param>
+    /// <param name="e">The routed click event.</param>
+    private void ClearGenreCloudCacheButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        var cacheDirectory = AppPaths.GetDataPath("genre-cloud-backgrounds");
+        if (Directory.Exists(cacheDirectory))
+        {
+            foreach (var file in Directory.EnumerateFiles(cacheDirectory))
+            {
+                try { File.Delete(file); }
+                catch { /* Cache cleanup is best-effort. */ }
+            }
+        }
+
+        GenreCloudCacheStatusTextBlock.Text = LocalizationManager.Current.GenreCloudCacheCleared;
+    }
+
+    /// <summary>Updates the visible percentage beside the Genre Cloud opacity slider.</summary>
+    /// <param name="sender">The opacity slider.</param>
+    /// <param name="e">The slider value-change event.</param>
+    private void GenreCloudVisibilitySlider_OnValueChanged(
+        object? sender,
+        RangeBaseValueChangedEventArgs e)
+        => UpdateGenreCloudVisibilityText();
+
+    /// <summary>Enables the opacity control only when background rendering is active.</summary>
+    /// <param name="sender">The background-mode selector.</param>
+    /// <param name="e">The selection-change event.</param>
+    private void GenreCloudBackgroundComboBox_OnSelectionChanged(
+        object? sender,
+        SelectionChangedEventArgs e)
+        => UpdateGenreCloudVisibilityEnabled();
+
+    /// <summary>Formats the current Genre Cloud opacity as an integer percentage.</summary>
+    private void UpdateGenreCloudVisibilityText()
+        => GenreCloudVisibilityValueTextBlock.Text = $"{GenreCloudVisibilitySlider.Value:0}%";
+
+    /// <summary>Synchronizes the opacity controls with the selected background mode.</summary>
+    private void UpdateGenreCloudVisibilityEnabled()
+    {
+        var enabled = SelectedGenreCloudBackground != GenreCloudBackgroundMode.None;
+        GenreCloudVisibilitySlider.IsEnabled = enabled;
+        GenreCloudVisibilityValueTextBlock.Opacity = enabled ? 1 : 0.45;
     }
 
     private async void RepairAlbumArtworkButton_OnClick(object? sender, RoutedEventArgs e)

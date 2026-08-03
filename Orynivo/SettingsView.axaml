@@ -1029,6 +1029,48 @@
                               HorizontalAlignment="Stretch"
                               Margin="0,0,0,20"/>
 
+                    <TextBlock Text="{DynamicResource L_GenreCloudBackground}"
+                               FontSize="{DynamicResource FontSizeCaption}"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+                    <TextBlock Text="{DynamicResource L_GenreCloudBackgroundHint}"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,8"/>
+                    <ComboBox x:Name="GenreCloudBackgroundComboBox"
+                              Height="30"
+                              HorizontalAlignment="Stretch"
+                              SelectionChanged="GenreCloudBackgroundComboBox_OnSelectionChanged"
+                              Margin="0,0,0,12"/>
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
+                        <TextBlock Text="{DynamicResource L_GenreCloudVisibility}"
+                                   FontSize="{DynamicResource FontSizeCaption}"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock x:Name="GenreCloudVisibilityValueTextBlock"
+                                   Grid.Column="1"
+                                   FontSize="{DynamicResource FontSizeCaption}"
+                                   Foreground="{DynamicResource AppSecondaryTextBrush}"/>
+                    </Grid>
+                    <Slider x:Name="GenreCloudVisibilitySlider"
+                            Minimum="0"
+                            Maximum="100"
+                            TickFrequency="1"
+                            IsSnapToTickEnabled="True"
+                            ValueChanged="GenreCloudVisibilitySlider_OnValueChanged"
+                            Margin="0,0,0,10"/>
+                    <Button Width="180"
+                            Height="30"
+                            HorizontalAlignment="Left"
+                            Theme="{StaticResource SettingsButtonTheme}"
+                            Content="{DynamicResource L_ClearGenreCloudCache}"
+                            Click="ClearGenreCloudCacheButton_OnClick"/>
+                    <TextBlock x:Name="GenreCloudCacheStatusTextBlock"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppSecondaryTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,6,0,20"/>
+
                     <TextBlock Text="{DynamicResource L_Updates}"
                                FontSize="{DynamicResource FontSizeCaption}"
                                FontWeight="SemiBold"

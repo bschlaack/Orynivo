@@ -10,6 +10,7 @@
 #define AppPublisher "Björn Schlaack"
 #define AppURL       "https://github.com/bschlaack/Orynivo"
 #define AppExe       "Orynivo.exe"
+#define AppUserModelId "Orynivo.AudioPlayer"
 ; Fixed GUID — must never change between releases so upgrades work correctly.
 #define AppId        "{{894E3E02-3CB4-4614-917A-12F8A7796571}"
 
@@ -72,8 +73,8 @@ Source: "..\artifacts\Orynivo-win-x64\*"; \
   Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\{#AppName}";    Filename: "{app}\{#AppExe}"
-Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
+Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExe}"; AppUserModelID: "{#AppUserModelId}"
+Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; AppUserModelID: "{#AppUserModelId}"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\{#AppExe}"; \

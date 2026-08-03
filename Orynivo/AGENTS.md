@@ -122,6 +122,29 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   leaf with candidates but no child nodes displays its own name centrally; it
   is not an empty-library state. The virtual `more-genres` node is localized
   while its dynamic children retain the actual unmapped library tag names.
+  Each taxonomy level may render up to sixteen recommendation-ranked local and
+  remote artist images as a non-interactive grayscale tile background. Keep it
+  faded beneath a dark veil so node labels retain priority. Scale each image
+  proportionally to fit completely inside its tile instead of center-cropping
+  away substantial parts. Cache only the rendered mosaic for 24 hours under the
+  data root; authenticated remote artwork URLs and API keys must never be
+  written to that cache.
+  Settings > Appearance exposes an independent clear action for these rendered
+  mosaics. It must not remove source artist images or any other remote artwork
+  cache. The same section persists a background mode of
+  None, Albums, or Artists (default). None must skip image resolution, network
+  downloads, and rendering completely. Albums use the source-aware resolved
+  recommendation album rows. Derive the column count and requested image count
+  from the measured cloud-surface width, capped at 32 images. Dedupe decoded
+  images by perceptual fingerprint so copies reached through different local or
+  server identities are not repeated. Center sparse sets as one balanced row or
+  two balanced rows; never repeat them merely to fill the available slots. A
+  single row uses the complete mosaic height and derives tile width from its
+  actual column count; two rows divide the height evenly. Preserve proportional
+  fitting so this adaptive enlargement never crops or distorts an image. Keep
+  the independent cache-clear action beside the mode selector in Appearance,
+  and persist a zero-to-one opacity setting exposed as a 0–100% slider with a
+  50% default. Disable that slider while the None mode is selected.
 - Matching local and Orynivo Server artists use
   `ArtistNameNormalizer.CreateComparisonKey` and one `UnifiedArtist` row. Its
   album drill-down combines every matching library while retaining each album's
@@ -334,6 +357,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   credentials in plaintext or claim unavailable WASAPI, ASIO, endpoint-volume,
   or SMTC capabilities.
   Cross-platform behavior shared with the server belongs in `Orynivo.Core`.
+- The Windows installer shortcuts must carry the same
+  `Orynivo.AudioPlayer` application user model ID that `App.xaml.cs` assigns to
+  the process. Windows uses that identity to attribute the SMTC media session
+  to Orynivo instead of showing an unknown application.
 - Keep the Linux-only direct `Tmds.DBus.Protocol` dependency at 0.92.0 or newer
   within the compatible package line: its non-blocking observer dispatch avoids
   a shutdown race with Avalonia's stopped UI dispatcher.

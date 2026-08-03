@@ -104,6 +104,12 @@ public static class LocalizationManager
         resources["L_Directories"] = Current.Directories;
         resources["L_AddDirectory"] = Current.AddDirectory;
         resources["L_DatabaseMaintenance"] = Current.DatabaseMaintenance;
+        resources["L_GenreCloudCache"] = Current.GenreCloudCache;
+        resources["L_GenreCloudCacheHint"] = Current.GenreCloudCacheHint;
+        resources["L_GenreCloudBackground"] = Current.GenreCloudBackground;
+        resources["L_GenreCloudBackgroundHint"] = Current.GenreCloudBackgroundHint;
+        resources["L_GenreCloudVisibility"] = Current.GenreCloudVisibility;
+        resources["L_ClearGenreCloudCache"] = Current.ClearGenreCloudCache;
         resources["L_OptimizeDatabase"] = Current.OptimizeDatabase;
         resources["L_RepairAlbumArtwork"] = Current.RepairAlbumArtwork;
         resources["L_DownloadMissingArtwork"] = Current.DownloadMissingArtwork;
@@ -524,6 +530,16 @@ public static class LocalizationManager
         OutputProfileDeleteTitle = "Ausgabe löschen",
         OutputProfileDeleteConfirm = "Soll die Ausgabe »{0}« wirklich gelöscht werden?",
         DatabaseOptimizeHint = "Freigegebene Seiten werden entfernt; danach ist die Datei physisch kleiner.",
+        GenreCloudCache = "Genre-Wolken-Hintergründe",
+        GenreCloudCacheHint = "Zwischengespeicherte Künstler-Mosaike löschen. Sie werden beim nächsten Öffnen einer Genre-Ebene neu erstellt.",
+        GenreCloudCacheCleared = "Der Cache der Genre-Wolken-Hintergründe wurde geleert.",
+        GenreCloudBackground = "Genre-Wolke",
+        GenreCloudBackgroundHint = "Hintergrundbilder auswählen oder für eine geringere Systemlast vollständig deaktivieren.",
+        GenreCloudBackgroundNone = "Keine Hintergrundbilder",
+        GenreCloudBackgroundAlbums = "Albumcover",
+        GenreCloudBackgroundArtists = "Künstlerbilder",
+        GenreCloudVisibility = "Sichtbarkeit der Bilder",
+        ClearGenreCloudCache = "Hintergrund-Cache leeren",
         AppearanceNavItem = "Darstellung",
         ArtistInfoNavItem = "Künstlerinfo",
         AsioBridgeMissing = "Dieser Build enthält keine ASIO-Unterstützung. Bitte WASAPI verwenden.",
@@ -1140,6 +1156,16 @@ public static class LocalizationManager
         OutputProfileNameExists = "An output with this name already exists.",
         OutputProfileDeleteTitle = "Delete output",
         OutputProfileDeleteConfirm = "Are you sure you want to delete the output “{0}”?", DatabaseOptimizeHint = "Released pages are removed so the file becomes physically smaller.",
+        GenreCloudCache = "Genre Cloud backgrounds",
+        GenreCloudCacheHint = "Clear cached artist mosaics. They are rebuilt the next time a genre level is opened.",
+        GenreCloudCacheCleared = "The Genre Cloud background cache has been cleared.",
+        GenreCloudBackground = "Genre Cloud",
+        GenreCloudBackgroundHint = "Choose background artwork or disable it completely to reduce system load.",
+        GenreCloudBackgroundNone = "No background images",
+        GenreCloudBackgroundAlbums = "Album covers",
+        GenreCloudBackgroundArtists = "Artist images",
+        GenreCloudVisibility = "Image visibility",
+        ClearGenreCloudCache = "Clear background cache",
         AppearanceNavItem = "Appearance", ArtistInfoNavItem = "Artist information",
         AsioBridgeMissing = "This build does not include ASIO support. Please use WASAPI.",
         KernelStreamingUnavailable = "Kernel Streaming can be selected but is not implemented as a playback backend yet.",
@@ -1747,6 +1773,16 @@ public static class LocalizationManager
         OutputProfileNameExists = "Une sortie portant ce nom existe déjà.",
         OutputProfileDeleteTitle = "Supprimer la sortie",
         OutputProfileDeleteConfirm = "Voulez-vous vraiment supprimer la sortie « {0} » ?", DatabaseOptimizeHint = "Les pages libérées sont supprimées afin de réduire physiquement le fichier.",
+        GenreCloudCache = "Arrière-plans du nuage de genres",
+        GenreCloudCacheHint = "Efface les mosaïques d’artistes en cache. Elles seront recréées à la prochaine ouverture d’un niveau de genre.",
+        GenreCloudCacheCleared = "Le cache des arrière-plans du nuage de genres a été vidé.",
+        GenreCloudBackground = "Nuage de genres",
+        GenreCloudBackgroundHint = "Choisissez les images d’arrière-plan ou désactivez-les complètement pour réduire la charge du système.",
+        GenreCloudBackgroundNone = "Aucune image d’arrière-plan",
+        GenreCloudBackgroundAlbums = "Pochettes d’album",
+        GenreCloudBackgroundArtists = "Images d’artistes",
+        GenreCloudVisibility = "Visibilité des images",
+        ClearGenreCloudCache = "Vider le cache d’arrière-plan",
         AppearanceNavItem = "Apparence", ArtistInfoNavItem = "Informations sur l’artiste",
         AsioBridgeMissing = "Cette version ne comprend pas la prise en charge ASIO. Utilisez WASAPI.",
         KernelStreamingUnavailable = "Kernel Streaming peut être sélectionné, mais ce mode de lecture n’est pas encore implémenté.",
@@ -2351,6 +2387,16 @@ public static class LocalizationManager
         OutputProfileNameExists = "Ya existe una salida con este nombre.",
         OutputProfileDeleteTitle = "Eliminar salida",
         OutputProfileDeleteConfirm = "¿Seguro que quieres eliminar la salida «{0}»?", DatabaseOptimizeHint = "Las páginas liberadas se eliminan para reducir físicamente el archivo.",
+        GenreCloudCache = "Fondos de la nube de géneros",
+        GenreCloudCacheHint = "Borra los mosaicos de artistas almacenados en caché. Se volverán a crear al abrir de nuevo un nivel de género.",
+        GenreCloudCacheCleared = "Se ha vaciado la caché de fondos de la nube de géneros.",
+        GenreCloudBackground = "Nube de géneros",
+        GenreCloudBackgroundHint = "Elige las imágenes de fondo o desactívalas por completo para reducir la carga del sistema.",
+        GenreCloudBackgroundNone = "Sin imágenes de fondo",
+        GenreCloudBackgroundAlbums = "Carátulas de álbumes",
+        GenreCloudBackgroundArtists = "Imágenes de artistas",
+        GenreCloudVisibility = "Visibilidad de las imágenes",
+        ClearGenreCloudCache = "Vaciar caché de fondos",
         AppearanceNavItem = "Apariencia", ArtistInfoNavItem = "Información del artista",
         AsioBridgeMissing = "Esta compilación no incluye compatibilidad con ASIO. Utiliza WASAPI.",
         KernelStreamingUnavailable = "Kernel Streaming se puede seleccionar, pero todavía no está implementado como backend de reproducción.",

@@ -337,7 +337,12 @@ public static class LibraryScanner
                     continue;
 
                 bool isNew = !timestamps.ContainsKey(filePath);
-                var record = BuildRecord(filePath, fi, modifiedAt, now, out _);
+                var record = TryBuildRecordWithRetries(filePath, fi, modifiedAt, now, ct);
+                if (record is null)
+                {
+                    failed++;
+                    continue;
+                }
                 if (metadataChanged && calculateMissingReplayGain)
                     EnsureReplayGain(record, ct);
                 db.Upsert(record);
@@ -849,6 +854,36 @@ public static class LibraryScanner
         }
 
         return record;
+    }
+
+    /// <summary>
+    /// Reads one file with bounded retries and returns no record when its tags could not be opened.
+    /// Callers must preserve an existing database row when this method returns <see langword="null"/>.
+    /// </summary>
+    /// <param name="filePath">Physical audio-file path.</param>
+    /// <param name="fileInfo">Current file-system metadata.</param>
+    /// <param name="modifiedAt">Last-write timestamp as Unix seconds.</param>
+    /// <param name="addedAt">Timestamp to use for a newly discovered row.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A metadata record after a successful read; otherwise <see langword="null"/>.</returns>
+    internal static TrackRecord? TryBuildRecordWithRetries(
+        string filePath,
+        FileInfo fileInfo,
+        long modifiedAt,
+        long addedAt,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < 4; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var record = BuildRecord(filePath, fileInfo, modifiedAt, addedAt, out var metadataRead);
+            if (metadataRead)
+                return record;
+            if (attempt < 3)
+                WaitBeforeRetry(attempt, cancellationToken);
+        }
+
+        return null;
     }
 
     private static List<TrackRecord> BuildCueRecords(

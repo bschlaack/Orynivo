@@ -76,6 +76,10 @@ public sealed class AppSettings
     public int PlaybackQueueIndex { get; set; } = -1;
     /// <summary>Gets or sets the application colour theme.</summary>
     public AppTheme Theme { get; set; } = AppTheme.Dark;
+    /// <summary>Gets or sets the artwork source used behind the Genre Cloud.</summary>
+    public GenreCloudBackgroundMode GenreCloudBackground { get; set; } = GenreCloudBackgroundMode.Artists;
+    /// <summary>Gets or sets the Genre Cloud tile opacity from zero (hidden) to one (fully visible).</summary>
+    public double GenreCloudBackgroundOpacity { get; set; } = 0.5;
     /// <summary>Gets or sets the active UI language.</summary>
     public Localization.Language Language { get; set; } = Localization.Language.German;
     /// <summary>Gets or sets the source used to fetch artist biography text.</summary>
@@ -165,4 +169,15 @@ public enum AppTheme
     Light,
     /// <summary>Dark colour scheme.</summary>
     Dark
+}
+
+/// <summary>Artwork sources available for the Genre Cloud background.</summary>
+public enum GenreCloudBackgroundMode
+{
+    /// <summary>Disables the decorative Genre Cloud background.</summary>
+    None,
+    /// <summary>Uses album covers from the current recommendations.</summary>
+    Albums,
+    /// <summary>Uses artist images from the current recommendations.</summary>
+    Artists
 }
