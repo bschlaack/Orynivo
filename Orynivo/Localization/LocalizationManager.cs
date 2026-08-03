@@ -295,6 +295,10 @@ public static class LocalizationManager
         resources["L_ArtistImageSearchFailed"] = Current.ArtistImageSearchFailed;
         resources["L_UseSelectedArtistImage"] = Current.UseSelectedArtistImage;
         resources["L_ArtistImageDownloadFailed"] = Current.ArtistImageDownloadFailed;
+        resources["L_ArtistProfileSearchTitle"] = Current.ArtistProfileSearchTitle;
+        resources["L_ArtistProfileSearchHint"] = Current.ArtistProfileSearchHint;
+        resources["L_ArtistProfileSearchQuery"] = Current.ArtistProfileSearchQuery;
+        resources["L_ArtistProfileSearchLoad"] = Current.ArtistProfileSearchLoad;
         resources["L_EditArtistName"] = Current.EditArtistName;
         resources["L_ArtistName"] = Current.ArtistName;
         resources["L_RenameArtist"] = Current.RenameArtist;
@@ -784,6 +788,10 @@ public static class LocalizationManager
         , ArtistImageSearchFailed = "Die Künstlerbildsuche ist fehlgeschlagen."
         , UseSelectedArtistImage = "Ausgewähltes Bild übernehmen"
         , ArtistImageDownloadFailed = "Das ausgewählte Künstlerbild konnte nicht gespeichert werden."
+        , ArtistProfileSearchTitle = "Künstlerinfo neu laden"
+        , ArtistProfileSearchHint = "Passe bei Bedarf den Namen an, mit dem Wikipedia oder Last.fm nach der Künstlerinfo sucht. Der Künstlername in deiner Bibliothek wird dadurch nicht geändert."
+        , ArtistProfileSearchQuery = "Name für die Profilsuche"
+        , ArtistProfileSearchLoad = "Info laden"
         , EditArtistName = "Künstlername ändern"
         , ArtistName = "Künstlername"
         , RenameArtist = "Umbenennen"
@@ -1398,6 +1406,10 @@ public static class LocalizationManager
         , ArtistImageSearchFailed = "The artist image search failed."
         , UseSelectedArtistImage = "Use selected image"
         , ArtistImageDownloadFailed = "The selected artist image could not be saved."
+        , ArtistProfileSearchTitle = "Reload artist information"
+        , ArtistProfileSearchHint = "If necessary, adjust the name Wikipedia or Last.fm uses to find the artist profile. This does not rename the artist in your library."
+        , ArtistProfileSearchQuery = "Profile search name"
+        , ArtistProfileSearchLoad = "Load information"
         , EditArtistName = "Edit artist name"
         , ArtistName = "Artist name"
         , RenameArtist = "Rename"
@@ -2015,6 +2027,10 @@ public static class LocalizationManager
         , ArtistImageSearchFailed = "La recherche d’images d’artiste a échoué."
         , UseSelectedArtistImage = "Utiliser l’image sélectionnée"
         , ArtistImageDownloadFailed = "Impossible d’enregistrer l’image d’artiste sélectionnée."
+        , ArtistProfileSearchTitle = "Recharger les informations de l’artiste"
+        , ArtistProfileSearchHint = "Si nécessaire, modifiez le nom utilisé par Wikipédia ou Last.fm pour rechercher le profil. Cela ne renomme pas l’artiste dans votre bibliothèque."
+        , ArtistProfileSearchQuery = "Nom pour la recherche du profil"
+        , ArtistProfileSearchLoad = "Charger les informations"
         , EditArtistName = "Modifier le nom de l’artiste"
         , ArtistName = "Nom de l’artiste"
         , RenameArtist = "Renommer"
@@ -2629,6 +2645,10 @@ public static class LocalizationManager
         , ArtistImageSearchFailed = "La búsqueda de imágenes del artista ha fallado."
         , UseSelectedArtistImage = "Usar imagen seleccionada"
         , ArtistImageDownloadFailed = "No se pudo guardar la imagen del artista seleccionada."
+        , ArtistProfileSearchTitle = "Volver a cargar la información del artista"
+        , ArtistProfileSearchHint = "Si es necesario, ajusta el nombre que Wikipedia o Last.fm utiliza para buscar el perfil. Esto no cambia el nombre del artista en tu biblioteca."
+        , ArtistProfileSearchQuery = "Nombre para buscar el perfil"
+        , ArtistProfileSearchLoad = "Cargar información"
         , EditArtistName = "Cambiar nombre del artista"
         , ArtistName = "Nombre del artista"
         , RenameArtist = "Cambiar nombre"
