@@ -1359,6 +1359,12 @@ fallback or allow client-provided commands/paths to reach the helper.
   below its action row, never as a centered overlay over the albums.
 - The artist hero uses a roughly 420 px minimum height with a 320 px image and
   enlarged bounded biography viewport; keep the album strip below the hero.
+- Unified artist detail loading is strictly album-first: query local catalog
+  data off the UI thread, render local albums, query configured servers
+  concurrently, render their albums, yield a render pass, and only then start
+  the cancellable biography/image phase. Profile loading must not clear the
+  unified album strip. Local artwork decoding also stays off the UI thread so
+  playback and transport interaction remain responsive.
 - Artist images remain visible even when no biography is available.
 - The artist information view can rename artists. A matching normalized name
   opens a merge dialog that asks which artist record and profile data survive;

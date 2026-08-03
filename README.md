@@ -32,7 +32,8 @@ the ability to reach that library from any device on the local network.
   synchronized favorites, image management, refreshable biographies, and
   combined local/Orynivo Server albums. Manual biography refresh can use an
   editable external lookup name without changing the library artist name
-  while the artist's albums remain available during profile loading
+  while the artist's albums render before profile loading and remain available
+  throughout it; profile text follows German, English, French, or Spanish
 - Hierarchical Genre Cloud with source-aware track and album recommendations
   across the local library and connected Orynivo Servers, backed by a subtle
   cached grayscale mosaic of matching artist images

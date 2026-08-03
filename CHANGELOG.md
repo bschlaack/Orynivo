@@ -4,6 +4,17 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.35.2] - 2026-08-03
+
+### Fixed
+
+- Fixed unified artist details clearing their already rendered albums when the
+  biography loader started. Local albums now render first, remote album queries
+  run concurrently, and only then does the cancellable profile/image phase
+  begin. Local catalog reads and artwork decoding run off the UI thread so the
+  player remains responsive. Spanish artist-profile requests now correctly use
+  `es` instead of silently falling back to English.
+
 ## [0.35.1] - 2026-08-03
 
 ### Fixed
