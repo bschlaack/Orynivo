@@ -745,6 +745,10 @@ public sealed record LocalizedStrings(
     public string ArtistImageSearchFailed { get; init; } = "";
     public string UseSelectedArtistImage { get; init; } = "";
     public string ArtistImageDownloadFailed { get; init; } = "";
+    public string ArtistProfileSearchTitle { get; init; } = "";
+    public string ArtistProfileSearchHint { get; init; } = "";
+    public string ArtistProfileSearchQuery { get; init; } = "";
+    public string ArtistProfileSearchLoad { get; init; } = "";
     public string EditArtistName { get; init; } = "";
     public string ArtistName { get; init; } = "";
     public string RenameArtist { get; init; } = "";

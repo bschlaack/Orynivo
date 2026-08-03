@@ -166,6 +166,36 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   artist detail upload/delete actions route through the owning local or remote
   artwork provider and use localized labels/tooltips. Plex identities remain
   separate.
+- Every non-Plex artist-name link, artist-row double-click, unified search
+  result, and artist navigation from the transport opens the shared artist
+  detail surface instead of a bare Albums list. Its accent-bordered hero places
+  the artist image at the left and the title, bounded scrollable biography,
+  source link, rename, image search/upload/delete, and profile-refresh actions
+  at the right without overlap. Its favorite button synchronizes all normalized
+  matching local and Orynivo Server identities. The album strip below combines matching local and Orynivo Server
+  identities and de-duplicates equivalent title/year cards while retaining the
+  chosen card's source-aware navigation. Album cards open on double-click and
+  pass their provider-local artist ID/name into the album detail so its initial
+  track list remains artist-scoped and its show-all checkbox is available. The
+  artist detail stays visible until loading finishes, and Back restores that
+  same detail. Refreshing the profile must restore
+  that unified album strip. The normal Back action returns to the originating
+  view in one step; the transport info overlay remains independently closable.
+- Artist detail reuse must reset all profile-bound controls and owning IDs
+  before resolving the next artist, so a missing or slow profile can never show
+  the previous artist's image/biography or mutate the previous identity. The
+  unified artwork-card info button resolves its name from `ContentRow.Title`.
+  Forced profile refresh uses `ArtistProfileSearchDialog` to accept a temporary
+  lookup name without changing the canonical library artist name.
+- Artist table/artwork rows open details exclusively via double-click; their
+  former info icon is intentionally absent. Populate unified albums before the
+  profile request and append reachable server results incrementally. Profile
+  status text stays in the hero beneath the action row and changes from loading
+  to not-found when no biography is available; it must never obscure the album
+  strip.
+- The artist detail hero intentionally has a roughly 420 px minimum height and
+  320 px image; its biography remains independently scrollable and the album
+  strip starts below the hero.
 - Navigation state must distinguish local, remote, Plex, and unified drill-downs;
   numeric IDs from different sources can collide. Back restoration of the
   top-level Artists and Albums views must use the normal unified loader rather

@@ -1,0 +1,56 @@
+<Window x:Class="Orynivo.ArtistProfileSearchDialog"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{DynamicResource L_ArtistProfileSearchTitle}"
+        Icon="avares://Orynivo/Assets/Orynivo.ico"
+        Width="520"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppSurfaceBrush}"
+        Foreground="{DynamicResource AppPrimaryTextBrush}">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Text="{DynamicResource L_ArtistProfileSearchHint}"
+                   FontSize="{DynamicResource FontSizeBody}"
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource AppSecondaryTextBrush}"/>
+        <TextBlock Grid.Row="1"
+                   Margin="0,18,0,6"
+                   Text="{DynamicResource L_ArtistProfileSearchQuery}"
+                   FontSize="{DynamicResource FontSizeCaption}"
+                   Foreground="{DynamicResource AppMutedTextBrush}"/>
+        <TextBox x:Name="QueryTextBox"
+                 Grid.Row="2"
+                 Height="38"
+                 Padding="10,0"
+                 VerticalContentAlignment="Center"
+                 Background="{DynamicResource AppInputBrush}"
+                 Foreground="{DynamicResource AppPrimaryTextBrush}"
+                 BorderBrush="{DynamicResource AppInputBorderBrush}"
+                 KeyDown="QueryTextBox_OnKeyDown"/>
+        <StackPanel Grid.Row="3"
+                    Margin="0,20,0,0"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Spacing="8">
+            <Button Width="100"
+                    Height="36"
+                    Theme="{StaticResource HeaderFilterButtonTheme}"
+                    Content="{DynamicResource L_Cancel}"
+                    Click="CancelButton_OnClick"/>
+            <Button Width="150"
+                    Height="36"
+                    Background="{DynamicResource AppAccentBrush}"
+                    Foreground="{DynamicResource AppAccentTextBrush}"
+                    BorderThickness="0"
+                    Content="{DynamicResource L_ArtistProfileSearchLoad}"
+                    Click="LoadButton_OnClick"/>
+        </StackPanel>
+    </Grid>
+</Window>

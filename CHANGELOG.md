@@ -4,9 +4,41 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.35.1] - 2026-08-03
+
+### Fixed
+
+- Reworked the unified artist detail hero to match the album-detail layout:
+  the artist image now stays in a fixed left column instead of overlapping the
+  biography, while title, biography, source, and actions remain on the right.
+  The hero also exposes a favorite button that synchronizes matching local and
+  Orynivo Server artist identities.
+- Fixed artist-detail album navigation so cards open only on double-click,
+  initially filter the album tracks to the selected artist with the existing
+  show-all checkbox, remain on the artist detail while loading, and return to
+  that same artist detail and selection through Back.
+- Fixed the artwork-card info button for unified artists so it passes the
+  clicked artist name instead of an empty track-style artist field. Artist
+  details now clear every previous title, image, biography, source, and action
+  target before resolving the new profile, preventing stale information from a
+  previously opened artist. Manual profile refresh again offers an editable
+  Wikipedia/Last.fm lookup name without renaming the library artist.
+- Moved artist-profile loading and not-found feedback into the artist hero
+  beneath its actions. Unified albums now render incrementally before profile
+  lookup completes, and the redundant info buttons were removed from artist
+  table and artwork views because double-click opens the same detail page.
+- Increased the artist-detail hero height by roughly fifty percent, including
+  a proportionally larger artist image and biography viewport.
+
 ## [0.35.0] - 2026-08-03
 
 ### Added
+
+- Added a unified artist detail page for every non-Plex artist navigation path.
+  Its album-style hero shows the artist image, biography/source, rename and
+  image-management actions, and an explicit profile refresh, followed by the
+  artist's de-duplicated albums from the local library and all matching Orynivo
+  Server identities.
 
 - Added a muted grayscale artist-image mosaic behind each Genre Cloud level.
   Images follow the selected genre's recommendations across local and Orynivo

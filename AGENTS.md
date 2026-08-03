@@ -1325,6 +1325,20 @@ fallback or allow client-provided commands/paths to reach the helper.
   closes the artist-info overlay and opens the album's tracks
   (`OpenArtistInfoAlbumAsync`): local via `ShowAlbumTracksAsync`, remote via
   `OpenOrynivoAlbumTracksAsync` on the album's own server.
+- The same artist-info controls form the normal non-Plex artist detail page.
+  Its accent-bordered hero places the image beside the artist name, bounded
+  scrollable biography, source, rename, image-management, and refresh actions;
+  its album strip combines normalized matching local and Orynivo Server
+  identities. The image occupies a fixed left column and must never overlap the
+  biography or actions in the right column. Its favorite button applies to all
+  normalized matching local and Orynivo Server identities. Artist links and
+  double-clicks must not fall back to a bare album-only list. Back returns to
+  the originating view in one step. Album cards in the artist detail open only
+  on double-click. They retain the provider-local artist ID/name as the initial
+  album-track scope, expose the existing show-all-tracks checkbox, and keep the
+  artist detail visible until the album detail has finished loading. Back from
+  that album must restore the same unified artist detail rather than a generic
+  Artists or Albums view.
 - Artwork A-Z navigation indexes the complete lightweight artist/album result,
   but binds rows to the virtualized wrap panels in pages. A jump must append
   through the target row and defer `ScrollIntoView` until layout has processed
@@ -1332,6 +1346,19 @@ fallback or allow client-provided commands/paths to reach the helper.
 - The artist information view can search Wikimedia Commons using editable text
   and assign the selected image without replacing the cached biography
   or its source URL.
+- Opening artist information must synchronously clear the previous artist's
+  image, biography, source URL, IDs, and mutation targets before any local or
+  remote lookup begins. Unified artist info buttons use the row `Title`, never
+  the track-style `Artist` field. Manual profile refresh prompts for an editable
+  external lookup name; that query may affect Wikipedia/Last.fm resolution but
+  must not rename the artist stored in any library.
+- Artist table and artwork views use double-click as their sole detail gesture;
+  do not add a redundant per-row info icon. The unified album strip is populated
+  incrementally before biography/image lookup and must remain visible throughout
+  that lookup. Loading, failure, and not-found status belongs inside the hero
+  below its action row, never as a centered overlay over the albums.
+- The artist hero uses a roughly 420 px minimum height with a 320 px image and
+  enlarged bounded biography viewport; keep the album strip below the hero.
 - Artist images remain visible even when no biography is available.
 - The artist information view can rename artists. A matching normalized name
   opens a merge dialog that asks which artist record and profile data survive;
