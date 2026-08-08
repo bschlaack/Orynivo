@@ -4,6 +4,15 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.35.3] - 2026-08-08
+
+### Changed
+
+- Added direct primary-name links to every double-clickable artwork card,
+  including albums shown on artist detail pages, while retaining double-click
+  navigation. Artist-detail album links render their title text directly rather
+  than exposing the Avalonia content control's type name.
+
 ## [0.35.2] - 2026-08-03
 
 ### Fixed

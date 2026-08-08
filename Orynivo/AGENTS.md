@@ -223,6 +223,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   sidebar entries carry a source-appropriate shared vector icon; smart playlists
   use the shared 13-px icon footprint and spacing but retain a dedicated orange
   vector lightning icon for emphasis.
+- Every artwork card that supports double-click navigation also exposes its
+  primary entity name as an `EntityLinkButtonTheme` link to the identical
+  destination. Link clicks must be handled independently so they neither invoke
+  the surrounding card's double-click handler nor trigger playback.
 - Non-Dashboard hero and intro surfaces use the normal card background and the
   shared cyan-violet highlight gradient as their persistent border. They use a
   consistent 14-px radius on all four corners. The artwork-backed Dashboard
