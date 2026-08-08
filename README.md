@@ -633,6 +633,8 @@ byte-range streaming without FFmpeg.
   library, search, playlist, radio, podcast, and Plex views
 - Back navigation restores the previous selection and scroll position in album
   and artist table or artwork views after returning from a drill-down
+- Double-clickable artist and album artwork cards also expose their primary
+  names as direct links to the same detail view.
 - Album cover changes and artist metadata/image updates retain the current
   selection and list position
 - Album track details provide an in-place favorite button and artist-info action

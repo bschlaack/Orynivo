@@ -14616,17 +14616,26 @@ public partial class MainWindow : Window
                 _ = LoadDashboardRemoteArtworkAsync(image, artUrl);
         }
 
-        var titleText = new TextBlock
+        var titleButton = new Button
         {
-            Text       = album.Title,
+            Content = album.Title,
+            Margin = new Thickness(10, 8, 10, 1),
+            Padding = new Thickness(0),
             FontWeight = FontWeight.SemiBold,
-            FontSize   = 12,
+            FontSize = 12,
             Foreground = FindResource<IBrush>("AppPrimaryTextBrush"),
-            Margin     = new Thickness(10, 8, 10, 1),
-            TextTrimming = TextTrimming.CharacterEllipsis
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Left,
+            Theme = FindResource<ControlTheme>("EntityLinkButtonTheme"),
+            Cursor = new Cursor(StandardCursorType.Hand)
         };
-        ToolTip.SetTip(titleText, album.Title);
-        stack.Children.Add(titleText);
+        ToolTip.SetTip(titleButton, album.Title);
+        titleButton.Click += (_, e) =>
+        {
+            e.Handled = true;
+            _ = OpenArtistInfoAlbumAsync(album, server);
+        };
+        stack.Children.Add(titleButton);
 
         stack.Children.Add(new TextBlock
         {
