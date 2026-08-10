@@ -8,6 +8,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Added album names to Dashboard Recently Played cards, with direct album
+  navigation for local, Orynivo Server, and Plex history entries.
 - Extended the unified artist detail page with source-aware tracks from the
   local library and matching Orynivo Servers, ordered by album, disc, and track
   number. Album cards on that page now also offer the existing direct cover

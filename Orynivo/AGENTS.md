@@ -335,6 +335,9 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   change visibility. At either end they remain reserved, disabled, and visually
   muted so the header layout cannot shift. Keep a clear gap before Show all.
   Their Show all views contain up to 100 items.
+- Dashboard Recently Played cards show the persisted album below the artist.
+  When the history identity can resolve a local, Orynivo Server, or Plex album,
+  the album name opens that source's album detail without triggering card playback.
 - Dashboard album recommendations rank compact local and Orynivo Server album
   candidates against genre listening time from the selected history period.
   Already-heard albums are de-emphasized, and the optional mood selector applies
