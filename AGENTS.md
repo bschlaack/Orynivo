@@ -1131,6 +1131,13 @@ fallback or allow client-provided commands/paths to reach the helper.
   counts and tags with at least two positive votes as separate JSON arrays.
   `GetTrackFacets` combines them with embedded genre text for classification;
   embedded tags are never overwritten.
+  After playback first starts, one client-side low-priority worker continues
+  stale MusicBrainz enrichment for local and configured Orynivo Server tracks
+  only while playback is active. Album-detail and explicit requests take
+  priority between API calls. Known MBIDs refresh after 30 days; conservative
+  text matching that resolves no unique recording stores only its attempt
+  timestamp and waits 90 days before retrying. This timestamp is not a cached
+  search-response rating and scans must preserve it.
 - `albums` contains stable album IDs (`id`, `title`, `artist_id`, `year`,
   `artwork_id`, `is_favorite`)
 - `artworks` deduplicates artwork by SHA-256 hash; originals and thumbnails live

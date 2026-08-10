@@ -111,6 +111,36 @@ public sealed class TrackRatingTests
         }
     }
 
+    /// <summary>Ensures an unresolved lookup timestamp survives a later scanner upsert.</summary>
+    [Fact]
+    public void MusicBrainzLookupAttempt_PersistsWithoutResolvedMbid()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"orynivo-rating-attempt-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        var databasePath = Path.Combine(root, "library.db");
+        var trackPath = Path.Combine(root, "track.flac");
+        try
+        {
+            using (var database = new AudioDatabase(databasePath))
+            {
+                database.Upsert(CreateTrack(trackPath));
+                var track = Assert.Single(database.GetTrackList());
+                database.SetTrackMusicBrainzLookupAttempt(track.Id, 1234567890);
+                database.Upsert(CreateTrack(trackPath));
+            }
+
+            using var reopened = new AudioDatabase(databasePath);
+            var persisted = Assert.Single(reopened.GetTrackList());
+            Assert.Null(persisted.MusicBrainzTrackId);
+            Assert.Equal(1234567890, persisted.MusicBrainzRatingFetchedAt);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static TrackRecord CreateTrack(string path) => new()
     {
         Path = path,

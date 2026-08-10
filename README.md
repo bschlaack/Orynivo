@@ -706,6 +706,12 @@ byte-range streaming without FFmpeg.
   tags with at least two positive votes. They remain separate from embedded
   genres but supplement Genre Cloud classification, genre filters, Infinite Mix,
   and full-text search. Normal scans never contact MusicBrainz or rewrite files.
+  During active music playback, Orynivo continues this enrichment in one
+  rate-limited background queue for the local library and configured Orynivo
+  Servers. Pausing or stopping playback pauses the queue; opening an album or
+  explicitly requesting a rating takes priority. Known recordings refresh
+  after 30 days, while unresolved artist/title matches wait 90 days before a
+  retry so ambiguous metadata does not generate repeated requests.
 - German, English, French, and Spanish user interfaces
 - Multiple Plex Media Server configurations with protected access tokens and
   music-library discovery, artist/album/track browsing, folder navigation, and

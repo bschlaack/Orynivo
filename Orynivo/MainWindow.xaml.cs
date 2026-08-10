@@ -71,6 +71,9 @@ public partial class MainWindow : Window
     };
     private static readonly TimeSpan MusicBrainzRatingCacheLifetime = TimeSpan.FromDays(30);
     private CancellationTokenSource? _albumMusicBrainzRatingCts;
+    private readonly CancellationTokenSource _musicBrainzBackgroundCts = new();
+    private int _musicBrainzBackgroundStarted;
+    private int _musicBrainzForegroundRequests;
     private OrynivoServerSettings? _activeOrynivoServer;
     private string _activeOrynivoView = "Artists";
     private int _orynivoNavigationLoadVersion;
@@ -982,6 +985,7 @@ public partial class MainWindow : Window
         CancelAndDispose(ref _podcastFeedCts);
         CancelAndDispose(ref _plexViewCts);
         CancelAndDispose(ref _unifiedLibraryAppendCts);
+        _musicBrainzBackgroundCts.Cancel();
         StopPlayback();
         _windowsMediaTransport?.Dispose();
         _windowsMediaTransport = null;
@@ -9355,7 +9359,7 @@ public partial class MainWindow : Window
                 button.Click += async (_, e) =>
                 {
                     e.Handled = true;
-                    await RefreshMusicBrainzTrackRatingAsync(row);
+                    await RefreshMusicBrainzTrackRatingForegroundAsync(row);
                 };
                 return button;
             })
@@ -9430,6 +9434,7 @@ public partial class MainWindow : Window
         IReadOnlyList<ContentRow> rows,
         CancellationTokenSource cts)
     {
+        Interlocked.Increment(ref _musicBrainzForegroundRequests);
         try
         {
             await Task.Yield();
@@ -9453,6 +9458,7 @@ public partial class MainWindow : Window
         }
         finally
         {
+            Interlocked.Decrement(ref _musicBrainzForegroundRequests);
             if (ReferenceEquals(_albumMusicBrainzRatingCts, cts))
                 _albumMusicBrainzRatingCts = null;
             cts.Dispose();
@@ -9520,7 +9526,10 @@ public partial class MainWindow : Window
                 row.KnownDuration?.TotalSeconds,
                 cancellationToken);
             if (result is null)
+            {
+                await PersistMusicBrainzLookupAttemptAsync(row, cancellationToken);
                 return;
+            }
             await PersistMusicBrainzTrackRatingAsync(row, result, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -9530,6 +9539,22 @@ public partial class MainWindow : Window
         catch
         {
             // Ratings are optional metadata; network failures leave the existing cache intact.
+        }
+    }
+
+    /// <summary>Runs one user-requested MusicBrainz lookup ahead of background enrichment.</summary>
+    /// <param name="row">Track row requested by the user.</param>
+    /// <returns>A task representing lookup and persistence.</returns>
+    private async Task RefreshMusicBrainzTrackRatingForegroundAsync(ContentRow row)
+    {
+        Interlocked.Increment(ref _musicBrainzForegroundRequests);
+        try
+        {
+            await RefreshMusicBrainzTrackRatingAsync(row);
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _musicBrainzForegroundRequests);
         }
     }
 
@@ -9575,10 +9600,13 @@ public partial class MainWindow : Window
             }, cancellationToken);
         if (!saved)
             return;
-        row.MusicBrainzTrackId = result.RecordingMbid;
-        row.MusicBrainzRatingVotes = result.Votes;
-        row.MusicBrainzRating = result.Rating;
-        row.MusicBrainzRatingFetchedAt = fetchedAt;
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            row.MusicBrainzTrackId = result.RecordingMbid;
+            row.MusicBrainzRatingVotes = result.Votes;
+            row.MusicBrainzRating = result.Rating;
+            row.MusicBrainzRatingFetchedAt = fetchedAt;
+        });
     }
 
     private static string GetAlbumGroupDirectoryLabel(string directory)
@@ -12056,6 +12084,7 @@ public partial class MainWindow : Window
         DurationTextBlock.Text = FormatTime(player.Duration);
         _ = LoadTransportWaveformAsync(filePath, player.Duration);
         _transportTimer.Start();
+        StartMusicBrainzBackgroundEnrichment();
 
         // Now-playing anzeigen
         var queueMetadata = GetPlaylistMetadata(filePath);

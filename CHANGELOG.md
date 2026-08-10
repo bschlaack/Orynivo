@@ -4,7 +4,7 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.36.0] - 2026-08-10
 
 ### Added
 
@@ -28,6 +28,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   include community ratings; empty values written by the earlier batched-search
   implementation are invalidated once and refreshed automatically. Duplicate
   local/server rows sharing one MBID reuse the same direct lookup result.
+  While music is playing, a single low-priority worker now continues enriching
+  stale tracks from the local library and every configured Orynivo Server.
+  Album-detail and explicit user requests pause that worker between requests
+  and take priority. Unresolved metadata matches are retried after 90 days
+  instead of being requested repeatedly.
 
 ### Fixed
 

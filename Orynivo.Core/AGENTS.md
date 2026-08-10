@@ -56,6 +56,9 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   tags with at least two positive votes, and persist both as separate bounded
   JSON arrays. `MusicBrainzGenreMetadata.Combine` is the shared effective-genre
   composition used by facets and indexing without altering embedded metadata.
+  A completed conservative lookup that cannot resolve one recording is
+  persisted through `SetTrackMusicBrainzLookupAttempt`; scanner upserts must
+  preserve that timestamp so clients can apply a longer retry cooldown.
 - Album catalog queries, recent-album queries, detail lookup, and Dashboard
   album totals expose only albums referenced by at least one indexed track.
   Artist catalog rows and artist totals likewise require a track-backed album;

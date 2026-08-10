@@ -2502,6 +2502,18 @@ public sealed class AudioDatabase : IDisposable
         command.ExecuteNonQuery();
     }
 
+    /// <summary>Records a completed MusicBrainz lookup that did not resolve a recording.</summary>
+    /// <param name="trackId">Database track identifier.</param>
+    /// <param name="fetchedAt">Lookup timestamp in Unix seconds.</param>
+    public void SetTrackMusicBrainzLookupAttempt(long trackId, long fetchedAt)
+    {
+        using var command = _conn.CreateCommand();
+        command.CommandText = "UPDATE tracks SET musicbrainz_rating_fetched_at = $fetched_at WHERE id = $id;";
+        Add(command, "$fetched_at", fetchedAt);
+        Add(command, "$id", trackId);
+        command.ExecuteNonQuery();
+    }
+
     /// <summary>Gets cached artwork file paths for an album.</summary>
     /// <param name="albumId">Album identifier.</param>
     /// <returns>Cached artwork paths, or <see langword="null"/> when the album has no artwork row.</returns>

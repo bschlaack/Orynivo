@@ -251,6 +251,10 @@ public static class LibraryEndpoints
                 if (db.GetTrackById(trackId) is { } updatedTrack)
                     TrackSearchIndex.UpdateMany([updatedTrack]);
             }
+            else if (request.MusicBrainzRatingFetchedAt is long attemptedAt)
+            {
+                db.SetTrackMusicBrainzLookupAttempt(trackId, attemptedAt);
+            }
             return Results.Ok(db.GetTrackRating(trackId));
         });
 

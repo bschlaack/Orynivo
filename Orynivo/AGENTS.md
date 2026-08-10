@@ -357,6 +357,14 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   through the owning local database or remote rating API, then incrementally
   update the local/server Lucene document; never replace the row's embedded
   genre or contact MusicBrainz from a normal library scan.
+  A single client-side background enrichment worker starts on first playback,
+  covers the local library and every configured Orynivo Server, and advances
+  only while playback is active and not paused. Album-detail and explicit
+  rating requests increment the foreground gate so the worker yields between
+  requests; all calls still share the MusicBrainz service throttle. Known
+  recording lookups use the 30-day cache lifetime. An unresolved conservative
+  metadata lookup persists its attempt timestamp and is retried after 90 days.
+  The worker must never block the UI thread or run from a normal library scan.
 - Dashboard album recommendations rank compact local and Orynivo Server album
   candidates against genre listening time from the selected history period.
   Already-heard albums are de-emphasized, and the optional mood selector applies
