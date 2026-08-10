@@ -3337,7 +3337,7 @@
 
             <ContentControl x:Name="SettingsViewHost"
                             Grid.Row="0"
-                            Grid.RowSpan="3"
+                            Grid.RowSpan="4"
                             IsVisible="False"
                             Background="{DynamicResource AppContentBrush}"
                             ZIndex="100"/>
@@ -3737,6 +3737,22 @@
                                           Data="M16,9 Q19,12 16,15 M19,6 Q23,12 19,18"/>
                                 </Canvas>
                             </Viewbox>
+                        </Button>
+                        <Button x:Name="OutputDeviceLockButton"
+                                Theme="{StaticResource TransportBtnTheme}"
+                                Margin="4,0,0,0"
+                                ToolTip.Tip="{DynamicResource L_ReleaseOutputDevice}"
+                                Click="OutputDeviceLockButton_OnClick">
+                            <Path x:Name="OutputDeviceLockIconPath"
+                                  Width="17"
+                                  Height="17"
+                                  Stretch="Uniform"
+                                  Data="{StaticResource IconLockOpen}"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="1.8"
+                                  StrokeLineCap="Round"
+                                  StrokeJoin="Round"
+                                  Fill="Transparent"/>
                         </Button>
                     </StackPanel>
                 </StackPanel>

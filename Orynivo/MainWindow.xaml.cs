@@ -115,6 +115,12 @@ public partial class MainWindow : Window
     // ------------------------------------------------------------------
 
     private IAudioPlayer?  _player;
+    private bool _audioDeviceExplicitlyReleased;
+    private string? _releasedOutputPath;
+    private RadioStationRecord? _releasedOutputRadioStation;
+    private PodcastPlayback? _releasedOutputPodcastPlayback;
+    private TimeSpan _releasedOutputPosition;
+    private bool _releasedOutputWasPaused;
     private CancellationTokenSource? _playbackCts;
     private readonly SettingsStore _settingsStore = new();
     private AppSettings _settings = new();
@@ -636,6 +642,7 @@ public partial class MainWindow : Window
         };
         using (StartupTimingLog.Time("MainWindow.LoadSettings"))
             LoadSettings();
+        UpdateOutputDeviceLockButton();
         RestoreWindowPlacement();
         PositionChanged += (_, _) => CaptureNormalWindowPlacement();
         SizeChanged += (_, _) => CaptureNormalWindowPlacement();
@@ -12040,6 +12047,9 @@ public partial class MainWindow : Window
         }
 
         _player        = player;
+        _audioDeviceExplicitlyReleased = false;
+        ClearReleasedOutputResumeState();
+        UpdateOutputDeviceLockButton();
         if (player is IGaplessAudioPlayer gaplessPlayer)
             gaplessPlayer.TrackChanged += GaplessPlayer_OnTrackChanged;
         if (initialPosition > TimeSpan.Zero && player.CanSeek)
@@ -13270,11 +13280,13 @@ public partial class MainWindow : Window
 
     private void StopPlayback()
     {
+        _audioDeviceExplicitlyReleased = false;
+        ClearReleasedOutputResumeState();
         var player = StopPlaybackCore();
         player?.Dispose();
     }
 
-    private async Task StopPlaybackAsync()
+    private async Task StopPlaybackAsync(bool waitForCompleteDisposal = false)
     {
         var player = StopPlaybackCore();
         if (player is not null)
@@ -13290,7 +13302,10 @@ public partial class MainWindow : Window
                     CrashLogger.Log(ex, "Background audio-player disposal");
                 }
             });
-            await Task.WhenAny(disposalTask, Task.Delay(TimeSpan.FromSeconds(2)));
+            if (waitForCompleteDisposal)
+                await disposalTask;
+            else
+                await Task.WhenAny(disposalTask, Task.Delay(TimeSpan.FromSeconds(2)));
         }
     }
 
@@ -13340,6 +13355,7 @@ public partial class MainWindow : Window
         ArtistInfoView.IsVisible = false;
         ClearRadioNowPlaying();
         UpdateNowPlayingFavoriteButton();
+        UpdateOutputDeviceLockButton();
         return player;
     }
 
@@ -16595,6 +16611,85 @@ public partial class MainWindow : Window
         OpenSettingsAt("AudioDevice");
     }
 
+    /// <summary>Releases or reacquires the exclusive output device while preserving playback context.</summary>
+    /// <param name="sender">Event sender.</param>
+    /// <param name="e">Click event arguments.</param>
+    private async void OutputDeviceLockButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        EqPickerPopup.IsOpen = false;
+        OutputPickerPopup.IsOpen = false;
+
+        if (_player is { } player)
+        {
+            _releasedOutputPath = _currentFilePath;
+            _releasedOutputRadioStation = _currentRadioStation;
+            _releasedOutputPodcastPlayback = _currentPodcastPlayback;
+            _releasedOutputPosition = player.Position;
+            _releasedOutputWasPaused = player.IsPaused;
+            await StopPlaybackAsync(waitForCompleteDisposal: true);
+            _audioDeviceExplicitlyReleased = true;
+            UpdateOutputDeviceLockButton();
+            StatusTextBlock.Text = LocalizationManager.Current.OutputDeviceReleased;
+            return;
+        }
+
+        if (!_audioDeviceExplicitlyReleased || string.IsNullOrWhiteSpace(_releasedOutputPath))
+            return;
+
+        var path = _releasedOutputPath;
+        var station = _releasedOutputRadioStation;
+        var podcast = _releasedOutputPodcastPlayback;
+        var position = _releasedOutputPosition;
+        var wasPaused = _releasedOutputWasPaused;
+        try
+        {
+            await StartPlaybackAsync(path, station, podcast, position);
+            if (wasPaused)
+                PausePlayback();
+        }
+        catch (OperationCanceledException)
+        {
+            _audioDeviceExplicitlyReleased = true;
+            UpdateOutputDeviceLockButton();
+            StatusTextBlock.Text = LocalizationManager.Current.PlaybackStopped;
+        }
+        catch (Exception ex)
+        {
+            _audioDeviceExplicitlyReleased = true;
+            UpdateOutputDeviceLockButton();
+            StatusTextBlock.Text = ex.Message;
+        }
+    }
+
+    /// <summary>Refreshes the lock icon, tooltip, and availability from the actual player state.</summary>
+    private void UpdateOutputDeviceLockButton()
+    {
+        if (OutputDeviceLockButton is null || OutputDeviceLockIconPath is null)
+            return;
+        var isHeld = _player is not null;
+        OutputDeviceLockIconPath.Data = FindResource<StreamGeometry>(
+            isHeld ? "IconLockClosed" : "IconLockOpen");
+        OutputDeviceLockButton.IsEnabled = isHeld ||
+            (_audioDeviceExplicitlyReleased && !string.IsNullOrWhiteSpace(_releasedOutputPath));
+        ToolTip.SetTip(
+            OutputDeviceLockButton,
+            isHeld
+                ? LocalizationManager.Current.ReleaseOutputDevice
+                : _audioDeviceExplicitlyReleased
+                    ? LocalizationManager.Current.ReacquireOutputDevice
+                    : LocalizationManager.Current.OutputDeviceReleased);
+    }
+
+    /// <summary>Clears the one-shot playback snapshot after the output device was reacquired normally.</summary>
+    private void ClearReleasedOutputResumeState()
+    {
+        _releasedOutputPath = null;
+        _releasedOutputRadioStation = null;
+        _releasedOutputPodcastPlayback = null;
+        _releasedOutputPosition = TimeSpan.Zero;
+        _releasedOutputWasPaused = false;
+    }
+
     private async Task ApplySettingsAsync(SettingsView window)
     {
             var themeChanged = _settings.Theme != window.SelectedTheme;
@@ -16743,7 +16838,10 @@ public partial class MainWindow : Window
                 UpdateNowPlayingRowHighlights();
             }
             if (languageChanged)
+            {
                 LocalizationManager.Apply(_settings.Language);
+                UpdateOutputDeviceLockButton();
+            }
             if (genreCloudBackgroundChanged)
             {
                 GenreCloudBackgroundImage.Source = null;

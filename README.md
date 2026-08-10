@@ -434,6 +434,11 @@ byte-range streaming without FFmpeg.
   profile without opening Settings. On first start, Orynivo creates and selects
   a `Default` WASAPI profile from the Windows default multimedia output device
   when no output has been configured yet.
+- A lock button beside the transport Equalizer and Output quick-pickers can
+  close the active exclusive player and release its audio device for another
+  application. Orynivo preserves the source and playback position; selecting
+  the open lock reacquires the device and resumes playback without restarting
+  the application.
 - Seeking, volume control, pause, and an editable persistent **Up next** queue
   with play-next/append actions, drag-and-drop from track, album, and folder
   views, removal, reordering, complete clearing, restore-last-queue, playlist
@@ -1099,6 +1104,8 @@ Settings > Appearance also controls whether the main window starts maximized.
 When maximized startup is disabled, Orynivo remembers the last normal window
 size and position and restores it only when that placement still intersects an
 attached screen.
+The embedded Settings view adapts to smaller window heights by scrolling the
+active section while keeping its Save and Cancel actions available.
 Server package uploads use a route-specific one-GiB safety limit so self-contained
 DEB/RPM packages are not rejected by Kestrel's smaller default request limit.
 The server also reapplies `Kestrel:Limits:MaxRequestBodySize` after loading the
@@ -1124,7 +1131,9 @@ Settings. When no output has been configured yet, Orynivo creates a `Default`
 WASAPI output from the Windows default multimedia output device so playback
 works without manual setup. Named output profiles allow saving multiple backend
 and device combinations; a quick-pick popup on the transport bar switches
-between them without opening Settings. ReplayGain can be disabled or switched to
+between them without opening Settings. The adjacent lock button releases an
+exclusively held device for other applications and can later resume the same
+source at its saved position. ReplayGain can be disabled or switched to
 track/album mode under the output-device settings. Automatic calculation of
 missing ReplayGain values during library scans can be enabled separately; it is
 disabled by default because analysing complete audio files makes initial scans
