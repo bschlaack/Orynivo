@@ -446,6 +446,15 @@ public sealed record LocalizedStrings(
     public string ReplayGainTrackColumn { get; init; } = "";
     /// <summary>Gets the album ReplayGain column label.</summary>
     public string ReplayGainAlbumColumn { get; init; } = "";
+    /// <summary>Gets the personal track-rating label.</summary>
+    public string PersonalRating { get; init; } = "";
+    /// <summary>Gets the MusicBrainz community-rating label.</summary>
+    public string MusicBrainzRating { get; init; } = "";
+    public string MusicBrainzNoRating { get; init; } = "";
+    /// <summary>Gets the tooltip for editing a personal rating.</summary>
+    public string RatingSetHint { get; init; } = "";
+    /// <summary>Gets the message shown when a rating cannot be persisted.</summary>
+    public string RatingUpdateFailed { get; init; } = "";
     /// <summary>Gets the codec column label.</summary>
     public string Codec { get; init; } = "";
     /// <summary>Gets the tags column label.</summary>

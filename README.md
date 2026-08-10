@@ -685,6 +685,33 @@ byte-range streaming without FFmpeg.
   to that Y-axis scale without overshooting measured values
 - Dashboard favorite totals match the unified Favorites view by counting only
   currently resolvable local and Orynivo Server tracks
+- Persistent personal 1–5-star ratings for local and Orynivo Server tracks,
+  editable directly in shared track tables. An optional MusicBrainz rating
+  column shows cached community scores and vote counts; lookups prefer embedded
+  recording MBIDs and conservatively match artist, title, and duration only
+  when exactly one recording remains. Personal ratings are weighted strongly
+  in Infinite Mix, with community ratings used as a smaller secondary signal.
+  Album detail pages automatically refresh missing or stale MusicBrainz track
+  ratings in the background; cached results remain valid for 30 days and the
+  requests are serialized to respect MusicBrainz service limits. A uniquely
+  resolved artist/title/duration fallback persists its recording MBID. Ratings
+  themselves use direct recording lookups: MusicBrainz supports identifier
+  searches in batches, but those search results do not reliably carry community
+  ratings and therefore cannot safely replace one lookup per recording.
+  Duplicate local and server rows with the same recording MBID nevertheless
+  share one lookup result, avoiding redundant requests for mirrored libraries.
+  A completed lookup without community votes is shown as **Not rated** rather
+  than the dash reserved for tracks that have not yet been queried.
+  The same direct lookup also caches curated MusicBrainz genres and community
+  tags with at least two positive votes. They remain separate from embedded
+  genres but supplement Genre Cloud classification, genre filters, Infinite Mix,
+  and full-text search. Normal scans never contact MusicBrainz or rewrite files.
+  During active music playback, Orynivo continues this enrichment in one
+  rate-limited background queue for the local library and configured Orynivo
+  Servers. Pausing or stopping playback pauses the queue; opening an album or
+  explicitly requesting a rating takes priority. Known recordings refresh
+  after 30 days, while unresolved artist/title matches wait 90 days before a
+  retry so ambiguous metadata does not generate repeated requests.
 - German, English, French, and Spanish user interfaces
 - Multiple Plex Media Server configurations with protected access tokens and
   music-library discovery, artist/album/track browsing, folder navigation, and

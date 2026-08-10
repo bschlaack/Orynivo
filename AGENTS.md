@@ -1114,6 +1114,30 @@ fallback or allow client-provided commands/paths to reach the helper.
 - `artists` contains stable artist IDs plus cached profile biography, image
   path, source URL, language, and fetch timestamp
 - `artists`, `albums`, and `tracks` each have a direct `is_favorite` flag
+- `tracks.user_rating` stores the independent personal zero-to-five-star value;
+  cached MusicBrainz community rating, vote count, fetch time, and recording
+  MBID remain separate. Client-side MusicBrainz lookup prefers embedded MBIDs
+  and only persists a text fallback when exact artist/title plus optional
+  duration matching leaves one recording. Local and server scans preserve these
+  values, and the server only caches client-resolved external metadata. Album
+  detail views refresh missing or older-than-30-days track ratings in the
+  background and cancel the series when another album replaces it. Fallback
+  resolution persists a newly identified MBID, but community ratings must use
+  direct recording lookups because MusicBrainz search responses do not reliably
+  include them. Never mark a search-only empty rating as freshly fetched.
+  Rows sharing a recording MBID within one album refresh must reuse one direct
+  lookup result and persist it independently to each owning library.
+  Direct rating lookups also cache curated MusicBrainz genres with positive
+  counts and tags with at least two positive votes as separate JSON arrays.
+  `GetTrackFacets` combines them with embedded genre text for classification;
+  embedded tags are never overwritten.
+  After playback first starts, one client-side low-priority worker continues
+  stale MusicBrainz enrichment for local and configured Orynivo Server tracks
+  only while playback is active. Album-detail and explicit requests take
+  priority between API calls. Known MBIDs refresh after 30 days; conservative
+  text matching that resolves no unique recording stores only its attempt
+  timestamp and waits 90 days before retrying. This timestamp is not a cached
+  search-response rating and scans must preserve it.
 - `albums` contains stable album IDs (`id`, `title`, `artist_id`, `year`,
   `artwork_id`, `is_favorite`)
 - `artworks` deduplicates artwork by SHA-256 hash; originals and thumbnails live
@@ -1570,6 +1594,8 @@ fallback or allow client-provided commands/paths to reach the helper.
   `%LOCALAPPDATA%\Orynivo\search-index`, supports category-specific fields,
   partial words, and German umlaut/eszett variants, rebuilds stale indexes,
   updates incrementally after scans, and removes missing files below rescanned roots
+  Supplemental MusicBrainz genres/tags are included in the all-fields document;
+  persisting enrichment must update that track's Lucene document.
 - Search-index freshness is determined by the stored schema marker; indexed
   `Field.Store.NO` fields must not be tested through stored-document field access
 - `TrackSearchIndex.RemovePaths(paths)` removes explicit watcher/full-scan

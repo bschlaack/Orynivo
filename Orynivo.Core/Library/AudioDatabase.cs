@@ -64,6 +64,13 @@ public sealed record AlbumInfo(
 /// <param name="ReplayGainAlbum">Album ReplayGain value.</param>
 /// <param name="ArtistId">Database identifier of the primary artist, or <see langword="null"/>.</param>
 /// <param name="AlbumId">Database identifier of the album, or <see langword="null"/>.</param>
+/// <param name="UserRating">Personal zero-to-five-star rating.</param>
+/// <param name="MusicBrainzRating">MusicBrainz community rating on a zero-to-five scale.</param>
+/// <param name="MusicBrainzRatingVotes">Number of contributing MusicBrainz votes.</param>
+/// <param name="MusicBrainzTrackId">MusicBrainz recording identifier.</param>
+/// <param name="MusicBrainzRatingFetchedAt">Unix timestamp of the latest MusicBrainz rating lookup.</param>
+/// <param name="MusicBrainzGenres">JSON array of supplemental MusicBrainz genres.</param>
+/// <param name="MusicBrainzTags">JSON array of supplemental positively voted MusicBrainz tags.</param>
 public sealed record TrackListInfo(
     string Path,
     string FileName,
@@ -93,7 +100,14 @@ public sealed record TrackListInfo(
     string? ReplayGainTrack,
     string? ReplayGainAlbum,
     long? ArtistId = null,
-    long? AlbumId = null);
+    long? AlbumId = null,
+    int UserRating = 0,
+    double? MusicBrainzRating = null,
+    int? MusicBrainzRatingVotes = null,
+    string? MusicBrainzTrackId = null,
+    long? MusicBrainzRatingFetchedAt = null,
+    string? MusicBrainzGenres = null,
+    string? MusicBrainzTags = null);
 
 /// <summary>Minimal track row for filter/facet building; carries only classification fields.</summary>
 /// <param name="Id">Track database identifier.</param>
@@ -103,6 +117,9 @@ public sealed record TrackListInfo(
 /// <param name="Bitrate">Encoded bitrate in kbps.</param>
 /// <param name="SourceKey">Stable source key, currently <c>local</c> for database rows.</param>
 /// <param name="AlbumId">Provider-local album identifier, when assigned.</param>
+/// <param name="UserRating">Personal zero-to-five-star rating.</param>
+/// <param name="MusicBrainzRating">MusicBrainz community rating on a zero-to-five scale.</param>
+/// <param name="MusicBrainzRatingVotes">Number of contributing MusicBrainz votes.</param>
 public sealed record TrackFacetInfo(
     long Id,
     bool IsFavorite,
@@ -110,7 +127,25 @@ public sealed record TrackFacetInfo(
     string? Format,
     int? Bitrate,
     string SourceKey = "local",
-    long? AlbumId = null);
+    long? AlbumId = null,
+    int UserRating = 0,
+    double? MusicBrainzRating = null,
+    int? MusicBrainzRatingVotes = null);
+
+/// <summary>Personal and cached MusicBrainz rating metadata for one track.</summary>
+/// <param name="TrackId">Database track identifier.</param>
+/// <param name="UserRating">Personal zero-to-five-star rating.</param>
+/// <param name="MusicBrainzTrackId">MusicBrainz recording identifier.</param>
+/// <param name="MusicBrainzRating">MusicBrainz community rating on a zero-to-five scale.</param>
+/// <param name="MusicBrainzRatingVotes">Number of contributing MusicBrainz votes.</param>
+/// <param name="MusicBrainzRatingFetchedAt">Unix timestamp of the latest MusicBrainz lookup.</param>
+public sealed record TrackRatingInfo(
+    long TrackId,
+    int UserRating,
+    string? MusicBrainzTrackId,
+    double? MusicBrainzRating,
+    int? MusicBrainzRatingVotes,
+    long? MusicBrainzRatingFetchedAt);
 
 /// <summary>Compact metadata and playback-history values used to resolve smart playlists.</summary>
 /// <param name="Id">Track database identifier.</param>
@@ -517,7 +552,7 @@ public sealed class AudioDatabase : IDisposable
                 mood                = excluded.mood,
                 replay_gain_track   = excluded.replay_gain_track,
                 replay_gain_album   = excluded.replay_gain_album,
-                musicbrainz_track_id    = excluded.musicbrainz_track_id,
+                musicbrainz_track_id    = COALESCE(excluded.musicbrainz_track_id, tracks.musicbrainz_track_id),
                 musicbrainz_release_id  = excluded.musicbrainz_release_id,
                 musicbrainz_artist_id   = excluded.musicbrainz_artist_id,
                 acoustid_fingerprint    = excluded.acoustid_fingerprint,
@@ -1946,7 +1981,9 @@ public sealed class AudioDatabase : IDisposable
                 path, file_name, title, artist, album, album_artist, genre, format, bitrate,
                 duration, sort_title, id, is_favorite, year, track_number, track_total,
                 disc_number, disc_total, sample_rate, bit_depth, channels, composer, bpm,
-                file_size, added_at, replay_gain_track, replay_gain_album, artist_id, album_id
+                file_size, added_at, replay_gain_track, replay_gain_album, artist_id, album_id,
+                user_rating, musicbrainz_rating, musicbrainz_rating_votes, musicbrainz_track_id,
+                musicbrainz_rating_fetched_at, musicbrainz_genres, musicbrainz_tags
             FROM tracks
             ORDER BY COALESCE(sort_title, title, file_name) COLLATE NOCASE;
             """;
@@ -1965,7 +2002,9 @@ public sealed class AudioDatabase : IDisposable
                 path, file_name, title, artist, album, album_artist, genre, format, bitrate,
                 duration, sort_title, id, is_favorite, year, track_number, track_total,
                 disc_number, disc_total, sample_rate, bit_depth, channels, composer, bpm,
-                file_size, added_at, replay_gain_track, replay_gain_album, artist_id, album_id
+                file_size, added_at, replay_gain_track, replay_gain_album, artist_id, album_id,
+                user_rating, musicbrainz_rating, musicbrainz_rating_votes, musicbrainz_track_id,
+                musicbrainz_rating_fetched_at, musicbrainz_genres, musicbrainz_tags
             FROM tracks
             WHERE album_id = $album_id
               AND ($artist_id IS NULL OR artist_id = $artist_id)
@@ -2036,7 +2075,9 @@ public sealed class AudioDatabase : IDisposable
                     path, file_name, title, artist, album, album_artist, genre, format, bitrate,
                     duration, sort_title, id, is_favorite, year, track_number, track_total,
                     disc_number, disc_total, sample_rate, bit_depth, channels, composer, bpm,
-                    file_size, added_at, replay_gain_track, replay_gain_album, artist_id, album_id
+                    file_size, added_at, replay_gain_track, replay_gain_album, artist_id, album_id,
+                    user_rating, musicbrainz_rating, musicbrainz_rating_votes, musicbrainz_track_id,
+                    musicbrainz_rating_fetched_at, musicbrainz_genres, musicbrainz_tags
                 FROM tracks
                 WHERE id IN ({string.Join(", ", parameters)});
                 """;
@@ -2077,7 +2118,9 @@ public sealed class AudioDatabase : IDisposable
                     path, file_name, title, artist, album, album_artist, genre, format, bitrate,
                     duration, sort_title, id, is_favorite, year, track_number, track_total,
                     disc_number, disc_total, sample_rate, bit_depth, channels, composer, bpm,
-                    file_size, added_at, replay_gain_track, replay_gain_album, artist_id, album_id
+                    file_size, added_at, replay_gain_track, replay_gain_album, artist_id, album_id,
+                    user_rating, musicbrainz_rating, musicbrainz_rating_votes, musicbrainz_track_id,
+                    musicbrainz_rating_fetched_at, musicbrainz_genres, musicbrainz_tags
                 FROM tracks
                 WHERE path IN ({string.Join(", ", parameters)});
                 """;
@@ -2094,17 +2137,23 @@ public sealed class AudioDatabase : IDisposable
     public List<TrackFacetInfo> GetTrackFacets()
     {
         using var cmd = _conn.CreateCommand();
-        cmd.CommandText = "SELECT id, is_favorite, genre, format, bitrate, album_id FROM tracks;";
+        cmd.CommandText = "SELECT id, is_favorite, genre, format, bitrate, album_id, user_rating, musicbrainz_rating, musicbrainz_rating_votes, musicbrainz_genres, musicbrainz_tags FROM tracks;";
         using var reader = cmd.ExecuteReader();
         var result = new List<TrackFacetInfo>();
         while (reader.Read())
             result.Add(new TrackFacetInfo(
                 reader.GetInt64(0),
                 reader.GetInt32(1) != 0,
-                reader.IsDBNull(2) ? null : reader.GetString(2),
+                MusicBrainzGenreMetadata.Combine(
+                    reader.IsDBNull(2) ? null : reader.GetString(2),
+                    reader.IsDBNull(9) ? null : reader.GetString(9),
+                    reader.IsDBNull(10) ? null : reader.GetString(10)),
                 reader.IsDBNull(3) ? null : reader.GetString(3),
                 reader.IsDBNull(4) ? null : reader.GetInt32(4),
-                AlbumId: reader.IsDBNull(5) ? null : reader.GetInt64(5)));
+                AlbumId: reader.IsDBNull(5) ? null : reader.GetInt64(5),
+                UserRating: reader.GetInt32(6),
+                MusicBrainzRating: reader.IsDBNull(7) ? null : reader.GetDouble(7),
+                MusicBrainzRatingVotes: reader.IsDBNull(8) ? null : reader.GetInt32(8)));
         return result;
     }
 
@@ -2198,7 +2247,14 @@ public sealed class AudioDatabase : IDisposable
         reader.IsDBNull(25) ? null : reader.GetString(25),
         reader.IsDBNull(26) ? null : reader.GetString(26),
         reader.IsDBNull(27) ? null : reader.GetInt64(27),
-        reader.IsDBNull(28) ? null : reader.GetInt64(28));
+        reader.IsDBNull(28) ? null : reader.GetInt64(28),
+        reader.GetInt32(29),
+        reader.IsDBNull(30) ? null : reader.GetDouble(30),
+        reader.IsDBNull(31) ? null : reader.GetInt32(31),
+        reader.IsDBNull(32) ? null : reader.GetString(32),
+        reader.IsDBNull(33) ? null : reader.GetInt64(33),
+        reader.IsDBNull(34) ? null : reader.GetString(34),
+        reader.IsDBNull(35) ? null : reader.GetString(35));
 
     /// <summary>Loads distinct albums referenced by the specified track identifiers.</summary>
     /// <param name="ids">Track identifiers.</param>
@@ -2368,6 +2424,95 @@ public sealed class AudioDatabase : IDisposable
     public void SetTrackFavorite(long id, bool value) => SetFavorite("tracks", id, value);
     public void SetArtistFavorite(long id, bool value) => SetFavorite("artists", id, value);
     public void SetAlbumFavorite(long id, bool value) => SetFavorite("albums", id, value);
+
+    /// <summary>Stores a personal zero-to-five-star rating for a track.</summary>
+    /// <param name="trackId">Database track identifier.</param>
+    /// <param name="rating">Rating from zero (unrated) through five.</param>
+    public void SetTrackUserRating(long trackId, int rating)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(rating, 0);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(rating, 5);
+        using var command = _conn.CreateCommand();
+        command.CommandText = "UPDATE tracks SET user_rating = $rating WHERE id = $id;";
+        Add(command, "$rating", rating);
+        Add(command, "$id", trackId);
+        command.ExecuteNonQuery();
+    }
+
+    /// <summary>Gets personal and cached community rating data for a track.</summary>
+    /// <param name="trackId">Database track identifier.</param>
+    /// <returns>The stored rating data, or <see langword="null"/> when the track does not exist.</returns>
+    public TrackRatingInfo? GetTrackRating(long trackId)
+    {
+        using var command = _conn.CreateCommand();
+        command.CommandText = """
+            SELECT id, user_rating, musicbrainz_track_id, musicbrainz_rating,
+                   musicbrainz_rating_votes, musicbrainz_rating_fetched_at
+            FROM tracks WHERE id = $id LIMIT 1;
+            """;
+        Add(command, "$id", trackId);
+        using var reader = command.ExecuteReader();
+        return reader.Read()
+            ? new TrackRatingInfo(
+                reader.GetInt64(0),
+                reader.GetInt32(1),
+                reader.IsDBNull(2) ? null : reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetDouble(3),
+                reader.IsDBNull(4) ? null : reader.GetInt32(4),
+                reader.IsDBNull(5) ? null : reader.GetInt64(5))
+            : null;
+    }
+
+    /// <summary>Stores a resolved recording MBID and its cached MusicBrainz community rating.</summary>
+    /// <param name="trackId">Database track identifier.</param>
+    /// <param name="recordingMbid">Resolved MusicBrainz recording identifier.</param>
+    /// <param name="rating">Community rating on a zero-to-five scale, or <see langword="null"/>.</param>
+    /// <param name="votes">Number of votes, or <see langword="null"/>.</param>
+    /// <param name="fetchedAt">Lookup timestamp in Unix seconds.</param>
+    /// <param name="genresJson">JSON array of supplemental genres.</param>
+    /// <param name="tagsJson">JSON array of positively voted supplemental tags.</param>
+    public void SetTrackMusicBrainzRating(
+        long trackId,
+        string recordingMbid,
+        double? rating,
+        int? votes,
+        long fetchedAt,
+        string? genresJson = null,
+        string? tagsJson = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(recordingMbid);
+        using var command = _conn.CreateCommand();
+        command.CommandText = """
+            UPDATE tracks
+            SET musicbrainz_track_id = $mbid,
+                musicbrainz_rating = $rating,
+                musicbrainz_rating_votes = $votes,
+                musicbrainz_rating_fetched_at = $fetched_at,
+                musicbrainz_genres = COALESCE($genres, musicbrainz_genres),
+                musicbrainz_tags = COALESCE($tags, musicbrainz_tags)
+            WHERE id = $id;
+            """;
+        Add(command, "$mbid", recordingMbid);
+        Add(command, "$rating", (object?)rating ?? DBNull.Value);
+        Add(command, "$votes", (object?)votes ?? DBNull.Value);
+        Add(command, "$fetched_at", fetchedAt);
+        Add(command, "$genres", (object?)genresJson ?? DBNull.Value);
+        Add(command, "$tags", (object?)tagsJson ?? DBNull.Value);
+        Add(command, "$id", trackId);
+        command.ExecuteNonQuery();
+    }
+
+    /// <summary>Records a completed MusicBrainz lookup that did not resolve a recording.</summary>
+    /// <param name="trackId">Database track identifier.</param>
+    /// <param name="fetchedAt">Lookup timestamp in Unix seconds.</param>
+    public void SetTrackMusicBrainzLookupAttempt(long trackId, long fetchedAt)
+    {
+        using var command = _conn.CreateCommand();
+        command.CommandText = "UPDATE tracks SET musicbrainz_rating_fetched_at = $fetched_at WHERE id = $id;";
+        Add(command, "$fetched_at", fetchedAt);
+        Add(command, "$id", trackId);
+        command.ExecuteNonQuery();
+    }
 
     /// <summary>Gets cached artwork file paths for an album.</summary>
     /// <param name="albumId">Album identifier.</param>
@@ -2732,6 +2877,12 @@ public sealed class AudioDatabase : IDisposable
                 musicbrainz_release_id  TEXT,
                 musicbrainz_artist_id   TEXT,
                 acoustid_fingerprint    TEXT,
+                user_rating             INTEGER NOT NULL DEFAULT 0,
+                musicbrainz_rating      REAL,
+                musicbrainz_rating_votes INTEGER,
+                musicbrainz_rating_fetched_at INTEGER,
+                musicbrainz_genres       TEXT,
+                musicbrainz_tags         TEXT,
                 album_artist_inferred   INTEGER NOT NULL DEFAULT 0,
 
                 -- Cover Art
@@ -2771,6 +2922,12 @@ public sealed class AudioDatabase : IDisposable
             EnsureColumn("tracks", "lyrics_source", "TEXT");
             EnsureColumn("tracks", "lyrics_fetched_at", "INTEGER");
             EnsureColumn("tracks", "album_artist_inferred", "INTEGER NOT NULL DEFAULT 0");
+            EnsureColumn("tracks", "user_rating", "INTEGER NOT NULL DEFAULT 0");
+            EnsureColumn("tracks", "musicbrainz_rating", "REAL");
+            EnsureColumn("tracks", "musicbrainz_rating_votes", "INTEGER");
+            EnsureColumn("tracks", "musicbrainz_rating_fetched_at", "INTEGER");
+            EnsureColumn("tracks", "musicbrainz_genres", "TEXT");
+            EnsureColumn("tracks", "musicbrainz_tags", "TEXT");
         }
 
         using (Orynivo.StartupDiagnostics.Time("AudioDatabase.EnsureSchema: core tables/indexes"))
@@ -2871,6 +3028,11 @@ public sealed class AudioDatabase : IDisposable
             );
             """);
         }
+
+        using (Orynivo.StartupDiagnostics.Time("AudioDatabase.EnsureSchema: MusicBrainz rating lookup repair"))
+            RepairUnreliableBatchedMusicBrainzRatingCache();
+        using (Orynivo.StartupDiagnostics.Time("AudioDatabase.EnsureSchema: MusicBrainz genre enrichment"))
+            InvalidateRatingsMissingMusicBrainzGenres();
 
         using (Orynivo.StartupDiagnostics.Time("AudioDatabase.EnsureSchema: legacy cache path migration"))
             MigrateLegacyCachePaths();
@@ -3693,6 +3855,45 @@ public sealed class AudioDatabase : IDisposable
         cmd.ExecuteNonQuery();
     }
 
+    /// <summary>
+    /// Invalidates empty rating timestamps produced by the short-lived batched
+    /// search implementation, whose search responses did not reliably include
+    /// community ratings. Direct recording lookups will repopulate them once.
+    /// </summary>
+    private void RepairUnreliableBatchedMusicBrainzRatingCache()
+    {
+        const string marker = "musicbrainz_rating_direct_lookup_v1";
+        if (GetMeta(marker) is not null)
+            return;
+        Execute("""
+            UPDATE tracks
+            SET musicbrainz_rating_fetched_at = NULL
+            WHERE musicbrainz_track_id IS NOT NULL
+              AND musicbrainz_rating IS NULL
+              AND musicbrainz_rating_fetched_at IS NOT NULL;
+            """);
+        SetMeta(marker, "1");
+    }
+
+    /// <summary>
+    /// Makes previously rated recordings eligible for one enrichment refresh
+    /// after supplemental MusicBrainz genres and tags are introduced.
+    /// </summary>
+    private void InvalidateRatingsMissingMusicBrainzGenres()
+    {
+        const string marker = "musicbrainz_genre_enrichment_v1";
+        if (GetMeta(marker) is not null)
+            return;
+        Execute("""
+            UPDATE tracks
+            SET musicbrainz_rating_fetched_at = NULL
+            WHERE musicbrainz_track_id IS NOT NULL
+              AND musicbrainz_genres IS NULL
+              AND musicbrainz_tags IS NULL;
+            """);
+        SetMeta(marker, "1");
+    }
+
     private void SetFavorite(string table, long id, bool value)
     {
         using var cmd = _conn.CreateCommand();
@@ -4315,6 +4516,12 @@ public sealed class AudioDatabase : IDisposable
             ReplayGainTrack       = NullableString(r, "replay_gain_track"),
             ReplayGainAlbum       = NullableString(r, "replay_gain_album"),
             MusicBrainzTrackId    = NullableString(r, "musicbrainz_track_id"),
+            UserRating            = NullableInt(r, "user_rating") ?? 0,
+            MusicBrainzRating     = NullableDouble(r, "musicbrainz_rating"),
+            MusicBrainzRatingVotes = NullableInt(r, "musicbrainz_rating_votes"),
+            MusicBrainzRatingFetchedAt = NullableLong(r, "musicbrainz_rating_fetched_at"),
+            MusicBrainzGenres      = NullableString(r, "musicbrainz_genres"),
+            MusicBrainzTags        = NullableString(r, "musicbrainz_tags"),
             MusicBrainzReleaseId  = NullableString(r, "musicbrainz_release_id"),
             MusicBrainzArtistId   = NullableString(r, "musicbrainz_artist_id"),
             AcoustIdFingerprint   = NullableString(r, "acoustid_fingerprint"),
