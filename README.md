@@ -30,7 +30,9 @@ the ability to reach that library from any device on the local network.
 - Local library, playlists, smart playlists and full-text search
 - Unified artist detail pages with an album-style image-and-biography hero,
   synchronized favorites, image management, refreshable biographies, and
-  combined local/Orynivo Server albums. Manual biography refresh can use an
+  combined local/Orynivo Server albums. Their cards include cover search,
+  favorites, and local/server source badges, and a source-aware track table below them lists
+  the artist's tracks ordered by album and track number. Manual biography refresh can use an
   editable external lookup name without changing the library artist name
   while the artist's albums render before profile loading and remain available
   throughout it; profile text follows German, English, French, or Spanish
@@ -586,7 +588,7 @@ byte-range streaming without FFmpeg.
   library counters (including local and configured Orynivo Server track
   favorites), random
   playback and queue shortcuts, parallel Recently Played/Recently Added artwork
-  strips, source and favorite state on history cards, a period-aware listening
+  strips, album links plus source and favorite state on history cards, a period-aware listening
   seven-point labeled and smoothed listening-trend chart, compact proportional
   genre/album/artist analytics, history-based album recommendations with
   period and mood selectors plus a persisted List/animated cover-stage view,

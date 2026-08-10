@@ -196,6 +196,14 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 - The artist detail hero intentionally has a roughly 420 px minimum height and
   320 px image; its biography remains independently scrollable and the album
   strip starts below the hero.
+- Artist-detail album cards expose the same missing-artwork cover-search,
+  favorite, and source-badge controls as the shared Albums artwork cards.
+  Equivalent local/server albums show `L+OS`, apply favorite changes to every
+  represented identity, and open their combined logical album detail. Below the album strip, the detail page
+  shows one source-aware local/Orynivo Server track table ordered by album,
+  disc, and track number. Its rows reuse the normal favorite, source, album-link,
+  context-menu, and double-click playback behavior; track loading must not block
+  profile rendering or discard already loaded album cards when one source fails.
 - `ShowUnifiedArtistAlbumsAsync` renders local albums before remote/profile
   work, loads server album sets concurrently, yields the dispatcher so cards
   paint, and starts profile/image resolution last. Its load version discards
@@ -212,6 +220,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   result is complete, unless a proven virtualized/paged strategy is used.
 - Use shared typography, brushes, vector icons, control themes, loading helpers,
   and context-menu patterns from the existing application resources.
+- Keep the application-level `DataGridSortIconMinWidth` override at zero. The
+  Fluent DataGrid theme otherwise reserves 32 px for an absent sort glyph in
+  every column header, obscuring labels in compact columns; a visible sort glyph
+  still contributes its natural width, and resize grippers remain unchanged.
 - Programmatically created confirmation dialogs use a restrained accent-soft
   primary action with an accent border/text and explicitly centered content;
   localized button labels must size through padding and minimum width rather
@@ -323,6 +335,9 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   change visibility. At either end they remain reserved, disabled, and visually
   muted so the header layout cannot shift. Keep a clear gap before Show all.
   Their Show all views contain up to 100 items.
+- Dashboard Recently Played cards show the persisted album below the artist.
+  When the history identity can resolve a local, Orynivo Server, or Plex album,
+  the album name opens that source's album detail without triggering card playback.
 - Dashboard album recommendations rank compact local and Orynivo Server album
   candidates against genre listening time from the selected history period.
   Already-heard albums are de-emphasized, and the optional mood selector applies

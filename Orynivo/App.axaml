@@ -17,6 +17,10 @@
     </Application.Styles>
     <Application.Resources>
         <ResourceDictionary>
+            <!-- Avalonia's Fluent DataGrid header reserves 32 px for an absent
+                 sort glyph by default. Let the glyph size itself only when it
+                 is visible so narrow headers keep their label readable. -->
+            <x:Double x:Key="DataGridSortIconMinWidth">0</x:Double>
             <!-- ── Theme brushes (overwritten at runtime by ThemeManager) ── -->
             <SolidColorBrush x:Key="AppAccentBrush"              Color="#20D9E8"/>
             <SolidColorBrush x:Key="AppFavoriteBrush"            Color="#FF5D7A"/>

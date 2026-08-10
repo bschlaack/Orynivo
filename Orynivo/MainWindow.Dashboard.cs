@@ -1656,7 +1656,7 @@ public partial class MainWindow : Window
         var card = new Border
         {
             Width           = 180,
-            MinHeight       = 276,
+            MinHeight       = 296,
             Margin          = expandedSpacing
                 ? new Thickness(8, 0, 12, 20)
                 : new Thickness(8),
@@ -1786,6 +1786,37 @@ public partial class MainWindow : Window
         stack.Children.Add(artistButton);
         stack.Children.Add(artistBlock);
 
+        var albumButton = new Button
+        {
+            Content = entry.Album,
+            FontSize = ResolveFontSize("FontSizeMeta"),
+            Foreground = FindResource<IBrush>("AppSecondaryTextBrush"),
+            Theme = FindResource<ControlTheme>("EntityLinkButtonTheme"),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            MaxWidth = artSize,
+            Margin = new Thickness(2, 0, 2, 0),
+            IsVisible = CanOpenHistoryAlbum(entry)
+        };
+        ToolTip.SetTip(albumButton, entry.Album);
+        albumButton.Click += async (_, e) =>
+        {
+            e.Handled = true;
+            await OpenHistoryAlbumAsync(entry);
+        };
+        var albumBlock = new TextBlock
+        {
+            Text = entry.Album,
+            FontSize = ResolveFontSize("FontSizeMeta"),
+            Foreground = FindResource<IBrush>("AppSecondaryTextBrush"),
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            MaxLines = 1,
+            Margin = new Thickness(2, 0, 2, 0),
+            IsVisible = !string.IsNullOrWhiteSpace(entry.Album) && !albumButton.IsVisible
+        };
+        ToolTip.SetTip(albumBlock, entry.Album);
+        stack.Children.Add(albumButton);
+        stack.Children.Add(albumBlock);
+
         var footer = new Grid { Margin = new Thickness(0, 3, 0, 0) };
         footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -1861,7 +1892,14 @@ public partial class MainWindow : Window
         card.Child = stack;
 
         if (TryGetOrynivoHistoryTarget(entry, out _, out _))
-            _ = HydrateRecentlyPlayedRemoteCardAsync(entry, titleBlock, artistButton, artistBlock, initialsAvatar);
+            _ = HydrateRecentlyPlayedRemoteCardAsync(
+                entry,
+                titleBlock,
+                artistButton,
+                artistBlock,
+                albumButton,
+                albumBlock,
+                initialsAvatar);
 
         card.PointerEntered += (_, _) =>
         {
@@ -1893,6 +1931,8 @@ public partial class MainWindow : Window
     /// <param name="titleBlock">Title text block to update.</param>
     /// <param name="artistButton">Artist link button to update.</param>
     /// <param name="artistBlock">Artist text block to update.</param>
+    /// <param name="albumButton">Album link button to update.</param>
+    /// <param name="albumBlock">Album text block to update.</param>
     /// <param name="initialsAvatar">Artwork placeholder to retitle.</param>
     /// <returns>A task representing the asynchronous metadata refresh.</returns>
     private async Task HydrateRecentlyPlayedRemoteCardAsync(
@@ -1900,6 +1940,8 @@ public partial class MainWindow : Window
         TextBlock titleBlock,
         Button artistButton,
         TextBlock artistBlock,
+        Button albumButton,
+        TextBlock albumBlock,
         Orynivo.Controls.InitialsAvatar initialsAvatar)
     {
         try
@@ -1915,6 +1957,13 @@ public partial class MainWindow : Window
             artistButton.IsVisible = canOpenArtist;
             artistBlock.Text = row.Artist;
             artistBlock.IsVisible = !canOpenArtist && !string.IsNullOrWhiteSpace(row.Artist);
+            var canOpenAlbum = row.AlbumId.HasValue && !string.IsNullOrWhiteSpace(row.Album);
+            albumButton.Content = row.Album;
+            albumButton.IsVisible = canOpenAlbum;
+            ToolTip.SetTip(albumButton, row.Album);
+            albumBlock.Text = row.Album;
+            albumBlock.IsVisible = !canOpenAlbum && !string.IsNullOrWhiteSpace(row.Album);
+            ToolTip.SetTip(albumBlock, row.Album);
             initialsAvatar.DisplayName = string.IsNullOrWhiteSpace(row.Title) ? row.Artist : row.Title;
         }
         catch

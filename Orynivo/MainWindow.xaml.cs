@@ -9325,6 +9325,7 @@ public partial class MainWindow : Window
         _artistInfoUnifiedArtistName = artistName;
         var comparisonKey = ArtistNameNormalizer.CreateComparisonKey(artistName);
         var albumSources = new List<(LibraryCatalogAlbum Album, OrynivoServerSettings? Server)>();
+        var trackRequests = new List<(ILibraryCatalogProvider Provider, OrynivoServerSettings? Server, long ArtistId, long AlbumId)>();
         var localArtists = await Task.Run(async () =>
             await _localCatalogProvider.GetArtistsAsync());
         if (!IsCurrentArtistDetailLoad(loadVersion, artistName))
@@ -9333,17 +9334,27 @@ public partial class MainWindow : Window
                 ArtistNameNormalizer.CreateComparisonKey(candidate.Name) == comparisonKey)
             .ToList();
         var isFavorite = matchingLocalArtists.Any(artist => artist.IsFavorite);
-        var localAlbumLists = await Task.Run(async () =>
+        var localCatalogLists = await Task.Run(async () =>
         {
-            var lists = new List<IReadOnlyList<LibraryCatalogAlbum>>();
+            var lists = new List<(long ArtistId, IReadOnlyList<LibraryCatalogAlbum> Albums)>();
             foreach (var artist in matchingLocalArtists)
-                lists.Add(await _localCatalogProvider.GetAlbumsByArtistAsync(artist.Id, includeArtwork: true));
+            {
+                var albums = await _localCatalogProvider.GetAlbumsByArtistAsync(artist.Id, includeArtwork: true);
+                lists.Add((artist.Id, albums));
+            }
             return lists;
         });
         if (!IsCurrentArtistDetailLoad(loadVersion, artistName))
             return;
-        foreach (var albums in localAlbumLists)
-            albumSources.AddRange(albums.Select(album => (album, (OrynivoServerSettings?)null)));
+        foreach (var catalog in localCatalogLists)
+        {
+            albumSources.AddRange(catalog.Albums.Select(album => (album, (OrynivoServerSettings?)null)));
+            trackRequests.AddRange(catalog.Albums.Select(album => (
+                (ILibraryCatalogProvider)_localCatalogProvider,
+                (OrynivoServerSettings?)null,
+                catalog.ArtistId,
+                album.Id)));
+        }
         PopulateUnifiedArtistInfoAlbums(albumSources);
         await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
 
@@ -9359,17 +9370,25 @@ public partial class MainWindow : Window
                             ArtistNameNormalizer.CreateComparisonKey(candidate.Name) == comparisonKey)
                         .ToList();
                     var albums = new List<LibraryCatalogAlbum>();
+                    var albumRequests = new List<(long ArtistId, long AlbumId)>();
                     foreach (var artist in matches)
                     {
-                        albums.AddRange(await provider.GetAlbumsByArtistAsync(
+                        var artistAlbums = await provider.GetAlbumsByArtistAsync(
                             artist.Id,
-                            includeArtwork: true));
+                            includeArtwork: true);
+                        albums.AddRange(artistAlbums);
+                        foreach (var album in artistAlbums)
+                            albumRequests.Add((artist.Id, album.Id));
                     }
-                    return (Server: server, Artists: matches, Albums: albums);
+                    return (Server: server, Artists: matches, Albums: albums, AlbumRequests: albumRequests);
                 }
                 catch
                 {
-                    return (Server: server, Artists: new List<LibraryCatalogArtist>(), Albums: new List<LibraryCatalogAlbum>());
+                    return (
+                        Server: server,
+                        Artists: new List<LibraryCatalogArtist>(),
+                        Albums: new List<LibraryCatalogAlbum>(),
+                        AlbumRequests: new List<(long ArtistId, long AlbumId)>());
                 }
             })
             .ToList();
@@ -9385,11 +9404,22 @@ public partial class MainWindow : Window
             albumSources.AddRange(remote.Albums.Select(album => (
                 album,
                 (OrynivoServerSettings?)remote.Server)));
+            var provider = CreateOrynivoCatalogProvider(remote.Server);
+            trackRequests.AddRange(remote.AlbumRequests.Select(request => (
+                (ILibraryCatalogProvider)provider,
+                (OrynivoServerSettings?)remote.Server,
+                request.ArtistId,
+                request.AlbumId)));
             PopulateUnifiedArtistInfoAlbums(albumSources);
         }
         await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
         if (!IsCurrentArtistDetailLoad(loadVersion, artistName))
             return;
+
+        _ = LoadAndPopulateArtistInfoTracksAsync(
+            trackRequests,
+            loadVersion,
+            artistName);
 
         if (matchingLocalArtists.FirstOrDefault() is { } localArtist)
             await ShowArtistInfoAsync(localArtist.Id, forceRefresh: false);
@@ -14434,11 +14464,116 @@ public partial class MainWindow : Window
         Process.Start(new ProcessStartInfo(_artistInfoSourceUrl) { UseShellExecute = true });
     }
 
-    /// <summary>Clears and hides the album strip shown under the artist biography.</summary>
+    /// <summary>Clears and hides the album and track sections shown under the artist biography.</summary>
     private void ResetArtistInfoAlbums()
     {
         ArtistInfoAlbumsPanel.Children.Clear();
         ArtistInfoAlbumsSection.IsVisible = false;
+        ArtistInfoTracksDataGrid.ItemsSource = null;
+        ArtistInfoTracksSection.IsVisible = false;
+    }
+
+    /// <summary>Renders the source-aware artist tracks in album and track-number order.</summary>
+    /// <param name="sources">Catalog tracks paired with their owning remote server, or <see langword="null"/> for local tracks.</param>
+    private void PopulateArtistInfoTracks(
+        IReadOnlyList<(LibraryCatalogTrack Track, OrynivoServerSettings? Server)> sources)
+    {
+        var rows = sources
+            .OrderBy(item => item.Track.Album ?? string.Empty, StringComparer.CurrentCultureIgnoreCase)
+            .ThenBy(item => item.Track.DiscNumber ?? 0)
+            .ThenBy(item => item.Track.TrackNumber ?? int.MaxValue)
+            .ThenBy(item => item.Track.Title ?? item.Track.FileName, StringComparer.CurrentCultureIgnoreCase)
+            .Select(item => ToCatalogTrackContentRow(item.Track, item.Server))
+            .ToList();
+
+        if (ArtistInfoTracksDataGrid.Columns.Count == 0)
+            ConfigureArtistInfoTracksGrid();
+        ArtistInfoTracksDataGrid.ItemsSource = rows;
+        ArtistInfoTracksSection.IsVisible = rows.Count > 0;
+    }
+
+    /// <summary>Configures the compact track table embedded in the artist detail page.</summary>
+    private void ConfigureArtistInfoTracksGrid()
+    {
+        ArtistInfoTracksDataGrid.Columns.Clear();
+        ArtistInfoTracksDataGrid.Columns.Add(CreateFavoriteColumn());
+        ArtistInfoTracksDataGrid.Columns.Add(CreateSourceBadgeColumn());
+        ArtistInfoTracksDataGrid.Columns.Add(CreateEntityLinkColumn(
+            LocalizationManager.Current.Album,
+            nameof(ContentRow.Album),
+            0,
+            true,
+            "Album",
+            1.35));
+        ArtistInfoTracksDataGrid.Columns.Add(new DataGridTextColumn
+        {
+            Header = LocalizationManager.Current.TrackNumber,
+            Binding = new Binding(nameof(ContentRow.TrackNumber)),
+            Width = new DataGridLength(86)
+        });
+        ArtistInfoTracksDataGrid.Columns.Add(new DataGridTextColumn
+        {
+            Header = LocalizationManager.Current.Title,
+            Binding = new Binding(nameof(ContentRow.Title)),
+            Width = new DataGridLength(2.4, DataGridLengthUnitType.Star)
+        });
+        ArtistInfoTracksDataGrid.Columns.Add(new DataGridTextColumn
+        {
+            Header = LocalizationManager.Current.Duration,
+            Binding = new Binding(nameof(ContentRow.Duration)),
+            Width = new DataGridLength(82)
+        });
+        ArtistInfoTracksDataGrid.Columns.Add(new DataGridTextColumn
+        {
+            Header = LocalizationManager.Current.Format,
+            Binding = new Binding(nameof(ContentRow.Format)),
+            Width = new DataGridLength(82)
+        });
+    }
+
+    /// <summary>Loads unified artist tracks independently from biography rendering and applies still-current results.</summary>
+    /// <param name="requests">Source-aware provider, artist, and album requests.</param>
+    /// <param name="loadVersion">Artist-detail load version used to discard stale results.</param>
+    /// <param name="artistName">Displayed normalized artist identity.</param>
+    /// <returns>A task representing the asynchronous track load.</returns>
+    private async Task LoadAndPopulateArtistInfoTracksAsync(
+        IReadOnlyList<(ILibraryCatalogProvider Provider, OrynivoServerSettings? Server, long ArtistId, long AlbumId)> requests,
+        int loadVersion,
+        string artistName)
+    {
+        await Task.Yield();
+        var sources = new List<(LibraryCatalogTrack Track, OrynivoServerSettings? Server)>();
+        foreach (var request in requests)
+        {
+            if (!IsCurrentArtistDetailLoad(loadVersion, artistName))
+                return;
+            try
+            {
+                IReadOnlyList<LibraryCatalogTrack> tracks;
+                if (request.Server is null)
+                {
+                    tracks = await Task.Run(async () =>
+                        await request.Provider.GetTracksByAlbumAsync(
+                            request.AlbumId,
+                            request.ArtistId));
+                }
+                else
+                {
+                    tracks = await request.Provider.GetTracksByAlbumAsync(
+                        request.AlbumId,
+                        request.ArtistId);
+                }
+                sources.AddRange(tracks.Select(track => (track, request.Server)));
+            }
+            catch
+            {
+                // One unavailable album must not hide tracks already loaded from
+                // the local library or another reachable server.
+            }
+        }
+
+        if (IsCurrentArtistDetailLoad(loadVersion, artistName))
+            PopulateArtistInfoTracks(sources);
     }
 
     /// <summary>
@@ -14462,6 +14597,25 @@ public partial class MainWindow : Window
             var albums = await provider.GetAlbumsByArtistAsync(artistId, includeArtwork: true, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             PopulateArtistInfoAlbums(albums, server);
+            try
+            {
+                var trackLists = await Task.WhenAll(albums.Select(album =>
+                    provider.GetTracksByAlbumAsync(album.Id, artistId, cancellationToken)));
+                cancellationToken.ThrowIfCancellationRequested();
+                PopulateArtistInfoTracks(trackLists
+                    .SelectMany(tracks => tracks)
+                    .Select(track => (track, server))
+                    .ToList());
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch
+            {
+                // Album cards remain useful even when the optional track table
+                // cannot be loaded from this provider.
+            }
         }
         catch (OperationCanceledException)
         {
@@ -14495,15 +14649,22 @@ public partial class MainWindow : Window
         IReadOnlyList<(LibraryCatalogAlbum Album, OrynivoServerSettings? Server)> sources)
     {
         ArtistInfoAlbumsPanel.Children.Clear();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var source in sources
-                     .OrderBy(item => item.Album.Year ?? int.MaxValue)
-                     .ThenBy(item => item.Album.Title, StringComparer.CurrentCultureIgnoreCase))
+        var groups = sources
+            .GroupBy(source =>
+                $"{ArtistNameNormalizer.CreateComparisonKey(source.Album.Title)}|{source.Album.Year}",
+                StringComparer.Ordinal)
+            .OrderBy(group => group.Min(item => item.Album.Year ?? int.MaxValue))
+            .ThenBy(group => group.First().Album.Title, StringComparer.CurrentCultureIgnoreCase);
+        foreach (var group in groups)
         {
-            var key = $"{ArtistNameNormalizer.CreateComparisonKey(source.Album.Title)}|{source.Album.Year}";
-            if (!seen.Add(key))
-                continue;
-            ArtistInfoAlbumsPanel.Children.Add(BuildArtistInfoAlbumCard(source.Album, source.Server));
+            var groupedSources = group
+                .OrderBy(item => item.Server is null ? 0 : 1)
+                .ToList();
+            var primary = groupedSources[0];
+            ArtistInfoAlbumsPanel.Children.Add(BuildArtistInfoAlbumCard(
+                primary.Album,
+                primary.Server,
+                groupedSources));
         }
 
         ArtistInfoAlbumsSection.IsVisible = ArtistInfoAlbumsPanel.Children.Count > 0;
@@ -14564,9 +14725,47 @@ public partial class MainWindow : Window
     /// <summary>Builds one album card opened by double-click from the artist-info album strip.</summary>
     /// <param name="album">The album to render.</param>
     /// <param name="server">Owning remote server, or <see langword="null"/> for a local album.</param>
+    /// <param name="logicalSources">Equivalent local and remote album identities represented by the card.</param>
     /// <returns>The card control.</returns>
-    private Control BuildArtistInfoAlbumCard(LibraryCatalogAlbum album, OrynivoServerSettings? server)
+    private Control BuildArtistInfoAlbumCard(
+        LibraryCatalogAlbum album,
+        OrynivoServerSettings? server,
+        IReadOnlyList<(LibraryCatalogAlbum Album, OrynivoServerSettings? Server)>? logicalSources = null)
     {
+        var row = ToCatalogAlbumContentRow(album, server);
+        var representedSources = logicalSources is { Count: > 0 }
+            ? logicalSources
+            : [(album, server)];
+        var distinctSourceCount = representedSources
+            .Select(source => source.Server?.Id ?? LocalSourceKey)
+            .Distinct(StringComparer.Ordinal)
+            .Count();
+        if (distinctSourceCount > 1)
+        {
+            row.EntityType = "UnifiedAlbum";
+            row.LogicalAlbumIds = representedSources.Select(source => source.Album.Id).Distinct().ToList();
+            row.LogicalAlbumParts = representedSources
+                .Select(source => new LogicalAlbumPart(
+                    source.Album.Id,
+                    source.Album.ArtistId,
+                    source.Server))
+                .ToList();
+            row.IsFavorite = representedSources.Any(source => source.Album.IsFavorite);
+        }
+        if (server is null)
+        {
+            var localPath = !string.IsNullOrWhiteSpace(album.ThumbnailPath) && File.Exists(album.ThumbnailPath)
+                ? album.ThumbnailPath
+                : !string.IsNullOrWhiteSpace(album.ArtworkPath) && File.Exists(album.ArtworkPath)
+                    ? album.ArtworkPath
+                    : null;
+            if (localPath is not null)
+                _ = LoadArtistInfoAlbumArtworkAsync(row, localPath);
+        }
+        else
+        {
+            EnsureArtworkHydrated(row);
+        }
         var card = new Border
         {
             Width           = 150,
@@ -14594,27 +14793,40 @@ public partial class MainWindow : Window
             Height  = 150,
             Stretch = Stretch.UniformToFill
         };
-        var artworkHost = new Panel { Width = 150, Height = 150, ClipToBounds = true };
+        var artworkHost = new Grid { Width = 150, Height = 150, ClipToBounds = true };
         artworkHost.Children.Add(avatar);
         artworkHost.Children.Add(image);
+        image.Bind(Image.SourceProperty, new Binding(nameof(ContentRow.Artwork)) { Source = row });
+        avatar.Bind(IsVisibleProperty, new Binding(nameof(ContentRow.Artwork))
+        {
+            Source = row,
+            Converter = ObjectConverters.IsNull
+        });
+        var searchCoverButton = new Button
+        {
+            Content = LocalizationManager.Current.SearchCover,
+            Tag = row,
+            Width = 112,
+            Height = 28,
+            Padding = new Thickness(0),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 0, 8),
+            Background = FindResource<IBrush>("AppAccentBrush"),
+            Foreground = FindResource<IBrush>("AppAccentTextBrush"),
+            BorderThickness = new Thickness(0),
+            Cursor = new Cursor(StandardCursorType.Hand)
+        };
+        searchCoverButton.Bind(IsVisibleProperty, new Binding(nameof(ContentRow.Artwork))
+        {
+            Source = row,
+            Converter = ObjectConverters.IsNull
+        });
+        searchCoverButton.Click += SearchCoverButton_OnClick;
+        artworkHost.Children.Add(searchCoverButton);
         stack.Children.Add(artworkHost);
-
-        if (server is null)
-        {
-            var localPath = !string.IsNullOrEmpty(album.ThumbnailPath) && File.Exists(album.ThumbnailPath)
-                ? album.ThumbnailPath
-                : !string.IsNullOrEmpty(album.ArtworkPath) && File.Exists(album.ArtworkPath)
-                    ? album.ArtworkPath
-                    : null;
-            if (localPath is not null)
-                _ = LoadDashboardLocalArtworkAsync(image, localPath);
-        }
-        else
-        {
-            var artUrl = album.ArtworkPath ?? album.ThumbnailPath;
-            if (!string.IsNullOrEmpty(artUrl))
-                _ = LoadDashboardRemoteArtworkAsync(image, artUrl);
-        }
 
         var titleButton = new Button
         {
@@ -14633,7 +14845,7 @@ public partial class MainWindow : Window
         titleButton.Click += (_, e) =>
         {
             e.Handled = true;
-            _ = OpenArtistInfoAlbumAsync(album, server);
+            _ = OpenArtistInfoAlbumCardAsync(album, server, row);
         };
         stack.Children.Add(titleButton);
 
@@ -14642,8 +14854,58 @@ public partial class MainWindow : Window
             Text       = album.Year is int year && year > 0 ? year.ToString(CultureInfo.CurrentCulture) : string.Empty,
             FontSize   = 11,
             Foreground = FindResource<IBrush>("AppMutedTextBrush"),
-            Margin     = new Thickness(10, 0, 10, 10)
+            Margin     = new Thickness(10, 0, 10, 2)
         });
+
+        var footer = new Grid { Margin = new Thickness(8, 2, 8, 8) };
+        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var favoriteButton = new Button
+        {
+            Tag = row,
+            Width = 28,
+            Height = 24,
+            MinWidth = 0,
+            MinHeight = 0,
+            Padding = new Thickness(0),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Background = Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            Foreground = FindResource<IBrush>("AppFavoriteBrush"),
+            FontFamily = new FontFamily("Segoe UI Symbol"),
+            FontSize = ResolveFontSize("FontSizeBodyStrong"),
+            Cursor = new Cursor(StandardCursorType.Hand)
+        };
+        favoriteButton.Bind(Button.ContentProperty, new Binding(nameof(ContentRow.FavoriteGlyph)) { Source = row });
+        favoriteButton.Click += FavoriteButton_OnClick;
+        footer.Children.Add(favoriteButton);
+
+        var sourceBadgeText = new TextBlock
+        {
+            FontSize = 10,
+            FontWeight = FontWeight.SemiBold,
+            Foreground = FindResource<IBrush>("AppAccentBrush"),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        sourceBadgeText.Bind(TextBlock.TextProperty, new Binding(nameof(ContentRow.SourceBadge)) { Source = row });
+        var sourceBadge = new Border
+        {
+            Height = 20,
+            MinWidth = 26,
+            Padding = new Thickness(6, 0),
+            CornerRadius = new CornerRadius(10),
+            Background = FindResource<IBrush>("AppSurfaceHoverBrush"),
+            BorderBrush = FindResource<IBrush>("AppAccentBrush"),
+            BorderThickness = new Thickness(1),
+            Child = sourceBadgeText
+        };
+        ToolTip.SetTip(sourceBadge, row.SourceName);
+        Grid.SetColumn(sourceBadge, 1);
+        footer.Children.Add(sourceBadge);
+        stack.Children.Add(footer);
 
         card.Child = stack;
         card.DoubleTapped += (_, e) =>
@@ -14651,9 +14913,46 @@ public partial class MainWindow : Window
             if (FindAncestor<Button>(e.Source as Visual) is not null)
                 return;
             e.Handled = true;
-            _ = OpenArtistInfoAlbumAsync(album, server);
+            _ = OpenArtistInfoAlbumCardAsync(album, server, row);
         };
         return card;
+    }
+
+    /// <summary>Opens every represented source for a unified card, or the single owning album otherwise.</summary>
+    /// <param name="album">Primary album represented by the card.</param>
+    /// <param name="server">Primary album's remote server, or <see langword="null"/> for local.</param>
+    /// <param name="row">Source-aware card row carrying optional logical album parts.</param>
+    /// <returns>A task representing the navigation.</returns>
+    private async Task OpenArtistInfoAlbumCardAsync(
+        LibraryCatalogAlbum album,
+        OrynivoServerSettings? server,
+        ContentRow row)
+    {
+        if (row.EntityType != "UnifiedAlbum")
+        {
+            await OpenArtistInfoAlbumAsync(album, server);
+            return;
+        }
+
+        await OpenLogicalAlbumTracksAsync(row);
+        ArtistInfoView.IsVisible = false;
+        _artistInfoUnifiedArtistName = null;
+        BackButton.IsVisible = true;
+    }
+
+    /// <summary>Decodes a local artist-detail album image off the UI thread and applies it to its card row.</summary>
+    /// <param name="row">Album row bound to the artist-detail card.</param>
+    /// <param name="path">Local cached artwork path.</param>
+    /// <returns>A task representing the asynchronous decode.</returns>
+    private static async Task LoadArtistInfoAlbumArtworkAsync(ContentRow row, string path)
+    {
+        var artwork = await Task.Run(() => CreateArtworkImage(path, 320));
+        if (artwork is null)
+            return;
+        row.Artwork = artwork;
+        row.Thumbnail = artwork;
+        row.ArtworkLoadCompleted = true;
+        row.ThumbnailLoadCompleted = true;
     }
 
     /// <summary>Opens the artist-scoped album tracks and then closes the artist-info overlay.</summary>

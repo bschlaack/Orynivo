@@ -154,6 +154,16 @@ public partial class MainWindow : Window
          (TryGetPlexHistoryTarget(entry, out _, out _, out _, out _, out var plexArtistKey) &&
           !string.IsNullOrWhiteSpace(plexArtistKey)));
 
+    /// <summary>Determines whether a playback-history album can be opened from local or remote metadata.</summary>
+    /// <param name="entry">The history entry to test.</param>
+    /// <returns><see langword="true"/> when the album has a local ID or a resolvable remote track target.</returns>
+    private bool CanOpenHistoryAlbum(DailyHistoryEntry entry) =>
+        !string.IsNullOrWhiteSpace(entry.Album) &&
+        (entry.AlbumId.HasValue ||
+         TryGetOrynivoHistoryTarget(entry, out _, out _) ||
+         (TryGetPlexHistoryTarget(entry, out _, out _, out _, out var plexAlbumKey, out _) &&
+          !string.IsNullOrWhiteSpace(plexAlbumKey)));
+
     private async Task OpenHistoryArtistAsync(DailyHistoryEntry entry)
     {
         if (entry.ArtistId is long localArtistId)
