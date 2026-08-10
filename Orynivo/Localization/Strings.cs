@@ -450,6 +450,7 @@ public sealed record LocalizedStrings(
     public string PersonalRating { get; init; } = "";
     /// <summary>Gets the MusicBrainz community-rating label.</summary>
     public string MusicBrainzRating { get; init; } = "";
+    public string MusicBrainzNoRating { get; init; } = "";
     /// <summary>Gets the tooltip for editing a personal rating.</summary>
     public string RatingSetHint { get; init; } = "";
     /// <summary>Gets the message shown when a rating cannot be persisted.</summary>

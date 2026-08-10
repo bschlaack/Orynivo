@@ -345,9 +345,18 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   only when optional duration filtering leaves one exact result. Server scans
   must preserve client-resolved recording MBIDs and all rating fields. Album
   detail rendering starts a cancellable refresh only after track rows are bound;
-  values fetched within 30 days must not be queried again. Group known MBIDs in
-  batches of at most 25, then resolve missing MBIDs conservatively one track at
-  a time and persist every unambiguous identity.
+  values fetched within 30 days must not be queried again. Resolve missing MBIDs
+  conservatively and persist every unambiguous identity, then fetch each rating
+  through the direct recording lookup; MusicBrainz batch search rating fields
+  are not reliable enough to cache. De-duplicate known MBIDs across mirrored
+  local/server album rows before issuing direct lookups.
+  The rating cell displays a localized not-rated state after a successful
+  direct lookup returns no community score; reserve the dash for tracks that
+  have not been queried.
+  Direct lookups request supplemental MusicBrainz genres and tags. Persist them
+  through the owning local database or remote rating API, then incrementally
+  update the local/server Lucene document; never replace the row's embedded
+  genre or contact MusicBrainz from a normal library scan.
 - Dashboard album recommendations rank compact local and Orynivo Server album
   candidates against genre listening time from the selected history period.
   Already-heard albums are de-emphasized, and the optional mood selector applies

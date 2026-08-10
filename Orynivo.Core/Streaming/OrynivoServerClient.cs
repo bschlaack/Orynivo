@@ -120,6 +120,8 @@ public sealed record OrynivoRecommendationAlbum(
 /// <param name="MusicBrainzRatingVotes">Number of contributing MusicBrainz votes.</param>
 /// <param name="MusicBrainzTrackId">MusicBrainz recording identifier.</param>
 /// <param name="MusicBrainzRatingFetchedAt">Unix timestamp of the latest MusicBrainz rating lookup.</param>
+/// <param name="MusicBrainzGenres">JSON array of supplemental MusicBrainz genres.</param>
+/// <param name="MusicBrainzTags">JSON array of supplemental positively voted MusicBrainz tags.</param>
 public sealed record OrynivoTrackInfo(
     long Id,
     string Path,
@@ -156,7 +158,9 @@ public sealed record OrynivoTrackInfo(
     double? MusicBrainzRating = null,
     int? MusicBrainzRatingVotes = null,
     string? MusicBrainzTrackId = null,
-    long? MusicBrainzRatingFetchedAt = null);
+    long? MusicBrainzRatingFetchedAt = null,
+    string? MusicBrainzGenres = null,
+    string? MusicBrainzTags = null);
 
 /// <summary>Rating mutation sent to an Orynivo Server.</summary>
 /// <param name="UserRating">Optional personal zero-to-five-star rating.</param>
@@ -164,12 +168,16 @@ public sealed record OrynivoTrackInfo(
 /// <param name="MusicBrainzRating">Optional cached MusicBrainz community rating.</param>
 /// <param name="MusicBrainzRatingVotes">Optional MusicBrainz vote count.</param>
 /// <param name="MusicBrainzRatingFetchedAt">Optional MusicBrainz lookup timestamp.</param>
+/// <param name="MusicBrainzGenres">Optional JSON array of supplemental MusicBrainz genres.</param>
+/// <param name="MusicBrainzTags">Optional JSON array of supplemental positively voted tags.</param>
 public sealed record OrynivoTrackRatingUpdate(
     int? UserRating = null,
     string? MusicBrainzTrackId = null,
     double? MusicBrainzRating = null,
     int? MusicBrainzRatingVotes = null,
-    long? MusicBrainzRatingFetchedAt = null);
+    long? MusicBrainzRatingFetchedAt = null,
+    string? MusicBrainzGenres = null,
+    string? MusicBrainzTags = null);
 
 /// <summary>Lightweight remote track entry used for folder-tree construction.</summary>
 /// <param name="Id">Database ID of the track.</param>

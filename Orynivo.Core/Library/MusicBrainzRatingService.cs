@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Orynivo.Library;
@@ -7,7 +8,59 @@ namespace Orynivo.Library;
 /// <param name="RecordingMbid">Stable MusicBrainz recording identifier.</param>
 /// <param name="Rating">Community rating on a zero-to-five scale, or <see langword="null"/>.</param>
 /// <param name="Votes">Number of votes contributing to the rating.</param>
-public sealed record MusicBrainzTrackRating(string RecordingMbid, double? Rating, int Votes);
+/// <param name="Genres">Curated MusicBrainz genres with positive community counts.</param>
+/// <param name="Tags">Community tags with at least two positive votes.</param>
+public sealed record MusicBrainzTrackRating(
+    string RecordingMbid,
+    double? Rating,
+    int Votes,
+    IReadOnlyList<string>? Genres = null,
+    IReadOnlyList<string>? Tags = null);
+
+/// <summary>Serializes and combines supplemental MusicBrainz genre metadata.</summary>
+public static class MusicBrainzGenreMetadata
+{
+    /// <summary>Serializes bounded normalized names for database storage.</summary>
+    /// <param name="values">Genre or tag names.</param>
+    /// <returns>A JSON array, or <see langword="null"/> when no names remain.</returns>
+    public static string? Serialize(IEnumerable<string>? values)
+    {
+        var normalized = Normalize(values).ToList();
+        return normalized.Count == 0 ? null : JsonSerializer.Serialize(normalized);
+    }
+
+    /// <summary>Combines embedded genres with separately stored MusicBrainz genres and tags.</summary>
+    /// <param name="embeddedGenre">Unmodified embedded genre text.</param>
+    /// <param name="genresJson">Stored MusicBrainz genre JSON.</param>
+    /// <param name="tagsJson">Stored MusicBrainz tag JSON.</param>
+    /// <returns>Comma-separated effective genre text for search and classification.</returns>
+    public static string? Combine(string? embeddedGenre, string? genresJson, string? tagsJson)
+    {
+        var values = new List<string>();
+        if (!string.IsNullOrWhiteSpace(embeddedGenre))
+            values.Add(embeddedGenre.Trim());
+        values.AddRange(Deserialize(genresJson));
+        values.AddRange(Deserialize(tagsJson));
+        var normalized = Normalize(values).ToList();
+        return normalized.Count == 0 ? null : string.Join(", ", normalized);
+    }
+
+    private static IEnumerable<string> Deserialize(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return [];
+        try { return JsonSerializer.Deserialize<List<string>>(json) ?? []; }
+        catch (JsonException) { return []; }
+    }
+
+    private static IEnumerable<string> Normalize(IEnumerable<string>? values) =>
+        (values ?? [])
+            .Select(value => value?.Trim())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Cast<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(32);
+}
 
 /// <summary>
 /// Resolves recordings and retrieves MusicBrainz community ratings. Embedded recording MBIDs are
@@ -16,7 +69,6 @@ public sealed record MusicBrainzTrackRating(string RecordingMbid, double? Rating
 public sealed class MusicBrainzRatingService
 {
     private const string ApiBase = "https://musicbrainz.org/ws/2/";
-    private const int BatchSize = 25;
     private static readonly SemaphoreSlim RequestGate = new(1, 1);
     private static DateTimeOffset _lastRequestAt = DateTimeOffset.MinValue;
     private readonly HttpClient _httpClient;
@@ -46,54 +98,23 @@ public sealed class MusicBrainzRatingService
     {
         var mbid = Guid.TryParse(recordingMbid, out var parsed) ? parsed.ToString() : null;
         if (mbid is null)
-            return await ResolveRecordingAsync(artist, title, durationSeconds, cancellationToken).ConfigureAwait(false);
+            mbid = await ResolveRecordingAsync(artist, title, durationSeconds, cancellationToken).ConfigureAwait(false);
+        if (mbid is null)
+            return null;
 
-        var uri = $"{ApiBase}recording/{mbid}?inc=ratings&fmt=json";
+        var uri = $"{ApiBase}recording/{mbid}?inc=ratings+genres+tags&fmt=json";
         var response = await GetAsync<RecordingLookup>(uri, cancellationToken).ConfigureAwait(false);
         return response is null
             ? null
-            : new MusicBrainzTrackRating(mbid, response.Rating?.Value, response.Rating?.VotesCount ?? 0);
+            : new MusicBrainzTrackRating(
+                mbid,
+                response.Rating?.Value,
+                response.Rating?.VotesCount ?? 0,
+                SelectNames(response.Genres, 1),
+                SelectNames(response.Tags, 2));
     }
 
-    /// <summary>
-    /// Gets cached community values for known recording MBIDs in bounded batch searches.
-    /// Invalid identifiers and identifiers not returned by MusicBrainz are omitted.
-    /// </summary>
-    /// <param name="recordingMbids">Recording MBIDs to retrieve.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Ratings keyed by canonical recording MBID.</returns>
-    public async Task<IReadOnlyDictionary<string, MusicBrainzTrackRating>> GetRatingsAsync(
-        IEnumerable<string> recordingMbids,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(recordingMbids);
-        var identifiers = recordingMbids
-            .Select(value => Guid.TryParse(value, out var parsed) ? parsed.ToString() : null)
-            .Where(value => value is not null)
-            .Cast<string>()
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        var result = new Dictionary<string, MusicBrainzTrackRating>(StringComparer.OrdinalIgnoreCase);
-        foreach (var batch in identifiers.Chunk(BatchSize))
-        {
-            var query = $"rid:({string.Join(" OR ", batch)})";
-            var uri = $"{ApiBase}recording?query={Uri.EscapeDataString(query)}&limit={batch.Length}&inc=ratings&fmt=json";
-            var response = await GetAsync<RecordingSearch>(uri, cancellationToken).ConfigureAwait(false);
-            foreach (var item in response?.Recordings ?? [])
-            {
-                if (!Guid.TryParse(item.Id, out var parsed))
-                    continue;
-                var mbid = parsed.ToString();
-                result[mbid] = new MusicBrainzTrackRating(
-                    mbid,
-                    item.Rating?.Value,
-                    item.Rating?.VotesCount ?? 0);
-            }
-        }
-        return result;
-    }
-
-    private async Task<MusicBrainzTrackRating?> ResolveRecordingAsync(
+    private async Task<string?> ResolveRecordingAsync(
         string? artist,
         string? title,
         double? durationSeconds,
@@ -103,7 +124,7 @@ public sealed class MusicBrainzRatingService
             return null;
 
         var query = $"recording:\"{EscapeQuery(title)}\" AND artist:\"{EscapeQuery(artist)}\"";
-        var uri = $"{ApiBase}recording?query={Uri.EscapeDataString(query)}&limit=10&inc=ratings&fmt=json";
+        var uri = $"{ApiBase}recording?query={Uri.EscapeDataString(query)}&limit=10&fmt=json";
         var response = await GetAsync<RecordingSearch>(uri, cancellationToken).ConfigureAwait(false);
         var matches = response?.Recordings
             .Where(item => string.Equals(item.Title?.Trim(), title.Trim(), StringComparison.OrdinalIgnoreCase))
@@ -112,12 +133,9 @@ public sealed class MusicBrainzRatingService
             .Where(item => !durationSeconds.HasValue || !item.Length.HasValue ||
                 Math.Abs(item.Length.Value / 1000d - durationSeconds.Value) <= 5d)
             .ToList() ?? [];
-        if (matches.Count != 1 || !Guid.TryParse(matches[0].Id, out var mbid))
-            return null;
-        return new MusicBrainzTrackRating(
-            mbid.ToString(),
-            matches[0].Rating?.Value,
-            matches[0].Rating?.VotesCount ?? 0);
+        return matches.Count == 1 && Guid.TryParse(matches[0].Id, out var mbid)
+            ? mbid.ToString()
+            : null;
     }
 
     private static string EscapeQuery(string value) =>
@@ -148,12 +166,28 @@ public sealed class MusicBrainzRatingService
         [property: JsonPropertyName("id")] string? Id,
         [property: JsonPropertyName("title")] string? Title,
         [property: JsonPropertyName("length")] int? Length,
-        [property: JsonPropertyName("artist-credit")] List<ArtistCredit> ArtistCredit,
-        [property: JsonPropertyName("rating")] RatingValue? Rating);
+        [property: JsonPropertyName("artist-credit")] List<ArtistCredit> ArtistCredit);
 
     private sealed record ArtistCredit([property: JsonPropertyName("name")] string? Name);
 
-    private sealed record RecordingLookup([property: JsonPropertyName("rating")] RatingValue? Rating);
+    private static IReadOnlyList<string> SelectNames(IEnumerable<TagValue>? values, int minimumCount) =>
+        (values ?? [])
+            .Where(value => value.Count >= minimumCount)
+            .Select(value => value.Name?.Trim())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Cast<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(32)
+            .ToList();
+
+    private sealed record RecordingLookup(
+        [property: JsonPropertyName("rating")] RatingValue? Rating,
+        [property: JsonPropertyName("genres")] List<TagValue>? Genres,
+        [property: JsonPropertyName("tags")] List<TagValue>? Tags);
+
+    private sealed record TagValue(
+        [property: JsonPropertyName("name")] string? Name,
+        [property: JsonPropertyName("count")] int Count);
 
     private sealed record RatingValue(
         [property: JsonPropertyName("value")] double? Value,

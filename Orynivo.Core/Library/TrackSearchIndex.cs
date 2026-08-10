@@ -35,7 +35,7 @@ public sealed record SearchHitIds(List<long> Ids, IReadOnlyDictionary<long, floa
 public static class TrackSearchIndex
 {
     private const LuceneVersion Version = LuceneVersion.LUCENE_48;
-    private const string SchemaVersion = "search-fields-v5-trimmed-titles";
+    private const string SchemaVersion = "search-fields-v6-musicbrainz-genres";
 
     private static string Root => AppPaths.GetDataPath("search-index");
 
@@ -348,7 +348,9 @@ public static class TrackSearchIndex
             t.Path, t.FileName, t.FileSize, t.ModifiedAt, t.AddedAt,
             t.Format, t.Duration, t.SampleRate, t.BitDepth, t.Channels, t.Bitrate,
             t.IsLossless, t.IsDsd, t.DsdRate, t.Title, t.SortTitle, t.Artist, t.SortArtist,
-            t.AlbumArtist, t.SortAlbumArtist, t.Album, t.SortAlbum, t.Genre, t.Year, t.Date,
+            t.AlbumArtist, t.SortAlbumArtist, t.Album, t.SortAlbum,
+            MusicBrainzGenreMetadata.Combine(t.Genre, t.MusicBrainzGenres, t.MusicBrainzTags),
+            t.Year, t.Date,
             t.TrackNumber, t.TrackTotal, t.DiscNumber, t.DiscTotal, t.Composer, t.Conductor,
             t.Lyricist, t.Lyrics, t.Comment, t.Copyright, t.Publisher, t.EncodedBy,
             t.EncodingSettings, t.Bpm, t.Compilation, t.Isrc, t.Language, t.Mood,

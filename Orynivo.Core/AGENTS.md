@@ -48,9 +48,14 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   Community ratings use MusicBrainz's zero-to-five scale and remain separate
   from the personal zero-to-five integer rating. Compact track list/streaming
   DTOs carry the rating fetch timestamp so clients can enforce cache freshness.
-  `MusicBrainzRatingService.GetRatingsAsync` batches at most 25 known recording
-  MBIDs, and metadata fallback returns the resolved MBID plus rating from the
-  same search response instead of issuing a redundant lookup.
+  Metadata fallback returns a resolved MBID and follows it with a direct
+  recording lookup. Do not cache community ratings from batch/search responses:
+  MusicBrainz does not reliably populate their rating field even when
+  `inc=ratings` is supplied.
+  Direct lookups request `ratings+genres+tags`; keep genres with positive counts,
+  tags with at least two positive votes, and persist both as separate bounded
+  JSON arrays. `MusicBrainzGenreMetadata.Combine` is the shared effective-genre
+  composition used by facets and indexing without altering embedded metadata.
 - Album catalog queries, recent-album queries, detail lookup, and Dashboard
   album totals expose only albums referenced by at least one indexed track.
   Artist catalog rows and artist totals likewise require a track-backed album;

@@ -454,10 +454,24 @@ public partial class MainWindow : Window
         }
         public string? MusicBrainzTrackId { get; set; }
         /// <summary>Gets or sets the Unix timestamp of the latest MusicBrainz rating lookup.</summary>
-        public long? MusicBrainzRatingFetchedAt { get; set; }
+        public long? MusicBrainzRatingFetchedAt
+        {
+            get => _musicBrainzRatingFetchedAt;
+            set
+            {
+                if (_musicBrainzRatingFetchedAt == value)
+                    return;
+                _musicBrainzRatingFetchedAt = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(MusicBrainzRatingFetchedAt)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(MusicBrainzRatingDisplay)));
+            }
+        }
+        private long? _musicBrainzRatingFetchedAt;
         public string MusicBrainzRatingDisplay => MusicBrainzRating is double rating
             ? $"★ {rating:0.0} ({MusicBrainzRatingVotes.GetValueOrDefault():N0})"
-            : "—";
+            : MusicBrainzRatingFetchedAt.HasValue
+                ? LocalizationManager.Current.MusicBrainzNoRating
+                : "—";
         public string? Folder      { get; init; }
         public string? ArtworkPath { get; set; }
         public string? ThumbnailPath { get; set; }
@@ -9419,21 +9433,13 @@ public partial class MainWindow : Window
         try
         {
             await Task.Yield();
-            var service = new MusicBrainzRatingService(MusicBrainzRatingHttpClient);
-            var rowsWithMbid = rows
+            var knownGroups = rows
                 .Where(row => Guid.TryParse(row.MusicBrainzTrackId, out _))
-                .ToList();
-            if (rowsWithMbid.Count > 0)
+                .GroupBy(row => row.MusicBrainzTrackId!, StringComparer.OrdinalIgnoreCase);
+            foreach (var group in knownGroups)
             {
-                var ratings = await service.GetRatingsAsync(
-                    rowsWithMbid.Select(row => row.MusicBrainzTrackId!),
-                    cts.Token);
-                foreach (var row in rowsWithMbid)
-                {
-                    cts.Token.ThrowIfCancellationRequested();
-                    if (ratings.TryGetValue(row.MusicBrainzTrackId!, out var rating))
-                        await PersistMusicBrainzTrackRatingAsync(row, rating, cts.Token);
-                }
+                cts.Token.ThrowIfCancellationRequested();
+                await RefreshMusicBrainzTrackRatingGroupAsync(group.ToList(), cts.Token);
             }
 
             foreach (var row in rows.Where(row => !Guid.TryParse(row.MusicBrainzTrackId, out _)))
@@ -9450,6 +9456,47 @@ public partial class MainWindow : Window
             if (ReferenceEquals(_albumMusicBrainzRatingCts, cts))
                 _albumMusicBrainzRatingCts = null;
             cts.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Uses one reliable direct Recording lookup for rows sharing an MBID, then
+    /// persists the result into every represented local or remote library row.
+    /// </summary>
+    /// <param name="rows">Rows sharing one known recording MBID.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task representing lookup and persistence.</returns>
+    private async Task RefreshMusicBrainzTrackRatingGroupAsync(
+        IReadOnlyList<ContentRow> rows,
+        CancellationToken cancellationToken)
+    {
+        if (rows.Count == 0)
+            return;
+        try
+        {
+            var first = rows[0];
+            var service = new MusicBrainzRatingService(MusicBrainzRatingHttpClient);
+            var result = await service.GetRatingAsync(
+                first.MusicBrainzTrackId,
+                first.Artist,
+                first.Title,
+                first.KnownDuration?.TotalSeconds,
+                cancellationToken);
+            if (result is null)
+                return;
+            foreach (var row in rows)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await PersistMusicBrainzTrackRatingAsync(row, result, cancellationToken);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            // Ratings are optional metadata; continue with the remaining album rows.
         }
     }
 
@@ -9507,7 +9554,9 @@ public partial class MainWindow : Window
                     MusicBrainzTrackId: result.RecordingMbid,
                     MusicBrainzRating: result.Rating,
                     MusicBrainzRatingVotes: result.Votes,
-                    MusicBrainzRatingFetchedAt: fetchedAt),
+                    MusicBrainzRatingFetchedAt: fetchedAt,
+                    MusicBrainzGenres: MusicBrainzGenreMetadata.Serialize(result.Genres),
+                    MusicBrainzTags: MusicBrainzGenreMetadata.Serialize(result.Tags)),
                 cancellationToken)
             : await Task.Run(() =>
             {
@@ -9517,7 +9566,11 @@ public partial class MainWindow : Window
                     result.RecordingMbid,
                     result.Rating,
                     result.Votes,
-                    fetchedAt);
+                    fetchedAt,
+                    MusicBrainzGenreMetadata.Serialize(result.Genres),
+                    MusicBrainzGenreMetadata.Serialize(result.Tags));
+                if (db.GetTrackById(trackId) is { } updatedTrack)
+                    TrackSearchIndex.UpdateMany([updatedTrack]);
                 return true;
             }, cancellationToken);
         if (!saved)

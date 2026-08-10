@@ -245,7 +245,11 @@ public static class LibraryEndpoints
                     request.MusicBrainzTrackId,
                     request.MusicBrainzRating,
                     request.MusicBrainzRatingVotes,
-                    fetchedAt);
+                    fetchedAt,
+                    request.MusicBrainzGenres,
+                    request.MusicBrainzTags);
+                if (db.GetTrackById(trackId) is { } updatedTrack)
+                    TrackSearchIndex.UpdateMany([updatedTrack]);
             }
             return Results.Ok(db.GetTrackRating(trackId));
         });
@@ -506,7 +510,7 @@ public static class LibraryEndpoints
         t.Artist,
         t.AlbumArtist,
         t.Album,
-        t.Genre,
+        Genre = MusicBrainzGenreMetadata.Combine(t.Genre, t.MusicBrainzGenres, t.MusicBrainzTags),
         t.Year,
         t.TrackNumber,
         t.TrackTotal,
@@ -532,6 +536,8 @@ public static class LibraryEndpoints
         t.MusicBrainzRatingVotes,
         t.MusicBrainzTrackId,
         t.MusicBrainzRatingFetchedAt,
+        t.MusicBrainzGenres,
+        t.MusicBrainzTags,
         IsCueTrack = IsVirtualSegmentPath(t.Path)
     };
 
@@ -553,7 +559,7 @@ public static class LibraryEndpoints
         t.TrackTotal,
         t.DiscNumber,
         t.DiscTotal,
-        t.Genre,
+        Genre = MusicBrainzGenreMetadata.Combine(t.Genre, t.MusicBrainzGenres, t.MusicBrainzTags),
         t.Duration,
         t.Bitrate,
         t.SampleRate,
@@ -565,6 +571,9 @@ public static class LibraryEndpoints
         t.MusicBrainzRating,
         t.MusicBrainzRatingVotes,
         t.MusicBrainzTrackId,
+        t.MusicBrainzRatingFetchedAt,
+        t.MusicBrainzGenres,
+        t.MusicBrainzTags,
         IsCueTrack = IsVirtualSegmentPath(t.Path)
     };
 
@@ -712,12 +721,16 @@ public sealed record TrackLyricsUpdateRequest(
 /// <param name="MusicBrainzRating">Optional cached MusicBrainz community rating.</param>
 /// <param name="MusicBrainzRatingVotes">Optional MusicBrainz vote count.</param>
 /// <param name="MusicBrainzRatingFetchedAt">Optional MusicBrainz lookup timestamp.</param>
+/// <param name="MusicBrainzGenres">Optional JSON array of supplemental MusicBrainz genres.</param>
+/// <param name="MusicBrainzTags">Optional JSON array of supplemental positively voted tags.</param>
 public sealed record TrackRatingUpdateRequest(
     int? UserRating,
     string? MusicBrainzTrackId,
     double? MusicBrainzRating,
     int? MusicBrainzRatingVotes,
-    long? MusicBrainzRatingFetchedAt);
+    long? MusicBrainzRatingFetchedAt,
+    string? MusicBrainzGenres,
+    string? MusicBrainzTags);
 
 /// <summary>Request body for creating a regular server playlist.</summary>
 /// <param name="Name">Playlist display name.</param>

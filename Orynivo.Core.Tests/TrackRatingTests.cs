@@ -28,34 +28,33 @@ public sealed class TrackRatingTests
         Assert.Equal(42, result.Votes);
     }
 
-    /// <summary>Verifies known recording MBIDs are retrieved through one bounded batch request.</summary>
+    /// <summary>Verifies supplemental genres and only sufficiently confirmed positive tags are retained.</summary>
     [Fact]
-    public async Task MusicBrainzRatingService_KnownMbidsUseOneBatchRequest()
+    public async Task MusicBrainzRatingService_FiltersSupplementalGenresAndTags()
     {
-        const string first = "c410a773-c6eb-4bc0-9df8-042fe6645c63";
-        const string second = "b1a9c0e9-d987-4042-ae91-78d6a3267d69";
-        var handler = new JsonHandler(
-            $$$"""{"recordings":[{"id":"{{{first}}}","title":"First","artist-credit":[],"rating":{"value":4.1,"votes-count":12}},{"id":"{{{second}}}","title":"Second","artist-credit":[],"rating":{"value":3.8,"votes-count":9}}]}""");
-        using var httpClient = new HttpClient(handler);
+        using var httpClient = new HttpClient(new JsonHandler(
+            """{"rating":{"value":4.0,"votes-count":4},"genres":[{"name":"Synth-pop","count":3},{"name":"Rejected","count":0}],"tags":[{"name":"80s","count":5},{"name":"weak","count":1},{"name":"negative","count":-2}]}"""));
         var service = new MusicBrainzRatingService(httpClient);
 
-        var ratings = await service.GetRatingsAsync([first, second]);
+        var result = await service.GetRatingAsync(
+            "c410a773-c6eb-4bc0-9df8-042fe6645c63",
+            "Artist",
+            "Track",
+            180);
 
-        Assert.Equal(2, ratings.Count);
-        Assert.Equal(4.1, ratings[first].Rating);
-        Assert.Equal(9, ratings[second].Votes);
-        Assert.Equal(1, handler.RequestCount);
-        Assert.Contains(first, handler.LastRequestUri, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains(second, handler.LastRequestUri, StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(result);
+        Assert.Equal(["Synth-pop"], result.Genres);
+        Assert.Equal(["80s"], result.Tags);
     }
 
-    /// <summary>Verifies metadata fallback returns and preserves the resolved MBID without a second lookup.</summary>
+    /// <summary>Verifies metadata fallback resolves an MBID and then uses its reliable direct rating lookup.</summary>
     [Fact]
     public async Task MusicBrainzRatingService_MetadataFallbackReturnsMbidAndRatingFromSearch()
     {
         const string mbid = "c410a773-c6eb-4bc0-9df8-042fe6645c63";
         var handler = new JsonHandler(
-            $$$"""{"recordings":[{"id":"{{{mbid}}}","title":"Track","length":180000,"artist-credit":[{"name":"Artist"}],"rating":{"value":4.4,"votes-count":22}}]}""");
+            $$$"""{"recordings":[{"id":"{{{mbid}}}","title":"Track","length":180000,"artist-credit":[{"name":"Artist"}]}]}""",
+            """{"rating":{"value":4.4,"votes-count":22}}""");
         using var httpClient = new HttpClient(handler);
         var service = new MusicBrainzRatingService(httpClient);
 
@@ -65,7 +64,7 @@ public sealed class TrackRatingTests
         Assert.Equal(mbid, result.RecordingMbid);
         Assert.Equal(4.4, result.Rating);
         Assert.Equal(22, result.Votes);
-        Assert.Equal(1, handler.RequestCount);
+        Assert.Equal(2, handler.RequestCount);
     }
 
     /// <summary>Ensures scanner upserts preserve user-entered ratings and resolved recording identities.</summary>
@@ -88,7 +87,9 @@ public sealed class TrackRatingTests
                     "c410a773-c6eb-4bc0-9df8-042fe6645c63",
                     4.2,
                     37,
-                    1234567890);
+                    1234567890,
+                    MusicBrainzGenreMetadata.Serialize(["Synth-pop"]),
+                    MusicBrainzGenreMetadata.Serialize(["80s"]));
                 database.Upsert(CreateTrack(trackPath));
             }
 
@@ -99,6 +100,9 @@ public sealed class TrackRatingTests
             Assert.Equal(37, persisted.MusicBrainzRatingVotes);
             Assert.Equal("c410a773-c6eb-4bc0-9df8-042fe6645c63", persisted.MusicBrainzTrackId);
             Assert.Equal(1234567890, persisted.MusicBrainzRatingFetchedAt);
+            Assert.Equal("Synth-pop", Assert.Single(System.Text.Json.JsonSerializer.Deserialize<List<string>>(persisted.MusicBrainzGenres!)!));
+            Assert.Contains("Synth-pop", Assert.Single(reopened.GetTrackFacets()).Genre);
+            Assert.Contains("80s", Assert.Single(reopened.GetTrackFacets()).Genre);
         }
         finally
         {
@@ -120,8 +124,10 @@ public sealed class TrackRatingTests
         Album = "Album"
     };
 
-    private sealed class JsonHandler(string json) : HttpMessageHandler
+    private sealed class JsonHandler(params string[] jsonResponses) : HttpMessageHandler
     {
+        private readonly Queue<string> _jsonResponses = new(jsonResponses);
+
         public int RequestCount { get; private set; }
 
         public string LastRequestUri { get; private set; } = string.Empty;
@@ -132,6 +138,9 @@ public sealed class TrackRatingTests
         {
             RequestCount++;
             LastRequestUri = request.RequestUri?.ToString() ?? string.Empty;
+            var json = _jsonResponses.Count > 1
+                ? _jsonResponses.Dequeue()
+                : _jsonResponses.Peek();
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(json, Encoding.UTF8, "application/json")

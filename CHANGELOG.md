@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- MusicBrainz recording refreshes now retrieve curated genres and positively
+  confirmed community tags alongside ratings. Supplemental values are stored
+  separately from embedded file genres, enrich Lucene search, Genre Cloud,
+  filters, and recommendation inputs, and never rewrite audio-file metadata.
+  Existing rated recordings receive one automatic enrichment refresh.
+
 - Added persistent personal zero-to-five-star track ratings for local and
   Orynivo Server libraries. Shared track tables expose interactive stars, while
   cached MusicBrainz recording ratings and vote counts can be shown as a
@@ -16,11 +22,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   survive later scans. Personal ratings strongly influence Infinite Mix and
   community ratings provide a smaller secondary signal. Opening an album now
   refreshes missing or older-than-30-days MusicBrainz ratings for its tracks in
-  the background without delaying the album view or player. Known recording
-  MBIDs are requested in bounded album batches, while metadata fallback stores
-  each newly resolved MBID so later refreshes can join the batch path.
+  the background without delaying the album view or player. Metadata fallback
+  stores each newly resolved MBID. Rating refreshes use the reliable direct
+  recording lookup because MusicBrainz search responses do not consistently
+  include community ratings; empty values written by the earlier batched-search
+  implementation are invalidated once and refreshed automatically. Duplicate
+  local/server rows sharing one MBID reuse the same direct lookup result.
 
 ### Fixed
+
+- Distinguished a completed MusicBrainz lookup with no community votes from a
+  track that has not been queried yet, instead of showing the same dash for
+  both states.
 
 ## [0.35.4] - 2026-08-10
 

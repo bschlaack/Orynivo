@@ -1121,9 +1121,16 @@ fallback or allow client-provided commands/paths to reach the helper.
   duration matching leaves one recording. Local and server scans preserve these
   values, and the server only caches client-resolved external metadata. Album
   detail views refresh missing or older-than-30-days track ratings in the
-  background and cancel the series when another album replaces it. Known MBIDs
-  are queried in batches of at most 25; fallback resolution persists a newly
-  identified MBID so subsequent refreshes can use batching.
+  background and cancel the series when another album replaces it. Fallback
+  resolution persists a newly identified MBID, but community ratings must use
+  direct recording lookups because MusicBrainz search responses do not reliably
+  include them. Never mark a search-only empty rating as freshly fetched.
+  Rows sharing a recording MBID within one album refresh must reuse one direct
+  lookup result and persist it independently to each owning library.
+  Direct rating lookups also cache curated MusicBrainz genres with positive
+  counts and tags with at least two positive votes as separate JSON arrays.
+  `GetTrackFacets` combines them with embedded genre text for classification;
+  embedded tags are never overwritten.
 - `albums` contains stable album IDs (`id`, `title`, `artist_id`, `year`,
   `artwork_id`, `is_favorite`)
 - `artworks` deduplicates artwork by SHA-256 hash; originals and thumbnails live
@@ -1580,6 +1587,8 @@ fallback or allow client-provided commands/paths to reach the helper.
   `%LOCALAPPDATA%\Orynivo\search-index`, supports category-specific fields,
   partial words, and German umlaut/eszett variants, rebuilds stale indexes,
   updates incrementally after scans, and removes missing files below rescanned roots
+  Supplemental MusicBrainz genres/tags are included in the all-fields document;
+  persisting enrichment must update that track's Lucene document.
 - Search-index freshness is determined by the stored schema marker; indexed
   `Field.Store.NO` fields must not be tested through stored-document field access
 - `TrackSearchIndex.RemovePaths(paths)` removes explicit watcher/full-scan

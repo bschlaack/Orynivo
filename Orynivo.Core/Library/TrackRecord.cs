@@ -192,6 +192,12 @@ public sealed class TrackRecord
     /// <summary>Unix timestamp of the most recent MusicBrainz rating lookup.</summary>
     public long? MusicBrainzRatingFetchedAt { get; set; }
 
+    /// <summary>JSON array of supplemental curated MusicBrainz genres.</summary>
+    public string? MusicBrainzGenres { get; set; }
+
+    /// <summary>JSON array of supplemental positively voted MusicBrainz tags.</summary>
+    public string? MusicBrainzTags { get; set; }
+
     /// <summary>MusicBrainz release ID; used for Cover Art Archive lookups.</summary>
     public string? MusicBrainzReleaseId { get; set; }
 
