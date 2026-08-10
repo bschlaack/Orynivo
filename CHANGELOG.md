@@ -4,6 +4,22 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.36.1] - 2026-08-10
+
+### Added
+
+- Added a transport output-lock button beside the Equalizer and Output
+  quick-pickers. It closes the active exclusive audio player to release the
+  device for other applications, preserves the current source and position,
+  and can reacquire the device and resume from that position without restarting
+  Orynivo.
+
+### Fixed
+
+- Fixed the embedded Settings view at constrained window heights: long
+  sections now scroll within the available content area while the Save and
+  Cancel actions remain reachable.
+
 ## [0.36.0] - 2026-08-10
 
 ### Added

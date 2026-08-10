@@ -98,6 +98,7 @@ public static class LocalizationManager
         resources["L_Language"] = Current.Language;
         resources["L_Playback"] = Current.Playback;
         resources["L_OutputDevice"] = Current.OutputDevice;
+        resources["L_ReleaseOutputDevice"] = Current.ReleaseOutputDevice;
         resources["L_AppearanceNavItem"] = Current.AppearanceNavItem;
         resources["L_ArtistInfoNavItem"] = Current.ArtistInfoNavItem;
         resources["L_Library"] = Current.Library;
@@ -254,6 +255,8 @@ public static class LocalizationManager
         resources["L_EqualizerCreateTitle"] = Current.EqualizerCreateTitle;
         resources["L_EqualizerName"] = Current.EqualizerName;
         resources["L_EqualizerDelete"] = Current.EqualizerDelete;
+        resources["L_ReacquireOutputDevice"] = Current.ReacquireOutputDevice;
+        resources["L_OutputDeviceReleased"] = Current.OutputDeviceReleased;
         resources["L_SelectColumns"] = Current.SelectColumns;
         resources["L_Codec"] = Current.Codec;
         resources["L_Tags"] = Current.Tags;
@@ -594,6 +597,9 @@ public static class LocalizationManager
         PcmOutputBoostHint = "Hebt alle PCM-Wiedergabewege an, um sie näher an die Lautheit nativer DSD-Ausgabe anzugleichen. Native DSD-Ausgabe bleibt bitgenau und unverändert.",
         OutputDevicesLoading = "Ausgabegeräte werden geladen …",
         Equalizer = "Parametrischer Equalizer",
+        ReleaseOutputDevice = "Ausgabegerät freigeben",
+        ReacquireOutputDevice = "Ausgabegerät wieder übernehmen und Wiedergabe fortsetzen",
+        OutputDeviceReleased = "Ausgabegerät ist freigegeben",
         EqualizerHint = "Importiert Equalizer-APO- und AutoEQ-Profile für PCM sowie DSD-zu-PCM. Native DSD-Ausgabe bleibt bitgenau.",
         EqualizerEnabled = "Equalizer aktivieren",
         EqualizerImport = "APO-/AutoEQ-Profil importieren",
@@ -1219,6 +1225,9 @@ public static class LocalizationManager
         PcmOutputBoostHint = "Raises all PCM playback paths so they are closer to native DSD output loudness. Native DSD output remains bit-perfect and unchanged.",
         OutputDevicesLoading = "Loading output devices …",
         Equalizer = "Parametric equalizer",
+        ReleaseOutputDevice = "Release output device",
+        ReacquireOutputDevice = "Reacquire output device and resume playback",
+        OutputDeviceReleased = "Output device is released",
         EqualizerHint = "Imports Equalizer APO and AutoEQ profiles for PCM and DSD-to-PCM playback. Native DSD output remains bit-perfect.",
         EqualizerEnabled = "Enable equalizer",
         EqualizerImport = "Import APO/AutoEQ profile",
@@ -1842,6 +1851,9 @@ public static class LocalizationManager
         PcmOutputBoostHint = "Augmente tous les chemins de lecture PCM pour les rapprocher du niveau perçu de la sortie DSD native. La sortie DSD native reste bit-perfect et inchangée.",
         OutputDevicesLoading = "Chargement des périphériques de sortie …",
         Equalizer = "Égaliseur paramétrique",
+        ReleaseOutputDevice = "Libérer le périphérique de sortie",
+        ReacquireOutputDevice = "Réacquérir le périphérique et reprendre la lecture",
+        OutputDeviceReleased = "Le périphérique de sortie est libéré",
         EqualizerHint = "Importe les profils Equalizer APO et AutoEQ pour la lecture PCM et DSD vers PCM. La sortie DSD native reste bit-perfect.",
         EqualizerEnabled = "Activer l’égaliseur",
         EqualizerImport = "Importer un profil APO/AutoEQ",
@@ -2462,6 +2474,9 @@ public static class LocalizationManager
         PcmOutputBoostHint = "Eleva todas las rutas de reproducción PCM para acercarlas al volumen percibido de la salida DSD nativa. La salida DSD nativa sigue siendo bit-perfect y no cambia.",
         OutputDevicesLoading = "Cargando dispositivos de salida …",
         Equalizer = "Ecualizador paramétrico",
+        ReleaseOutputDevice = "Liberar el dispositivo de salida",
+        ReacquireOutputDevice = "Recuperar el dispositivo y reanudar la reproducción",
+        OutputDeviceReleased = "El dispositivo de salida está liberado",
         EqualizerHint = "Importa perfiles de Equalizer APO y AutoEQ para PCM y DSD convertido a PCM. La salida DSD nativa sigue siendo bit-perfect.",
         EqualizerEnabled = "Activar ecualizador",
         EqualizerImport = "Importar perfil APO/AutoEQ",

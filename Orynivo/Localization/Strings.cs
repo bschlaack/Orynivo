@@ -162,6 +162,12 @@ public sealed record LocalizedStrings(
     string CrashMessage,
     string CrashMessageWithoutLog)
 {
+    /// <summary>Gets the action label for releasing the currently held exclusive output device.</summary>
+    public string ReleaseOutputDevice { get; init; } = "";
+    /// <summary>Gets the action label for reacquiring the output device and resuming playback.</summary>
+    public string ReacquireOutputDevice { get; init; } = "";
+    /// <summary>Gets the status text shown when no output device is currently held.</summary>
+    public string OutputDeviceReleased { get; init; } = "";
     /// <summary>Gets the application-version label shown in the About window.</summary>
     public string VersionLabel { get; init; } = "";
     /// <summary>Gets the label for checking GitHub Releases for an update.</summary>

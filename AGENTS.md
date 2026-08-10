@@ -1829,11 +1829,16 @@ fallback or allow client-provided commands/paths to reach the helper.
   cover search and **Save as playlist** remain adjacent themed actions.
 - The bottom transport bar is a full-width, flush bar (top separator only, no
   floating card) showing 72 × 72 px rounded album artwork, track information,
-  favorite state, playback controls, position, volume, and two quick-pick
-  buttons (EQ and Output) below the volume control. The EQ popup contains a
+  favorite state, playback controls, position, volume, two quick-pick buttons
+  (EQ and Output), and an output-device lock toggle below the volume control.
+  The EQ popup contains a
   profile ComboBox, a vector settings button, and a themed enable/disable checkbox
   (`PopupCheckBoxTheme`). The Output popup contains a profile ComboBox and a
-  vector settings button. Both buttons use vector path icons and tooltips.
+  vector settings button. All three buttons use vector path icons and tooltips.
+  The lock is closed only while an active player owns the configured output;
+  selecting it snapshots playback context and position, disposes the player to
+  release an exclusive device, and changes to an open lock that can reacquire
+  the device and resume. A normal pause does not release the device.
   Right-clicking the now-playing cover opens a compact themed menu for opening
   the current album or artist, searching album artwork, and toggling the
   current track favorite.

@@ -111,6 +111,8 @@
             <StreamGeometry x:Key="IconQueue">M5,6 H19 M5,12 H19 M5,18 H15 M18,16 L21,18 L18,20</StreamGeometry>
             <StreamGeometry x:Key="IconAi">M12,3 L13.7,8.3 L19,10 L13.7,11.7 L12,17 L10.3,11.7 L5,10 L10.3,8.3 Z M18,16 L18.8,18.2 L21,19 L18.8,19.8 L18,22 L17.2,19.8 L15,19 L17.2,18.2 Z</StreamGeometry>
             <StreamGeometry x:Key="IconServer">M5,4 H19 V9 H5 Z M5,11 H19 V16 H5 Z M5,18 H19 V21 H5 Z M8,6.5 H9 M8,13.5 H9 M8,19.5 H9</StreamGeometry>
+            <StreamGeometry x:Key="IconLockClosed">M6,10 H18 V21 H6 Z M8.5,10 V7.5 A3.5,3.5 0 0 1 15.5,7.5 V10 M12,14 V17</StreamGeometry>
+            <StreamGeometry x:Key="IconLockOpen">M6,10 H18 V21 H6 Z M9,10 V7.5 A3.5,3.5 0 0 1 15.5,7.5 M12,14 V17</StreamGeometry>
 
             <!-- ── Typography scale (font-size tokens) ──
                  Shared modular scale so views stop using ad-hoc pixel sizes.
@@ -466,6 +468,7 @@
             <x:String x:Key="L_Language">Sprache</x:String>
             <x:String x:Key="L_Playback">WIEDERGABE</x:String>
             <x:String x:Key="L_OutputDevice">Ausgabegerät</x:String>
+            <x:String x:Key="L_ReleaseOutputDevice">Ausgabegerät freigeben</x:String>
             <x:String x:Key="L_Library">BIBLIOTHEK</x:String>
             <x:String x:Key="L_Directories">Verzeichnisse</x:String>
             <x:String x:Key="L_AddDirectory">+ Verzeichnis hinzufügen</x:String>
