@@ -65,6 +65,12 @@ public partial class MainWindow : Window
     private INowPlayingMetadataProvider? _currentNowPlayingProvider;
     private ContentRow? _currentOrynivoTrackRow;
     private readonly OrynivoServerClient _orynivoClient = new();
+    private static readonly HttpClient MusicBrainzRatingHttpClient = new()
+    {
+        Timeout = TimeSpan.FromSeconds(15)
+    };
+    private static readonly TimeSpan MusicBrainzRatingCacheLifetime = TimeSpan.FromDays(30);
+    private CancellationTokenSource? _albumMusicBrainzRatingCts;
     private OrynivoServerSettings? _activeOrynivoServer;
     private string _activeOrynivoView = "Artists";
     private int _orynivoNavigationLoadVersion;
@@ -406,6 +412,52 @@ public partial class MainWindow : Window
         public string? AddedAt     { get; init; }
         public string? ReplayGainTrack { get; init; }
         public string? ReplayGainAlbum { get; init; }
+        private int _userRating;
+        public int UserRating
+        {
+            get => _userRating;
+            set
+            {
+                if (_userRating == value)
+                    return;
+                _userRating = Math.Clamp(value, 0, 5);
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(UserRating)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(UserRatingGlyph)));
+            }
+        }
+        public string UserRatingGlyph => new string('★', UserRating) + new string('☆', 5 - UserRating);
+        private double? _musicBrainzRating;
+        public double? MusicBrainzRating
+        {
+            get => _musicBrainzRating;
+            set
+            {
+                if (_musicBrainzRating == value)
+                    return;
+                _musicBrainzRating = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(MusicBrainzRating)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(MusicBrainzRatingDisplay)));
+            }
+        }
+        private int? _musicBrainzRatingVotes;
+        public int? MusicBrainzRatingVotes
+        {
+            get => _musicBrainzRatingVotes;
+            set
+            {
+                if (_musicBrainzRatingVotes == value)
+                    return;
+                _musicBrainzRatingVotes = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(MusicBrainzRatingVotes)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(MusicBrainzRatingDisplay)));
+            }
+        }
+        public string? MusicBrainzTrackId { get; set; }
+        /// <summary>Gets or sets the Unix timestamp of the latest MusicBrainz rating lookup.</summary>
+        public long? MusicBrainzRatingFetchedAt { get; set; }
+        public string MusicBrainzRatingDisplay => MusicBrainzRating is double rating
+            ? $"★ {rating:0.0} ({MusicBrainzRatingVotes.GetValueOrDefault():N0})"
+            : "—";
         public string? Folder      { get; init; }
         public string? ArtworkPath { get; set; }
         public string? ThumbnailPath { get; set; }
@@ -4632,6 +4684,11 @@ public partial class MainWindow : Window
                 : null,
             ReplayGainTrack = FormatReplayGainDisplay(track.ReplayGainTrack),
             ReplayGainAlbum = FormatReplayGainDisplay(track.ReplayGainAlbum),
+            UserRating = track.UserRating,
+            MusicBrainzRating = track.MusicBrainzRating,
+            MusicBrainzRatingVotes = track.MusicBrainzRatingVotes,
+            MusicBrainzTrackId = track.MusicBrainzTrackId,
+            MusicBrainzRatingFetchedAt = track.MusicBrainzRatingFetchedAt,
             FilePath = streamUrl,
             SourcePath = track.SourcePath ?? track.Path,
             ArtworkPath = OrynivoServerClient.GetTrackArtworkUrl(server, track.Id, 320),
@@ -5091,11 +5148,17 @@ public partial class MainWindow : Window
             .ToString("d", CultureInfo.CurrentCulture),
         ReplayGainTrack = FormatReplayGainDisplay(t.ReplayGainTrack),
         ReplayGainAlbum = FormatReplayGainDisplay(t.ReplayGainAlbum),
+        UserRating = t.UserRating,
+        MusicBrainzRating = t.MusicBrainzRating,
+        MusicBrainzRatingVotes = t.MusicBrainzRatingVotes,
+        MusicBrainzTrackId = t.MusicBrainzTrackId,
+        MusicBrainzRatingFetchedAt = t.MusicBrainzRatingFetchedAt,
         FilePath = t.Path,
         SourcePath = t.Path,
         IsFavorite = t.IsFavorite,
         ArtistId = t.ArtistId,
         AlbumId = t.AlbumId,
+        KnownDuration = t.Duration.HasValue ? TimeSpan.FromSeconds(t.Duration.Value) : null,
         EntityType = "Track"
     };
 
@@ -5133,6 +5196,11 @@ public partial class MainWindow : Window
                 : null,
             ReplayGainTrack = FormatReplayGainDisplay(track.ReplayGainTrack),
             ReplayGainAlbum = FormatReplayGainDisplay(track.ReplayGainAlbum),
+            UserRating = track.UserRating,
+            MusicBrainzRating = track.MusicBrainzRating,
+            MusicBrainzRatingVotes = track.MusicBrainzRatingVotes,
+            MusicBrainzTrackId = track.MusicBrainzTrackId,
+            MusicBrainzRatingFetchedAt = track.MusicBrainzRatingFetchedAt,
             FilePath = track.PlaybackPath,
             SourcePath = track.SourcePath,
             IsFavorite = track.IsFavorite,
@@ -5198,7 +5266,12 @@ public partial class MainWindow : Window
         track.Genre, track.Format, track.Bitrate, track.Duration, track.SortTitle, track.Id,
         false, track.Year, track.TrackNumber, track.TrackTotal, track.DiscNumber,
         track.DiscTotal, track.SampleRate, track.BitDepth, track.Channels, track.Composer,
-        track.Bpm, track.FileSize, track.AddedAt, track.ReplayGainTrack, track.ReplayGainAlbum);
+        track.Bpm, track.FileSize, track.AddedAt, track.ReplayGainTrack, track.ReplayGainAlbum,
+        UserRating: track.UserRating,
+        MusicBrainzRating: track.MusicBrainzRating,
+        MusicBrainzRatingVotes: track.MusicBrainzRatingVotes,
+        MusicBrainzTrackId: track.MusicBrainzTrackId,
+        MusicBrainzRatingFetchedAt: track.MusicBrainzRatingFetchedAt);
 
     private static string? FormatPartNumber(int? number, int? total) =>
         number is null ? null : total is > 0 ? $"{number}/{total}" : number.Value.ToString(CultureInfo.CurrentCulture);
@@ -7129,6 +7202,10 @@ public partial class MainWindow : Window
             Add(LocalizationManager.Current.AddedAt, nameof(ContentRow.AddedAt), 110, "addedAt", defaultVisible: false);
             Add(LocalizationManager.Current.ReplayGainTrackColumn, nameof(ContentRow.ReplayGainTrack), 120, "replayGainTrack", right: true, defaultVisible: false);
             Add(LocalizationManager.Current.ReplayGainAlbumColumn, nameof(ContentRow.ReplayGainAlbum), 120, "replayGainAlbum", right: true, defaultVisible: false);
+            grid.Columns.Add(CreatePersonalRatingColumn());
+            var musicBrainzRatingColumn = CreateMusicBrainzRatingColumn();
+            musicBrainzRatingColumn.IsVisible = false;
+            grid.Columns.Add(musicBrainzRatingColumn);
         }
 
         void AddSourceBadge()
@@ -8681,6 +8758,7 @@ public partial class MainWindow : Window
                 .ToList();
 
             ContentDataGrid.ItemsSource = rows;
+            StartAlbumMusicBrainzRatingRefresh(rows);
             ContentCountTextBlock.Text = LocalizationManager.FormatTrackCount(rows.Count);
             UpdateAlphabetIndex(null, false);
             EnsureArtworkHydrated(albumRow);
@@ -8821,6 +8899,7 @@ public partial class MainWindow : Window
             ContentDataGrid.IsVisible = true;
             ApplyColumns("Tracks");
             ContentDataGrid.ItemsSource = rows;
+            StartAlbumMusicBrainzRatingRefresh(rows);
             ContentCountTextBlock.Text = LocalizationManager.FormatTrackCount(rows.Count);
             UpdateAlphabetIndex(null, false);
             ApplyAlbumDetailHeader(result.Album);
@@ -8936,6 +9015,7 @@ public partial class MainWindow : Window
             ContentDataGrid.IsVisible = true;
             ApplyColumns("Tracks");
             ContentDataGrid.ItemsSource = rows;
+            StartAlbumMusicBrainzRatingRefresh(rows);
             ContentCountTextBlock.Text = LocalizationManager.FormatTrackCount(rows.Count);
             UpdateAlphabetIndex(null, false);
             ApplyAlbumDetailHeader(album);
@@ -9176,6 +9256,276 @@ public partial class MainWindow : Window
             CornerRadius = new CornerRadius(0, 16, 0, 16),
             Child = content
         };
+    }
+
+    /// <summary>Creates the interactive five-star personal track-rating column.</summary>
+    /// <returns>A rating column that persists local and Orynivo Server values.</returns>
+    private DataGridColumn CreatePersonalRatingColumn()
+    {
+        var column = new DataGridTemplateColumn
+        {
+            Header = LocalizationManager.Current.PersonalRating,
+            Width = new DataGridLength(118),
+            CellTemplate = new FuncDataTemplate<ContentRow>((row, _) =>
+            {
+                var panel = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Spacing = 0,
+                    HorizontalAlignment = HorizontalAlignment.Left
+                };
+                var buttons = new List<Button>(5);
+                for (var value = 1; value <= 5; value++)
+                {
+                    var starValue = value;
+                    var button = new Button
+                    {
+                        Content = "★",
+                        Width = 21,
+                        Height = 25,
+                        MinWidth = 0,
+                        MinHeight = 0,
+                        Padding = new Thickness(0),
+                        Background = Brushes.Transparent,
+                        BorderThickness = new Thickness(0),
+                        Foreground = FindResource<IBrush>("AppFavoriteBrush"),
+                        FontFamily = new FontFamily("Segoe UI Symbol"),
+                        FontSize = ResolveFontSize("FontSizeBodyStrong"),
+                        Cursor = new Cursor(StandardCursorType.Hand)
+                    };
+                    ToolTip.SetTip(button, $"{LocalizationManager.Current.RatingSetHint}: {value}/5");
+                    button.Click += async (_, e) =>
+                    {
+                        e.Handled = true;
+                        await SetPersonalTrackRatingAsync(row, row.UserRating == starValue ? 0 : starValue);
+                    };
+                    buttons.Add(button);
+                    panel.Children.Add(button);
+                }
+
+                void RefreshStars()
+                {
+                    for (var index = 0; index < buttons.Count; index++)
+                        buttons[index].Opacity = index < row.UserRating ? 1 : 0.28;
+                }
+                RefreshStars();
+                row.PropertyChanged += (_, args) =>
+                {
+                    if (args.PropertyName == nameof(ContentRow.UserRating))
+                        RefreshStars();
+                };
+                return panel;
+            })
+        };
+        column.Tag = "personalRating";
+        return column;
+    }
+
+    /// <summary>Creates the optional cached MusicBrainz rating column with an explicit refresh action.</summary>
+    /// <returns>A community-rating column.</returns>
+    private DataGridColumn CreateMusicBrainzRatingColumn()
+    {
+        var column = new DataGridTemplateColumn
+        {
+            Header = LocalizationManager.Current.MusicBrainzRating,
+            Width = new DataGridLength(138),
+            CellTemplate = new FuncDataTemplate<ContentRow>((row, _) =>
+            {
+                var button = new Button
+                {
+                    Theme = FindResource<ControlTheme>("EntityLinkButtonTheme"),
+                    HorizontalAlignment = HorizontalAlignment.Left
+                };
+                button.Bind(Button.ContentProperty, new Binding(nameof(ContentRow.MusicBrainzRatingDisplay)));
+                ToolTip.SetTip(button, LocalizationManager.Current.MusicBrainzRating);
+                button.Click += async (_, e) =>
+                {
+                    e.Handled = true;
+                    await RefreshMusicBrainzTrackRatingAsync(row);
+                };
+                return button;
+            })
+        };
+        column.Tag = "musicBrainzRating";
+        return column;
+    }
+
+    /// <summary>Persists a personal rating and opportunistically refreshes its MusicBrainz community value.</summary>
+    /// <param name="row">Track row being rated.</param>
+    /// <param name="rating">New zero-to-five-star rating.</param>
+    /// <returns>A task representing persistence and optional metadata refresh.</returns>
+    private async Task SetPersonalTrackRatingAsync(ContentRow row, int rating)
+    {
+        if (row.Id is not long trackId || row.EntityType is not ("Track" or "OrynivoTrack"))
+            return;
+        var previous = row.UserRating;
+        row.UserRating = rating;
+        var saved = row.OrynivoServer is { } server
+            ? await _orynivoClient.UpdateTrackRatingAsync(
+                server,
+                trackId,
+                new OrynivoTrackRatingUpdate(UserRating: rating))
+            : await Task.Run(() =>
+            {
+                using var db = AudioDatabase.OpenDefault();
+                db.SetTrackUserRating(trackId, rating);
+                return true;
+            });
+        if (!saved)
+        {
+            row.UserRating = previous;
+            StatusTextBlock.Text = LocalizationManager.Current.RatingUpdateFailed;
+            return;
+        }
+
+        _ = RefreshMusicBrainzTrackRatingAsync(row);
+    }
+
+    /// <summary>
+    /// Starts a cancellable, sequential MusicBrainz refresh for stale tracks in the
+    /// currently displayed album without delaying album rendering.
+    /// </summary>
+    /// <param name="rows">Displayed album-track rows.</param>
+    private void StartAlbumMusicBrainzRatingRefresh(IReadOnlyList<ContentRow> rows)
+    {
+        _albumMusicBrainzRatingCts?.Cancel();
+        _albumMusicBrainzRatingCts = null;
+
+        var freshAfter = DateTimeOffset.UtcNow
+            .Subtract(MusicBrainzRatingCacheLifetime)
+            .ToUnixTimeSeconds();
+        var staleRows = rows
+            .Where(row => row.Id.HasValue &&
+                          row.EntityType is "Track" or "OrynivoTrack" &&
+                          (!row.MusicBrainzRatingFetchedAt.HasValue ||
+                           row.MusicBrainzRatingFetchedAt.Value < freshAfter))
+            .ToList();
+        if (staleRows.Count == 0)
+            return;
+
+        var cts = new CancellationTokenSource();
+        _albumMusicBrainzRatingCts = cts;
+        _ = RefreshAlbumMusicBrainzRatingsAsync(staleRows, cts);
+    }
+
+    /// <summary>Refreshes album-track ratings sequentially to respect MusicBrainz request limits.</summary>
+    /// <param name="rows">Stale album-track rows.</param>
+    /// <param name="cts">Cancellation source owned by the current album view.</param>
+    /// <returns>A task representing the background refresh.</returns>
+    private async Task RefreshAlbumMusicBrainzRatingsAsync(
+        IReadOnlyList<ContentRow> rows,
+        CancellationTokenSource cts)
+    {
+        try
+        {
+            await Task.Yield();
+            var service = new MusicBrainzRatingService(MusicBrainzRatingHttpClient);
+            var rowsWithMbid = rows
+                .Where(row => Guid.TryParse(row.MusicBrainzTrackId, out _))
+                .ToList();
+            if (rowsWithMbid.Count > 0)
+            {
+                var ratings = await service.GetRatingsAsync(
+                    rowsWithMbid.Select(row => row.MusicBrainzTrackId!),
+                    cts.Token);
+                foreach (var row in rowsWithMbid)
+                {
+                    cts.Token.ThrowIfCancellationRequested();
+                    if (ratings.TryGetValue(row.MusicBrainzTrackId!, out var rating))
+                        await PersistMusicBrainzTrackRatingAsync(row, rating, cts.Token);
+                }
+            }
+
+            foreach (var row in rows.Where(row => !Guid.TryParse(row.MusicBrainzTrackId, out _)))
+            {
+                cts.Token.ThrowIfCancellationRequested();
+                await RefreshMusicBrainzTrackRatingAsync(row, cts.Token);
+            }
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            if (ReferenceEquals(_albumMusicBrainzRatingCts, cts))
+                _albumMusicBrainzRatingCts = null;
+            cts.Dispose();
+        }
+    }
+
+    /// <summary>Resolves and caches the community rating for one track without blocking rating interaction.</summary>
+    /// <param name="row">Track row whose metadata should be resolved.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task representing the MusicBrainz lookup and cache update.</returns>
+    private async Task RefreshMusicBrainzTrackRatingAsync(
+        ContentRow row,
+        CancellationToken cancellationToken = default)
+    {
+        if (row.Id is not long trackId)
+            return;
+        try
+        {
+            var service = new MusicBrainzRatingService(MusicBrainzRatingHttpClient);
+            var result = await service.GetRatingAsync(
+                row.MusicBrainzTrackId,
+                row.Artist,
+                row.Title,
+                row.KnownDuration?.TotalSeconds,
+                cancellationToken);
+            if (result is null)
+                return;
+            await PersistMusicBrainzTrackRatingAsync(row, result, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            // Ratings are optional metadata; network failures leave the existing cache intact.
+        }
+    }
+
+    /// <summary>Persists one client-resolved MusicBrainz result in its owning local or remote library.</summary>
+    /// <param name="row">Track row whose rating was resolved.</param>
+    /// <param name="result">Resolved recording identity and rating.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task representing persistence.</returns>
+    private async Task PersistMusicBrainzTrackRatingAsync(
+        ContentRow row,
+        MusicBrainzTrackRating result,
+        CancellationToken cancellationToken)
+    {
+        if (row.Id is not long trackId)
+            return;
+        var fetchedAt = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var saved = row.OrynivoServer is { } server
+            ? await _orynivoClient.UpdateTrackRatingAsync(
+                server,
+                trackId,
+                new OrynivoTrackRatingUpdate(
+                    MusicBrainzTrackId: result.RecordingMbid,
+                    MusicBrainzRating: result.Rating,
+                    MusicBrainzRatingVotes: result.Votes,
+                    MusicBrainzRatingFetchedAt: fetchedAt),
+                cancellationToken)
+            : await Task.Run(() =>
+            {
+                using var db = AudioDatabase.OpenDefault();
+                db.SetTrackMusicBrainzRating(
+                    trackId,
+                    result.RecordingMbid,
+                    result.Rating,
+                    result.Votes,
+                    fetchedAt);
+                return true;
+            }, cancellationToken);
+        if (!saved)
+            return;
+        row.MusicBrainzTrackId = result.RecordingMbid;
+        row.MusicBrainzRatingVotes = result.Votes;
+        row.MusicBrainzRating = result.Rating;
+        row.MusicBrainzRatingFetchedAt = fetchedAt;
     }
 
     private static string GetAlbumGroupDirectoryLabel(string directory)
@@ -14498,6 +14848,7 @@ public partial class MainWindow : Window
         ArtistInfoTracksDataGrid.Columns.Clear();
         ArtistInfoTracksDataGrid.Columns.Add(CreateFavoriteColumn());
         ArtistInfoTracksDataGrid.Columns.Add(CreateSourceBadgeColumn());
+        ArtistInfoTracksDataGrid.Columns.Add(CreatePersonalRatingColumn());
         ArtistInfoTracksDataGrid.Columns.Add(CreateEntityLinkColumn(
             LocalizationManager.Current.Album,
             nameof(ContentRow.Album),

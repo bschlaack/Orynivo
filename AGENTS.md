@@ -1114,6 +1114,16 @@ fallback or allow client-provided commands/paths to reach the helper.
 - `artists` contains stable artist IDs plus cached profile biography, image
   path, source URL, language, and fetch timestamp
 - `artists`, `albums`, and `tracks` each have a direct `is_favorite` flag
+- `tracks.user_rating` stores the independent personal zero-to-five-star value;
+  cached MusicBrainz community rating, vote count, fetch time, and recording
+  MBID remain separate. Client-side MusicBrainz lookup prefers embedded MBIDs
+  and only persists a text fallback when exact artist/title plus optional
+  duration matching leaves one recording. Local and server scans preserve these
+  values, and the server only caches client-resolved external metadata. Album
+  detail views refresh missing or older-than-30-days track ratings in the
+  background and cancel the series when another album replaces it. Known MBIDs
+  are queried in batches of at most 25; fallback resolution persists a newly
+  identified MBID so subsequent refreshes can use batching.
 - `albums` contains stable album IDs (`id`, `title`, `artist_id`, `year`,
   `artwork_id`, `is_favorite`)
 - `artworks` deduplicates artwork by SHA-256 hash; originals and thumbnails live

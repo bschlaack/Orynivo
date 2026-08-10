@@ -115,6 +115,11 @@ public sealed record OrynivoRecommendationAlbum(
 /// <param name="IsFavorite">Whether the track is marked as favorite on the server.</param>
 /// <param name="IsCueTrack">Whether the track is a CUE or chapter-based virtual segment; the legacy property name is retained for API compatibility.</param>
 /// <param name="ArtistId">Database ID of the primary artist, or <see langword="null"/>.</param>
+/// <param name="UserRating">Server-side personal zero-to-five-star rating.</param>
+/// <param name="MusicBrainzRating">Cached MusicBrainz community rating.</param>
+/// <param name="MusicBrainzRatingVotes">Number of contributing MusicBrainz votes.</param>
+/// <param name="MusicBrainzTrackId">MusicBrainz recording identifier.</param>
+/// <param name="MusicBrainzRatingFetchedAt">Unix timestamp of the latest MusicBrainz rating lookup.</param>
 public sealed record OrynivoTrackInfo(
     long Id,
     string Path,
@@ -146,7 +151,25 @@ public sealed record OrynivoTrackInfo(
     bool IsFavorite = false,
     bool IsCueTrack = false,
     long? ArtistId = null,
-    long? AlbumId = null);
+    long? AlbumId = null,
+    int UserRating = 0,
+    double? MusicBrainzRating = null,
+    int? MusicBrainzRatingVotes = null,
+    string? MusicBrainzTrackId = null,
+    long? MusicBrainzRatingFetchedAt = null);
+
+/// <summary>Rating mutation sent to an Orynivo Server.</summary>
+/// <param name="UserRating">Optional personal zero-to-five-star rating.</param>
+/// <param name="MusicBrainzTrackId">Optional resolved MusicBrainz recording identifier.</param>
+/// <param name="MusicBrainzRating">Optional cached MusicBrainz community rating.</param>
+/// <param name="MusicBrainzRatingVotes">Optional MusicBrainz vote count.</param>
+/// <param name="MusicBrainzRatingFetchedAt">Optional MusicBrainz lookup timestamp.</param>
+public sealed record OrynivoTrackRatingUpdate(
+    int? UserRating = null,
+    string? MusicBrainzTrackId = null,
+    double? MusicBrainzRating = null,
+    int? MusicBrainzRatingVotes = null,
+    long? MusicBrainzRatingFetchedAt = null);
 
 /// <summary>Lightweight remote track entry used for folder-tree construction.</summary>
 /// <param name="Id">Database ID of the track.</param>
@@ -1209,6 +1232,36 @@ public sealed class OrynivoServerClient : IDisposable
                 server, $"/api/tracks/{trackId}/lyrics", cancellationToken);
         }
         catch { return null; }
+    }
+
+    /// <summary>Stores personal or client-resolved MusicBrainz rating data on a remote server.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="trackId">Server-side track identifier.</param>
+    /// <param name="update">Rating fields to update.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when the update was accepted.</returns>
+    public async Task<bool> UpdateTrackRatingAsync(
+        OrynivoServerSettings server,
+        long trackId,
+        OrynivoTrackRatingUpdate update,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(
+                HttpMethod.Put,
+                BuildUrl(server, $"/api/tracks/{trackId}/rating"))
+            {
+                Content = JsonContent.Create(update, options: JsonOptions)
+            };
+            request.Headers.Add("X-Api-Key", server.ApiKey);
+            using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>Gets cached or newly generated waveform data for a remote server track.</summary>

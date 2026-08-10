@@ -30,6 +30,11 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
 - Keep external metadata/artwork searches on the client; the server stores and
   serves client-provided results. Authenticated album/artist artwork PUT and
   DELETE endpoints are the shared remote upload/removal surface.
+- `PUT /api/tracks/{id}/rating` stores personal stars and client-resolved
+  MusicBrainz recording/rating metadata. The server never contacts MusicBrainz;
+  all track DTOs include the rating fetch timestamp, and genre-cloud candidates
+  return cached values so desktop
+  recommendation scoring works identically for local and remote libraries.
 - Keep `SkiaSharp.NativeAssets.Linux.NoDependencies`; do not add an ImageMagick
   runtime dependency.
 - Linux service data belongs under `ORYNIVO_DATA_DIR=/var/lib/orynivo-server`.

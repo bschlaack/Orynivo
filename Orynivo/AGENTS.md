@@ -338,6 +338,16 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 - Dashboard Recently Played cards show the persisted album below the artist.
   When the history identity can resolve a local, Orynivo Server, or Plex album,
   the album name opens that source's album detail without triggering card playback.
+- Shared local and Orynivo Server track rows carry a personal zero-to-five
+  rating plus cached MusicBrainz recording rating metadata. The interactive
+  star column persists through the owning database/API. MusicBrainz lookup runs
+  on the client, prefers the recording MBID, and accepts an artist/title fallback
+  only when optional duration filtering leaves one exact result. Server scans
+  must preserve client-resolved recording MBIDs and all rating fields. Album
+  detail rendering starts a cancellable refresh only after track rows are bound;
+  values fetched within 30 days must not be queried again. Group known MBIDs in
+  batches of at most 25, then resolve missing MBIDs conservatively one track at
+  a time and persist every unambiguous identity.
 - Dashboard album recommendations rank compact local and Orynivo Server album
   candidates against genre listening time from the selected history period.
   Already-heard albums are de-emphasized, and the optional mood selector applies

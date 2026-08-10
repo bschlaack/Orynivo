@@ -180,6 +180,18 @@ public sealed class TrackRecord
     /// <summary>MusicBrainz track/recording ID.</summary>
     public string? MusicBrainzTrackId   { get; set; }
 
+    /// <summary>Personal zero-to-five-star rating; zero means unrated.</summary>
+    public int UserRating { get; set; }
+
+    /// <summary>MusicBrainz community rating on its zero-to-five scale.</summary>
+    public double? MusicBrainzRating { get; set; }
+
+    /// <summary>Number of MusicBrainz votes contributing to <see cref="MusicBrainzRating"/>.</summary>
+    public int? MusicBrainzRatingVotes { get; set; }
+
+    /// <summary>Unix timestamp of the most recent MusicBrainz rating lookup.</summary>
+    public long? MusicBrainzRatingFetchedAt { get; set; }
+
     /// <summary>MusicBrainz release ID; used for Cover Art Archive lookups.</summary>
     public string? MusicBrainzReleaseId { get; set; }
 

@@ -226,6 +226,30 @@ public static class LibraryEndpoints
             return updated ? Results.Ok() : Results.NotFound();
         });
 
+        api.MapPut("/tracks/{trackId:long}/rating", (long trackId, TrackRatingUpdateRequest request) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            if (db.GetTrackById(trackId) is null)
+                return Results.NotFound();
+            if (request.UserRating is int userRating)
+            {
+                if (userRating is < 0 or > 5)
+                    return Results.BadRequest();
+                db.SetTrackUserRating(trackId, userRating);
+            }
+            if (!string.IsNullOrWhiteSpace(request.MusicBrainzTrackId) &&
+                request.MusicBrainzRatingFetchedAt is long fetchedAt)
+            {
+                db.SetTrackMusicBrainzRating(
+                    trackId,
+                    request.MusicBrainzTrackId,
+                    request.MusicBrainzRating,
+                    request.MusicBrainzRatingVotes,
+                    fetchedAt);
+            }
+            return Results.Ok(db.GetTrackRating(trackId));
+        });
+
         // --- Folders -------------------------------------------------------
 
         api.MapGet("/folders/tracks", () =>
@@ -503,6 +527,11 @@ public static class LibraryEndpoints
         t.IsFavorite,
         t.ArtistId,
         t.AlbumId,
+        t.UserRating,
+        t.MusicBrainzRating,
+        t.MusicBrainzRatingVotes,
+        t.MusicBrainzTrackId,
+        t.MusicBrainzRatingFetchedAt,
         IsCueTrack = IsVirtualSegmentPath(t.Path)
     };
 
@@ -532,6 +561,10 @@ public static class LibraryEndpoints
         t.Channels,
         t.Format,
         t.FileSize,
+        t.UserRating,
+        t.MusicBrainzRating,
+        t.MusicBrainzRatingVotes,
+        t.MusicBrainzTrackId,
         IsCueTrack = IsVirtualSegmentPath(t.Path)
     };
 
@@ -672,6 +705,19 @@ public sealed record ArtistRenameResponse(ArtistRenameResult? Result, object? Ma
 public sealed record TrackLyricsUpdateRequest(
     string? PlainLyrics,
     string? SyncedLyrics);
+
+/// <summary>Request body for personal and cached MusicBrainz track ratings.</summary>
+/// <param name="UserRating">Optional personal zero-to-five-star rating.</param>
+/// <param name="MusicBrainzTrackId">Optional resolved MusicBrainz recording identifier.</param>
+/// <param name="MusicBrainzRating">Optional cached MusicBrainz community rating.</param>
+/// <param name="MusicBrainzRatingVotes">Optional MusicBrainz vote count.</param>
+/// <param name="MusicBrainzRatingFetchedAt">Optional MusicBrainz lookup timestamp.</param>
+public sealed record TrackRatingUpdateRequest(
+    int? UserRating,
+    string? MusicBrainzTrackId,
+    double? MusicBrainzRating,
+    int? MusicBrainzRatingVotes,
+    long? MusicBrainzRatingFetchedAt);
 
 /// <summary>Request body for creating a regular server playlist.</summary>
 /// <param name="Name">Playlist display name.</param>

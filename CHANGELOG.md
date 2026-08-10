@@ -4,6 +4,24 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Added persistent personal zero-to-five-star track ratings for local and
+  Orynivo Server libraries. Shared track tables expose interactive stars, while
+  cached MusicBrainz recording ratings and vote counts can be shown as a
+  selectable column. MusicBrainz lookup prefers embedded recording MBIDs and
+  only accepts an unambiguous artist/title/duration fallback; resolved MBIDs
+  survive later scans. Personal ratings strongly influence Infinite Mix and
+  community ratings provide a smaller secondary signal. Opening an album now
+  refreshes missing or older-than-30-days MusicBrainz ratings for its tracks in
+  the background without delaying the album view or player. Known recording
+  MBIDs are requested in bounded album batches, while metadata fallback stores
+  each newly resolved MBID so later refreshes can join the batch path.
+
+### Fixed
+
 ## [0.35.4] - 2026-08-10
 
 ### Added

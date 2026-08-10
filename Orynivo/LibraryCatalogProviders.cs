@@ -92,6 +92,11 @@ internal sealed record LibraryCatalogAlbum(
 /// <param name="KnownDuration">Authoritative playback duration.</param>
 /// <param name="ArtistId">Provider-local primary-artist identifier, or <see langword="null"/>.</param>
 /// <param name="AlbumId">Provider-local album identifier, or <see langword="null"/>.</param>
+/// <param name="UserRating">Personal zero-to-five-star rating.</param>
+/// <param name="MusicBrainzRating">Cached MusicBrainz community rating.</param>
+/// <param name="MusicBrainzRatingVotes">Number of contributing MusicBrainz votes.</param>
+/// <param name="MusicBrainzTrackId">MusicBrainz recording identifier.</param>
+/// <param name="MusicBrainzRatingFetchedAt">Unix timestamp of the latest MusicBrainz rating lookup.</param>
 internal sealed record LibraryCatalogTrack(
     LibraryCatalogSource Source,
     long Id,
@@ -124,7 +129,12 @@ internal sealed record LibraryCatalogTrack(
     string? ReplayGainAlbum,
     TimeSpan? KnownDuration = null,
     long? ArtistId = null,
-    long? AlbumId = null);
+    long? AlbumId = null,
+    int UserRating = 0,
+    double? MusicBrainzRating = null,
+    int? MusicBrainzRatingVotes = null,
+    string? MusicBrainzTrackId = null,
+    long? MusicBrainzRatingFetchedAt = null);
 
 /// <summary>Common catalog surface for local and remote music libraries.</summary>
 internal interface ILibraryCatalogProvider
@@ -361,7 +371,12 @@ internal sealed class LocalLibraryCatalogProvider : ILibraryCatalogProvider
         track.ReplayGainAlbum,
         track.Duration.HasValue ? TimeSpan.FromSeconds(track.Duration.Value) : null,
         track.ArtistId,
-        track.AlbumId);
+        track.AlbumId,
+        track.UserRating,
+        track.MusicBrainzRating,
+        track.MusicBrainzRatingVotes,
+        track.MusicBrainzTrackId,
+        track.MusicBrainzRatingFetchedAt);
 }
 
 /// <summary>Remote Orynivo Server-backed catalog provider.</summary>
@@ -552,6 +567,11 @@ internal sealed class OrynivoServerLibraryCatalogProvider : ILibraryCatalogProvi
             track.ReplayGainAlbum,
             track.Duration.HasValue ? TimeSpan.FromSeconds(track.Duration.Value) : null,
             track.ArtistId,
-            track.AlbumId);
+            track.AlbumId,
+            track.UserRating,
+            track.MusicBrainzRating,
+            track.MusicBrainzRatingVotes,
+            track.MusicBrainzTrackId,
+            track.MusicBrainzRatingFetchedAt);
     }
 }

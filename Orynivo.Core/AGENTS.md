@@ -41,6 +41,16 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   Existing target artwork wins; favorites are combined rather than cleared.
 - Keep compact query models compact; do not add artwork BLOBs, lyrics, or full
   records to list/facet/folder queries.
+- Track scans preserve personal ratings, cached MusicBrainz rating/vote data,
+  and a client-resolved recording MBID when the media tag has no recording ID.
+  `MusicBrainzRatingService` prefers a valid recording MBID and permits fallback
+  matching only for one exact artist/title candidate compatible with duration.
+  Community ratings use MusicBrainz's zero-to-five scale and remain separate
+  from the personal zero-to-five integer rating. Compact track list/streaming
+  DTOs carry the rating fetch timestamp so clients can enforce cache freshness.
+  `MusicBrainzRatingService.GetRatingsAsync` batches at most 25 known recording
+  MBIDs, and metadata fallback returns the resolved MBID plus rating from the
+  same search response instead of issuing a redundant lookup.
 - Album catalog queries, recent-album queries, detail lookup, and Dashboard
   album totals expose only albums referenced by at least one indexed track.
   Artist catalog rows and artist totals likewise require a track-backed album;

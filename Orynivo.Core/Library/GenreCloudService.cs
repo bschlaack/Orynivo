@@ -9,7 +9,16 @@ namespace Orynivo.Library;
 /// <param name="TrackId">Provider-local track identifier.</param>
 /// <param name="GenreKey">Normalized deepest taxonomy key assigned to the track.</param>
 /// <param name="IsFavorite">Whether the provider marks the track as a favorite.</param>
-public sealed record GenreCloudTrackCandidate(long TrackId, string GenreKey, bool IsFavorite);
+/// <param name="UserRating">Personal zero-to-five-star rating.</param>
+/// <param name="MusicBrainzRating">MusicBrainz community rating on a zero-to-five scale.</param>
+/// <param name="MusicBrainzRatingVotes">Number of contributing MusicBrainz votes.</param>
+public sealed record GenreCloudTrackCandidate(
+    long TrackId,
+    string GenreKey,
+    bool IsFavorite,
+    int UserRating = 0,
+    double? MusicBrainzRating = null,
+    int? MusicBrainzRatingVotes = null);
 
 /// <summary>Represents one visible child in an interactive genre cloud.</summary>
 /// <param name="Key">Stable language-independent taxonomy key.</param>
@@ -136,7 +145,10 @@ public static class GenreCloudService
             .Select(item => new GenreCloudTrackCandidate(
                 item.Track.Id,
                 item.Genres.First(key => selected is null || BelongsToSelection(key, selected)),
-                item.Track.IsFavorite))
+                item.Track.IsFavorite,
+                item.Track.UserRating,
+                item.Track.MusicBrainzRating,
+                item.Track.MusicBrainzRatingVotes))
             .ToList();
 
         return new GenreCloudSnapshot(selected, BuildBreadcrumb(selected), nodes, candidates);

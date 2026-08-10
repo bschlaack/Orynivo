@@ -290,6 +290,22 @@ public partial class MainWindow
             : IsOrynivoFavorite(server, "Track", candidate.TrackId);
         if (profile.WeightFavorites && isFavorite)
             score += 35;
+        // Personal ratings are the strongest explicit signal. Community ratings are
+        // deliberately weaker because their vote count is not part of the compact cloud payload.
+        score += candidate.UserRating switch
+        {
+            5 => 90,
+            4 => 48,
+            3 => 8,
+            2 => -55,
+            1 => -120,
+            _ => 0
+        };
+        if (candidate.MusicBrainzRating is double communityRating)
+        {
+            var voteConfidence = Math.Min(1d, Math.Log10(1d + candidate.MusicBrainzRatingVotes.GetValueOrDefault()) / 2d);
+            score += (communityRating - 3d) * 12d * voteConfidence;
+        }
         if (profile.PreferRareTracks)
         {
             var playCount = playCounts.GetValueOrDefault(BuildInfiniteMixTrackKey(server, candidate.TrackId));
