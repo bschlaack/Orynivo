@@ -30,7 +30,9 @@ the ability to reach that library from any device on the local network.
 - Local library, playlists, smart playlists and full-text search
 - Unified artist detail pages with an album-style image-and-biography hero,
   synchronized favorites, image management, refreshable biographies, and
-  combined local/Orynivo Server albums. Manual biography refresh can use an
+  combined local/Orynivo Server albums. Missing album covers can be searched
+  directly from these cards, and a source-aware track table below them lists
+  the artist's tracks ordered by album and track number. Manual biography refresh can use an
   editable external lookup name without changing the library artist name
   while the artist's albums render before profile loading and remain available
   throughout it; profile text follows German, English, French, or Spanish

@@ -3184,6 +3184,7 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
                         <Border Grid.Row="0"
                                 MinHeight="420"
@@ -3302,6 +3303,33 @@
                                        Foreground="{DynamicResource AppPrimaryTextBrush}"/>
                             <WrapPanel x:Name="ArtistInfoAlbumsPanel"
                                        Orientation="Horizontal"/>
+                        </StackPanel>
+                        <StackPanel x:Name="ArtistInfoTracksSection"
+                                    Grid.Row="2"
+                                    Margin="0,24,0,0"
+                                    HorizontalAlignment="Stretch"
+                                    IsVisible="False">
+                            <TextBlock Text="{DynamicResource L_Tracks}"
+                                       FontSize="{DynamicResource FontSizeTitle}"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,14"
+                                       Foreground="{DynamicResource AppPrimaryTextBrush}"/>
+                            <DataGrid x:Name="ArtistInfoTracksDataGrid"
+                                      Height="460"
+                                      Background="{DynamicResource AppContentBrush}"
+                                      BorderBrush="{DynamicResource AppGridLineBrush}"
+                                      BorderThickness="1"
+                                      RowHeight="40"
+                                      ColumnHeaderHeight="44"
+                                      GridLinesVisibility="Horizontal"
+                                      HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
+                                      AutoGenerateColumns="False"
+                                      CanUserResizeColumns="True"
+                                      IsReadOnly="True"
+                                      SelectionMode="Single"
+                                      FontSize="{DynamicResource FontSizeCaption}"
+                                      LoadingRow="ContentDataGrid_OnLoadingRow"
+                                      DoubleTapped="ContentDataGrid_OnMouseDoubleClick"/>
                         </StackPanel>
                     </Grid>
                 </ScrollViewer>

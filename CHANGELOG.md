@@ -4,6 +4,21 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Extended the unified artist detail page with source-aware tracks from the
+  local library and matching Orynivo Servers, ordered by album, disc, and track
+  number. Album cards on that page now also offer the existing direct cover
+  search action when artwork is missing.
+
+### Fixed
+
+- Removed the Fluent DataGrid header's permanent empty sort-icon reservation,
+  preventing it from covering or truncating labels in narrow columns such as
+  the source column while preserving sorting and column resizing.
+
 ## [0.35.3] - 2026-08-08
 
 ### Changed
