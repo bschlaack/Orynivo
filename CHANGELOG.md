@@ -11,7 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Extended the unified artist detail page with source-aware tracks from the
   local library and matching Orynivo Servers, ordered by album, disc, and track
   number. Album cards on that page now also offer the existing direct cover
-  search action when artwork is missing.
+  search action when artwork is missing, plus the same favorite control and
+  local/Orynivo Server source badge as the main Albums artwork view.
 
 ### Fixed
 

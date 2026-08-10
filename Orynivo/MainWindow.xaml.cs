@@ -14649,15 +14649,22 @@ public partial class MainWindow : Window
         IReadOnlyList<(LibraryCatalogAlbum Album, OrynivoServerSettings? Server)> sources)
     {
         ArtistInfoAlbumsPanel.Children.Clear();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var source in sources
-                     .OrderBy(item => item.Album.Year ?? int.MaxValue)
-                     .ThenBy(item => item.Album.Title, StringComparer.CurrentCultureIgnoreCase))
+        var groups = sources
+            .GroupBy(source =>
+                $"{ArtistNameNormalizer.CreateComparisonKey(source.Album.Title)}|{source.Album.Year}",
+                StringComparer.Ordinal)
+            .OrderBy(group => group.Min(item => item.Album.Year ?? int.MaxValue))
+            .ThenBy(group => group.First().Album.Title, StringComparer.CurrentCultureIgnoreCase);
+        foreach (var group in groups)
         {
-            var key = $"{ArtistNameNormalizer.CreateComparisonKey(source.Album.Title)}|{source.Album.Year}";
-            if (!seen.Add(key))
-                continue;
-            ArtistInfoAlbumsPanel.Children.Add(BuildArtistInfoAlbumCard(source.Album, source.Server));
+            var groupedSources = group
+                .OrderBy(item => item.Server is null ? 0 : 1)
+                .ToList();
+            var primary = groupedSources[0];
+            ArtistInfoAlbumsPanel.Children.Add(BuildArtistInfoAlbumCard(
+                primary.Album,
+                primary.Server,
+                groupedSources));
         }
 
         ArtistInfoAlbumsSection.IsVisible = ArtistInfoAlbumsPanel.Children.Count > 0;
@@ -14718,10 +14725,33 @@ public partial class MainWindow : Window
     /// <summary>Builds one album card opened by double-click from the artist-info album strip.</summary>
     /// <param name="album">The album to render.</param>
     /// <param name="server">Owning remote server, or <see langword="null"/> for a local album.</param>
+    /// <param name="logicalSources">Equivalent local and remote album identities represented by the card.</param>
     /// <returns>The card control.</returns>
-    private Control BuildArtistInfoAlbumCard(LibraryCatalogAlbum album, OrynivoServerSettings? server)
+    private Control BuildArtistInfoAlbumCard(
+        LibraryCatalogAlbum album,
+        OrynivoServerSettings? server,
+        IReadOnlyList<(LibraryCatalogAlbum Album, OrynivoServerSettings? Server)>? logicalSources = null)
     {
         var row = ToCatalogAlbumContentRow(album, server);
+        var representedSources = logicalSources is { Count: > 0 }
+            ? logicalSources
+            : [(album, server)];
+        var distinctSourceCount = representedSources
+            .Select(source => source.Server?.Id ?? LocalSourceKey)
+            .Distinct(StringComparer.Ordinal)
+            .Count();
+        if (distinctSourceCount > 1)
+        {
+            row.EntityType = "UnifiedAlbum";
+            row.LogicalAlbumIds = representedSources.Select(source => source.Album.Id).Distinct().ToList();
+            row.LogicalAlbumParts = representedSources
+                .Select(source => new LogicalAlbumPart(
+                    source.Album.Id,
+                    source.Album.ArtistId,
+                    source.Server))
+                .ToList();
+            row.IsFavorite = representedSources.Any(source => source.Album.IsFavorite);
+        }
         if (server is null)
         {
             var localPath = !string.IsNullOrWhiteSpace(album.ThumbnailPath) && File.Exists(album.ThumbnailPath)
@@ -14815,7 +14845,7 @@ public partial class MainWindow : Window
         titleButton.Click += (_, e) =>
         {
             e.Handled = true;
-            _ = OpenArtistInfoAlbumAsync(album, server);
+            _ = OpenArtistInfoAlbumCardAsync(album, server, row);
         };
         stack.Children.Add(titleButton);
 
@@ -14824,8 +14854,58 @@ public partial class MainWindow : Window
             Text       = album.Year is int year && year > 0 ? year.ToString(CultureInfo.CurrentCulture) : string.Empty,
             FontSize   = 11,
             Foreground = FindResource<IBrush>("AppMutedTextBrush"),
-            Margin     = new Thickness(10, 0, 10, 10)
+            Margin     = new Thickness(10, 0, 10, 2)
         });
+
+        var footer = new Grid { Margin = new Thickness(8, 2, 8, 8) };
+        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var favoriteButton = new Button
+        {
+            Tag = row,
+            Width = 28,
+            Height = 24,
+            MinWidth = 0,
+            MinHeight = 0,
+            Padding = new Thickness(0),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            HorizontalContentAlignment = HorizontalAlignment.Center,
+            VerticalContentAlignment = VerticalAlignment.Center,
+            Background = Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            Foreground = FindResource<IBrush>("AppFavoriteBrush"),
+            FontFamily = new FontFamily("Segoe UI Symbol"),
+            FontSize = ResolveFontSize("FontSizeBodyStrong"),
+            Cursor = new Cursor(StandardCursorType.Hand)
+        };
+        favoriteButton.Bind(Button.ContentProperty, new Binding(nameof(ContentRow.FavoriteGlyph)) { Source = row });
+        favoriteButton.Click += FavoriteButton_OnClick;
+        footer.Children.Add(favoriteButton);
+
+        var sourceBadgeText = new TextBlock
+        {
+            FontSize = 10,
+            FontWeight = FontWeight.SemiBold,
+            Foreground = FindResource<IBrush>("AppAccentBrush"),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        sourceBadgeText.Bind(TextBlock.TextProperty, new Binding(nameof(ContentRow.SourceBadge)) { Source = row });
+        var sourceBadge = new Border
+        {
+            Height = 20,
+            MinWidth = 26,
+            Padding = new Thickness(6, 0),
+            CornerRadius = new CornerRadius(10),
+            Background = FindResource<IBrush>("AppSurfaceHoverBrush"),
+            BorderBrush = FindResource<IBrush>("AppAccentBrush"),
+            BorderThickness = new Thickness(1),
+            Child = sourceBadgeText
+        };
+        ToolTip.SetTip(sourceBadge, row.SourceName);
+        Grid.SetColumn(sourceBadge, 1);
+        footer.Children.Add(sourceBadge);
+        stack.Children.Add(footer);
 
         card.Child = stack;
         card.DoubleTapped += (_, e) =>
@@ -14833,9 +14913,31 @@ public partial class MainWindow : Window
             if (FindAncestor<Button>(e.Source as Visual) is not null)
                 return;
             e.Handled = true;
-            _ = OpenArtistInfoAlbumAsync(album, server);
+            _ = OpenArtistInfoAlbumCardAsync(album, server, row);
         };
         return card;
+    }
+
+    /// <summary>Opens every represented source for a unified card, or the single owning album otherwise.</summary>
+    /// <param name="album">Primary album represented by the card.</param>
+    /// <param name="server">Primary album's remote server, or <see langword="null"/> for local.</param>
+    /// <param name="row">Source-aware card row carrying optional logical album parts.</param>
+    /// <returns>A task representing the navigation.</returns>
+    private async Task OpenArtistInfoAlbumCardAsync(
+        LibraryCatalogAlbum album,
+        OrynivoServerSettings? server,
+        ContentRow row)
+    {
+        if (row.EntityType != "UnifiedAlbum")
+        {
+            await OpenArtistInfoAlbumAsync(album, server);
+            return;
+        }
+
+        await OpenLogicalAlbumTracksAsync(row);
+        ArtistInfoView.IsVisible = false;
+        _artistInfoUnifiedArtistName = null;
+        BackButton.IsVisible = true;
     }
 
     /// <summary>Decodes a local artist-detail album image off the UI thread and applies it to its card row.</summary>

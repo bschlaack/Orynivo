@@ -196,8 +196,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 - The artist detail hero intentionally has a roughly 420 px minimum height and
   320 px image; its biography remains independently scrollable and the album
   strip starts below the hero.
-- Artist-detail album cards expose the same missing-artwork cover-search action
-  as the shared Albums artwork cards. Below the album strip, the detail page
+- Artist-detail album cards expose the same missing-artwork cover-search,
+  favorite, and source-badge controls as the shared Albums artwork cards.
+  Equivalent local/server albums show `L+OS`, apply favorite changes to every
+  represented identity, and open their combined logical album detail. Below the album strip, the detail page
   shows one source-aware local/Orynivo Server track table ordered by album,
   disc, and track number. Its rows reuse the normal favorite, source, album-link,
   context-menu, and double-click playback behavior; track loading must not block
