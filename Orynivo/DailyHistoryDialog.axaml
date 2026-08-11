@@ -178,6 +178,7 @@
                       ItemsSource="{Binding Rows}"
                       IsVisible="{Binding ShowGrid}"
                       AutoGenerateColumns="False"
+                      CanUserSortColumns="True"
                       IsReadOnly="True"
                       CanUserReorderColumns="True"
                       CanUserResizeColumns="True"
@@ -187,13 +188,15 @@
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="{DynamicResource L_PlayedAt}"
                                         Binding="{Binding PlayedAt}"
+                                        SortMemberPath="PlayedAtSort"
                                         Tag="playedAt"
                                         Width="90"/>
                     <DataGridTextColumn Header="{DynamicResource L_MediaType}"
                                         Binding="{Binding MediaType}"
+                                        SortMemberPath="MediaType"
                                         Tag="mediaType"
                                         Width="90"/>
-                    <DataGridTemplateColumn Header="{DynamicResource L_Title}" Tag="title" Width="2*">
+                    <DataGridTemplateColumn Header="{DynamicResource L_Title}" SortMemberPath="Title" Tag="title" Width="2*">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <Grid>
@@ -212,7 +215,7 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Header="{DynamicResource L_Artist}" Tag="artist" Width="*">
+                    <DataGridTemplateColumn Header="{DynamicResource L_Artist}" SortMemberPath="Artist" Tag="artist" Width="*">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <Grid>
@@ -231,7 +234,7 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Header="{DynamicResource L_Album}" Tag="album" Width="*">
+                    <DataGridTemplateColumn Header="{DynamicResource L_Album}" SortMemberPath="Album" Tag="album" Width="*">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <Grid>
@@ -252,10 +255,12 @@
                     </DataGridTemplateColumn>
                     <DataGridTextColumn Header="{DynamicResource L_ListenedDuration}"
                                         Binding="{Binding ListenedDuration}"
+                                        SortMemberPath="ListenedDurationSort"
                                         Tag="listened"
                                         Width="100"/>
                     <DataGridTextColumn Header="{DynamicResource L_Duration}"
                                         Binding="{Binding TotalDuration}"
+                                        SortMemberPath="TotalDurationSort"
                                         Tag="duration"
                                         Width="100"/>
                 </DataGrid.Columns>

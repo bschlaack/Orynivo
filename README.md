@@ -1168,6 +1168,12 @@ periodic full scans reconcile changes that a watcher may have missed. On the
 server, startup and manually requested multi-root scans temporarily suspend
 watcher processing for the complete pass, so periodic reconciliation cannot
 interleave between roots or make the reported foreground scan appear stalled.
+Desktop tables can be sorted ascending or descending by clicking their data
+column headers. Formatted numeric, date, duration, source, favorite, and rating
+columns sort by their underlying values rather than their rendered labels.
+Right-clicking the artist-detail track table header opens the same complete
+track-column chooser used by the main track views; its selection, order, and
+widths are stored independently for that detail table.
 Each local directory also offers **Re-read metadata** in Settings. This explicit
 maintenance scan processes timestamp-unchanged files again and is useful when a
 database contains stale tags from an older scan. It preserves track favorites

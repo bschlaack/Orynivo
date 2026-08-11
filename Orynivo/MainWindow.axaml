@@ -1905,13 +1905,14 @@
                               GridLinesVisibility="Horizontal"
                               HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
                               AutoGenerateColumns="False"
+                              CanUserSortColumns="True"
                               CanUserResizeColumns="True"
                               IsReadOnly="True"
                               SelectionMode="Single"
                               LoadingRow="TrackDataGrid_OnLoadingRow"
                               DoubleTapped="RadioStationsDataGrid_OnMouseDoubleClick">
                         <DataGrid.Columns>
-                            <DataGridTemplateColumn Width="70">
+                            <DataGridTemplateColumn Width="70" SortMemberPath="Name">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <Border Width="38"
@@ -1958,6 +1959,7 @@
                                                 Width="100"/>
                             <DataGridTextColumn Header="{DynamicResource L_Bitrate}"
                                                 Binding="{Binding BitrateSummary}"
+                                                SortMemberPath="Bitrate"
                                                 Tag="bitrate"
                                                 IsVisible="False"
                                                 Width="90"/>
@@ -1971,7 +1973,7 @@
                                                 Tag="homepage"
                                                 IsVisible="False"
                                                 Width="220"/>
-                            <DataGridTemplateColumn Width="120">
+                            <DataGridTemplateColumn Width="120" CanUserSort="False">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <Button Content="{DynamicResource L_PlayRadio}"
@@ -1982,7 +1984,7 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTemplateColumn Width="180">
+                            <DataGridTemplateColumn Width="180" CanUserSort="False">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <Button Content="{DynamicResource L_AddToOwnRadios}"
@@ -2173,12 +2175,13 @@
                               GridLinesVisibility="Horizontal"
                               HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
                               AutoGenerateColumns="False"
+                              CanUserSortColumns="True"
                               CanUserResizeColumns="True"
                               IsReadOnly="True"
                               SelectionMode="Single"
                               DoubleTapped="PodcastsDataGrid_OnMouseDoubleClick">
                         <DataGrid.Columns>
-                            <DataGridTemplateColumn Width="78">
+                            <DataGridTemplateColumn Width="78" SortMemberPath="Name">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <Border Width="48"
@@ -2223,7 +2226,7 @@
                                                 Tag="feed"
                                                 IsVisible="False"
                                                 Width="280"/>
-                            <DataGridTemplateColumn Width="160">
+                            <DataGridTemplateColumn Width="160" CanUserSort="False">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <Button Content="{DynamicResource L_ShowEpisodes}"
@@ -2234,7 +2237,7 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTemplateColumn Width="180">
+                            <DataGridTemplateColumn Width="180" CanUserSort="False">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <Button Content="{DynamicResource L_AddToMyPodcasts}"
@@ -2336,6 +2339,7 @@
                                   GridLinesVisibility="Horizontal"
                                   HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
                             AutoGenerateColumns="False"
+                            CanUserSortColumns="True"
                             CanUserResizeColumns="True"
                                   IsReadOnly="True"
                                   SelectionMode="Single"
@@ -2352,14 +2356,17 @@
                                                     Width="*"/>
                                 <DataGridTextColumn Header="{DynamicResource L_Published}"
                                                     Binding="{Binding Published}"
+                                                    SortMemberPath="PublishedSort"
                                                     Tag="published"
                                                     Width="120"/>
                                 <DataGridTextColumn Header="{DynamicResource L_Duration}"
                                                     Binding="{Binding Duration}"
+                                                    SortMemberPath="DurationSort"
                                                     Tag="duration"
                                                     Width="90"/>
                                 <DataGridTextColumn Header="{DynamicResource L_Progress}"
                                                     Binding="{Binding Progress}"
+                                                    SortMemberPath="ProgressSort"
                                                     Tag="progress"
                                                     Width="130"/>
                             </DataGrid.Columns>
@@ -2567,6 +2574,7 @@
                           GridLinesVisibility="Horizontal"
                           HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
                           AutoGenerateColumns="False"
+                          CanUserSortColumns="True"
                           CanUserResizeColumns="True"
                           IsReadOnly="True"
                           SelectionMode="Single"
@@ -2613,6 +2621,7 @@
                                       Background="{DynamicResource AppSurfaceBrush}"
                                       BorderThickness="0"
                                       AutoGenerateColumns="False"
+                                      CanUserSortColumns="True"
                                       CanUserResizeColumns="True"
                                       IsReadOnly="True"
                                       HeadersVisibility="Column"
@@ -2645,6 +2654,7 @@
                                       Background="{DynamicResource AppSurfaceBrush}"
                                       BorderThickness="0"
                                       AutoGenerateColumns="False"
+                                      CanUserSortColumns="True"
                                       CanUserResizeColumns="True"
                                       IsReadOnly="True"
                                       HeadersVisibility="Column"
@@ -2676,6 +2686,7 @@
                                       Background="{DynamicResource AppSurfaceBrush}"
                                       BorderThickness="0"
                                       AutoGenerateColumns="False"
+                                      CanUserSortColumns="True"
                                       CanUserResizeColumns="True"
                                       IsReadOnly="True"
                                       HeadersVisibility="Column"
@@ -3324,6 +3335,7 @@
                                       GridLinesVisibility="Horizontal"
                                       HorizontalGridLinesBrush="{DynamicResource AppGridLineBrush}"
                                       AutoGenerateColumns="False"
+                                      CanUserSortColumns="True"
                                       CanUserResizeColumns="True"
                                       IsReadOnly="True"
                                       SelectionMode="Single"

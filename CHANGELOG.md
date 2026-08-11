@@ -4,6 +4,19 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- All desktop data tables now support column-header sorting. Linked entity,
+  favorite, source, rating, artwork, date, duration, track-number, and formatted
+  technical columns use explicit semantic sort keys instead of display-text
+  ordering; action-only columns remain unsortable. The artist-detail track
+  table now also exposes the complete shared track-column chooser from its
+  header context menu and persists its own visibility, order, and widths.
+
+### Fixed
+
 ## [0.36.3] - 2026-08-11
 
 ### Fixed

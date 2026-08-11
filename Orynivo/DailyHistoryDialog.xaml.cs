@@ -51,6 +51,12 @@ public partial class DailyHistoryDialog : Window
         public required string Album { get; init; }
         public required string ListenedDuration { get; init; }
         public required string TotalDuration { get; init; }
+        /// <summary>Gets the original playback timestamp used for chronological table sorting.</summary>
+        public DateTime PlayedAtSort => Entry.StartedAt;
+        /// <summary>Gets the listened duration in seconds used for numeric table sorting.</summary>
+        public double ListenedDurationSort => Entry.ListenedSeconds;
+        /// <summary>Gets the media duration in seconds used for numeric table sorting.</summary>
+        public double TotalDurationSort => Entry.DurationSeconds ?? double.PositiveInfinity;
         public bool CanOpenTrack =>
             Entry.TrackId.HasValue &&
             (File.Exists(Entry.Path) ||

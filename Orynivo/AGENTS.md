@@ -230,6 +230,9 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   disc, and track number. Its rows reuse the normal favorite, source, album-link,
   context-menu, and double-click playback behavior; track loading must not block
   profile rendering or discard already loaded album cards when one source fails.
+  That embedded table uses the complete shared Tracks column set and a dedicated
+  `ArtistInfoTracks` column-settings key, so header right-click selection,
+  display order, and widths persist independently from the main Tracks table.
 - `ShowUnifiedArtistAlbumsAsync` renders local albums before remote/profile
   work, loads server album sets concurrently, yields the dispatcher so cards
   paint, and starts profile/image resolution last. Its load version discards
@@ -250,6 +253,12 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   Fluent DataGrid theme otherwise reserves 32 px for an absent sort glyph in
   every column header, obscuring labels in compact columns; a visible sort glyph
   still contributes its natural width, and resize grippers remain unchanged.
+- Every data-bearing desktop table column must be sortable from its header.
+  Template columns require an explicit `SortMemberPath`; formatted numeric,
+  date, duration, source, favorite, and rating values must sort through typed
+  semantic properties rather than rendered strings. Pure artwork/action columns
+  may map to their entity name or remain explicitly unsortable when no data
+  ordering is meaningful.
 - Programmatically created confirmation dialogs use a restrained accent-soft
   primary action with an accent border/text and explicitly centered content;
   localized button labels must size through padding and minimum width rather

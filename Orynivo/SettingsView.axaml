@@ -843,6 +843,7 @@
                     <DataGrid x:Name="MetadataProblemsDataGrid"
                               Height="420"
                               AutoGenerateColumns="False"
+                              CanUserSortColumns="True"
                               IsReadOnly="True"
                               HeadersVisibility="Column"
                               GridLinesVisibility="None"
