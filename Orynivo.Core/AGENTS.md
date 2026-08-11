@@ -29,6 +29,10 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   the source media.
 - Scanner, watcher, and reconciliation writes must keep SQLite and Lucene in
   sync and use the shared scanner gate.
+- Multi-root owner scans must hold a watcher-operation suspension for their
+  complete duration. This prevents incremental updates or periodic
+  reconciliations from taking the shared scanner gate between roots and making
+  the reported foreground scan appear stalled on its next root.
 - `LibraryScanner.RefreshMetadataAsync` is the explicit maintenance path that
   bypasses timestamp skipping and re-reads every supported file. It shares the
   normal scanner gate and reconciliation/indexing pipeline, preserves

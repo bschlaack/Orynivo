@@ -1164,7 +1164,10 @@ The DSD playback option can force DSF/DFF files through this PCM path even when
 cwASIO or Steinberg ASIO native DSD is available.
 Available library roots are monitored automatically after configuration.
 File-system events are debounced before updating the database and search index;
-periodic full scans reconcile changes that a watcher may have missed.
+periodic full scans reconcile changes that a watcher may have missed. On the
+server, startup and manually requested multi-root scans temporarily suspend
+watcher processing for the complete pass, so periodic reconciliation cannot
+interleave between roots or make the reported foreground scan appear stalled.
 Each local directory also offers **Re-read metadata** in Settings. This explicit
 maintenance scan processes timestamp-unchanged files again and is useful when a
 database contains stale tags from an older scan. It preserves track favorites

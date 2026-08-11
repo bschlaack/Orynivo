@@ -4,11 +4,13 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
-
-### Added
+## [0.36.3] - 2026-08-11
 
 ### Fixed
+
+- Fixed server scans with multiple library roots occasionally appearing stuck
+  or unavailable because a periodic watcher reconciliation could interleave
+  between roots and run a second expensive scan first.
 
 ## [0.36.2] - 2026-08-10
 

@@ -25,6 +25,7 @@ public sealed class LibraryWatcherService : IDisposable
     private readonly Action _libraryChanged;
     private readonly Action<LibraryScanActivity>? _activityChanged;
     private readonly CancellationTokenSource _cts = new();
+    private readonly SemaphoreSlim _operationGate = new(1, 1);
     private readonly Dictionary<string, WatchRegistration> _registrations =
         new(StringComparer.OrdinalIgnoreCase);
     private HashSet<string> _configuredPaths = new(StringComparer.OrdinalIgnoreCase);
@@ -63,6 +64,19 @@ public sealed class LibraryWatcherService : IDisposable
             if (!_disposed)
                 _calculateMissingReplayGain = calculateMissingReplayGain;
         }
+    }
+
+    /// <summary>
+    /// Prevents watcher updates and periodic reconciliations from starting until the returned lease is disposed.
+    /// Any watcher operation already in progress is allowed to finish before the lease is granted.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token used while waiting for an active watcher operation.</param>
+    /// <returns>An asynchronous lease that resumes watcher processing when disposed.</returns>
+    public async ValueTask<IAsyncDisposable> SuspendOperationsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await _operationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        return new OperationLease(_operationGate);
     }
 
     /// <summary>
@@ -134,8 +148,11 @@ public sealed class LibraryWatcherService : IDisposable
 
     private async Task ProcessPathsAsync(IReadOnlyCollection<string> paths)
     {
+        var gateAcquired = false;
         try
         {
+            await _operationGate.WaitAsync(_cts.Token).ConfigureAwait(false);
+            gateAcquired = true;
             List<string> configuredPaths;
             lock (_sync)
             {
@@ -172,6 +189,11 @@ public sealed class LibraryWatcherService : IDisposable
         {
             ScheduleFullReconciliation();
         }
+        finally
+        {
+            if (gateAcquired)
+                _operationGate.Release();
+        }
     }
 
     /// <summary>Reports background scan/index activity to the optional activity callback, swallowing UI errors.</summary>
@@ -206,8 +228,11 @@ public sealed class LibraryWatcherService : IDisposable
         if (Interlocked.Exchange(ref _fullScanRunning, 1) != 0)
             return;
 
+        var gateAcquired = false;
         try
         {
+            await _operationGate.WaitAsync(_cts.Token).ConfigureAwait(false);
+            gateAcquired = true;
             List<string> roots;
             bool calculateMissingReplayGain;
             lock (_sync)
@@ -259,7 +284,26 @@ public sealed class LibraryWatcherService : IDisposable
         }
         finally
         {
+            if (gateAcquired)
+                _operationGate.Release();
             Interlocked.Exchange(ref _fullScanRunning, 0);
+        }
+    }
+
+    /// <summary>Releases an exclusive watcher-operation suspension.</summary>
+    private sealed class OperationLease : IAsyncDisposable
+    {
+        private SemaphoreSlim? _gate;
+
+        /// <summary>Initializes a lease for the acquired operation gate.</summary>
+        /// <param name="gate">The acquired watcher operation gate.</param>
+        internal OperationLease(SemaphoreSlim gate) => _gate = gate;
+
+        /// <inheritdoc/>
+        public ValueTask DisposeAsync()
+        {
+            Interlocked.Exchange(ref _gate, null)?.Release();
+            return ValueTask.CompletedTask;
         }
     }
 
