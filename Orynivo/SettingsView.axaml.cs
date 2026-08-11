@@ -51,7 +51,8 @@ internal partial class SettingsView : UserControl
         OrynivoServerSettings Server,
         TextBlock Detail,
         StatusBadge StatusBadge,
-        CancellationToken CancellationToken);
+        CancellationToken CancellationToken,
+        bool ReplayGainOnly);
 
     private readonly AppSettings _settings;
     private readonly List<string> _libraryPaths = [];
@@ -683,6 +684,7 @@ internal partial class SettingsView : UserControl
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             var description = new StackPanel();
             description.Children.Add(new TextBlock
@@ -721,33 +723,43 @@ internal partial class SettingsView : UserControl
                 double.NaN,
                 28,
                 new Thickness(8, 0, 0, 0));
-            scanButton.Tag = new OrynivoServerScanAction(server, scanDetail, statusBadge, statusToken);
+            scanButton.Tag = new OrynivoServerScanAction(server, scanDetail, statusBadge, statusToken, false);
             scanButton.Click += ScanOrynivoServerButton_OnClick;
             Grid.SetColumn(scanButton, 3);
             row.Children.Add(scanButton);
 
+            var replayGainButton = CreateStyledButton(
+                LocalizationManager.Current.OrynivoCalculateServerReplayGain,
+                double.NaN,
+                28,
+                new Thickness(8, 0, 0, 0));
+            replayGainButton.Tag = new OrynivoServerScanAction(server, scanDetail, statusBadge, statusToken, true);
+            replayGainButton.Click += ScanOrynivoServerButton_OnClick;
+            Grid.SetColumn(replayGainButton, 4);
+            row.Children.Add(replayGainButton);
+
             var editButton = CreateStyledButton(LocalizationManager.Current.OrynivoEditServer, 80, 28, new Thickness(8, 0, 0, 0));
             editButton.Tag    = server.Id;
             editButton.Click += EditOrynivoServerButton_OnClick;
-            Grid.SetColumn(editButton, 4);
+            Grid.SetColumn(editButton, 5);
             row.Children.Add(editButton);
 
             var cacheButton = CreateStyledButton(LocalizationManager.Current.ClearCache, 90, 28, new Thickness(8, 0, 0, 0));
             cacheButton.Tag    = server.Id;
             cacheButton.Click += ClearOrynivoServerCacheButton_OnClick;
-            Grid.SetColumn(cacheButton, 5);
+            Grid.SetColumn(cacheButton, 6);
             row.Children.Add(cacheButton);
 
             var updateButton = CreateStyledButton(LocalizationManager.Current.UpdateServer, double.NaN, 28, new Thickness(8, 0, 0, 0));
             updateButton.Tag = server;
             updateButton.Click += UpdateOrynivoServerButton_OnClick;
-            Grid.SetColumn(updateButton, 6);
+            Grid.SetColumn(updateButton, 7);
             row.Children.Add(updateButton);
 
             var removeButton = CreateStyledButton(LocalizationManager.Current.OrynivoRemoveServer, 80, 28, new Thickness(8, 0, 0, 0));
             removeButton.Tag    = server.Id;
             removeButton.Click += RemoveOrynivoServerButton_OnClick;
-            Grid.SetColumn(removeButton, 7);
+            Grid.SetColumn(removeButton, 8);
             row.Children.Add(removeButton);
 
             OrynivoServersPanel.Children.Add(row);
@@ -770,17 +782,24 @@ internal partial class SettingsView : UserControl
             return;
         }
 
-        button.IsEnabled = false;
+        SetOrynivoServerOperationButtonsEnabled(button, false);
         action.Detail.IsVisible = true;
-        action.Detail.Text = LocalizationManager.Current.OrynivoServerScanStarting;
+        action.Detail.Text = action.ReplayGainOnly
+            ? LocalizationManager.Current.ReplayGainCalculating
+            : LocalizationManager.Current.OrynivoServerScanStarting;
         action.StatusBadge.State = StatusBadgeState.Off;
         action.StatusBadge.Text = LocalizationManager.Current.ScanRunning;
         try
         {
             using var client = new OrynivoServerClient();
-            if (!await client.TriggerScanAsync(
+            var started = action.ReplayGainOnly
+                ? await client.TriggerReplayGainCalculationAsync(
                     action.Server,
-                    cancellationToken: action.CancellationToken))
+                    action.CancellationToken)
+                : await client.TriggerScanAsync(
+                    action.Server,
+                    cancellationToken: action.CancellationToken);
+            if (!started)
             {
                 action.Detail.Text = LocalizationManager.Current.OrynivoServerScanStartFailed;
                 action.StatusBadge.State = StatusBadgeState.Warning;
@@ -801,7 +820,9 @@ internal partial class SettingsView : UserControl
                     return;
                 }
 
-                action.Detail.Text = FormatOrynivoServerScanStatus(status);
+                action.Detail.Text = action.ReplayGainOnly
+                    ? FormatOrynivoServerReplayGainStatus(status)
+                    : FormatOrynivoServerScanStatus(status);
                 if (!status.IsRunning)
                 {
                     action.StatusBadge.State = string.IsNullOrWhiteSpace(status.Error)
@@ -822,7 +843,23 @@ internal partial class SettingsView : UserControl
         finally
         {
             if (!action.CancellationToken.IsCancellationRequested)
-                button.IsEnabled = true;
+                SetOrynivoServerOperationButtonsEnabled(button, true);
+        }
+    }
+
+    private static void SetOrynivoServerOperationButtonsEnabled(Button source, bool enabled)
+    {
+        if (source.Parent is not Grid row)
+        {
+            source.IsEnabled = enabled;
+            return;
+        }
+
+        foreach (var operationButton in row.Children
+                     .OfType<Button>()
+                     .Where(static candidate => candidate.Tag is OrynivoServerScanAction))
+        {
+            operationButton.IsEnabled = enabled;
         }
     }
 
@@ -855,6 +892,23 @@ internal partial class SettingsView : UserControl
                 result.Removed,
                 result.Failed)
             : localization.OrynivoServerScanIdle;
+    }
+
+    private static string FormatOrynivoServerReplayGainStatus(OrynivoScanStatus status)
+    {
+        var localization = LocalizationManager.Current;
+        if (!string.IsNullOrWhiteSpace(status.Error))
+            return string.Format(localization.ReplayGainCalculationFailed, status.Error);
+        if (status.IsRunning)
+        {
+            return status.Total > 0
+                ? $"{localization.ReplayGainCalculating} {status.Current}/{status.Total} – {Path.GetFileName(status.CurrentFile)}"
+                : localization.ReplayGainCalculating;
+        }
+
+        return string.Format(
+            localization.ReplayGainCalculated,
+            status.LastResult?.Updated ?? 0);
     }
 
     /// <summary>Downloads, verifies, relays, and starts a supported Orynivo Server package update.</summary>

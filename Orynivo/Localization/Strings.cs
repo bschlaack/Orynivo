@@ -955,6 +955,8 @@ public sealed record LocalizedStrings(
     public string OrynivoServerScan { get; init; } = "";
     /// <summary>Gets the command label for starting a remote server scan.</summary>
     public string OrynivoStartServerScan { get; init; } = "";
+    /// <summary>Gets the command label for calculating only missing ReplayGain values on one server.</summary>
+    public string OrynivoCalculateServerReplayGain { get; init; } = "";
     /// <summary>Gets the message shown while a remote server scan is starting.</summary>
     public string OrynivoServerScanStarting { get; init; } = "";
     /// <summary>Gets the message shown when a remote server scan cannot be started.</summary>
