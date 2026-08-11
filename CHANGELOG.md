@@ -4,7 +4,7 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.36.2] - 2026-08-10
 
 ### Added
 
@@ -16,8 +16,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   ReplayGain during server scans** preference in the server dialog. The desktop
   scan checkbox is explicitly local, while updated servers apply remote changes
   immediately and retain them in their editable configuration.
-
-### Fixed
+- Each configured Orynivo Server row now provides a direct **Start scan** action
+  with server-specific progress and completion status, avoiding the need to
+  open the server editor for a routine scan.
 
 ## [0.36.1] - 2026-08-10
 

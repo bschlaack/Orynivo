@@ -518,6 +518,9 @@ fallback or allow client-provided commands/paths to reach the helper.
   scan in the shared sidebar activity line (`UpdateLibraryActivityIndicator`,
   which prefers the local `_localScanText` over the remote `_remoteScanText`),
   never reloading or blocking the current view.
+  Settings additionally exposes a per-server **Start scan** row action that
+  triggers only its owning server and displays that operation's progress in the
+  row until completion.
 - `Orynivo/EqualizerProfileNameDialog.*`: themed unique-name dialog used when
   creating a new persisted equalizer profile
 - `Native/AsioBridge/bridge.cpp`: shared Steinberg/cwASIO initialization,

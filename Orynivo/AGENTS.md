@@ -54,6 +54,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   authenticated settings API, disables the control for older servers, and
   persists a changed value before saving paths so an automatically triggered
   server scan observes the new setting.
+- Every configured Orynivo Server row exposes a direct scan action. It targets
+  only that row's server, disables itself while polling `/api/scan`, renders
+  progress in a dedicated detail line without replacing connection/capability
+  details, and cancels client polling when the list is rebuilt or Settings closes.
 - The embedded Settings host must span the complete bounded main-content grid.
   Its active section scrolls inside that bound while the bottom Save and Cancel
   action row remains visible; do not place the host only in auto-sized rows.
