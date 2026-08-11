@@ -68,6 +68,7 @@ internal partial class SettingsView : UserControl
     private bool _plexCredentialsChanged;
     private bool _metadataAnalysisLoaded;
     private CancellationTokenSource? _missingArtistImagesCts;
+    private CancellationTokenSource? _replayGainCalculationCts;
 
     /// <summary>
     /// Initializes a runtime-loader instance with default settings.
@@ -914,6 +915,7 @@ internal partial class SettingsView : UserControl
         _orynivoStatusCts?.Cancel();
         _plexStatusCts?.Cancel();
         _missingArtistImagesCts?.Cancel();
+        _replayGainCalculationCts?.Cancel();
         Interlocked.Increment(ref _equalizerPreviewVersion);
         if (!_settingsAccepted)
         {
@@ -2114,16 +2116,64 @@ internal partial class SettingsView : UserControl
 
     private async void CalculateReplayGainButton_OnClick(object? sender, RoutedEventArgs e)
     {
+        _replayGainCalculationCts?.Cancel();
+        _replayGainCalculationCts?.Dispose();
+        var cancellation = new CancellationTokenSource();
+        _replayGainCalculationCts = cancellation;
         CalculateReplayGainButton.IsEnabled = false;
         ReplayGainCalculationStatusTextBlock.Text = LocalizationManager.Current.ReplayGainCalculating;
-        var progress = new Progress<ScanProgress>(p =>
-            ReplayGainCalculationStatusTextBlock.Text =
-                $"{LocalizationManager.Current.ReplayGainCalculating} {p.Current}/{p.Total} – {Path.GetFileName(p.CurrentFile)}");
         try
         {
-            var updated = await LibraryScanner.CalculateMissingReplayGainAsync(progress);
+            var progress = new Progress<ScanProgress>(p =>
+                ReplayGainCalculationStatusTextBlock.Text =
+                    $"{LocalizationManager.Current.ReplayGainCalculating} {p.Current}/{p.Total} – {Path.GetFileName(p.CurrentFile)}");
+            var updated = await LibraryScanner.CalculateMissingReplayGainAsync(
+                progress,
+                cancellation.Token);
+            var failedServers = new List<string>();
+            using var client = new OrynivoServerClient();
+            foreach (var server in _orynivoServers)
+            {
+                cancellation.Token.ThrowIfCancellationRequested();
+                ReplayGainCalculationStatusTextBlock.Text =
+                    $"{LocalizationManager.Current.ReplayGainCalculating} – {server.Name}";
+                if (!await client.TriggerReplayGainCalculationAsync(server, cancellation.Token))
+                {
+                    failedServers.Add(server.Name);
+                    continue;
+                }
+
+                while (true)
+                {
+                    await Task.Delay(750, cancellation.Token);
+                    var status = await client.GetScanStatusAsync(server, cancellation.Token);
+                    if (status is null)
+                    {
+                        failedServers.Add(server.Name);
+                        break;
+                    }
+
+                    ReplayGainCalculationStatusTextBlock.Text = status.Total > 0
+                        ? $"{LocalizationManager.Current.ReplayGainCalculating} – {server.Name}: {status.Current}/{status.Total} – {Path.GetFileName(status.CurrentFile)}"
+                        : $"{LocalizationManager.Current.ReplayGainCalculating} – {server.Name}";
+                    if (status.IsRunning)
+                        continue;
+                    if (!string.IsNullOrWhiteSpace(status.Error))
+                        failedServers.Add(server.Name);
+                    else
+                        updated += status.LastResult?.Updated ?? 0;
+                    break;
+                }
+            }
+
             ReplayGainCalculationStatusTextBlock.Text =
-                string.Format(LocalizationManager.Current.ReplayGainCalculated, updated);
+                failedServers.Count == 0
+                    ? string.Format(LocalizationManager.Current.ReplayGainCalculated, updated)
+                    : $"{string.Format(LocalizationManager.Current.ReplayGainCalculated, updated)} {string.Format(LocalizationManager.Current.ReplayGainCalculationFailed, string.Join(", ", failedServers))}";
+        }
+        catch (OperationCanceledException)
+        {
+            ReplayGainCalculationStatusTextBlock.Text = string.Empty;
         }
         catch (Exception ex)
         {
@@ -2133,6 +2183,9 @@ internal partial class SettingsView : UserControl
         finally
         {
             CalculateReplayGainButton.IsEnabled = true;
+            if (ReferenceEquals(_replayGainCalculationCts, cancellation))
+                _replayGainCalculationCts = null;
+            cancellation.Dispose();
         }
     }
 

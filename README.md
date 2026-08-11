@@ -1139,7 +1139,13 @@ missing ReplayGain values during library scans can be enabled separately; it is
 disabled by default because analysing complete audio files makes initial scans
 substantially slower. The first subsequent scan of each configured library root
 refreshes unchanged files once to import existing ReplayGain tags regardless of
-that option. The dedicated calculation button can fill missing values later.
+that option. The dedicated calculation button fills missing values later in the
+local library and on every configured Orynivo Server, reporting each server's
+progress in turn. Values already present are preserved.
+The desktop checkbox controls local scans only. Each remote server exposes its
+own equivalent checkbox in **Settings → Library → Orynivo Server**; opening the
+server dialog loads the current value from that server, and saving applies and
+persists it there without requiring a service restart.
 Equalizer APO or AutoEQ `.txt`/`.cfg` profiles can be imported in the same
 section. `GraphicEQ` curves are translated into a log-frequency shelf cascade;
 the imported parameters are stored directly in `settings.json`, so the source

@@ -23,6 +23,14 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
 - Normal full scans and watcher updates use
   `CalculateMissingReplayGainDuringScan`, which defaults to `false`; do not
   reintroduce unconditional FFmpeg ReplayGain analysis into library discovery.
+- `POST /api/replaygain` is the explicit authenticated maintenance path for
+  calculating only missing track and album ReplayGain values. It shares scan
+  serialization and `/api/scan` progress reporting, invalidates library caches
+  when values change, and must never overwrite an existing ReplayGain value.
+- Authenticated `GET`/`PUT /api/settings/replaygain` expose the server-owned
+  `CalculateMissingReplayGainDuringScan` preference. PUT updates the live
+  watcher immediately and persists the value to the editable configuration;
+  changing server library paths must retain the same persisted preference.
 - `POST /api/scan/metadata` explicitly requests the slower forced metadata
   refresh. Keep it separate from `POST /api/scan` so older servers return 404
   instead of silently treating the request as an incremental scan; both paths

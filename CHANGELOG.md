@@ -4,6 +4,21 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- The explicit **Calculate missing ReplayGain** action now processes the local
+  library and every configured Orynivo Server. Servers expose a separate
+  authenticated maintenance endpoint with progress reporting; existing track
+  and album ReplayGain values remain untouched.
+- Orynivo Server connections now load and persist their own **calculate missing
+  ReplayGain during server scans** preference in the server dialog. The desktop
+  scan checkbox is explicitly local, while updated servers apply remote changes
+  immediately and retain them in their editable configuration.
+
+### Fixed
+
 ## [0.36.1] - 2026-08-10
 
 ### Added

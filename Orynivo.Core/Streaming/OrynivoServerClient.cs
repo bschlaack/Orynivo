@@ -342,6 +342,10 @@ public sealed record OrynivoServerCapabilities(bool? TrackFacets, bool? RecentAl
 /// <summary>Library path configuration returned by the Orynivo Server API.</summary>
 public sealed record OrynivoLibraryPaths(IReadOnlyList<string> Paths);
 
+/// <summary>ReplayGain analysis settings returned by the Orynivo Server API.</summary>
+/// <param name="CalculateMissingReplayGainDuringScan">Whether server scans calculate missing ReplayGain values.</param>
+public sealed record OrynivoReplayGainSettings(bool CalculateMissingReplayGainDuringScan);
+
 /// <summary>Directory listing returned by the Orynivo Server API.</summary>
 public sealed record OrynivoDirectoryListing(
     string Path,
@@ -1468,6 +1472,83 @@ public sealed class OrynivoServerClient : IDisposable
             return response.IsSuccessStatusCode;
         }
         catch { return false; }
+    }
+
+    /// <summary>Returns the remote server's scan-time ReplayGain preference.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The server setting, or <see langword="null"/> when unavailable or unsupported.</returns>
+    public async Task<OrynivoReplayGainSettings?> GetReplayGainSettingsAsync(
+        OrynivoServerSettings server,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await GetJsonAsync<OrynivoReplayGainSettings>(
+                server,
+                "/api/settings/replaygain",
+                cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Persists the remote server's scan-time ReplayGain preference.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="enabled">Whether missing ReplayGain values should be calculated during scans.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when the server accepted and persisted the setting.</returns>
+    public async Task<bool> SetReplayGainSettingsAsync(
+        OrynivoServerSettings server,
+        bool enabled,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(
+                HttpMethod.Put,
+                BuildUrl(server, "/api/settings/replaygain"))
+            {
+                Content = JsonContent.Create(
+                    new OrynivoReplayGainSettings(enabled),
+                    options: JsonOptions)
+            };
+            request.Headers.Add("X-Api-Key", server.ApiKey);
+            using var response = await _http.SendAsync(request, cancellationToken);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Requests an explicit calculation of missing ReplayGain values on a remote server.
+    /// Existing server-side track and album values are preserved.
+    /// </summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when the server accepted the request.</returns>
+    public async Task<bool> TriggerReplayGainCalculationAsync(
+        OrynivoServerSettings server,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(
+                HttpMethod.Post,
+                BuildUrl(server, "/api/replaygain"));
+            request.Headers.Add("X-Api-Key", server.ApiKey);
+            using var response = await _http.SendAsync(request, cancellationToken);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>Downloads a complete server library backup to a local ZIP file.</summary>

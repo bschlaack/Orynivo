@@ -43,6 +43,17 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   partials instead of creating competing window state or navigation models.
 - Do not block the UI thread with database access, network requests, FFmpeg,
   device enumeration, player disposal, large cache I/O, or large row composition.
+- The explicit ReplayGain maintenance action processes the local library and
+  each configured Orynivo Server sequentially. It polls the shared remote scan
+  status for progress, stops client-side polling when Settings closes,
+  preserves all existing track/album values, and reports servers that do not
+  support or cannot complete the authenticated maintenance request. An already
+  accepted server calculation continues independently on that server.
+- The desktop scan-time ReplayGain checkbox is local-only and says so. Each
+  Orynivo Server dialog loads its server-owned scan-time preference through the
+  authenticated settings API, disables the control for older servers, and
+  persists a changed value before saving paths so an automatically triggered
+  server scan observes the new setting.
 - The embedded Settings host must span the complete bounded main-content grid.
   Its active section scrolls inside that bound while the bottom Save and Cancel
   action row remains visible; do not place the host only in auto-sized rows.

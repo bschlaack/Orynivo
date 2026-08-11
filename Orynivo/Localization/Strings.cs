@@ -927,6 +927,14 @@ public sealed record LocalizedStrings(
     public string OrynivoSavingServerDirectories { get; init; } = "";
     /// <summary>Gets the message shown when remote server library directories cannot be saved.</summary>
     public string OrynivoServerDirectoriesSaveFailed { get; init; } = "";
+    /// <summary>Gets the server-side scan-time ReplayGain checkbox label.</summary>
+    public string OrynivoCalculateReplayGainDuringScan { get; init; } = "";
+    /// <summary>Gets the message shown while the server ReplayGain preference is being saved.</summary>
+    public string OrynivoSavingReplayGainSettings { get; init; } = "";
+    /// <summary>Gets the message shown when the server ReplayGain preference cannot be saved.</summary>
+    public string OrynivoReplayGainSettingsSaveFailed { get; init; } = "";
+    /// <summary>Gets the compatibility message shown when a server lacks ReplayGain settings support.</summary>
+    public string OrynivoReplayGainSettingsUnsupported { get; init; } = "";
     /// <summary>Gets the empty-state text for remote server library directories.</summary>
     public string OrynivoNoServerDirectories { get; init; } = "";
     /// <summary>Gets the remote server directory browser window title.</summary>

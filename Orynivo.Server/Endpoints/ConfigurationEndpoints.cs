@@ -38,6 +38,18 @@ public static class ConfigurationEndpoints
                 return Results.Ok(new LibraryPathsRequest(settings.LibraryPaths));
             });
 
+        api.MapGet("/settings/replaygain", (ServerSettings settings) =>
+            Results.Ok(new ReplayGainSettingsRequest(settings.CalculateMissingReplayGainDuringScan)));
+
+        api.MapPut(
+            "/settings/replaygain",
+            (ReplayGainSettingsRequest request, ServerSettings settings, LibraryService libraryService, IWebHostEnvironment env) =>
+            {
+                libraryService.UpdateReplayGainAnalysis(request.CalculateMissingReplayGainDuringScan);
+                PersistReplayGainSettings(env.ContentRootPath, settings);
+                return Results.Ok(new ReplayGainSettingsRequest(settings.CalculateMissingReplayGainDuringScan));
+            });
+
         api.MapGet("/files/directories", (string? path) =>
         {
             try
@@ -143,8 +155,33 @@ public static class ConfigurationEndpoints
             orynivo["ApiKey"] = settings.ApiKey;
             orynivo["LibraryPaths"] = new JsonArray(paths.Select(static path => JsonValue.Create(path)).ToArray<JsonNode?>());
             orynivo["ScanOnStartup"] = settings.ScanOnStartup;
+            orynivo["CalculateMissingReplayGainDuringScan"] = settings.CalculateMissingReplayGainDuringScan;
             orynivo["ServerName"] = settings.ServerName;
 
+            var options = new JsonSerializerOptions { WriteIndented = true };
+            File.WriteAllText(appSettingsPath, root.ToJsonString(options));
+        }
+    }
+
+
+    /// <summary>Persists the live ReplayGain scan preference to the editable server configuration.</summary>
+    /// <param name="contentRootPath">Application content root used outside packaged Linux installations.</param>
+    /// <param name="settings">Live server settings to persist.</param>
+    internal static void PersistReplayGainSettings(string contentRootPath, ServerSettings settings)
+    {
+        var appSettingsPath = ResolveWritableSettingsPath(contentRootPath);
+        lock (AppSettingsWriteLock)
+        {
+            JsonObject root = File.Exists(appSettingsPath)
+                ? JsonNode.Parse(File.ReadAllText(appSettingsPath)) as JsonObject ?? []
+                : [];
+            if (root["Orynivo"] is not JsonObject orynivo)
+            {
+                orynivo = [];
+                root["Orynivo"] = orynivo;
+            }
+
+            orynivo["CalculateMissingReplayGainDuringScan"] = settings.CalculateMissingReplayGainDuringScan;
             var options = new JsonSerializerOptions { WriteIndented = true };
             File.WriteAllText(appSettingsPath, root.ToJsonString(options));
         }
@@ -154,6 +191,10 @@ public static class ConfigurationEndpoints
 /// <summary>Request or response payload containing server library root paths.</summary>
 /// <param name="Paths">Configured library root directories.</param>
 public sealed record LibraryPathsRequest(IReadOnlyList<string> Paths);
+
+/// <summary>Request or response payload containing the server scan-time ReplayGain preference.</summary>
+/// <param name="CalculateMissingReplayGainDuringScan">Whether missing values are calculated during server scans.</param>
+public sealed record ReplayGainSettingsRequest(bool CalculateMissingReplayGainDuringScan);
 
 /// <summary>Response payload for a browsed server directory.</summary>
 /// <param name="Path">Directory path that was listed.</param>
