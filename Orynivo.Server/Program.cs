@@ -126,6 +126,15 @@ app.MapPost("/api/scan/metadata", (LibraryService svc) =>
 app.MapGet("/api/scan", (LibraryService svc) =>
     Results.Ok(svc.ScanStatus));
 
+// Explicit ReplayGain maintenance; existing values are preserved.
+app.MapPost("/api/replaygain", (LibraryService svc) =>
+{
+    var started = svc.TriggerReplayGainCalculation();
+    return started
+        ? Results.Accepted("/api/replaygain", new { Status = "started" })
+        : Results.Conflict(new { Status = "already_running" });
+});
+
 app.MapLibraryEndpoints();
 app.MapStreamEndpoints();
 app.MapConfigurationEndpoints();

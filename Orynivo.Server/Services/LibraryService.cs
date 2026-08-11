@@ -70,6 +70,14 @@ public sealed class LibraryService : IHostedService, IDisposable
             _libraryChangeTracker.Touch();
     }
 
+    /// <summary>Updates whether future server scans calculate missing ReplayGain values.</summary>
+    /// <param name="enabled">Whether scan-time FFmpeg ReplayGain analysis is enabled.</param>
+    public void UpdateReplayGainAnalysis(bool enabled)
+    {
+        _settings.CalculateMissingReplayGainDuringScan = enabled;
+        _watcher.UpdateReplayGainAnalysis(enabled);
+    }
+
     /// <inheritdoc/>
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -106,6 +114,24 @@ public sealed class LibraryService : IHostedService, IDisposable
         _scanning = true;
         SetScanStatus(new ServerScanStatus(true, null, 0, 0, null, null, null));
         _ = Task.Run(() => RunScanAsync(forceMetadataRefresh, cancellationToken), cancellationToken);
+        return true;
+    }
+
+    /// <summary>
+    /// Starts an explicit background calculation of missing ReplayGain track and
+    /// album values without replacing values already stored in the library.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token for the background operation.</param>
+    /// <returns>
+    /// <see langword="true"/> when the calculation was started;
+    /// <see langword="false"/> when another library operation is already running.
+    /// </returns>
+    public bool TriggerReplayGainCalculation(CancellationToken cancellationToken = default)
+    {
+        if (_scanning) return false;
+        _scanning = true;
+        SetScanStatus(new ServerScanStatus(true, null, 0, 0, null, null, null));
+        _ = Task.Run(() => RunReplayGainCalculationAsync(cancellationToken), cancellationToken);
         return true;
     }
 
@@ -247,6 +273,62 @@ public sealed class LibraryService : IHostedService, IDisposable
         }
     }
 
+    private async Task RunReplayGainCalculationAsync(CancellationToken cancellationToken)
+    {
+        if (!await _scanGate.WaitAsync(0, cancellationToken))
+        {
+            _scanning = false;
+            SetScanStatus(ScanStatus with { IsRunning = false });
+            return;
+        }
+
+        _scanning = true;
+        SetScanStatus(new ServerScanStatus(true, null, 0, 0, null, null, null));
+        try
+        {
+            _logger.LogInformation("Explicit missing ReplayGain calculation started");
+            var progress = new InlineScanProgress(value =>
+                SetScanStatus(new ServerScanStatus(
+                    true,
+                    null,
+                    value.Current,
+                    value.Total,
+                    value.CurrentFile,
+                    null,
+                    null)));
+            var updated = await LibraryScanner.CalculateMissingReplayGainAsync(progress, cancellationToken);
+            var total = ScanStatus.Total;
+            if (updated > 0)
+                _libraryChangeTracker.Touch();
+            SetScanStatus(new ServerScanStatus(
+                false,
+                null,
+                total,
+                total,
+                null,
+                new ScanResult(total, 0, updated, 0, 0),
+                null));
+            _logger.LogInformation(
+                "Explicit missing ReplayGain calculation complete: {Updated} tracks updated",
+                updated);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Explicit missing ReplayGain calculation cancelled");
+            SetScanStatus(ScanStatus with { IsRunning = false, Error = "cancelled" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Explicit missing ReplayGain calculation failed");
+            SetScanStatus(ScanStatus with { IsRunning = false, Error = ex.Message });
+        }
+        finally
+        {
+            _scanning = false;
+            _scanGate.Release();
+        }
+    }
+
     private void SetScanStatus(ServerScanStatus status)
     {
         if (status.LibraryChangedAt is null)
@@ -257,6 +339,11 @@ public sealed class LibraryService : IHostedService, IDisposable
 
     private static bool HasLibraryChanges(ScanResult result)
         => result.Added > 0 || result.Updated > 0 || result.Removed > 0;
+
+    private sealed class InlineScanProgress(Action<ScanProgress> report) : IProgress<ScanProgress>
+    {
+        public void Report(ScanProgress value) => report(value);
+    }
 
     /// <inheritdoc/>
     public void Dispose()

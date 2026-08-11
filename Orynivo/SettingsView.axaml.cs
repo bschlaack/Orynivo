@@ -47,6 +47,12 @@ internal partial class SettingsView : UserControl
         string SourceName,
         OrynivoServerSettings? Server);
 
+    private sealed record OrynivoServerScanAction(
+        OrynivoServerSettings Server,
+        TextBlock Detail,
+        StatusBadge StatusBadge,
+        CancellationToken CancellationToken);
+
     private readonly AppSettings _settings;
     private readonly List<string> _libraryPaths = [];
     private readonly List<PlexServerSettings> _plexServers = [];
@@ -68,6 +74,7 @@ internal partial class SettingsView : UserControl
     private bool _plexCredentialsChanged;
     private bool _metadataAnalysisLoaded;
     private CancellationTokenSource? _missingArtistImagesCts;
+    private CancellationTokenSource? _replayGainCalculationCts;
 
     /// <summary>
     /// Initializes a runtime-loader instance with default settings.
@@ -675,6 +682,7 @@ internal partial class SettingsView : UserControl
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             var description = new StackPanel();
             description.Children.Add(new TextBlock
@@ -705,28 +713,41 @@ internal partial class SettingsView : UserControl
             Grid.SetColumn(versionBadge, 2);
             row.Children.Add(versionBadge);
 
+            var scanDetail = CreateServerStatusDetail();
+            description.Children.Add(scanDetail);
+
+            var scanButton = CreateStyledButton(
+                LocalizationManager.Current.OrynivoStartServerScan,
+                double.NaN,
+                28,
+                new Thickness(8, 0, 0, 0));
+            scanButton.Tag = new OrynivoServerScanAction(server, scanDetail, statusBadge, statusToken);
+            scanButton.Click += ScanOrynivoServerButton_OnClick;
+            Grid.SetColumn(scanButton, 3);
+            row.Children.Add(scanButton);
+
             var editButton = CreateStyledButton(LocalizationManager.Current.OrynivoEditServer, 80, 28, new Thickness(8, 0, 0, 0));
             editButton.Tag    = server.Id;
             editButton.Click += EditOrynivoServerButton_OnClick;
-            Grid.SetColumn(editButton, 3);
+            Grid.SetColumn(editButton, 4);
             row.Children.Add(editButton);
 
             var cacheButton = CreateStyledButton(LocalizationManager.Current.ClearCache, 90, 28, new Thickness(8, 0, 0, 0));
             cacheButton.Tag    = server.Id;
             cacheButton.Click += ClearOrynivoServerCacheButton_OnClick;
-            Grid.SetColumn(cacheButton, 4);
+            Grid.SetColumn(cacheButton, 5);
             row.Children.Add(cacheButton);
 
             var updateButton = CreateStyledButton(LocalizationManager.Current.UpdateServer, double.NaN, 28, new Thickness(8, 0, 0, 0));
             updateButton.Tag = server;
             updateButton.Click += UpdateOrynivoServerButton_OnClick;
-            Grid.SetColumn(updateButton, 5);
+            Grid.SetColumn(updateButton, 6);
             row.Children.Add(updateButton);
 
             var removeButton = CreateStyledButton(LocalizationManager.Current.OrynivoRemoveServer, 80, 28, new Thickness(8, 0, 0, 0));
             removeButton.Tag    = server.Id;
             removeButton.Click += RemoveOrynivoServerButton_OnClick;
-            Grid.SetColumn(removeButton, 6);
+            Grid.SetColumn(removeButton, 7);
             row.Children.Add(removeButton);
 
             OrynivoServersPanel.Children.Add(row);
@@ -737,6 +758,103 @@ internal partial class SettingsView : UserControl
         }
 
         RefreshRemoteCacheSize();
+    }
+
+    private async void ScanOrynivoServerButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button
+            {
+                Tag: OrynivoServerScanAction action
+            } button)
+        {
+            return;
+        }
+
+        button.IsEnabled = false;
+        action.Detail.IsVisible = true;
+        action.Detail.Text = LocalizationManager.Current.OrynivoServerScanStarting;
+        action.StatusBadge.State = StatusBadgeState.Off;
+        action.StatusBadge.Text = LocalizationManager.Current.ScanRunning;
+        try
+        {
+            using var client = new OrynivoServerClient();
+            if (!await client.TriggerScanAsync(
+                    action.Server,
+                    cancellationToken: action.CancellationToken))
+            {
+                action.Detail.Text = LocalizationManager.Current.OrynivoServerScanStartFailed;
+                action.StatusBadge.State = StatusBadgeState.Warning;
+                action.StatusBadge.Text = LocalizationManager.Current.ServerUnreachable;
+                return;
+            }
+
+            while (!action.CancellationToken.IsCancellationRequested)
+            {
+                var status = await client.GetScanStatusAsync(
+                    action.Server,
+                    action.CancellationToken);
+                if (status is null)
+                {
+                    action.Detail.Text = LocalizationManager.Current.OrynivoServerScanStartFailed;
+                    action.StatusBadge.State = StatusBadgeState.Warning;
+                    action.StatusBadge.Text = LocalizationManager.Current.ServerUnreachable;
+                    return;
+                }
+
+                action.Detail.Text = FormatOrynivoServerScanStatus(status);
+                if (!status.IsRunning)
+                {
+                    action.StatusBadge.State = string.IsNullOrWhiteSpace(status.Error)
+                        ? StatusBadgeState.Ok
+                        : StatusBadgeState.Warning;
+                    action.StatusBadge.Text = string.IsNullOrWhiteSpace(status.Error)
+                        ? LocalizationManager.Current.StatusAvailable
+                        : LocalizationManager.Current.ServerUnreachable;
+                    return;
+                }
+
+                await Task.Delay(1000, action.CancellationToken);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            if (!action.CancellationToken.IsCancellationRequested)
+                button.IsEnabled = true;
+        }
+    }
+
+    private static string FormatOrynivoServerScanStatus(OrynivoScanStatus status)
+    {
+        var localization = LocalizationManager.Current;
+        if (!string.IsNullOrWhiteSpace(status.Error))
+            return string.Format(localization.OrynivoServerScanFailed, status.Error);
+        if (status.IsRunning)
+        {
+            return status.Total > 0
+                ? string.Format(
+                    localization.OrynivoServerScanProgress,
+                    status.Current,
+                    status.Total,
+                    Path.GetFileName(status.CurrentFile) is { Length: > 0 } name
+                        ? name
+                        : status.Path ?? string.Empty)
+                : string.Format(
+                    localization.OrynivoServerScanDiscovering,
+                    status.Path ?? status.CurrentFile ?? string.Empty);
+        }
+
+        return status.LastResult is { } result
+            ? string.Format(
+                localization.OrynivoServerScanCompleted,
+                result.Total,
+                result.Added,
+                result.Updated,
+                result.Removed,
+                result.Failed)
+            : localization.OrynivoServerScanIdle;
     }
 
     /// <summary>Downloads, verifies, relays, and starts a supported Orynivo Server package update.</summary>
@@ -914,6 +1032,7 @@ internal partial class SettingsView : UserControl
         _orynivoStatusCts?.Cancel();
         _plexStatusCts?.Cancel();
         _missingArtistImagesCts?.Cancel();
+        _replayGainCalculationCts?.Cancel();
         Interlocked.Increment(ref _equalizerPreviewVersion);
         if (!_settingsAccepted)
         {
@@ -2114,16 +2233,64 @@ internal partial class SettingsView : UserControl
 
     private async void CalculateReplayGainButton_OnClick(object? sender, RoutedEventArgs e)
     {
+        _replayGainCalculationCts?.Cancel();
+        _replayGainCalculationCts?.Dispose();
+        var cancellation = new CancellationTokenSource();
+        _replayGainCalculationCts = cancellation;
         CalculateReplayGainButton.IsEnabled = false;
         ReplayGainCalculationStatusTextBlock.Text = LocalizationManager.Current.ReplayGainCalculating;
-        var progress = new Progress<ScanProgress>(p =>
-            ReplayGainCalculationStatusTextBlock.Text =
-                $"{LocalizationManager.Current.ReplayGainCalculating} {p.Current}/{p.Total} – {Path.GetFileName(p.CurrentFile)}");
         try
         {
-            var updated = await LibraryScanner.CalculateMissingReplayGainAsync(progress);
+            var progress = new Progress<ScanProgress>(p =>
+                ReplayGainCalculationStatusTextBlock.Text =
+                    $"{LocalizationManager.Current.ReplayGainCalculating} {p.Current}/{p.Total} – {Path.GetFileName(p.CurrentFile)}");
+            var updated = await LibraryScanner.CalculateMissingReplayGainAsync(
+                progress,
+                cancellation.Token);
+            var failedServers = new List<string>();
+            using var client = new OrynivoServerClient();
+            foreach (var server in _orynivoServers)
+            {
+                cancellation.Token.ThrowIfCancellationRequested();
+                ReplayGainCalculationStatusTextBlock.Text =
+                    $"{LocalizationManager.Current.ReplayGainCalculating} – {server.Name}";
+                if (!await client.TriggerReplayGainCalculationAsync(server, cancellation.Token))
+                {
+                    failedServers.Add(server.Name);
+                    continue;
+                }
+
+                while (true)
+                {
+                    await Task.Delay(750, cancellation.Token);
+                    var status = await client.GetScanStatusAsync(server, cancellation.Token);
+                    if (status is null)
+                    {
+                        failedServers.Add(server.Name);
+                        break;
+                    }
+
+                    ReplayGainCalculationStatusTextBlock.Text = status.Total > 0
+                        ? $"{LocalizationManager.Current.ReplayGainCalculating} – {server.Name}: {status.Current}/{status.Total} – {Path.GetFileName(status.CurrentFile)}"
+                        : $"{LocalizationManager.Current.ReplayGainCalculating} – {server.Name}";
+                    if (status.IsRunning)
+                        continue;
+                    if (!string.IsNullOrWhiteSpace(status.Error))
+                        failedServers.Add(server.Name);
+                    else
+                        updated += status.LastResult?.Updated ?? 0;
+                    break;
+                }
+            }
+
             ReplayGainCalculationStatusTextBlock.Text =
-                string.Format(LocalizationManager.Current.ReplayGainCalculated, updated);
+                failedServers.Count == 0
+                    ? string.Format(LocalizationManager.Current.ReplayGainCalculated, updated)
+                    : $"{string.Format(LocalizationManager.Current.ReplayGainCalculated, updated)} {string.Format(LocalizationManager.Current.ReplayGainCalculationFailed, string.Join(", ", failedServers))}";
+        }
+        catch (OperationCanceledException)
+        {
+            ReplayGainCalculationStatusTextBlock.Text = string.Empty;
         }
         catch (Exception ex)
         {
@@ -2133,6 +2300,9 @@ internal partial class SettingsView : UserControl
         finally
         {
             CalculateReplayGainButton.IsEnabled = true;
+            if (ReferenceEquals(_replayGainCalculationCts, cancellation))
+                _replayGainCalculationCts = null;
+            cancellation.Dispose();
         }
     }
 

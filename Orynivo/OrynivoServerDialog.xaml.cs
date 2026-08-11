@@ -22,6 +22,9 @@ public partial class OrynivoServerDialog : Window
     private CancellationTokenSource? _scanStatusCts;
     private bool _serverLibraryPathsLoaded;
     private bool _serverLibraryPathsChanged;
+    private bool _serverReplayGainSettingsLoaded;
+    private bool _serverReplayGainSettingsChanged;
+    private bool _loadingServerReplayGainSettings;
 
     /// <summary>Initializes a dialog for a new server.</summary>
     public OrynivoServerDialog()
@@ -259,12 +262,25 @@ public partial class OrynivoServerDialog : Window
         if (!TryCreateServer(out var server))
             return;
 
+        using var client = new OrynivoServerClient();
+        if (_serverReplayGainSettingsLoaded && _serverReplayGainSettingsChanged)
+        {
+            StatusTextBlock.Text = LocalizationManager.Current.OrynivoSavingReplayGainSettings;
+            if (!await client.SetReplayGainSettingsAsync(
+                    server,
+                    ServerReplayGainDuringScanCheckBox.IsChecked == true))
+            {
+                StatusTextBlock.Text = LocalizationManager.Current.OrynivoReplayGainSettingsSaveFailed;
+                return;
+            }
+            _serverReplayGainSettingsChanged = false;
+        }
+
         if (_serverLibraryPathsLoaded && _serverLibraryPathsChanged)
         {
             StatusTextBlock.Text = LocalizationManager.Current.OrynivoSavingServerDirectories;
             try
             {
-                using var client = new OrynivoServerClient();
                 var saved = await client.SetLibraryPathsAsync(server, _serverLibraryPaths);
                 if (!saved)
                 {
@@ -327,13 +343,32 @@ public partial class OrynivoServerDialog : Window
         try
         {
             using var client = new OrynivoServerClient();
-            var paths = await client.GetLibraryPathsAsync(server);
+            var pathsTask = client.GetLibraryPathsAsync(server);
+            var replayGainTask = client.GetReplayGainSettingsAsync(server);
+            await Task.WhenAll(pathsTask, replayGainTask);
+            var paths = await pathsTask;
             _serverLibraryPaths.Clear();
             _serverLibraryPaths.AddRange(paths);
             _serverLibraryPathsLoaded = true;
             _serverLibraryPathsChanged = false;
             RebuildServerDirectoryList();
-            StatusTextBlock.Text = LocalizationManager.Current.OrynivoServerDirectoriesLoaded;
+            var replayGainSettings = await replayGainTask;
+            _loadingServerReplayGainSettings = true;
+            try
+            {
+                ServerReplayGainDuringScanCheckBox.IsChecked =
+                    replayGainSettings?.CalculateMissingReplayGainDuringScan == true;
+                ServerReplayGainDuringScanCheckBox.IsEnabled = replayGainSettings is not null;
+                _serverReplayGainSettingsLoaded = replayGainSettings is not null;
+                _serverReplayGainSettingsChanged = false;
+            }
+            finally
+            {
+                _loadingServerReplayGainSettings = false;
+            }
+            StatusTextBlock.Text = replayGainSettings is not null
+                ? LocalizationManager.Current.OrynivoServerDirectoriesLoaded
+                : LocalizationManager.Current.OrynivoReplayGainSettingsUnsupported;
             StartScanStatusPolling(server);
         }
         catch
@@ -345,6 +380,14 @@ public partial class OrynivoServerDialog : Window
             LoadServerDirectoriesButton.IsEnabled = true;
             AddServerDirectoryButton.IsEnabled = true;
         }
+    }
+
+    private void ServerReplayGainDuringScanCheckBox_OnIsCheckedChanged(
+        object? sender,
+        RoutedEventArgs e)
+    {
+        if (!_loadingServerReplayGainSettings && _serverReplayGainSettingsLoaded)
+            _serverReplayGainSettingsChanged = true;
     }
 
     private void StartScanStatusPolling(OrynivoServerSettings server)

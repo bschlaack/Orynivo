@@ -355,6 +355,7 @@ public static class LocalizationManager
         resources["L_OrynivoServerDirectories"] = Current.OrynivoServerDirectories;
         resources["L_OrynivoLoadServerDirectories"] = Current.OrynivoLoadServerDirectories;
         resources["L_OrynivoAddServerDirectory"] = Current.OrynivoAddServerDirectory;
+        resources["L_OrynivoCalculateReplayGainDuringScan"] = Current.OrynivoCalculateReplayGainDuringScan;
         resources["L_OrynivoServerDirectoryBrowserTitle"] = Current.OrynivoServerDirectoryBrowserTitle;
         resources["L_OrynivoServerDirectoryRoots"] = Current.OrynivoServerDirectoryRoots;
         resources["L_OrynivoServerDirectoryUp"] = Current.OrynivoServerDirectoryUp;
@@ -580,7 +581,7 @@ public static class LocalizationManager
         ReplayGainOff = "Aus",
         ReplayGainTrack = "Track",
         ReplayGainAlbum = "Album",
-        CalculateReplayGainDuringScan = "Fehlendes ReplayGain automatisch während Bibliotheksscans berechnen (langsamer)",
+        CalculateReplayGainDuringScan = "Fehlendes ReplayGain automatisch während lokaler Bibliotheksscans berechnen (langsamer)",
         CalculateReplayGain = "Fehlendes ReplayGain berechnen",
         ReplayGainCalculating = "ReplayGain wird berechnet …",
         ReplayGainCalculated = "ReplayGain berechnet: {0} Tracks aktualisiert.",
@@ -954,6 +955,10 @@ public static class LocalizationManager
         , OrynivoServerDirectoriesLoadFailed = "Server-Verzeichnisse konnten nicht geladen werden."
         , OrynivoSavingServerDirectories = "Server-Verzeichnisse werden gespeichert …"
         , OrynivoServerDirectoriesSaveFailed = "Server-Verzeichnisse konnten nicht gespeichert werden."
+        , OrynivoCalculateReplayGainDuringScan = "Fehlendes ReplayGain während Server-Scans berechnen (langsamer)"
+        , OrynivoSavingReplayGainSettings = "ReplayGain-Scaneinstellung wird auf dem Server gespeichert …"
+        , OrynivoReplayGainSettingsSaveFailed = "Die ReplayGain-Scaneinstellung konnte nicht auf dem Server gespeichert werden."
+        , OrynivoReplayGainSettingsUnsupported = "Verzeichnisse geladen. Dieser Server unterstützt die ReplayGain-Scaneinstellung noch nicht."
         , OrynivoNoServerDirectories = "Keine Server-Verzeichnisse gesetzt."
         , OrynivoServerDirectoryBrowserTitle = "Server-Verzeichnis auswählen"
         , OrynivoServerDirectoryRoots = "Laufwerke"
@@ -1208,7 +1213,7 @@ public static class LocalizationManager
         ReplayGain = "ReplayGain volume adjustment",
         ReplayGainHint = "Applies to PCM playback. Track mode prefers track gain; album mode prefers album gain. Native DSD output remains bit-perfect.",
         ReplayGainOff = "Off", ReplayGainTrack = "Track", ReplayGainAlbum = "Album",
-        CalculateReplayGainDuringScan = "Automatically calculate missing ReplayGain during library scans (slower)",
+        CalculateReplayGainDuringScan = "Automatically calculate missing ReplayGain during local library scans (slower)",
         CalculateReplayGain = "Calculate missing ReplayGain",
         ReplayGainCalculating = "Calculating ReplayGain …",
         ReplayGainCalculated = "ReplayGain calculated: {0} tracks updated.",
@@ -1577,6 +1582,10 @@ public static class LocalizationManager
         , OrynivoServerDirectoriesLoadFailed = "Server directories could not be loaded."
         , OrynivoSavingServerDirectories = "Saving server directories…"
         , OrynivoServerDirectoriesSaveFailed = "Server directories could not be saved."
+        , OrynivoCalculateReplayGainDuringScan = "Calculate missing ReplayGain during server scans (slower)"
+        , OrynivoSavingReplayGainSettings = "Saving the ReplayGain scan setting on the server…"
+        , OrynivoReplayGainSettingsSaveFailed = "The ReplayGain scan setting could not be saved on the server."
+        , OrynivoReplayGainSettingsUnsupported = "Directories loaded. This server does not yet support the ReplayGain scan setting."
         , OrynivoNoServerDirectories = "No server directories configured."
         , OrynivoServerDirectoryBrowserTitle = "Select server directory"
         , OrynivoServerDirectoryRoots = "Roots"
@@ -1834,7 +1843,7 @@ public static class LocalizationManager
         ReplayGain = "Ajustement du volume ReplayGain",
         ReplayGainHint = "S’applique à la lecture PCM. Le mode piste privilégie le gain de piste, le mode album le gain d’album. La sortie DSD native reste bit-perfect.",
         ReplayGainOff = "Désactivé", ReplayGainTrack = "Piste", ReplayGainAlbum = "Album",
-        CalculateReplayGainDuringScan = "Calculer automatiquement les ReplayGain manquants pendant l’analyse de la bibliothèque (plus lent)",
+        CalculateReplayGainDuringScan = "Calculer automatiquement les ReplayGain manquants pendant l’analyse de la bibliothèque locale (plus lent)",
         CalculateReplayGain = "Calculer les ReplayGain manquants",
         ReplayGainCalculating = "Calcul des ReplayGain …",
         ReplayGainCalculated = "ReplayGain calculé : {0} pistes mises à jour.",
@@ -2203,6 +2212,10 @@ public static class LocalizationManager
         , OrynivoServerDirectoriesLoadFailed = "Impossible de charger les dossiers du serveur."
         , OrynivoSavingServerDirectories = "Enregistrement des dossiers du serveur…"
         , OrynivoServerDirectoriesSaveFailed = "Impossible d'enregistrer les dossiers du serveur."
+        , OrynivoCalculateReplayGainDuringScan = "Calculer les ReplayGain manquants pendant les analyses du serveur (plus lent)"
+        , OrynivoSavingReplayGainSettings = "Enregistrement du paramètre d’analyse ReplayGain sur le serveur…"
+        , OrynivoReplayGainSettingsSaveFailed = "Impossible d’enregistrer le paramètre d’analyse ReplayGain sur le serveur."
+        , OrynivoReplayGainSettingsUnsupported = "Dossiers chargés. Ce serveur ne prend pas encore en charge le paramètre d’analyse ReplayGain."
         , OrynivoNoServerDirectories = "Aucun dossier serveur configuré."
         , OrynivoServerDirectoryBrowserTitle = "Sélectionner un dossier serveur"
         , OrynivoServerDirectoryRoots = "Racines"
@@ -2457,7 +2470,7 @@ public static class LocalizationManager
         ReplayGain = "Ajuste de volumen ReplayGain",
         ReplayGainHint = "Se aplica a la reproducción PCM. El modo pista prioriza la ganancia de pista y el modo álbum la ganancia de álbum. La salida DSD nativa sigue siendo bit-perfect.",
         ReplayGainOff = "Desactivado", ReplayGainTrack = "Pista", ReplayGainAlbum = "Álbum",
-        CalculateReplayGainDuringScan = "Calcular automáticamente ReplayGain faltante durante el análisis de la biblioteca (más lento)",
+        CalculateReplayGainDuringScan = "Calcular automáticamente ReplayGain faltante durante el análisis de la biblioteca local (más lento)",
         CalculateReplayGain = "Calcular ReplayGain faltante",
         ReplayGainCalculating = "Calculando ReplayGain …",
         ReplayGainCalculated = "ReplayGain calculado: {0} pistas actualizadas.",
@@ -2826,6 +2839,10 @@ public static class LocalizationManager
         , OrynivoServerDirectoriesLoadFailed = "No se pudieron cargar los directorios del servidor."
         , OrynivoSavingServerDirectories = "Guardando directorios del servidor…"
         , OrynivoServerDirectoriesSaveFailed = "No se pudieron guardar los directorios del servidor."
+        , OrynivoCalculateReplayGainDuringScan = "Calcular ReplayGain faltante durante los análisis del servidor (más lento)"
+        , OrynivoSavingReplayGainSettings = "Guardando el ajuste de análisis ReplayGain en el servidor…"
+        , OrynivoReplayGainSettingsSaveFailed = "No se pudo guardar el ajuste de análisis ReplayGain en el servidor."
+        , OrynivoReplayGainSettingsUnsupported = "Directorios cargados. Este servidor aún no admite el ajuste de análisis ReplayGain."
         , OrynivoNoServerDirectories = "No hay directorios de servidor configurados."
         , OrynivoServerDirectoryBrowserTitle = "Seleccionar directorio del servidor"
         , OrynivoServerDirectoryRoots = "Raíces"

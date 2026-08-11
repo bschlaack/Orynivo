@@ -305,7 +305,10 @@ runtime dependency.
   and store them in the server-side artwork caches
 - `Orynivo.Server/Endpoints/ConfigurationEndpoints.cs`: authenticated
   `/api/settings/library-paths` GET/PUT and `/api/files/directories?path=`
-  endpoints; PUT persists `Orynivo:LibraryPaths`, refreshes
+  endpoints plus authenticated `/api/settings/replaygain` GET/PUT for the
+  server-owned scan-time ReplayGain preference; the ReplayGain PUT updates the
+  live watcher and persists the value immediately. The library-path PUT persists
+  `Orynivo:LibraryPaths`, refreshes
   `LibraryWatcherService`, and starts a scan. Settings are written to the
   editable, service-writable config (`/etc/orynivo-server/appsettings.json` via
   `ConfigurationEndpoints.LinuxConfigFilePath` when that directory exists,
@@ -515,6 +518,9 @@ fallback or allow client-provided commands/paths to reach the helper.
   scan in the shared sidebar activity line (`UpdateLibraryActivityIndicator`,
   which prefers the local `_localScanText` over the remote `_remoteScanText`),
   never reloading or blocking the current view.
+  Settings additionally exposes a per-server **Start scan** row action that
+  triggers only its owning server and displays that operation's progress in the
+  row until completion.
 - `Orynivo/EqualizerProfileNameDialog.*`: themed unique-name dialog used when
   creating a new persisted equalizer profile
 - `Native/AsioBridge/bridge.cpp`: shared Steinberg/cwASIO initialization,
@@ -1239,9 +1245,15 @@ fallback or allow client-provided commands/paths to reach the helper.
   the scanner calculates missing track gain per file and missing album gain by
   analysing the affected album as a whole through a temporary FFmpeg concat list.
   Existing ReplayGain metadata is preserved. Settings > Playback exposes
-  **Calculate missing ReplayGain** to backfill existing local tracks manually;
-  remote Orynivo Server libraries use the same Core scanner when a server scan is
-  started from the Orynivo Server dialog.
+  **Calculate missing ReplayGain** to backfill the local library and every
+  configured Orynivo Server. Remote calculations use authenticated
+  `POST /api/replaygain`, report progress through `/api/scan`, and preserve all
+  existing track and album values. Normal server scans remain governed by the
+  separate `CalculateMissingReplayGainDuringScan` option.
+- The desktop's scan-time ReplayGain checkbox controls only its local watcher.
+  Each Orynivo Server dialog reads and writes the server-owned equivalent via
+  authenticated `GET`/`PUT /api/settings/replaygain`; the server applies it to
+  the live watcher and persists it without requiring a restart.
 - Opening the database runs a legacy-data migration that normalizes artists,
   albums, and artwork and removes old per-track artwork BLOBs
 - `album_artist_rebuild_v1` rebuilds album assignments strictly from
