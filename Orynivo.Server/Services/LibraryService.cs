@@ -196,6 +196,9 @@ public sealed class LibraryService : IHostedService, IDisposable
         SetScanStatus(new ServerScanStatus(true, null, 0, 0, null, null, null));
         try
         {
+            await using var watcherSuspension = await _watcher
+                .SuspendOperationsAsync(cancellationToken)
+                .ConfigureAwait(false);
             _logger.LogInformation(
                 "Library scan started ({Count} paths, force metadata refresh: {ForceMetadataRefresh})",
                 _settings.LibraryPaths.Count,

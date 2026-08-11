@@ -1146,9 +1146,10 @@ The desktop checkbox controls local scans only. Each remote server exposes its
 own equivalent checkbox in **Settings → Library → Orynivo Server**; opening the
 server dialog loads the current value from that server, and saving applies and
 persists it there without requiring a service restart.
-Configured server rows also provide a direct **Start scan** button. It starts a
-scan only on that server and reports discovery, per-file progress, completion,
-or failure directly beneath the server entry.
+Configured server rows provide separate **Scan library** and **Calculate
+ReplayGain** buttons. Each action targets only that server and reports
+discovery or analysis progress, completion, and failure directly beneath the
+server entry. The server editor uses the same unambiguous library-scan label.
 Equalizer APO or AutoEQ `.txt`/`.cfg` profiles can be imported in the same
 section. `GraphicEQ` curves are translated into a log-frequency shelf cascade;
 the imported parameters are stored directly in `settings.json`, so the source
@@ -1163,7 +1164,10 @@ The DSD playback option can force DSF/DFF files through this PCM path even when
 cwASIO or Steinberg ASIO native DSD is available.
 Available library roots are monitored automatically after configuration.
 File-system events are debounced before updating the database and search index;
-periodic full scans reconcile changes that a watcher may have missed.
+periodic full scans reconcile changes that a watcher may have missed. On the
+server, startup and manually requested multi-root scans temporarily suspend
+watcher processing for the complete pass, so periodic reconciliation cannot
+interleave between roots or make the reported foreground scan appear stalled.
 Each local directory also offers **Re-read metadata** in Settings. This explicit
 maintenance scan processes timestamp-unchanged files again and is useful when a
 database contains stale tags from an older scan. It preserves track favorites

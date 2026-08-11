@@ -362,6 +362,7 @@ public static class LocalizationManager
         resources["L_OrynivoSelectServerDirectory"] = Current.OrynivoSelectServerDirectory;
         resources["L_OrynivoServerScan"] = Current.OrynivoServerScan;
         resources["L_OrynivoStartServerScan"] = Current.OrynivoStartServerScan;
+        resources["L_OrynivoCalculateServerReplayGain"] = Current.OrynivoCalculateServerReplayGain;
         resources["L_OrynivoServerBackup"] = Current.OrynivoServerBackup;
         resources["L_OrynivoDownloadBackup"] = Current.OrynivoDownloadBackup;
         resources["L_OrynivoRestoreBackup"] = Current.OrynivoRestoreBackup;
@@ -968,7 +969,8 @@ public static class LocalizationManager
         , OrynivoServerDirectoryLoadFailed = "Verzeichnis konnte nicht geladen werden."
         , OrynivoServerDirectoryEmpty = "Keine Unterverzeichnisse vorhanden."
         , OrynivoServerScan = "Server-Scan"
-        , OrynivoStartServerScan = "Scan starten"
+        , OrynivoStartServerScan = "Bibliothek scannen"
+        , OrynivoCalculateServerReplayGain = "ReplayGain berechnen"
         , OrynivoServerScanStarting = "Server-Scan wird gestartet …"
         , OrynivoServerScanStartFailed = "Server-Scan konnte nicht gestartet werden."
         , OrynivoServerScanIdle = "Kein Server-Scan aktiv."
@@ -1595,7 +1597,8 @@ public static class LocalizationManager
         , OrynivoServerDirectoryLoadFailed = "Directory could not be loaded."
         , OrynivoServerDirectoryEmpty = "No subdirectories available."
         , OrynivoServerScan = "Server scan"
-        , OrynivoStartServerScan = "Start scan"
+        , OrynivoStartServerScan = "Scan library"
+        , OrynivoCalculateServerReplayGain = "Calculate ReplayGain"
         , OrynivoServerScanStarting = "Starting server scan…"
         , OrynivoServerScanStartFailed = "Server scan could not be started."
         , OrynivoServerScanIdle = "No server scan is running."
@@ -2225,7 +2228,8 @@ public static class LocalizationManager
         , OrynivoServerDirectoryLoadFailed = "Impossible de charger le dossier."
         , OrynivoServerDirectoryEmpty = "Aucun sous-dossier disponible."
         , OrynivoServerScan = "Analyse du serveur"
-        , OrynivoStartServerScan = "Lancer l'analyse"
+        , OrynivoStartServerScan = "Analyser la bibliothèque"
+        , OrynivoCalculateServerReplayGain = "Calculer ReplayGain"
         , OrynivoServerScanStarting = "Démarrage de l'analyse du serveur…"
         , OrynivoServerScanStartFailed = "Impossible de démarrer l'analyse du serveur."
         , OrynivoServerScanIdle = "Aucune analyse serveur en cours."
@@ -2852,7 +2856,8 @@ public static class LocalizationManager
         , OrynivoServerDirectoryLoadFailed = "No se pudo cargar el directorio."
         , OrynivoServerDirectoryEmpty = "No hay subdirectorios disponibles."
         , OrynivoServerScan = "Escaneo del servidor"
-        , OrynivoStartServerScan = "Iniciar escaneo"
+        , OrynivoStartServerScan = "Analizar biblioteca"
+        , OrynivoCalculateServerReplayGain = "Calcular ReplayGain"
         , OrynivoServerScanStarting = "Iniciando escaneo del servidor…"
         , OrynivoServerScanStartFailed = "No se pudo iniciar el escaneo del servidor."
         , OrynivoServerScanIdle = "No hay ningún escaneo del servidor en curso."
