@@ -4,7 +4,7 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.36.4] - 2026-08-12
 
 ### Added
 
@@ -19,8 +19,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   ordering; action-only columns remain unsortable. The artist-detail track
   table now also exposes the complete shared track-column chooser from its
   header context menu and persists its own visibility, order, and widths.
-
-### Fixed
 
 ## [0.36.3] - 2026-08-11
 
