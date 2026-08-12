@@ -39,6 +39,28 @@ public partial class MainWindow
     private List<ContentRow> _genreCloudTrackRows = [];
     private List<ContentRow> _genreCloudAlbumRows = [];
 
+    /// <summary>Starts Infinite Mix with every leaf genre represented by the current cloud level.</summary>
+    private async void GenreCloudInfiniteMixButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (_infiniteMixLoading)
+            return;
+
+        var representedKeys = _genreCloudNodes.Count > 0
+            ? _genreCloudNodes.Select(node => node.Key)
+            : string.IsNullOrWhiteSpace(_genreCloudSelectedKey)
+                ? Enumerable.Empty<string>()
+                : [_genreCloudSelectedKey];
+        var leafKeys = GenreCloudService.ResolveLeafGenreKeys(representedKeys);
+        if (leafKeys.Count == 0)
+            return;
+
+        StopInfiniteMix();
+        _settings.InfiniteMix.IncludedGenres = leafKeys.ToList();
+        await Task.Run(() => new SettingsStore().Save(_settings));
+        await StartInfiniteMixAsync(editSettings: false);
+    }
+
     /// <summary>Loads and renders one level of the unified local and remote genre cloud.</summary>
     /// <param name="parentKey">Selected taxonomy key, or <see langword="null"/> for the root.</param>
     private async Task ShowGenreCloudAsync(string? parentKey)

@@ -118,6 +118,7 @@ public static class LocalizationManager
         resources["L_CoverNotFound"] = Current.CoverNotFound;
         resources["L_SearchCover"] = Current.SearchCover;
         resources["L_InfiniteMixStart"] = Current.InfiniteMixStart;
+        resources["L_GenreCloudInfiniteMix"] = Current.GenreCloudInfiniteMix;
         resources["L_InfiniteMixCalculating"] = Current.InfiniteMixCalculating;
         resources["L_InfiniteMixSettingsTitle"] = Current.InfiniteMixSettingsTitle;
         resources["L_InfiniteMixSettingsHint"] = Current.InfiniteMixSettingsHint;
@@ -718,6 +719,7 @@ public static class LocalizationManager
         DashboardHeroHint = "Bereit für großartige Musik? Entdecke neue Klänge oder höre deine Favoriten.",
         DashboardRandomPlayback = "Zufällige Wiedergabe",
         InfiniteMixStart = "Endlos-Mix starten",
+        GenreCloudInfiniteMix = "Endlos-Mix aus Wolke",
         InfiniteMixStop = "Endlos-Mix stoppen",
         InfiniteMixActive = "Endlos-Mix aktiv · wird automatisch ergänzt",
         InfiniteMixCalculating = "Dein Endlos-Mix wird gerade berechnet …",
@@ -1348,6 +1350,7 @@ public static class LocalizationManager
         DashboardHeroHint = "Ready for great music? Discover something new or return to your favorites.",
         DashboardRandomPlayback = "Random playback",
         InfiniteMixStart = "Start Infinite Mix",
+        GenreCloudInfiniteMix = "Start Infinite Mix from cloud",
         InfiniteMixStop = "Stop Infinite Mix",
         InfiniteMixActive = "Infinite Mix active · replenishes automatically",
         InfiniteMixCalculating = "Your Infinite Mix is being prepared …",
@@ -1979,6 +1982,7 @@ public static class LocalizationManager
         DashboardHeroHint = "Prêt pour de la bonne musique ? Découvrez de nouveaux sons ou retrouvez vos favoris.",
         DashboardRandomPlayback = "Lecture aléatoire",
         InfiniteMixStart = "Démarrer le mix infini",
+        GenreCloudInfiniteMix = "Lancer le mix infini depuis le nuage",
         InfiniteMixStop = "Arrêter le mix infini",
         InfiniteMixActive = "Mix infini actif · complété automatiquement",
         InfiniteMixCalculating = "Votre mix infini est en cours de préparation …",
@@ -2607,6 +2611,7 @@ public static class LocalizationManager
         DashboardHeroHint = "¿Listo para disfrutar de buena música? Descubre nuevos sonidos o vuelve a tus favoritos.",
         DashboardRandomPlayback = "Reproducción aleatoria",
         InfiniteMixStart = "Iniciar mezcla infinita",
+        GenreCloudInfiniteMix = "Iniciar mezcla infinita desde la nube",
         InfiniteMixStop = "Detener mezcla infinita",
         InfiniteMixActive = "Mezcla infinita activa · se completa automáticamente",
         InfiniteMixCalculating = "Se está preparando tu mezcla infinita …",

@@ -6,6 +6,17 @@ namespace Orynivo.Core.Tests;
 /// <summary>Verifies hierarchical genre aggregation and compact candidate selection.</summary>
 public sealed class GenreCloudServiceTests
 {
+    /// <summary>Verifies recursive branch expansion and preservation of dynamic genre leaves.</summary>
+    [Fact]
+    public void ResolveLeafGenreKeys_ExpandsBranchesAndPreservesDynamicKeys()
+    {
+        var leaves = GenreCloudService.ResolveLeafGenreKeys(["edm", "unmapped:zeuhl"]);
+
+        Assert.Contains("unmapped:zeuhl", leaves);
+        Assert.DoesNotContain("edm", leaves);
+        Assert.All(leaves.Where(key => key != "unmapped:zeuhl"), key =>
+            Assert.False(GenreCloudService.BuildSnapshot([], key).Nodes.Any()));
+    }
     /// <summary>Verifies that descendant genres contribute to their root count.</summary>
     [Fact]
     public void BuildSnapshot_AggregatesDescendantsIntoRootGenres()

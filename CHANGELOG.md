@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Genre Cloud now starts Infinite Mix directly from the genres represented by
+  its current level. Branch nodes are expanded recursively to their taxonomy
+  leaves, while a selected leaf is used as-is.
 - All desktop data tables now support column-header sorting. Linked entity,
   favorite, source, rating, artwork, date, duration, track-number, and formatted
   technical columns use explicit semantic sort keys instead of display-text

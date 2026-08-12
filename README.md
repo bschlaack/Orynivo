@@ -738,6 +738,10 @@ the library into broad families. Selecting a label reveals its more specific
 genres and immediately updates the recommendations below the cloud. The
 breadcrumb buttons return to an earlier level. A leaf without further children
 remains visible as the large center label instead of producing an empty view.
+The **Start Infinite Mix from cloud** action replaces the mix's included-genre
+profile with the genres represented at that level and starts playback. Orynivo
+recursively expands every displayed branch to its leaf genres; on a leaf level,
+only that selected genre is used.
 
 The selector above the recommendations changes both the result presentation and
 the numbers in the cloud:
@@ -772,7 +776,8 @@ available width only among its actual images, without cropping or distortion.
 The same Appearance block stores a 0–100% image-visibility slider, defaults it
 to 50%, and provides the independent background-cache clear action.
 
-**Infinite Mix** can be started from the Dashboard or from **Up next**. Before
+**Infinite Mix** can be started from the Dashboard, **Up next**, or the current
+Genre Cloud level. Before
 starting, its compact profile editor selects a calm, balanced, or energetic
 mood; familiar-to-adventurous discovery level; 3, 7, 30, or 90-day history
 period; local and individual Orynivo Server sources; favorite and rarely-played

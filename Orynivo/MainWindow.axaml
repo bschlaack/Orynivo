@@ -1669,13 +1669,20 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="{DynamicResource L_GenreRecommendations}"
                                    VerticalAlignment="Center"
                                    FontSize="{DynamicResource FontSizeSubtitle}"
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource AppPrimaryTextBrush}"/>
-                        <Border Grid.Column="1"
+                        <Button Grid.Column="1"
+                                Margin="0,0,12,0"
+                                Padding="16,8"
+                                VerticalAlignment="Center"
+                                Content="{DynamicResource L_GenreCloudInfiniteMix}"
+                                Click="GenreCloudInfiniteMixButton_OnClick"/>
+                        <Border Grid.Column="2"
                                 Padding="3"
                                 Background="{DynamicResource AppButtonBrush}"
                                 BorderBrush="{DynamicResource AppButtonBorderBrush}"

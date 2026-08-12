@@ -623,6 +623,8 @@ public sealed record LocalizedStrings(
     public string DashboardRandomPlayback { get; init; } = "";
     /// <summary>Gets the action label that starts the automatically replenished history-informed mix.</summary>
     public string InfiniteMixStart { get; init; } = "";
+    /// <summary>Gets the action that starts Infinite Mix from the genres represented by the cloud.</summary>
+    public string GenreCloudInfiniteMix { get; init; } = "";
     /// <summary>Gets the action label that stops automatic Infinite Mix replenishment.</summary>
     public string InfiniteMixStop { get; init; } = "";
     /// <summary>Gets the queue status shown while Infinite Mix is active.</summary>

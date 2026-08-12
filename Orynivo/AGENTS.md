@@ -171,6 +171,11 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   the independent cache-clear action beside the mode selector in Appearance,
   and persist a zero-to-one opacity setting exposed as a 0–100% slider with a
   50% default. Disable that slider while the None mode is selected.
+  The cloud footer starts Infinite Mix from the genres represented by the
+  current level. Expand every visible taxonomy branch recursively to distinct
+  leaf keys before replacing `InfiniteMix.IncludedGenres`; when the current
+  level is a leaf, use that selected key directly. Reuse the normal initial-mix
+  queue, progress overlay, active-playback preservation, and persistence path.
 - Matching local and Orynivo Server artists use
   `ArtistNameNormalizer.CreateComparisonKey` and one `UnifiedArtist` row. Its
   album drill-down combines every matching library while retaining each album's

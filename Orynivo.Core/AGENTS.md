@@ -95,6 +95,9 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   from arbitrary substrings. Unmapped tags retain dynamic `unmapped:` keys and
   appear by their actual names beneath `more-genres`; never collapse them into
   an Other bucket. The desktop merges snapshots across providers.
+  `ResolveLeafGenreKeys` performs cycle-safe recursive expansion of one or more
+  visible taxonomy branches for Genre Cloud-driven Infinite Mix filters and
+  preserves dynamic unmapped keys as leaves.
 - `AudioDatabase.GetListeningTrend` supports up to 366 equal chronological
   buckets so the client can request daily Dashboard points without materializing
   playback-history rows.

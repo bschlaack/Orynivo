@@ -30,7 +30,14 @@ public partial class MainWindow
             return;
         }
 
-        if (!await EditInfiniteMixSettingsAsync())
+        await StartInfiniteMixAsync(editSettings: true);
+    }
+
+    /// <summary>Starts a newly configured Infinite Mix and preserves an already audible item.</summary>
+    /// <param name="editSettings">Whether the profile editor must be confirmed before generation.</param>
+    private async Task StartInfiniteMixAsync(bool editSettings)
+    {
+        if (editSettings && !await EditInfiniteMixSettingsAsync())
             return;
 
         _infiniteMixEnabled = true;
