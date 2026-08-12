@@ -141,6 +141,25 @@ public sealed class GenreCloudServiceTests
         Assert.Contains(more.Nodes, node => node.DisplayName == "Zeuhl" && node.TrackCount == 1);
     }
 
+    /// <summary>Verifies that repeated recommendation windows advance through and wrap around the stable order.</summary>
+    [Fact]
+    public void BuildSnapshot_RotatesCandidateWindowAndWraps()
+    {
+        var tracks = Enumerable.Range(1, 6)
+            .Select(id => Facet(id, "Trance"))
+            .ToList();
+
+        var first = GenreCloudService.BuildSnapshot(tracks, "trance", 3, 0);
+        var second = GenreCloudService.BuildSnapshot(tracks, "trance", 3, 3);
+        var wrapped = GenreCloudService.BuildSnapshot(tracks, "trance", 3, 6);
+
+        Assert.Empty(first.Candidates.Select(item => item.TrackId)
+            .Intersect(second.Candidates.Select(item => item.TrackId)));
+        Assert.Equal(
+            first.Candidates.Select(item => item.TrackId),
+            wrapped.Candidates.Select(item => item.TrackId));
+    }
+
     private static TrackFacetInfo Facet(long id, string genre, long? albumId = null) =>
         new(id, false, genre, "flac", 1000, AlbumId: albumId);
 }

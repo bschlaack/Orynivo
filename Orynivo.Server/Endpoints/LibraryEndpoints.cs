@@ -165,10 +165,10 @@ public static class LibraryEndpoints
             return Results.Ok(db.GetTrackFacets());
         });
 
-        api.MapGet("/genres/cloud", (string? parent, int candidates = 250) =>
+        api.MapGet("/genres/cloud", (string? parent, int candidates = 250, int offset = 0) =>
         {
             using var db = AudioDatabase.OpenDefault();
-            return Results.Ok(GenreCloudService.BuildSnapshot(db.GetTrackFacets(), parent, candidates));
+            return Results.Ok(GenreCloudService.BuildSnapshot(db.GetTrackFacets(), parent, candidates, offset));
         });
 
         api.MapPost("/tracks/by-ids", (long[] ids) =>

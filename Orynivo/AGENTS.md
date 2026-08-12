@@ -357,7 +357,11 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   Batch diversity is progressive: first avoid recent artists and repeated
   albums, then permit artist repetition, and finally permit further eligible
   tracks from represented albums. Narrow genres with only a few albums must
-  still fill the requested batch from their remaining candidates.
+  still fill the requested batch from their remaining candidates. Repeated
+  refills rotate through the stable provider candidate order instead of
+  querying the same bounded prefix forever; active playback also performs a
+  throttled lightweight threshold check so refill is not dependent on queue-view
+  events and an empty/error refill does not create a tight request loop.
 - Remote album lists are cached by `LibraryChangedAt`, but artwork mutations do
   not advance that scan timestamp. Every successful remote album artwork upload,
   reassignment, or deletion must therefore call `DeleteOrynivoAlbumListCache`

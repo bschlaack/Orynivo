@@ -1172,17 +1172,19 @@ public sealed class OrynivoServerClient : IDisposable
     /// <param name="server">Server connection settings.</param>
     /// <param name="parentKey">Selected taxonomy key, or <see langword="null"/> for root genres.</param>
     /// <param name="maximumCandidates">Maximum candidate track identifiers requested from the server.</param>
+    /// <param name="candidateOffset">Offset into the server's stable candidate order.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The genre-cloud snapshot, or an empty root snapshot when unavailable.</returns>
     public async Task<GenreCloudSnapshot> GetGenreCloudAsync(
         OrynivoServerSettings server,
         string? parentKey = null,
         int maximumCandidates = 250,
+        int candidateOffset = 0,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            var query = $"?candidates={Math.Clamp(maximumCandidates, 1, 2000)}";
+            var query = $"?candidates={Math.Clamp(maximumCandidates, 1, 2000)}&offset={Math.Max(0, candidateOffset)}";
             if (!string.IsNullOrWhiteSpace(parentKey))
                 query += $"&parent={Uri.EscapeDataString(parentKey)}";
             return await GetJsonAsync<GenreCloudSnapshot>(server, $"/api/genres/cloud{query}", cancellationToken)

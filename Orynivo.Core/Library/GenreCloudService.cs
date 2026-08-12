@@ -66,11 +66,13 @@ public static class GenreCloudService
     /// <param name="tracks">Provider-local lightweight track facets.</param>
     /// <param name="parentKey">Selected taxonomy key, or <see langword="null"/> for top-level genres.</param>
     /// <param name="maximumCandidates">Maximum matching track identifiers included for recommendation ranking.</param>
+    /// <param name="candidateOffset">Offset into the stable candidate order, wrapped at the matching track count.</param>
     /// <returns>The visible nodes and bounded track candidates.</returns>
     public static GenreCloudSnapshot BuildSnapshot(
         IEnumerable<TrackFacetInfo> tracks,
         string? parentKey = null,
-        int maximumCandidates = 250)
+        int maximumCandidates = 250,
+        int candidateOffset = 0)
     {
         ArgumentNullException.ThrowIfNull(tracks);
         maximumCandidates = Math.Clamp(maximumCandidates, 1, 2000);
@@ -138,9 +140,16 @@ public static class GenreCloudService
             _ when IsUnmapped(selected) => classified.Where(track => track.Genres.Contains(selected, StringComparer.Ordinal)).ToList(),
             _ => classified.Where(track => track.Genres.Any(key => IsDescendantOrSelf(key, selected))).ToList()
         };
-        var candidates = matching
+        var orderedCandidates = matching
             .OrderByDescending(item => item.Track.IsFavorite)
             .ThenBy(item => StableCandidateOrder(item.Track.Id, selected))
+            .ToList();
+        var normalizedOffset = orderedCandidates.Count == 0
+            ? 0
+            : Math.Abs((long)candidateOffset) % orderedCandidates.Count;
+        var candidates = orderedCandidates
+            .Skip((int)normalizedOffset)
+            .Concat(orderedCandidates.Take((int)normalizedOffset))
             .Take(maximumCandidates)
             .Select(item => new GenreCloudTrackCandidate(
                 item.Track.Id,

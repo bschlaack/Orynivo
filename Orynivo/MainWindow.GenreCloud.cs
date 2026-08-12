@@ -592,7 +592,11 @@ public partial class MainWindow
         string? parentKey,
         CancellationToken cancellationToken)
     {
-        var snapshot = await _orynivoClient.GetGenreCloudAsync(server, parentKey, 500, cancellationToken);
+        var snapshot = await _orynivoClient.GetGenreCloudAsync(
+            server,
+            parentKey,
+            500,
+            cancellationToken: cancellationToken);
         var returnedWrongLevel = !string.Equals(
             snapshot.ParentKey,
             parentKey,

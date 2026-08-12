@@ -88,7 +88,9 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
   and listening history remain on the client.
 - `GET /api/genres/cloud` returns one compact `GenreCloudService` taxonomy
   level plus bounded provider-local track candidates; it must not return file
-  paths or credentials.
+  paths or credentials. Its optional non-negative `offset` rotates the stable
+  candidate order so long-running clients do not repeatedly receive only the
+  same bounded prefix.
 - Remote package updates remain disabled by default. The server process may only
   stage a signed, matching DEB/RPM bundle beneath its data directory; installation
   belongs to the fixed-command root systemd helper, which independently verifies
