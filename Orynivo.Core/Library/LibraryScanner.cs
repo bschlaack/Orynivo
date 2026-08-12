@@ -28,6 +28,17 @@ public readonly record struct ScanResult(int Total, int Added, int Updated, int 
 /// </summary>
 public static class LibraryScanner
 {
+    private static int _replayGainThreadCount;
+    private static int _replayGainDelayMilliseconds;
+
+    /// <summary>Configures process and pacing limits for subsequent ReplayGain analyses.</summary>
+    /// <param name="ffmpegThreadCount">Maximum FFmpeg worker threads, or zero for FFmpeg's default.</param>
+    /// <param name="delayMilliseconds">Cancellable delay after each analysed track.</param>
+    public static void ConfigureReplayGainThrottling(int ffmpegThreadCount, int delayMilliseconds)
+    {
+        Volatile.Write(ref _replayGainThreadCount, Math.Clamp(ffmpegThreadCount, 0, 64));
+        Volatile.Write(ref _replayGainDelayMilliseconds, Math.Clamp(delayMilliseconds, 0, 10000));
+    }
     private static readonly SemaphoreSlim ScanGate = new(1, 1);
     private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -664,7 +675,7 @@ public static class LibraryScanner
             return 0;
 
         var updatedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var albumSeedTracks = new List<TrackRecord>();
+        var albumIdsMissingGain = new HashSet<long>();
         for (var i = 0; i < rows.Count; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -685,21 +696,29 @@ public static class LibraryScanner
                 }
             }
 
-            if (string.IsNullOrWhiteSpace(row.ReplayGainAlbum))
-                albumSeedTracks.Add(track);
+            if (string.IsNullOrWhiteSpace(row.ReplayGainAlbum) && row.AlbumId is long albumId)
+                albumIdsMissingGain.Add(albumId);
         }
 
-        foreach (var updatedTrack in EnsureAlbumReplayGain(db, albumSeedTracks, cancellationToken))
-            updatedPaths.Add(updatedTrack.Path);
+        EnsureAlbumReplayGainForAlbums(
+            db,
+            albumIdsMissingGain,
+            cancellationToken,
+            path => updatedPaths.Add(path),
+            collectUpdatedTracks: false);
 
         if (updatedPaths.Count > 0)
         {
-            var updatedTracks = updatedPaths
-                .Select(db.GetByPath)
-                .Where(track => track is not null)
-                .Cast<TrackRecord>()
-                .ToList();
-            TrackSearchIndex.UpdateMany(updatedTracks);
+            foreach (var batch in updatedPaths.Chunk(250))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var updatedTracks = batch
+                    .Select(db.GetByPath)
+                    .Where(track => track is not null)
+                    .Cast<TrackRecord>()
+                    .ToList();
+                TrackSearchIndex.UpdateMany(updatedTracks);
+            }
         }
 
         return updatedPaths.Count;
@@ -945,6 +964,7 @@ public static class LibraryScanner
                 record.SegmentStart,
                 record.SegmentEnd,
                 cancellationToken);
+            DelayAfterReplayGainAnalysis(cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -981,6 +1001,8 @@ public static class LibraryScanner
         if (process is null)
             return null;
 
+        TryLowerReplayGainProcessPriority(process);
+
         try
         {
             var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
@@ -1008,6 +1030,15 @@ public static class LibraryScanner
         double? segmentEnd,
         Action<IList<string>>? configureInputArguments)
     {
+        var threadCount = Volatile.Read(ref _replayGainThreadCount);
+        if (threadCount > 0)
+        {
+            startInfo.ArgumentList.Add("-threads");
+            startInfo.ArgumentList.Add(threadCount.ToString(CultureInfo.InvariantCulture));
+            startInfo.ArgumentList.Add("-filter_threads");
+            startInfo.ArgumentList.Add(threadCount.ToString(CultureInfo.InvariantCulture));
+        }
+
         if (segmentStart is > 0)
         {
             startInfo.ArgumentList.Add("-ss");
@@ -1031,6 +1062,25 @@ public static class LibraryScanner
         startInfo.ArgumentList.Add("-f");
         startInfo.ArgumentList.Add("null");
         startInfo.ArgumentList.Add("-");
+    }
+
+    private static void DelayAfterReplayGainAnalysis(CancellationToken cancellationToken)
+    {
+        var delay = Volatile.Read(ref _replayGainDelayMilliseconds);
+        if (delay > 0)
+            Task.Delay(delay, cancellationToken).GetAwaiter().GetResult();
+    }
+
+    private static void TryLowerReplayGainProcessPriority(Process process)
+    {
+        try
+        {
+            process.PriorityClass = ProcessPriorityClass.BelowNormal;
+        }
+        catch
+        {
+            // Priority changes are best-effort and may be denied by the host OS.
+        }
     }
 
     private static string? ParseReplayGainTrack(string stderr)
@@ -1087,6 +1137,16 @@ public static class LibraryScanner
         if (albumIds.Count == 0)
             return [];
 
+        return EnsureAlbumReplayGainForAlbums(db, albumIds, cancellationToken);
+    }
+
+    private static List<TrackRecord> EnsureAlbumReplayGainForAlbums(
+        AudioDatabase db,
+        IEnumerable<long> albumIds,
+        CancellationToken cancellationToken,
+        Action<string>? onUpdatedPath = null,
+        bool collectUpdatedTracks = true)
+    {
         var updated = new List<TrackRecord>();
         foreach (var albumId in albumIds)
         {
@@ -1116,11 +1176,12 @@ public static class LibraryScanner
             if (db.UpdateReplayGainAlbumForTracks(missingIds, albumGain) == 0)
                 continue;
 
-            updated.AddRange(
-                db.GetTrackListByIds(missingIds)
-                    .Select(row => db.GetByPath(row.Path))
-                    .Where(track => track is not null)
-                    .Cast<TrackRecord>());
+            foreach (var row in db.GetTrackListByIds(missingIds))
+            {
+                onUpdatedPath?.Invoke(row.Path);
+                if (collectUpdatedTracks && db.GetByPath(row.Path) is { } updatedTrack)
+                    updated.Add(updatedTrack);
+            }
         }
 
         return updated;

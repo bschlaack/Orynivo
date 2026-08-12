@@ -492,11 +492,41 @@ public partial class MainWindow : Window
             }
         }
         private long? _musicBrainzRatingFetchedAt;
+        private bool _isMusicBrainzRatingLoading;
+        private bool _musicBrainzRatingTemporaryFailure;
+        /// <summary>Gets or sets whether a MusicBrainz lookup is currently running for this row.</summary>
+        public bool IsMusicBrainzRatingLoading
+        {
+            get => _isMusicBrainzRatingLoading;
+            set
+            {
+                if (_isMusicBrainzRatingLoading == value) return;
+                _isMusicBrainzRatingLoading = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsMusicBrainzRatingLoading)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(MusicBrainzRatingDisplay)));
+            }
+        }
+        /// <summary>Gets or sets whether the latest MusicBrainz request failed temporarily.</summary>
+        public bool MusicBrainzRatingTemporaryFailure
+        {
+            get => _musicBrainzRatingTemporaryFailure;
+            set
+            {
+                if (_musicBrainzRatingTemporaryFailure == value) return;
+                _musicBrainzRatingTemporaryFailure = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(MusicBrainzRatingTemporaryFailure)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(MusicBrainzRatingDisplay)));
+            }
+        }
         public string MusicBrainzRatingDisplay => MusicBrainzRating is double rating
             ? $"★ {rating:0.0} ({MusicBrainzRatingVotes.GetValueOrDefault():N0})"
+            : IsMusicBrainzRatingLoading
+                ? LocalizationManager.Current.MusicBrainzLoadingRating
+            : MusicBrainzRatingTemporaryFailure
+                ? LocalizationManager.Current.MusicBrainzRetryRating
             : MusicBrainzRatingFetchedAt.HasValue
                 ? LocalizationManager.Current.MusicBrainzNoRating
-                : "—";
+                : LocalizationManager.Current.MusicBrainzLoadRating;
         public string? Folder      { get; init; }
         public string? ArtworkPath { get; set; }
         public string? ThumbnailPath { get; set; }
@@ -9459,7 +9489,7 @@ public partial class MainWindow : Window
         {
             Header = LocalizationManager.Current.MusicBrainzRating,
             SortMemberPath = nameof(ContentRow.MusicBrainzRating),
-            Width = new DataGridLength(138),
+            Width = new DataGridLength(160),
             CellTemplate = new FuncDataTemplate<ContentRow>((row, _) =>
             {
                 var button = new Button
@@ -9557,7 +9587,13 @@ public partial class MainWindow : Window
             foreach (var group in knownGroups)
             {
                 cts.Token.ThrowIfCancellationRequested();
-                await RefreshMusicBrainzTrackRatingGroupAsync(group.ToList(), cts.Token);
+                var groupRows = group.ToList();
+                for (var attempt = 0; attempt < 3; attempt++)
+                {
+                    if (await RefreshMusicBrainzTrackRatingGroupAsync(groupRows, cts.Token))
+                        break;
+                    await Task.Delay(TimeSpan.FromSeconds(attempt + 1), cts.Token);
+                }
             }
 
             foreach (var row in rows.Where(row => !Guid.TryParse(row.MusicBrainzTrackId, out _)))
@@ -9585,12 +9621,20 @@ public partial class MainWindow : Window
     /// <param name="rows">Rows sharing one known recording MBID.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A task representing lookup and persistence.</returns>
-    private async Task RefreshMusicBrainzTrackRatingGroupAsync(
+    private async Task<bool> RefreshMusicBrainzTrackRatingGroupAsync(
         IReadOnlyList<ContentRow> rows,
         CancellationToken cancellationToken)
     {
         if (rows.Count == 0)
-            return;
+            return true;
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            foreach (var row in rows)
+            {
+                row.IsMusicBrainzRatingLoading = true;
+                row.MusicBrainzRatingTemporaryFailure = false;
+            }
+        });
         try
         {
             var first = rows[0];
@@ -9602,12 +9646,16 @@ public partial class MainWindow : Window
                 first.KnownDuration?.TotalSeconds,
                 cancellationToken);
             if (result is null)
-                return;
+            {
+                await SetMusicBrainzTemporaryFailureAsync(rows);
+                return false;
+            }
             foreach (var row in rows)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 await PersistMusicBrainzTrackRatingAsync(row, result, cancellationToken);
             }
+            return true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -9615,7 +9663,16 @@ public partial class MainWindow : Window
         }
         catch
         {
-            // Ratings are optional metadata; continue with the remaining album rows.
+            await SetMusicBrainzTemporaryFailureAsync(rows);
+            return false;
+        }
+        finally
+        {
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                foreach (var row in rows)
+                    row.IsMusicBrainzRatingLoading = false;
+            });
         }
     }
 
@@ -9629,6 +9686,11 @@ public partial class MainWindow : Window
     {
         if (row.Id is not long trackId)
             return;
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            row.IsMusicBrainzRatingLoading = true;
+            row.MusicBrainzRatingTemporaryFailure = false;
+        });
         try
         {
             var service = new MusicBrainzRatingService(MusicBrainzRatingHttpClient);
@@ -9651,8 +9713,25 @@ public partial class MainWindow : Window
         }
         catch
         {
-            // Ratings are optional metadata; network failures leave the existing cache intact.
+            await SetMusicBrainzTemporaryFailureAsync([row]);
         }
+        finally
+        {
+            await Dispatcher.UIThread.InvokeAsync(() => row.IsMusicBrainzRatingLoading = false);
+        }
+    }
+
+    /// <summary>Marks rows for a visible manual retry after a temporary MusicBrainz failure.</summary>
+    /// <param name="rows">Rows whose lookup did not complete.</param>
+    /// <returns>A task representing the UI update.</returns>
+    private static async Task SetMusicBrainzTemporaryFailureAsync(IEnumerable<ContentRow> rows)
+    {
+        var snapshot = rows.ToList();
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            foreach (var row in snapshot)
+                row.MusicBrainzRatingTemporaryFailure = true;
+        });
     }
 
     /// <summary>Runs one user-requested MusicBrainz lookup ahead of background enrichment.</summary>
@@ -9719,6 +9798,7 @@ public partial class MainWindow : Window
             row.MusicBrainzRatingVotes = result.Votes;
             row.MusicBrainzRating = result.Rating;
             row.MusicBrainzRatingFetchedAt = fetchedAt;
+            row.MusicBrainzRatingTemporaryFailure = false;
         });
     }
 

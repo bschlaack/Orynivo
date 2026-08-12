@@ -221,6 +221,28 @@ public static class GenreCloudService
         return leaves.OrderBy(key => key, StringComparer.Ordinal).ToArray();
     }
 
+    /// <summary>Expands taxonomy nodes to themselves and every recursive descendant key.</summary>
+    /// <param name="keys">Stable taxonomy branch keys to expand.</param>
+    /// <returns>Distinct branch and descendant keys in deterministic order.</returns>
+    public static IReadOnlyList<string> ResolveDescendantGenreKeys(IEnumerable<string> keys)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        var resolved = new HashSet<string>(StringComparer.Ordinal);
+
+        void Visit(string key)
+        {
+            if (!resolved.Add(key) || key == MoreKey || IsUnmapped(key))
+                return;
+            foreach (var child in Definitions.Where(definition =>
+                         definition.Parents.Contains(key, StringComparer.Ordinal)))
+                Visit(child.Key);
+        }
+
+        foreach (var key in keys.Where(key => !string.IsNullOrWhiteSpace(key)))
+            Visit(key);
+        return resolved.OrderBy(key => key, StringComparer.Ordinal).ToArray();
+    }
+
     private static int CountAlbums(IEnumerable<ClassifiedTrack> tracks, string genreKey) =>
         tracks.Where(track => track.Genres.Any(key => IsDescendantOrSelf(key, genreKey)))
             .Select(track => track.Track.AlbumId)

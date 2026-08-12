@@ -31,6 +31,15 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
   calculating only missing track and album ReplayGain values. It shares scan
   serialization and `/api/scan` progress reporting, invalidates library caches
   when values change, and must never overwrite an existing ReplayGain value.
+- Server startup configures Core ReplayGain analysis from
+  `ReplayGainFfmpegThreads` (default one) and `ReplayGainDelayMilliseconds`
+  (default 250 ms). Packaged Linux services additionally run below normal CPU
+  priority with best-effort low I/O priority. Preserve these defaults so long
+  maintenance does not starve SSH or Kestrel traffic; administrators may
+  override them through `/etc/default/orynivo-server`.
+  The Core maintenance implementation retains only album IDs across its track
+  pass and indexes completed rows in bounded batches; do not reintroduce a
+  complete-library `TrackRecord` collection in the server process.
 - Authenticated `GET`/`PUT /api/settings/replaygain` expose the server-owned
   `CalculateMissingReplayGainDuringScan` preference. PUT updates the live
   watcher immediately and persists the value to the editable configuration;

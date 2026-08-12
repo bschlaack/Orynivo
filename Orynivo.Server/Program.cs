@@ -34,6 +34,10 @@ var settings = builder.Configuration
     .GetSection("Orynivo")
     .Get<ServerSettings>() ?? new ServerSettings();
 
+LibraryScanner.ConfigureReplayGainThrottling(
+    settings.ReplayGainFfmpegThreads,
+    settings.ReplayGainDelayMilliseconds);
+
 builder.Services.AddSingleton(settings);
 builder.Services.AddSingleton<ServerLibraryChangeTracker>();
 

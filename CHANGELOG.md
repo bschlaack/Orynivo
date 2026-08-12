@@ -9,16 +9,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - Genre Cloud now starts Infinite Mix directly from the genres represented by
-  its current level. Branch nodes are expanded recursively to their taxonomy
-  leaves, while a selected leaf is used as-is. The normal profile dialog opens
-  with those genres preselected, and generation queries each selected subtree
-  directly so narrow genres are not lost in a root-level candidate sample.
+  its current level. A selected node contributes its complete taxonomy subtree,
+  including tracks tagged directly with the parent and every recursive
+  subgenre. The normal profile dialog opens with the branch preselected, and
+  generation queries it and its descendants directly so narrow genres are not
+  lost in a root-level candidate sample.
 - All desktop data tables now support column-header sorting. Linked entity,
   favorite, source, rating, artwork, date, duration, track-number, and formatted
   technical columns use explicit semantic sort keys instead of display-text
   ordering; action-only columns remain unsortable. The artist-detail track
   table now also exposes the complete shared track-column chooser from its
   header context menu and persists its own visibility, order, and widths.
+
+### Fixed
+
+- Orynivo Server ReplayGain maintenance now runs FFmpeg with one worker thread,
+  below-normal process/CPU priority, low I/O priority, and a short cancellable
+  pause between tracks by default. The thread and pacing limits are configurable
+  so long analyses no longer starve SSH and normal server API traffic. The
+  maintenance pass now retains only album IDs instead of every full track
+  record and updates Lucene in bounded batches, preventing multi-gigabyte server
+  memory growth on large libraries.
+- Unresolved MusicBrainz rating cells now show a localized **Load rating**
+  action instead of a narrow dash. Album-detail enrichment retries temporary
+  lookup failures up to three times, exposes **Try again** afterward, and keeps
+  a confirmed recording without community votes in the distinct **Not rated**
+  state.
+- Infinite Mix no longer stops initial genre-based generation after finding
+  only one track per artist or album. It now applies diversity in stages and
+  fills the requested batch with additional eligible tracks when a narrow
+  genre spans only a few albums.
 
 ## [0.36.3] - 2026-08-11
 

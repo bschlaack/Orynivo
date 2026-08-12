@@ -172,11 +172,12 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   and persist a zero-to-one opacity setting exposed as a 0–100% slider with a
   50% default. Disable that slider while the None mode is selected.
   The cloud footer starts Infinite Mix from the genres represented by the
-  current level. Expand every visible taxonomy branch recursively to distinct
-  leaf keys before replacing `InfiniteMix.IncludedGenres`; when the current
-  level is a leaf, use that selected key directly. Open the normal profile
-  dialog with these includes prefilled, then load candidates from each selected
-  subtree instead of relying on a bounded root snapshot. Reuse the normal
+  current level. Below the root, store the selected parent branch in
+  `InfiniteMix.IncludedGenres`; at the root, store every visible root branch.
+  Candidate loading must expand each branch to itself plus every recursive
+  descendant so directly tagged parent tracks and all subgenres participate.
+  Open the normal profile dialog with these includes prefilled, then load those
+  branch snapshots instead of relying on a bounded root snapshot. Reuse the normal
   initial-mix queue, progress overlay, active-playback preservation, and
   persistence path.
 - Matching local and Orynivo Server artists use
@@ -353,6 +354,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   removable chips. Their type-ahead suggestions load asynchronously from the
   currently checked local/server sources; unavailable servers must not block
   the dialog, and arbitrary custom genre values remain valid.
+  Batch diversity is progressive: first avoid recent artists and repeated
+  albums, then permit artist repetition, and finally permit further eligible
+  tracks from represented albums. Narrow genres with only a few albums must
+  still fill the requested batch from their remaining candidates.
 - Remote album lists are cached by `LibraryChangedAt`, but artwork mutations do
   not advance that scan timestamp. Every successful remote album artwork upload,
   reassignment, or deletion must therefore call `DeleteOrynivoAlbumListCache`
@@ -393,9 +398,11 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   through the direct recording lookup; MusicBrainz batch search rating fields
   are not reliable enough to cache. De-duplicate known MBIDs across mirrored
   local/server album rows before issuing direct lookups.
-  The rating cell displays a localized not-rated state after a successful
-  direct lookup returns no community score; reserve the dash for tracks that
-  have not been queried.
+  The rating cell displays a localized **Load rating** action before its first
+  lookup, a loading state while active, and **Try again** after a temporary
+  failure. Album-detail foreground refresh retries temporary failures up to
+  three times. A successful direct lookup without a community score displays
+  the distinct localized not-rated state and must not be retried continuously.
   Direct lookups request supplemental MusicBrainz genres and tags. Persist them
   through the owning local database or remote rating API, then incrementally
   update the local/server Lucene document; never replace the row's embedded

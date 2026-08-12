@@ -327,6 +327,8 @@ Edit `appsettings.json` before first use:
     "LibraryPaths": ["/music", "/mnt/nas/music"],
     "ScanOnStartup": true,
     "CalculateMissingReplayGainDuringScan": false,
+    "ReplayGainFfmpegThreads": 1,
+    "ReplayGainDelayMilliseconds": 250,
     "AllowRemoteUpdates": false
   }
 }
@@ -336,6 +338,15 @@ Edit `appsettings.json` before first use:
 tags are still imported, while expensive FFmpeg analysis is skipped during
 normal discovery scans. Enabling it can substantially lengthen scans of large
 or chaptered files such as complete-concert MKA containers.
+Server ReplayGain work defaults to one FFmpeg worker thread and a cancellable
+250 ms pause between analysed tracks. Packaged Linux services also use reduced
+CPU and I/O priority so SSH and API traffic remain responsive. Set
+`ReplayGainFfmpegThreads` to `0` to restore FFmpeg's automatic thread choice;
+both limits can be overridden through `/etc/default/orynivo-server` with the
+usual `Orynivo__...` environment-variable names.
+ReplayGain maintenance keeps only compact album identifiers between its track
+and album phases and refreshes the search index in bounded batches, so memory
+usage remains proportional to a small work set rather than the complete library.
 
 `AllowRemoteUpdates` is disabled by default. When enabled on a packaged Linux
 server, an authenticated Orynivo desktop client can download the matching signed
@@ -705,8 +716,11 @@ byte-range streaming without FFmpeg.
   ratings and therefore cannot safely replace one lookup per recording.
   Duplicate local and server rows with the same recording MBID nevertheless
   share one lookup result, avoiding redundant requests for mirrored libraries.
-  A completed lookup without community votes is shown as **Not rated** rather
-  than the dash reserved for tracks that have not yet been queried.
+  A track that has not yet been queried shows the larger **Load rating** action;
+  temporary album-refresh failures are retried up to three times and then show
+  **Try again**. A completed lookup without community votes is shown as
+  **Not rated**, so transient failures are not confused with a confirmed empty
+  rating.
   The same direct lookup also caches curated MusicBrainz genres and community
   tags with at least two positive votes. They remain separate from embedded
   genres but supplement Genre Cloud classification, genre filters, Infinite Mix,
@@ -740,9 +754,9 @@ breadcrumb buttons return to an earlier level. A leaf without further children
 remains visible as the large center label instead of producing an empty view.
 The **Start Infinite Mix from cloud** action opens the normal profile editor
 with the genres represented at that level already selected. After confirmation,
-Orynivo recursively expands every displayed branch to its leaf genres and
-queries those subtrees directly; on a leaf level, only that selected genre is
-used.
+Orynivo queries the selected branch and every recursive subgenre directly,
+including tracks tagged with the parent genre itself; on a leaf level, only
+that selected genre is used.
 
 The selector above the recommendations changes both the result presentation and
 the numbers in the cloud:
@@ -787,6 +801,9 @@ blocking progress overlay so the start action cannot be mistaken for an
 unresponsive button. The first 20 tracks are added to Up next; another batch is
 prepared automatically in the background when five tracks remain. Existing
 queue entries and immediate track, album, and artist repetitions are avoided.
+Selection prefers different artists and albums first, then fills the batch with
+additional eligible tracks when a narrow genre contains too few distinct albums
+to reach the normal 20-track batch size.
 Genre rules use removable chips with type-ahead suggestions gathered from the
 currently enabled local and Orynivo Server libraries; custom genre text remains
 possible when a library does not offer a matching suggestion.

@@ -31,6 +31,12 @@ public sealed class ServerSettings
     /// </summary>
     public bool CalculateMissingReplayGainDuringScan { get; set; }
 
+    /// <summary>Gets or sets the FFmpeg thread limit for server ReplayGain analysis.</summary>
+    public int ReplayGainFfmpegThreads { get; set; } = 1;
+
+    /// <summary>Gets or sets the pause in milliseconds between server ReplayGain track analyses.</summary>
+    public int ReplayGainDelayMilliseconds { get; set; } = 250;
+
     /// <summary>Gets or sets whether authenticated clients may stage and request signed package updates.</summary>
     public bool AllowRemoteUpdates { get; set; }
 

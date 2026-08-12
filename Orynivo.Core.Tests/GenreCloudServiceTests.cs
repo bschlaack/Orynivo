@@ -17,6 +17,16 @@ public sealed class GenreCloudServiceTests
         Assert.All(leaves.Where(key => key != "unmapped:zeuhl"), key =>
             Assert.False(GenreCloudService.BuildSnapshot([], key).Nodes.Any()));
     }
+    /// <summary>Verifies that branch expansion includes both the branch and all nested subgenres.</summary>
+    [Fact]
+    public void ResolveDescendantGenreKeys_IncludesBranchAndNestedGenres()
+    {
+        var genres = GenreCloudService.ResolveDescendantGenreKeys(["trance"]);
+
+        Assert.Contains("trance", genres);
+        Assert.Contains("psytrance", genres);
+        Assert.Contains("goa-trance", genres);
+    }
     /// <summary>Verifies that descendant genres contribute to their root count.</summary>
     [Fact]
     public void BuildSnapshot_AggregatesDescendantsIntoRootGenres()

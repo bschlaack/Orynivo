@@ -39,24 +39,21 @@ public partial class MainWindow
     private List<ContentRow> _genreCloudTrackRows = [];
     private List<ContentRow> _genreCloudAlbumRows = [];
 
-    /// <summary>Starts Infinite Mix with every leaf genre represented by the current cloud level.</summary>
+    /// <summary>Starts Infinite Mix with every complete genre branch represented by the current cloud level.</summary>
     private async void GenreCloudInfiniteMixButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         e.Handled = true;
         if (_infiniteMixLoading)
             return;
 
-        var representedKeys = _genreCloudNodes.Count > 0
-            ? _genreCloudNodes.Select(node => node.Key)
-            : string.IsNullOrWhiteSpace(_genreCloudSelectedKey)
-                ? Enumerable.Empty<string>()
-                : [_genreCloudSelectedKey];
-        var leafKeys = GenreCloudService.ResolveLeafGenreKeys(representedKeys);
-        if (leafKeys.Count == 0)
+        var representedKeys = string.IsNullOrWhiteSpace(_genreCloudSelectedKey)
+            ? _genreCloudNodes.Select(node => node.Key).ToList()
+            : [_genreCloudSelectedKey];
+        if (representedKeys.Count == 0)
             return;
 
         var profile = CloneInfiniteMixSettings(_settings.InfiniteMix);
-        profile.IncludedGenres = leafKeys.ToList();
+        profile.IncludedGenres = representedKeys;
         if (!await EditInfiniteMixSettingsAsync(profile))
             return;
 

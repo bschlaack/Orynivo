@@ -137,10 +137,11 @@ public partial class MainWindow
         try
         {
             var profile = _settings.InfiniteMix;
-            var requestedGenreKeys = profile.IncludedGenres
+            var includedGenreKeys = profile.IncludedGenres
                 .SelectMany(GenreCloudService.ResolveGenreKeys)
                 .Distinct(StringComparer.Ordinal)
                 .ToArray();
+            var requestedGenreKeys = GenreCloudService.ResolveDescendantGenreKeys(includedGenreKeys);
             var sources = new List<GenreCloudSource>();
             if (profile.IncludeLocalLibrary)
             {
@@ -148,7 +149,9 @@ public partial class MainWindow
                 {
                     using var db = AudioDatabase.OpenDefault();
                     var facets = db.GetTrackFacets();
-                    var keys = requestedGenreKeys.Length == 0 ? new string?[] { null } : requestedGenreKeys;
+                    IEnumerable<string?> keys = requestedGenreKeys.Count == 0
+                        ? new string?[] { null }
+                        : requestedGenreKeys.Cast<string?>();
                     return keys.Select(key => new GenreCloudSource(
                         null,
                         GenreCloudService.BuildSnapshot(facets, key, 1000))).ToList();
@@ -159,7 +162,9 @@ public partial class MainWindow
             var enabledServers = _settings.OrynivoServers.Where(server =>
                 !profile.ServerSelectionConfigured || profile.EnabledServerIds.Contains(server.Id));
             var remoteTasks = enabledServers.SelectMany(server =>
-                (requestedGenreKeys.Length == 0 ? new string?[] { null } : requestedGenreKeys)
+                (requestedGenreKeys.Count == 0
+                    ? (IEnumerable<string?>)new string?[] { null }
+                    : requestedGenreKeys.Cast<string?>())
                 .Select(key => LoadInfiniteMixSourceAsync(server, key)));
             var remote = await Task.WhenAll(remoteTasks);
             sources.AddRange(remote.Where(source => source is not null).Cast<GenreCloudSource>());
@@ -202,21 +207,32 @@ public partial class MainWindow
                 .Count();
             var sourceLimit = Math.Max(1, (int)Math.Ceiling(batchSize / (double)Math.Max(1, physicalSourceCount)) + 2);
             var selected = new List<ContentRow>();
-            foreach (var row in rows)
+
+            bool TrySelect(ContentRow row, bool requireNewAlbum, bool avoidRecentArtist)
             {
                 if (selected.Count >= batchSize || string.IsNullOrWhiteSpace(row.FilePath) || queued.Contains(row.FilePath))
-                    continue;
+                    return false;
                 if (sourceCounts.GetValueOrDefault(row.SourceKey) >= sourceLimit)
-                    continue;
-                if (!string.IsNullOrWhiteSpace(row.Artist) && recentArtists.Contains(row.Artist) && selected.Count < 8)
-                    continue;
+                    return false;
+                if (avoidRecentArtist && !string.IsNullOrWhiteSpace(row.Artist) && recentArtists.Contains(row.Artist))
+                    return false;
                 var albumKey = $"{row.SourceKey}|{row.AlbumId}|{row.Album}";
-                if (!string.IsNullOrWhiteSpace(row.Album) && !selectedAlbums.Add(albumKey))
-                    continue;
+                if (requireNewAlbum && !string.IsNullOrWhiteSpace(row.Album) && !selectedAlbums.Add(albumKey))
+                    return false;
                 selected.Add(row);
                 queued.Add(row.FilePath);
                 sourceCounts[row.SourceKey] = sourceCounts.GetValueOrDefault(row.SourceKey) + 1;
+                if (!string.IsNullOrWhiteSpace(row.Artist))
+                    recentArtists.Add(row.Artist);
+                return true;
             }
+
+            foreach (var row in rows)
+                TrySelect(row, requireNewAlbum: true, avoidRecentArtist: true);
+            foreach (var row in rows)
+                TrySelect(row, requireNewAlbum: true, avoidRecentArtist: false);
+            foreach (var row in rows)
+                TrySelect(row, requireNewAlbum: false, avoidRecentArtist: false);
             foreach (var row in selected)
             {
                 _queue.Add(ToPlaylistItem(row));
