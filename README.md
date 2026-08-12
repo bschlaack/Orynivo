@@ -738,10 +738,11 @@ the library into broad families. Selecting a label reveals its more specific
 genres and immediately updates the recommendations below the cloud. The
 breadcrumb buttons return to an earlier level. A leaf without further children
 remains visible as the large center label instead of producing an empty view.
-The **Start Infinite Mix from cloud** action replaces the mix's included-genre
-profile with the genres represented at that level and starts playback. Orynivo
-recursively expands every displayed branch to its leaf genres; on a leaf level,
-only that selected genre is used.
+The **Start Infinite Mix from cloud** action opens the normal profile editor
+with the genres represented at that level already selected. After confirmation,
+Orynivo recursively expands every displayed branch to its leaf genres and
+queries those subtrees directly; on a leaf level, only that selected genre is
+used.
 
 The selector above the recommendations changes both the result presentation and
 the numbers in the cloud:

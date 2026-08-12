@@ -55,9 +55,12 @@ public partial class MainWindow
         if (leafKeys.Count == 0)
             return;
 
+        var profile = CloneInfiniteMixSettings(_settings.InfiniteMix);
+        profile.IncludedGenres = leafKeys.ToList();
+        if (!await EditInfiniteMixSettingsAsync(profile))
+            return;
+
         StopInfiniteMix();
-        _settings.InfiniteMix.IncludedGenres = leafKeys.ToList();
-        await Task.Run(() => new SettingsStore().Save(_settings));
         await StartInfiniteMixAsync(editSettings: false);
     }
 
