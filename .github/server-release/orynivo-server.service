@@ -15,7 +15,14 @@ ExecStart=/usr/lib/orynivo-server/Orynivo.Server
 # database under $HOME and the process aborts on startup.
 StateDirectory=orynivo-server
 Environment=ORYNIVO_DATA_DIR=/var/lib/orynivo-server
+# Keep long ReplayGain maintenance subordinate to SSH, Kestrel, and normal
+# system activity. Administrators may override these values in the environment file.
+Environment=Orynivo__ReplayGainFfmpegThreads=1
+Environment=Orynivo__ReplayGainDelayMilliseconds=250
 EnvironmentFile=-/etc/default/orynivo-server
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal

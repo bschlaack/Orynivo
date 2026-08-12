@@ -30,7 +30,14 @@ public partial class MainWindow
             return;
         }
 
-        if (!await EditInfiniteMixSettingsAsync())
+        await StartInfiniteMixAsync(editSettings: true);
+    }
+
+    /// <summary>Starts a newly configured Infinite Mix and preserves an already audible item.</summary>
+    /// <param name="editSettings">Whether the profile editor must be confirmed before generation.</param>
+    private async Task StartInfiniteMixAsync(bool editSettings)
+    {
+        if (editSettings && !await EditInfiniteMixSettingsAsync())
             return;
 
         _infiniteMixEnabled = true;
@@ -130,22 +137,37 @@ public partial class MainWindow
         try
         {
             var profile = _settings.InfiniteMix;
-            GenreCloudSource? local = null;
+            var includedGenreKeys = profile.IncludedGenres
+                .SelectMany(GenreCloudService.ResolveGenreKeys)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+            var requestedGenreKeys = GenreCloudService.ResolveDescendantGenreKeys(includedGenreKeys);
+            var sources = new List<GenreCloudSource>();
             if (profile.IncludeLocalLibrary)
             {
-                local = await Task.Run(() =>
+                sources.AddRange(await Task.Run(() =>
                 {
                     using var db = AudioDatabase.OpenDefault();
-                    return new GenreCloudSource(null, GenreCloudService.BuildSnapshot(db.GetTrackFacets(), null, 1000));
-                });
+                    var facets = db.GetTrackFacets();
+                    IEnumerable<string?> keys = requestedGenreKeys.Count == 0
+                        ? new string?[] { null }
+                        : requestedGenreKeys.Cast<string?>();
+                    return keys.Select(key => new GenreCloudSource(
+                        null,
+                        GenreCloudService.BuildSnapshot(facets, key, 1000))).ToList();
+                }));
             }
             if (showProgress)
                 ShowInfiniteMixProgress(25);
             var enabledServers = _settings.OrynivoServers.Where(server =>
                 !profile.ServerSelectionConfigured || profile.EnabledServerIds.Contains(server.Id));
-            var remote = await Task.WhenAll(enabledServers.Select(LoadInfiniteMixSourceAsync));
-            var sources = (local is null ? Enumerable.Empty<GenreCloudSource>() : new[] { local })
-                .Concat(remote.Where(source => source is not null).Cast<GenreCloudSource>()).ToList();
+            var remoteTasks = enabledServers.SelectMany(server =>
+                (requestedGenreKeys.Count == 0
+                    ? (IEnumerable<string?>)new string?[] { null }
+                    : requestedGenreKeys.Cast<string?>())
+                .Select(key => LoadInfiniteMixSourceAsync(server, key)));
+            var remote = await Task.WhenAll(remoteTasks);
+            sources.AddRange(remote.Where(source => source is not null).Cast<GenreCloudSource>());
             if (showProgress)
                 ShowInfiniteMixProgress(45);
             var listeningWeights = await Task.Run(() =>
@@ -166,6 +188,8 @@ public partial class MainWindow
                     .Where(candidate => !profile.ExcludedTrackKeys.Contains(BuildInfiniteMixTrackKey(source.Server, candidate.TrackId)))
                     .Select(candidate => new GenreCloudCandidate(source.Server, candidate,
                         CalculateInfiniteMixScore(source.Server, candidate, listeningWeights, playCounts, profile))))
+                .GroupBy(candidate => BuildInfiniteMixTrackKey(candidate.Server, candidate.Track.TrackId), StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.OrderByDescending(candidate => candidate.Score).First())
                 .OrderByDescending(candidate => candidate.Score)
                 .ToList();
             var rows = await ResolveGenreCandidateRowsAsync(ranked, CancellationToken.None);
@@ -177,23 +201,38 @@ public partial class MainWindow
                 .ToHashSet(StringComparer.CurrentCultureIgnoreCase);
             var selectedAlbums = new HashSet<string>(StringComparer.CurrentCultureIgnoreCase);
             var sourceCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            var sourceLimit = Math.Max(1, (int)Math.Ceiling(batchSize / (double)Math.Max(1, sources.Count)) + 2);
+            var physicalSourceCount = sources
+                .Select(source => source.Server?.Id ?? "local")
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count();
+            var sourceLimit = Math.Max(1, (int)Math.Ceiling(batchSize / (double)Math.Max(1, physicalSourceCount)) + 2);
             var selected = new List<ContentRow>();
-            foreach (var row in rows)
+
+            bool TrySelect(ContentRow row, bool requireNewAlbum, bool avoidRecentArtist)
             {
                 if (selected.Count >= batchSize || string.IsNullOrWhiteSpace(row.FilePath) || queued.Contains(row.FilePath))
-                    continue;
+                    return false;
                 if (sourceCounts.GetValueOrDefault(row.SourceKey) >= sourceLimit)
-                    continue;
-                if (!string.IsNullOrWhiteSpace(row.Artist) && recentArtists.Contains(row.Artist) && selected.Count < 8)
-                    continue;
+                    return false;
+                if (avoidRecentArtist && !string.IsNullOrWhiteSpace(row.Artist) && recentArtists.Contains(row.Artist))
+                    return false;
                 var albumKey = $"{row.SourceKey}|{row.AlbumId}|{row.Album}";
-                if (!string.IsNullOrWhiteSpace(row.Album) && !selectedAlbums.Add(albumKey))
-                    continue;
+                if (requireNewAlbum && !string.IsNullOrWhiteSpace(row.Album) && !selectedAlbums.Add(albumKey))
+                    return false;
                 selected.Add(row);
                 queued.Add(row.FilePath);
                 sourceCounts[row.SourceKey] = sourceCounts.GetValueOrDefault(row.SourceKey) + 1;
+                if (!string.IsNullOrWhiteSpace(row.Artist))
+                    recentArtists.Add(row.Artist);
+                return true;
             }
+
+            foreach (var row in rows)
+                TrySelect(row, requireNewAlbum: true, avoidRecentArtist: true);
+            foreach (var row in rows)
+                TrySelect(row, requireNewAlbum: true, avoidRecentArtist: false);
+            foreach (var row in rows)
+                TrySelect(row, requireNewAlbum: false, avoidRecentArtist: false);
             foreach (var row in selected)
             {
                 _queue.Add(ToPlaylistItem(row));
@@ -243,11 +282,13 @@ public partial class MainWindow
     /// <summary>Loads one remote mix source without allowing an unavailable server to suppress other libraries.</summary>
     /// <param name="server">Configured remote library.</param>
     /// <returns>The source snapshot, or <see langword="null"/> when the server is unavailable.</returns>
-    private async Task<GenreCloudSource?> LoadInfiniteMixSourceAsync(OrynivoServerSettings server)
+    private async Task<GenreCloudSource?> LoadInfiniteMixSourceAsync(
+        OrynivoServerSettings server,
+        string? genreKey)
     {
         try
         {
-            return await LoadRemoteGenreCloudAsync(server, null, CancellationToken.None);
+            return await LoadRemoteGenreCloudAsync(server, genreKey, CancellationToken.None);
         }
         catch
         {
@@ -262,15 +303,34 @@ public partial class MainWindow
         UpdateInfiniteMixUi();
     }
 
-    private async Task<bool> EditInfiniteMixSettingsAsync()
+    private async Task<bool> EditInfiniteMixSettingsAsync(InfiniteMixSettings? initialSettings = null)
     {
-        var dialog = new InfiniteMixDialog(_settings.InfiniteMix, _settings.OrynivoServers);
+        var dialog = new InfiniteMixDialog(initialSettings ?? _settings.InfiniteMix, _settings.OrynivoServers);
         if (!await dialog.ShowDialog<bool>(this) || dialog.Result is null)
             return false;
         _settings.InfiniteMix = dialog.Result;
         await Task.Run(() => new SettingsStore().Save(_settings));
         return true;
     }
+
+    /// <summary>Creates an independent editable copy of an Infinite Mix profile.</summary>
+    /// <param name="source">Persisted profile to copy.</param>
+    /// <returns>A profile whose mutable collections are independent from the source.</returns>
+    private static InfiniteMixSettings CloneInfiniteMixSettings(InfiniteMixSettings source) => new()
+    {
+        Mood = source.Mood,
+        DiscoveryLevel = source.DiscoveryLevel,
+        HistoryDays = source.HistoryDays,
+        IncludeLocalLibrary = source.IncludeLocalLibrary,
+        EnabledServerIds = new HashSet<string>(source.EnabledServerIds, StringComparer.OrdinalIgnoreCase),
+        ServerSelectionConfigured = source.ServerSelectionConfigured,
+        WeightFavorites = source.WeightFavorites,
+        PreferRareTracks = source.PreferRareTracks,
+        IncludedGenres = source.IncludedGenres.ToList(),
+        ExcludedGenres = source.ExcludedGenres.ToList(),
+        GenreFeedback = new Dictionary<string, int>(source.GenreFeedback, StringComparer.OrdinalIgnoreCase),
+        ExcludedTrackKeys = new HashSet<string>(source.ExcludedTrackKeys, StringComparer.OrdinalIgnoreCase)
+    };
 
     private double CalculateInfiniteMixScore(
         OrynivoServerSettings? server,
@@ -338,7 +398,8 @@ public partial class MainWindow
         static bool Matches(string key, string filter)
         {
             var normalized = filter.Trim();
-            if (key.Contains(normalized, StringComparison.CurrentCultureIgnoreCase))
+            if (key.Contains(normalized, StringComparison.CurrentCultureIgnoreCase) ||
+                GenreCloudService.IsDescendantOrSelf(key, normalized))
                 return true;
             return GenreCloudService.ResolveGenreKeys(normalized).Any(filterKey =>
                 GenreCloudService.IsDescendantOrSelf(key, filterKey) ||

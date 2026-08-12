@@ -190,6 +190,59 @@ public static class GenreCloudService
     /// <returns>Distinct normalized taxonomy keys.</returns>
     public static IReadOnlyList<string> ResolveGenreKeys(string? value) => ResolveTrackGenres(value);
 
+    /// <summary>Expands taxonomy nodes recursively to their terminal descendant genre keys.</summary>
+    /// <param name="keys">Stable taxonomy keys represented by the current cloud level.</param>
+    /// <returns>Distinct leaf keys; dynamic and virtual genre keys are preserved.</returns>
+    public static IReadOnlyList<string> ResolveLeafGenreKeys(IEnumerable<string> keys)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        var leaves = new HashSet<string>(StringComparer.Ordinal);
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+
+        void Visit(string key)
+        {
+            if (!visited.Add(key))
+                return;
+            var children = Definitions
+                .Where(definition => definition.Parents.Contains(key, StringComparer.Ordinal))
+                .Select(definition => definition.Key)
+                .ToArray();
+            if (children.Length == 0 || key == MoreKey || IsUnmapped(key))
+            {
+                leaves.Add(key);
+                return;
+            }
+            foreach (var child in children)
+                Visit(child);
+        }
+
+        foreach (var key in keys.Where(key => !string.IsNullOrWhiteSpace(key)))
+            Visit(key);
+        return leaves.OrderBy(key => key, StringComparer.Ordinal).ToArray();
+    }
+
+    /// <summary>Expands taxonomy nodes to themselves and every recursive descendant key.</summary>
+    /// <param name="keys">Stable taxonomy branch keys to expand.</param>
+    /// <returns>Distinct branch and descendant keys in deterministic order.</returns>
+    public static IReadOnlyList<string> ResolveDescendantGenreKeys(IEnumerable<string> keys)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        var resolved = new HashSet<string>(StringComparer.Ordinal);
+
+        void Visit(string key)
+        {
+            if (!resolved.Add(key) || key == MoreKey || IsUnmapped(key))
+                return;
+            foreach (var child in Definitions.Where(definition =>
+                         definition.Parents.Contains(key, StringComparer.Ordinal)))
+                Visit(child.Key);
+        }
+
+        foreach (var key in keys.Where(key => !string.IsNullOrWhiteSpace(key)))
+            Visit(key);
+        return resolved.OrderBy(key => key, StringComparer.Ordinal).ToArray();
+    }
+
     private static int CountAlbums(IEnumerable<ClassifiedTrack> tracks, string genreKey) =>
         tracks.Where(track => track.Genres.Any(key => IsDescendantOrSelf(key, genreKey)))
             .Select(track => track.Track.AlbumId)

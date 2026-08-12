@@ -388,6 +388,9 @@ public partial class MainWindow : Window
         public required string Duration { get; init; }
         public required string Progress { get; init; }
         public required string Status { get; init; }
+        public DateTimeOffset PublishedSort => Episode.PublishedAt ?? DateTimeOffset.MaxValue;
+        public TimeSpan DurationSort { get; init; }
+        public TimeSpan ProgressSort { get; init; }
     }
 
     private sealed class ContentRow : INotifyPropertyChanged
@@ -421,6 +424,19 @@ public partial class MainWindow : Window
         public string? AddedAt     { get; init; }
         public string? ReplayGainTrack { get; init; }
         public string? ReplayGainAlbum { get; init; }
+        public int NrSort => ParseLeadingInteger(Nr);
+        public int YearSort => ParseLeadingInteger(Year);
+        public int TrackNumberSort => ParseLeadingInteger(TrackNumber);
+        public int DiscNumberSort => ParseLeadingInteger(DiscNumber);
+        public int BitrateSort => ParseDisplayNumber(Bitrate);
+        public int SampleRateSort => SampleRateHz ?? ParseDisplayNumber(SampleRate);
+        public int BitDepthSort => ParseLeadingInteger(BitDepth);
+        public int ChannelsSort => ChannelCount ?? ParseLeadingInteger(Channels);
+        public double BpmSort => ParseDisplayDouble(Bpm);
+        public long FileSizeSort => ParseFileSize(FileSize);
+        public DateTime AddedAtSort => ParseDisplayDate(AddedAt);
+        public double ReplayGainTrackSort => ParseDisplayDouble(ReplayGainTrack);
+        public double ReplayGainAlbumSort => ParseDisplayDouble(ReplayGainAlbum);
         private int _userRating;
         public int UserRating
         {
@@ -476,11 +492,41 @@ public partial class MainWindow : Window
             }
         }
         private long? _musicBrainzRatingFetchedAt;
+        private bool _isMusicBrainzRatingLoading;
+        private bool _musicBrainzRatingTemporaryFailure;
+        /// <summary>Gets or sets whether a MusicBrainz lookup is currently running for this row.</summary>
+        public bool IsMusicBrainzRatingLoading
+        {
+            get => _isMusicBrainzRatingLoading;
+            set
+            {
+                if (_isMusicBrainzRatingLoading == value) return;
+                _isMusicBrainzRatingLoading = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsMusicBrainzRatingLoading)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(MusicBrainzRatingDisplay)));
+            }
+        }
+        /// <summary>Gets or sets whether the latest MusicBrainz request failed temporarily.</summary>
+        public bool MusicBrainzRatingTemporaryFailure
+        {
+            get => _musicBrainzRatingTemporaryFailure;
+            set
+            {
+                if (_musicBrainzRatingTemporaryFailure == value) return;
+                _musicBrainzRatingTemporaryFailure = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(MusicBrainzRatingTemporaryFailure)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(MusicBrainzRatingDisplay)));
+            }
+        }
         public string MusicBrainzRatingDisplay => MusicBrainzRating is double rating
             ? $"★ {rating:0.0} ({MusicBrainzRatingVotes.GetValueOrDefault():N0})"
+            : IsMusicBrainzRatingLoading
+                ? LocalizationManager.Current.MusicBrainzLoadingRating
+            : MusicBrainzRatingTemporaryFailure
+                ? LocalizationManager.Current.MusicBrainzRetryRating
             : MusicBrainzRatingFetchedAt.HasValue
                 ? LocalizationManager.Current.MusicBrainzNoRating
-                : "—";
+                : LocalizationManager.Current.MusicBrainzLoadRating;
         public string? Folder      { get; init; }
         public string? ArtworkPath { get; set; }
         public string? ThumbnailPath { get; set; }
@@ -552,8 +598,63 @@ public partial class MainWindow : Window
         public string? SourcePath   { get; init; }
         public IReadOnlyList<string>? PlexPartUrls { get; init; }
         public TimeSpan? KnownDuration { get; init; }
+        public TimeSpan DurationSort => KnownDuration ?? ParseDisplayDuration(Duration);
         public long?   PlaylistEntryId { get; set; }
         public PlaylistItem? QueueItem { get; set; }
+
+        private static int ParseLeadingInteger(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return int.MaxValue;
+            var digits = new string(value.Trim().TakeWhile(char.IsDigit).ToArray());
+            return int.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out var result) ? result : int.MaxValue;
+        }
+
+        private static int ParseDisplayNumber(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return int.MaxValue;
+            var digits = new string(value.Where(char.IsDigit).ToArray());
+            return int.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out var result) ? result : int.MaxValue;
+        }
+
+        private static double ParseDisplayDouble(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return double.PositiveInfinity;
+            var token = new string(value.Trim().TakeWhile(character =>
+                char.IsDigit(character) || character is '+' or '-' or '.' or ',').ToArray());
+            return double.TryParse(token, NumberStyles.Float, CultureInfo.CurrentCulture, out var result) ||
+                   double.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out result)
+                ? result
+                : double.PositiveInfinity;
+        }
+
+        private static long ParseFileSize(string? value)
+        {
+            var number = ParseDisplayDouble(value);
+            if (!double.IsFinite(number) || string.IsNullOrWhiteSpace(value)) return long.MaxValue;
+            var multiplier = value.Contains("TB", StringComparison.OrdinalIgnoreCase) ? 1L << 40
+                : value.Contains("GB", StringComparison.OrdinalIgnoreCase) ? 1L << 30
+                : value.Contains("MB", StringComparison.OrdinalIgnoreCase) ? 1L << 20
+                : value.Contains("KB", StringComparison.OrdinalIgnoreCase) ? 1L << 10
+                : 1L;
+            return (long)Math.Min(long.MaxValue, number * multiplier);
+        }
+
+        private static DateTime ParseDisplayDate(string? value) =>
+            DateTime.TryParse(value, CultureInfo.CurrentCulture, DateTimeStyles.None, out var result) ||
+            DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out result)
+                ? result : DateTime.MaxValue;
+
+        private static TimeSpan ParseDisplayDuration(string? value)
+        {
+            var parts = value?.Split(':');
+            if (parts is { Length: 2 } &&
+                int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var minutes) &&
+                int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out var seconds))
+                return TimeSpan.FromMinutes(minutes) + TimeSpan.FromSeconds(seconds);
+            return TimeSpan.TryParse(value, CultureInfo.CurrentCulture, out var result) ||
+                   TimeSpan.TryParse(value, CultureInfo.InvariantCulture, out result)
+                ? result : TimeSpan.MaxValue;
+        }
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -1103,6 +1204,7 @@ public partial class MainWindow : Window
         DataGridColumnChooser.Attach(SearchTracksDataGrid, "SearchTracks", _settings);
         DataGridColumnChooser.Attach(SearchAlbumsDataGrid, "SearchAlbums", _settings);
         DataGridColumnChooser.Attach(SearchArtistsDataGrid, "SearchArtists", _settings);
+        DataGridColumnChooser.Attach(ArtistInfoTracksDataGrid, "ArtistInfoTracks", _settings);
         DataGridColumnChooser.Attach(RadioStationsDataGrid, "RadioStations", _settings);
         DataGridColumnChooser.Attach(PodcastsDataGrid, "Podcasts", _settings);
         DataGridColumnChooser.Attach(PodcastEpisodesDataGrid, "PodcastEpisodes", _settings);
@@ -1117,6 +1219,7 @@ public partial class MainWindow : Window
         CaptureColumnWidths("SearchTracks", SearchTracksDataGrid);
         CaptureColumnWidths("SearchAlbums", SearchAlbumsDataGrid);
         CaptureColumnWidths("SearchArtists", SearchArtistsDataGrid);
+        CaptureColumnWidths("ArtistInfoTracks", ArtistInfoTracksDataGrid);
     }
 
     private void CaptureContentDataGridColumnWidths()
@@ -6308,6 +6411,7 @@ public partial class MainWindow : Window
                 {
                     Header = column.Header,
                     Binding = new Binding(column.Binding),
+                    SortMemberPath = GetContentRowSortMemberPath(column.Binding),
                     Width = new DataGridLength(column.Width),
                     Tag = column.Key,
                     IsVisible = column.DefaultVisible
@@ -6325,6 +6429,7 @@ public partial class MainWindow : Window
         new DataGridTemplateColumn
         {
             Header = "",
+            SortMemberPath = nameof(ContentRow.IsFavorite),
             Width = new DataGridLength(42),
             CellTemplate = new FuncDataTemplate<ContentRow>((_, _) =>
             {
@@ -6358,6 +6463,7 @@ public partial class MainWindow : Window
         var column = new DataGridTemplateColumn
         {
             Header = LocalizationManager.Current.SourceColumn,
+            SortMemberPath = nameof(ContentRow.SourceName),
             Width = new DataGridLength(54),
             CellTemplate = new FuncDataTemplate<ContentRow>((_, _) =>
             {
@@ -6427,6 +6533,7 @@ public partial class MainWindow : Window
         return new DataGridTemplateColumn
         {
             Header = header,
+            SortMemberPath = GetContentRowSortMemberPath(property),
             Width = star
                 ? new DataGridLength(starWeight, DataGridLengthUnitType.Star)
                 : new DataGridLength(width),
@@ -6443,6 +6550,28 @@ public partial class MainWindow : Window
             })
         };
     }
+
+    /// <summary>Resolves a displayed content-row property to its typed sort property.</summary>
+    /// <param name="property">Displayed <see cref="ContentRow"/> property name.</param>
+    /// <returns>The property name used by the DataGrid collection view for sorting.</returns>
+    private static string GetContentRowSortMemberPath(string property) => property switch
+    {
+        nameof(ContentRow.Nr) => nameof(ContentRow.NrSort),
+        nameof(ContentRow.Year) => nameof(ContentRow.YearSort),
+        nameof(ContentRow.TrackNumber) => nameof(ContentRow.TrackNumberSort),
+        nameof(ContentRow.DiscNumber) => nameof(ContentRow.DiscNumberSort),
+        nameof(ContentRow.Duration) => nameof(ContentRow.DurationSort),
+        nameof(ContentRow.Bitrate) => nameof(ContentRow.BitrateSort),
+        nameof(ContentRow.SampleRate) => nameof(ContentRow.SampleRateSort),
+        nameof(ContentRow.BitDepth) => nameof(ContentRow.BitDepthSort),
+        nameof(ContentRow.Channels) => nameof(ContentRow.ChannelsSort),
+        nameof(ContentRow.Bpm) => nameof(ContentRow.BpmSort),
+        nameof(ContentRow.FileSize) => nameof(ContentRow.FileSizeSort),
+        nameof(ContentRow.AddedAt) => nameof(ContentRow.AddedAtSort),
+        nameof(ContentRow.ReplayGainTrack) => nameof(ContentRow.ReplayGainTrackSort),
+        nameof(ContentRow.ReplayGainAlbum) => nameof(ContentRow.ReplayGainAlbumSort),
+        _ => property
+    };
 
     private static IImage? CreateArtworkImage(string? path, int decodeWidth, bool ignoreCache = false)
     {
@@ -7075,7 +7204,8 @@ public partial class MainWindow : Window
     private void ApplyColumns(
         string view,
         DataGrid? targetGrid = null,
-        bool captureCurrentWidths = true)
+        bool captureCurrentWidths = true,
+        string? tableKeyOverride = null)
     {
         var grid = targetGrid ?? ContentDataGrid;
         if (captureCurrentWidths && ReferenceEquals(grid, ContentDataGrid))
@@ -7083,7 +7213,7 @@ public partial class MainWindow : Window
             CaptureContentDataGridColumnWidths();
             _contentColumnWidthKey = GetContentColumnWidthKey(view);
         }
-        var widthKey = GetContentColumnWidthKey(view);
+        var widthKey = tableKeyOverride ?? GetContentColumnWidthKey(view);
         grid.Columns.Clear();
         switch (view)
         {
@@ -7172,6 +7302,7 @@ public partial class MainWindow : Window
                 column = new DataGridTemplateColumn
                 {
                     Header = header,
+                    SortMemberPath = GetContentRowSortMemberPath(prop),
                     Width = star ? new DataGridLength(starWeight, DataGridLengthUnitType.Star) : new DataGridLength(width),
                     CellTemplate = new FuncDataTemplate<ContentRow>((_, _) =>
                     {
@@ -7192,6 +7323,7 @@ public partial class MainWindow : Window
                 {
                     Header = header,
                     Binding = new Binding(prop),
+                    SortMemberPath = GetContentRowSortMemberPath(prop),
                     Width = star ? new DataGridLength(starWeight, DataGridLengthUnitType.Star) : new DataGridLength(width)
                 };
             }
@@ -7248,6 +7380,7 @@ public partial class MainWindow : Window
             var column = new DataGridTemplateColumn
             {
                 Header = "",
+                SortMemberPath = nameof(ContentRow.Title),
                 Width = new DataGridLength(64),
                 CellTemplate = new FuncDataTemplate<ContentRow>((_, _) =>
                 {
@@ -7273,6 +7406,7 @@ public partial class MainWindow : Window
             grid.Columns.Add(new DataGridTemplateColumn
             {
                 Header = "",
+                CanUserSort = false,
                 Width = new DataGridLength(244),
                 CellTemplate = new FuncDataTemplate<ContentRow>((row, _) =>
                 {
@@ -9290,6 +9424,7 @@ public partial class MainWindow : Window
         var column = new DataGridTemplateColumn
         {
             Header = LocalizationManager.Current.PersonalRating,
+            SortMemberPath = nameof(ContentRow.UserRating),
             Width = new DataGridLength(118),
             CellTemplate = new FuncDataTemplate<ContentRow>((row, _) =>
             {
@@ -9353,7 +9488,8 @@ public partial class MainWindow : Window
         var column = new DataGridTemplateColumn
         {
             Header = LocalizationManager.Current.MusicBrainzRating,
-            Width = new DataGridLength(138),
+            SortMemberPath = nameof(ContentRow.MusicBrainzRating),
+            Width = new DataGridLength(160),
             CellTemplate = new FuncDataTemplate<ContentRow>((row, _) =>
             {
                 var button = new Button
@@ -9451,7 +9587,13 @@ public partial class MainWindow : Window
             foreach (var group in knownGroups)
             {
                 cts.Token.ThrowIfCancellationRequested();
-                await RefreshMusicBrainzTrackRatingGroupAsync(group.ToList(), cts.Token);
+                var groupRows = group.ToList();
+                for (var attempt = 0; attempt < 3; attempt++)
+                {
+                    if (await RefreshMusicBrainzTrackRatingGroupAsync(groupRows, cts.Token))
+                        break;
+                    await Task.Delay(TimeSpan.FromSeconds(attempt + 1), cts.Token);
+                }
             }
 
             foreach (var row in rows.Where(row => !Guid.TryParse(row.MusicBrainzTrackId, out _)))
@@ -9479,12 +9621,20 @@ public partial class MainWindow : Window
     /// <param name="rows">Rows sharing one known recording MBID.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A task representing lookup and persistence.</returns>
-    private async Task RefreshMusicBrainzTrackRatingGroupAsync(
+    private async Task<bool> RefreshMusicBrainzTrackRatingGroupAsync(
         IReadOnlyList<ContentRow> rows,
         CancellationToken cancellationToken)
     {
         if (rows.Count == 0)
-            return;
+            return true;
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            foreach (var row in rows)
+            {
+                row.IsMusicBrainzRatingLoading = true;
+                row.MusicBrainzRatingTemporaryFailure = false;
+            }
+        });
         try
         {
             var first = rows[0];
@@ -9496,12 +9646,16 @@ public partial class MainWindow : Window
                 first.KnownDuration?.TotalSeconds,
                 cancellationToken);
             if (result is null)
-                return;
+            {
+                await SetMusicBrainzTemporaryFailureAsync(rows);
+                return false;
+            }
             foreach (var row in rows)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 await PersistMusicBrainzTrackRatingAsync(row, result, cancellationToken);
             }
+            return true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -9509,7 +9663,16 @@ public partial class MainWindow : Window
         }
         catch
         {
-            // Ratings are optional metadata; continue with the remaining album rows.
+            await SetMusicBrainzTemporaryFailureAsync(rows);
+            return false;
+        }
+        finally
+        {
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                foreach (var row in rows)
+                    row.IsMusicBrainzRatingLoading = false;
+            });
         }
     }
 
@@ -9523,6 +9686,11 @@ public partial class MainWindow : Window
     {
         if (row.Id is not long trackId)
             return;
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            row.IsMusicBrainzRatingLoading = true;
+            row.MusicBrainzRatingTemporaryFailure = false;
+        });
         try
         {
             var service = new MusicBrainzRatingService(MusicBrainzRatingHttpClient);
@@ -9545,8 +9713,25 @@ public partial class MainWindow : Window
         }
         catch
         {
-            // Ratings are optional metadata; network failures leave the existing cache intact.
+            await SetMusicBrainzTemporaryFailureAsync([row]);
         }
+        finally
+        {
+            await Dispatcher.UIThread.InvokeAsync(() => row.IsMusicBrainzRatingLoading = false);
+        }
+    }
+
+    /// <summary>Marks rows for a visible manual retry after a temporary MusicBrainz failure.</summary>
+    /// <param name="rows">Rows whose lookup did not complete.</param>
+    /// <returns>A task representing the UI update.</returns>
+    private static async Task SetMusicBrainzTemporaryFailureAsync(IEnumerable<ContentRow> rows)
+    {
+        var snapshot = rows.ToList();
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            foreach (var row in snapshot)
+                row.MusicBrainzRatingTemporaryFailure = true;
+        });
     }
 
     /// <summary>Runs one user-requested MusicBrainz lookup ahead of background enrichment.</summary>
@@ -9613,6 +9798,7 @@ public partial class MainWindow : Window
             row.MusicBrainzRatingVotes = result.Votes;
             row.MusicBrainzRating = result.Rating;
             row.MusicBrainzRatingFetchedAt = fetchedAt;
+            row.MusicBrainzRatingTemporaryFailure = false;
         });
     }
 
@@ -11752,7 +11938,9 @@ public partial class MainWindow : Window
                 : duration is null
                     ? FormatTime(position)
                     : $"{FormatTime(position)} / {FormatTime(duration.Value)}",
-            Status = status
+            Status = status,
+            DurationSort = duration ?? TimeSpan.MaxValue,
+            ProgressSort = position
         };
     }
 
@@ -14943,41 +15131,11 @@ public partial class MainWindow : Window
     /// <summary>Configures the compact track table embedded in the artist detail page.</summary>
     private void ConfigureArtistInfoTracksGrid()
     {
-        ArtistInfoTracksDataGrid.Columns.Clear();
-        ArtistInfoTracksDataGrid.Columns.Add(CreateFavoriteColumn());
-        ArtistInfoTracksDataGrid.Columns.Add(CreateSourceBadgeColumn());
-        ArtistInfoTracksDataGrid.Columns.Add(CreatePersonalRatingColumn());
-        ArtistInfoTracksDataGrid.Columns.Add(CreateEntityLinkColumn(
-            LocalizationManager.Current.Album,
-            nameof(ContentRow.Album),
-            0,
-            true,
-            "Album",
-            1.35));
-        ArtistInfoTracksDataGrid.Columns.Add(new DataGridTextColumn
-        {
-            Header = LocalizationManager.Current.TrackNumber,
-            Binding = new Binding(nameof(ContentRow.TrackNumber)),
-            Width = new DataGridLength(86)
-        });
-        ArtistInfoTracksDataGrid.Columns.Add(new DataGridTextColumn
-        {
-            Header = LocalizationManager.Current.Title,
-            Binding = new Binding(nameof(ContentRow.Title)),
-            Width = new DataGridLength(2.4, DataGridLengthUnitType.Star)
-        });
-        ArtistInfoTracksDataGrid.Columns.Add(new DataGridTextColumn
-        {
-            Header = LocalizationManager.Current.Duration,
-            Binding = new Binding(nameof(ContentRow.Duration)),
-            Width = new DataGridLength(82)
-        });
-        ArtistInfoTracksDataGrid.Columns.Add(new DataGridTextColumn
-        {
-            Header = LocalizationManager.Current.Format,
-            Binding = new Binding(nameof(ContentRow.Format)),
-            Width = new DataGridLength(82)
-        });
+        ApplyColumns(
+            "Tracks",
+            ArtistInfoTracksDataGrid,
+            captureCurrentWidths: false,
+            tableKeyOverride: "ArtistInfoTracks");
     }
 
     /// <summary>Loads unified artist tracks independently from biography rendering and applies still-current results.</summary>

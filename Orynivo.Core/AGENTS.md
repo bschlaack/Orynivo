@@ -29,6 +29,12 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   the source media.
 - Scanner, watcher, and reconciliation writes must keep SQLite and Lucene in
   sync and use the shared scanner gate.
+- `LibraryScanner.ConfigureReplayGainThrottling` controls FFmpeg threads and a
+  cancellable inter-track delay for server maintenance. Defaults remain inert
+  for desktop callers; the server configures conservative values at startup.
+- Explicit ReplayGain maintenance must retain only missing album IDs across the
+  track pass and update Lucene in bounded batches. Never accumulate complete
+  `TrackRecord` instances or one library-wide update list for this workflow.
 - Multi-root owner scans must hold a watcher-operation suspension for their
   complete duration. This prevents incremental updates or periodic
   reconciliations from taking the shared scanner gate between roots and making
@@ -95,6 +101,12 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   from arbitrary substrings. Unmapped tags retain dynamic `unmapped:` keys and
   appear by their actual names beneath `more-genres`; never collapse them into
   an Other bucket. The desktop merges snapshots across providers.
+  `ResolveLeafGenreKeys` performs cycle-safe recursive expansion of one or more
+  visible taxonomy branches for Genre Cloud-driven Infinite Mix filters and
+  preserves dynamic unmapped keys as leaves.
+  `ResolveDescendantGenreKeys` returns each supplied branch itself plus every
+  recursive descendant, preserving direct parent-tag matches in branch-based
+  recommendation queries.
 - `AudioDatabase.GetListeningTrend` supports up to 366 equal chronological
   buckets so the client can request daily Dashboard points without materializing
   playback-history rows.

@@ -118,6 +118,7 @@ public static class LocalizationManager
         resources["L_CoverNotFound"] = Current.CoverNotFound;
         resources["L_SearchCover"] = Current.SearchCover;
         resources["L_InfiniteMixStart"] = Current.InfiniteMixStart;
+        resources["L_GenreCloudInfiniteMix"] = Current.GenreCloudInfiniteMix;
         resources["L_InfiniteMixCalculating"] = Current.InfiniteMixCalculating;
         resources["L_InfiniteMixSettingsTitle"] = Current.InfiniteMixSettingsTitle;
         resources["L_InfiniteMixSettingsHint"] = Current.InfiniteMixSettingsHint;
@@ -636,7 +637,7 @@ public static class LocalizationManager
         TrackNumber = "Tracknummer", DiscNumber = "Discnummer", Composer = "Komponist",
         Bpm = "BPM", ReplayGainTrackColumn = "ReplayGain Track",
         ReplayGainAlbumColumn = "ReplayGain Album", Codec = "Codec", Tags = "Tags",
-        PersonalRating = "Eigene Bewertung", MusicBrainzRating = "MusicBrainz-Bewertung", MusicBrainzNoRating = "Keine Bewertung",
+        PersonalRating = "Eigene Bewertung", MusicBrainzRating = "MusicBrainz-Bewertung", MusicBrainzLoadRating = "Bewertung laden", MusicBrainzLoadingRating = "Wird geladen …", MusicBrainzRetryRating = "Erneut versuchen", MusicBrainzNoRating = "Keine Bewertung",
         RatingSetHint = "Eigene Bewertung festlegen", RatingUpdateFailed = "Bewertung konnte nicht gespeichert werden.",
         Homepage = "Homepage", FeedUrl = "Feed-Adresse",
         SearchResultSummary = "{0:N0} Titel · {1:N0} Alben · {2:N0} Künstler",
@@ -718,6 +719,7 @@ public static class LocalizationManager
         DashboardHeroHint = "Bereit für großartige Musik? Entdecke neue Klänge oder höre deine Favoriten.",
         DashboardRandomPlayback = "Zufällige Wiedergabe",
         InfiniteMixStart = "Endlos-Mix starten",
+        GenreCloudInfiniteMix = "Endlos-Mix aus Wolke",
         InfiniteMixStop = "Endlos-Mix stoppen",
         InfiniteMixActive = "Endlos-Mix aktiv · wird automatisch ergänzt",
         InfiniteMixCalculating = "Dein Endlos-Mix wird gerade berechnet …",
@@ -1269,7 +1271,7 @@ public static class LocalizationManager
         TrackNumber = "Track number", DiscNumber = "Disc number", Composer = "Composer",
         Bpm = "BPM", ReplayGainTrackColumn = "ReplayGain track",
         ReplayGainAlbumColumn = "ReplayGain album", Codec = "Codec", Tags = "Tags",
-        PersonalRating = "My rating", MusicBrainzRating = "MusicBrainz rating", MusicBrainzNoRating = "Not rated",
+        PersonalRating = "My rating", MusicBrainzRating = "MusicBrainz rating", MusicBrainzLoadRating = "Load rating", MusicBrainzLoadingRating = "Loading …", MusicBrainzRetryRating = "Try again", MusicBrainzNoRating = "Not rated",
         RatingSetHint = "Set personal rating", RatingUpdateFailed = "The rating could not be saved.",
         Homepage = "Homepage", FeedUrl = "Feed address",
         SearchResultSummary = "{0:N0} tracks · {1:N0} albums · {2:N0} artists",
@@ -1348,6 +1350,7 @@ public static class LocalizationManager
         DashboardHeroHint = "Ready for great music? Discover something new or return to your favorites.",
         DashboardRandomPlayback = "Random playback",
         InfiniteMixStart = "Start Infinite Mix",
+        GenreCloudInfiniteMix = "Start Infinite Mix from cloud",
         InfiniteMixStop = "Stop Infinite Mix",
         InfiniteMixActive = "Infinite Mix active · replenishes automatically",
         InfiniteMixCalculating = "Your Infinite Mix is being prepared …",
@@ -1900,7 +1903,7 @@ public static class LocalizationManager
         TrackNumber = "Numéro de piste", DiscNumber = "Numéro de disque", Composer = "Compositeur",
         Bpm = "BPM", ReplayGainTrackColumn = "ReplayGain piste",
         ReplayGainAlbumColumn = "ReplayGain album", Codec = "Codec", Tags = "Tags",
-        PersonalRating = "Mon évaluation", MusicBrainzRating = "Évaluation MusicBrainz", MusicBrainzNoRating = "Non évalué",
+        PersonalRating = "Mon évaluation", MusicBrainzRating = "Évaluation MusicBrainz", MusicBrainzLoadRating = "Charger l’évaluation", MusicBrainzLoadingRating = "Chargement …", MusicBrainzRetryRating = "Réessayer", MusicBrainzNoRating = "Non évalué",
         RatingSetHint = "Définir l’évaluation personnelle", RatingUpdateFailed = "L’évaluation n’a pas pu être enregistrée.",
         Homepage = "Page d’accueil", FeedUrl = "Adresse du flux",
         SearchResultSummary = "{0:N0} titres · {1:N0} albums · {2:N0} artistes",
@@ -1979,6 +1982,7 @@ public static class LocalizationManager
         DashboardHeroHint = "Prêt pour de la bonne musique ? Découvrez de nouveaux sons ou retrouvez vos favoris.",
         DashboardRandomPlayback = "Lecture aléatoire",
         InfiniteMixStart = "Démarrer le mix infini",
+        GenreCloudInfiniteMix = "Lancer le mix infini depuis le nuage",
         InfiniteMixStop = "Arrêter le mix infini",
         InfiniteMixActive = "Mix infini actif · complété automatiquement",
         InfiniteMixCalculating = "Votre mix infini est en cours de préparation …",
@@ -2528,7 +2532,7 @@ public static class LocalizationManager
         TrackNumber = "Número de pista", DiscNumber = "Número de disco", Composer = "Compositor",
         Bpm = "BPM", ReplayGainTrackColumn = "ReplayGain pista",
         ReplayGainAlbumColumn = "ReplayGain álbum", Codec = "Códec", Tags = "Etiquetas",
-        PersonalRating = "Mi valoración", MusicBrainzRating = "Valoración de MusicBrainz", MusicBrainzNoRating = "Sin valoración",
+        PersonalRating = "Mi valoración", MusicBrainzRating = "Valoración de MusicBrainz", MusicBrainzLoadRating = "Cargar valoración", MusicBrainzLoadingRating = "Cargando …", MusicBrainzRetryRating = "Reintentar", MusicBrainzNoRating = "Sin valoración",
         RatingSetHint = "Establecer valoración personal", RatingUpdateFailed = "No se pudo guardar la valoración.",
         Homepage = "Página principal", FeedUrl = "Dirección del feed",
         SearchResultSummary = "{0:N0} pistas · {1:N0} álbumes · {2:N0} artistas",
@@ -2607,6 +2611,7 @@ public static class LocalizationManager
         DashboardHeroHint = "¿Listo para disfrutar de buena música? Descubre nuevos sonidos o vuelve a tus favoritos.",
         DashboardRandomPlayback = "Reproducción aleatoria",
         InfiniteMixStart = "Iniciar mezcla infinita",
+        GenreCloudInfiniteMix = "Iniciar mezcla infinita desde la nube",
         InfiniteMixStop = "Detener mezcla infinita",
         InfiniteMixActive = "Mezcla infinita activa · se completa automáticamente",
         InfiniteMixCalculating = "Se está preparando tu mezcla infinita …",

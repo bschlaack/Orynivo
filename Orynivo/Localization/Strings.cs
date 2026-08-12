@@ -456,6 +456,13 @@ public sealed record LocalizedStrings(
     public string PersonalRating { get; init; } = "";
     /// <summary>Gets the MusicBrainz community-rating label.</summary>
     public string MusicBrainzRating { get; init; } = "";
+    /// <summary>Gets the action label for an unresolved MusicBrainz rating.</summary>
+    public string MusicBrainzLoadRating { get; init; } = "";
+    /// <summary>Gets the state shown while a MusicBrainz rating request is running.</summary>
+    public string MusicBrainzLoadingRating { get; init; } = "";
+    /// <summary>Gets the state shown after a temporary MusicBrainz lookup failure.</summary>
+    public string MusicBrainzRetryRating { get; init; } = "";
+    /// <summary>Gets the confirmed state for a recording without a community rating.</summary>
     public string MusicBrainzNoRating { get; init; } = "";
     /// <summary>Gets the tooltip for editing a personal rating.</summary>
     public string RatingSetHint { get; init; } = "";
@@ -623,6 +630,8 @@ public sealed record LocalizedStrings(
     public string DashboardRandomPlayback { get; init; } = "";
     /// <summary>Gets the action label that starts the automatically replenished history-informed mix.</summary>
     public string InfiniteMixStart { get; init; } = "";
+    /// <summary>Gets the action that starts Infinite Mix from the genres represented by the cloud.</summary>
+    public string GenreCloudInfiniteMix { get; init; } = "";
     /// <summary>Gets the action label that stops automatic Infinite Mix replenishment.</summary>
     public string InfiniteMixStop { get; init; } = "";
     /// <summary>Gets the queue status shown while Infinite Mix is active.</summary>
