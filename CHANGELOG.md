@@ -4,6 +4,17 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+### Fixed
+
+- Infinite Mix no longer stalls after exhausting its first two 20-track
+  batches. Refills rotate through the stable genre candidate order in local and
+  remote libraries, and active playback performs a throttled lightweight refill check
+  continuously instead of relying only on queue-navigation updates.
+
 ## [0.36.4] - 2026-08-12
 
 ### Added

@@ -9,9 +9,12 @@ public partial class MainWindow
 {
     private const int InfiniteMixBatchSize = 20;
     private const int InfiniteMixRefillThreshold = 5;
+    private const int InfiniteMixCandidateWindowSize = 1000;
     private bool _infiniteMixEnabled;
     private bool _infiniteMixPaused;
     private bool _infiniteMixLoading;
+    private int _infiniteMixCandidateOffset;
+    private DateTimeOffset _lastInfiniteMixRefillAttempt = DateTimeOffset.MinValue;
     private readonly Dictionary<string, InfiniteMixCandidateIdentity> _infiniteMixIdentitiesByPath =
         new(StringComparer.OrdinalIgnoreCase);
 
@@ -42,6 +45,8 @@ public partial class MainWindow
 
         _infiniteMixEnabled = true;
         _infiniteMixPaused = false;
+        _infiniteMixCandidateOffset = 0;
+        _lastInfiniteMixRefillAttempt = DateTimeOffset.MinValue;
         _infiniteMixIdentitiesByPath.Clear();
         var hasActivePlayback = _player is not null && !string.IsNullOrWhiteSpace(_currentFilePath);
         var activeItem = hasActivePlayback
@@ -111,7 +116,8 @@ public partial class MainWindow
         if (!_infiniteMixEnabled || _infiniteMixPaused || _infiniteMixLoading)
             return;
         var remaining = _queueIndex < 0 ? _queue.Count : _queue.Count - _queueIndex - 1;
-        if (remaining <= InfiniteMixRefillThreshold)
+        if (remaining <= InfiniteMixRefillThreshold &&
+            DateTimeOffset.UtcNow - _lastInfiniteMixRefillAttempt >= TimeSpan.FromSeconds(5))
             _ = RefillInfiniteMixAsync(force: false);
     }
 
@@ -130,6 +136,7 @@ public partial class MainWindow
         if (!force && remaining > InfiniteMixRefillThreshold)
             return;
 
+        _lastInfiniteMixRefillAttempt = DateTimeOffset.UtcNow;
         _infiniteMixLoading = true;
         var showProgress = force && batchSize == InfiniteMixBatchSize;
         if (showProgress)
@@ -154,7 +161,11 @@ public partial class MainWindow
                         : requestedGenreKeys.Cast<string?>();
                     return keys.Select(key => new GenreCloudSource(
                         null,
-                        GenreCloudService.BuildSnapshot(facets, key, 1000))).ToList();
+                        GenreCloudService.BuildSnapshot(
+                            facets,
+                            key,
+                            InfiniteMixCandidateWindowSize,
+                            _infiniteMixCandidateOffset))).ToList();
                 }));
             }
             if (showProgress)
@@ -165,7 +176,7 @@ public partial class MainWindow
                 (requestedGenreKeys.Count == 0
                     ? (IEnumerable<string?>)new string?[] { null }
                     : requestedGenreKeys.Cast<string?>())
-                .Select(key => LoadInfiniteMixSourceAsync(server, key)));
+                .Select(key => LoadInfiniteMixSourceAsync(server, key, _infiniteMixCandidateOffset)));
             var remote = await Task.WhenAll(remoteTasks);
             sources.AddRange(remote.Where(source => source is not null).Cast<GenreCloudSource>());
             if (showProgress)
@@ -242,6 +253,8 @@ public partial class MainWindow
                     _infiniteMixIdentitiesByPath[row.FilePath] = new(
                         BuildInfiniteMixTrackKey(candidate.Server, candidate.Track.TrackId), candidate.Track.GenreKey);
             }
+            _infiniteMixCandidateOffset =
+                (_infiniteMixCandidateOffset + InfiniteMixCandidateWindowSize) % 2_000_000_000;
             if (showProgress)
                 ShowInfiniteMixProgress(100);
             PersistPlaybackQueue();
@@ -281,14 +294,33 @@ public partial class MainWindow
 
     /// <summary>Loads one remote mix source without allowing an unavailable server to suppress other libraries.</summary>
     /// <param name="server">Configured remote library.</param>
+    /// <param name="genreKey">Selected taxonomy branch, or <see langword="null"/> for all genres.</param>
+    /// <param name="candidateOffset">Offset into the provider's stable candidate order.</param>
     /// <returns>The source snapshot, or <see langword="null"/> when the server is unavailable.</returns>
     private async Task<GenreCloudSource?> LoadInfiniteMixSourceAsync(
         OrynivoServerSettings server,
-        string? genreKey)
+        string? genreKey,
+        int candidateOffset)
     {
         try
         {
-            return await LoadRemoteGenreCloudAsync(server, genreKey, CancellationToken.None);
+            var snapshot = await _orynivoClient.GetGenreCloudAsync(
+                server,
+                genreKey,
+                InfiniteMixCandidateWindowSize,
+                candidateOffset,
+                CancellationToken.None);
+            var returnedWrongLevel = !string.Equals(snapshot.ParentKey, genreKey, StringComparison.Ordinal);
+            if (returnedWrongLevel || snapshot.Nodes.Count == 0 && snapshot.Candidates.Count == 0)
+            {
+                var facets = await _orynivoClient.GetTrackFacetsAsync(server, CancellationToken.None);
+                snapshot = GenreCloudService.BuildSnapshot(
+                    facets,
+                    genreKey,
+                    InfiniteMixCandidateWindowSize,
+                    candidateOffset);
+            }
+            return new GenreCloudSource(server, snapshot);
         }
         catch
         {

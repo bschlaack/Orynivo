@@ -599,7 +599,8 @@ byte-range streaming without FFmpeg.
   listening habits, favorites, the local library, and all reachable Orynivo
   Servers. It balances discovery with genre affinity and suppresses immediate
   track, album, and artist repetition. Initial preparation is surfaced through
-  a progress overlay; later refills happen automatically in the background.
+  a progress overlay; later refills rotate through the complete matching genre
+  population and happen automatically in the background.
 - Dashboard with an artwork-backed greeting hero with a lightened-artwork rim, live
   library counters (including local and configured Orynivo Server track
   favorites), random

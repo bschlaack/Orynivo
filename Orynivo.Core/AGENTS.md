@@ -91,7 +91,8 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   Keep this payload free of track rows, artwork bytes, and playback credentials.
 - `GenreCloudService` owns the stable hierarchical genre taxonomy, tag
   normalization, count aggregation, breadcrumbs, and bounded provider-local
-  candidate selection. Its curated data lives in the embedded
+  candidate selection. Candidate offsets rotate and wrap the stable order for
+  repeated background batches. Its curated data lives in the embedded
   `Library/GenreTaxonomy.json`; definitions may be top-level and have multiple
   parents, so traversal must be cycle-safe and node counts must deduplicate a
   track even when several graph paths reach the same ancestor. Every node also
