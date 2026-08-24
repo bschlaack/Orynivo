@@ -212,6 +212,11 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   artist detail upload/delete actions route through the owning local or remote
   artwork provider and use localized labels/tooltips. Plex identities remain
   separate.
+- Unified artist and logical-album details reconcile artwork for equivalent
+  local/server identities with a bounded best-effort request. Copy only into
+  missing destinations, preserve manual artist images, invalidate unified and
+  remote list caches after writes, and never let an unavailable server prevent
+  the detail view from opening.
 - Every non-Plex artist-name link, artist-row double-click, unified search
   result, and artist navigation from the transport opens the shared artist
   detail surface instead of a bare Albums list. Its accent-bordered hero places

@@ -8930,6 +8930,17 @@ public partial class MainWindow : Window
         PodcastView.IsVisible = false;
         UpdateAlphabetIndex(null, false);
 
+        using (var artworkSyncCts = new CancellationTokenSource(TimeSpan.FromSeconds(10)))
+        {
+            try
+            {
+                await SynchronizeLogicalAlbumArtworkAsync(row, parts, artworkSyncCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // Artwork synchronization is optional and must not block album navigation.
+            }
+        }
         await ReloadVisibleLogicalAlbumTracksAsync();
         BackButton.IsVisible = true;
     }
@@ -10026,6 +10037,7 @@ public partial class MainWindow : Window
         _artistInfoUnifiedArtistName = artistName;
         var comparisonKey = ArtistNameNormalizer.CreateComparisonKey(artistName);
         var albumSources = new List<(LibraryCatalogAlbum Album, OrynivoServerSettings? Server)>();
+        var artistSources = new List<(LibraryCatalogArtist Artist, OrynivoServerSettings? Server)>();
         var trackRequests = new List<(ILibraryCatalogProvider Provider, OrynivoServerSettings? Server, long ArtistId, long AlbumId)>();
         var localArtists = await Task.Run(async () =>
             await _localCatalogProvider.GetArtistsAsync());
@@ -10034,6 +10046,9 @@ public partial class MainWindow : Window
         var matchingLocalArtists = localArtists.Where(candidate =>
                 ArtistNameNormalizer.CreateComparisonKey(candidate.Name) == comparisonKey)
             .ToList();
+        artistSources.AddRange(matchingLocalArtists.Select(artist => (
+            artist,
+            (OrynivoServerSettings?)null)));
         var isFavorite = matchingLocalArtists.Any(artist => artist.IsFavorite);
         var localCatalogLists = await Task.Run(async () =>
         {
@@ -10101,6 +10116,7 @@ public partial class MainWindow : Window
             {
                 isFavorite |= artist.IsFavorite;
                 matchingRemoteRow ??= ToCatalogArtistContentRow(artist, remote.Server);
+                artistSources.Add((artist, remote.Server));
             }
             albumSources.AddRange(remote.Albums.Select(album => (
                 album,
@@ -10114,6 +10130,21 @@ public partial class MainWindow : Window
             PopulateUnifiedArtistInfoAlbums(albumSources);
         }
         await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Background);
+        if (!IsCurrentArtistDetailLoad(loadVersion, artistName))
+            return;
+
+        using (var artworkSyncCts = new CancellationTokenSource(TimeSpan.FromSeconds(10)))
+        {
+            try
+            {
+                await SynchronizeMissingArtistArtworkAsync(artistName, artistSources, artworkSyncCts.Token);
+                albumSources = await SynchronizeMissingAlbumArtworkAsync(albumSources, artworkSyncCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // Artwork synchronization is optional and must not block artist navigation.
+            }
+        }
         if (!IsCurrentArtistDetailLoad(loadVersion, artistName))
             return;
 
@@ -10648,6 +10679,7 @@ public partial class MainWindow : Window
                 // The image remains available in every reachable matching library.
             }
         }
+        InvalidateUnifiedLibraryViewCache();
     }
 
     /// <summary>
@@ -10731,6 +10763,7 @@ public partial class MainWindow : Window
                 // Profile synchronization is best-effort for temporarily unavailable servers.
             }
         }
+        InvalidateUnifiedLibraryViewCache();
     }
 
     private async Task ReloadAlbumRowsAsync(
@@ -14833,6 +14866,7 @@ public partial class MainWindow : Window
                 // Deletion remains applied to every reachable matching library.
             }
         }
+        InvalidateUnifiedLibraryViewCache();
     }
 
     private async void EditArtistNameButton_OnClick(object? sender, RoutedEventArgs e)

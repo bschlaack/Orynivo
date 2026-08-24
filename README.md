@@ -65,7 +65,9 @@ the ability to reach that library from any device on the local network.
   and to its matching artists on every reachable configured Orynivo Server;
   local merge-priority choices are applied to equivalent server collisions.
   Cached biographies and images are shared across matching identities, and new
-  profile downloads or manual image selections are synchronized to each source
+  profile downloads or manual image selections are synchronized to each source.
+  Opening a unified artist or album also fills missing artwork in either the
+  local library or matching reachable Orynivo Servers from an existing counterpart.
 - AI control via local LLMs, LM Studio/Ollama/OpenAI-compatible endpoints
 - MCP server for external AI assistants
 - **Orynivo Server** — headless cross-platform music server (Linux, macOS, Windows)

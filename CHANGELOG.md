@@ -4,6 +4,21 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.36.7] - 2026-08-25
+
+### Added
+
+- Unified artist and album details now reconcile missing artwork between the
+  local library and matching reachable Orynivo Server identities. Existing
+  images are copied only to sources without artwork, and manually protected
+  artist images are never overwritten.
+
+### Fixed
+
+- Artist and album artwork changes now invalidate the unified library view
+  cache, so returning to Artists or Albums immediately shows newly assigned or
+  removed images instead of a stale cached row.
+
 ## [0.36.6] - 2026-08-25
 
 ### Added
