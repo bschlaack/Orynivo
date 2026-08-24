@@ -781,7 +781,12 @@ fallback or allow client-provided commands/paths to reach the helper.
   image selections are synchronized to every matching local and reachable
   Orynivo Server identity; automatic image synchronization must preserve manual
   images. Manual artist-image uploads and deletions use the same synchronized
-  identity set. Album and artist detail headers expose localized upload actions
+  identity set. Opening a unified artist or logical album performs a bounded,
+  best-effort artwork reconciliation: copy an existing local or remote image
+  only into equivalent identities without artwork, preserve manual artist
+  images, invalidate unified/provider caches after writes, and never let an
+  unreachable server block navigation. Album and artist detail headers expose
+  localized upload actions
   plus contrast-safe vector trash buttons with explicit delete tooltips; local
   and remote mutations use their owning artwork cache/API. Dashboard artist
   analytics use the same unified drill-down,
