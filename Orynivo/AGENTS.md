@@ -402,11 +402,18 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   `logs/dashboard-performance.log`. Keep this persistence off the UI thread and
   never add media names, paths, server URLs, API keys, or other credentials to
   the diagnostic payload.
-- Expensive Dashboard album aggregates use one one-minute in-memory catalog
+- Expensive Dashboard album aggregates use one versioned in-memory catalog
   snapshot per recommendation profile and configured server set. Concurrent
   builds must await the same in-flight load. Local watcher changes and changed
   remote `LibraryChangedAt` values invalidate it; cheap listening statistics,
   calendar data, and recently played rows remain outside this cache.
+- The complete unfiltered shared Artists, Albums, and Tracks results use a
+  three-entry LRU session cache. Configured-server identity and a generation
+  form the key; library-version, watcher, favorite, and artwork changes advance
+  the generation. Independent remote servers load concurrently, and local
+  provider database work must not run synchronously on the Avalonia UI thread.
+- A cached Genre Cloud level renders immediately and must not retain the
+  first-load branch-transition delay.
 - `AppSettings.LastMainView` persists every selectable sidebar leaf tag, not a
   hard-coded view subset. Section and library-group containers, empty hints,
   and disabled Plex server headings are never persisted. Synchronously built

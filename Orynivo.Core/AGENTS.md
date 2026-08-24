@@ -151,3 +151,8 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
 
 Consult the detailed database, scanner, search, streaming, audio, and web rules
 in the root `AGENTS.md` before modifying those areas.
+- `AudioDatabase` applies connection pragmas on every connection but coalesces
+  schema creation/migration once per physical path and process. A newly created
+  file at a reused path must discard the old initialization marker.
+- Use `GetTrackListPage` when only one ordered page is required; do not load the
+  complete track list and page it in managed memory.

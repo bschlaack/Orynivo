@@ -4,7 +4,7 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.36.6] - 2026-08-25
 
 ### Added
 
@@ -15,6 +15,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Repeated Artists, Albums, and Tracks navigation now reuses a bounded,
+  versioned three-view cache. Remote Orynivo Server catalogs load concurrently,
+  local catalog work runs away from the UI thread, and artwork, favorite,
+  watcher, and server-version changes invalidate affected snapshots.
+- SQLite schema migration is now performed once per database file and process,
+  while track pages use SQL `LIMIT`/`OFFSET` instead of materializing the full
+  library. Remote album drill-down uses a dedicated single-album endpoint.
+- Dashboard catalog snapshots remain valid until library/history invalidation
+  instead of expiring after one minute, and cached Genre Cloud levels skip the
+  artificial branch-transition delay.
 - Genre Cloud levels now keep a bounded, versioned in-memory session cache of
   their merged taxonomy nodes and resolved local/server track and album
   recommendations. Reopening the root or a recently visited branch no longer
@@ -25,7 +35,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   recent-album and recommendation queries aggregate tracks before joining
   album metadata. This removes repeated full-library join work and prevents
   independent remote requests from extending navigation time additively.
-- Repeated Dashboard navigation now reuses a one-minute in-memory catalog
+- Repeated Dashboard navigation now reuses a versioned in-memory catalog
   snapshot and coalesces overlapping loads. Local watcher changes and changed
   remote server library versions invalidate it immediately, while listening
   statistics and recently played rows remain freshly queried.

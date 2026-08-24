@@ -114,7 +114,7 @@ public partial class MainWindow : Window
         DateTimeOffset ExpiresAtUtc,
         DashboardCatalogSnapshot Snapshot);
 
-    private static readonly TimeSpan DashboardCatalogCacheLifetime = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan DashboardCatalogCacheLifetime = TimeSpan.FromHours(24);
     private readonly object _dashboardCatalogCacheSync = new();
     private DashboardCatalogCacheEntry? _dashboardCatalogCache;
     private Task<DashboardCatalogSnapshot>? _dashboardCatalogLoadTask;

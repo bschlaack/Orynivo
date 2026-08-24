@@ -228,71 +228,73 @@ internal sealed class LocalLibraryCatalogProvider : ILibraryCatalogProvider
     public LibraryCatalogSource Source => LibraryCatalogSource.Local;
 
     /// <inheritdoc/>
-    public Task<IReadOnlyList<LibraryCatalogArtist>> GetArtistsAsync(CancellationToken cancellationToken = default)
-    {
-        using var db = AudioDatabase.OpenDefault();
-        return Task.FromResult<IReadOnlyList<LibraryCatalogArtist>>(
-            db.GetArtistsLite().Select(ToArtist).ToList());
-    }
+    public Task<IReadOnlyList<LibraryCatalogArtist>> GetArtistsAsync(CancellationToken cancellationToken = default) =>
+        Task.Run<IReadOnlyList<LibraryCatalogArtist>>(() =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            return db.GetArtistsLite().Select(ToArtist).ToList();
+        }, cancellationToken);
 
     /// <inheritdoc/>
-    public Task<IReadOnlyList<LibraryCatalogAlbum>> GetAlbumsAsync(bool includeArtwork, CancellationToken cancellationToken = default)
-    {
-        using var db = AudioDatabase.OpenDefault();
-        return Task.FromResult<IReadOnlyList<LibraryCatalogAlbum>>(
-            db.GetAlbumsLite(includeArtwork).Select(ToAlbum).ToList());
-    }
+    public Task<IReadOnlyList<LibraryCatalogAlbum>> GetAlbumsAsync(bool includeArtwork, CancellationToken cancellationToken = default) =>
+        Task.Run<IReadOnlyList<LibraryCatalogAlbum>>(() =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            return db.GetAlbumsLite(includeArtwork).Select(ToAlbum).ToList();
+        }, cancellationToken);
 
     /// <inheritdoc/>
-    public Task<LibraryCatalogAlbum?> GetAlbumAsync(long albumId, bool includeArtwork, CancellationToken cancellationToken = default)
-    {
-        using var db = AudioDatabase.OpenDefault();
-        var album = db.GetAlbumById(albumId);
-        return Task.FromResult(album is null ? null : ToAlbum(album));
-    }
+    public Task<LibraryCatalogAlbum?> GetAlbumAsync(long albumId, bool includeArtwork, CancellationToken cancellationToken = default) =>
+        Task.Run(() =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            var album = db.GetAlbumById(albumId);
+            return album is null ? null : ToAlbum(album);
+        }, cancellationToken);
 
     /// <inheritdoc/>
-    public Task<IReadOnlyList<LibraryCatalogAlbum>> GetAlbumsByArtistAsync(long artistId, bool includeArtwork, CancellationToken cancellationToken = default)
-    {
-        using var db = AudioDatabase.OpenDefault();
-        return Task.FromResult<IReadOnlyList<LibraryCatalogAlbum>>(
-            db.GetAlbumsByArtist(artistId, includeArtwork).Select(ToAlbum).ToList());
-    }
+    public Task<IReadOnlyList<LibraryCatalogAlbum>> GetAlbumsByArtistAsync(long artistId, bool includeArtwork, CancellationToken cancellationToken = default) =>
+        Task.Run<IReadOnlyList<LibraryCatalogAlbum>>(() =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            return db.GetAlbumsByArtist(artistId, includeArtwork).Select(ToAlbum).ToList();
+        }, cancellationToken);
 
     /// <inheritdoc/>
-    public Task<IReadOnlyList<LibraryCatalogTrack>> GetTracksAsync(int page = 0, int pageSize = int.MaxValue, CancellationToken cancellationToken = default)
-    {
-        using var db = AudioDatabase.OpenDefault();
-        var tracks = db.GetTrackList();
-        if (pageSize != int.MaxValue)
-            tracks = tracks.Skip(page * pageSize).Take(pageSize).ToList();
-        return Task.FromResult<IReadOnlyList<LibraryCatalogTrack>>(tracks.Select(ToTrack).ToList());
-    }
+    public Task<IReadOnlyList<LibraryCatalogTrack>> GetTracksAsync(int page = 0, int pageSize = int.MaxValue, CancellationToken cancellationToken = default) =>
+        Task.Run<IReadOnlyList<LibraryCatalogTrack>>(() =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            var tracks = pageSize == int.MaxValue
+                ? db.GetTrackList()
+                : db.GetTrackListPage(page, pageSize);
+            return tracks.Select(ToTrack).ToList();
+        }, cancellationToken);
 
     /// <inheritdoc/>
-    public Task<IReadOnlyList<LibraryCatalogTrack>> GetTracksByAlbumAsync(long albumId, long? artistId = null, CancellationToken cancellationToken = default)
-    {
-        using var db = AudioDatabase.OpenDefault();
-        return Task.FromResult<IReadOnlyList<LibraryCatalogTrack>>(
-            db.GetTrackListByAlbum(albumId, artistId).Select(ToTrack).ToList());
-    }
+    public Task<IReadOnlyList<LibraryCatalogTrack>> GetTracksByAlbumAsync(long albumId, long? artistId = null, CancellationToken cancellationToken = default) =>
+        Task.Run<IReadOnlyList<LibraryCatalogTrack>>(() =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            return db.GetTrackListByAlbum(albumId, artistId).Select(ToTrack).ToList();
+        }, cancellationToken);
 
     /// <inheritdoc/>
-    public Task<IReadOnlyList<LibraryCatalogTrack>> SearchTracksAsync(string query, int limit, CancellationToken cancellationToken = default)
-    {
-        using var db = AudioDatabase.OpenDefault();
-        var ids = TrackSearchIndex.SearchByCategory(query).Tracks.Ids.Take(limit);
-        return Task.FromResult<IReadOnlyList<LibraryCatalogTrack>>(
-            db.GetTrackListByIds(ids).Select(ToTrack).ToList());
-    }
+    public Task<IReadOnlyList<LibraryCatalogTrack>> SearchTracksAsync(string query, int limit, CancellationToken cancellationToken = default) =>
+        Task.Run<IReadOnlyList<LibraryCatalogTrack>>(() =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            var ids = TrackSearchIndex.SearchByCategory(query).Tracks.Ids.Take(limit);
+            return db.GetTrackListByIds(ids).Select(ToTrack).ToList();
+        }, cancellationToken);
 
     /// <inheritdoc/>
-    public Task<IReadOnlyList<LibraryCatalogTrack>> GetTracksByIdsAsync(IReadOnlyList<long> ids, CancellationToken cancellationToken = default)
-    {
-        using var db = AudioDatabase.OpenDefault();
-        return Task.FromResult<IReadOnlyList<LibraryCatalogTrack>>(
-            db.GetTrackListByIds(ids).Select(ToTrack).ToList());
-    }
+    public Task<IReadOnlyList<LibraryCatalogTrack>> GetTracksByIdsAsync(IReadOnlyList<long> ids, CancellationToken cancellationToken = default) =>
+        Task.Run<IReadOnlyList<LibraryCatalogTrack>>(() =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            return db.GetTrackListByIds(ids).Select(ToTrack).ToList();
+        }, cancellationToken);
 
     /// <inheritdoc/>
     public Task<bool> SetAlbumArtworkAsync(long albumId, byte[] imageData, string? mimeType, CancellationToken cancellationToken = default) =>
@@ -314,6 +316,21 @@ internal sealed class LocalLibraryCatalogProvider : ILibraryCatalogProvider
             db.ClearArtworkFromAlbum(albumId);
             return true;
         }, cancellationToken);
+
+    /// <summary>Maps one compact local database artist to the provider-neutral catalog model.</summary>
+    /// <param name="artist">Local artist row.</param>
+    /// <returns>Provider-neutral artist metadata.</returns>
+    internal static LibraryCatalogArtist ToCatalogArtist(ArtistInfo artist) => ToArtist(artist);
+
+    /// <summary>Maps one compact local database album to the provider-neutral catalog model.</summary>
+    /// <param name="album">Local album row.</param>
+    /// <returns>Provider-neutral album metadata.</returns>
+    internal static LibraryCatalogAlbum ToCatalogAlbum(AlbumInfo album) => ToAlbum(album);
+
+    /// <summary>Maps one compact local database track to the provider-neutral catalog model.</summary>
+    /// <param name="track">Local track row.</param>
+    /// <returns>Provider-neutral track metadata.</returns>
+    internal static LibraryCatalogTrack ToCatalogTrack(TrackListInfo track) => ToTrack(track);
 
     private static LibraryCatalogArtist ToArtist(ArtistInfo artist) => new(
         LibraryCatalogSource.Local,
@@ -426,8 +443,10 @@ internal sealed class OrynivoServerLibraryCatalogProvider : ILibraryCatalogProvi
     /// <inheritdoc/>
     public async Task<LibraryCatalogAlbum?> GetAlbumAsync(long albumId, bool includeArtwork, CancellationToken cancellationToken = default)
     {
-        var albums = await _client.GetAlbumsAsync(_server, cancellationToken);
-        return albums.FirstOrDefault(album => album.Id == albumId) is { } album
+        var album = await _client.GetAlbumAsync(_server, albumId, cancellationToken);
+        album ??= (await _client.GetAlbumsAsync(_server, cancellationToken))
+            .FirstOrDefault(candidate => candidate.Id == albumId);
+        return album is not null
             ? ToAlbum(album)
             : null;
     }

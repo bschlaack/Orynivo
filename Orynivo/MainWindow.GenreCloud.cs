@@ -86,13 +86,14 @@ public partial class MainWindow
     /// <param name="parentKey">Selected taxonomy key, or <see langword="null"/> for the root.</param>
     private async Task ShowGenreCloudAsync(string? parentKey)
     {
+        var hasCachedView = IsGenreCloudViewCached(parentKey);
         _genreCloudSelectedKey = parentKey;
         CancelAndDispose(ref _genreCloudCts);
         _genreCloudCts = new CancellationTokenSource();
         var cancellationToken = _genreCloudCts.Token;
         try
         {
-            if (GenreCloudNodesCanvas.Children.Count > 0)
+            if (!hasCachedView && GenreCloudNodesCanvas.Children.Count > 0)
             {
                 GenreCloudNodesCanvas.Opacity = 0;
                 await Task.Delay(140, cancellationToken);
@@ -202,6 +203,16 @@ public partial class MainWindow
                 }
             }
         }
+    }
+
+    /// <summary>Checks whether the requested level can be rendered without source loading.</summary>
+    /// <param name="parentKey">Selected taxonomy key, or <see langword="null"/> for the root.</param>
+    /// <returns><see langword="true"/> when a current completed cache entry exists.</returns>
+    private bool IsGenreCloudViewCached(string? parentKey)
+    {
+        var key = CreateGenreCloudViewCacheKey(parentKey);
+        lock (_genreCloudViewCacheSync)
+            return _genreCloudViewCache.ContainsKey(key);
     }
 
     /// <summary>Loads and resolves one Genre Cloud level from local and remote catalogs.</summary>

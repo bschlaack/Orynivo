@@ -131,6 +131,13 @@ public static class LibraryEndpoints
             return Results.Ok(db.GetRecentAlbums(limit).Select(RecentAlbumDto).ToList());
         });
 
+        api.MapGet("/albums/{albumId:long}", (long albumId) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            var album = db.GetAlbumById(albumId);
+            return album is null ? Results.NotFound() : Results.Ok(AlbumDto(album));
+        });
+
         api.MapGet("/albums/recommendation-candidates", () =>
         {
             using var db = AudioDatabase.OpenDefault();
@@ -151,9 +158,7 @@ public static class LibraryEndpoints
         api.MapGet("/tracks", (int page = 0, int pageSize = 500) =>
         {
             using var db = AudioDatabase.OpenDefault();
-            var tracks = db.GetTrackList()
-                .Skip(page * pageSize)
-                .Take(pageSize)
+            var tracks = db.GetTrackListPage(Math.Max(0, page), Math.Clamp(pageSize, 1, 5000))
                 .Select(TrackDto)
                 .ToList();
             return Results.Ok(tracks);

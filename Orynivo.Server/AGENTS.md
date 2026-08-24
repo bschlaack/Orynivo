@@ -86,6 +86,9 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
 - `GET /api/albums/recommendation-candidates` returns compact album-level
   genre/BPM metadata for client-side Dashboard ranking; recommendation policy
   and listening history remain on the client.
+- `GET /api/albums/{id}` returns one album for detail navigation. The paged
+  `GET /api/tracks` route must page in SQLite through `GetTrackListPage`, not
+  materialize all server tracks before applying the requested page.
 - `GET /api/genres/cloud` returns one compact `GenreCloudService` taxonomy
   level plus bounded provider-local track candidates; it must not return file
   paths or credentials. Its optional non-negative `offset` rotates the stable

@@ -282,6 +282,7 @@ works directly in FFmpeg and browser URLs.
 | `POST /api/artists/{id}/rename` | Rename one artist or merge it with a matching artist |
 | `GET /api/artists/{id}/albums` | Albums for one artist |
 | `GET /api/albums` | All albums (id, title, display artist, year, artwork paths) |
+| `GET /api/albums/{id}` | One album without loading the complete album catalog |
 | `GET /api/albums/{id}/tracks` | Track list for one album |
 | `GET /api/tracks` | Paginated track list (`?page=0&pageSize=500`) |
 | `GET /api/tracks/{id}` | Full metadata for one track |

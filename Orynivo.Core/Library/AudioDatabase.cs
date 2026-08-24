@@ -1,4 +1,5 @@
 using System.IO;
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -350,6 +351,8 @@ public sealed record PlaybackQueueSnapshot(IReadOnlyList<string> Paths, int Curr
 /// </summary>
 public sealed class AudioDatabase : IDisposable
 {
+    private static readonly ConcurrentDictionary<string, Lazy<bool>> InitializedSchemas =
+        new(StringComparer.OrdinalIgnoreCase);
     private readonly SqliteConnection _conn;
     private Dictionary<string, (long Id, string Name)>? _artistsByComparisonKey;
     private Dictionary<long, string>? _artistNamesById;
@@ -363,14 +366,33 @@ public sealed class AudioDatabase : IDisposable
     /// <param name="dbPath">Absolute path to the <c>.db</c> file.</param>
     public AudioDatabase(string dbPath)
     {
-        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(dbPath)!);
-        _conn = new SqliteConnection($"Data Source={dbPath}");
+        var fullPath = System.IO.Path.GetFullPath(dbPath);
+        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(fullPath)!);
+        if (!File.Exists(fullPath))
+            InitializedSchemas.TryRemove(fullPath, out _);
+        _conn = new SqliteConnection($"Data Source={fullPath}");
         using (Orynivo.StartupDiagnostics.Time("AudioDatabase: SQLite open"))
             _conn.Open();
         using (Orynivo.StartupDiagnostics.Time("AudioDatabase: ApplyPragmas"))
             ApplyPragmas();
-        using (Orynivo.StartupDiagnostics.Time("AudioDatabase: EnsureSchema"))
-            EnsureSchema();
+        var schemaInitializer = InitializedSchemas.GetOrAdd(
+            fullPath,
+            _ => new Lazy<bool>(() =>
+            {
+                using (Orynivo.StartupDiagnostics.Time("AudioDatabase: EnsureSchema"))
+                    EnsureSchema();
+                return true;
+            }, LazyThreadSafetyMode.ExecutionAndPublication));
+        try
+        {
+            _ = schemaInitializer.Value;
+        }
+        catch
+        {
+            InitializedSchemas.TryRemove(
+                new KeyValuePair<string, Lazy<bool>>(fullPath, schemaInitializer));
+            throw;
+        }
     }
 
     // ------------------------------------------------------------------
@@ -4731,6 +4753,36 @@ public sealed class AudioDatabase : IDisposable
                 r.IsDBNull(5) ? 0 : r.GetInt64(5),
                 !r.IsDBNull(6) && r.GetInt64(6) != 0,
                 r.IsDBNull(7) ? null : r.GetString(7)));
+        return result;
+    }
+
+    /// <summary>Loads one ordered page of compact track rows directly in SQLite.</summary>
+    /// <param name="page">Zero-based page index.</param>
+    /// <param name="pageSize">Positive maximum number of rows to return.</param>
+    /// <returns>The requested track page ordered by display title.</returns>
+    public List<TrackListInfo> GetTrackListPage(int page, int pageSize)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(page);
+        ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT
+                path, file_name, title, artist, album, album_artist, genre, format, bitrate,
+                duration, sort_title, id, is_favorite, year, track_number, track_total,
+                disc_number, disc_total, sample_rate, bit_depth, channels, composer, bpm,
+                file_size, added_at, replay_gain_track, replay_gain_album, artist_id, album_id,
+                user_rating, musicbrainz_rating, musicbrainz_rating_votes, musicbrainz_track_id,
+                musicbrainz_rating_fetched_at, musicbrainz_genres, musicbrainz_tags
+            FROM tracks
+            ORDER BY COALESCE(sort_title, title, file_name) COLLATE NOCASE
+            LIMIT $limit OFFSET $offset;
+            """;
+        Add(cmd, "$limit", pageSize);
+        Add(cmd, "$offset", checked(page * pageSize));
+        using var reader = cmd.ExecuteReader();
+        var result = new List<TrackListInfo>(pageSize);
+        while (reader.Read())
+            result.Add(MapTrackListInfo(reader));
         return result;
     }
 
