@@ -155,6 +155,17 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   away substantial parts. Cache only the rendered mosaic for 24 hours under the
   data root; authenticated remote artwork URLs and API keys must never be
   written to that cache.
+  The expensive merged nodes plus resolved track/album recommendations are
+  retained separately in a bounded in-memory LRU cache keyed
+  by taxonomy level, configured server identities, and a catalog generation.
+  The key may contain a process-local hash of a server URL for configuration
+  invalidation, but never the URL or API key itself; the cache is never persisted.
+  Reopening a cached level must only rebuild its controls and bind its existing
+  rows; it must not repeat local facet queries, remote ID resolution, or remote
+  album-catalog loads. Local watcher changes and changed remote
+  `LibraryChangedAt` values increment the generation and clear completed
+  entries. An in-flight load is shared and may finish after its original
+  navigation is cancelled so an immediate return can reuse it.
   Settings > Appearance exposes an independent clear action for these rendered
   mosaics. It must not remove source artist images or any other remote artwork
   cache. The same section persists a background mode of

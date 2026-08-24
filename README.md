@@ -785,6 +785,13 @@ history when available, but the cloud remains usable with a new or empty play
 history. Remote results retain their owning server for playback, favorites,
 artwork, and album/artist navigation.
 
+Resolved cloud levels are retained in a bounded in-memory session cache. After
+the first load, reopening the root or one of the recently visited branches
+reuses its merged taxonomy and source-aware recommendations instead of querying
+and resolving every library again. Local file-watcher changes and newer remote
+server library versions invalidate these entries automatically; the cache is
+never persisted, and its identity contains neither server URLs nor credentials.
+
 The current level uses available images from its recommended local and remote
 artists as a muted grayscale tile background. Images are proportionally fitted
 inside their tiles so portraits and landscape artwork remain complete. Orynivo

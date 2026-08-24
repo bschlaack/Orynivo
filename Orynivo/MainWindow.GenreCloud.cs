@@ -29,15 +29,36 @@ public partial class MainWindow
         bool IsRemote,
         string Location);
 
+    /// <summary>Immutable data required to render one previously resolved Genre Cloud level.</summary>
+    /// <param name="Nodes">Merged taxonomy nodes for the level.</param>
+    /// <param name="TrackRows">Ranked playable track recommendations.</param>
+    /// <param name="AlbumRows">Distinct album recommendations resolved from the tracks.</param>
+    private sealed record GenreCloudViewSnapshot(
+        List<GenreCloudNode> Nodes,
+        List<ContentRow> TrackRows,
+        List<ContentRow> AlbumRows);
+
+    /// <summary>One bounded in-memory Genre Cloud cache entry.</summary>
+    /// <param name="Snapshot">Resolved view data.</param>
+    /// <param name="LastAccessUtc">Last access time used for least-recently-used eviction.</param>
+    private sealed record GenreCloudViewCacheEntry(
+        GenreCloudViewSnapshot Snapshot,
+        DateTimeOffset LastAccessUtc);
+
     private static readonly TimeSpan GenreCloudBackgroundLifetime = TimeSpan.FromHours(24);
     private const int GenreCloudBackgroundMaximumImages = 32;
     private const int GenreCloudBackgroundHeight = 400;
+    private const int GenreCloudViewCacheMaximumEntries = 16;
 
     private CancellationTokenSource? _genreCloudCts;
     private string? _genreCloudSelectedKey;
     private List<GenreCloudNode> _genreCloudNodes = [];
     private List<ContentRow> _genreCloudTrackRows = [];
     private List<ContentRow> _genreCloudAlbumRows = [];
+    private readonly object _genreCloudViewCacheSync = new();
+    private readonly Dictionary<string, GenreCloudViewCacheEntry> _genreCloudViewCache = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Task<GenreCloudViewSnapshot>> _genreCloudViewLoads = new(StringComparer.Ordinal);
+    private int _genreCloudCatalogGeneration;
 
     /// <summary>Starts Infinite Mix with every complete genre branch represented by the current cloud level.</summary>
     private async void GenreCloudInfiniteMixButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -86,32 +107,8 @@ public partial class MainWindow
             AlbumArtworkListBox.ItemsSource = null;
             ContentCountTextBlock.Text = string.Empty;
 
-            var localTask = Task.Run(() =>
-            {
-                using var db = AudioDatabase.OpenDefault();
-                return new GenreCloudSource(
-                    null,
-                    GenreCloudService.BuildSnapshot(db.GetTrackFacets(), parentKey, 500));
-            }, cancellationToken);
-            var remoteTasks = _settings.OrynivoServers
-                .Select(server => LoadRemoteGenreCloudAsync(server, parentKey, cancellationToken))
-                .ToArray();
-            var sources = new List<GenreCloudSource> { await localTask };
-            sources.AddRange(await Task.WhenAll(remoteTasks));
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var nodes = sources
-                .SelectMany(source => source.Snapshot.Nodes)
-                .GroupBy(node => node.Key, StringComparer.Ordinal)
-                .Select(group => new GenreCloudNode(
-                    group.Key,
-                    group.First().DisplayName,
-                    group.Sum(node => node.TrackCount),
-                    group.Sum(node => node.AlbumCount),
-                    group.Any(node => node.HasChildren)))
-                .OrderByDescending(node => node.TrackCount)
-                .ThenBy(node => node.DisplayName, StringComparer.CurrentCultureIgnoreCase)
-                .ToList();
+            var snapshot = await GetGenreCloudViewSnapshotAsync(parentKey, cancellationToken);
+            var nodes = snapshot.Nodes;
             _genreCloudNodes = nodes;
             BuildGenreCloudBreadcrumb(parentKey);
             BuildGenreCloudNodes(nodes, GenreAlbumRecommendationsRadioButton.IsChecked == true);
@@ -122,19 +119,8 @@ public partial class MainWindow
                 ? GetGenreCloudDisplayName(parentKey!)
                 : string.Empty;
 
-            var listeningWeights = await Task.Run(LoadGenreListeningWeights, cancellationToken);
-            var candidates = sources
-                .SelectMany(source => source.Snapshot.Candidates.Select(candidate =>
-                    new GenreCloudCandidate(
-                        source.Server,
-                        candidate,
-                        CalculateGenreCandidateScore(source.Server, candidate, listeningWeights))))
-                .OrderByDescending(candidate => candidate.Score)
-                .Take(100)
-                .ToList();
-            var rows = await ResolveGenreCandidateRowsAsync(candidates, cancellationToken);
-            var albumRows = await ResolveGenreCandidateAlbumRowsAsync(rows, cancellationToken);
-            cancellationToken.ThrowIfCancellationRequested();
+            var rows = snapshot.TrackRows;
+            var albumRows = snapshot.AlbumRows;
             _genreCloudTrackRows = rows;
             _genreCloudAlbumRows = albumRows;
             ApplyGenreRecommendationMode();
@@ -159,6 +145,151 @@ public partial class MainWindow
         catch (OperationCanceledException)
         {
             // Navigation or a newer drill-down superseded this request.
+        }
+    }
+
+    /// <summary>
+    /// Returns a resolved Genre Cloud level from the session cache or coalesces an
+    /// existing load for the same library generation and taxonomy key.
+    /// </summary>
+    /// <param name="parentKey">Selected taxonomy key, or <see langword="null"/> for the root.</param>
+    /// <param name="cancellationToken">Token that cancels waiting when navigation changes.</param>
+    /// <returns>The resolved nodes and recommendation rows for the requested level.</returns>
+    private async Task<GenreCloudViewSnapshot> GetGenreCloudViewSnapshotAsync(
+        string? parentKey,
+        CancellationToken cancellationToken)
+    {
+        var key = CreateGenreCloudViewCacheKey(parentKey);
+        Task<GenreCloudViewSnapshot> loadTask;
+        lock (_genreCloudViewCacheSync)
+        {
+            if (_genreCloudViewCache.TryGetValue(key, out var cached))
+            {
+                _genreCloudViewCache[key] = cached with { LastAccessUtc = DateTimeOffset.UtcNow };
+                return cached.Snapshot;
+            }
+
+            if (!_genreCloudViewLoads.TryGetValue(key, out loadTask!))
+            {
+                // The shared load deliberately outlives one navigation request. A quick
+                // departure and return can therefore reuse the work already in progress.
+                loadTask = LoadGenreCloudViewSnapshotAsync(parentKey, CancellationToken.None);
+                _genreCloudViewLoads[key] = loadTask;
+            }
+        }
+
+        try
+        {
+            var snapshot = await loadTask.WaitAsync(cancellationToken);
+            lock (_genreCloudViewCacheSync)
+            {
+                if (key == CreateGenreCloudViewCacheKey(parentKey))
+                {
+                    _genreCloudViewCache[key] = new GenreCloudViewCacheEntry(snapshot, DateTimeOffset.UtcNow);
+                    TrimGenreCloudViewCache();
+                }
+            }
+            return snapshot;
+        }
+        finally
+        {
+            if (loadTask.IsCompleted)
+            {
+                lock (_genreCloudViewCacheSync)
+                {
+                    if (_genreCloudViewLoads.TryGetValue(key, out var active) && ReferenceEquals(active, loadTask))
+                        _genreCloudViewLoads.Remove(key);
+                }
+            }
+        }
+    }
+
+    /// <summary>Loads and resolves one Genre Cloud level from local and remote catalogs.</summary>
+    /// <param name="parentKey">Selected taxonomy key, or <see langword="null"/> for the root.</param>
+    /// <param name="cancellationToken">Token that cancels source and row resolution.</param>
+    /// <returns>A complete cacheable view snapshot.</returns>
+    private async Task<GenreCloudViewSnapshot> LoadGenreCloudViewSnapshotAsync(
+        string? parentKey,
+        CancellationToken cancellationToken)
+    {
+        var localTask = Task.Run(() =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            return new GenreCloudSource(
+                null,
+                GenreCloudService.BuildSnapshot(db.GetTrackFacets(), parentKey, 500));
+        }, cancellationToken);
+        var listeningWeightsTask = Task.Run(LoadGenreListeningWeights, cancellationToken);
+        var remoteTasks = (_settings.OrynivoServers ?? [])
+            .Select(server => LoadRemoteGenreCloudAsync(server, parentKey, cancellationToken))
+            .ToArray();
+
+        await Task.WhenAll(remoteTasks.Append<Task>(localTask).Append(listeningWeightsTask));
+        var sources = new List<GenreCloudSource> { await localTask };
+        sources.AddRange(await Task.WhenAll(remoteTasks));
+        var listeningWeights = await listeningWeightsTask;
+
+        var composed = await Task.Run(() =>
+        {
+            var nodes = sources
+                .SelectMany(source => source.Snapshot.Nodes)
+                .GroupBy(node => node.Key, StringComparer.Ordinal)
+                .Select(group => new GenreCloudNode(
+                    group.Key,
+                    group.First().DisplayName,
+                    group.Sum(node => node.TrackCount),
+                    group.Sum(node => node.AlbumCount),
+                    group.Any(node => node.HasChildren)))
+                .OrderByDescending(node => node.TrackCount)
+                .ThenBy(node => node.DisplayName, StringComparer.CurrentCultureIgnoreCase)
+                .ToList();
+            var candidates = sources
+                .SelectMany(source => source.Snapshot.Candidates.Select(candidate =>
+                    new GenreCloudCandidate(
+                        source.Server,
+                        candidate,
+                        CalculateGenreCandidateScore(source.Server, candidate, listeningWeights))))
+                .OrderByDescending(candidate => candidate.Score)
+                .Take(100)
+                .ToList();
+            return (Nodes: nodes, Candidates: candidates);
+        }, cancellationToken);
+
+        var rows = await ResolveGenreCandidateRowsAsync(composed.Candidates, cancellationToken);
+        var albumRows = await ResolveGenreCandidateAlbumRowsAsync(rows, cancellationToken);
+        return new GenreCloudViewSnapshot(composed.Nodes, rows, albumRows);
+    }
+
+    /// <summary>Builds a credential-free session-cache identity for one taxonomy level.</summary>
+    /// <param name="parentKey">Selected taxonomy key, or <see langword="null"/> for the root.</param>
+    /// <returns>The current cache identity.</returns>
+    private string CreateGenreCloudViewCacheKey(string? parentKey)
+    {
+        var servers = string.Join('|', (_settings.OrynivoServers ?? [])
+            .OrderBy(server => server.Id, StringComparer.Ordinal)
+            .Select(server => $"{server.Id}:{StringComparer.Ordinal.GetHashCode(server.BaseUrl ?? string.Empty)}"));
+        return $"{Volatile.Read(ref _genreCloudCatalogGeneration)};{parentKey ?? "<root>"};{servers}";
+    }
+
+    /// <summary>Evicts least-recently-used Genre Cloud levels beyond the session bound.</summary>
+    private void TrimGenreCloudViewCache()
+    {
+        while (_genreCloudViewCache.Count > GenreCloudViewCacheMaximumEntries)
+        {
+            var oldestKey = _genreCloudViewCache
+                .MinBy(pair => pair.Value.LastAccessUtc).Key;
+            _genreCloudViewCache.Remove(oldestKey);
+        }
+    }
+
+    /// <summary>Invalidates every resolved Genre Cloud level after catalog data changes.</summary>
+    private void InvalidateGenreCloudViewCache()
+    {
+        Interlocked.Increment(ref _genreCloudCatalogGeneration);
+        lock (_genreCloudViewCacheSync)
+        {
+            _genreCloudViewCache.Clear();
+            _genreCloudViewLoads.Clear();
         }
     }
 

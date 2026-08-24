@@ -1280,6 +1280,7 @@ public partial class MainWindow : Window
     private void OnWatchedLibraryChanged()
     {
         InvalidateDashboardCatalogCache();
+        InvalidateGenreCloudViewCache();
 
         // Coalesce bursts of change signals into a single UI-thread pass.
         if (Interlocked.Exchange(ref _libraryWatcherRefreshPending, 1) != 0)
@@ -1385,6 +1386,7 @@ public partial class MainWindow : Window
                             previousVersion != libraryVersion)
                         {
                             InvalidateDashboardCatalogCache();
+                            InvalidateGenreCloudViewCache();
                         }
                         _dashboardRemoteLibraryVersions[server.Id] = libraryVersion;
                     }

@@ -15,6 +15,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Genre Cloud levels now keep a bounded, versioned in-memory session cache of
+  their merged taxonomy nodes and resolved local/server track and album
+  recommendations. Reopening the root or a recently visited branch no longer
+  repeats facet queries, remote ID resolution, or complete album-catalog loads;
+  local watcher changes and changed remote server library versions invalidate
+  the cache immediately.
 - Dashboard data sources now load concurrently instead of serially, and local
   recent-album and recommendation queries aggregate tracks before joining
   album metadata. This removes repeated full-library join work and prevents
