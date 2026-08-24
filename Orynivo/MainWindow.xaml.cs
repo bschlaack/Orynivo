@@ -259,6 +259,7 @@ public partial class MainWindow : Window
     private int _dashboardBuildVersion;
     private StackPanel? _dashboardRootPanel;
     private readonly Dictionary<string, long> _dashboardRemoteLibraryVersions = new(StringComparer.Ordinal);
+    private string? _pendingInitialNavigationTag;
     private bool _suppressNavSelectionChanged;
     private string? _currentTopLevelTag;
 
@@ -1108,6 +1109,8 @@ public partial class MainWindow : Window
         var item = NavListBox.Items
             .OfType<ListBoxItem>()
             .FirstOrDefault(i => string.Equals(i.Tag as string, tag, StringComparison.Ordinal));
+        if (item is null && tag.StartsWith("PlexLibrary:", StringComparison.Ordinal))
+            _pendingInitialNavigationTag = tag;
         NavListBox.SelectedItem = item
             ?? NavListBox.Items.OfType<ListBoxItem>().FirstOrDefault(i => string.Equals(i.Tag as string, "Tracks", StringComparison.Ordinal));
     }
@@ -1115,7 +1118,7 @@ public partial class MainWindow : Window
     private void PersistViewState()
     {
         if (NavListBox.SelectedItem is ListBoxItem { Tag: string tag } &&
-            tag is "Dashboard" or "InternetRadio" or "Podcasts" or "Queue" or "Artists" or "Albums" or "Tracks" or "Folders")
+            IsPersistableMainViewTag(tag))
         {
             _settings.LastMainView = tag;
         }
@@ -1710,6 +1713,23 @@ public partial class MainWindow : Window
         }
 
         ApplySidebarNavigationSettings();
+        RestorePendingInitialNavigationTag();
+    }
+
+    /// <summary>Restores a Plex library tag after its asynchronous navigation load completes.</summary>
+    private void RestorePendingInitialNavigationTag()
+    {
+        if (_pendingInitialNavigationTag is not { } tag)
+            return;
+        var item = NavListBox.Items
+            .OfType<ListBoxItem>()
+            .FirstOrDefault(candidate =>
+                string.Equals(candidate.Tag as string, tag, StringComparison.Ordinal));
+        if (item is null)
+            return;
+
+        _pendingInitialNavigationTag = null;
+        NavListBox.SelectedItem = item;
     }
 
     private ListBoxItem CreatePlexLibraryItem(string serverId, string libraryKey, string title)
@@ -2296,10 +2316,23 @@ public partial class MainWindow : Window
         if (IsNavigationContainerTag(tag))
             return;
 
+        if (_pendingInitialNavigationTag is not null)
+        {
+            if (tag == "Tracks")
+            {
+                // Tracks is only a temporary startup fallback until asynchronous
+                // Plex navigation has materialized the persisted library item.
+            }
+            else
+            {
+                _pendingInitialNavigationTag = null;
+            }
+        }
+
         CloseEmbeddedSettings();
         PushCurrentNavigationState();
         ResetDrilldownState(clearNavigationHistory: false);
-        if (tag is "InternetRadio" or "Podcasts" or "Queue" or "Artists" or "Albums" or "Tracks" or "Folders")
+        if (_pendingInitialNavigationTag is null && IsPersistableMainViewTag(tag))
             _settings.LastMainView = tag;
         await ShowTopLevelViewAsync(tag);
     }
@@ -2326,6 +2359,14 @@ public partial class MainWindow : Window
     private static bool IsNavigationContainerTag(string tag) =>
         tag.StartsWith("Section:", StringComparison.Ordinal) ||
         tag.StartsWith("LibraryGroup:", StringComparison.Ordinal);
+
+    /// <summary>Determines whether a sidebar tag represents a restorable content view.</summary>
+    /// <param name="tag">Sidebar navigation tag.</param>
+    /// <returns><see langword="true"/> for selectable leaf views.</returns>
+    private static bool IsPersistableMainViewTag(string tag) =>
+        !IsNavigationContainerTag(tag) &&
+        !tag.EndsWith(":EmptyHint", StringComparison.Ordinal) &&
+        !tag.StartsWith("PlexServer:", StringComparison.Ordinal);
 
     private void ResetDrilldownState(bool clearNavigationHistory = true)
     {

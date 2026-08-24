@@ -26,6 +26,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Restarting Orynivo now restores every selectable sidebar content view rather
+  than only a hard-coded subset. This includes Dashboard, Genre Cloud, AI Chat,
+  playlists, saved radio/podcast entries, Orynivo Server views, and asynchronously
+  loaded Plex libraries; removed entries still fall back safely to Tracks.
 - Starting a local title from the calendar's daily listening-history dialog no
   longer builds and scrolls the complete unified Tracks table first. It now
   starts the selected history entry directly, avoiding a long Avalonia UI-thread

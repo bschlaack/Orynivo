@@ -396,6 +396,11 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   builds must await the same in-flight load. Local watcher changes and changed
   remote `LibraryChangedAt` values invalidate it; cheap listening statistics,
   calendar data, and recently played rows remain outside this cache.
+- `AppSettings.LastMainView` persists every selectable sidebar leaf tag, not a
+  hard-coded view subset. Section and library-group containers, empty hints,
+  and disabled Plex server headings are never persisted. Synchronously built
+  dynamic rows restore normally; a Plex library tag remains pending while Plex
+  navigation loads asynchronously, with Tracks as the temporary/safe fallback.
 - Dashboard Recently Played cards show the persisted album below the artist.
   When the history identity can resolve a local, Orynivo Server, or Plex album,
   the album name opens that source's album detail without triggering card playback.

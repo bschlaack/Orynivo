@@ -619,6 +619,10 @@ byte-range streaming without FFmpeg.
   Expensive album catalog aggregates use a short in-memory snapshot across
   repeated Dashboard visits; overlapping loads are coalesced, and local or
   remote library-version changes invalidate the snapshot automatically.
+- The last selectable sidebar view is restored on restart, including Genre
+  Cloud, Dashboard, AI Chat, playlists, saved radio/podcast entries, Orynivo
+  Server views, and Plex libraries. Missing or removed entries fall back to
+  Tracks.
 - Clickable populated calendar days with a modal daily listening history;
   local title, album, and artist links open the corresponding library view,
   and title links immediately start playback
