@@ -7,6 +7,41 @@ namespace Orynivo.Core.Tests;
 /// <summary>Verifies that catalog queries hide album records without indexed tracks.</summary>
 public sealed class AudioDatabaseAlbumVisibilityTests
 {
+    /// <summary>Preserves recent ordering and compact recommendation aggregates after track-first grouping.</summary>
+    [Fact]
+    public void DashboardAlbumQueries_AggregateTracksBeforeJoiningAlbumMetadata()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"orynivo-dashboard-albums-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        var databasePath = Path.Combine(root, "library.db");
+
+        try
+        {
+            using var database = new AudioDatabase(databasePath);
+            database.Upsert(CreateDashboardTrack(
+                Path.Combine(root, "older", "one.flac"), "Older", "Artist A", 10, "Rock", 100));
+            database.Upsert(CreateDashboardTrack(
+                Path.Combine(root, "newer", "one.flac"), "Newer", "Artist B", 20, "Pop", 120));
+            database.Upsert(CreateDashboardTrack(
+                Path.Combine(root, "newer", "two.flac"), "Newer", "Artist B", 30, "Dance", 140));
+
+            var recent = database.GetRecentAlbums(1);
+            Assert.Equal("Newer", Assert.Single(recent).Title);
+            Assert.Equal(30, recent[0].AddedAt);
+
+            var recommendation = Assert.Single(
+                database.GetRecommendationAlbums(), album => album.Title == "Newer");
+            Assert.Contains("Pop", recommendation.Genres);
+            Assert.Contains("Dance", recommendation.Genres);
+            Assert.Equal(130, recommendation.AverageBpm);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     /// <summary>Preserves downloaded artwork and favorite state when corrected tags replace an album identity.</summary>
     [Fact]
     public void Upsert_CorrectedAlbumIdentityPreservesPresentationStateInSameDirectory()
@@ -137,6 +172,30 @@ public sealed class AudioDatabaseAlbumVisibilityTests
             Artist = artist,
             AlbumArtist = artist,
             Album = album,
+            TrackNumber = 1
+        };
+
+    private static TrackRecord CreateDashboardTrack(
+        string path,
+        string album,
+        string artist,
+        long addedAt,
+        string genre,
+        int bpm) =>
+        new()
+        {
+            Path = path,
+            SourcePath = path,
+            FileName = Path.GetFileName(path),
+            ModifiedAt = addedAt,
+            AddedAt = addedAt,
+            Duration = 180,
+            Title = Path.GetFileNameWithoutExtension(path),
+            Artist = artist,
+            AlbumArtist = artist,
+            Album = album,
+            Genre = genre,
+            Bpm = bpm,
             TrackNumber = 1
         };
 }

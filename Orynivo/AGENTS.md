@@ -155,6 +155,17 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   away substantial parts. Cache only the rendered mosaic for 24 hours under the
   data root; authenticated remote artwork URLs and API keys must never be
   written to that cache.
+  The expensive merged nodes plus resolved track/album recommendations are
+  retained separately in a bounded in-memory LRU cache keyed
+  by taxonomy level, configured server identities, and a catalog generation.
+  The key may contain a process-local hash of a server URL for configuration
+  invalidation, but never the URL or API key itself; the cache is never persisted.
+  Reopening a cached level must only rebuild its controls and bind its existing
+  rows; it must not repeat local facet queries, remote ID resolution, or remote
+  album-catalog loads. Local watcher changes and changed remote
+  `LibraryChangedAt` values increment the generation and clear completed
+  entries. An in-flight load is shared and may finish after its original
+  navigation is cancelled so an immediate return can reuse it.
   Settings > Appearance exposes an independent clear action for these rendered
   mosaics. It must not remove source artist images or any other remote artwork
   cache. The same section persists a background mode of
@@ -387,9 +398,35 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   change visibility. At either end they remain reserved, disabled, and visually
   muted so the header layout cannot shift. Keep a clear gap before Show all.
   Their Show all views contain up to 100 items.
+- Dashboard builds write one sanitized phase summary to the bounded rolling
+  `logs/dashboard-performance.log`. Keep this persistence off the UI thread and
+  never add media names, paths, server URLs, API keys, or other credentials to
+  the diagnostic payload.
+- Expensive Dashboard album aggregates use one versioned in-memory catalog
+  snapshot per recommendation profile and configured server set. Concurrent
+  builds must await the same in-flight load. Local watcher changes and changed
+  remote `LibraryChangedAt` values invalidate it; cheap listening statistics,
+  calendar data, and recently played rows remain outside this cache.
+- The complete unfiltered shared Artists, Albums, and Tracks results use a
+  three-entry LRU session cache. Configured-server identity and a generation
+  form the key; library-version, watcher, favorite, and artwork changes advance
+  the generation. Independent remote servers load concurrently, and local
+  provider database work must not run synchronously on the Avalonia UI thread.
+- A cached Genre Cloud level renders immediately and must not retain the
+  first-load branch-transition delay.
+- `AppSettings.LastMainView` persists every selectable sidebar leaf tag, not a
+  hard-coded view subset. Section and library-group containers, empty hints,
+  and disabled Plex server headings are never persisted. Synchronously built
+  dynamic rows restore normally; a Plex library tag remains pending while Plex
+  navigation loads asynchronously, with Tracks as the temporary/safe fallback.
 - Dashboard Recently Played cards show the persisted album below the artist.
   When the history identity can resolve a local, Orynivo Server, or Plex album,
   the album name opens that source's album detail without triggering card playback.
+- A title action in `DailyHistoryDialog` starts the selected history entry
+  directly through `PlayHistoryEntryInPlaceAsync`. It must never navigate to,
+  bind, or `ScrollIntoView` the complete unified Tracks table first; that path
+  can block Avalonia's UI thread for large mixed libraries. Album and artist
+  actions retain their source-aware navigation behavior.
 - Shared local and Orynivo Server track rows carry a personal zero-to-five
   rating plus cached MusicBrainz recording rating metadata. The interactive
   star column persists through the owning database/API. MusicBrainz lookup runs

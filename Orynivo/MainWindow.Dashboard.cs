@@ -94,6 +94,97 @@ public partial class MainWindow : Window
         string? Genres,
         double? AverageBpm);
 
+    /// <summary>Immutable expensive catalog portion shared by repeated Dashboard builds.</summary>
+    /// <param name="RecentAlbums">Merged recently added albums.</param>
+    /// <param name="Recommendations">Ranked album recommendations for the selected profile.</param>
+    /// <param name="LocalSummary">Local library totals and normalized artist identities.</param>
+    /// <param name="RemoteSummary">Remote library totals and normalized artist identities.</param>
+    private sealed record DashboardCatalogSnapshot(
+        List<DashboardAlbum> RecentAlbums,
+        List<DashboardAlbum> Recommendations,
+        (DashboardLibrarySummary Summary, HashSet<string> ArtistKeys) LocalSummary,
+        (int AlbumCount, int TrackCount, int FavoriteCount, HashSet<string> ArtistKeys) RemoteSummary);
+
+    /// <summary>One versioned in-memory Dashboard catalog cache entry.</summary>
+    /// <param name="Key">Non-persisted cache identity derived from view options and configured server identities.</param>
+    /// <param name="ExpiresAtUtc">UTC expiry used to bound playback-history and remote-library staleness.</param>
+    /// <param name="Snapshot">Cached catalog snapshot.</param>
+    private sealed record DashboardCatalogCacheEntry(
+        string Key,
+        DateTimeOffset ExpiresAtUtc,
+        DashboardCatalogSnapshot Snapshot);
+
+    private static readonly TimeSpan DashboardCatalogCacheLifetime = TimeSpan.FromHours(24);
+    private readonly object _dashboardCatalogCacheSync = new();
+    private DashboardCatalogCacheEntry? _dashboardCatalogCache;
+    private Task<DashboardCatalogSnapshot>? _dashboardCatalogLoadTask;
+    private string? _dashboardCatalogLoadKey;
+    private int _dashboardCatalogGeneration;
+
+    /// <summary>Collects one Dashboard build's sanitized phase durations.</summary>
+    /// <param name="buildVersion">Monotonic build identifier used to recognize superseded loads.</param>
+    private sealed class DashboardBuildMetrics(int buildVersion)
+    {
+        private readonly object _sync = new();
+        private readonly Stopwatch _total = Stopwatch.StartNew();
+        private readonly Dictionary<string, long> _phases = new(StringComparer.Ordinal);
+
+        /// <summary>Measures an asynchronous Dashboard phase.</summary>
+        /// <typeparam name="T">Phase result type.</typeparam>
+        /// <param name="name">Stable non-sensitive phase name.</param>
+        /// <param name="action">Asynchronous work to execute.</param>
+        /// <returns>The phase result.</returns>
+        public async Task<T> MeasureAsync<T>(string name, Func<Task<T>> action)
+        {
+            var timer = Stopwatch.StartNew();
+            try { return await action(); }
+            finally { Set(name, timer.ElapsedMilliseconds); }
+        }
+
+        /// <summary>Measures a synchronous Dashboard phase.</summary>
+        /// <param name="name">Stable non-sensitive phase name.</param>
+        /// <param name="action">Work to execute.</param>
+        public void Measure(string name, Action action)
+        {
+            var timer = Stopwatch.StartNew();
+            try { action(); }
+            finally { Set(name, timer.ElapsedMilliseconds); }
+        }
+
+        /// <summary>Adds an independently measured duration to a phase.</summary>
+        /// <param name="name">Stable non-sensitive phase name.</param>
+        /// <param name="elapsedMilliseconds">Elapsed whole milliseconds.</param>
+        public void Record(string name, long elapsedMilliseconds)
+        {
+            lock (_sync)
+                _phases[name] = _phases.GetValueOrDefault(name) + elapsedMilliseconds;
+        }
+
+        private void Set(string name, long elapsedMilliseconds)
+        {
+            lock (_sync)
+                _phases[name] = elapsedMilliseconds;
+        }
+
+        /// <summary>Writes the completed timing summary.</summary>
+        /// <param name="outcome">Completed, superseded, or incomplete state.</param>
+        /// <param name="serverCount">Number of configured remote libraries.</param>
+        public void Complete(string outcome, int serverCount)
+        {
+            _total.Stop();
+            string phases;
+            lock (_sync)
+            {
+                phases = string.Join(' ', _phases
+                    .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                    .Select(pair => $"{pair.Key}={pair.Value}ms"));
+            }
+            DashboardPerformanceLog.Write(
+                $"build={buildVersion} outcome={outcome} total={_total.ElapsedMilliseconds}ms " +
+                $"servers={serverCount} {phases}".TrimEnd());
+        }
+    }
+
     private async Task ShowDashboardAsync()
     {
         ContentTitleTextBlock.Text = LocalizationManager.Current.Dashboard;
@@ -139,6 +230,8 @@ public partial class MainWindow : Window
     private async Task BuildDashboardAsync()
     {
         var buildVersion = ++_dashboardBuildVersion;
+        var metrics = new DashboardBuildMetrics(buildVersion);
+        var committed = false;
         var visiblePanel = _dashboardRootPanel ?? DashboardPanel;
         _dashboardRootPanel = visiblePanel;
         var buildPanel = new StackPanel
@@ -156,51 +249,21 @@ public partial class MainWindow : Window
             _calendarInner = null;
             _dashboardTwoColumnLayout = ComputeDashboardTwoColumn();
 
-            var recentAlbums = await LoadRecentAlbumsAsync();
-            if (buildVersion != _dashboardBuildVersion)
-                return;
-
-            var recommendations = await LoadDashboardRecommendationsAsync();
-            if (buildVersion != _dashboardBuildVersion)
-                return;
-
-            var localLibrary = await Task.Run(() =>
-            {
-                using var db = AudioDatabase.OpenDefault();
-                return (
-                    Summary: db.GetDashboardLibrarySummary(),
-                    ArtistKeys: db.GetArtistsLite()
-                        .Select(artist => ArtistNameNormalizer.CreateComparisonKey(artist.Artist))
-                        .ToHashSet(StringComparer.Ordinal));
-            });
-            var remoteLibrary = await ResolveDashboardRemoteLibrarySummaryAsync();
-            if (buildVersion != _dashboardBuildVersion)
-                return;
-            localLibrary.ArtistKeys.UnionWith(remoteLibrary.ArtistKeys);
-            var librarySummary = localLibrary.Summary with
-            {
-                AlbumCount = localLibrary.Summary.AlbumCount + remoteLibrary.AlbumCount,
-                TrackCount = localLibrary.Summary.TrackCount + remoteLibrary.TrackCount,
-                ArtistCount = localLibrary.ArtistKeys.Count,
-                FavoriteCount = localLibrary.Summary.FavoriteCount + remoteLibrary.FavoriteCount
-            };
-            if (buildVersion != _dashboardBuildVersion)
-                return;
-
-            var (recentlyPlayed, recentThumbs, recentFavorites) = await LoadRecentlyPlayedAsync(20);
-            if (buildVersion != _dashboardBuildVersion)
-                return;
-
-            var calendarData = await Task.Run(() =>
+            // The expensive catalog portion is reused briefly between navigations.
+            // Its loader still overlaps all independent local and remote requests.
+            var catalogTask = GetDashboardCatalogSnapshotAsync(metrics);
+            var recentlyPlayedTask = metrics.MeasureAsync(
+                "recently-played",
+                () => LoadRecentlyPlayedAsync(20));
+            var calendarDataTask = metrics.MeasureAsync("calendar", () => Task.Run(() =>
             {
                 using var db = AudioDatabase.OpenDefault();
                 return db.GetCalendarData(_dashboardYear, _dashboardMonth);
-            });
+            }));
             if (buildVersion != _dashboardBuildVersion)
                 return;
-
             var since = StatsPeriodSinceUnix(_dashboardStatsPeriod);
-            var listeningStats = await Task.Run(() =>
+            var listeningStatsTask = metrics.MeasureAsync("listening", () => Task.Run(() =>
             {
                 using var db = AudioDatabase.OpenDefault();
                 var total = db.GetTotalListeningSeconds(since);
@@ -213,40 +276,66 @@ public partial class MainWindow : Window
                     previous = db.GetTotalListeningSeconds(currentStart - span, currentStart);
                 }
                 return (Total: total, Previous: previous, Trend: trend);
-            });
-            if (buildVersion != _dashboardBuildVersion)
-                return;
-            var topGenres = await Task.Run(() =>
+            }));
+            var topGenresTask = metrics.MeasureAsync("top-genres", () => Task.Run(() =>
             {
                 using var db = AudioDatabase.OpenDefault();
                 return db.GetTopGenres(10, since);
-            });
-            if (buildVersion != _dashboardBuildVersion)
-                return;
-
-            var topAlbums = await Task.Run(() =>
+            }));
+            var topAlbumsTask = metrics.MeasureAsync("top-albums", () => Task.Run(() =>
             {
                 using var db = AudioDatabase.OpenDefault();
                 return db.GetTopAlbums(10, since);
-            });
-            if (buildVersion != _dashboardBuildVersion)
-                return;
-
-            var topArtists = await Task.Run(() =>
+            }));
+            var topArtistsTask = metrics.MeasureAsync("top-artists", () => Task.Run(() =>
             {
                 using var db = AudioDatabase.OpenDefault();
                 return db.GetTopArtists(10, since);
-            });
+            }));
+
+            await Task.WhenAll(
+                catalogTask,
+                recentlyPlayedTask,
+                calendarDataTask,
+                listeningStatsTask,
+                topGenresTask,
+                topAlbumsTask,
+                topArtistsTask);
             if (buildVersion != _dashboardBuildVersion)
                 return;
 
-            DashboardBuildGreeting(librarySummary);
-            DashboardBuildMediaOverview(recentlyPlayed, recentThumbs, recentFavorites, recentAlbums);
-            DashboardBuildRecommendations(recommendations);
-            DashboardBuildStatsSection(
-                calendarData, topGenres, topAlbums, topArtists,
-                listeningStats.Total, listeningStats.Previous, listeningStats.Trend,
-                librarySummary);
+            var catalog = await catalogTask;
+            var recentAlbums = catalog.RecentAlbums;
+            var recommendations = catalog.Recommendations;
+            var localLibrary = catalog.LocalSummary;
+            var remoteLibrary = catalog.RemoteSummary;
+            var (recentlyPlayed, recentThumbs, recentFavorites) = await recentlyPlayedTask;
+            var calendarData = await calendarDataTask;
+            var listeningStats = await listeningStatsTask;
+            var topGenres = await topGenresTask;
+            var topAlbums = await topAlbumsTask;
+            var topArtists = await topArtistsTask;
+
+            var unifiedArtistKeys = new HashSet<string>(localLibrary.ArtistKeys, StringComparer.Ordinal);
+            unifiedArtistKeys.UnionWith(remoteLibrary.ArtistKeys);
+            var librarySummary = localLibrary.Summary with
+            {
+                AlbumCount = localLibrary.Summary.AlbumCount + remoteLibrary.AlbumCount,
+                TrackCount = localLibrary.Summary.TrackCount + remoteLibrary.TrackCount,
+                ArtistCount = unifiedArtistKeys.Count,
+                FavoriteCount = localLibrary.Summary.FavoriteCount + remoteLibrary.FavoriteCount
+            };
+
+            metrics.Measure("ui-build", () =>
+            {
+                DashboardBuildGreeting(librarySummary);
+                DashboardBuildMediaOverview(recentlyPlayed, recentThumbs, recentFavorites, recentAlbums);
+                DashboardBuildRecommendations(recommendations);
+                DashboardBuildStatsSection(
+                    calendarData, topGenres, topAlbums, topArtists,
+                    listeningStats.Total, listeningStats.Previous, listeningStats.Trend,
+                    librarySummary);
+            });
             if (buildVersion != _dashboardBuildVersion)
                 return;
 
@@ -258,11 +347,15 @@ public partial class MainWindow : Window
                 buildPanel.Children.RemoveAt(0);
                 visiblePanel.Children.Add(child);
             }
+            committed = true;
         }
         finally
         {
             if (ReferenceEquals(DashboardPanel, buildPanel))
                 DashboardPanel = visiblePanel;
+            metrics.Complete(
+                committed ? "completed" : buildVersion != _dashboardBuildVersion ? "superseded" : "incomplete",
+                (_settings.OrynivoServers ?? []).Count);
         }
     }
 
@@ -676,13 +769,17 @@ public partial class MainWindow : Window
     /// </summary>
     /// <param name="perSource">Maximum entries to fetch per source and to return overall.</param>
     /// <returns>The merged, recency-sorted recently added albums.</returns>
-    private async Task<List<DashboardAlbum>> LoadRecentAlbumsAsync(int perSource = 20)
+    private async Task<List<DashboardAlbum>> LoadRecentAlbumsAsync(
+        int perSource = 20,
+        DashboardBuildMetrics? metrics = null)
     {
+        var localTimer = Stopwatch.StartNew();
         var local = await Task.Run(() =>
         {
             using var db = AudioDatabase.OpenDefault();
             return db.GetRecentAlbums(perSource);
         });
+        metrics?.Record("recent-albums-local", localTimer.ElapsedMilliseconds);
 
         var combined = local
             .Select(a => new DashboardAlbum(
@@ -694,6 +791,7 @@ public partial class MainWindow : Window
         var servers = _settings.OrynivoServers ?? [];
         if (servers.Count > 0)
         {
+            var remoteTimer = Stopwatch.StartNew();
             var remoteTasks = servers
                 .Select(server => (Server: server, Task: _orynivoClient.GetRecentAlbumsAsync(server, perSource)))
                 .ToList();
@@ -711,6 +809,7 @@ public partial class MainWindow : Window
                     a.HasArtwork,
                     IsOrynivoFavorite(server, "Album", a.Id))));
             }
+            metrics?.Record("recent-albums-remote", remoteTimer.ElapsedMilliseconds);
         }
 
         return MergeDashboardAlbums(combined)
@@ -719,7 +818,118 @@ public partial class MainWindow : Window
             .ToList();
     }
 
-    private async Task<List<DashboardAlbum>> LoadDashboardRecommendationsAsync()
+    /// <summary>
+    /// Returns the current expensive Dashboard catalog snapshot, coalescing concurrent
+    /// builds and reusing a completed result for a bounded period.
+    /// </summary>
+    /// <param name="metrics">Optional build metrics receiving cache and source timings.</param>
+    /// <returns>A consistent local-plus-remote catalog snapshot.</returns>
+    private async Task<DashboardCatalogSnapshot> GetDashboardCatalogSnapshotAsync(
+        DashboardBuildMetrics metrics)
+    {
+        var key = CreateDashboardCatalogCacheKey();
+        Task<DashboardCatalogSnapshot> loadTask;
+        lock (_dashboardCatalogCacheSync)
+        {
+            if (_dashboardCatalogCache is { } cached &&
+                cached.Key == key &&
+                cached.ExpiresAtUtc > DateTimeOffset.UtcNow)
+            {
+                metrics.Record("catalog-cache-hit", 0);
+                return cached.Snapshot;
+            }
+
+            if (_dashboardCatalogLoadTask is { IsCompleted: false } active &&
+                _dashboardCatalogLoadKey == key)
+            {
+                metrics.Record("catalog-cache-wait", 0);
+                loadTask = active;
+            }
+            else
+            {
+                loadTask = LoadDashboardCatalogSnapshotAsync(metrics);
+                _dashboardCatalogLoadTask = loadTask;
+                _dashboardCatalogLoadKey = key;
+            }
+        }
+
+        var snapshot = await loadTask;
+        lock (_dashboardCatalogCacheSync)
+        {
+            if (key == CreateDashboardCatalogCacheKey())
+            {
+                _dashboardCatalogCache = new DashboardCatalogCacheEntry(
+                    key,
+                    DateTimeOffset.UtcNow + DashboardCatalogCacheLifetime,
+                    snapshot);
+            }
+            if (ReferenceEquals(_dashboardCatalogLoadTask, loadTask))
+            {
+                _dashboardCatalogLoadTask = null;
+                _dashboardCatalogLoadKey = null;
+            }
+        }
+        return snapshot;
+    }
+
+    /// <summary>Loads all expensive Dashboard catalog sources concurrently.</summary>
+    /// <param name="metrics">Build metrics receiving individual source timings.</param>
+    /// <returns>The newly loaded catalog snapshot.</returns>
+    private async Task<DashboardCatalogSnapshot> LoadDashboardCatalogSnapshotAsync(
+        DashboardBuildMetrics metrics)
+    {
+        var recentAlbumsTask = metrics.MeasureAsync(
+            "recent-albums",
+            () => LoadRecentAlbumsAsync(metrics: metrics));
+        var recommendationsTask = metrics.MeasureAsync(
+            "recommendations",
+            () => LoadDashboardRecommendationsAsync(metrics));
+        var localLibraryTask = metrics.MeasureAsync("library-local", () => Task.Run(() =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            return (
+                Summary: db.GetDashboardLibrarySummary(),
+                ArtistKeys: db.GetArtistsLite()
+                    .Select(artist => ArtistNameNormalizer.CreateComparisonKey(artist.Artist))
+                    .ToHashSet(StringComparer.Ordinal));
+        }));
+        var remoteLibraryTask = metrics.MeasureAsync(
+            "library-remote",
+            () => ResolveDashboardRemoteLibrarySummaryAsync(metrics));
+
+        await Task.WhenAll(
+            recentAlbumsTask,
+            recommendationsTask,
+            localLibraryTask,
+            remoteLibraryTask);
+        return new DashboardCatalogSnapshot(
+            await recentAlbumsTask,
+            await recommendationsTask,
+            await localLibraryTask,
+            await remoteLibraryTask);
+    }
+
+    /// <summary>Builds a non-persisted cache identity without including server credentials.</summary>
+    /// <returns>The current Dashboard catalog cache identity.</returns>
+    private string CreateDashboardCatalogCacheKey()
+    {
+        var servers = string.Join('|', (_settings.OrynivoServers ?? [])
+            .OrderBy(server => server.Id, StringComparer.Ordinal)
+            .Select(server => $"{server.Id}:{server.BaseUrl}"));
+        return $"{Volatile.Read(ref _dashboardCatalogGeneration)};" +
+               $"{(int)_dashboardRecommendationPeriod};{(int)_dashboardRecommendationMood};{servers}";
+    }
+
+    /// <summary>Invalidates cached Dashboard catalog aggregates after a local library change.</summary>
+    private void InvalidateDashboardCatalogCache()
+    {
+        Interlocked.Increment(ref _dashboardCatalogGeneration);
+        lock (_dashboardCatalogCacheSync)
+            _dashboardCatalogCache = null;
+    }
+
+    private async Task<List<DashboardAlbum>> LoadDashboardRecommendationsAsync(
+        DashboardBuildMetrics? metrics = null)
     {
         var since = _dashboardRecommendationPeriod switch
         {
@@ -728,6 +938,7 @@ public partial class MainWindow : Window
             _ => (long?)null
         };
 
+        var localTimer = Stopwatch.StartNew();
         var localProfile = await Task.Run(() =>
         {
             using var db = AudioDatabase.OpenDefault();
@@ -736,6 +947,7 @@ public partial class MainWindow : Window
                 Played: db.GetPlayedAlbumIdentities(since),
                 Albums: db.GetRecommendationAlbums());
         });
+        metrics?.Record("recommendations-local", localTimer.ElapsedMilliseconds);
 
         var candidates = localProfile.Albums.Select(album =>
             new DashboardRecommendationCandidate(
@@ -752,6 +964,7 @@ public partial class MainWindow : Window
                 album.Genres,
                 album.AverageBpm)).ToList();
 
+        var remoteTimer = Stopwatch.StartNew();
         var remoteTasks = (_settings.OrynivoServers ?? [])
             .Select(server => (Server: server, Task: _orynivoClient.GetRecommendationAlbumsAsync(server)))
             .ToList();
@@ -785,6 +998,7 @@ public partial class MainWindow : Window
                     album.Genres,
                     album.AverageBpm)));
         }
+        metrics?.Record("recommendations-remote", remoteTimer.ElapsedMilliseconds);
 
         candidates = MergeDashboardRecommendationCandidates(candidates);
 
@@ -1550,11 +1764,12 @@ public partial class MainWindow : Window
     /// </summary>
     /// <returns>Combined remote counts and normalized artist identity keys.</returns>
     private async Task<(int AlbumCount, int TrackCount, int FavoriteCount, HashSet<string> ArtistKeys)>
-        ResolveDashboardRemoteLibrarySummaryAsync()
+        ResolveDashboardRemoteLibrarySummaryAsync(DashboardBuildMetrics? metrics = null)
     {
         var tasks = (_settings.OrynivoServers ?? [])
             .Select(async server =>
             {
+                var serverTimer = Stopwatch.StartNew();
                 try
                 {
                     using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(8));
@@ -1583,17 +1798,20 @@ public partial class MainWindow : Window
                         favoriteCount = tracks.Select(track => track.Id).Distinct().Count();
                     }
 
-                    return (
+                    var result = (
                         AlbumCount: albumCount.GetValueOrDefault(),
                         TrackCount: summary?.TrackCount ?? facets.Count,
                         FavoriteCount: favoriteCount,
                         ArtistKeys: artists
                             .Select(artist => ArtistNameNormalizer.CreateComparisonKey(artist.Name))
                             .ToHashSet(StringComparer.Ordinal));
+                    metrics?.Record("library-remote-server", serverTimer.ElapsedMilliseconds);
+                    return result;
                 }
                 catch
                 {
                     // Unified library views also omit a server that cannot resolve its rows.
+                    metrics?.Record("library-remote-server", serverTimer.ElapsedMilliseconds);
                     return (
                         AlbumCount: 0,
                         TrackCount: 0,

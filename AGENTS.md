@@ -1589,6 +1589,13 @@ fallback or allow client-provided commands/paths to reach the helper.
 - `GetTrackListByIds(ids)` batches large ID sets to stay below SQLite variable limits
 - `GetTrackListByPaths(paths)` batches queue metadata lookup and deduplicates
   query paths while the queue view restores the original order and duplicates.
+- `GetTrackListPage(page, pageSize)` applies ordering and `LIMIT`/`OFFSET` in
+  SQLite; server paging must not materialize the complete track catalog first.
+- Schema migration is coalesced once per physical database path and process.
+  Creating a missing database at a previously used path must clear that marker.
+- The shared Artists, Albums, and Tracks views retain at most three versioned
+  final row snapshots. Local/remote loading runs concurrently where independent;
+  watcher, remote-version, favorite, and artwork mutations invalidate the cache.
 - `GetTracksByDirectory(dirPath)` uses an SQL prefix query plus a direct-child filter
 - `GetTrackPathsUnderDirectory(rootPath)` returns all recursive track paths
   below a root

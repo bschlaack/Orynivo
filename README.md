@@ -282,6 +282,7 @@ works directly in FFmpeg and browser URLs.
 | `POST /api/artists/{id}/rename` | Rename one artist or merge it with a matching artist |
 | `GET /api/artists/{id}/albums` | Albums for one artist |
 | `GET /api/albums` | All albums (id, title, display artist, year, artwork paths) |
+| `GET /api/albums/{id}` | One album without loading the complete album catalog |
 | `GET /api/albums/{id}/tracks` | Track list for one album |
 | `GET /api/tracks` | Paginated track list (`?page=0&pageSize=500`) |
 | `GET /api/tracks/{id}` | Full metadata for one track |
@@ -612,6 +613,17 @@ byte-range streaming without FFmpeg.
   quick access, and a
   clickable playback calendar. Album rankings retain artwork, and linked genres
   open the matching filtered track list.
+- Dashboard performance investigations can use the bounded rolling
+  `logs/dashboard-performance.log` beneath the Orynivo data directory. It
+  contains only phase names, elapsed times, build outcome, and server count;
+  library paths, media names, URLs, and credentials are never recorded.
+  Expensive album catalog aggregates use a short in-memory snapshot across
+  repeated Dashboard visits; overlapping loads are coalesced, and local or
+  remote library-version changes invalidate the snapshot automatically.
+- The last selectable sidebar view is restored on restart, including Genre
+  Cloud, Dashboard, AI Chat, playlists, saved radio/podcast entries, Orynivo
+  Server views, and Plex libraries. Missing or removed entries fall back to
+  Tracks.
 - Clickable populated calendar days with a modal daily listening history;
   local title, album, and artist links open the corresponding library view,
   and title links immediately start playback
@@ -773,6 +785,13 @@ than being collapsed into a generic Other bucket. Suggestions use listening
 history when available, but the cloud remains usable with a new or empty play
 history. Remote results retain their owning server for playback, favorites,
 artwork, and album/artist navigation.
+
+Resolved cloud levels are retained in a bounded in-memory session cache. After
+the first load, reopening the root or one of the recently visited branches
+reuses its merged taxonomy and source-aware recommendations instead of querying
+and resolving every library again. Local file-watcher changes and newer remote
+server library versions invalidate these entries automatically; the cache is
+never persisted, and its identity contains neither server URLs nor credentials.
 
 The current level uses available images from its recommended local and remote
 artists as a muted grayscale tile background. Images are proportionally fitted

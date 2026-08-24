@@ -258,6 +258,8 @@ public partial class MainWindow : Window
     private bool? _dashboardTwoColumnLayout;
     private int _dashboardBuildVersion;
     private StackPanel? _dashboardRootPanel;
+    private readonly Dictionary<string, long> _dashboardRemoteLibraryVersions = new(StringComparer.Ordinal);
+    private string? _pendingInitialNavigationTag;
     private bool _suppressNavSelectionChanged;
     private string? _currentTopLevelTag;
 
@@ -1107,6 +1109,8 @@ public partial class MainWindow : Window
         var item = NavListBox.Items
             .OfType<ListBoxItem>()
             .FirstOrDefault(i => string.Equals(i.Tag as string, tag, StringComparison.Ordinal));
+        if (item is null && tag.StartsWith("PlexLibrary:", StringComparison.Ordinal))
+            _pendingInitialNavigationTag = tag;
         NavListBox.SelectedItem = item
             ?? NavListBox.Items.OfType<ListBoxItem>().FirstOrDefault(i => string.Equals(i.Tag as string, "Tracks", StringComparison.Ordinal));
     }
@@ -1114,7 +1118,7 @@ public partial class MainWindow : Window
     private void PersistViewState()
     {
         if (NavListBox.SelectedItem is ListBoxItem { Tag: string tag } &&
-            tag is "Dashboard" or "InternetRadio" or "Podcasts" or "Queue" or "Artists" or "Albums" or "Tracks" or "Folders")
+            IsPersistableMainViewTag(tag))
         {
             _settings.LastMainView = tag;
         }
@@ -1275,6 +1279,10 @@ public partial class MainWindow : Window
 
     private void OnWatchedLibraryChanged()
     {
+        InvalidateDashboardCatalogCache();
+        InvalidateGenreCloudViewCache();
+        InvalidateUnifiedLibraryViewCache();
+
         // Coalesce bursts of change signals into a single UI-thread pass.
         if (Interlocked.Exchange(ref _libraryWatcherRefreshPending, 1) != 0)
             return;
@@ -1373,6 +1381,17 @@ public partial class MainWindow : Window
                 try
                 {
                     var status = await _orynivoClient.GetScanStatusAsync(server, CancellationToken.None);
+                    if (status?.LibraryChangedAt is long libraryVersion)
+                    {
+                        if (_dashboardRemoteLibraryVersions.TryGetValue(server.Id, out var previousVersion) &&
+                            previousVersion != libraryVersion)
+                        {
+                            InvalidateDashboardCatalogCache();
+                            InvalidateGenreCloudViewCache();
+                            InvalidateUnifiedLibraryViewCache();
+                        }
+                        _dashboardRemoteLibraryVersions[server.Id] = libraryVersion;
+                    }
                     if (status is { IsRunning: true })
                     {
                         scanning = status is { Total: > 0, Current: > 0 }
@@ -1698,6 +1717,23 @@ public partial class MainWindow : Window
         }
 
         ApplySidebarNavigationSettings();
+        RestorePendingInitialNavigationTag();
+    }
+
+    /// <summary>Restores a Plex library tag after its asynchronous navigation load completes.</summary>
+    private void RestorePendingInitialNavigationTag()
+    {
+        if (_pendingInitialNavigationTag is not { } tag)
+            return;
+        var item = NavListBox.Items
+            .OfType<ListBoxItem>()
+            .FirstOrDefault(candidate =>
+                string.Equals(candidate.Tag as string, tag, StringComparison.Ordinal));
+        if (item is null)
+            return;
+
+        _pendingInitialNavigationTag = null;
+        NavListBox.SelectedItem = item;
     }
 
     private ListBoxItem CreatePlexLibraryItem(string serverId, string libraryKey, string title)
@@ -2284,10 +2320,23 @@ public partial class MainWindow : Window
         if (IsNavigationContainerTag(tag))
             return;
 
+        if (_pendingInitialNavigationTag is not null)
+        {
+            if (tag == "Tracks")
+            {
+                // Tracks is only a temporary startup fallback until asynchronous
+                // Plex navigation has materialized the persisted library item.
+            }
+            else
+            {
+                _pendingInitialNavigationTag = null;
+            }
+        }
+
         CloseEmbeddedSettings();
         PushCurrentNavigationState();
         ResetDrilldownState(clearNavigationHistory: false);
-        if (tag is "InternetRadio" or "Podcasts" or "Queue" or "Artists" or "Albums" or "Tracks" or "Folders")
+        if (_pendingInitialNavigationTag is null && IsPersistableMainViewTag(tag))
             _settings.LastMainView = tag;
         await ShowTopLevelViewAsync(tag);
     }
@@ -2314,6 +2363,14 @@ public partial class MainWindow : Window
     private static bool IsNavigationContainerTag(string tag) =>
         tag.StartsWith("Section:", StringComparison.Ordinal) ||
         tag.StartsWith("LibraryGroup:", StringComparison.Ordinal);
+
+    /// <summary>Determines whether a sidebar tag represents a restorable content view.</summary>
+    /// <param name="tag">Sidebar navigation tag.</param>
+    /// <returns><see langword="true"/> for selectable leaf views.</returns>
+    private static bool IsPersistableMainViewTag(string tag) =>
+        !IsNavigationContainerTag(tag) &&
+        !tag.EndsWith(":EmptyHint", StringComparison.Ordinal) &&
+        !tag.StartsWith("PlexServer:", StringComparison.Ordinal);
 
     private void ResetDrilldownState(bool clearNavigationHistory = true)
     {
@@ -4909,27 +4966,24 @@ public partial class MainWindow : Window
                     .Select(ToTrackContentRow)
                     .ToList(),
 
-                "Artists" => _localCatalogProvider.GetArtistsAsync()
-                    .GetAwaiter()
-                    .GetResult()
+                "Artists" => db.GetArtistsLite()
+                    .Select(LocalLibraryCatalogProvider.ToCatalogArtist)
                     .Where(a => !_artistFavoritesOnly || a.IsFavorite)
                     .Select(artist => ToCatalogArtistContentRow(artist))
                     .ToList(),
 
                 "Albums" => (_activeArtistFilterId is long artistId
-                        ? _localCatalogProvider.GetAlbumsByArtistAsync(artistId, _showAlbumArtworkView)
-                        : _localCatalogProvider.GetAlbumsAsync(_showAlbumArtworkView))
-                    .GetAwaiter()
-                    .GetResult()
+                        ? db.GetAlbumsByArtist(artistId, _showAlbumArtworkView)
+                        : db.GetAlbumsLite(_showAlbumArtworkView))
+                    .Select(LocalLibraryCatalogProvider.ToCatalogAlbum)
                     .Where(a => !_albumFavoritesOnly || a.IsFavorite)
                     .Select(album => ToCatalogAlbumContentRow(album))
                     .ToList(),
 
                 _ => (_activeAlbumFilterId is long albumId
-                        ? _localCatalogProvider.GetTracksByAlbumAsync(albumId)
-                    : _localCatalogProvider.GetTracksAsync())  // "Tracks" und Fallback
-                    .GetAwaiter()
-                    .GetResult()
+                        ? db.GetTrackListByAlbum(albumId)
+                        : db.GetTrackList()) // "Tracks" and fallback
+                    .Select(LocalLibraryCatalogProvider.ToCatalogTrack)
                     .Select(track => ToCatalogTrackContentRow(track))
                     .ToList()
             };
@@ -4976,6 +5030,17 @@ public partial class MainWindow : Window
         _unifiedLibraryAppendCts = new CancellationTokenSource();
         var cancellationToken = _unifiedLibraryAppendCts.Token;
         var version = ++_unifiedLibraryLoadVersion;
+        if (TryGetUnifiedLibraryViewCache(tag, out var cachedRows))
+        {
+            ApplyColumns(tag);
+            ContentDataGrid.ItemsSource = cachedRows;
+            BindUnifiedArtworkRowsIfVisible(tag, cachedRows);
+            UpdateAlphabetIndex(cachedRows, true);
+            UpdateUnifiedContentCount(tag, cachedRows.Count);
+            LogUiDiagnostics(
+                $"BindLocalRowsAndStartRemoteAppendAsync cache hit tag={tag} count={cachedRows.Count} elapsed={diagnosticStopwatch.ElapsedMilliseconds}ms");
+            return;
+        }
         var rows = tag == "Tracks"
             ? await Task.Run(GetFilteredTrackRows)
             : await Task.Run(() => QueryRows(tag));
@@ -5009,6 +5074,7 @@ public partial class MainWindow : Window
             sortedRows = MergeUnifiedArtistRows(sortedRows);
         else if (tag == "Albums")
             sortedRows = MergeLogicalAlbumRows(sortedRows);
+        StoreUnifiedLibraryViewCache(tag, sortedRows);
         LogUiDiagnostics(
             $"BindLocalRowsAndStartRemoteAppendAsync combined rows sorted tag={tag} count={sortedRows.Count} elapsed={diagnosticStopwatch.ElapsedMilliseconds}ms");
         ApplyColumns(tag);
@@ -5026,66 +5092,76 @@ public partial class MainWindow : Window
         CancellationToken cancellationToken,
         Stopwatch diagnosticStopwatch)
     {
-        var rows = new List<ContentRow>();
         LogUiDiagnostics(
             $"LoadRemoteUnifiedRowsAsync start tag={tag} version={version} servers={_settings.OrynivoServers?.Count ?? 0}");
-        foreach (var server in _settings.OrynivoServers ?? [])
-        {
-            if (cancellationToken.IsCancellationRequested || version != _unifiedLibraryLoadVersion)
-            {
-                LogUiDiagnostics(
-                    $"LoadRemoteUnifiedRowsAsync canceled before server tag={tag} version={version} currentVersion={_unifiedLibraryLoadVersion}");
-                return rows;
-            }
-
-            try
-            {
-                LogUiDiagnostics(
-                    $"LoadRemoteUnifiedRowsAsync server start tag={tag} server={server.Name} elapsed={diagnosticStopwatch.ElapsedMilliseconds}ms");
-                using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
-                var provider = CreateOrynivoCatalogProvider(server);
-                List<ContentRow> serverRows = tag switch
-                {
-                    "Artists" => (await LoadAllOrynivoArtistsAsync(server, provider, linkedCts.Token))
-                        .Where(artist => !_artistFavoritesOnly || artist.IsFavorite)
-                        .Select(artist => ToCatalogArtistContentRow(artist, server))
-                        .ToList(),
-                    "Albums" => (await LoadAllOrynivoAlbumsAsync(server, provider, linkedCts.Token))
-                        .Where(album => !_albumFavoritesOnly || album.IsFavorite)
-                        .Select(album => ToCatalogAlbumContentRow(album, server))
-                        .ToList(),
-                    "Tracks" => (await LoadRemoteTracksForUnifiedViewAsync(server, provider, linkedCts.Token))
-                        .Select(track => ToCatalogTrackContentRow(track, server))
-                        .ToList(),
-                    _ => []
-                };
-                LogUiDiagnostics(
-                    $"LoadRemoteUnifiedRowsAsync server rows loaded tag={tag} server={server.Name} count={serverRows.Count} elapsed={diagnosticStopwatch.ElapsedMilliseconds}ms");
-
-                if (serverRows.Count == 0 || cancellationToken.IsCancellationRequested || version != _unifiedLibraryLoadVersion)
-                    continue;
-
-                rows.AddRange(serverRows);
-                LogUiDiagnostics(
-                    $"LoadRemoteUnifiedRowsAsync server rows merged tag={tag} server={server.Name} remoteTotal={rows.Count} elapsed={diagnosticStopwatch.ElapsedMilliseconds}ms");
-            }
-            catch (OperationCanceledException)
-            {
-                LogUiDiagnostics(
-                    $"LoadRemoteUnifiedRowsAsync canceled tag={tag} elapsed={diagnosticStopwatch.ElapsedMilliseconds}ms");
-                return rows;
-            }
-            catch (Exception ex)
-            {
-                LogUiDiagnostics(
-                    $"LoadRemoteUnifiedRowsAsync server failed tag={tag} server={server.Name} error={ex.GetType().Name}: {ex.Message}");
-                // An unavailable server must not prevent local browsing.
-            }
-        }
+        var tasks = (_settings.OrynivoServers ?? [])
+            .Select(server => LoadRemoteUnifiedServerRowsAsync(
+                tag,
+                server,
+                version,
+                cancellationToken,
+                diagnosticStopwatch))
+            .ToArray();
+        var rows = (await Task.WhenAll(tasks)).SelectMany(serverRows => serverRows).ToList();
         LogUiDiagnostics(
             $"LoadRemoteUnifiedRowsAsync finish tag={tag} rows={rows.Count} elapsed={diagnosticStopwatch.ElapsedMilliseconds}ms");
         return rows;
+    }
+
+    /// <summary>Loads one remote server's shared library rows with an independent timeout.</summary>
+    /// <param name="tag">Shared Artists, Albums, or Tracks view tag.</param>
+    /// <param name="server">Owning Orynivo Server.</param>
+    /// <param name="version">Navigation load version.</param>
+    /// <param name="cancellationToken">Navigation cancellation token.</param>
+    /// <param name="diagnosticStopwatch">Shared diagnostic stopwatch.</param>
+    /// <returns>Mapped rows from this server, or an empty list when unavailable.</returns>
+    private async Task<List<ContentRow>> LoadRemoteUnifiedServerRowsAsync(
+        string tag,
+        OrynivoServerSettings server,
+        int version,
+        CancellationToken cancellationToken,
+        Stopwatch diagnosticStopwatch)
+    {
+        if (cancellationToken.IsCancellationRequested || version != _unifiedLibraryLoadVersion)
+            return [];
+        try
+        {
+            LogUiDiagnostics(
+                $"LoadRemoteUnifiedRowsAsync server start tag={tag} server={server.Name} elapsed={diagnosticStopwatch.ElapsedMilliseconds}ms");
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+            var provider = CreateOrynivoCatalogProvider(server);
+            var serverRows = tag switch
+            {
+                "Artists" => (await LoadAllOrynivoArtistsAsync(server, provider, linkedCts.Token))
+                    .Where(artist => !_artistFavoritesOnly || artist.IsFavorite)
+                    .Select(artist => ToCatalogArtistContentRow(artist, server))
+                    .ToList(),
+                "Albums" => (await LoadAllOrynivoAlbumsAsync(server, provider, linkedCts.Token))
+                    .Where(album => !_albumFavoritesOnly || album.IsFavorite)
+                    .Select(album => ToCatalogAlbumContentRow(album, server))
+                    .ToList(),
+                "Tracks" => (await LoadRemoteTracksForUnifiedViewAsync(server, provider, linkedCts.Token))
+                    .Select(track => ToCatalogTrackContentRow(track, server))
+                    .ToList(),
+                _ => []
+            };
+            LogUiDiagnostics(
+                $"LoadRemoteUnifiedRowsAsync server rows loaded tag={tag} server={server.Name} count={serverRows.Count} elapsed={diagnosticStopwatch.ElapsedMilliseconds}ms");
+            return cancellationToken.IsCancellationRequested || version != _unifiedLibraryLoadVersion
+                ? []
+                : serverRows;
+        }
+        catch (OperationCanceledException)
+        {
+            return [];
+        }
+        catch (Exception ex)
+        {
+            LogUiDiagnostics(
+                $"LoadRemoteUnifiedRowsAsync server failed tag={tag} server={server.Name} error={ex.GetType().Name}: {ex.Message}");
+            return [];
+        }
     }
 
     private async Task<IReadOnlyList<LibraryCatalogTrack>> LoadRemoteTracksForUnifiedViewAsync(
@@ -9860,6 +9936,7 @@ public partial class MainWindow : Window
             return;
 
         row.IsFavorite = !row.IsFavorite;
+        InvalidateUnifiedLibraryViewCache();
         if (row.EntityType == "UnifiedAlbum" && row.LogicalAlbumParts is { Count: > 0 })
         {
             SetLogicalAlbumFavorite(row.LogicalAlbumParts, row.IsFavorite);
@@ -10110,6 +10187,8 @@ public partial class MainWindow : Window
             UpdateRowArtworkFromBytes(row, image.Data);
         }
 
+        InvalidateUnifiedLibraryViewCache();
+
         if (_activeAlbumFilterId == albumId && row.EntityType != "OrynivoAlbum")
             await ReloadAlbumDetailHeaderAsync(albumId);
         StatusTextBlock.Text = string.Empty;
@@ -10137,6 +10216,7 @@ public partial class MainWindow : Window
         UpdateRowArtworkFromBytes(row, null);
         if (row.EntityType == "OrynivoAlbum" && ResolveRowOrynivoServer(row) is { } remoteServer)
             DeleteOrynivoAlbumListCache(remoteServer);
+        InvalidateUnifiedLibraryViewCache();
         if (_activeAlbumFilterId == albumId && row.EntityType != "OrynivoAlbum")
             await ReloadAlbumDetailHeaderAsync(albumId);
         StatusTextBlock.Text = string.Empty;
@@ -10332,6 +10412,7 @@ public partial class MainWindow : Window
             return;
 
         await _localCatalogProvider.SetAlbumArtworkAsync(albumId, selected.ImageData, selected.MimeType);
+        InvalidateUnifiedLibraryViewCache();
 
         // Refresh the bound row directly so a card outside the Albums list (e.g. a
         // dashboard recent-album card) updates immediately.
@@ -10392,6 +10473,7 @@ public partial class MainWindow : Window
         row.ThumbnailPath ??= OrynivoServerClient.GetAlbumArtworkUrl(server, albumId, 96);
         ApplyRemoteArtwork(row, selected.ImageData);
         DeleteOrynivoAlbumListCache(server);
+        InvalidateUnifiedLibraryViewCache();
         StatusTextBlock.Text = string.Empty;
     }
 
@@ -11041,6 +11123,7 @@ public partial class MainWindow : Window
         {
             var (favServer, favId) = target;
             _currentTrackIsFavorite = !_currentTrackIsFavorite;
+            InvalidateUnifiedLibraryViewCache();
             var key = GetOrynivoFavoriteKey(favServer.Id, "Track", favId);
             if (_currentTrackIsFavorite)
                 _settings.OrynivoServerFavorites.Add(key);
@@ -11059,6 +11142,7 @@ public partial class MainWindow : Window
             return;
 
         _currentTrackIsFavorite = !_currentTrackIsFavorite;
+        InvalidateUnifiedLibraryViewCache();
         try
         {
             using var db = AudioDatabase.OpenDefault();
@@ -11128,6 +11212,7 @@ public partial class MainWindow : Window
         }
 
         _settingsStore.Save(_settings);
+        InvalidateUnifiedLibraryViewCache();
     }
 
     private void SetArtistInfoFavoriteState(bool isFavorite)
@@ -11167,6 +11252,7 @@ public partial class MainWindow : Window
             return;
 
         row.IsFavorite = !row.IsFavorite;
+        InvalidateUnifiedLibraryViewCache();
         if (row.EntityType == "UnifiedAlbum" && row.LogicalAlbumParts is { Count: > 0 })
         {
             SetLogicalAlbumFavorite(row.LogicalAlbumParts, row.IsFavorite);
@@ -13578,6 +13664,7 @@ public partial class MainWindow : Window
         finally
         {
             _currentPlayHistoryId = null;
+            InvalidateDashboardCatalogCache();
         }
     }
 

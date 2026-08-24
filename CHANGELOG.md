@@ -4,6 +4,53 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.36.6] - 2026-08-25
+
+### Added
+
+- Dashboard loading now records sanitized per-phase performance timings in a
+  bounded rolling diagnostic log, separating local data, remote rounds,
+  statistics, recommendations, and UI construction without exposing library
+  paths, media names, server URLs, or credentials.
+
+### Changed
+
+- Repeated Artists, Albums, and Tracks navigation now reuses a bounded,
+  versioned three-view cache. Remote Orynivo Server catalogs load concurrently,
+  local catalog work runs away from the UI thread, and artwork, favorite,
+  watcher, and server-version changes invalidate affected snapshots.
+- SQLite schema migration is now performed once per database file and process,
+  while track pages use SQL `LIMIT`/`OFFSET` instead of materializing the full
+  library. Remote album drill-down uses a dedicated single-album endpoint.
+- Dashboard catalog snapshots remain valid until library/history invalidation
+  instead of expiring after one minute, and cached Genre Cloud levels skip the
+  artificial branch-transition delay.
+- Genre Cloud levels now keep a bounded, versioned in-memory session cache of
+  their merged taxonomy nodes and resolved local/server track and album
+  recommendations. Reopening the root or a recently visited branch no longer
+  repeats facet queries, remote ID resolution, or complete album-catalog loads;
+  local watcher changes and changed remote server library versions invalidate
+  the cache immediately.
+- Dashboard data sources now load concurrently instead of serially, and local
+  recent-album and recommendation queries aggregate tracks before joining
+  album metadata. This removes repeated full-library join work and prevents
+  independent remote requests from extending navigation time additively.
+- Repeated Dashboard navigation now reuses a versioned in-memory catalog
+  snapshot and coalesces overlapping loads. Local watcher changes and changed
+  remote server library versions invalidate it immediately, while listening
+  statistics and recently played rows remain freshly queried.
+
+### Fixed
+
+- Restarting Orynivo now restores every selectable sidebar content view rather
+  than only a hard-coded subset. This includes Dashboard, Genre Cloud, AI Chat,
+  playlists, saved radio/podcast entries, Orynivo Server views, and asynchronously
+  loaded Plex libraries; removed entries still fall back safely to Tracks.
+- Starting a local title from the calendar's daily listening-history dialog no
+  longer builds and scrolls the complete unified Tracks table first. It now
+  starts the selected history entry directly, avoiding a long Avalonia UI-thread
+  hang that Windows could terminate as `AppHangB1` on large libraries.
+
 ## [0.36.5] - 2026-08-12
 
 ### Fixed

@@ -55,7 +55,7 @@ public partial class MainWindow : Window
         switch (dialog.SelectedAction)
         {
             case DailyHistoryAction.Track:
-                await OpenHistoryTrackAsync(entry);
+                await PlayHistoryEntryInPlaceAsync(entry);
                 break;
             case DailyHistoryAction.Album:
                 await OpenHistoryAlbumAsync(entry);
@@ -99,48 +99,6 @@ public partial class MainWindow : Window
             remoteAlbumId,
             remoteRow.Album ?? entry.Album ?? LocalizationManager.Current.Unknown,
             remoteRow.AlbumArtist ?? remoteRow.Artist ?? entry.Artist);
-    }
-
-    private async Task OpenHistoryTrackAsync(DailyHistoryEntry entry)
-    {
-        if (entry.TrackId is null || !IsAvailableLocalTrack(entry.Path))
-            return;
-
-        _trackFavoritesOnly = false;
-        _selectedTrackGenres.Clear();
-        _selectedTrackFormats.Clear();
-        _selectedTrackBitrates.Clear();
-        PushCurrentNavigationState();
-        ResetDrilldownState(clearNavigationHistory: false);
-        _settings.LastMainView = "Tracks";
-
-        var tracksItem = NavListBox.Items
-            .OfType<ListBoxItem>()
-            .FirstOrDefault(item =>
-                string.Equals(item.Tag as string, "Tracks", StringComparison.Ordinal));
-        if (tracksItem is not null && !ReferenceEquals(NavListBox.SelectedItem, tracksItem))
-        {
-            _suppressNavSelectionChanged = true;
-            try
-            {
-                NavListBox.SelectedItem = tracksItem;
-            }
-            finally
-            {
-                _suppressNavSelectionChanged = false;
-            }
-        }
-
-        await ShowTopLevelViewAsync("Tracks");
-        var rows = (ContentDataGrid.ItemsSource as IEnumerable<ContentRow>)?.ToList() ?? [];
-        var row = rows.FirstOrDefault(item =>
-            string.Equals(item.FilePath, entry.Path, StringComparison.OrdinalIgnoreCase));
-        if (row is null)
-            return;
-
-        ContentDataGrid.SelectedItem = row;
-        ContentDataGrid.ScrollIntoView(row, null);
-        await PlayTrackFromRowsAsync(row, rows);
     }
 
     private static bool IsPlayableHistoryEntry(DailyHistoryEntry entry) =>

@@ -699,6 +699,29 @@ public sealed class OrynivoServerClient : IDisposable
         catch { return []; }
     }
 
+    /// <summary>Loads one album without transferring the complete remote album catalog.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="albumId">Provider-local album identifier.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The requested album, or <see langword="null"/> when unavailable.</returns>
+    public async Task<OrynivoAlbumInfo?> GetAlbumAsync(
+        OrynivoServerSettings server,
+        long albumId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await GetJsonAsync<OrynivoAlbumInfo>(
+                server,
+                $"/api/albums/{albumId}",
+                cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     /// <summary>Loads compact album candidates for history-based recommendations.</summary>
     /// <param name="server">Server connection settings.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
