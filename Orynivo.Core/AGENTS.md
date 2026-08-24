@@ -89,6 +89,11 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
 - Dashboard recommendations use compact album-level genre/BPM candidates from
   `AudioDatabase.GetRecommendationAlbums` and the matching server endpoint.
   Keep this payload free of track rows, artwork bytes, and playback credentials.
+  Local recent-album and recommendation queries must aggregate the `tracks`
+  table before joining album, artist, and artwork metadata; joining those
+  tables per track caused Dashboard load time to grow with the complete library.
+  Preserve the covering `(album_id, added_at DESC)` index used by the recent
+  album aggregation.
 - `GenreCloudService` owns the stable hierarchical genre taxonomy, tag
   normalization, count aggregation, breadcrumbs, and bounded provider-local
   candidate selection. Candidate offsets rotate and wrap the stable order for

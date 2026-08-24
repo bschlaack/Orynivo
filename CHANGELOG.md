@@ -4,6 +4,33 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Dashboard loading now records sanitized per-phase performance timings in a
+  bounded rolling diagnostic log, separating local data, remote rounds,
+  statistics, recommendations, and UI construction without exposing library
+  paths, media names, server URLs, or credentials.
+
+### Changed
+
+- Dashboard data sources now load concurrently instead of serially, and local
+  recent-album and recommendation queries aggregate tracks before joining
+  album metadata. This removes repeated full-library join work and prevents
+  independent remote requests from extending navigation time additively.
+- Repeated Dashboard navigation now reuses a one-minute in-memory catalog
+  snapshot and coalesces overlapping loads. Local watcher changes and changed
+  remote server library versions invalidate it immediately, while listening
+  statistics and recently played rows remain freshly queried.
+
+### Fixed
+
+- Starting a local title from the calendar's daily listening-history dialog no
+  longer builds and scrolls the complete unified Tracks table first. It now
+  starts the selected history entry directly, avoiding a long Avalonia UI-thread
+  hang that Windows could terminate as `AppHangB1` on large libraries.
+
 ## [0.36.5] - 2026-08-12
 
 ### Fixed

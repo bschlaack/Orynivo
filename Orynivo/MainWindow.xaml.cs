@@ -258,6 +258,7 @@ public partial class MainWindow : Window
     private bool? _dashboardTwoColumnLayout;
     private int _dashboardBuildVersion;
     private StackPanel? _dashboardRootPanel;
+    private readonly Dictionary<string, long> _dashboardRemoteLibraryVersions = new(StringComparer.Ordinal);
     private bool _suppressNavSelectionChanged;
     private string? _currentTopLevelTag;
 
@@ -1275,6 +1276,8 @@ public partial class MainWindow : Window
 
     private void OnWatchedLibraryChanged()
     {
+        InvalidateDashboardCatalogCache();
+
         // Coalesce bursts of change signals into a single UI-thread pass.
         if (Interlocked.Exchange(ref _libraryWatcherRefreshPending, 1) != 0)
             return;
@@ -1373,6 +1376,15 @@ public partial class MainWindow : Window
                 try
                 {
                     var status = await _orynivoClient.GetScanStatusAsync(server, CancellationToken.None);
+                    if (status?.LibraryChangedAt is long libraryVersion)
+                    {
+                        if (_dashboardRemoteLibraryVersions.TryGetValue(server.Id, out var previousVersion) &&
+                            previousVersion != libraryVersion)
+                        {
+                            InvalidateDashboardCatalogCache();
+                        }
+                        _dashboardRemoteLibraryVersions[server.Id] = libraryVersion;
+                    }
                     if (status is { IsRunning: true })
                     {
                         scanning = status is { Total: > 0, Current: > 0 }

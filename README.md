@@ -612,6 +612,13 @@ byte-range streaming without FFmpeg.
   quick access, and a
   clickable playback calendar. Album rankings retain artwork, and linked genres
   open the matching filtered track list.
+- Dashboard performance investigations can use the bounded rolling
+  `logs/dashboard-performance.log` beneath the Orynivo data directory. It
+  contains only phase names, elapsed times, build outcome, and server count;
+  library paths, media names, URLs, and credentials are never recorded.
+  Expensive album catalog aggregates use a short in-memory snapshot across
+  repeated Dashboard visits; overlapping loads are coalesced, and local or
+  remote library-version changes invalidate the snapshot automatically.
 - Clickable populated calendar days with a modal daily listening history;
   local title, album, and artist links open the corresponding library view,
   and title links immediately start playback

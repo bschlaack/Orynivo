@@ -2999,6 +2999,7 @@ public sealed class AudioDatabase : IDisposable
             CREATE INDEX IF NOT EXISTS idx_artist_aliases_artist ON artist_aliases (artist_id);
             CREATE INDEX IF NOT EXISTS idx_tracks_artist_id     ON tracks (artist_id);
             CREATE INDEX IF NOT EXISTS idx_tracks_album_id      ON tracks (album_id);
+            CREATE INDEX IF NOT EXISTS idx_tracks_album_added   ON tracks (album_id, added_at DESC);
             CREATE INDEX IF NOT EXISTS idx_play_history_track   ON play_history (track_id, started_at DESC);
             CREATE INDEX IF NOT EXISTS idx_play_history_started ON play_history (started_at DESC);
 
@@ -4689,25 +4690,35 @@ public sealed class AudioDatabase : IDisposable
         return result;
     }
 
+    /// <summary>Returns the albums whose tracks were added most recently.</summary>
+    /// <param name="limit">Maximum number of albums to return.</param>
+    /// <returns>Compact recent-album rows ordered by newest track addition.</returns>
     public List<RecentAlbumInfo> GetRecentAlbums(int limit = 12)
     {
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = """
+            WITH recent AS (
+                SELECT album_id,
+                       MAX(COALESCE(added_at, 0)) AS last_added
+                FROM tracks
+                WHERE album_id IS NOT NULL
+                GROUP BY album_id
+                ORDER BY last_added DESC
+                LIMIT $limit
+            )
             SELECT a.id,
                    COALESCE(a.title, '')  AS title,
                    COALESCE(ar.name, '')  AS artist,
                    art.thumb_96_path,
                    a.artist_id,
-                   MAX(COALESCE(t.added_at, 0)) AS last_added,
+                   recent.last_added,
                    COALESCE(a.is_favorite, 0) AS is_favorite,
                    COALESCE(art.thumb_320_path, art.original_path) AS artwork_path
-            FROM albums a
+            FROM recent
+            JOIN albums a       ON a.id = recent.album_id
             LEFT JOIN artists  ar  ON ar.id  = a.artist_id
             LEFT JOIN artworks art ON art.id  = a.artwork_id
-            JOIN tracks        t   ON t.album_id = a.id
-            GROUP BY a.id
-            ORDER BY last_added DESC
-            LIMIT $limit;
+            ORDER BY recent.last_added DESC;
             """;
         cmd.Parameters.AddWithValue("$limit", limit);
         using var r = cmd.ExecuteReader();
@@ -4912,19 +4923,26 @@ public sealed class AudioDatabase : IDisposable
     {
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = """
+            WITH track_stats AS (
+                SELECT album_id,
+                       GROUP_CONCAT(DISTINCT NULLIF(TRIM(genre), '')) AS genres,
+                       AVG(CASE WHEN bpm > 0 THEN bpm END) AS average_bpm
+                FROM tracks
+                WHERE album_id IS NOT NULL
+                GROUP BY album_id
+            )
             SELECT a.id,
                    COALESCE(a.title, ''),
                    COALESCE(ar.name, ''),
                    a.artist_id,
-                   GROUP_CONCAT(DISTINCT NULLIF(TRIM(t.genre), '')),
-                   AVG(CASE WHEN t.bpm > 0 THEN t.bpm END),
+                   track_stats.genres,
+                   track_stats.average_bpm,
                    COALESCE(art.thumb_320_path, art.original_path),
                    COALESCE(a.is_favorite, 0)
-            FROM albums a
-            JOIN tracks t ON t.album_id = a.id
+            FROM track_stats
+            JOIN albums a ON a.id = track_stats.album_id
             LEFT JOIN artists ar ON ar.id = a.artist_id
-            LEFT JOIN artworks art ON art.id = a.artwork_id
-            GROUP BY a.id;
+            LEFT JOIN artworks art ON art.id = a.artwork_id;
             """;
         using var reader = cmd.ExecuteReader();
         var result = new List<RecommendationAlbumInfo>();
