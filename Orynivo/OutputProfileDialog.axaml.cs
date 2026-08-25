@@ -55,7 +55,8 @@ internal partial class OutputProfileDialog : Window
         var availableBackends = new List<BackendChoice>
         {
             new(OutputBackend.Asio, LocalizationManager.Current.SteinbergAsio),
-            new(OutputBackend.CwAsio, LocalizationManager.Current.CwAsio)
+            new(OutputBackend.CwAsio, LocalizationManager.Current.CwAsio),
+            new(OutputBackend.AirPlay, LocalizationManager.Current.AirPlay)
         };
         if (!OperatingSystem.IsWindows())
         {
@@ -83,7 +84,8 @@ internal partial class OutputProfileDialog : Window
             BackendComboBox.SelectedItem =
                 filteredBackends.FirstOrDefault(c =>
                     c.Value == profile.Backend &&
-                    (OperatingSystem.IsWindows() ||
+                    (profile.Backend == OutputBackend.AirPlay ||
+                     OperatingSystem.IsWindows() ||
                      profile.Backend != OutputBackend.Wasapi ||
                      c.LinuxDeviceKind == ResolveLinuxDeviceKind(profile.SelectedWasapiDeviceId)))
                 ?? filteredBackends.FirstOrDefault(c => c.Value == OutputBackend.Wasapi)
@@ -213,6 +215,35 @@ internal partial class OutputProfileDialog : Window
                     ? LocalizationManager.Current.NoWasapiDevices
                     : string.Empty;
             }
+            else if (backend == OutputBackend.AirPlay)
+            {
+                var devices = (await AirPlayDeviceDiscovery.DiscoverAsync(forceRefresh: true)).ToList();
+                if (devices.Count == 0 &&
+                    !string.IsNullOrWhiteSpace(_initialProfile?.SelectedAirPlayDeviceId) &&
+                    !string.IsNullOrWhiteSpace(_initialProfile.SelectedAirPlayHost) &&
+                    _initialProfile.SelectedAirPlayPort > 0)
+                {
+                    devices.Add(new AirPlayDeviceInfo(
+                        _initialProfile.SelectedAirPlayDeviceId,
+                        _initialProfile.SelectedAirPlayDeviceName ?? _initialProfile.SelectedAirPlayDeviceId,
+                        _initialProfile.SelectedAirPlayHost,
+                        _initialProfile.SelectedAirPlayPort,
+                        new Dictionary<string, string>()));
+                }
+                if (loadVersion != Volatile.Read(ref _deviceLoadVersion))
+                    return;
+                DeviceComboBox.ItemsSource = devices;
+                DeviceComboBox.DisplayMemberBinding = new Avalonia.Data.Binding(nameof(AirPlayDeviceInfo.Name));
+                DeviceComboBox.SelectedItem = devices.FirstOrDefault(device =>
+                    string.Equals(device.Id, _initialProfile?.SelectedAirPlayDeviceId, StringComparison.OrdinalIgnoreCase))
+                    ?? devices.FirstOrDefault();
+                DeviceLabelTextBlock.Text = LocalizationManager.Current.AirPlayOutputDevice;
+                StatusTextBlock.Text = devices.Count == 0
+                    ? LocalizationManager.Current.NoAirPlayDevices
+                    : AirPlayAudioPlayer.IsSenderAvailable
+                        ? string.Empty
+                        : LocalizationManager.Current.AirPlaySenderMissing;
+            }
             else if (backend is OutputBackend.Asio or OutputBackend.CwAsio)
             {
                 var drivers = await Task.Run(() => SteinbergAsioStream.GetDriverNames(backend));
@@ -246,9 +277,12 @@ internal partial class OutputProfileDialog : Window
         catch
         {
             if (loadVersion == Volatile.Read(ref _deviceLoadVersion))
-                StatusTextBlock.Text = backend == OutputBackend.Wasapi
-                    ? LocalizationManager.Current.NoWasapiDevices
-                    : LocalizationManager.Current.NoAsioDrivers;
+                StatusTextBlock.Text = backend switch
+                {
+                    OutputBackend.Wasapi => LocalizationManager.Current.NoWasapiDevices,
+                    OutputBackend.AirPlay => LocalizationManager.Current.NoAirPlayDevices,
+                    _ => LocalizationManager.Current.NoAsioDrivers
+                };
         }
         finally
         {
@@ -290,13 +324,18 @@ internal partial class OutputProfileDialog : Window
         if (!CanSave())
             return;
         var backend = SelectedBackend;
+        var airPlayDevice = DeviceComboBox.SelectedItem as AirPlayDeviceInfo;
         Result = new OutputProfile
         {
             Name = NameTextBox.Text!.Trim(),
             Backend = backend,
             SelectedDriverName = DeviceComboBox.SelectedItem as string,
             SelectedWasapiDeviceId = DeviceComboBox.SelectedItem is WasapiDeviceInfo w ? w.Id : null,
-            SelectedWasapiDeviceName = DeviceComboBox.SelectedItem is WasapiDeviceInfo wd ? wd.Name : null
+            SelectedWasapiDeviceName = DeviceComboBox.SelectedItem is WasapiDeviceInfo wd ? wd.Name : null,
+            SelectedAirPlayDeviceId = airPlayDevice?.Id,
+            SelectedAirPlayDeviceName = airPlayDevice?.Name,
+            SelectedAirPlayHost = airPlayDevice?.Host,
+            SelectedAirPlayPort = airPlayDevice?.Port ?? 0
         };
         Close(true);
     }

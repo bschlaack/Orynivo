@@ -24,6 +24,8 @@ the ability to reach that library from any device on the local network.
 - Bit-perfect/native DSD playback through direct ALSA on Linux without a native
   bridge, or through cwASIO/the optional Steinberg ASIO bridge on Windows
 - Exclusive WASAPI, cwASIO, and Steinberg ASIO output profiles
+- Classic AirPlay (RAOP) output profiles with automatic receiver discovery on
+  Windows, Linux, and macOS
 - Gapless playback
 - CUE sheet support
 - ReplayGain and parametric EQ
@@ -95,6 +97,30 @@ processing features through the system OpenAL output path on Intel and Apple
 Silicon. Native DSD output remains available only through Windows ASIO/cwASIO
 or Linux direct ALSA, and Windows System Media Transport Controls remain
 Windows-specific.
+
+Classic AirPlay output is shared by all desktop platforms. Selecting AirPlay
+while creating an output profile scans the local network for `_raop._tcp`
+receivers and displays them instead of local sound devices. Playback is decoded
+to 44.1 kHz stereo PCM and sent through a compatible `raop_play` executable
+located beside Orynivo or on `PATH`. The helper is deliberately not bundled
+because available RAOP implementations use licenses independent of Orynivo's
+Apache-2.0 distribution. This initial backend supports one classic,
+non-password-protected AirPlay receiver; AirPlay 2-only pairing, protected
+receivers, multiroom synchronization, gapless transitions, and Orynivo's
+parametric equalizer are not yet supported. Volume and ReplayGain are applied
+to the PCM feed.
+
+Receivers that advertise only `_airplay._tcp`, including current AirPlay 2-only
+Sonos devices, do not appear in this classic RAOP device list and cannot yet be
+used as Orynivo outputs. A future Qt-free `AirPlay2Bridge` is planned to add
+native transient-pairing support on Windows, Linux, and macOS while retaining
+the existing RAOP route for AirPlay 1 receivers. The evaluated
+[`airplay2-sender-cpp`](https://github.com/akustikrausch/airplay2-sender-cpp)
+project currently supplies a reusable Apache-2.0 cryptographic core and a
+Qt-/host-dependent reference sender, but not a standalone sender target. It is
+therefore not bundled or treated as an Orynivo runtime dependency. Before such
+a bridge can ship, its portable transport, C API, packaging, and fail-closed
+pairing verification must be implemented and tested against real receivers.
 
 Settings > Playback offers mutually exclusive DSD routing preferences for
 lossy DSD-to-PCM conversion and bit-perfect DSD over PCM (DoP). DoP requires a
@@ -426,6 +452,8 @@ byte-range streaming without FFmpeg.
 
 - Playback through direct ALSA or OpenAL on Linux, and through cwASIO, the
   optional Steinberg ASIO bridge, or exclusive-mode WASAPI on Windows
+- Classic AirPlay playback through automatically discovered RAOP receivers on
+  Windows, Linux, and macOS when a compatible `raop_play` helper is installed
 - Automatic PCM down-conversion through `ffmpeg` when the source sample rate
   exceeds the selected ASIO or WASAPI device's capabilities; WASAPI uses the
   highest supported 32-bit float, 24-bit PCM, or 16-bit PCM output format

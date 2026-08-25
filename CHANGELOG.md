@@ -4,6 +4,24 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Output profiles can now select classic AirPlay (RAOP) receivers discovered
+  through mDNS on Windows, Linux, and macOS. Orynivo resolves the selected
+  receiver again before playback and streams FFmpeg-decoded PCM through a
+  separately installed compatible `raop_play` sender.
+
+### Fixed
+
+- AirPlay discovery now reads the concrete DNS-SD SRV instance name instead of
+  displaying the generic `_raop._tcp.local.` PTR service type, so compatible
+  AirPlay 1 receivers appear under their advertised device name.
+- Documented that receivers advertising only `_airplay._tcp`, including
+  AirPlay 2-only Sonos devices, require the planned Qt-free AirPlay 2 bridge
+  and are not exposed by the current classic RAOP backend.
+
 ## [0.36.7] - 2026-08-25
 
 ### Added

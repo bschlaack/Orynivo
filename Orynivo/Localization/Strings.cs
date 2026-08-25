@@ -220,6 +220,16 @@ public sealed record LocalizedStrings(
     public string SteinbergAsio { get; init; } = "";
     public string CwAsio { get; init; } = "";
     public string WasapiOutputDevice { get; init; } = "";
+    /// <summary>Gets the AirPlay output backend label.</summary>
+    public string AirPlay { get; init; } = "";
+    /// <summary>Gets the AirPlay receiver field label.</summary>
+    public string AirPlayOutputDevice { get; init; } = "";
+    /// <summary>Gets the message shown when no AirPlay receivers were discovered.</summary>
+    public string NoAirPlayDevices { get; init; } = "";
+    /// <summary>Gets the message shown when no compatible RAOP sender helper is installed.</summary>
+    public string AirPlaySenderMissing { get; init; } = "";
+    /// <summary>Gets the message shown when an AirPlay profile has no receiver selected.</summary>
+    public string SelectAirPlayDevice { get; init; } = "";
     /// <summary>Gets the OpenAL backend label.</summary>
     public string OpenAl { get; init; } = "";
     /// <summary>Gets the OpenAL output-device field label.</summary>

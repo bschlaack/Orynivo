@@ -27,6 +27,14 @@ public sealed class AppSettings
     public string? SelectedWasapiDeviceId { get; set; }
     /// <summary>Gets or sets the display name of the selected WASAPI render device (derived from the selected profile on load).</summary>
     public string? SelectedWasapiDeviceName { get; set; }
+    /// <summary>Gets or sets the selected AirPlay DNS-SD service name (derived from the selected profile).</summary>
+    public string? SelectedAirPlayDeviceId { get; set; }
+    /// <summary>Gets or sets the selected AirPlay receiver display name (derived from the selected profile).</summary>
+    public string? SelectedAirPlayDeviceName { get; set; }
+    /// <summary>Gets or sets the last resolved AirPlay receiver address (derived from the selected profile).</summary>
+    public string? SelectedAirPlayHost { get; set; }
+    /// <summary>Gets or sets the last resolved AirPlay receiver port (derived from the selected profile).</summary>
+    public int SelectedAirPlayPort { get; set; }
     /// <summary>Gets or sets the list of root directories scanned for audio files.</summary>
     public List<string> LibraryPaths { get; set; } = [];
     /// <summary>Gets or sets the identifier of the last active main-area view.</summary>

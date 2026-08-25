@@ -69,6 +69,12 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   and permits one-click reacquisition/resume. Ordinary playback clears that
   snapshot. Pausing alone must never be presented as releasing an exclusive
   WASAPI, ASIO, cwASIO, or direct ALSA device.
+- Classic AirPlay output is a cross-platform `OutputBackend.AirPlay` profile.
+  Discover `_raop._tcp.local.` receivers away from the UI thread, persist only
+  their stable service ID/display name/last endpoint, refresh the endpoint
+  before playback, and stream 44.1 kHz stereo PCM to a separately installed
+  `raop_play` helper. Do not claim AirPlay 2, protected receiver, multiroom, or
+  gapless support and never persist passwords or pairing material.
 - Preserve source identity on mixed rows. Remote rows must carry their
   `OrynivoServer`, server-side IDs, and authenticated playback metadata; never
   persist credential-bearing URLs.

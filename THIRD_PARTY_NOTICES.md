@@ -29,7 +29,8 @@ packages.
   The vendored revision and its original license are recorded in
   `third_party/cwasio/UPSTREAM.md` and `third_party/cwasio/LICENSE`.
 - Other resolved MIT dependencies include HarfBuzzSharp, MicroCom.Runtime,
-  Tmds.DBus.Protocol, and their applicable native asset packages.
+  Tmds.DBus.Protocol, [Zeroconf 3.7.16](https://github.com/novotnyllc/Zeroconf)
+  for AirPlay DNS-SD discovery, and their applicable native asset packages.
 
 ## Apache License 2.0 components
 
