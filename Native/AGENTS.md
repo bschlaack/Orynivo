@@ -23,6 +23,13 @@ This file applies to `Native/` and supplements `../AGENTS.md`.
   failures must remain recoverable.
 - Do not change ring-buffer or callback ownership without checking both PCM and
   DSD paths in both bridge variants.
+- `AirPlay2Bridge` is an independently buildable Qt-free CMake project. Its
+  exported surface is the C ABI in `include/airplay2_bridge.h`; keep C++ and
+  platform socket types private so the component can be published separately.
+  Every opaque session owns its sockets, copies caller configuration, reports
+  stable result/state enums, and must fail closed on pairing proof errors.
+  Orynivo integration remains disabled while transient pairing or streaming
+  returns `AP2_NOT_IMPLEMENTED`.
 
 Consult the detailed ASIO/cwASIO build and playback rules in the root
 `AGENTS.md` before modifying bridge code.

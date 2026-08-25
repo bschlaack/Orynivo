@@ -369,6 +369,12 @@ fallback or allow client-provided commands/paths to reach the helper.
   installed `raop_play` helper. Do not persist receiver passwords or pairing
   material. The initial backend is single-receiver AirPlay 1 and must not be
   presented as AirPlay 2, protected-receiver, or multiroom support.
+- `Native/AirPlay2Bridge/`: standalone Qt-free native AirPlay 2 sender project.
+  It exposes only a versioned C ABI with opaque sessions and keeps portable
+  transport/protocol internals private so it can be released independently.
+  The initial transport milestone is intentionally not loaded by Orynivo; the
+  desktop may integrate it only after fail-closed transient pairing, encrypted
+  RTSP/event handling, ALAC/RTP streaming, and real receiver tests are complete.
 - `Orynivo/OutputProfileDialog.axaml/.cs`: dialog for creating or editing an
   output profile; loads available devices asynchronously, validates unique
   names, and exposes the confirmed result via `Result`

@@ -1,5 +1,6 @@
 bin/
 obj/
+build/
 out/
 artifacts/
 publish/

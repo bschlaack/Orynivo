@@ -1,0 +1,11 @@
+Orynivo AirPlay2Bridge
+Copyright 2026 Orynivo contributors
+
+This project is an independent interoperability implementation and is not
+affiliated with, authorized by, or endorsed by Apple Inc. AirPlay, Apple TV,
+HomePod, HomeKit, macOS, Sonos, and other product names are trademarks of their
+respective owners and are used only to describe protocol compatibility.
+
+The planned cryptographic and wire-format port is based on work published by
+Andreas Wendorf (Akustikrausch) in airplay2-sender-cpp under Apache-2.0. No
+upstream implementation source is included in the initial transport milestone.

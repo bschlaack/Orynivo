@@ -122,6 +122,14 @@ therefore not bundled or treated as an Orynivo runtime dependency. Before such
 a bridge can ship, its portable transport, C API, packaging, and fail-closed
 pairing verification must be implemented and tested against real receivers.
 
+Development of that component has started in
+[`Native/AirPlay2Bridge`](Native/AirPlay2Bridge/README.md). It is deliberately a
+standalone CMake project with a versioned C ABI and no dependency on Avalonia,
+Orynivo, or Qt, so it can later be published and consumed independently. The
+current milestone provides the portable Windows/POSIX socket foundation and
+native tests only; Orynivo does not load it yet and therefore still makes no
+AirPlay 2 playback claim.
+
 Settings > Playback offers mutually exclusive DSD routing preferences for
 lossy DSD-to-PCM conversion and bit-perfect DSD over PCM (DoP). DoP requires a
 DoP-capable DAC and an exact-rate output path; PCM volume, ReplayGain, boost,
@@ -1063,12 +1071,17 @@ Paths can be supplied without modifying project files:
 .\build.ps1 -Configuration Release
 .\build.ps1 -Configuration Release -SkipAsio
 .\build.ps1 -Configuration Release -SkipAsio -SkipCwAsio
+.\build.ps1 -Configuration Release -SkipAirPlay2Bridge
 ```
 
 For a persistent local setup, set `ASIO_SDK_DIR`. MSBuild discovery can
 similarly be overridden with `-MSBuildPath` or `MSBUILD_EXE_PATH`.
 `-RequireAsio` makes a missing Steinberg SDK fail the build. `-SkipAsio`
 disables only the Steinberg bridge; `-SkipCwAsio` disables cwASIO.
+The default build also compiles and tests the independent Qt-free
+`Native/AirPlay2Bridge` transport milestone. `-SkipAirPlay2Bridge` skips that
+native project for a focused managed/ASIO build; the incomplete bridge is not
+copied into the desktop output.
 
 ### Orynivo Server
 

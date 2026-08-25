@@ -75,6 +75,12 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   before playback, and stream 44.1 kHz stereo PCM to a separately installed
   `raop_play` helper. Do not claim AirPlay 2, protected receiver, multiroom, or
   gapless support and never persist passwords or pairing material.
+- The future AirPlay 2 sender lives in the independent Qt-free
+  `Native/AirPlay2Bridge` CMake project. Keep its public boundary as a stable C
+  ABI with opaque session handles; it must not depend on Avalonia or Orynivo.
+  Do not load or advertise it from the desktop until transient pairing,
+  receiver-proof validation, encrypted RTSP/event channels, and ALAC/RTP audio
+  pass native tests and real-receiver verification.
 - Preserve source identity on mixed rows. Remote rows must carry their
   `OrynivoServer`, server-side IDs, and authenticated playback metadata; never
   persist credential-bearing URLs.
