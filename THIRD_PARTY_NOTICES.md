@@ -52,6 +52,9 @@ The complete Apache License 2.0 text is the repository's `LICENSE` file.
   pinned to commit `8c4034263f1c265d25b3cfb88a090624760ad22a`, and
   [Mbed TLS](https://github.com/Mbed-TLS/mbedtls), which it fetches for the
   standalone AirPlay2Bridge. The Qt sender application is not linked.
+- Apple's official [ALAC codec](https://github.com/macosforge/alac), pinned to
+  commit `c38887c5c5e64a4b31108733bd79ca9b2496d987`, supplies the Apache-2.0
+  encoder used by the standalone AirPlay2Bridge.
 
 ## zlib-licensed components
 

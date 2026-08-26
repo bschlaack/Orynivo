@@ -380,8 +380,11 @@ fallback or allow client-provided commands/paths to reach the helper.
   binary-plist session SETUP, which advertises a bound local NTP timing port and
   captures the receiver's event port. A live NTP responder is required before
   RECORD and realtime stream SETUP; that stream advertises local UDP data and
-  control ports and receives the Sonos RTP destination. The bridge remains
-  unloaded by Orynivo until event processing and ALAC/RTP streaming are complete.
+  control ports and receives the Sonos RTP destination. PCM writes are buffered
+  into 352-frame stereo units, encoded by the pinned official Apple ALAC codec,
+  and authenticated as realtime RTP through the session audio key. The bridge
+  remains unloaded by Orynivo until audible RTP synchronization, event/lifecycle
+  handling, and real-receiver playback verification are complete.
 - `Orynivo/OutputProfileDialog.axaml/.cs`: dialog for creating or editing an
   output profile; loads available devices asynchronously, validates unique
   names, and exposes the confirmed result via `Result`

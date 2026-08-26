@@ -78,10 +78,12 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 - The AirPlay 2 sender under development lives in the independent Qt-free
   `Native/AirPlay2Bridge` CMake project. Keep its public boundary as a stable C
   ABI with opaque session handles; it must not depend on Avalonia or Orynivo.
-  Fail-closed transient pairing, encrypted control, and session SETUP are
-  NTP timing, RECORD, and audio-stream SETUP are implemented and Sonos-verified.
-  Do not load or advertise it from the desktop until event processing and
-  ALAC/RTP audio pass native tests and complete real-receiver verification.
+  Fail-closed transient pairing, encrypted control, session SETUP, NTP timing,
+  RECORD, and audio-stream SETUP are implemented and Sonos-verified. ALAC
+  encoding plus encrypted realtime RTP packetization is implemented behind the
+  ABI. Do not load or advertise it from the desktop until audible RTP timing,
+  event/lifecycle handling, native tests, and real-receiver playback
+  verification are complete.
 - Preserve source identity on mixed rows. Remote rows must carry their
   `OrynivoServer`, server-side IDs, and authenticated playback metadata; never
   persist credential-bearing URLs.

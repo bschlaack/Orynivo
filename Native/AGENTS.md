@@ -31,14 +31,18 @@ This file applies to `Native/` and supplements `../AGENTS.md`.
   Transient pairing uses HAP mode 4 and never logs derived keys. Control framing
   authenticates the two-byte little-endian length, caps plaintext frames at
   1024 bytes, and maintains separate counters for each direction. Orynivo
-  integration remains disabled while event-channel and audio-stream setup or
-  streaming returns `AP2_NOT_IMPLEMENTED`. The session sequence is encrypted
+  integration remains disabled until audible receiver timing, teardown, and
+  failure handling pass real-device tests. The session sequence is encrypted
   `GET /info` followed by binary-plist session SETUP with a real bound timing
   port; the NTP responder must remain active through the audio session because
   receivers gate RECORD/stream SETUP on timing replies. Realtime stream SETUP
   advertises the bound UDP data/control ports and the first 32 bytes of the
   transient shared secret as `shk`. Response bodies and declared sizes remain
-  bounded.
+  bounded. The PCM ABI accepts stereo signed 16-bit data, buffers partial calls
+  into 352-frame units, encodes with the pinned official Apple ALAC source, and
+  emits authenticated realtime RTP as header, ciphertext/tag, and the explicit
+  eight-byte nonce suffix. Keep codec and packetization behind private C++
+  types so the public C ABI stays independently reusable.
 
 Consult the detailed ASIO/cwASIO build and playback rules in the root
 `AGENTS.md` before modifying bridge code.

@@ -13,9 +13,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   fail-closed HAP transient pairing, authenticated encrypted-control framing,
   encrypted RTSP response parsing, binary-plist session SETUP, and native
   transport/crypto tests. A portable NTP timing responder now permits RECORD
-  and realtime audio-stream SETUP. Pairing through negotiated RTP ports has
-  been verified against a real Sonos AirPlay 2 receiver; Orynivo does not load
-  the bridge until event processing and ALAC/RTP streaming are complete.
+  and realtime audio-stream SETUP. The bridge now buffers partial signed
+  16-bit stereo PCM into 352-frame packets, encodes them through Apple's pinned
+  Apache-2.0 ALAC encoder, and emits ChaCha20-Poly1305-authenticated realtime
+  RTP datagrams. Pairing through negotiated RTP ports has been verified against
+  a real Sonos AirPlay 2 receiver; audible timing/synchronization and lifecycle
+  work remains before Orynivo loads the bridge.
 - Output profiles can now select classic AirPlay (RAOP) receivers discovered
   through mDNS on Windows, Linux, and macOS. Orynivo resolves the selected
   receiver again before playback and streams FFmpeg-decoded PCM through a

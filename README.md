@@ -117,8 +117,9 @@ native AirPlay 2 support on Windows, Linux, and macOS while retaining
 the existing RAOP route for AirPlay 1 receivers. The evaluated
 [`airplay2-sender-cpp`](https://github.com/akustikrausch/airplay2-sender-cpp)
 project supplies the reusable Apache-2.0 cryptographic core fetched at a pinned
-commit; its Qt sender is not linked. Before the bridge can ship, encrypted RTSP
-negotiation, audio streaming, packaging, and complete receiver tests must be
+commit; its Qt sender is not linked. The native bridge fetches Apple's official
+Apache-2.0 ALAC encoder separately. Before the bridge can ship, audible RTP
+timing, lifecycle handling, packaging, and complete receiver tests must be
 finished.
 
 Development of that component has started in
@@ -127,9 +128,11 @@ standalone CMake project with a versioned C ABI and no dependency on Avalonia,
 Orynivo, or Qt, so it can later be published and consumed independently. The
 current milestone provides portable sockets, fail-closed transient pairing,
 authenticated encrypted control, NTP timing, session/RECORD/audio-stream SETUP,
-and negotiated RTP ports, all verified against a Sonos receiver, plus native
-tests. Event processing and ALAC/RTP transport remain unfinished. Orynivo does
-not load the bridge yet and therefore still makes no AirPlay 2 playback claim.
+negotiated RTP ports, official Apple ALAC encoding, partial-PCM buffering, and
+encrypted realtime RTP packetization, plus native tests. Session negotiation
+through the RTP ports is verified against a Sonos receiver; audible RTP timing,
+event handling, and teardown remain unfinished. Orynivo does not load the bridge
+yet and therefore still makes no AirPlay 2 playback claim.
 
 Settings > Playback offers mutually exclusive DSD routing preferences for
 lossy DSD-to-PCM conversion and bit-perfect DSD over PCM (DoP). DoP requires a

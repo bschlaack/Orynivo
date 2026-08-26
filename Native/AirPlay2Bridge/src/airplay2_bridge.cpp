@@ -3,6 +3,7 @@
 #include "airplay_crypto.h"
 #include "encrypted_rtsp.h"
 #include "ntp_timing.h"
+#include "realtime_audio_packetizer.h"
 #include "socket_transport.h"
 #include "transient_pairing.h"
 
@@ -11,6 +12,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <vector>
 
 using orynivo::airplay2::Socket;
 
@@ -33,6 +35,8 @@ struct ap2_session {
     orynivo::airplay2::TransientPairingKeys pairingKeys;
     std::unique_ptr<orynivo::airplay2::EncryptedRtsp> rtsp;
     std::unique_ptr<orynivo::airplay2::NtpTimingResponder> timing;
+    std::unique_ptr<orynivo::airplay2::RealtimeAudioPacketizer> packetizer;
+    std::vector<std::byte> pendingPcm;
     std::uint16_t eventPort = 0;
     std::uint16_t dataPort = 0;
     std::uint16_t controlPort = 0;
@@ -210,7 +214,12 @@ ap2_result AP2_CALL ap2_session_start(ap2_session* session) {
         }
         if (session->dataPort == 0)
             throw std::runtime_error("AirPlay stream SETUP returned no audio data port.");
-        return fail(AP2_NOT_IMPLEMENTED, "AirPlay 2 audio stream SETUP verified; ALAC packet transport is not implemented yet.");
+        session->packetizer = std::make_unique<orynivo::airplay2::RealtimeAudioPacketizer>(
+            session->sampleRate, session->pairingKeys.audioKey);
+        session->pendingPcm.clear();
+        notify(*session, AP2_STATE_STREAMING, "AirPlay 2 realtime audio stream is ready.");
+        lastError.clear();
+        return AP2_OK;
     } catch (const std::exception& error) {
         notify(*session, AP2_STATE_FAILED, error.what());
         return fail(AP2_NETWORK_ERROR, error.what());
@@ -221,7 +230,32 @@ ap2_result AP2_CALL ap2_session_write_pcm(ap2_session* session, const void* samp
     if (consumed != nullptr) *consumed = 0;
     if (session == nullptr || (samples == nullptr && byteCount != 0))
         return fail(AP2_INVALID_ARGUMENT, "Invalid PCM buffer.");
-    return fail(AP2_INVALID_STATE, "PCM is accepted only after the encrypted stream is active.");
+    std::scoped_lock lock(session->mutex);
+    if (session->state != AP2_STATE_STREAMING || session->packetizer == nullptr)
+        return fail(AP2_INVALID_STATE, "PCM is accepted only after the encrypted stream is active.");
+    try {
+        if (byteCount != 0) {
+            const auto* input = static_cast<const std::byte*>(samples);
+            session->pendingPcm.insert(session->pendingPcm.end(), input, input + byteCount);
+        }
+        constexpr auto packetBytes = orynivo::airplay2::AlacEncoder::PcmBytesPerPacket;
+        std::size_t offset = 0;
+        while (session->pendingPcm.size() - offset >= packetBytes) {
+            const auto packet = session->packetizer->packetize(
+                std::span<const std::byte>(session->pendingPcm).subspan(offset, packetBytes));
+            session->audio.sendTo(session->host, session->dataPort, packet);
+            offset += packetBytes;
+        }
+        if (offset != 0)
+            session->pendingPcm.erase(session->pendingPcm.begin(),
+                                      session->pendingPcm.begin() + static_cast<std::ptrdiff_t>(offset));
+        if (consumed != nullptr) *consumed = byteCount;
+        lastError.clear();
+        return AP2_OK;
+    } catch (const std::exception& error) {
+        notify(*session, AP2_STATE_FAILED, error.what());
+        return fail(AP2_NETWORK_ERROR, error.what());
+    }
 }
 
 ap2_result AP2_CALL ap2_session_stop(ap2_session* session) {
@@ -233,6 +267,8 @@ ap2_result AP2_CALL ap2_session_stop(ap2_session* session) {
     session->audioControl.close();
     session->events.close();
     session->rtsp.reset();
+    session->packetizer.reset();
+    session->pendingPcm.clear();
     notify(*session, AP2_STATE_STOPPED, "AirPlay 2 session stopped.");
     lastError.clear();
     return AP2_OK;
