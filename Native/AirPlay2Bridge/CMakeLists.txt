@@ -19,6 +19,7 @@ add_library(AirPlay2Bridge SHARED
     src/airplay2_bridge.cpp
     src/encrypted_control.cpp
     src/encrypted_rtsp.cpp
+    src/ntp_timing.cpp
     src/transient_pairing.cpp
     src/socket_transport.cpp)
 
@@ -62,6 +63,17 @@ if(AIRPLAY2BRIDGE_BUILD_TESTS)
     target_include_directories(AirPlay2BridgeEncryptedControlTests PRIVATE src)
     target_link_libraries(AirPlay2BridgeEncryptedControlTests PRIVATE airplay_crypto)
     add_test(NAME AirPlay2Bridge.EncryptedControl COMMAND AirPlay2BridgeEncryptedControlTests)
+
+    add_executable(AirPlay2BridgeNtpTimingTests
+        tests/ntp_timing_tests.cpp
+        src/ntp_timing.cpp
+        src/socket_transport.cpp)
+    target_compile_features(AirPlay2BridgeNtpTimingTests PRIVATE cxx_std_20)
+    target_include_directories(AirPlay2BridgeNtpTimingTests PRIVATE src)
+    if(WIN32)
+        target_link_libraries(AirPlay2BridgeNtpTimingTests PRIVATE ws2_32)
+    endif()
+    add_test(NAME AirPlay2Bridge.NtpTiming COMMAND AirPlay2BridgeNtpTimingTests)
 endif()
 
 install(TARGETS AirPlay2Bridge

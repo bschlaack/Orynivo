@@ -203,6 +203,34 @@ std::size_t Socket::receive(std::span<std::byte> destination, std::chrono::milli
     return static_cast<std::size_t>(received);
 }
 
+std::size_t Socket::receiveFrom(std::span<std::byte> destination,
+                                std::chrono::milliseconds timeout,
+                                std::string& host, std::uint16_t& port) {
+    if (!waitReadable(native(handle_), timeout)) return 0;
+    sockaddr_storage address{};
+#if defined(_WIN32)
+    int length = sizeof(address);
+#else
+    socklen_t length = sizeof(address);
+#endif
+    const int received = recvfrom(native(handle_), reinterpret_cast<char*>(destination.data()),
+                                  static_cast<int>(destination.size()), 0,
+                                  reinterpret_cast<sockaddr*>(&address), &length);
+    if (received < 0)
+        throw std::system_error(lastSocketError(), std::system_category(), "recvfrom");
+    std::array<char, INET6_ADDRSTRLEN> text{};
+    const void* source = address.ss_family == AF_INET
+        ? static_cast<const void*>(&reinterpret_cast<const sockaddr_in*>(&address)->sin_addr)
+        : static_cast<const void*>(&reinterpret_cast<const sockaddr_in6*>(&address)->sin6_addr);
+    if (inet_ntop(address.ss_family, source, text.data(), static_cast<socklen_t>(text.size())) == nullptr)
+        throw std::system_error(lastSocketError(), std::system_category(), "inet_ntop");
+    host = text.data();
+    port = address.ss_family == AF_INET
+        ? ntohs(reinterpret_cast<const sockaddr_in*>(&address)->sin_port)
+        : ntohs(reinterpret_cast<const sockaddr_in6*>(&address)->sin6_port);
+    return static_cast<std::size_t>(received);
+}
+
 void Socket::close() noexcept {
     if (valid()) {
         closeSocket(native(handle_));

@@ -27,6 +27,7 @@ EncryptedRtsp::EncryptedRtsp(Socket& socket, std::vector<std::uint8_t> writeKey,
 
 RtspResponse EncryptedRtsp::request(std::string method, std::string uri,
                                     std::string contentType, std::vector<std::uint8_t> body,
+                                    std::map<std::string, std::string> extraHeaders,
                                     std::chrono::milliseconds timeout) {
     std::string request = method + " " + uri + " RTSP/1.0\r\n" +
         "CSeq: " + std::to_string(sequence_++) + "\r\n" +
@@ -36,7 +37,9 @@ RtspResponse EncryptedRtsp::request(std::string method, std::string uri,
         "Client-Instance: " + senderId_ + "\r\n" +
         "X-Apple-Client-Name: Orynivo\r\n";
     if (!contentType.empty()) request += "Content-Type: " + contentType + "\r\n";
-    if (!body.empty()) request += "Content-Length: " + std::to_string(body.size()) + "\r\n";
+    for (const auto& [key, value] : extraHeaders)
+        request += key + ": " + value + "\r\n";
+    request += "Content-Length: " + std::to_string(body.size()) + "\r\n";
     request += "\r\n";
     std::vector<std::uint8_t> plain(request.begin(), request.end());
     plain.insert(plain.end(), body.begin(), body.end());

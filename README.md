@@ -126,10 +126,10 @@ Development of that component has started in
 standalone CMake project with a versioned C ABI and no dependency on Avalonia,
 Orynivo, or Qt, so it can later be published and consumed independently. The
 current milestone provides portable sockets, fail-closed transient pairing,
-authenticated encrypted control, and binary-plist session SETUP, all verified
-against a Sonos receiver, plus native tests. Event handling, audio-stream SETUP,
-and ALAC/RTP transport remain unfinished. Orynivo does not load the bridge yet
-and therefore still makes no AirPlay 2 playback claim.
+authenticated encrypted control, NTP timing, session/RECORD/audio-stream SETUP,
+and negotiated RTP ports, all verified against a Sonos receiver, plus native
+tests. Event processing and ALAC/RTP transport remain unfinished. Orynivo does
+not load the bridge yet and therefore still makes no AirPlay 2 playback claim.
 
 Settings > Playback offers mutually exclusive DSD routing preferences for
 lossy DSD-to-PCM conversion and bit-perfect DSD over PCM (DoP). DoP requires a

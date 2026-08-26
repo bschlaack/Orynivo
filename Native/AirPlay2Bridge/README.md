@@ -9,10 +9,12 @@ and audio decoding remain outside the project.
 
 The current milestone contains the ABI, portable Windows/POSIX sockets,
 fail-closed HAP transient pairing, the authenticated encrypted-control frame
-codec, encrypted `GET /info`, and binary-plist session SETUP. These stages have
-been verified against a Sonos AirPlay 2 receiver. The bridge currently returns
-`AP2_NOT_IMPLEMENTED` after session SETUP because event-channel handling,
-audio-stream SETUP, ALAC/RTP audio, and metadata are not complete yet.
+codec, encrypted `GET /info`, binary-plist session SETUP, an NTP timing
+responder, event-channel connection, `RECORD`, and realtime audio-stream SETUP.
+These stages have been verified against a Sonos AirPlay 2 receiver. The bridge
+currently returns `AP2_NOT_IMPLEMENTED` after the receiver supplies its RTP
+ports because ALAC/RTP packet transport, event processing, and metadata are not
+complete yet.
 Orynivo must not load or advertise this bridge until a complete session passes
 real-receiver tests.
 

@@ -79,9 +79,9 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   `Native/AirPlay2Bridge` CMake project. Keep its public boundary as a stable C
   ABI with opaque session handles; it must not depend on Avalonia or Orynivo.
   Fail-closed transient pairing, encrypted control, and session SETUP are
-  implemented and Sonos-verified. Do not load or advertise it from the desktop
-  until event-channel handling, audio-stream SETUP, and ALAC/RTP audio pass
-  native tests and complete real-receiver verification.
+  NTP timing, RECORD, and audio-stream SETUP are implemented and Sonos-verified.
+  Do not load or advertise it from the desktop until event processing and
+  ALAC/RTP audio pass native tests and complete real-receiver verification.
 - Preserve source identity on mixed rows. Remote rows must carry their
   `OrynivoServer`, server-side IDs, and authenticated playback metadata; never
   persist credential-bearing URLs.

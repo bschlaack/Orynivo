@@ -12,9 +12,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   ABI, portable Windows/POSIX socket ownership layer, CMake packaging boundary,
   fail-closed HAP transient pairing, authenticated encrypted-control framing,
   encrypted RTSP response parsing, binary-plist session SETUP, and native
-  transport/crypto tests. Pairing, encrypted `GET /info`, and session SETUP
-  have been verified against a real Sonos AirPlay 2 receiver; Orynivo does not
-  load the bridge until event handling and audio streaming are complete.
+  transport/crypto tests. A portable NTP timing responder now permits RECORD
+  and realtime audio-stream SETUP. Pairing through negotiated RTP ports has
+  been verified against a real Sonos AirPlay 2 receiver; Orynivo does not load
+  the bridge until event processing and ALAC/RTP streaming are complete.
 - Output profiles can now select classic AirPlay (RAOP) receivers discovered
   through mDNS on Windows, Linux, and macOS. Orynivo resolves the selected
   receiver again before playback and streams FFmpeg-decoded PCM through a

@@ -30,6 +30,7 @@ public:
     RtspResponse request(std::string method, std::string uri,
                          std::string contentType = {},
                          std::vector<std::uint8_t> body = {},
+                         std::map<std::string, std::string> extraHeaders = {},
                          std::chrono::milliseconds timeout = std::chrono::seconds(10));
 
 private:

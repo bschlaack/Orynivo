@@ -42,6 +42,11 @@ public:
         std::span<std::byte> destination,
         std::chrono::milliseconds timeout);
 
+    /** Receives one UDP datagram and returns its numeric sender endpoint. */
+    std::size_t receiveFrom(std::span<std::byte> destination,
+                            std::chrono::milliseconds timeout,
+                            std::string& host, std::uint16_t& port);
+
     /** Closes the socket and makes subsequent close calls harmless. */
     void close() noexcept;
 

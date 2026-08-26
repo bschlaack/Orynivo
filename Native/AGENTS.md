@@ -34,7 +34,11 @@ This file applies to `Native/` and supplements `../AGENTS.md`.
   integration remains disabled while event-channel and audio-stream setup or
   streaming returns `AP2_NOT_IMPLEMENTED`. The session sequence is encrypted
   `GET /info` followed by binary-plist session SETUP with a real bound timing
-  port; response bodies and declared sizes remain bounded.
+  port; the NTP responder must remain active through the audio session because
+  receivers gate RECORD/stream SETUP on timing replies. Realtime stream SETUP
+  advertises the bound UDP data/control ports and the first 32 bytes of the
+  transient shared secret as `shk`. Response bodies and declared sizes remain
+  bounded.
 
 Consult the detailed ASIO/cwASIO build and playback rules in the root
 `AGENTS.md` before modifying bridge code.

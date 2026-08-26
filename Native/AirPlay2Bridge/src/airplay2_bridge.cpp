@@ -2,6 +2,7 @@
 #include "airplay2_bridge.h"
 #include "airplay_crypto.h"
 #include "encrypted_rtsp.h"
+#include "ntp_timing.h"
 #include "socket_transport.h"
 #include "transient_pairing.h"
 
@@ -26,10 +27,17 @@ struct ap2_session {
     ap2_state_callback callback = nullptr;
     void* userData = nullptr;
     Socket control;
-    Socket timing;
+    Socket audio;
+    Socket audioControl;
+    Socket events;
     orynivo::airplay2::TransientPairingKeys pairingKeys;
     std::unique_ptr<orynivo::airplay2::EncryptedRtsp> rtsp;
+    std::unique_ptr<orynivo::airplay2::NtpTimingResponder> timing;
     std::uint16_t eventPort = 0;
+    std::uint16_t dataPort = 0;
+    std::uint16_t controlPort = 0;
+    std::uint32_t sessionId = 0;
+    std::string rtspUri;
 };
 
 namespace {
@@ -122,12 +130,12 @@ ap2_result AP2_CALL ap2_session_start(ap2_session* session) {
         if (info.status < 200 || info.status >= 300)
             throw std::runtime_error("AirPlay receiver rejected encrypted GET /info with RTSP " +
                                      std::to_string(info.status) + '.');
-        session->timing = Socket::bindUdp();
+        session->timing = std::make_unique<orynivo::airplay2::NtpTimingResponder>();
         using namespace fxchain::airplay::bplist;
         Dict setup;
         setup.emplace_back("deviceID", Value::str("02:00:00:00:00:01"));
         setup.emplace_back("sessionUUID", Value::str(createUuid()));
-        setup.emplace_back("timingPort", Value::integer(session->timing.localPort()));
+        setup.emplace_back("timingPort", Value::integer(session->timing->localPort()));
         setup.emplace_back("timingProtocol", Value::str("NTP"));
         setup.emplace_back("isMultiSelectAirPlay", Value::boolean(false));
         setup.emplace_back("groupContainsGroupLeader", Value::boolean(false));
@@ -139,9 +147,12 @@ ap2_result AP2_CALL ap2_session_start(ap2_session* session) {
         setup.emplace_back("senderSupportsRelay", Value::boolean(false));
         setup.emplace_back("statsCollectionEnabled", Value::boolean(false));
         const auto body = encode(Value::object(std::move(setup)));
-        const auto uri = "rtsp://" + session->control.localAddress() + "/" + std::to_string(createSessionId());
+        session->sessionId = createSessionId();
+        session->rtspUri = "rtsp://" + session->control.localAddress() + "/" +
+                           std::to_string(session->sessionId);
         const auto setupResponse = session->rtsp->request(
-            "SETUP", uri, "application/x-apple-binary-plist", body);
+            "SETUP", session->rtspUri, "application/x-apple-binary-plist", body,
+            {{"X-Apple-StreamID", "1"}});
         if (setupResponse.status < 200 || setupResponse.status >= 300)
             throw std::runtime_error("AirPlay receiver rejected session SETUP with RTSP " +
                                      std::to_string(setupResponse.status) + '.');
@@ -149,7 +160,57 @@ ap2_result AP2_CALL ap2_session_start(ap2_session* session) {
         if (!decoded) throw std::runtime_error("AirPlay session SETUP returned an invalid binary property list.");
         if (const auto* eventPort = decoded->find("eventPort"))
             session->eventPort = static_cast<std::uint16_t>(eventPort->asInt());
-        return fail(AP2_NOT_IMPLEMENTED, "AirPlay 2 session SETUP verified; event and audio streams are not implemented yet.");
+        if (session->eventPort == 0)
+            throw std::runtime_error("AirPlay session SETUP returned no event port.");
+        notify(*session, AP2_STATE_NEGOTIATING, "Opening AirPlay 2 event channel.");
+        session->events = Socket::connectTcp(session->host, session->eventPort, std::chrono::seconds(5));
+
+        notify(*session, AP2_STATE_NEGOTIATING, "Preparing AirPlay 2 receiver for recording.");
+        const auto recordResponse = session->rtsp->request("RECORD", session->rtspUri);
+        if (recordResponse.status < 200 || recordResponse.status >= 300)
+            throw std::runtime_error("AirPlay receiver rejected RECORD with RTSP " +
+                                     std::to_string(recordResponse.status) + '.');
+
+        session->audio = Socket::bindUdp();
+        session->audioControl = Socket::bindUdp();
+        Dict stream;
+        stream.emplace_back("audioFormat", Value::integer(0x40000));
+        stream.emplace_back("audioMode", Value::str("default"));
+        stream.emplace_back("controlPort", Value::integer(session->audioControl.localPort()));
+        stream.emplace_back("ct", Value::integer(2));
+        stream.emplace_back("dataPort", Value::integer(session->audio.localPort()));
+        stream.emplace_back("isMedia", Value::boolean(true));
+        stream.emplace_back("latencyMax", Value::integer(88200));
+        stream.emplace_back("latencyMin", Value::integer(11025));
+        stream.emplace_back("shk", Value::bytes(session->pairingKeys.audioKey));
+        stream.emplace_back("spf", Value::integer(352));
+        stream.emplace_back("sr", Value::integer(session->sampleRate));
+        stream.emplace_back("type", Value::integer(0x60));
+        stream.emplace_back("supportsDynamicStreamID", Value::boolean(false));
+        stream.emplace_back("streamConnectionID", Value::integer(session->sessionId));
+        Array streams;
+        streams.push_back(Value::object(std::move(stream)));
+        Dict streamSetup;
+        streamSetup.emplace_back("streams", Value::array(std::move(streams)));
+        const auto streamBody = encode(Value::object(std::move(streamSetup)));
+        notify(*session, AP2_STATE_NEGOTIATING, "Negotiating AirPlay 2 realtime audio stream.");
+        const auto streamResponse = session->rtsp->request(
+            "SETUP", session->rtspUri, "application/x-apple-binary-plist", streamBody);
+        if (streamResponse.status < 200 || streamResponse.status >= 300)
+            throw std::runtime_error("AirPlay receiver rejected audio stream SETUP with RTSP " +
+                                     std::to_string(streamResponse.status) + '.');
+        const auto streamDecoded = decode(streamResponse.body);
+        if (!streamDecoded) throw std::runtime_error("AirPlay stream SETUP returned an invalid binary property list.");
+        if (const auto* responseStreams = streamDecoded->find("streams");
+            responseStreams && responseStreams->type == Value::Type::Arr && !responseStreams->arr.empty()) {
+            if (const auto* port = responseStreams->arr.front().find("dataPort"))
+                session->dataPort = static_cast<std::uint16_t>(port->asInt());
+            if (const auto* port = responseStreams->arr.front().find("controlPort"))
+                session->controlPort = static_cast<std::uint16_t>(port->asInt());
+        }
+        if (session->dataPort == 0)
+            throw std::runtime_error("AirPlay stream SETUP returned no audio data port.");
+        return fail(AP2_NOT_IMPLEMENTED, "AirPlay 2 audio stream SETUP verified; ALAC packet transport is not implemented yet.");
     } catch (const std::exception& error) {
         notify(*session, AP2_STATE_FAILED, error.what());
         return fail(AP2_NETWORK_ERROR, error.what());
@@ -167,7 +228,10 @@ ap2_result AP2_CALL ap2_session_stop(ap2_session* session) {
     if (session == nullptr) return fail(AP2_INVALID_ARGUMENT, "Session is null.");
     std::scoped_lock lock(session->mutex);
     session->control.close();
-    session->timing.close();
+    session->timing.reset();
+    session->audio.close();
+    session->audioControl.close();
+    session->events.close();
     session->rtsp.reset();
     notify(*session, AP2_STATE_STOPPED, "AirPlay 2 session stopped.");
     lastError.clear();

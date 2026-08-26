@@ -378,8 +378,10 @@ fallback or allow client-provided commands/paths to reach the helper.
   at most 1024 plaintext bytes per frame, and an independent monotonically
   increasing counter in each direction. Encrypted `GET /info` precedes the
   binary-plist session SETUP, which advertises a bound local NTP timing port and
-  captures the receiver's event port. The bridge remains unloaded by Orynivo
-  until event handling and ALAC/RTP streaming are complete.
+  captures the receiver's event port. A live NTP responder is required before
+  RECORD and realtime stream SETUP; that stream advertises local UDP data and
+  control ports and receives the Sonos RTP destination. The bridge remains
+  unloaded by Orynivo until event processing and ALAC/RTP streaming are complete.
 - `Orynivo/OutputProfileDialog.axaml/.cs`: dialog for creating or editing an
   output profile; loads available devices asynchronously, validates unique
   names, and exposes the confirmed result via `Result`
