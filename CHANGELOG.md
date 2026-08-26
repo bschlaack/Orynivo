@@ -21,7 +21,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   work remains before Orynivo loads the bridge. Realtime streams now also emit
   initial and periodic NTP/RTP synchronization anchors, retain a bounded packet
   history for receiver-requested retransmission, and send a best-effort
-  encrypted `TEARDOWN` when the session closes.
+  encrypted `TEARDOWN` when the session closes. PCM delivery now performs a
+  rate-aware 1.75-second receiver prefill with a bounded initial packet cadence,
+  then follows the exact PCM clock instead of flooding the receiver's UDP queue.
 - Output profiles can now select classic AirPlay (RAOP) receivers discovered
   through mDNS on Windows, Linux, and macOS. Orynivo resolves the selected
   receiver again before playback and streams FFmpeg-decoded PCM through a

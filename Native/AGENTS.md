@@ -46,6 +46,10 @@ This file applies to `Native/` and supplements `../AGENTS.md`.
   sequence-indexed retransmit ring and answers type `0x55` requests with type
   `0x56` plus the original encrypted packet. Stop that responder before closing
   the socket and attempt encrypted `TEARDOWN` without making destruction fail.
+  PCM delivery uses a 1.75-second pacing window: initial fill packets retain at
+  least a 1 ms gap, then releases follow their exact sample-clock deadlines.
+  The manual probe may generate its quiet test tone only when `--tone` is
+  supplied explicitly; the default receiver probe must remain silent.
   Keep codec and packetization behind private C++ types so the public C ABI
   stays independently reusable.
 

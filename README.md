@@ -130,8 +130,8 @@ current milestone provides portable sockets, fail-closed transient pairing,
 authenticated encrypted control, NTP timing, session/RECORD/audio-stream SETUP,
 negotiated RTP ports, official Apple ALAC encoding, partial-PCM buffering, and
 encrypted realtime RTP packetization, NTP/RTP anchors, bounded retransmissions,
-and encrypted teardown, plus native tests. Session negotiation through the RTP
-ports is verified against a Sonos receiver; audible packet pacing and event
+rate-aware receiver prefill/pacing, and encrypted teardown, plus native tests.
+Session negotiation through the RTP ports is verified against a Sonos receiver; audible packet pacing and event
 handling remain unfinished. Orynivo does not load the bridge yet and therefore
 still makes no AirPlay 2 playback claim.
 

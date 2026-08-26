@@ -385,7 +385,8 @@ fallback or allow client-provided commands/paths to reach the helper.
   and authenticated as realtime RTP through the session audio key. Initial and
   periodic NTP/RTP anchors plus bounded receiver-requested retransmissions run
   over the negotiated control socket; session stop attempts encrypted teardown.
-  The bridge remains unloaded by Orynivo until audible packet pacing,
+  Delivery pre-fills at most 1.75 seconds with a 1 ms minimum fill cadence and
+  then follows the PCM sample clock. The bridge remains unloaded by Orynivo until audible packet pacing,
   event/lifecycle handling, and real-receiver playback verification are complete.
 - `Orynivo/OutputProfileDialog.axaml/.cs`: dialog for creating or editing an
   output profile; loads available devices asynchronously, validates unique

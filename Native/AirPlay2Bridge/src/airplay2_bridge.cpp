@@ -3,6 +3,7 @@
 #include "airplay_crypto.h"
 #include "encrypted_rtsp.h"
 #include "ntp_timing.h"
+#include "packet_pacer.h"
 #include "realtime_audio_packetizer.h"
 #include "rtp_control.h"
 #include "socket_transport.h"
@@ -37,6 +38,7 @@ struct ap2_session {
     std::unique_ptr<orynivo::airplay2::EncryptedRtsp> rtsp;
     std::unique_ptr<orynivo::airplay2::NtpTimingResponder> timing;
     std::unique_ptr<orynivo::airplay2::RealtimeAudioPacketizer> packetizer;
+    std::unique_ptr<orynivo::airplay2::PacketPacer> pacer;
     std::unique_ptr<orynivo::airplay2::RtpRetransmitResponder> retransmit;
     std::vector<std::byte> pendingPcm;
     std::uint16_t eventPort = 0;
@@ -220,6 +222,9 @@ ap2_result AP2_CALL ap2_session_start(ap2_session* session) {
             throw std::runtime_error("AirPlay stream SETUP returned no RTP control port.");
         session->packetizer = std::make_unique<orynivo::airplay2::RealtimeAudioPacketizer>(
             session->sampleRate, session->pairingKeys.audioKey);
+        session->pacer = std::make_unique<orynivo::airplay2::PacketPacer>(
+            session->sampleRate,
+            static_cast<std::uint32_t>(orynivo::airplay2::AlacEncoder::FramesPerPacket));
         session->retransmit = std::make_unique<orynivo::airplay2::RtpRetransmitResponder>(
             session->audioControl);
         session->pendingPcm.clear();
@@ -248,6 +253,7 @@ ap2_result AP2_CALL ap2_session_write_pcm(ap2_session* session, const void* samp
         std::size_t offset = 0;
         while (session->pendingPcm.size() - offset >= packetBytes) {
             const auto packetCount = session->packetizer->packetCount();
+            session->pacer->waitFor(packetCount);
             if (packetCount == 0 || packetCount % 100 == 0) {
                 const auto sync = orynivo::airplay2::buildRtpSyncPacket(
                     session->packetizer->nextTimestamp(), session->sampleRate, packetCount == 0);
@@ -289,6 +295,7 @@ ap2_result AP2_CALL ap2_session_stop(ap2_session* session) {
     session->audioControl.close();
     session->events.close();
     session->packetizer.reset();
+    session->pacer.reset();
     session->pendingPcm.clear();
     notify(*session, AP2_STATE_STOPPED, "AirPlay 2 session stopped.");
     lastError.clear();

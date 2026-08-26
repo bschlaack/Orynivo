@@ -81,8 +81,8 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   Fail-closed transient pairing, encrypted control, session SETUP, NTP timing,
   RECORD, and audio-stream SETUP are implemented and Sonos-verified. ALAC
   encoding, encrypted realtime RTP packetization, NTP/RTP sync anchors,
-  retransmit handling, and best-effort teardown are implemented behind the ABI.
-  Do not load or advertise it from the desktop until audible packet pacing,
+  retransmit handling, rate-aware prefill/pacing, and best-effort teardown are
+  implemented behind the ABI. Do not load or advertise it from the desktop until audible packet pacing,
   event handling, native tests, and real-receiver playback
   verification are complete.
 - Preserve source identity on mixed rows. Remote rows must carry their

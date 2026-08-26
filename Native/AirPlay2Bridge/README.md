@@ -46,3 +46,6 @@ platforms use their system socket API.
 For manual development against a receiver, enable the default probe target and
 run `AirPlay2BridgeProbe <host> [port]`. The tool prints only lifecycle states
 and sanitized errors; it never prints session keys or pairing material.
+Passing the explicit final `--tone` option sends a quiet three-second 440 Hz
+stereo test signal through the complete ALAC/RTP path. It is never enabled by
+default, so ordinary handshake probes remain silent.

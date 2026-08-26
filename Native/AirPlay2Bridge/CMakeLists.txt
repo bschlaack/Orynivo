@@ -38,6 +38,7 @@ add_library(AirPlay2Bridge SHARED
     src/encrypted_control.cpp
     src/encrypted_rtsp.cpp
     src/ntp_timing.cpp
+    src/packet_pacer.cpp
     src/realtime_audio_packetizer.cpp
     src/rtp_control.cpp
     src/transient_pairing.cpp
@@ -122,6 +123,13 @@ if(AIRPLAY2BRIDGE_BUILD_TESTS)
         target_link_libraries(AirPlay2BridgeRtpControlTests PRIVATE ws2_32)
     endif()
     add_test(NAME AirPlay2Bridge.RtpControl COMMAND AirPlay2BridgeRtpControlTests)
+
+    add_executable(AirPlay2BridgePacketPacerTests
+        tests/packet_pacer_tests.cpp
+        src/packet_pacer.cpp)
+    target_compile_features(AirPlay2BridgePacketPacerTests PRIVATE cxx_std_20)
+    target_include_directories(AirPlay2BridgePacketPacerTests PRIVATE src)
+    add_test(NAME AirPlay2Bridge.PacketPacer COMMAND AirPlay2BridgePacketPacerTests)
 endif()
 
 install(TARGETS AirPlay2Bridge
