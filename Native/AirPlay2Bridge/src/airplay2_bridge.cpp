@@ -4,6 +4,7 @@
 #include "encrypted_rtsp.h"
 #include "ntp_timing.h"
 #include "realtime_audio_packetizer.h"
+#include "rtp_control.h"
 #include "socket_transport.h"
 #include "transient_pairing.h"
 
@@ -36,6 +37,7 @@ struct ap2_session {
     std::unique_ptr<orynivo::airplay2::EncryptedRtsp> rtsp;
     std::unique_ptr<orynivo::airplay2::NtpTimingResponder> timing;
     std::unique_ptr<orynivo::airplay2::RealtimeAudioPacketizer> packetizer;
+    std::unique_ptr<orynivo::airplay2::RtpRetransmitResponder> retransmit;
     std::vector<std::byte> pendingPcm;
     std::uint16_t eventPort = 0;
     std::uint16_t dataPort = 0;
@@ -214,8 +216,12 @@ ap2_result AP2_CALL ap2_session_start(ap2_session* session) {
         }
         if (session->dataPort == 0)
             throw std::runtime_error("AirPlay stream SETUP returned no audio data port.");
+        if (session->controlPort == 0)
+            throw std::runtime_error("AirPlay stream SETUP returned no RTP control port.");
         session->packetizer = std::make_unique<orynivo::airplay2::RealtimeAudioPacketizer>(
             session->sampleRate, session->pairingKeys.audioKey);
+        session->retransmit = std::make_unique<orynivo::airplay2::RtpRetransmitResponder>(
+            session->audioControl);
         session->pendingPcm.clear();
         notify(*session, AP2_STATE_STREAMING, "AirPlay 2 realtime audio stream is ready.");
         lastError.clear();
@@ -241,9 +247,16 @@ ap2_result AP2_CALL ap2_session_write_pcm(ap2_session* session, const void* samp
         constexpr auto packetBytes = orynivo::airplay2::AlacEncoder::PcmBytesPerPacket;
         std::size_t offset = 0;
         while (session->pendingPcm.size() - offset >= packetBytes) {
+            const auto packetCount = session->packetizer->packetCount();
+            if (packetCount == 0 || packetCount % 100 == 0) {
+                const auto sync = orynivo::airplay2::buildRtpSyncPacket(
+                    session->packetizer->nextTimestamp(), session->sampleRate, packetCount == 0);
+                session->audioControl.sendTo(session->host, session->controlPort, sync);
+            }
             const auto packet = session->packetizer->packetize(
                 std::span<const std::byte>(session->pendingPcm).subspan(offset, packetBytes));
             session->audio.sendTo(session->host, session->dataPort, packet);
+            session->retransmit->store(packet);
             offset += packetBytes;
         }
         if (offset != 0)
@@ -261,12 +274,20 @@ ap2_result AP2_CALL ap2_session_write_pcm(ap2_session* session, const void* samp
 ap2_result AP2_CALL ap2_session_stop(ap2_session* session) {
     if (session == nullptr) return fail(AP2_INVALID_ARGUMENT, "Session is null.");
     std::scoped_lock lock(session->mutex);
+    session->retransmit.reset();
+    if (session->rtsp != nullptr && !session->rtspUri.empty()) {
+        try {
+            session->rtsp->request("TEARDOWN", session->rtspUri, {}, {}, {}, std::chrono::seconds(2));
+        } catch (...) {
+            // Teardown is best-effort; an unavailable receiver must not make destruction fail.
+        }
+    }
+    session->rtsp.reset();
     session->control.close();
     session->timing.reset();
     session->audio.close();
     session->audioControl.close();
     session->events.close();
-    session->rtsp.reset();
     session->packetizer.reset();
     session->pendingPcm.clear();
     notify(*session, AP2_STATE_STOPPED, "AirPlay 2 session stopped.");

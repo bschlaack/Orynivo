@@ -41,8 +41,13 @@ This file applies to `Native/` and supplements `../AGENTS.md`.
   bounded. The PCM ABI accepts stereo signed 16-bit data, buffers partial calls
   into 352-frame units, encodes with the pinned official Apple ALAC source, and
   emits authenticated realtime RTP as header, ciphertext/tag, and the explicit
-  eight-byte nonce suffix. Keep codec and packetization behind private C++
-  types so the public C ABI stays independently reusable.
+  eight-byte nonce suffix. Emit the 20-byte NTP sync anchor before the first
+  packet and every 100 packets. The bound RTP control socket owns a bounded
+  sequence-indexed retransmit ring and answers type `0x55` requests with type
+  `0x56` plus the original encrypted packet. Stop that responder before closing
+  the socket and attempt encrypted `TEARDOWN` without making destruction fail.
+  Keep codec and packetization behind private C++ types so the public C ABI
+  stays independently reusable.
 
 Consult the detailed ASIO/cwASIO build and playback rules in the root
 `AGENTS.md` before modifying bridge code.

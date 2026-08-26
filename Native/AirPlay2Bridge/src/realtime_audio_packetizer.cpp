@@ -60,6 +60,7 @@ std::vector<std::byte> RealtimeAudioPacketizer::packetize(std::span<const std::b
                    [](std::uint8_t value) { return static_cast<std::byte>(value); });
     ++sequence_;
     timestamp_ += AlacEncoder::FramesPerPacket;
+    ++packetCount_;
     first_ = false;
     return packet;
 }

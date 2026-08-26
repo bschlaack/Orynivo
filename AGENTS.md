@@ -382,9 +382,11 @@ fallback or allow client-provided commands/paths to reach the helper.
   RECORD and realtime stream SETUP; that stream advertises local UDP data and
   control ports and receives the Sonos RTP destination. PCM writes are buffered
   into 352-frame stereo units, encoded by the pinned official Apple ALAC codec,
-  and authenticated as realtime RTP through the session audio key. The bridge
-  remains unloaded by Orynivo until audible RTP synchronization, event/lifecycle
-  handling, and real-receiver playback verification are complete.
+  and authenticated as realtime RTP through the session audio key. Initial and
+  periodic NTP/RTP anchors plus bounded receiver-requested retransmissions run
+  over the negotiated control socket; session stop attempts encrypted teardown.
+  The bridge remains unloaded by Orynivo until audible packet pacing,
+  event/lifecycle handling, and real-receiver playback verification are complete.
 - `Orynivo/OutputProfileDialog.axaml/.cs`: dialog for creating or editing an
   output profile; loads available devices asynchronously, validates unique
   names, and exposes the confirmed result via `Result`

@@ -12,11 +12,12 @@ fail-closed HAP transient pairing, the authenticated encrypted-control frame
 codec, encrypted `GET /info`, binary-plist session SETUP, an NTP timing
 responder, event-channel connection, `RECORD`, realtime audio-stream SETUP, the
 official Apple ALAC encoder, partial-PCM buffering, and ChaCha20-Poly1305
-encrypted realtime RTP packet transport. Negotiation through the receiver's RTP
-ports has been verified against a Sonos AirPlay 2 receiver. Receiver-side
-audible playback still requires completion and real-device verification of RTP
-timing/synchronization, retransmission handling, and lifecycle teardown;
-event processing and metadata are also incomplete.
+encrypted realtime RTP packet transport. Initial and periodic NTP-backed RTP
+anchors, a bounded retransmission responder, and best-effort encrypted teardown
+are implemented and covered by native tests. Negotiation through the receiver's
+RTP ports has been verified against a Sonos AirPlay 2 receiver. Receiver-side
+audible playback still requires real-device verification of packet pacing and
+the complete timing path; event processing and metadata are also incomplete.
 Orynivo must not load or advertise this bridge until a complete session passes
 real-receiver tests.
 

@@ -80,9 +80,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   ABI with opaque session handles; it must not depend on Avalonia or Orynivo.
   Fail-closed transient pairing, encrypted control, session SETUP, NTP timing,
   RECORD, and audio-stream SETUP are implemented and Sonos-verified. ALAC
-  encoding plus encrypted realtime RTP packetization is implemented behind the
-  ABI. Do not load or advertise it from the desktop until audible RTP timing,
-  event/lifecycle handling, native tests, and real-receiver playback
+  encoding, encrypted realtime RTP packetization, NTP/RTP sync anchors,
+  retransmit handling, and best-effort teardown are implemented behind the ABI.
+  Do not load or advertise it from the desktop until audible packet pacing,
+  event handling, native tests, and real-receiver playback
   verification are complete.
 - Preserve source identity on mixed rows. Remote rows must carry their
   `OrynivoServer`, server-side IDs, and authenticated playback metadata; never

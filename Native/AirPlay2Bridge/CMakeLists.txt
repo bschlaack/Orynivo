@@ -39,6 +39,7 @@ add_library(AirPlay2Bridge SHARED
     src/encrypted_rtsp.cpp
     src/ntp_timing.cpp
     src/realtime_audio_packetizer.cpp
+    src/rtp_control.cpp
     src/transient_pairing.cpp
     src/socket_transport.cpp)
 
@@ -110,6 +111,17 @@ if(AIRPLAY2BRIDGE_BUILD_TESTS)
     target_include_directories(AirPlay2BridgeRealtimeAudioTests PRIVATE src)
     target_link_libraries(AirPlay2BridgeRealtimeAudioTests PRIVATE airplay_crypto apple_alac_encoder)
     add_test(NAME AirPlay2Bridge.RealtimeAudioPacketizer COMMAND AirPlay2BridgeRealtimeAudioTests)
+
+    add_executable(AirPlay2BridgeRtpControlTests
+        tests/rtp_control_tests.cpp
+        src/rtp_control.cpp
+        src/socket_transport.cpp)
+    target_compile_features(AirPlay2BridgeRtpControlTests PRIVATE cxx_std_20)
+    target_include_directories(AirPlay2BridgeRtpControlTests PRIVATE src)
+    if(WIN32)
+        target_link_libraries(AirPlay2BridgeRtpControlTests PRIVATE ws2_32)
+    endif()
+    add_test(NAME AirPlay2Bridge.RtpControl COMMAND AirPlay2BridgeRtpControlTests)
 endif()
 
 install(TARGETS AirPlay2Bridge

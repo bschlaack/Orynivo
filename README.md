@@ -129,10 +129,11 @@ Orynivo, or Qt, so it can later be published and consumed independently. The
 current milestone provides portable sockets, fail-closed transient pairing,
 authenticated encrypted control, NTP timing, session/RECORD/audio-stream SETUP,
 negotiated RTP ports, official Apple ALAC encoding, partial-PCM buffering, and
-encrypted realtime RTP packetization, plus native tests. Session negotiation
-through the RTP ports is verified against a Sonos receiver; audible RTP timing,
-event handling, and teardown remain unfinished. Orynivo does not load the bridge
-yet and therefore still makes no AirPlay 2 playback claim.
+encrypted realtime RTP packetization, NTP/RTP anchors, bounded retransmissions,
+and encrypted teardown, plus native tests. Session negotiation through the RTP
+ports is verified against a Sonos receiver; audible packet pacing and event
+handling remain unfinished. Orynivo does not load the bridge yet and therefore
+still makes no AirPlay 2 playback claim.
 
 Settings > Playback offers mutually exclusive DSD routing preferences for
 lossy DSD-to-PCM conversion and bit-perfect DSD over PCM (DoP). DoP requires a

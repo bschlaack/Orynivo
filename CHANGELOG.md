@@ -18,7 +18,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Apache-2.0 ALAC encoder, and emits ChaCha20-Poly1305-authenticated realtime
   RTP datagrams. Pairing through negotiated RTP ports has been verified against
   a real Sonos AirPlay 2 receiver; audible timing/synchronization and lifecycle
-  work remains before Orynivo loads the bridge.
+  work remains before Orynivo loads the bridge. Realtime streams now also emit
+  initial and periodic NTP/RTP synchronization anchors, retain a bounded packet
+  history for receiver-requested retransmission, and send a best-effort
+  encrypted `TEARDOWN` when the session closes.
 - Output profiles can now select classic AirPlay (RAOP) receivers discovered
   through mDNS on Windows, Linux, and macOS. Orynivo resolves the selected
   receiver again before playback and streams FFmpeg-decoded PCM through a
