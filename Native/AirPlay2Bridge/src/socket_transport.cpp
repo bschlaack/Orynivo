@@ -227,4 +227,23 @@ std::uint16_t Socket::localPort() const {
     return ntohs(reinterpret_cast<const sockaddr_in6*>(&address)->sin6_port);
 }
 
+std::string Socket::localAddress() const {
+    if (!valid()) return {};
+    sockaddr_storage address{};
+#if defined(_WIN32)
+    int length = sizeof(address);
+#else
+    socklen_t length = sizeof(address);
+#endif
+    if (getsockname(native(handle_), reinterpret_cast<sockaddr*>(&address), &length) != 0)
+        throw std::system_error(lastSocketError(), std::system_category(), "getsockname");
+    std::array<char, INET6_ADDRSTRLEN> text{};
+    const void* source = address.ss_family == AF_INET
+        ? static_cast<const void*>(&reinterpret_cast<const sockaddr_in*>(&address)->sin_addr)
+        : static_cast<const void*>(&reinterpret_cast<const sockaddr_in6*>(&address)->sin6_addr);
+    if (inet_ntop(address.ss_family, source, text.data(), static_cast<socklen_t>(text.size())) == nullptr)
+        throw std::system_error(lastSocketError(), std::system_category(), "inet_ntop");
+    return text.data();
+}
+
 } // namespace orynivo::airplay2

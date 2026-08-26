@@ -6,6 +6,8 @@ affiliated with, authorized by, or endorsed by Apple Inc. AirPlay, Apple TV,
 HomePod, HomeKit, macOS, Sonos, and other product names are trademarks of their
 respective owners and are used only to describe protocol compatibility.
 
-The planned cryptographic and wire-format port is based on work published by
-Andreas Wendorf (Akustikrausch) in airplay2-sender-cpp under Apache-2.0. No
-upstream implementation source is included in the initial transport milestone.
+The cryptographic and wire-format implementation uses the Qt-free
+airplay_crypto target published by Andreas Wendorf (Akustikrausch) in
+airplay2-sender-cpp under Apache-2.0, pinned to commit
+8c4034263f1c265d25b3cfb88a090624760ad22a. Its Mbed TLS and ed25519 components
+retain their respective licenses described in THIRD_PARTY_NOTICES.md.

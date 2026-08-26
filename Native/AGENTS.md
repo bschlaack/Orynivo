@@ -28,8 +28,13 @@ This file applies to `Native/` and supplements `../AGENTS.md`.
   platform socket types private so the component can be published separately.
   Every opaque session owns its sockets, copies caller configuration, reports
   stable result/state enums, and must fail closed on pairing proof errors.
-  Orynivo integration remains disabled while transient pairing or streaming
-  returns `AP2_NOT_IMPLEMENTED`.
+  Transient pairing uses HAP mode 4 and never logs derived keys. Control framing
+  authenticates the two-byte little-endian length, caps plaintext frames at
+  1024 bytes, and maintains separate counters for each direction. Orynivo
+  integration remains disabled while event-channel and audio-stream setup or
+  streaming returns `AP2_NOT_IMPLEMENTED`. The session sequence is encrypted
+  `GET /info` followed by binary-plist session SETUP with a real bound timing
+  port; response bodies and declared sizes remain bounded.
 
 Consult the detailed ASIO/cwASIO build and playback rules in the root
 `AGENTS.md` before modifying bridge code.

@@ -112,23 +112,24 @@ to the PCM feed.
 
 Receivers that advertise only `_airplay._tcp`, including current AirPlay 2-only
 Sonos devices, do not appear in this classic RAOP device list and cannot yet be
-used as Orynivo outputs. A future Qt-free `AirPlay2Bridge` is planned to add
-native transient-pairing support on Windows, Linux, and macOS while retaining
+used as Orynivo outputs. The Qt-free `AirPlay2Bridge` under development adds
+native AirPlay 2 support on Windows, Linux, and macOS while retaining
 the existing RAOP route for AirPlay 1 receivers. The evaluated
 [`airplay2-sender-cpp`](https://github.com/akustikrausch/airplay2-sender-cpp)
-project currently supplies a reusable Apache-2.0 cryptographic core and a
-Qt-/host-dependent reference sender, but not a standalone sender target. It is
-therefore not bundled or treated as an Orynivo runtime dependency. Before such
-a bridge can ship, its portable transport, C API, packaging, and fail-closed
-pairing verification must be implemented and tested against real receivers.
+project supplies the reusable Apache-2.0 cryptographic core fetched at a pinned
+commit; its Qt sender is not linked. Before the bridge can ship, encrypted RTSP
+negotiation, audio streaming, packaging, and complete receiver tests must be
+finished.
 
 Development of that component has started in
 [`Native/AirPlay2Bridge`](Native/AirPlay2Bridge/README.md). It is deliberately a
 standalone CMake project with a versioned C ABI and no dependency on Avalonia,
 Orynivo, or Qt, so it can later be published and consumed independently. The
-current milestone provides the portable Windows/POSIX socket foundation and
-native tests only; Orynivo does not load it yet and therefore still makes no
-AirPlay 2 playback claim.
+current milestone provides portable sockets, fail-closed transient pairing,
+authenticated encrypted control, and binary-plist session SETUP, all verified
+against a Sonos receiver, plus native tests. Event handling, audio-stream SETUP,
+and ALAC/RTP transport remain unfinished. Orynivo does not load the bridge yet
+and therefore still makes no AirPlay 2 playback claim.
 
 Settings > Playback offers mutually exclusive DSD routing preferences for
 lossy DSD-to-PCM conversion and bit-perfect DSD over PCM (DoP). DoP requires a

@@ -42,7 +42,8 @@ typedef enum ap2_state {
     AP2_STATE_PAIRING = 2,
     AP2_STATE_STREAMING = 3,
     AP2_STATE_STOPPED = 4,
-    AP2_STATE_FAILED = 5
+    AP2_STATE_FAILED = 5,
+    AP2_STATE_NEGOTIATING = 6
 } ap2_state;
 
 /** Host callback for lifecycle changes. The message is valid only for the call. */

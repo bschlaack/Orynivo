@@ -51,6 +51,9 @@ public:
     /** Returns the bound local port, or zero for an invalid socket. */
     [[nodiscard]] std::uint16_t localPort() const;
 
+    /** Returns the numeric local address selected for this socket. */
+    [[nodiscard]] std::string localAddress() const;
+
 private:
     explicit Socket(std::intptr_t handle) noexcept : handle_(handle) {}
     std::intptr_t handle_ = -1;

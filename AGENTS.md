@@ -372,9 +372,14 @@ fallback or allow client-provided commands/paths to reach the helper.
 - `Native/AirPlay2Bridge/`: standalone Qt-free native AirPlay 2 sender project.
   It exposes only a versioned C ABI with opaque sessions and keeps portable
   transport/protocol internals private so it can be released independently.
-  The initial transport milestone is intentionally not loaded by Orynivo; the
-  desktop may integrate it only after fail-closed transient pairing, encrypted
-  RTSP/event handling, ALAC/RTP streaming, and real receiver tests are complete.
+  Transient HAP pairing must send `X-Apple-HKP: 4`, verify the receiver SRP
+  proof, and derive directional keys without logging key material. Encrypted
+  control frames use a two-byte little-endian length as authenticated data,
+  at most 1024 plaintext bytes per frame, and an independent monotonically
+  increasing counter in each direction. Encrypted `GET /info` precedes the
+  binary-plist session SETUP, which advertises a bound local NTP timing port and
+  captures the receiver's event port. The bridge remains unloaded by Orynivo
+  until event handling and ALAC/RTP streaming are complete.
 - `Orynivo/OutputProfileDialog.axaml/.cs`: dialog for creating or editing an
   output profile; loads available devices asynchronously, validates unique
   names, and exposes the confirmed result via `Result`

@@ -10,8 +10,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Began the standalone, Qt-free `Native/AirPlay2Bridge` project with a stable C
   ABI, portable Windows/POSIX socket ownership layer, CMake packaging boundary,
-  and native transport tests. It is not loaded by Orynivo until secure pairing
-  and streaming are complete.
+  fail-closed HAP transient pairing, authenticated encrypted-control framing,
+  encrypted RTSP response parsing, binary-plist session SETUP, and native
+  transport/crypto tests. Pairing, encrypted `GET /info`, and session SETUP
+  have been verified against a real Sonos AirPlay 2 receiver; Orynivo does not
+  load the bridge until event handling and audio streaming are complete.
 - Output profiles can now select classic AirPlay (RAOP) receivers discovered
   through mDNS on Windows, Linux, and macOS. Orynivo resolves the selected
   receiver again before playback and streams FFmpeg-decoded PCM through a
