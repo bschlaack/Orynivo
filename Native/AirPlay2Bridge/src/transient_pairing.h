@@ -15,7 +15,7 @@ struct TransientPairingKeys final {
     std::vector<std::uint8_t> controlRead;
     std::vector<std::uint8_t> eventWrite;
     std::vector<std::uint8_t> eventRead;
-    std::vector<std::uint8_t> audioKey;
+    std::vector<std::uint8_t> audioKey; // First 32 bytes of the pairing secret; never an event key.
 };
 
 /** Performs the Sonos-compatible HAP pair-setup M1-M4 exchange. */

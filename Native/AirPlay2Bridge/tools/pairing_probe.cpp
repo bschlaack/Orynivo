@@ -49,7 +49,7 @@ int main(int argc, char** argv) {
         std::vector<std::int16_t> pcm(frames * 2U);
         for (std::uint32_t frame = 0; frame < frames; ++frame) {
             const auto sample = static_cast<std::int16_t>(
-                std::sin(2.0 * 3.14159265358979323846 * 440.0 * frame / sampleRate) * 1000.0);
+                std::sin(2.0 * 3.14159265358979323846 * 440.0 * frame / sampleRate) * 8000.0);
             pcm[frame * 2U] = sample;
             pcm[frame * 2U + 1U] = sample;
         }

@@ -12,6 +12,13 @@ int main() {
     assert(sync[16] == std::byte{0x00} && sync[17] == std::byte{0x01});
     assert(sync[18] == std::byte{0x86} && sync[19] == std::byte{0xa0});
 
+    const auto ptpSync = orynivo::airplay2::buildPtpRtpSyncPacket(
+        66150, 66150, 0x0102030405060708ULL, 0x1112131415161718ULL, true);
+    assert(ptpSync[0] == std::byte{0x90} && ptpSync[1] == std::byte{0xd7});
+    assert(ptpSync[6] == std::byte{0x2b} && ptpSync[7] == std::byte{0x1b});
+    assert(ptpSync[16] == std::byte{0x00} && ptpSync[17] == std::byte{0x01});
+    assert(ptpSync[18] == std::byte{0x58} && ptpSync[19] == std::byte{0x92});
+
     auto control = orynivo::airplay2::Socket::bindUdp();
     orynivo::airplay2::RtpRetransmitResponder responder(control);
     std::array<std::byte, 16> original{};

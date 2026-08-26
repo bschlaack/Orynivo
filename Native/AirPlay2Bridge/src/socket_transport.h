@@ -25,8 +25,8 @@ public:
         std::uint16_t port,
         std::chrono::milliseconds timeout);
 
-    /** Creates a UDP socket bound to an ephemeral local port. */
-    static Socket bindUdp();
+    /** Creates an IPv4 UDP socket bound to the requested local port (zero selects an ephemeral port). */
+    static Socket bindUdp(std::uint16_t port = 0);
 
     /** Sends every byte or throws std::system_error. */
     void sendAll(std::span<const std::byte> bytes);

@@ -8,16 +8,40 @@ and audio decoding remain outside the project.
 ## Current status
 
 The current milestone contains the ABI, portable Windows/POSIX sockets,
-fail-closed HAP transient pairing, the authenticated encrypted-control frame
-codec, encrypted `GET /info`, binary-plist session SETUP, an NTP timing
-responder, event-channel connection, `RECORD`, realtime audio-stream SETUP, the
-official Apple ALAC encoder, partial-PCM buffering, and ChaCha20-Poly1305
-encrypted realtime RTP packet transport. Initial and periodic NTP-backed RTP
-anchors, a bounded retransmission responder, and best-effort encrypted teardown
-are implemented and covered by native tests. Negotiation through the receiver's
-RTP ports has been verified against a Sonos AirPlay 2 receiver. Receiver-side
-audible playback still requires real-device verification of packet pacing and
-the complete timing path; event processing and metadata are also incomplete.
+fail-closed HAP transient pairing, authenticated encrypted control, binary-plist
+session negotiation, event-channel handling, a unicast gPTP grandmaster, and a
+native realtime type-96 ALAC path. PCM is collected into 352-frame blocks,
+wrapped in the uncompressed ALAC escape-frame representation used by the pinned
+sender reference, authenticated with the pairing-derived
+audio key, and sent over the receiver-negotiated UDP channel. Session negotiation
+registers timing peers; 28-byte PTP/RTP synchronization anchors place the media
+timeline on the same clock. The captured type-103 TCP record framing remains an
+isolated, tested transport component for later buffered-AAC work. Best-effort
+encrypted teardown and the native transports are
+covered by tests. The reverse event socket uses its
+independent HAP keys to answer receiver requests with encrypted RTSP success
+responses. Negotiation through the receiver's
+media ports has been verified against a Sonos AirPlay 2 receiver. Realtime RTP now
+uses the negotiated stream connection ID as its NTP-session SSRC so the receiver
+can associate the encrypted packets with the prepared stream. It also supplies
+initial volume and RTP-anchored DMAP track metadata before PCM delivery because
+Sonos may withhold an otherwise valid stream until metadata arrives. The initial
+RTP/NTP mapping uses a deterministic 66,150-frame receiver-latency line, and the
+probe reports the receiver's active-stream count returned by `/feedback`.
+Realtime encryption uses a dedicated little-endian audio nonce counter starting
+at zero, independent of the randomized RTP sequence number. Native realtime
+SETUP is followed by a timeline-anchored `RECORD` carrying the first packet's
+sequence and RTP timestamp. SETUP does not advertise a sender data port; it uses
+the destination returned by the receiver.
+The active realtime media format is stereo 16-bit ALAC
+(`audioFormat=0x40000`, `ct=2`, `spf=352`). It requires UDP ports 319 and 320
+for gPTP in addition to the encrypted RTSP and receiver-selected UDP audio ports.
+Session SETUP advertises multi-select AirPlay capability for grouped receivers,
+including Sonos stereo pairs.
+The complete control, timing, and encrypted media path has produced audible output
+on a Sonos stereo pair; clean sample reproduction still requires real-device
+verification of the corrected uncompressed ALAC payload representation. Event
+processing and metadata are also incomplete.
 Orynivo must not load or advertise this bridge until a complete session passes
 real-receiver tests.
 
@@ -46,6 +70,10 @@ platforms use their system socket API.
 For manual development against a receiver, enable the default probe target and
 run `AirPlay2BridgeProbe <host> [port]`. The tool prints only lifecycle states
 and sanitized errors; it never prints session keys or pairing material.
-Passing the explicit final `--tone` option sends a quiet three-second 440 Hz
-stereo test signal through the complete ALAC/RTP path. It is never enabled by
+Passing the explicit final `--tone` option sends a three-second 440 Hz
+stereo test signal through the complete ALAC/type-96 PTP path. It is never enabled by
 default, so ordinary handshake probes remain silent.
+The tone probe uses a safe -20 dB receiver volume and a bounded signal. On
+shutdown it reports RTP, retransmission, and PTP delay-request totals;
+a successful UDP write alone does not prove that the receiver decrypted or
+rendered the audio.

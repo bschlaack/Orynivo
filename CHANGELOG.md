@@ -6,6 +6,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- Reworked the silent Sonos AirPlay 2 probe around the PTP behavior established
+  by a complete working iPhone capture. The active compatibility path now uses
+  unicast gPTP, `SETPEERS`, realtime type-96 ALAC, a PTP/RTP synchronization
+  anchor, bounded retransmission, and receiver-selected UDP ports. The captured
+  buffered type-103 TCP framing remains implemented as an isolated transport
+  option for later AAC integration rather than being mislabelled as ALAC.
+  Native `shk` and payload encryption now use the first 32 bytes of the
+  transient pairing secret, independently from the event-channel HKDF keys.
+
+### Fixed
+
+- Fixed silent AirPlay 2 realtime playback by using the negotiated stream
+  connection ID as the RTP SSRC, allowing receivers such as Sonos to associate
+  incoming audio packets with the prepared stream. The bridge now also sends
+  initial volume and RTP-anchored DMAP track metadata because Sonos can retain
+  an otherwise valid native AirPlay 2 stream in a silent state without them.
+  The initial RTP/NTP timeline now starts at a deterministic 1.5-second receiver
+  latency instead of an unrelated random timestamp, and the probe reports the
+  receiver's own active-stream count from `/feedback`. Realtime packets now use
+  the receiver-negotiated ALAC profile (`audioFormat=0x40000`, `ct=2`) with the
+  uncompressed ALAC escape-frame representation used by the interoperable sender
+  reference, plus a dedicated zero-based audio nonce instead of coupling encryption
+  nonces to the randomized RTP sequence.
+  Native realtime sessions issue `RECORD` only after audio-stream SETUP and
+  include the first packet's sequence and RTP timestamp plus the playback range;
+  they do not advertise a sender `dataPort`, and the receiver-selected destination
+  port is authoritative. The probe uses a safe -20 dB receiver volume and a bounded
+  test tone, then reports sent RTP packets and observed retransmission traffic
+  so successful UDP submission is no longer mistaken for receiver playback.
+  The reverse event socket now uses its independent HAP event keys, decrypts
+  receiver requests, and returns encrypted RTSP success responses.
+  Session SETUP now advertises multi-select AirPlay capability so a Sonos stereo
+  pair can accept the stream through its advertised group endpoint.
+  Event-channel keys remain isolated from media encryption; native audio uses
+  the first 32 bytes of the pairing shared secret as both advertised `shk` and
+  payload cipher key.
+
 ### Added
 
 - Began the standalone, Qt-free `Native/AirPlay2Bridge` project with a stable C

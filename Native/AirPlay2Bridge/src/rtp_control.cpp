@@ -25,15 +25,33 @@ void writeNtp(std::byte* destination) {
 } // namespace
 
 std::array<std::byte, 20> buildRtpSyncPacket(
-    std::uint32_t nextTimestamp, std::uint32_t sampleRate, bool first) {
+    std::uint32_t nextTimestamp, std::uint32_t latencyFrames, bool first) {
     std::array<std::byte, 20> packet{};
     packet[0] = first ? std::byte{0x90} : std::byte{0x80};
     packet[1] = std::byte{0xd4};
     packet[3] = std::byte{0x07};
-    const auto latency = sampleRate * 2U;
-    writeBigEndian32(packet.data() + 4, nextTimestamp >= latency ? nextTimestamp - latency : 0);
+    writeBigEndian32(packet.data() + 4,
+                     nextTimestamp >= latencyFrames ? nextTimestamp - latencyFrames : 0);
     writeNtp(packet.data() + 8);
     writeBigEndian32(packet.data() + 16, nextTimestamp);
+    return packet;
+}
+
+std::array<std::byte, 28> buildPtpRtpSyncPacket(
+    std::uint32_t nextTimestamp, std::uint32_t latencyFrames,
+    std::uint64_t clockNanoseconds, std::uint64_t clockId, bool first) {
+    std::array<std::byte, 28> packet{};
+    packet[0] = first ? std::byte{0x90} : std::byte{0x80};
+    packet[1] = std::byte{0xd7};
+    packet[3] = std::byte{0x06};
+    const auto playPosition = nextTimestamp - latencyFrames;
+    const auto frameOne = playPosition + 11035U;
+    writeBigEndian32(packet.data() + 4, frameOne);
+    writeBigEndian32(packet.data() + 8, static_cast<std::uint32_t>(clockNanoseconds >> 32));
+    writeBigEndian32(packet.data() + 12, static_cast<std::uint32_t>(clockNanoseconds));
+    writeBigEndian32(packet.data() + 16, frameOne + 77175U);
+    writeBigEndian32(packet.data() + 20, static_cast<std::uint32_t>(clockId >> 32));
+    writeBigEndian32(packet.data() + 24, static_cast<std::uint32_t>(clockId));
     return packet;
 }
 
@@ -55,6 +73,18 @@ void RtpRetransmitResponder::store(std::span<const std::byte> packet) {
     slot.packet.assign(packet.begin(), packet.end());
 }
 
+std::uint64_t RtpRetransmitResponder::receivedDatagramCount() const noexcept {
+    return receivedDatagrams_.load(std::memory_order_relaxed);
+}
+
+std::uint64_t RtpRetransmitResponder::retransmitRequestCount() const noexcept {
+    return retransmitRequests_.load(std::memory_order_relaxed);
+}
+
+std::uint64_t RtpRetransmitResponder::resentPacketCount() const noexcept {
+    return resentPackets_.load(std::memory_order_relaxed);
+}
+
 void RtpRetransmitResponder::run(std::stop_token stopToken) {
     std::array<std::byte, 512> request{};
     while (!stopToken.stop_requested()) {
@@ -62,7 +92,10 @@ void RtpRetransmitResponder::run(std::stop_token stopToken) {
         std::uint16_t port = 0;
         try {
             const auto size = socket_.receiveFrom(request, std::chrono::milliseconds(100), host, port);
+            if (size == 0) continue;
+            receivedDatagrams_.fetch_add(1, std::memory_order_relaxed);
             if (size < 8 || (std::to_integer<std::uint8_t>(request[1]) & 0x7f) != 0x55) continue;
+            retransmitRequests_.fetch_add(1, std::memory_order_relaxed);
             const auto requestSequence = static_cast<std::uint16_t>(
                 std::to_integer<std::uint8_t>(request[2]) << 8 | std::to_integer<std::uint8_t>(request[3]));
             const auto first = static_cast<std::uint16_t>(
@@ -86,6 +119,7 @@ void RtpRetransmitResponder::run(std::stop_token stopToken) {
                 response[3] = static_cast<std::byte>(requestSequence);
                 std::copy(original.begin(), original.end(), response.begin() + 4);
                 socket_.sendTo(host, port, response);
+                resentPackets_.fetch_add(1, std::memory_order_relaxed);
             }
         } catch (...) {
             if (stopToken.stop_requested()) return;

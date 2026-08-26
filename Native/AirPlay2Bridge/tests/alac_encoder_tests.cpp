@@ -11,5 +11,8 @@ int main() {
     const auto packet = encoder.encode(silence);
     assert(!packet.empty());
     assert(packet.size() < silence.size());
+    const auto uncompressed = encoder.encodeUncompressed(silence);
+    assert(uncompressed.size() == 1412);
+    assert(uncompressed.front() == std::byte{0x20});
     return 0;
 }

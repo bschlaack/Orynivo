@@ -127,11 +127,15 @@ Development of that component has started in
 standalone CMake project with a versioned C ABI and no dependency on Avalonia,
 Orynivo, or Qt, so it can later be published and consumed independently. The
 current milestone provides portable sockets, fail-closed transient pairing,
-authenticated encrypted control, NTP timing, session/RECORD/audio-stream SETUP,
-negotiated RTP ports, official Apple ALAC encoding, partial-PCM buffering, and
-encrypted realtime RTP packetization, NTP/RTP anchors, bounded retransmissions,
-rate-aware receiver prefill/pacing, and encrypted teardown, plus native tests.
-Session negotiation through the RTP ports is verified against a Sonos receiver; audible packet pacing and event
+authenticated encrypted control, unicast gPTP timing, timing-peer registration,
+session/audio-stream SETUP, official Apple ALAC support, partial-PCM buffering,
+and encrypted realtime type-96 media over receiver-selected UDP ports.
+Its PTP clock behavior follows a complete working iPhone-to-Sonos capture;
+352-frame ALAC packets use a PTP/RTP synchronization anchor and bounded
+retransmission. Captured type-103 TCP framing remains isolated for later AAC use.
+Initial receiver volume, RTP-anchored DMAP metadata, encrypted teardown, and
+PTP/buffered-packet diagnostics are included. These paths are backed by native
+tests. Session negotiation through the media ports is verified against a Sonos receiver; audible packet identity/timing and event
 handling remain unfinished. Orynivo does not load the bridge yet and therefore
 still makes no AirPlay 2 playback claim.
 

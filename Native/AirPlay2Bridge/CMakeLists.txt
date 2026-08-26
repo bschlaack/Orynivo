@@ -35,10 +35,13 @@ target_include_directories(apple_alac_encoder PUBLIC ${apple_alac_SOURCE_DIR}/co
 add_library(AirPlay2Bridge SHARED
     src/alac_encoder.cpp
     src/airplay2_bridge.cpp
+    src/buffered_audio_packetizer.cpp
     src/encrypted_control.cpp
     src/encrypted_rtsp.cpp
+    src/event_channel.cpp
     src/ntp_timing.cpp
     src/packet_pacer.cpp
+    src/ptp_timing.cpp
     src/realtime_audio_packetizer.cpp
     src/rtp_control.cpp
     src/transient_pairing.cpp
@@ -112,6 +115,15 @@ if(AIRPLAY2BRIDGE_BUILD_TESTS)
     target_include_directories(AirPlay2BridgeRealtimeAudioTests PRIVATE src)
     target_link_libraries(AirPlay2BridgeRealtimeAudioTests PRIVATE airplay_crypto apple_alac_encoder)
     add_test(NAME AirPlay2Bridge.RealtimeAudioPacketizer COMMAND AirPlay2BridgeRealtimeAudioTests)
+
+    add_executable(AirPlay2BridgeBufferedAudioTests
+        tests/buffered_audio_packetizer_tests.cpp
+        src/alac_encoder.cpp
+        src/buffered_audio_packetizer.cpp)
+    target_compile_features(AirPlay2BridgeBufferedAudioTests PRIVATE cxx_std_20)
+    target_include_directories(AirPlay2BridgeBufferedAudioTests PRIVATE src)
+    target_link_libraries(AirPlay2BridgeBufferedAudioTests PRIVATE airplay_crypto apple_alac_encoder)
+    add_test(NAME AirPlay2Bridge.BufferedAudioPacketizer COMMAND AirPlay2BridgeBufferedAudioTests)
 
     add_executable(AirPlay2BridgeRtpControlTests
         tests/rtp_control_tests.cpp

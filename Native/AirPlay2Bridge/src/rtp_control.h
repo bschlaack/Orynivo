@@ -4,6 +4,7 @@
 #include "socket_transport.h"
 
 #include <array>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <mutex>
@@ -15,7 +16,12 @@ namespace orynivo::airplay2 {
 
 /** Builds the NTP-backed realtime RTP synchronization datagram. */
 [[nodiscard]] std::array<std::byte, 20> buildRtpSyncPacket(
-    std::uint32_t nextTimestamp, std::uint32_t sampleRate, bool first);
+    std::uint32_t nextTimestamp, std::uint32_t latencyFrames, bool first);
+
+/** Builds the PTP-clocked realtime RTP synchronization datagram. */
+[[nodiscard]] std::array<std::byte, 28> buildPtpRtpSyncPacket(
+    std::uint32_t nextTimestamp, std::uint32_t latencyFrames,
+    std::uint64_t clockNanoseconds, std::uint64_t clockId, bool first);
 
 /** Retains a bounded audio packet history and answers receiver resend requests. */
 class RtpRetransmitResponder final {
@@ -29,6 +35,15 @@ public:
     /** Adds one complete RTP audio datagram to the bounded history. */
     void store(std::span<const std::byte> packet);
 
+    /** Returns the number of receiver control datagrams observed. */
+    [[nodiscard]] std::uint64_t receivedDatagramCount() const noexcept;
+
+    /** Returns the number of valid receiver retransmission requests observed. */
+    [[nodiscard]] std::uint64_t retransmitRequestCount() const noexcept;
+
+    /** Returns the number of historical audio packets sent again. */
+    [[nodiscard]] std::uint64_t resentPacketCount() const noexcept;
+
 private:
     struct Slot {
         std::uint16_t sequence = 0;
@@ -41,6 +56,9 @@ private:
     std::array<Slot, SlotCount> slots_{};
     std::mutex mutex_;
     std::jthread thread_;
+    std::atomic<std::uint64_t> receivedDatagrams_{0};
+    std::atomic<std::uint64_t> retransmitRequests_{0};
+    std::atomic<std::uint64_t> resentPackets_{0};
 };
 
 } // namespace orynivo::airplay2

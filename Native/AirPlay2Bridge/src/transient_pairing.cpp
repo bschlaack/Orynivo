@@ -151,9 +151,10 @@ TransientPairingKeys TransientPairing::run(Socket& control) {
         "Events-Salt", "Events-Write-Encryption-Key", keys.sharedSecret, 32);
     keys.eventRead = fxchain::airplay::hkdfSha512(
         "Events-Salt", "Events-Read-Encryption-Key", keys.sharedSecret, 32);
-    if (keys.sharedSecret.size() < 32)
-        throw std::runtime_error("AirPlay transient pairing produced a short audio key.");
-    keys.audioKey.assign(keys.sharedSecret.begin(), keys.sharedSecret.begin() + 32);
+    keys.audioKey.assign(keys.sharedSecret.begin(), keys.sharedSecret.begin() +
+        std::min<std::size_t>(32, keys.sharedSecret.size()));
+    if (keys.audioKey.size() != 32)
+        throw std::runtime_error("AirPlay transient pairing produced an invalid realtime audio key.");
     return keys;
 }
 

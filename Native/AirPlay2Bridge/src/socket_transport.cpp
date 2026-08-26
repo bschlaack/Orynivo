@@ -155,7 +155,7 @@ Socket Socket::connectTcp(
     throw std::system_error(lastError, std::system_category(), "Unable to connect to AirPlay receiver");
 }
 
-Socket Socket::bindUdp() {
+Socket Socket::bindUdp(std::uint16_t port) {
     ensureRuntime();
     NativeSocket value = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (value == InvalidSocket)
@@ -163,7 +163,7 @@ Socket Socket::bindUdp() {
     sockaddr_in address{};
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = htonl(INADDR_ANY);
-    address.sin_port = 0;
+    address.sin_port = htons(port);
     if (bind(value, reinterpret_cast<sockaddr*>(&address), sizeof(address)) != 0) {
         const int error = lastSocketError();
         closeSocket(value);

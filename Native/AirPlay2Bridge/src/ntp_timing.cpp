@@ -32,6 +32,14 @@ NtpTimingResponder::~NtpTimingResponder() {
 
 std::uint16_t NtpTimingResponder::localPort() const { return socket_.localPort(); }
 
+std::uint64_t NtpTimingResponder::requestCount() const noexcept {
+    return requests_.load(std::memory_order_relaxed);
+}
+
+std::uint64_t NtpTimingResponder::responseCount() const noexcept {
+    return responses_.load(std::memory_order_relaxed);
+}
+
 void NtpTimingResponder::run(std::stop_token stopToken) {
     std::array<std::byte, 256> request{};
     while (!stopToken.stop_requested()) {
@@ -40,6 +48,7 @@ void NtpTimingResponder::run(std::stop_token stopToken) {
         try {
             const auto count = socket_.receiveFrom(request, std::chrono::milliseconds(100), host, port);
             if (count < 32 || request[1] != std::byte{0xD2}) continue;
+            requests_.fetch_add(1, std::memory_order_relaxed);
             std::array<std::byte, 32> response{};
             response[0] = std::byte{0x80};
             response[1] = std::byte{0xD3};
@@ -48,6 +57,7 @@ void NtpTimingResponder::run(std::stop_token stopToken) {
             writeNtp(response.data() + 16);
             std::memcpy(response.data() + 24, response.data() + 16, 8);
             socket_.sendTo(host, port, response);
+            responses_.fetch_add(1, std::memory_order_relaxed);
         } catch (...) {
             if (stopToken.stop_requested()) return;
         }
