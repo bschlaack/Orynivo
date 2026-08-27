@@ -49,6 +49,14 @@ Avalonia desktop music library with:
   local network)
 - Native Steinberg ASIO bridge in `Native/AsioBridge/`
 - MIT-licensed cwASIO bridge in `Native/CwAsioBridge/`
+- Static localized product website in `html/`; edit the German source page and
+  `i18n.js`, then run `node html/generate-localized-pages.js` so English,
+  German, French, and Spanish pages remain synchronized. Its five-minute
+  quick-start styles live in `html/quickstart.css`.
+- Structured public contribution forms live in `.github/ISSUE_TEMPLATE/`.
+  Bug reports must warn contributors not to disclose credentials,
+  authenticated URLs, private paths, device addresses, or personal library
+  data; security reports must route to private GitHub security advisories.
 - PCM playback through `ffmpeg`
 - Native DSF/DFF DSD playback through ASIO on Windows or direct ALSA on Linux
 - Real-time DSF/DFF-to-PCM conversion through `ffmpeg` for WASAPI playback

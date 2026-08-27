@@ -25,6 +25,7 @@
   <link rel="alternate" hreflang="es" href="https://orynivo.app/es/">
   <link rel="icon" href="/assets/brand/icon.png">
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/quickstart.css">
   <link rel="stylesheet" href="/wiki-links.css">
   <script defer src="/i18n.js"></script>
   <script defer src="/script.js"></script>
@@ -151,7 +152,15 @@
     </section>
 
     <section class="section install" id="install">
-      <div class="section-heading install-heading reveal"><div><p class="eyebrow">Listo en minutos</p><h2>Instalación y primeros pasos.</h2></div><a class="docs-link" href="https://github.com/bschlaack/Orynivo/wiki/Installation" target="_blank" rel="noreferrer">Guía completa en la wiki ↗</a></div>
+      <div class="section-heading install-heading reveal"><div><p class="eyebrow">Listo en cinco minutos</p><h2>Tu inicio rápido.</h2><p>Desde la descarga hasta tu primera pista: una biblioteca local no necesita cuenta ni servidor.</p></div><a class="docs-link" href="https://github.com/bschlaack/Orynivo/wiki/First-Setup" target="_blank" rel="noreferrer">Guía completa en la wiki ↗</a></div>
+      <ol class="quickstart-grid reveal">
+        <li><span>1 minuto</span><b>Instalar y abrir</b><p>Descarga el paquete para tu sistema operativo, instala Orynivo e inicia la aplicación.</p></li>
+        <li><span>1 minuto</span><b>Añadir una fuente de música</b><p>Abre Ajustes → Directorios y selecciona al menos una carpeta de música local. También puedes conectar un servidor Orynivo en su lugar o además.</p></li>
+        <li><span>Automático</span><b>Escanear la biblioteca</b><p>Inicia el escaneo. Los artistas, álbumes, pistas y carátulas existentes aparecen progresivamente durante la indexación.</p></li>
+        <li><span>1 minuto</span><b>Comprobar la salida de audio</b><p>La salida predeterminada funciona de inmediato. En Ajustes → Salida puedes elegir WASAPI, ASIO, ALSA, OpenAL o AirPlay cuando sea necesario.</p></li>
+        <li><span>Listo</span><b>Reproducir tu primera pista</b><p>Abre Pistas, Álbumes o Artistas y haz doble clic en una pista. El volumen, la cola y la salida están siempre disponibles en el reproductor inferior.</p></li>
+      </ol>
+      <div class="platform-install-heading reveal"><p class="eyebrow">Instalación específica de la plataforma</p><h3>El paquete adecuado para tu sistema.</h3></div>
       <div class="install-layout">
         <div class="install-nav" role="tablist" aria-label="Installationssystem"><button class="active" data-install="windows">Windows</button><button data-install="linux">Linux</button><button data-install="macos">macOS</button><button data-install="server">Servidor</button></div>
         <div class="install-panel active" data-panel="windows"><ol><li><b>Descargar el instalador</b><span>Descarga el archivo actual <code>win-x64-Setup.exe</code> desde la versión.</span></li><li><b>Instalar Orynivo</b><span>Ejecuta el instalador y sigue el asistente. También puedes extraer el ZIP portátil.</span></li><li><b>Añadir música</b><span>Abre Ajustes → Biblioteca, añade tus carpetas de música e inicia el escaneo.</span></li><li><b>Elegir una salida</b><span>Orynivo selecciona una salida predeterminada. Para reproducción bit-perfect, configura WASAPI Exclusive, ASIO o cwASIO.</span></li></ol></div>

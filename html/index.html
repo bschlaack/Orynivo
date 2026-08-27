@@ -25,6 +25,7 @@
   <link rel="alternate" hreflang="es" href="https://orynivo.app/es/">
   <link rel="icon" href="/assets/brand/icon.png">
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/quickstart.css">
   <link rel="stylesheet" href="/wiki-links.css">
   <script defer src="/i18n.js"></script>
   <script defer src="/script.js"></script>
@@ -151,7 +152,15 @@
     </section>
 
     <section class="section install" id="install">
-      <div class="section-heading install-heading reveal"><div><p class="eyebrow">Ready in minutes</p><h2>Installation & first steps.</h2></div><a class="docs-link" href="https://github.com/bschlaack/Orynivo/wiki/Installation" target="_blank" rel="noreferrer">Full guide in the wiki ↗</a></div>
+      <div class="section-heading install-heading reveal"><div><p class="eyebrow">Ready in five minutes</p><h2>Your quick start.</h2><p>From download to your first track: a local library requires neither an account nor a server.</p></div><a class="docs-link" href="https://github.com/bschlaack/Orynivo/wiki/First-Setup" target="_blank" rel="noreferrer">Full guide in the wiki ↗</a></div>
+      <ol class="quickstart-grid reveal">
+        <li><span>1 minute</span><b>Install and open</b><p>Download the package for your operating system, install Orynivo and launch the app.</p></li>
+        <li><span>1 minute</span><b>Add a music source</b><p>Open Settings → Directories and select at least one local music folder. You can connect an Orynivo Server instead or in addition.</p></li>
+        <li><span>Automatic</span><b>Scan your library</b><p>Start the scan. Artists, albums, tracks and existing artwork appear progressively while indexing runs.</p></li>
+        <li><span>1 minute</span><b>Check audio output</b><p>The default output works immediately. Under Settings → Output you can select WASAPI, ASIO, ALSA, OpenAL or AirPlay when needed.</p></li>
+        <li><span>Ready</span><b>Play your first track</b><p>Open Tracks, Albums or Artists and double-click a track. Volume, queue and output remain available in the bottom player.</p></li>
+      </ol>
+      <div class="platform-install-heading reveal"><p class="eyebrow">Platform-specific installation</p><h3>The right package for your system.</h3></div>
       <div class="install-layout">
         <div class="install-nav" role="tablist" aria-label="Installationssystem"><button class="active" data-install="windows">Windows</button><button data-install="linux">Linux</button><button data-install="macos">macOS</button><button data-install="server">Server</button></div>
         <div class="install-panel active" data-panel="windows"><ol><li><b>Download the installer</b><span>Download the current <code>win-x64-Setup.exe</code> from the release.</span></li><li><b>Install Orynivo</b><span>Run the installer and follow the wizard. Alternatively, extract the portable ZIP.</span></li><li><b>Add music</b><span>Open Settings → Library, add your music folders and start the scan.</span></li><li><b>Choose an output</b><span>Orynivo selects a default output. For bit-perfect playback, configure WASAPI Exclusive, ASIO or cwASIO.</span></li></ol></div>
