@@ -362,6 +362,32 @@ fallback or allow client-provided commands/paths to reach the helper.
 - `Orynivo/OutputProfile.cs`: named audio output configuration (backend, device
   IDs, display name); multiple profiles allow switching between output devices
   without reconfiguring each time
+- `Orynivo/Audio/AirPlayDeviceDiscovery.cs` and `AirPlayAudioPlayer.cs`:
+  cross-platform classic AirPlay/RAOP output. Profiles retain the stable DNS-SD
+  service name and last resolved endpoint, discovery refreshes it before
+  playback, and FFmpeg-decoded 44.1 kHz stereo PCM is piped to a separately
+  installed `raop_play` helper. Do not persist receiver passwords or pairing
+  material. The initial backend is single-receiver AirPlay 1 and must not be
+  presented as AirPlay 2, protected-receiver, or multiroom support.
+- `Native/AirPlay2Bridge/`: standalone Qt-free native AirPlay 2 sender project.
+  It exposes only a versioned C ABI with opaque sessions and keeps portable
+  transport/protocol internals private so it can be released independently.
+  Transient HAP pairing must send `X-Apple-HKP: 4`, verify the receiver SRP
+  proof, and derive directional keys without logging key material. Encrypted
+  control frames use a two-byte little-endian length as authenticated data,
+  at most 1024 plaintext bytes per frame, and an independent monotonically
+  increasing counter in each direction. Encrypted `GET /info` precedes the
+  binary-plist session SETUP, which advertises a bound local NTP timing port and
+  captures the receiver's event port. A live NTP responder is required before
+  RECORD and realtime stream SETUP; that stream advertises local UDP data and
+  control ports and receives the Sonos RTP destination. PCM writes are buffered
+  into 352-frame stereo units, encoded by the pinned official Apple ALAC codec,
+  and authenticated as realtime RTP through the session audio key. Initial and
+  periodic NTP/RTP anchors plus bounded receiver-requested retransmissions run
+  over the negotiated control socket; session stop attempts encrypted teardown.
+  Delivery pre-fills at most 1.75 seconds with a 1 ms minimum fill cadence and
+  then follows the PCM sample clock. The bridge remains unloaded by Orynivo until audible packet pacing,
+  event/lifecycle handling, and real-receiver playback verification are complete.
 - `Orynivo/OutputProfileDialog.axaml/.cs`: dialog for creating or editing an
   output profile; loads available devices asynchronously, validates unique
   names, and exposes the confirmed result via `Result`
@@ -1654,6 +1680,8 @@ fallback or allow client-provided commands/paths to reach the helper.
   ASIO implementation when available, otherwise to WASAPI.
 - `OutputBackend` values are persisted numerically; existing values remain
   `Asio=0`, `Wasapi=1`, and `KernelStreaming=2`, while `CwAsio=3` is appended.
+  Classic network AirPlay is appended as `AirPlay=4`; never renumber existing
+  values.
 - Native DSD supports `.dsf` and uncompressed stereo `.dff`
 - DST-compressed `.dff` is not played natively
 - Output types represented by settings: Steinberg `ASIO`, `CwAsio`, `WASAPI`, `KernelStreaming`

@@ -22,4 +22,16 @@ public sealed class OutputProfile
 
     /// <summary>Gets or sets the display name of the selected WASAPI render device.</summary>
     public string? SelectedWasapiDeviceName { get; set; }
+
+    /// <summary>Gets or sets the stable DNS-SD service name of the selected AirPlay receiver.</summary>
+    public string? SelectedAirPlayDeviceId { get; set; }
+
+    /// <summary>Gets or sets the display name of the selected AirPlay receiver.</summary>
+    public string? SelectedAirPlayDeviceName { get; set; }
+
+    /// <summary>Gets or sets the last resolved network address of the selected AirPlay receiver.</summary>
+    public string? SelectedAirPlayHost { get; set; }
+
+    /// <summary>Gets or sets the last resolved RAOP port of the selected AirPlay receiver.</summary>
+    public int SelectedAirPlayPort { get; set; }
 }

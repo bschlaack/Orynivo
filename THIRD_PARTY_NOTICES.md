@@ -29,7 +29,8 @@ packages.
   The vendored revision and its original license are recorded in
   `third_party/cwasio/UPSTREAM.md` and `third_party/cwasio/LICENSE`.
 - Other resolved MIT dependencies include HarfBuzzSharp, MicroCom.Runtime,
-  Tmds.DBus.Protocol, and their applicable native asset packages.
+  Tmds.DBus.Protocol, [Zeroconf 3.7.16](https://github.com/novotnyllc/Zeroconf)
+  for AirPlay DNS-SD discovery, and their applicable native asset packages.
 
 ## Apache License 2.0 components
 
@@ -46,6 +47,20 @@ The complete Apache License 2.0 text is the repository's `LICENSE` file.
 - [SQLitePCLRaw 2.1.10](https://github.com/ericsink/SQLitePCL.raw), including
   the core, provider, bundle, and native e_sqlite3 packages. SQLite itself is
   dedicated to the public domain; see https://sqlite.org/copyright.html.
+- The Qt-free `airplay_crypto` target from
+  [airplay2-sender-cpp](https://github.com/akustikrausch/airplay2-sender-cpp),
+  pinned to commit `8c4034263f1c265d25b3cfb88a090624760ad22a`, and
+  [Mbed TLS](https://github.com/Mbed-TLS/mbedtls), which it fetches for the
+  standalone AirPlay2Bridge. The Qt sender application is not linked.
+- Apple's official [ALAC codec](https://github.com/macosforge/alac), pinned to
+  commit `c38887c5c5e64a4b31108733bd79ca9b2496d987`, supplies the Apache-2.0
+  encoder used by the standalone AirPlay2Bridge.
+
+## zlib-licensed components
+
+- The ed25519 implementation vendored by the pinned airplay2-sender-cpp crypto
+  target is derived from [orlp/ed25519](https://github.com/orlp/ed25519) and
+  retains its zlib license and copyright notice.
 
 ## TagLibSharp
 

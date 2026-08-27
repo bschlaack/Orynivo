@@ -37,11 +37,14 @@
     <IncludeAsioBridge Condition="'$(IncludeAsioBridge)' == '' and '$(OS)' != 'Windows_NT'">false</IncludeAsioBridge>
     <IncludeCwAsioBridge Condition="'$(IncludeCwAsioBridge)' == '' and '$(OS)' == 'Windows_NT'">true</IncludeCwAsioBridge>
     <IncludeCwAsioBridge Condition="'$(IncludeCwAsioBridge)' == '' and '$(OS)' != 'Windows_NT'">false</IncludeCwAsioBridge>
+    <IncludeAirPlay2Bridge Condition="'$(IncludeAirPlay2Bridge)' == '' and '$(OS)' == 'Windows_NT'">true</IncludeAirPlay2Bridge>
+    <IncludeAirPlay2Bridge Condition="'$(IncludeAirPlay2Bridge)' == '' and '$(OS)' != 'Windows_NT'">false</IncludeAirPlay2Bridge>
   </PropertyGroup>
 
   <ItemGroup>
     <None Include="..\Native\AsioBridge\x64\$(Configuration)\AsioBridge.dll" Link="AsioBridge.dll" CopyToOutputDirectory="PreserveNewest" Condition="'$(IncludeAsioBridge)' == 'true' and Exists('..\Native\AsioBridge\x64\$(Configuration)\AsioBridge.dll')" />
     <None Include="..\Native\CwAsioBridge\x64\$(Configuration)\CwAsioBridge.dll" Link="CwAsioBridge.dll" CopyToOutputDirectory="PreserveNewest" Condition="'$(IncludeCwAsioBridge)' == 'true' and Exists('..\Native\CwAsioBridge\x64\$(Configuration)\CwAsioBridge.dll')" />
+    <None Include="..\artifacts\AirPlay2Bridge\$(Configuration)\AirPlay2Bridge.dll" Link="AirPlay2Bridge.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="'$(IncludeAirPlay2Bridge)' == 'true' and Exists('..\artifacts\AirPlay2Bridge\$(Configuration)\AirPlay2Bridge.dll')" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(OS)' != 'Windows_NT'">
@@ -68,6 +71,12 @@
   </Target>
   <Target Name="RemoveDisabledCwAsioBridgeFromPublish" AfterTargets="Publish" Condition="'$(IncludeCwAsioBridge)' != 'true'">
     <Delete Files="$(PublishDir)CwAsioBridge.dll" />
+  </Target>
+  <Target Name="RemoveDisabledAirPlay2Bridge" AfterTargets="Build" Condition="'$(IncludeAirPlay2Bridge)' != 'true'">
+    <Delete Files="$(TargetDir)AirPlay2Bridge.dll" />
+  </Target>
+  <Target Name="RemoveDisabledAirPlay2BridgeFromPublish" AfterTargets="Publish" Condition="'$(IncludeAirPlay2Bridge)' != 'true'">
+    <Delete Files="$(PublishDir)AirPlay2Bridge.dll" />
   </Target>
 
   <ItemGroup>
@@ -98,6 +107,7 @@
     <PackageReference Include="ModelContextProtocol.AspNetCore" Version="1.4.0" />
     <PackageReference Include="NAudio" Version="2.3.0" Condition="'$(OS)' == 'Windows_NT'" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+    <PackageReference Include="Zeroconf" Version="3.7.16" />
   </ItemGroup>
 
   <ItemGroup>

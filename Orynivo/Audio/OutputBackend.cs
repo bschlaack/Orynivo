@@ -12,5 +12,7 @@ public enum OutputBackend
     /// <summary>Windows Kernel Streaming (selectable but not yet implemented as a playback backend).</summary>
     KernelStreaming = 2,
     /// <summary>cwASIO via <c>CwAsioBridge.dll</c>.</summary>
-    CwAsio = 3
+    CwAsio = 3,
+    /// <summary>AirPlay 2 output through the native sender, with classic RAOP fallback.</summary>
+    AirPlay = 4
 }

@@ -4,6 +4,114 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.37.0] - 2026-08-27
+
+### Changed
+
+- Changed AirPlay volume to a cubic perceptual curve, providing substantially
+  finer control at ordinary listening levels while preserving mute and the
+  unchanged 100-percent maximum.
+- Documented native AirPlay 2 output as experimental in the main README,
+  standalone bridge documentation, and project wiki, including its verified
+  Sonos scope and current receiver-interoperability limitations.
+
+- Reworked the silent Sonos AirPlay 2 probe around the PTP behavior established
+  by a complete working iPhone capture. The active compatibility path now uses
+  unicast gPTP, `SETPEERS`, realtime type-96 ALAC, a PTP/RTP synchronization
+  anchor, bounded retransmission, and receiver-selected UDP ports. The captured
+  buffered type-103 TCP framing remains implemented as an isolated transport
+  option for later AAC integration rather than being mislabelled as ALAC.
+  Native `shk` and payload encryption now use the first 32 bytes of the
+  transient pairing secret, independently from the event-channel HKDF keys.
+
+### Fixed
+
+- AirPlay 2 receiver controls now drive Orynivo's transport instead of only
+  silencing the receiver: authenticated Play, Pause, Next, and Previous events
+  from Sonos are decoded on the reverse event channel and dispatched through
+  the shared player controls, keeping Orynivo's state and UI synchronized.
+  Receiver-originated Play rebuilds a paused AirPlay session at its current
+  audible position because Sonos does not resume accepting media on the stream
+  it placed into the paused state.
+- Kept native AirPlay 2 music sessions alive beyond the receiver's initial
+  roughly two-second media window by sending authenticated `/feedback`
+  keepalives once per second. The worker is joined before teardown and its
+  successful requests are included in native media diagnostics.
+- Corrected the PTP/RTP synchronization timeline used after the initial AirPlay
+  2 sender buffer. Current-playback and earliest-render timestamps now use the
+  receiver-compatible 77,175- and 11,025-frame offsets, anchors follow a
+  sample-rate cadence and current grandmaster time, and PTP audio uses SSRC
+  zero. This prevents Sonos from discarding an otherwise valid stream after its
+  first one to two seconds.
+- Removed the duplicate 1.75-second fast sender prefill from realtime AirPlay 2
+  delivery. Packets now follow the 44.1-kHz media clock from the first frame;
+  buffering remains represented once by the PTP/RTP synchronization offset, so
+  the first periodic anchor no longer invalidates a working start or seek.
+- Fixed silent AirPlay 2 realtime playback by using the negotiated stream
+  connection ID as the RTP SSRC, allowing receivers such as Sonos to associate
+  incoming audio packets with the prepared stream. The bridge now also sends
+  initial volume and RTP-anchored DMAP track metadata because Sonos can retain
+  an otherwise valid native AirPlay 2 stream in a silent state without them.
+  The initial RTP/NTP timeline now starts at a deterministic 1.5-second receiver
+  latency instead of an unrelated random timestamp, and the probe reports the
+  receiver's own active-stream count from `/feedback`. Realtime packets now use
+  the receiver-negotiated ALAC profile (`audioFormat=0x40000`, `ct=2`) with the
+  uncompressed ALAC escape-frame representation used by the interoperable sender
+  reference, plus a dedicated zero-based audio nonce instead of coupling encryption
+  nonces to the randomized RTP sequence.
+  Native realtime sessions issue `RECORD` only after audio-stream SETUP and
+  include the first packet's sequence and RTP timestamp plus the playback range;
+  they do not advertise a sender `dataPort`, and the receiver-selected destination
+  port is authoritative. The probe uses a safe -20 dB receiver volume and a bounded
+  test tone, then reports sent RTP packets and observed retransmission traffic
+  so successful UDP submission is no longer mistaken for receiver playback.
+  The reverse event socket now uses its independent HAP event keys, decrypts
+  receiver requests, and returns encrypted RTSP success responses.
+  Session SETUP now advertises multi-select AirPlay capability so a Sonos stereo
+  pair can accept the stream through its advertised group endpoint.
+  Event-channel keys remain isolated from media encryption; native audio uses
+  the first 32 bytes of the pairing shared secret as both advertised `shk` and
+  payload cipher key.
+- AirPlay discovery now reads the concrete DNS-SD SRV instance name instead of
+  displaying the generic `_raop._tcp.local.` PTR service type, so compatible
+  AirPlay 1 receivers appear under their advertised device name.
+- Documented that receivers advertising only `_airplay._tcp`, including
+  AirPlay 2-only Sonos devices, require the planned Qt-free AirPlay 2 bridge
+  and are not exposed by the current classic RAOP backend.
+
+### Added
+
+- Native AirPlay 2 sessions now publish the current title, artist, album, and
+  optional bounded JPEG/PNG cover artwork to receiver displays instead of the
+  bridge's former diagnostic test-tone metadata.
+- Integrated the Sonos-verified native AirPlay 2 bridge into regular Orynivo
+  playback. AirPlay output profiles now feed FFmpeg-decoded 44.1 kHz stereo PCM
+  through the bundled bridge, including pause, seek, volume, ReplayGain, stop,
+  output release, and the existing classic `raop_play` fallback. The bridge's
+  probe-safe -20 dB default remains in the diagnostic tool, while desktop
+  playback selects 0 dB receiver gain and applies the user's volume to PCM.
+
+- Began the standalone, Qt-free `Native/AirPlay2Bridge` project with a stable C
+  ABI, portable Windows/POSIX socket ownership layer, CMake packaging boundary,
+  fail-closed HAP transient pairing, authenticated encrypted-control framing,
+  encrypted RTSP response parsing, binary-plist session SETUP, and native
+  transport/crypto tests. A portable NTP timing responder now permits RECORD
+  and realtime audio-stream SETUP. The bridge now buffers partial signed
+  16-bit stereo PCM into 352-frame packets, encodes them through Apple's pinned
+  Apache-2.0 ALAC encoder, and emits ChaCha20-Poly1305-authenticated realtime
+  RTP datagrams. Pairing through negotiated RTP ports has been verified against
+  a real Sonos AirPlay 2 receiver. Realtime streams emit initial and periodic
+  PTP/RTP synchronization anchors, retain a bounded packet history for
+  receiver-requested retransmission, and send a best-effort encrypted
+  `TEARDOWN` when the session closes. PCM delivery follows the exact media
+  sample clock while the synchronization timeline declares the receiver
+  buffer. Continuous playback remains explicitly experimental outside the
+  verified Sonos stereo-pair configuration.
+- Output profiles can now select classic AirPlay (RAOP) receivers discovered
+  through mDNS on Windows, Linux, and macOS. Orynivo resolves the selected
+  receiver again before playback and streams FFmpeg-decoded PCM through a
+  separately installed compatible `raop_play` sender.
+
 ## [0.36.7] - 2026-08-25
 
 ### Added

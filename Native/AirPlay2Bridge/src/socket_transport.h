@@ -1,0 +1,67 @@
+// SPDX-License-Identifier: Apache-2.0
+#pragma once
+
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <span>
+#include <string>
+
+namespace orynivo::airplay2 {
+
+/** Cross-platform socket handle whose ownership is explicit and movable. */
+class Socket final {
+public:
+    Socket() noexcept = default;
+    ~Socket();
+    Socket(Socket&& other) noexcept;
+    Socket& operator=(Socket&& other) noexcept;
+    Socket(const Socket&) = delete;
+    Socket& operator=(const Socket&) = delete;
+
+    /** Connects a TCP socket to a numeric address or DNS host. */
+    static Socket connectTcp(
+        const std::string& host,
+        std::uint16_t port,
+        std::chrono::milliseconds timeout);
+
+    /** Creates an IPv4 UDP socket bound to the requested local port (zero selects an ephemeral port). */
+    static Socket bindUdp(std::uint16_t port = 0);
+
+    /** Sends every byte or throws std::system_error. */
+    void sendAll(std::span<const std::byte> bytes);
+
+    /** Sends one UDP datagram to a numeric address or DNS host. */
+    void sendTo(
+        const std::string& host,
+        std::uint16_t port,
+        std::span<const std::byte> bytes);
+
+    /** Receives available TCP bytes, returning zero on orderly shutdown. */
+    std::size_t receive(
+        std::span<std::byte> destination,
+        std::chrono::milliseconds timeout);
+
+    /** Receives one UDP datagram and returns its numeric sender endpoint. */
+    std::size_t receiveFrom(std::span<std::byte> destination,
+                            std::chrono::milliseconds timeout,
+                            std::string& host, std::uint16_t& port);
+
+    /** Closes the socket and makes subsequent close calls harmless. */
+    void close() noexcept;
+
+    /** Returns whether this object currently owns a socket. */
+    [[nodiscard]] bool valid() const noexcept;
+
+    /** Returns the bound local port, or zero for an invalid socket. */
+    [[nodiscard]] std::uint16_t localPort() const;
+
+    /** Returns the numeric local address selected for this socket. */
+    [[nodiscard]] std::string localAddress() const;
+
+private:
+    explicit Socket(std::intptr_t handle) noexcept : handle_(handle) {}
+    std::intptr_t handle_ = -1;
+};
+
+} // namespace orynivo::airplay2

@@ -69,6 +69,42 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   and permits one-click reacquisition/resume. Ordinary playback clears that
   snapshot. Pausing alone must never be presented as releasing an exclusive
   WASAPI, ASIO, cwASIO, or direct ALSA device.
+- AirPlay output is a cross-platform `OutputBackend.AirPlay` profile.
+  Discover `_raop._tcp.local.` receivers away from the UI thread, persist only
+  their stable service ID/display name/last endpoint and refresh the endpoint
+  before playback. Prefer the bundled native AirPlay 2 bridge when available;
+  retain the separately installed `raop_play` helper as a classic fallback.
+  Never persist passwords or transient pairing material.
+- The AirPlay 2 sender lives in the independent Qt-free
+  `Native/AirPlay2Bridge` CMake project. Keep its public boundary as a stable C
+  ABI with opaque session handles; it must not depend on Avalonia or Orynivo.
+  Fail-closed transient pairing, encrypted control, session SETUP, NTP timing,
+  RECORD, and audio-stream SETUP are implemented and Sonos-verified. ALAC
+  encoding, encrypted realtime RTP packetization, NTP/RTP sync anchors,
+  retransmit handling, rate-aware prefill/pacing, and best-effort teardown are
+  implemented behind the ABI and clean playback is verified on a Sonos stereo
+  pair. `AirPlay2NativeSession` is the only managed interop boundary;
+  `AirPlayAudioPlayer` owns it and feeds 44.1 kHz signed 16-bit stereo PCM.
+  AirPlay user volume uses a cubic normalized-to-linear PCM curve so normal
+  listening levels occupy a useful portion of the transport slider; ReplayGain
+  is multiplied after that mapping. Other output backends retain their existing
+  volume behavior.
+  Session creation also carries title, artist, album, and optional bounded
+  JPEG/PNG artwork resolved by `MainWindow.AirPlay`; the native bridge copies
+  all values before returning from creation. Receiver artwork rejection is
+  best-effort and must never prevent audio playback.
+  Authenticated receiver Play, Pause, Next, and Previous events cross the native
+  callback into `MainWindow.AirPlay` and must dispatch through the same shared
+  transport methods as the desktop controls so player state, SMTC, history, and
+  UI remain synchronized. A receiver-originated Play after Pause must rebuild
+  the AirPlay pipeline at the player's current position before clearing its
+  paused state; Sonos does not reliably resume media consumption on the old
+  stream. Ignore callbacks from a session that is no longer the active AirPlay
+  player. Receiver-originated timeline seeking is not available
+  on this reverse event channel and remains unsupported until a bounded DACP
+  endpoint is implemented.
+  Keep pause, seek, stop, output release, and fallback RAOP lifecycle behavior
+  behind that existing player abstraction.
 - Preserve source identity on mixed rows. Remote rows must carry their
   `OrynivoServer`, server-side IDs, and authenticated playback metadata; never
   persist credential-bearing URLs.

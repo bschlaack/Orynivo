@@ -24,6 +24,8 @@ the ability to reach that library from any device on the local network.
 - Bit-perfect/native DSD playback through direct ALSA on Linux without a native
   bridge, or through cwASIO/the optional Steinberg ASIO bridge on Windows
 - Exclusive WASAPI, cwASIO, and Steinberg ASIO output profiles
+- Classic AirPlay (RAOP) output profiles with automatic receiver discovery on
+  Windows, Linux, and macOS
 - Gapless playback
 - CUE sheet support
 - ReplayGain and parametric EQ
@@ -95,6 +97,63 @@ processing features through the system OpenAL output path on Intel and Apple
 Silicon. Native DSD output remains available only through Windows ASIO/cwASIO
 or Linux direct ALSA, and Windows System Media Transport Controls remain
 Windows-specific.
+
+AirPlay output profiles discover local `_raop._tcp` receivers on every desktop
+platform. On Windows, the bundled native `AirPlay2Bridge` is preferred and
+performs transient pairing, encrypted ALAC transport, unicast PTP timing, and
+receiver-requested RTP retransmission. This path has been verified with clean
+audible playback on a Sonos stereo pair. Playback is decoded to 44.1 kHz stereo
+PCM; volume and ReplayGain are applied before it reaches the native bridge.
+AirPlay volume uses a perceptual curve with additional control at normal
+listening levels instead of mapping the slider directly to linear PCM gain.
+The receiver now-playing display receives the current title, artist, album,
+and bounded JPEG/PNG cover artwork when it is available locally or through the
+active library provider.
+Receiver-side Play, Pause, Next, and Previous controls are synchronized back to
+Orynivo through the authenticated AirPlay event channel. Resuming after a
+receiver-side pause rebuilds the stream at its current position for Sonos
+compatibility. Receiver-originated timeline seeking is not currently supported;
+it requires a separate DACP
+control endpoint rather than the reverse event channel used by those buttons.
+If the bridge is unavailable, Orynivo falls back to a compatible `raop_play`
+executable beside Orynivo or on `PATH`. The helper is deliberately not bundled
+because available RAOP implementations use licenses independent of Orynivo's
+Apache-2.0 distribution. Gapless transitions and Orynivo's parametric equalizer
+are not yet supported for either network path.
+
+> **Experimental:** Native AirPlay 2 support is an interoperability
+> implementation based on observed protocol behavior rather than a public Apple
+> sender specification. Continuous playback, seeking, timing, and stereo-pair
+> output have been verified with the tested Sonos receiver, but other receiver
+> models, firmware versions, grouped configurations, and network environments
+> may behave differently. Keep a conventional local output profile available
+> and report reproducible receiver-specific problems with model and firmware
+> information.
+
+The Qt-free `AirPlay2Bridge` provides native AirPlay 2 support while retaining
+the existing RAOP route for AirPlay 1 receivers. The evaluated
+[`airplay2-sender-cpp`](https://github.com/akustikrausch/airplay2-sender-cpp)
+project supplies the reusable Apache-2.0 cryptographic core fetched at a pinned
+commit; its Qt sender is not linked. The native bridge fetches Apple's official
+Apache-2.0 ALAC encoder separately.
+
+Development of that component has started in
+[`Native/AirPlay2Bridge`](Native/AirPlay2Bridge/README.md). It is deliberately a
+standalone CMake project with a versioned C ABI and no dependency on Avalonia,
+Orynivo, or Qt, so it can later be published and consumed independently. The
+current milestone provides portable sockets, fail-closed transient pairing,
+authenticated encrypted control, unicast gPTP timing, timing-peer registration,
+session/audio-stream SETUP, official Apple ALAC support, partial-PCM buffering,
+and encrypted realtime type-96 media over receiver-selected UDP ports.
+Its PTP clock behavior follows a complete working iPhone-to-Sonos capture;
+352-frame ALAC packets use a PTP/RTP synchronization anchor and bounded
+retransmission. Captured type-103 TCP framing remains isolated for later AAC use.
+Initial receiver volume, RTP-anchored DMAP metadata, encrypted teardown, and
+PTP/buffered-packet diagnostics are included. These paths are backed by native
+tests. Session negotiation, encrypted media, PTP timing, retransmission,
+teardown, and clean audible playback are verified against a Sonos stereo-pair
+receiver. The Windows build copies the bridge beside Orynivo and loads it
+through its stable C ABI.
 
 Settings > Playback offers mutually exclusive DSD routing preferences for
 lossy DSD-to-PCM conversion and bit-perfect DSD over PCM (DoP). DoP requires a
@@ -426,6 +485,8 @@ byte-range streaming without FFmpeg.
 
 - Playback through direct ALSA or OpenAL on Linux, and through cwASIO, the
   optional Steinberg ASIO bridge, or exclusive-mode WASAPI on Windows
+- Classic AirPlay playback through automatically discovered RAOP receivers on
+  Windows, Linux, and macOS when a compatible `raop_play` helper is installed
 - Automatic PCM down-conversion through `ffmpeg` when the source sample rate
   exceeds the selected ASIO or WASAPI device's capabilities; WASAPI uses the
   highest supported 32-bit float, 24-bit PCM, or 16-bit PCM output format
@@ -1035,12 +1096,17 @@ Paths can be supplied without modifying project files:
 .\build.ps1 -Configuration Release
 .\build.ps1 -Configuration Release -SkipAsio
 .\build.ps1 -Configuration Release -SkipAsio -SkipCwAsio
+.\build.ps1 -Configuration Release -SkipAirPlay2Bridge
 ```
 
 For a persistent local setup, set `ASIO_SDK_DIR`. MSBuild discovery can
 similarly be overridden with `-MSBuildPath` or `MSBUILD_EXE_PATH`.
 `-RequireAsio` makes a missing Steinberg SDK fail the build. `-SkipAsio`
 disables only the Steinberg bridge; `-SkipCwAsio` disables cwASIO.
+The default build also compiles and tests the independent Qt-free
+`Native/AirPlay2Bridge` transport milestone. `-SkipAirPlay2Bridge` skips that
+native project for a focused managed/ASIO build; the incomplete bridge is not
+copied into the desktop output.
 
 ### Orynivo Server
 
