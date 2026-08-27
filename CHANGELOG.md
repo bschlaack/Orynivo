@@ -4,7 +4,7 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.37.0] - 2026-08-27
 
 ### Changed
 
@@ -47,7 +47,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   delivery. Packets now follow the 44.1-kHz media clock from the first frame;
   buffering remains represented once by the PTP/RTP synchronization offset, so
   the first periodic anchor no longer invalidates a working start or seek.
-
 - Fixed silent AirPlay 2 realtime playback by using the negotiated stream
   connection ID as the RTP SSRC, allowing receivers such as Sonos to associate
   incoming audio packets with the prepared stream. The bridge now also sends
@@ -73,6 +72,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Event-channel keys remain isolated from media encryption; native audio uses
   the first 32 bytes of the pairing shared secret as both advertised `shk` and
   payload cipher key.
+- AirPlay discovery now reads the concrete DNS-SD SRV instance name instead of
+  displaying the generic `_raop._tcp.local.` PTR service type, so compatible
+  AirPlay 1 receivers appear under their advertised device name.
+- Documented that receivers advertising only `_airplay._tcp`, including
+  AirPlay 2-only Sonos devices, require the planned Qt-free AirPlay 2 bridge
+  and are not exposed by the current classic RAOP backend.
 
 ### Added
 
@@ -106,15 +111,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   through mDNS on Windows, Linux, and macOS. Orynivo resolves the selected
   receiver again before playback and streams FFmpeg-decoded PCM through a
   separately installed compatible `raop_play` sender.
-
-### Fixed
-
-- AirPlay discovery now reads the concrete DNS-SD SRV instance name instead of
-  displaying the generic `_raop._tcp.local.` PTR service type, so compatible
-  AirPlay 1 receivers appear under their advertised device name.
-- Documented that receivers advertising only `_airplay._tcp`, including
-  AirPlay 2-only Sonos devices, require the planned Qt-free AirPlay 2 bridge
-  and are not exposed by the current classic RAOP backend.
 
 ## [0.36.7] - 2026-08-25
 
