@@ -6,13 +6,18 @@ namespace Orynivo.Audio;
 internal sealed class AirPlay2NativeSession : IDisposable
 {
     private const string LibraryName = "AirPlay2Bridge";
-    private const uint ExpectedAbiVersion = 100;
+    private const uint ExpectedAbiVersion = 102;
     private readonly object _nativeGate = new();
     private readonly StateCallback _callback;
+    private readonly RemoteCommandCallback _remoteCommandCallback;
     private IntPtr _session;
     private bool _disposed;
 
-    private AirPlay2NativeSession(StateCallback callback) => _callback = callback;
+    private AirPlay2NativeSession(StateCallback callback, RemoteCommandCallback remoteCommandCallback)
+    {
+        _callback = callback;
+        _remoteCommandCallback = remoteCommandCallback;
+    }
 
     /// <summary>Gets whether the compatible native bridge can be loaded.</summary>
     internal static bool IsAvailable
@@ -32,6 +37,8 @@ internal sealed class AirPlay2NativeSession : IDisposable
     /// <param name="port">Receiver AirPlay port.</param>
     /// <param name="deviceName">Receiver display name.</param>
     /// <param name="deviceId">Stable DNS-SD service identifier.</param>
+    /// <param name="metadata">Track metadata and optional bounded artwork.</param>
+    /// <param name="remoteCommand">Receives authenticated transport commands from the receiver.</param>
     /// <param name="cancellationToken">Cancels session startup.</param>
     /// <returns>The active native session.</returns>
     internal static async Task<AirPlay2NativeSession> CreateAsync(
@@ -39,13 +46,25 @@ internal sealed class AirPlay2NativeSession : IDisposable
         int port,
         string? deviceName,
         string? deviceId,
+        AirPlayTrackMetadata metadata,
+        Action<AirPlayRemoteCommand> remoteCommand,
         CancellationToken cancellationToken)
     {
         StateCallback callback = static (_, _, _) => { };
-        var instance = new AirPlay2NativeSession(callback);
+        RemoteCommandCallback remoteCallback = (_, command) => remoteCommand(command);
+        var instance = new AirPlay2NativeSession(callback, remoteCallback);
         var hostPointer = Marshal.StringToCoTaskMemUTF8(host);
         var namePointer = Marshal.StringToCoTaskMemUTF8(deviceName ?? "Orynivo AirPlay 2");
         var idPointer = Marshal.StringToCoTaskMemUTF8(deviceId ?? string.Empty);
+        var titlePointer = Marshal.StringToCoTaskMemUTF8(metadata.Title ?? string.Empty);
+        var artistPointer = Marshal.StringToCoTaskMemUTF8(metadata.Artist ?? string.Empty);
+        var albumPointer = Marshal.StringToCoTaskMemUTF8(metadata.Album ?? string.Empty);
+        var artworkMimePointer = Marshal.StringToCoTaskMemUTF8(metadata.ArtworkMimeType ?? string.Empty);
+        var artworkPointer = metadata.Artwork is { Length: > 0 }
+            ? Marshal.AllocHGlobal(metadata.Artwork.Length)
+            : IntPtr.Zero;
+        if (artworkPointer != IntPtr.Zero)
+            Marshal.Copy(metadata.Artwork!, 0, artworkPointer, metadata.Artwork!.Length);
         try
         {
             var config = new SessionConfig
@@ -59,7 +78,14 @@ internal sealed class AirPlay2NativeSession : IDisposable
                 Channels = 2,
                 BitsPerSample = 16,
                 StateCallback = instance._callback,
-                UserData = IntPtr.Zero
+                UserData = IntPtr.Zero,
+                TitleUtf8 = titlePointer,
+                ArtistUtf8 = artistPointer,
+                AlbumUtf8 = albumPointer,
+                ArtworkData = artworkPointer,
+                ArtworkSize = (nuint)(metadata.Artwork?.Length ?? 0),
+                ArtworkMimeUtf8 = artworkMimePointer,
+                RemoteCommandCallback = instance._remoteCommandCallback
             };
             ThrowIfFailed(SessionCreate(in config, out instance._session));
             ThrowIfFailed(SessionSetInitialVolume(instance._session, 0.0f));
@@ -78,6 +104,12 @@ internal sealed class AirPlay2NativeSession : IDisposable
             Marshal.FreeCoTaskMem(hostPointer);
             Marshal.FreeCoTaskMem(namePointer);
             Marshal.FreeCoTaskMem(idPointer);
+            Marshal.FreeCoTaskMem(titlePointer);
+            Marshal.FreeCoTaskMem(artistPointer);
+            Marshal.FreeCoTaskMem(albumPointer);
+            Marshal.FreeCoTaskMem(artworkMimePointer);
+            if (artworkPointer != IntPtr.Zero)
+                Marshal.FreeHGlobal(artworkPointer);
         }
     }
 
@@ -122,11 +154,15 @@ internal sealed class AirPlay2NativeSession : IDisposable
             SessionDestroy(_session);
             _session = IntPtr.Zero;
             GC.KeepAlive(_callback);
+            GC.KeepAlive(_remoteCommandCallback);
         }
     }
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate void StateCallback(IntPtr userData, State state, IntPtr messageUtf8);
+
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate void RemoteCommandCallback(IntPtr userData, AirPlayRemoteCommand command);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct SessionConfig
@@ -141,6 +177,13 @@ internal sealed class AirPlay2NativeSession : IDisposable
         internal ushort BitsPerSample;
         internal StateCallback StateCallback;
         internal IntPtr UserData;
+        internal IntPtr TitleUtf8;
+        internal IntPtr ArtistUtf8;
+        internal IntPtr AlbumUtf8;
+        internal IntPtr ArtworkData;
+        internal nuint ArtworkSize;
+        internal IntPtr ArtworkMimeUtf8;
+        internal RemoteCommandCallback RemoteCommandCallback;
     }
 
     private enum Result { Ok = 0 }

@@ -46,11 +46,24 @@ typedef enum ap2_state {
     AP2_STATE_NEGOTIATING = 6
 } ap2_state;
 
+/** Authenticated transport commands emitted by an AirPlay receiver. */
+typedef enum ap2_remote_command {
+    AP2_REMOTE_PLAY = 0,
+    AP2_REMOTE_PAUSE = 1,
+    AP2_REMOTE_NEXT = 2,
+    AP2_REMOTE_PREVIOUS = 3
+} ap2_remote_command;
+
 /** Host callback for lifecycle changes. The message is valid only for the call. */
 typedef void(AP2_CALL *ap2_state_callback)(
     void* user_data,
     ap2_state state,
     const char* message_utf8);
+
+/** Host callback for receiver-originated transport commands. */
+typedef void(AP2_CALL *ap2_remote_command_callback)(
+    void* user_data,
+    ap2_remote_command command);
 
 /** Configuration copied by ap2_session_create; pointers need not outlive it. */
 typedef struct ap2_session_config {
@@ -64,6 +77,13 @@ typedef struct ap2_session_config {
     uint16_t bits_per_sample;
     ap2_state_callback state_callback;
     void* user_data;
+    const char* title_utf8;        /**< Optional track title copied at creation. */
+    const char* artist_utf8;       /**< Optional artist copied at creation. */
+    const char* album_utf8;        /**< Optional album title copied at creation. */
+    const void* artwork_data;      /**< Optional JPEG or PNG bytes copied at creation. */
+    size_t artwork_size;           /**< Artwork byte count, bounded to 8 MiB. */
+    const char* artwork_mime_utf8; /**< Optional image/jpeg or image/png media type. */
+    ap2_remote_command_callback remote_command_callback; /**< Optional transport callback. */
 } ap2_session_config;
 
 /** Returns the ABI version encoded as major * 10000 + minor * 100 + patch. */

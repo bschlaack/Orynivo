@@ -32,12 +32,18 @@ struct ap2_session {
     std::string host;
     std::string name;
     std::string id;
+    std::string title;
+    std::string artist;
+    std::string album;
+    std::string artworkMime;
+    std::vector<std::uint8_t> artwork;
     std::uint16_t port = 7000;
     std::uint32_t sampleRate = 44100;
     std::uint16_t channels = 2;
     std::uint16_t bitsPerSample = 16;
     ap2_state state = AP2_STATE_IDLE;
     ap2_state_callback callback = nullptr;
+    ap2_remote_command_callback remoteCommandCallback = nullptr;
     void* userData = nullptr;
     Socket control;
     Socket audio;
@@ -69,6 +75,7 @@ thread_local std::string lastError;
 constexpr std::uint32_t ReceiverLatencyFrames = 22050U + 44100U;
 constexpr std::uint32_t SenderBufferFrames = 77175U;
 constexpr std::uint64_t SyncIntervalFrames = 44100U;
+constexpr std::size_t MaximumArtworkBytes = 8U * 1024U * 1024U;
 
 ap2_result fail(ap2_result result, std::string message) {
     lastError = std::move(message);
@@ -165,9 +172,9 @@ void prepareReceiverForAudio(ap2_session& session) {
     std::vector<std::uint8_t> metadata(8, 0);
     metadata[0] = 'm'; metadata[1] = 'l'; metadata[2] = 'i'; metadata[3] = 't';
     metadata.insert(metadata.end(), {'m', 'i', 'k', 'd', 0, 0, 0, 1, 2});
-    appendDmapString(metadata, "minm", "AirPlay 2 test signal");
-    appendDmapString(metadata, "asar", "Orynivo");
-    appendDmapString(metadata, "asal", "AirPlay 2 Bridge");
+    appendDmapString(metadata, "minm", session.title.empty() ? "Orynivo" : session.title);
+    appendDmapString(metadata, "asar", session.artist.empty() ? "Orynivo" : session.artist);
+    appendDmapString(metadata, "asal", session.album);
     metadata.insert(metadata.end(), {'a', 's', 't', 'n', 0, 0, 0, 2, 0, 1});
     const auto payloadSize = static_cast<std::uint32_t>(metadata.size() - 8);
     metadata[4] = static_cast<std::uint8_t>(payloadSize >> 24);
@@ -180,6 +187,16 @@ void prepareReceiverForAudio(ap2_session& session) {
     if (metadataResponse.status < 200 || metadataResponse.status >= 300)
         throw std::runtime_error("AirPlay receiver rejected initial metadata with RTSP " +
                                  std::to_string(metadataResponse.status) + '.');
+
+    if (!session.artwork.empty() &&
+        (session.artworkMime == "image/jpeg" || session.artworkMime == "image/png")) {
+        const auto artworkResponse = session.rtsp->request(
+            "SET_PARAMETER", session.rtspUri, session.artworkMime, session.artwork,
+            {{"RTP-Info", "rtptime=" + std::to_string(nextMediaTimestamp(session))}});
+        // Artwork is optional receiver decoration. A receiver that accepts the
+        // audio session but rejects this media type must still play the track.
+        (void)artworkResponse;
+    }
 
     const auto feedbackResponse = session.rtsp->request("POST", "/feedback");
     if (feedbackResponse.status < 200 || feedbackResponse.status >= 300)
@@ -222,7 +239,7 @@ void startPeriodicFeedback(ap2_session& session) {
 }
 } // namespace
 
-uint32_t AP2_CALL ap2_get_abi_version(void) { return 100; }
+uint32_t AP2_CALL ap2_get_abi_version(void) { return 102; }
 
 ap2_result AP2_CALL ap2_session_create(const ap2_session_config* config, ap2_session** session) {
     if (config == nullptr || session == nullptr || config->struct_size < sizeof(ap2_session_config) ||
@@ -241,6 +258,18 @@ ap2_result AP2_CALL ap2_session_create(const ap2_session_config* config, ap2_ses
         value->bitsPerSample = config->bits_per_sample;
         value->callback = config->state_callback;
         value->userData = config->user_data;
+        value->remoteCommandCallback = config->remote_command_callback;
+        value->title = config->title_utf8 == nullptr ? "" : config->title_utf8;
+        value->artist = config->artist_utf8 == nullptr ? "" : config->artist_utf8;
+        value->album = config->album_utf8 == nullptr ? "" : config->album_utf8;
+        value->artworkMime = config->artwork_mime_utf8 == nullptr ? "" : config->artwork_mime_utf8;
+        if (config->artwork_size > MaximumArtworkBytes ||
+            (config->artwork_size != 0 && config->artwork_data == nullptr))
+            return fail(AP2_INVALID_ARGUMENT, "AirPlay artwork is missing or exceeds the size limit.");
+        if (config->artwork_size != 0) {
+            const auto* first = static_cast<const std::uint8_t*>(config->artwork_data);
+            value->artwork.assign(first, first + config->artwork_size);
+        }
         *session = value.release();
         lastError.clear();
         return AP2_OK;
@@ -321,7 +350,18 @@ ap2_result AP2_CALL ap2_session_start(ap2_session* session) {
         notify(*session, AP2_STATE_NEGOTIATING, "Opening AirPlay 2 event channel.");
         session->events = Socket::connectTcp(session->host, session->eventPort, std::chrono::seconds(5));
         session->eventChannel = std::make_unique<orynivo::airplay2::EventChannel>(
-            session->events, session->pairingKeys.eventWrite, session->pairingKeys.eventRead);
+            session->events, session->pairingKeys.eventWrite, session->pairingKeys.eventRead,
+            [session](orynivo::airplay2::MediaRemoteCommand command) {
+                if (session->remoteCommandCallback == nullptr) return;
+                ap2_remote_command mapped = AP2_REMOTE_PLAY;
+                switch (command) {
+                    case orynivo::airplay2::MediaRemoteCommand::Play: mapped = AP2_REMOTE_PLAY; break;
+                    case orynivo::airplay2::MediaRemoteCommand::Pause: mapped = AP2_REMOTE_PAUSE; break;
+                    case orynivo::airplay2::MediaRemoteCommand::Next: mapped = AP2_REMOTE_NEXT; break;
+                    case orynivo::airplay2::MediaRemoteCommand::Previous: mapped = AP2_REMOTE_PREVIOUS; break;
+                }
+                session->remoteCommandCallback(session->userData, mapped);
+            });
 
         session->audioControl = Socket::bindUdp();
         session->audio = Socket::bindUdp();

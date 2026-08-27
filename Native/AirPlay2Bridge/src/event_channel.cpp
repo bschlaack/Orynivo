@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "event_channel.h"
+#include "airplay_crypto.h"
 
 #include <array>
 #include <charconv>
@@ -21,8 +22,10 @@ std::string trim(std::string value) {
 }
 
 EventChannel::EventChannel(Socket& socket, std::vector<std::uint8_t> incomingKey,
-                           std::vector<std::uint8_t> outgoingKey)
+                           std::vector<std::uint8_t> outgoingKey,
+                           MediaRemoteCommandCallback commandCallback)
     : socket_(socket), incoming_(std::move(incomingKey)), outgoing_(std::move(outgoingKey)),
+      commandCallback_(std::move(commandCallback)),
       thread_([this](std::stop_token token) { run(token); }) {}
 
 EventChannel::~EventChannel() {
@@ -81,6 +84,24 @@ void EventChannel::processPlaintext() {
         }
         const auto total = headerEnd + 4 + contentLength;
         if (plaintext_.size() < total) return;
+        if (contentLength != 0 && commandCallback_) {
+            const auto bodyStart = headerEnd + 4;
+            fxchain::airplay::Bytes body(
+                plaintext_.begin() + static_cast<std::ptrdiff_t>(bodyStart),
+                plaintext_.begin() + static_cast<std::ptrdiff_t>(total));
+            if (const auto event = fxchain::airplay::bplist::decode(body)) {
+                const auto* type = event->find("type");
+                const auto* value = event->find("value");
+                if (type != nullptr && value != nullptr &&
+                    type->asStr() == "sendMediaRemoteCommand") {
+                    const auto command = value->asStr();
+                    if (command == "play") commandCallback_(MediaRemoteCommand::Play);
+                    else if (command == "paus") commandCallback_(MediaRemoteCommand::Pause);
+                    else if (command == "nitm") commandCallback_(MediaRemoteCommand::Next);
+                    else if (command == "pitm") commandCallback_(MediaRemoteCommand::Previous);
+                }
+            }
+        }
         plaintext_.erase(0, total);
         auto response = std::string("RTSP/1.0 200 OK\r\nServer: AirTunes/550.10\r\n");
         if (!cseq.empty()) response += "CSeq: " + cseq + "\r\n";

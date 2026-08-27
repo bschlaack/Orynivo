@@ -1,10 +1,13 @@
 using Orynivo.Audio;
+using Orynivo.Library;
 using Orynivo.Localization;
+using Avalonia.Threading;
 
 namespace Orynivo;
 
 public partial class MainWindow
 {
+    private const int MaximumAirPlayArtworkBytes = 8 * 1024 * 1024;
     /// <summary>
     /// Resolves the selected receiver again when possible and creates the
     /// native AirPlay 2 playback session with the profile's last address as a fallback.
@@ -57,6 +60,7 @@ public partial class MainWindow
 
         if (string.IsNullOrWhiteSpace(host) || port <= 0)
             throw new InvalidOperationException(LocalizationManager.Current.NoAirPlayDevices);
+        var metadata = await ResolveAirPlayTrackMetadataAsync(item.FilePath, cancellationToken);
         return await AirPlayAudioPlayer.CreateAsync(
             item,
             host,
@@ -65,6 +69,112 @@ public partial class MainWindow
             _settings.SelectedAirPlayDeviceId,
             (float)VolumeSlider.Value,
             GetReplayGainFactor(item.FilePath),
+            metadata,
+            HandleAirPlayRemoteCommand,
             cancellationToken);
+    }
+
+    /// <summary>Routes an authenticated receiver command through Orynivo's shared transport.</summary>
+    /// <param name="command">Receiver-originated AirPlay transport command.</param>
+    private void HandleAirPlayRemoteCommand(AirPlayRemoteCommand command)
+    {
+        Dispatcher.UIThread.Post(async () =>
+        {
+            if (_player is not AirPlayAudioPlayer)
+                return;
+
+            switch (command)
+            {
+                case AirPlayRemoteCommand.Play:
+                    await ResumeAirPlayFromReceiverAsync();
+                    break;
+                case AirPlayRemoteCommand.Pause:
+                    PausePlayback();
+                    break;
+                case AirPlayRemoteCommand.Next:
+                    await PlayNextAsync();
+                    break;
+                case AirPlayRemoteCommand.Previous:
+                    await PlayPreviousAsync();
+                    break;
+            }
+        });
+    }
+
+    /// <summary>
+    /// Recreates a receiver-paused AirPlay stream at its audible position before resuming it.
+    /// </summary>
+    private async Task ResumeAirPlayFromReceiverAsync()
+    {
+        if (_player is not AirPlayAudioPlayer player || !player.IsPaused)
+            return;
+
+        try
+        {
+            var position = player.Position;
+            await player.SeekAsync(position);
+            if (!ReferenceEquals(_player, player))
+                return;
+            await ResumeOrStartPlaybackAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            // A newer playback or transport request replaced this resume.
+        }
+        catch (Exception ex)
+        {
+            if (ReferenceEquals(_player, player))
+                StatusTextBlock.Text = ex.Message;
+        }
+    }
+
+    /// <summary>Resolves bounded receiver metadata for a local, Plex, or Orynivo Server track.</summary>
+    /// <param name="filePath">Playable track path or registered stream URL.</param>
+    /// <param name="cancellationToken">Cancels artwork loading.</param>
+    /// <returns>Text metadata and optional JPEG or PNG artwork.</returns>
+    private async Task<AirPlayTrackMetadata> ResolveAirPlayTrackMetadataAsync(
+        string filePath,
+        CancellationToken cancellationToken)
+    {
+        var playlist = GetPlaylistMetadata(filePath);
+        var title = playlist?.DisplayTitle;
+        var artist = playlist?.Artist;
+        var album = playlist?.Album;
+        string? artworkPath = null;
+
+        if (_orynivoTracksByUrl.TryGetValue(filePath, out var remoteRow))
+            artworkPath = remoteRow.ArtworkPath ?? remoteRow.ThumbnailPath;
+        else if (_plexTracksByUrl.TryGetValue(filePath, out var plexRow))
+            artworkPath = plexRow.ArtworkPath ?? plexRow.ThumbnailPath;
+        else
+        {
+            var local = await Task.Run(() =>
+            {
+                using var db = AudioDatabase.OpenDefault();
+                var track = db.GetByPath(filePath);
+                var artwork = db.GetArtworkPathsByTrackPath(filePath);
+                return (track, artwork);
+            }, cancellationToken);
+            title ??= local.track?.Title;
+            artist ??= local.track?.Artist;
+            album ??= local.track?.Album;
+            artworkPath = local.artwork?.OriginalPath ??
+                          local.artwork?.Thumb320Path ??
+                          local.artwork?.Thumb96Path;
+        }
+
+        title = string.IsNullOrWhiteSpace(title)
+            ? Path.GetFileNameWithoutExtension(filePath)
+            : title;
+        var artworkBytes = await TryReadArtworkBytesAsync(artworkPath, cancellationToken);
+        if (artworkBytes is { Data.Length: > MaximumAirPlayArtworkBytes } or
+            { MimeType: not ("image/jpeg" or "image/png") })
+            artworkBytes = null;
+        return new AirPlayTrackMetadata(
+            title,
+            artist,
+            album,
+            artworkBytes?.Data,
+            artworkBytes?.MimeType);
     }
 }

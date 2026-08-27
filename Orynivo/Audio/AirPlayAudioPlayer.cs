@@ -5,6 +5,22 @@ using Orynivo.Localization;
 
 namespace Orynivo.Audio;
 
+/// <summary>Metadata sent to an AirPlay receiver for its now-playing display.</summary>
+/// <param name="Title">Track title.</param>
+/// <param name="Artist">Track artist.</param>
+/// <param name="Album">Album title.</param>
+/// <param name="Artwork">Optional JPEG or PNG artwork bytes.</param>
+/// <param name="ArtworkMimeType">MIME type of <paramref name="Artwork"/>.</param>
+internal sealed record AirPlayTrackMetadata(
+    string? Title,
+    string? Artist,
+    string? Album,
+    byte[]? Artwork,
+    string? ArtworkMimeType);
+
+/// <summary>Transport command received through the authenticated AirPlay event channel.</summary>
+internal enum AirPlayRemoteCommand { Play, Pause, Next, Previous }
+
 /// <summary>
 /// Decodes one logical track to 44.1 kHz stereo PCM and feeds it to the native
 /// AirPlay 2 bridge, with the classic RAOP helper retained as a fallback.
@@ -18,6 +34,8 @@ internal sealed class AirPlayAudioPlayer : IAudioPlayer
     private readonly string? _deviceName;
     private readonly string? _deviceId;
     private readonly string? _senderPath;
+    private AirPlayTrackMetadata _metadata = new(null, null, null, null, null);
+    private Action<AirPlayRemoteCommand> _remoteCommand = static _ => { };
     private readonly CancellationTokenSource _lifetimeCts = new();
     private readonly SemaphoreSlim _pipelineGate = new(1, 1);
     private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -91,6 +109,8 @@ internal sealed class AirPlayAudioPlayer : IAudioPlayer
     /// <param name="deviceId">Stable DNS-SD service identifier.</param>
     /// <param name="initialVolume">Initial linear PCM volume.</param>
     /// <param name="initialReplayGain">Initial linear ReplayGain factor.</param>
+    /// <param name="metadata">Track metadata displayed by the receiver.</param>
+    /// <param name="remoteCommand">Handles receiver-originated transport commands.</param>
     /// <param name="cancellationToken">Cancels startup.</param>
     /// <returns>The player together with its decoded stream information.</returns>
     internal static async Task<(AirPlayAudioPlayer Player, AudioFileInfo Info)> CreateAsync(
@@ -101,6 +121,8 @@ internal sealed class AirPlayAudioPlayer : IAudioPlayer
         string? deviceId,
         float initialVolume,
         float initialReplayGain,
+        AirPlayTrackMetadata metadata,
+        Action<AirPlayRemoteCommand> remoteCommand,
         CancellationToken cancellationToken)
     {
         var senderPath = FindSenderPath();
@@ -116,6 +138,8 @@ internal sealed class AirPlayAudioPlayer : IAudioPlayer
         var player = new AirPlayAudioPlayer(item, host, port, deviceName, deviceId, senderPath, info);
         player.Volume = initialVolume;
         player.ReplayGainFactor = initialReplayGain;
+        player._metadata = metadata;
+        player._remoteCommand = remoteCommand;
         await player.RestartPipelineAsync(TimeSpan.Zero, cancellationToken);
         return (player, info);
     }
@@ -162,7 +186,8 @@ internal sealed class AirPlayAudioPlayer : IAudioPlayer
                 if (AirPlay2NativeSession.IsAvailable)
                 {
                     nativeSession = await AirPlay2NativeSession.CreateAsync(
-                        _host, _port, _deviceName, _deviceId, cancellationToken).ConfigureAwait(false);
+                        _host, _port, _deviceName, _deviceId, _metadata, _remoteCommand,
+                        cancellationToken).ConfigureAwait(false);
                 }
                 else
                 {
@@ -271,7 +296,7 @@ internal sealed class AirPlayAudioPlayer : IAudioPlayer
 
     private void ApplyGain(Span<byte> pcm)
     {
-        var gain = Volume * ReplayGainFactor;
+        var gain = MapVolumeToLinearGain(Volume) * ReplayGainFactor;
         if (Math.Abs(gain - 1.0f) < 0.0001f)
             return;
         for (var offset = 0; offset + 1 < pcm.Length; offset += 2)
@@ -281,6 +306,18 @@ internal sealed class AirPlayAudioPlayer : IAudioPlayer
             pcm[offset] = (byte)scaled;
             pcm[offset + 1] = (byte)(scaled >> 8);
         }
+    }
+
+    /// <summary>
+    /// Maps the normalized AirPlay volume control to a perceptual PCM gain with
+    /// additional resolution at normal listening levels.
+    /// </summary>
+    /// <param name="volume">Normalized volume from zero through one.</param>
+    /// <returns>A cubic linear PCM gain from zero through one.</returns>
+    internal static float MapVolumeToLinearGain(float volume)
+    {
+        var normalized = Math.Clamp(volume, 0.0f, 1.0f);
+        return normalized * normalized * normalized;
     }
 
     private void StopPipeline()

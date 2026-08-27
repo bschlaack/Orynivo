@@ -104,6 +104,17 @@ performs transient pairing, encrypted ALAC transport, unicast PTP timing, and
 receiver-requested RTP retransmission. This path has been verified with clean
 audible playback on a Sonos stereo pair. Playback is decoded to 44.1 kHz stereo
 PCM; volume and ReplayGain are applied before it reaches the native bridge.
+AirPlay volume uses a perceptual curve with additional control at normal
+listening levels instead of mapping the slider directly to linear PCM gain.
+The receiver now-playing display receives the current title, artist, album,
+and bounded JPEG/PNG cover artwork when it is available locally or through the
+active library provider.
+Receiver-side Play, Pause, Next, and Previous controls are synchronized back to
+Orynivo through the authenticated AirPlay event channel. Resuming after a
+receiver-side pause rebuilds the stream at its current position for Sonos
+compatibility. Receiver-originated timeline seeking is not currently supported;
+it requires a separate DACP
+control endpoint rather than the reverse event channel used by those buttons.
 If the bridge is unavailable, Orynivo falls back to a compatible `raop_play`
 executable beside Orynivo or on `PATH`. The helper is deliberately not bundled
 because available RAOP implementations use licenses independent of Orynivo's

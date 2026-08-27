@@ -34,9 +34,16 @@ can associate the encrypted packets with the prepared stream. It also supplies
 initial volume and RTP-anchored DMAP track metadata before PCM delivery because
 Sonos may withhold an otherwise valid stream until metadata arrives. Receiver
 volume defaults to a probe-safe -20 dB and can be selected before session start
-through the C ABI; Orynivo uses 0 dB and applies its volume to PCM. The initial
+through the C ABI; Orynivo uses 0 dB and applies its volume to PCM. Caller-supplied
+title, artist, and album replace the diagnostic probe labels. Optional JPEG or
+PNG cover bytes are copied during session creation, bounded to 8 MiB, and sent
+best-effort so artwork rejection cannot prevent playback. The initial
 RTP/NTP mapping uses a deterministic 66,150-frame receiver-latency line, and the
 probe reports the receiver's active-stream count returned by `/feedback`.
+Authenticated reverse-event requests are acknowledged and
+`sendMediaRemoteCommand` values for Play, Pause, Next, and Previous are exposed
+through the optional C-ABI callback. Receiver-originated absolute seeking is a
+separate DACP concern and is not implemented by this bridge yet.
 Long-running sessions continue sending authenticated `/feedback` keepalives
 once per second; their worker is owned and stopped by the native session.
 Realtime encryption uses a dedicated little-endian audio nonce counter starting

@@ -58,7 +58,9 @@ This file applies to `Native/` and supplements `../AGENTS.md`.
   sequence number. For NTP sessions the RTP SSRC equals the advertised
   `streamConnectionID`; some receivers accept SETUP but silently discard packets
   that use an unrelated random SSRC. Send explicit initial volume and RTP-anchored
-  DMAP metadata before the first audio packet; Sonos may otherwise retain a valid
+  DMAP metadata before the first audio packet. Metadata comes from copied C-ABI
+  UTF-8 title/artist/album fields, with optional copied JPEG/PNG artwork bounded
+  to 8 MiB; artwork rejection is non-fatal. Sonos may otherwise retain a valid
   stream in a silent state. Sessions default to a probe-safe -20 dB receiver
   volume; desktop playback explicitly selects 0 dB and applies user volume to
   PCM. Realtime NTP sessions begin on the deterministic
@@ -79,7 +81,12 @@ This file applies to `Native/` and supplements `../AGENTS.md`.
   session mutex for teardown so shutdown cannot deadlock against feedback.
   The reverse event channel decrypts with `Events-Write-Encryption-Key`, encrypts
   responses with `Events-Read-Encryption-Key`, uses independent counters, and must
-  answer every complete request with a bare encrypted RTSP 200 response.
+  answer every complete request with a bare encrypted RTSP 200 response. Decode
+  authenticated `sendMediaRemoteCommand` binary-plist bodies and surface only
+  the known Play, Pause, Next, and Previous values through the optional C-ABI
+  callback; unknown event types remain acknowledged and ignored. Absolute
+  receiver seeking requires a separate DACP endpoint and must not be inferred
+  from this event stream.
   Session SETUP advertises `isMultiSelectAirPlay=true`; Sonos stereo-pair and
   grouped endpoints may otherwise accept timing while withholding audio.
   PCM delivery follows the exact negotiated sample clock from the first packet.

@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Changed AirPlay volume to a cubic perceptual curve, providing substantially
+  finer control at ordinary listening levels while preserving mute and the
+  unchanged 100-percent maximum.
 - Documented native AirPlay 2 output as experimental in the main README,
   standalone bridge documentation, and project wiki, including its verified
   Sonos scope and current receiver-interoperability limitations.
@@ -23,6 +26,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- AirPlay 2 receiver controls now drive Orynivo's transport instead of only
+  silencing the receiver: authenticated Play, Pause, Next, and Previous events
+  from Sonos are decoded on the reverse event channel and dispatched through
+  the shared player controls, keeping Orynivo's state and UI synchronized.
+  Receiver-originated Play rebuilds a paused AirPlay session at its current
+  audible position because Sonos does not resume accepting media on the stream
+  it placed into the paused state.
 - Kept native AirPlay 2 music sessions alive beyond the receiver's initial
   roughly two-second media window by sending authenticated `/feedback`
   keepalives once per second. The worker is joined before teardown and its
@@ -66,6 +76,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Native AirPlay 2 sessions now publish the current title, artist, album, and
+  optional bounded JPEG/PNG cover artwork to receiver displays instead of the
+  bridge's former diagnostic test-tone metadata.
 - Integrated the Sonos-verified native AirPlay 2 bridge into regular Orynivo
   playback. AirPlay output profiles now feed FFmpeg-decoded 44.1 kHz stereo PCM
   through the bundled bridge, including pause, seek, volume, ReplayGain, stop,
