@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and setup help
+    url: https://github.com/bschlaack/Orynivo/discussions/categories/q-a
+    about: Ask the community about setup, output devices, servers, and general use.
+  - name: Private security report
+    url: https://github.com/bschlaack/Orynivo/security/advisories/new
+    about: Report security vulnerabilities privately. Do not open a public issue.

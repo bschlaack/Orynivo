@@ -25,6 +25,7 @@
   <link rel="alternate" hreflang="es" href="https://orynivo.app/es/">
   <link rel="icon" href="/assets/brand/icon.png">
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/quickstart.css">
   <link rel="stylesheet" href="/wiki-links.css">
   <script defer src="/i18n.js"></script>
   <script defer src="/script.js"></script>
@@ -151,7 +152,15 @@
     </section>
 
     <section class="section install" id="install">
-      <div class="section-heading install-heading reveal"><div><p class="eyebrow">Prêt en quelques minutes</p><h2>Installation et premiers pas.</h2></div><a class="docs-link" href="https://github.com/bschlaack/Orynivo/wiki/Installation" target="_blank" rel="noreferrer">Guide complet dans le wiki ↗</a></div>
+      <div class="section-heading install-heading reveal"><div><p class="eyebrow">Prêt en cinq minutes</p><h2>Votre démarrage rapide.</h2><p>Du téléchargement au premier titre : une bibliothèque locale ne nécessite ni compte ni serveur.</p></div><a class="docs-link" href="https://github.com/bschlaack/Orynivo/wiki/First-Setup" target="_blank" rel="noreferrer">Guide complet dans le wiki ↗</a></div>
+      <ol class="quickstart-grid reveal">
+        <li><span>1 minute</span><b>Installer et ouvrir</b><p>Téléchargez le paquet correspondant à votre système, installez Orynivo et lancez l’application.</p></li>
+        <li><span>1 minute</span><b>Ajouter une source musicale</b><p>Ouvrez Réglages → Dossiers et sélectionnez au moins un dossier musical local. Vous pouvez aussi connecter un serveur Orynivo à la place ou en complément.</p></li>
+        <li><span>Automatique</span><b>Analyser la bibliothèque</b><p>Lancez l’analyse. Les artistes, albums, titres et pochettes existantes apparaissent progressivement pendant l’indexation.</p></li>
+        <li><span>1 minute</span><b>Vérifier la sortie audio</b><p>La sortie par défaut fonctionne immédiatement. Dans Réglages → Sortie, vous pouvez choisir WASAPI, ASIO, ALSA, OpenAL ou AirPlay si nécessaire.</p></li>
+        <li><span>C’est parti</span><b>Lire votre premier titre</b><p>Ouvrez Titres, Albums ou Artistes et double-cliquez sur un titre. Le volume, la file d’attente et la sortie restent accessibles dans le lecteur inférieur.</p></li>
+      </ol>
+      <div class="platform-install-heading reveal"><p class="eyebrow">Installation selon la plateforme</p><h3>Le paquet adapté à votre système.</h3></div>
       <div class="install-layout">
         <div class="install-nav" role="tablist" aria-label="Installationssystem"><button class="active" data-install="windows">Windows</button><button data-install="linux">Linux</button><button data-install="macos">macOS</button><button data-install="server">Serveur</button></div>
         <div class="install-panel active" data-panel="windows"><ol><li><b>Télécharger l’installateur</b><span>Téléchargez le fichier actuel <code>win-x64-Setup.exe</code> depuis la version.</span></li><li><b>Installer Orynivo</b><span>Lancez l’installateur et suivez l’assistant. Vous pouvez aussi extraire le ZIP portable.</span></li><li><b>Ajouter de la musique</b><span>Ouvrez Réglages → Bibliothèque, ajoutez vos dossiers musicaux et lancez l’analyse.</span></li><li><b>Choisir une sortie</b><span>Orynivo sélectionne une sortie par défaut. Pour une lecture bit-perfect, configurez WASAPI Exclusive, ASIO ou cwASIO.</span></li></ol></div>

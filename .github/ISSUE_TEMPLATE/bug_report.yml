@@ -1,0 +1,73 @@
+name: Bug report
+description: Report a reproducible problem in Orynivo or Orynivo Server.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thank you for helping improve Orynivo. Remove API keys, authenticated URLs, private filesystem paths, and personal library data from screenshots and logs.
+  - type: input
+    id: version
+    attributes:
+      label: Orynivo version
+      placeholder: e.g. 0.36.7
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected component
+      options: [Desktop player, Orynivo Server, Installer or updater, Website or documentation, Native AirPlay 2 bridge, Other]
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: Operating system and architecture
+      placeholder: e.g. Windows 11 24H2 x64, Ubuntu 26.04 x64, macOS 15 arm64
+    validations:
+      required: true
+  - type: input
+    id: audio
+    attributes:
+      label: Audio output and device
+      description: Required only for playback problems.
+      placeholder: e.g. WASAPI exclusive / Topping DAC, direct ALSA / hw:2, AirPlay 2 / Sonos stereo pair
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. Open …\n2. Select …\n3. …"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized logs or screenshots
+      description: Drag files here if useful. Never include credentials, authenticated URLs, private paths, device addresses, or personal library information.
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Include library source, media format, and whether the problem is consistent when relevant.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Submission checks
+      options:
+        - label: I searched existing issues for this problem.
+          required: true
+        - label: I removed credentials and private data from all attached material.
+          required: true

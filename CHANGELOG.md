@@ -4,6 +4,19 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.37.1] - 2026-08-27
+
+### Added
+
+- Added a responsive, localized five-minute quick-start guide to the product
+  website, a wiki feature-status page that distinguishes everyday,
+  experimental, provider-dependent, and unavailable functionality, and
+  structured GitHub forms for bug reports and feature requests. The issue
+  chooser routes setup questions to Discussions and security reports to private
+  security advisories.
+
+### Fixed
+
 ## [0.37.0] - 2026-08-27
 
 ### Changed

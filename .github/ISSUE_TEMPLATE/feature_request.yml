@@ -1,0 +1,46 @@
+name: Feature request
+description: Suggest an improvement or a new capability for Orynivo.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: Describe the user problem first. This makes it easier to compare possible solutions and platform trade-offs.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options: [Library and metadata, Playback and audio output, Orynivo Server and networking, Playlists and recommendations, User interface and accessibility, Radio, podcasts, Plex or integrations, Packaging, updates or documentation, Other]
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What are you trying to accomplish, and what currently makes it difficult?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe the behavior you would find most useful.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Optional workarounds or other designs you have considered.
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Screenshots or examples are welcome, but remove credentials and private library data.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Submission check
+      options:
+        - label: I searched existing issues and discussions for a similar request.
+          required: true
