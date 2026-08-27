@@ -74,6 +74,11 @@ AP2_API ap2_result AP2_CALL ap2_session_create(
     const ap2_session_config* config,
     ap2_session** session);
 
+/** Sets the receiver volume in decibels before session start (default: -20 dB). */
+AP2_API ap2_result AP2_CALL ap2_session_set_initial_volume(
+    ap2_session* session,
+    float volume_db);
+
 /** Starts the asynchronous AirPlay 2 connection and transient pairing flow. */
 AP2_API ap2_result AP2_CALL ap2_session_start(ap2_session* session);
 

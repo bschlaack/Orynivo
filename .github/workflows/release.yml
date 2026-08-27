@@ -73,6 +73,16 @@ jobs:
             /p:Configuration=Release /p:Platform=x64
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Build and test AirPlay 2 bridge (Release)
+        shell: pwsh
+        run: |
+          cmake -S Native/AirPlay2Bridge -B artifacts/AirPlay2Bridge -A x64
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build artifacts/AirPlay2Bridge --config Release --parallel
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ctest --test-dir artifacts/AirPlay2Bridge -C Release --output-on-failure
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Publish self-contained Windows build
         shell: pwsh
         run: >
@@ -84,6 +94,7 @@ jobs:
           --output artifacts/Orynivo-win-x64
           /p:IncludeAsioBridge=false
           /p:IncludeCwAsioBridge=true
+          /p:IncludeAirPlay2Bridge=true
           /p:AssemblyVersion=${{ steps.ver.outputs.version }}.0
           /p:FileVersion=${{ steps.ver.outputs.version }}.0
           /p:InformationalVersion=${{ steps.ver.outputs.version }}

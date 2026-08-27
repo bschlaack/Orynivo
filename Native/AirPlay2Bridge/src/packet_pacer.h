@@ -6,7 +6,7 @@
 
 namespace orynivo::airplay2 {
 
-/** Paces realtime RTP delivery within the receiver's advertised two-second buffer. */
+/** Paces RTP delivery on the negotiated realtime audio sample clock. */
 class PacketPacer final {
 public:
     /** Creates a clock for fixed-size audio packets at the supplied sample rate. */
@@ -22,7 +22,6 @@ private:
     std::uint32_t sampleRate_;
     std::uint32_t framesPerPacket_;
     std::chrono::steady_clock::time_point started_{};
-    std::chrono::steady_clock::time_point lastRelease_{};
 };
 
 } // namespace orynivo::airplay2

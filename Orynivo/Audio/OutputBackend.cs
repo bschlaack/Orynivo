@@ -13,6 +13,6 @@ public enum OutputBackend
     KernelStreaming = 2,
     /// <summary>cwASIO via <c>CwAsioBridge.dll</c>.</summary>
     CwAsio = 3,
-    /// <summary>Classic AirPlay audio output through the RAOP network protocol.</summary>
+    /// <summary>AirPlay 2 output through the native sender, with classic RAOP fallback.</summary>
     AirPlay = 4
 }

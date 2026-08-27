@@ -7,7 +7,7 @@ public partial class MainWindow
 {
     /// <summary>
     /// Resolves the selected receiver again when possible and creates the
-    /// classic AirPlay playback session with the profile's last address as a fallback.
+    /// native AirPlay 2 playback session with the profile's last address as a fallback.
     /// </summary>
     /// <param name="item">Track to decode and stream.</param>
     /// <param name="cancellationToken">Cancels discovery and playback startup.</param>
@@ -61,6 +61,8 @@ public partial class MainWindow
             item,
             host,
             port,
+            _settings.SelectedAirPlayDeviceName,
+            _settings.SelectedAirPlayDeviceId,
             (float)VolumeSlider.Value,
             GetReplayGainFactor(item.FilePath),
             cancellationToken);

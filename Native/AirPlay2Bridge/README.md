@@ -7,6 +7,13 @@ and audio decoding remain outside the project.
 
 ## Current status
 
+> **Experimental:** This sender is suitable for interoperability testing and
+> Orynivo's experimental AirPlay 2 output, but it is not yet a general
+> compatibility guarantee for every AirPlay 2 receiver. Continuous playback,
+> seeking, and clean stereo output have been verified on the tested Sonos stereo
+> pair. Other device models, firmware revisions, grouped topologies, and network
+> conditions still require real-device validation.
+
 The current milestone contains the ABI, portable Windows/POSIX sockets,
 fail-closed HAP transient pairing, authenticated encrypted control, binary-plist
 session negotiation, event-channel handling, a unicast gPTP grandmaster, and a
@@ -25,25 +32,31 @@ media ports has been verified against a Sonos AirPlay 2 receiver. Realtime RTP n
 uses the negotiated stream connection ID as its NTP-session SSRC so the receiver
 can associate the encrypted packets with the prepared stream. It also supplies
 initial volume and RTP-anchored DMAP track metadata before PCM delivery because
-Sonos may withhold an otherwise valid stream until metadata arrives. The initial
+Sonos may withhold an otherwise valid stream until metadata arrives. Receiver
+volume defaults to a probe-safe -20 dB and can be selected before session start
+through the C ABI; Orynivo uses 0 dB and applies its volume to PCM. The initial
 RTP/NTP mapping uses a deterministic 66,150-frame receiver-latency line, and the
 probe reports the receiver's active-stream count returned by `/feedback`.
+Long-running sessions continue sending authenticated `/feedback` keepalives
+once per second; their worker is owned and stopped by the native session.
 Realtime encryption uses a dedicated little-endian audio nonce counter starting
 at zero, independent of the randomized RTP sequence number. Native realtime
 SETUP is followed by a timeline-anchored `RECORD` carrying the first packet's
 sequence and RTP timestamp. SETUP does not advertise a sender data port; it uses
 the destination returned by the receiver.
+The captured PTP/RTP media anchor is emitted before the first packet and then
+approximately once per sample-rate second. Realtime packets follow the media
+sample clock from the beginning; receiver buffering is represented once in the
+anchor timeline rather than duplicated by a fast sender prefill.
 The active realtime media format is stereo 16-bit ALAC
 (`audioFormat=0x40000`, `ct=2`, `spf=352`). It requires UDP ports 319 and 320
 for gPTP in addition to the encrypted RTSP and receiver-selected UDP audio ports.
 Session SETUP advertises multi-select AirPlay capability for grouped receivers,
 including Sonos stereo pairs.
-The complete control, timing, and encrypted media path has produced audible output
-on a Sonos stereo pair; clean sample reproduction still requires real-device
-verification of the corrected uncompressed ALAC payload representation. Event
-processing and metadata are also incomplete.
-Orynivo must not load or advertise this bridge until a complete session passes
-real-receiver tests.
+The complete control, timing, and encrypted media path has produced continuous,
+clean output on a Sonos stereo pair, including playback after seeking. Broader
+receiver interoperability, event processing, and metadata behavior remain
+experimental and require additional real-device testing.
 
 The protocol and cryptographic port is based on the interoperability research
 published by

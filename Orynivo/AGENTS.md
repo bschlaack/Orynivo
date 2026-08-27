@@ -69,22 +69,24 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   and permits one-click reacquisition/resume. Ordinary playback clears that
   snapshot. Pausing alone must never be presented as releasing an exclusive
   WASAPI, ASIO, cwASIO, or direct ALSA device.
-- Classic AirPlay output is a cross-platform `OutputBackend.AirPlay` profile.
+- AirPlay output is a cross-platform `OutputBackend.AirPlay` profile.
   Discover `_raop._tcp.local.` receivers away from the UI thread, persist only
-  their stable service ID/display name/last endpoint, refresh the endpoint
-  before playback, and stream 44.1 kHz stereo PCM to a separately installed
-  `raop_play` helper. Do not claim AirPlay 2, protected receiver, multiroom, or
-  gapless support and never persist passwords or pairing material.
-- The AirPlay 2 sender under development lives in the independent Qt-free
+  their stable service ID/display name/last endpoint and refresh the endpoint
+  before playback. Prefer the bundled native AirPlay 2 bridge when available;
+  retain the separately installed `raop_play` helper as a classic fallback.
+  Never persist passwords or transient pairing material.
+- The AirPlay 2 sender lives in the independent Qt-free
   `Native/AirPlay2Bridge` CMake project. Keep its public boundary as a stable C
   ABI with opaque session handles; it must not depend on Avalonia or Orynivo.
   Fail-closed transient pairing, encrypted control, session SETUP, NTP timing,
   RECORD, and audio-stream SETUP are implemented and Sonos-verified. ALAC
   encoding, encrypted realtime RTP packetization, NTP/RTP sync anchors,
   retransmit handling, rate-aware prefill/pacing, and best-effort teardown are
-  implemented behind the ABI. Do not load or advertise it from the desktop until audible packet pacing,
-  event handling, native tests, and real-receiver playback
-  verification are complete.
+  implemented behind the ABI and clean playback is verified on a Sonos stereo
+  pair. `AirPlay2NativeSession` is the only managed interop boundary;
+  `AirPlayAudioPlayer` owns it and feeds 44.1 kHz signed 16-bit stereo PCM.
+  Keep pause, seek, stop, output release, and fallback RAOP lifecycle behavior
+  behind that existing player abstraction.
 - Preserve source identity on mixed rows. Remote rows must carry their
   `OrynivoServer`, server-side IDs, and authenticated playback metadata; never
   persist credential-bearing URLs.

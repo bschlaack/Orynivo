@@ -98,29 +98,33 @@ Silicon. Native DSD output remains available only through Windows ASIO/cwASIO
 or Linux direct ALSA, and Windows System Media Transport Controls remain
 Windows-specific.
 
-Classic AirPlay output is shared by all desktop platforms. Selecting AirPlay
-while creating an output profile scans the local network for `_raop._tcp`
-receivers and displays them instead of local sound devices. Playback is decoded
-to 44.1 kHz stereo PCM and sent through a compatible `raop_play` executable
-located beside Orynivo or on `PATH`. The helper is deliberately not bundled
+AirPlay output profiles discover local `_raop._tcp` receivers on every desktop
+platform. On Windows, the bundled native `AirPlay2Bridge` is preferred and
+performs transient pairing, encrypted ALAC transport, unicast PTP timing, and
+receiver-requested RTP retransmission. This path has been verified with clean
+audible playback on a Sonos stereo pair. Playback is decoded to 44.1 kHz stereo
+PCM; volume and ReplayGain are applied before it reaches the native bridge.
+If the bridge is unavailable, Orynivo falls back to a compatible `raop_play`
+executable beside Orynivo or on `PATH`. The helper is deliberately not bundled
 because available RAOP implementations use licenses independent of Orynivo's
-Apache-2.0 distribution. This initial backend supports one classic,
-non-password-protected AirPlay receiver; AirPlay 2-only pairing, protected
-receivers, multiroom synchronization, gapless transitions, and Orynivo's
-parametric equalizer are not yet supported. Volume and ReplayGain are applied
-to the PCM feed.
+Apache-2.0 distribution. Gapless transitions and Orynivo's parametric equalizer
+are not yet supported for either network path.
 
-Receivers that advertise only `_airplay._tcp`, including current AirPlay 2-only
-Sonos devices, do not appear in this classic RAOP device list and cannot yet be
-used as Orynivo outputs. The Qt-free `AirPlay2Bridge` under development adds
-native AirPlay 2 support on Windows, Linux, and macOS while retaining
+> **Experimental:** Native AirPlay 2 support is an interoperability
+> implementation based on observed protocol behavior rather than a public Apple
+> sender specification. Continuous playback, seeking, timing, and stereo-pair
+> output have been verified with the tested Sonos receiver, but other receiver
+> models, firmware versions, grouped configurations, and network environments
+> may behave differently. Keep a conventional local output profile available
+> and report reproducible receiver-specific problems with model and firmware
+> information.
+
+The Qt-free `AirPlay2Bridge` provides native AirPlay 2 support while retaining
 the existing RAOP route for AirPlay 1 receivers. The evaluated
 [`airplay2-sender-cpp`](https://github.com/akustikrausch/airplay2-sender-cpp)
 project supplies the reusable Apache-2.0 cryptographic core fetched at a pinned
 commit; its Qt sender is not linked. The native bridge fetches Apple's official
-Apache-2.0 ALAC encoder separately. Before the bridge can ship, audible RTP
-timing, lifecycle handling, packaging, and complete receiver tests must be
-finished.
+Apache-2.0 ALAC encoder separately.
 
 Development of that component has started in
 [`Native/AirPlay2Bridge`](Native/AirPlay2Bridge/README.md). It is deliberately a
@@ -135,9 +139,10 @@ Its PTP clock behavior follows a complete working iPhone-to-Sonos capture;
 retransmission. Captured type-103 TCP framing remains isolated for later AAC use.
 Initial receiver volume, RTP-anchored DMAP metadata, encrypted teardown, and
 PTP/buffered-packet diagnostics are included. These paths are backed by native
-tests. Session negotiation through the media ports is verified against a Sonos receiver; audible packet identity/timing and event
-handling remain unfinished. Orynivo does not load the bridge yet and therefore
-still makes no AirPlay 2 playback claim.
+tests. Session negotiation, encrypted media, PTP timing, retransmission,
+teardown, and clean audible playback are verified against a Sonos stereo-pair
+receiver. The Windows build copies the bridge beside Orynivo and loads it
+through its stable C ABI.
 
 Settings > Playback offers mutually exclusive DSD routing preferences for
 lossy DSD-to-PCM conversion and bit-perfect DSD over PCM (DoP). DoP requires a

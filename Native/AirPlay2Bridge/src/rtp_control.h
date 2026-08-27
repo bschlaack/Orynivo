@@ -20,7 +20,7 @@ namespace orynivo::airplay2 {
 
 /** Builds the PTP-clocked realtime RTP synchronization datagram. */
 [[nodiscard]] std::array<std::byte, 28> buildPtpRtpSyncPacket(
-    std::uint32_t nextTimestamp, std::uint32_t latencyFrames,
+    std::uint32_t currentPlaybackTimestamp, std::uint32_t nextTimestamp,
     std::uint64_t clockNanoseconds, std::uint64_t clockId, bool first);
 
 /** Retains a bounded audio packet history and answers receiver resend requests. */

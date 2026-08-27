@@ -38,18 +38,19 @@ std::array<std::byte, 20> buildRtpSyncPacket(
 }
 
 std::array<std::byte, 28> buildPtpRtpSyncPacket(
-    std::uint32_t nextTimestamp, std::uint32_t latencyFrames,
+    std::uint32_t currentPlaybackTimestamp, std::uint32_t nextTimestamp,
     std::uint64_t clockNanoseconds, std::uint64_t clockId, bool first) {
     std::array<std::byte, 28> packet{};
     packet[0] = first ? std::byte{0x90} : std::byte{0x80};
     packet[1] = std::byte{0xd7};
     packet[3] = std::byte{0x06};
-    const auto playPosition = nextTimestamp - latencyFrames;
-    const auto frameOne = playPosition + 11035U;
-    writeBigEndian32(packet.data() + 4, frameOne);
+    writeBigEndian32(packet.data() + 4, currentPlaybackTimestamp);
     writeBigEndian32(packet.data() + 8, static_cast<std::uint32_t>(clockNanoseconds >> 32));
     writeBigEndian32(packet.data() + 12, static_cast<std::uint32_t>(clockNanoseconds));
-    writeBigEndian32(packet.data() + 16, frameOne + 77175U);
+    // AirPlay 2 receivers use this field as the earliest RTP frame that may be
+    // rendered. Apple's senders and OwnTone place it 250 ms behind the next
+    // packet timestamp for a 44.1-kHz stream.
+    writeBigEndian32(packet.data() + 16, nextTimestamp - 11025U);
     writeBigEndian32(packet.data() + 20, static_cast<std::uint32_t>(clockId >> 32));
     writeBigEndian32(packet.data() + 24, static_cast<std::uint32_t>(clockId));
     return packet;

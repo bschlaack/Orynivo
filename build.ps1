@@ -149,7 +149,9 @@ else {
 
 $includeAsioBridge = if ($null -ne $asioSdk) { 'true' } else { 'false' }
 $includeCwAsioBridge = if (-not $SkipCwAsio) { 'true' } else { 'false' }
+$includeAirPlay2Bridge = if (-not $SkipAirPlay2Bridge) { 'true' } else { 'false' }
 dotnet build $managedProject -c $Configuration `
     "/p:IncludeAsioBridge=$includeAsioBridge" `
-    "/p:IncludeCwAsioBridge=$includeCwAsioBridge"
+    "/p:IncludeCwAsioBridge=$includeCwAsioBridge" `
+    "/p:IncludeAirPlay2Bridge=$includeAirPlay2Bridge"
 exit $LASTEXITCODE

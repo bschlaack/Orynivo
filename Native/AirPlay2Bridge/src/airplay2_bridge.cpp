@@ -14,11 +14,14 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <iomanip>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <sstream>
 #include <thread>
 #include <vector>
 
@@ -56,11 +59,16 @@ struct ap2_session {
     std::uint32_t sessionId = 0;
     std::string rtspUri;
     bool buffered = false;
+    float initialVolumeDb = -20.0F;
+    std::jthread feedbackThread;
+    std::atomic<std::uint64_t> periodicFeedbackCount{0};
 };
 
 namespace {
 thread_local std::string lastError;
 constexpr std::uint32_t ReceiverLatencyFrames = 22050U + 44100U;
+constexpr std::uint32_t SenderBufferFrames = 77175U;
+constexpr std::uint64_t SyncIntervalFrames = 44100U;
 
 ap2_result fail(ap2_result result, std::string message) {
     lastError = std::move(message);
@@ -143,7 +151,10 @@ void appendDmapString(std::vector<std::uint8_t>& body, const char tag[4], const 
 }
 
 void prepareReceiverForAudio(ap2_session& session) {
-    const std::string volume = "volume: -20.000000\r\n";
+    std::ostringstream volumeStream;
+    volumeStream << "volume: " << std::fixed << std::setprecision(6)
+                 << session.initialVolumeDb << "\r\n";
+    const auto volume = volumeStream.str();
     const auto volumeResponse = session.rtsp->request(
         "SET_PARAMETER", session.rtspUri, "text/parameters",
         {volume.begin(), volume.end()});
@@ -187,6 +198,28 @@ void prepareReceiverForAudio(ap2_session& session) {
             : " active stream(s); using native realtime type-96 ALAC audio and PTP.");
     notify(session, AP2_STATE_NEGOTIATING, message.c_str());
 }
+
+void startPeriodicFeedback(ap2_session& session) {
+    session.feedbackThread = std::jthread([&session](std::stop_token stopToken) {
+        while (!stopToken.stop_requested()) {
+            for (int slice = 0; slice < 10 && !stopToken.stop_requested(); ++slice)
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            if (stopToken.stop_requested())
+                break;
+            try {
+                std::scoped_lock lock(session.mutex);
+                if (session.state != AP2_STATE_STREAMING || session.rtsp == nullptr)
+                    continue;
+                const auto response = session.rtsp->request("POST", "/feedback");
+                if (response.status >= 200 && response.status < 300)
+                    session.periodicFeedbackCount.fetch_add(1, std::memory_order_relaxed);
+            } catch (...) {
+                // A transient feedback failure must not interrupt an otherwise
+                // healthy media stream; the next interval retries it.
+            }
+        }
+    });
+}
 } // namespace
 
 uint32_t AP2_CALL ap2_get_abi_version(void) { return 100; }
@@ -214,6 +247,17 @@ ap2_result AP2_CALL ap2_session_create(const ap2_session_config* config, ap2_ses
     } catch (const std::exception& error) {
         return fail(AP2_INTERNAL_ERROR, error.what());
     }
+}
+
+ap2_result AP2_CALL ap2_session_set_initial_volume(ap2_session* session, float volumeDb) {
+    if (session == nullptr || volumeDb < -144.0F || volumeDb > 0.0F)
+        return fail(AP2_INVALID_ARGUMENT, "AirPlay 2 initial volume must be between -144 and 0 dB.");
+    std::scoped_lock lock(session->mutex);
+    if (session->state != AP2_STATE_IDLE)
+        return fail(AP2_INVALID_STATE, "Initial volume can only be set before session start.");
+    session->initialVolumeDb = volumeDb;
+    lastError.clear();
+    return AP2_OK;
 }
 
 ap2_result AP2_CALL ap2_session_start(ap2_session* session) {
@@ -326,7 +370,7 @@ ap2_result AP2_CALL ap2_session_start(ap2_session* session) {
         if (session->controlPort == 0)
             throw std::runtime_error("AirPlay stream SETUP returned no RTP control port.");
         session->packetizer = std::make_unique<orynivo::airplay2::RealtimeAudioPacketizer>(
-            session->sampleRate, session->pairingKeys.audioKey, session->sessionId,
+            session->sampleRate, session->pairingKeys.audioKey, 0,
             ReceiverLatencyFrames);
         session->pacer = std::make_unique<orynivo::airplay2::PacketPacer>(
             session->sampleRate,
@@ -349,6 +393,7 @@ ap2_result AP2_CALL ap2_session_start(ap2_session* session) {
         notify(*session, AP2_STATE_NEGOTIATING, "Setting initial AirPlay 2 volume and metadata.");
         prepareReceiverForAudio(*session);
         notify(*session, AP2_STATE_STREAMING, "AirPlay 2 realtime ALAC/PTP stream is ready.");
+        startPeriodicFeedback(*session);
         lastError.clear();
         return AP2_OK;
     } catch (const std::exception& error) {
@@ -379,10 +424,18 @@ ap2_result AP2_CALL ap2_session_write_pcm(ap2_session* session, const void* samp
                 ? session->bufferedPacketizer->packetCount()
                 : session->packetizer->packetCount();
             session->pacer->waitFor(packetCount);
-            if (!session->buffered && (packetCount == 0 || packetCount % 100 == 0)) {
+            const auto framesSent =
+                packetCount * orynivo::airplay2::AlacEncoder::FramesPerPacket;
+            const auto previousFramesSent = packetCount == 0
+                ? 0
+                : (packetCount - 1) * orynivo::airplay2::AlacEncoder::FramesPerPacket;
+            if (!session->buffered &&
+                (packetCount == 0 || framesSent / SyncIntervalFrames !=
+                                     previousFramesSent / SyncIntervalFrames)) {
+                const auto clockNow = orynivo::airplay2::PtpTimingGrandmaster::nowNanoseconds();
+                const auto nextTimestamp = session->packetizer->nextTimestamp();
                 const auto sync = orynivo::airplay2::buildPtpRtpSyncPacket(
-                    session->packetizer->nextTimestamp(), ReceiverLatencyFrames,
-                    orynivo::airplay2::PtpTimingGrandmaster::nowNanoseconds(),
+                    nextTimestamp - SenderBufferFrames, nextTimestamp, clockNow,
                     session->ptp->clockId(), packetCount == 0);
                 session->audioControl.sendTo(session->host, session->controlPort, sync);
             }
@@ -411,6 +464,9 @@ ap2_result AP2_CALL ap2_session_write_pcm(ap2_session* session, const void* samp
 
 ap2_result AP2_CALL ap2_session_stop(ap2_session* session) {
     if (session == nullptr) return fail(AP2_INVALID_ARGUMENT, "Session is null.");
+    session->feedbackThread.request_stop();
+    if (session->feedbackThread.joinable())
+        session->feedbackThread.join();
     std::scoped_lock lock(session->mutex);
     if (session->bufferedPacketizer != nullptr && session->ptp != nullptr) {
         const auto diagnostic = "AirPlay 2 media diagnostics: sent " +
@@ -434,7 +490,9 @@ ap2_result AP2_CALL ap2_session_stop(ap2_session* session) {
                 : std::to_string(session->timing->responseCount()) + " of " +
                   std::to_string(session->timing->requestCount()) + " NTP timing request(s), answered ") +
             std::to_string(session->eventChannel == nullptr ? 0 : session->eventChannel->answeredRequestCount()) +
-            " encrypted event request(s)" +
+            " encrypted event request(s), sent " +
+            std::to_string(session->periodicFeedbackCount.load(std::memory_order_relaxed)) +
+            " periodic feedback request(s)" +
             (session->eventChannel != nullptr && session->eventChannel->failed() ? " (event channel failed)." : ".");
         notify(*session, AP2_STATE_NEGOTIATING, diagnostic.c_str());
     }

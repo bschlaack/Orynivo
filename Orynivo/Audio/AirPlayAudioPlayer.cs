@@ -6,8 +6,8 @@ using Orynivo.Localization;
 namespace Orynivo.Audio;
 
 /// <summary>
-/// Decodes one logical track to 44.1 kHz stereo PCM and feeds it to a classic
-/// AirPlay/RAOP sender process.
+/// Decodes one logical track to 44.1 kHz stereo PCM and feeds it to the native
+/// AirPlay 2 bridge, with the classic RAOP helper retained as a fallback.
 /// </summary>
 internal sealed class AirPlayAudioPlayer : IAudioPlayer
 {
@@ -15,13 +15,16 @@ internal sealed class AirPlayAudioPlayer : IAudioPlayer
     private readonly GaplessPlaybackItem _item;
     private readonly string _host;
     private readonly int _port;
-    private readonly string _senderPath;
+    private readonly string? _deviceName;
+    private readonly string? _deviceId;
+    private readonly string? _senderPath;
     private readonly CancellationTokenSource _lifetimeCts = new();
     private readonly SemaphoreSlim _pipelineGate = new(1, 1);
     private readonly TaskCompletionSource _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private CancellationTokenSource? _pipelineCts;
     private FfmpegPcmDecoder? _decoder;
     private Process? _sender;
+    private AirPlay2NativeSession? _nativeSession;
     private Task? _pumpTask;
     private long _framesSent;
     private long _positionOffsetFrames;
@@ -34,12 +37,16 @@ internal sealed class AirPlayAudioPlayer : IAudioPlayer
         GaplessPlaybackItem item,
         string host,
         int port,
-        string senderPath,
+        string? deviceName,
+        string? deviceId,
+        string? senderPath,
         AudioFileInfo info)
     {
         _item = item;
         _host = host;
         _port = port;
+        _deviceName = deviceName;
+        _deviceId = deviceId;
         _senderPath = senderPath;
         Info = info;
     }
@@ -76,10 +83,12 @@ internal sealed class AirPlayAudioPlayer : IAudioPlayer
         set => Volatile.Write(ref _replayGainFactor, Math.Max(0.0f, value));
     }
 
-    /// <summary>Creates and starts a classic AirPlay playback session.</summary>
+    /// <summary>Creates and starts an AirPlay 2 or fallback classic AirPlay session.</summary>
     /// <param name="item">Logical source track and optional segment bounds.</param>
     /// <param name="host">Resolved receiver address.</param>
     /// <param name="port">Receiver RAOP port.</param>
+    /// <param name="deviceName">Receiver display name.</param>
+    /// <param name="deviceId">Stable DNS-SD service identifier.</param>
     /// <param name="initialVolume">Initial linear PCM volume.</param>
     /// <param name="initialReplayGain">Initial linear ReplayGain factor.</param>
     /// <param name="cancellationToken">Cancels startup.</param>
@@ -88,12 +97,15 @@ internal sealed class AirPlayAudioPlayer : IAudioPlayer
         GaplessPlaybackItem item,
         string host,
         int port,
+        string? deviceName,
+        string? deviceId,
         float initialVolume,
         float initialReplayGain,
         CancellationToken cancellationToken)
     {
-        var senderPath = FindSenderPath()
-            ?? throw new InvalidOperationException(LocalizationManager.Current.AirPlaySenderMissing);
+        var senderPath = FindSenderPath();
+        if (!AirPlay2NativeSession.IsAvailable && senderPath is null)
+            throw new InvalidOperationException(LocalizationManager.Current.AirPlaySenderMissing);
         var info = item.TryCreateKnownAudioInfo() ?? await ProbeAsync(item.PlaybackPath, cancellationToken);
         if (item.SegmentDuration is { } segmentDuration)
             info = info with { Duration = segmentDuration };
@@ -101,7 +113,7 @@ internal sealed class AirPlayAudioPlayer : IAudioPlayer
             info = info with { Duration = knownDuration };
         info = info with { OutputSampleRate = SampleRate, Channels = 2 };
 
-        var player = new AirPlayAudioPlayer(item, host, port, senderPath, info);
+        var player = new AirPlayAudioPlayer(item, host, port, deviceName, deviceId, senderPath, info);
         player.Volume = initialVolume;
         player.ReplayGainFactor = initialReplayGain;
         await player.RestartPipelineAsync(TimeSpan.Zero, cancellationToken);
@@ -144,19 +156,30 @@ internal sealed class AirPlayAudioPlayer : IAudioPlayer
                 _item.SegmentEnd,
                 cancellationToken).ConfigureAwait(false);
             Process? sender = null;
+            AirPlay2NativeSession? nativeSession = null;
             try
             {
-                sender = StartSender();
+                if (AirPlay2NativeSession.IsAvailable)
+                {
+                    nativeSession = await AirPlay2NativeSession.CreateAsync(
+                        _host, _port, _deviceName, _deviceId, cancellationToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    sender = StartSender();
+                }
                 _decoder = decoder;
                 _sender = sender;
+                _nativeSession = nativeSession;
                 Interlocked.Exchange(ref _framesSent, 0);
                 Interlocked.Exchange(ref _positionOffsetFrames, (long)(position.TotalSeconds * SampleRate));
-                _pumpTask = Task.Run(() => PumpAsync(decoder, sender, linkedCts.Token));
+                _pumpTask = Task.Run(() => PumpAsync(decoder, sender, nativeSession, linkedCts.Token));
             }
             catch
             {
                 decoder.Dispose();
                 sender?.Dispose();
+                nativeSession?.Dispose();
                 linkedCts.Dispose();
                 _pipelineCts = null;
                 throw;
@@ -170,6 +193,8 @@ internal sealed class AirPlayAudioPlayer : IAudioPlayer
 
     private Process StartSender()
     {
+        if (_senderPath is null)
+            throw new InvalidOperationException(LocalizationManager.Current.AirPlaySenderMissing);
         var startInfo = new ProcessStartInfo
         {
             FileName = _senderPath,
@@ -196,7 +221,8 @@ internal sealed class AirPlayAudioPlayer : IAudioPlayer
 
     private async Task PumpAsync(
         FfmpegPcmDecoder decoder,
-        Process sender,
+        Process? sender,
+        AirPlay2NativeSession? nativeSession,
         CancellationToken cancellationToken)
     {
         var buffer = new byte[32 * 1024];
@@ -214,16 +240,22 @@ internal sealed class AirPlayAudioPlayer : IAudioPlayer
                 if (read <= 0)
                     break;
                 ApplyGain(buffer.AsSpan(0, read));
-                await sender.StandardInput.BaseStream
-                    .WriteAsync(buffer.AsMemory(0, read), cancellationToken)
-                    .ConfigureAwait(false);
+                if (nativeSession is not null)
+                    nativeSession.Write(buffer.AsSpan(0, read));
+                else if (sender is not null)
+                    await sender.StandardInput.BaseStream
+                        .WriteAsync(buffer.AsMemory(0, read), cancellationToken)
+                        .ConfigureAwait(false);
                 Interlocked.Add(ref _framesSent, read / 4);
             }
 
             if (!cancellationToken.IsCancellationRequested)
             {
-                sender.StandardInput.Close();
-                await sender.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+                if (sender is not null)
+                {
+                    sender.StandardInput.Close();
+                    await sender.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+                }
                 _completion.TrySetResult();
             }
         }
@@ -260,12 +292,14 @@ internal sealed class AirPlayAudioPlayer : IAudioPlayer
             sender.Kill(entireProcessTree: true);
         _sender?.Dispose();
         _sender = null;
+        _nativeSession?.Dispose();
+        _nativeSession = null;
         _pipelineCts?.Dispose();
         _pipelineCts = null;
     }
 
-    /// <summary>Gets whether a compatible RAOP sender executable is currently available.</summary>
-    internal static bool IsSenderAvailable => FindSenderPath() is not null;
+    /// <summary>Gets whether the native AirPlay 2 bridge or compatible RAOP fallback is available.</summary>
+    internal static bool IsSenderAvailable => AirPlay2NativeSession.IsAvailable || FindSenderPath() is not null;
 
     private static string? FindSenderPath()
     {
