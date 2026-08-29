@@ -37,6 +37,15 @@ public sealed record PlayerState(
 /// <param name="FileName">File name without directory path.</param>
 public sealed record QueueEntry(int Index, bool IsCurrent, string Path, string FileName);
 
+/// <summary>Snapshot of the configured equalizer profiles exposed to remote-control tools.</summary>
+/// <param name="Profiles">Available profile names.</param>
+/// <param name="SelectedProfile">Selected profile name, or <see langword="null"/>.</param>
+/// <param name="Enabled">Whether equalization is enabled.</param>
+public sealed record EqualizerProfileState(
+    IReadOnlyList<string> Profiles,
+    string? SelectedProfile,
+    bool Enabled);
+
 /// <summary>
 /// Thread-safe bridge between the MCP tool layer and the Avalonia main-window player.
 /// All delegate members are populated by <see cref="MainWindow"/> before the MCP server starts.
@@ -100,6 +109,33 @@ public sealed class McpPlayerBridge
     /// </summary>
     public Func<string, Task<string?>>? ResolveRemoteTrackFunc { get; set; }
 
+    /// <summary>Gets or sets a function that applies the requested favorite state to the current track.</summary>
+    public Func<bool, bool>? SetCurrentFavoriteFunc { get; set; }
+
+    /// <summary>Gets or sets a function that controls Infinite Mix and returns its resulting state.</summary>
+    public Func<string, Task<string>>? ControlInfiniteMixFunc { get; set; }
+
+    /// <summary>Gets or sets a function returning all output profile names.</summary>
+    public Func<IReadOnlyList<string>>? GetOutputProfilesFunc { get; set; }
+
+    /// <summary>Gets or sets a function selecting an output profile by name.</summary>
+    public Func<string, Task<bool>>? SelectOutputProfileFunc { get; set; }
+
+    /// <summary>Gets or sets a function returning the equalizer profile state.</summary>
+    public Func<EqualizerProfileState>? GetEqualizerProfilesFunc { get; set; }
+
+    /// <summary>Gets or sets a function selecting an equalizer profile and enable state.</summary>
+    public Func<string?, bool, Task<bool>>? ConfigureEqualizerFunc { get; set; }
+
+    /// <summary>Gets or sets a function returning cached lyrics for the current track.</summary>
+    public Func<Task<string?>>? GetCurrentLyricsFunc { get; set; }
+
+    /// <summary>Gets or sets a function returning configured Orynivo Server display names.</summary>
+    public Func<IReadOnlyList<string>>? GetOrynivoServerNamesFunc { get; set; }
+
+    /// <summary>Gets or sets a function that starts a library scan on one named Orynivo Server.</summary>
+    public Func<string, Task<bool>>? TriggerOrynivoServerScanFunc { get; set; }
+
     /// <summary>Gets or sets the set of tool names that are individually disabled; <see langword="null"/> means all tools are enabled.</summary>
     public HashSet<string>? DisabledTools { get; set; }
 
@@ -121,6 +157,17 @@ public sealed class McpPlayerBridge
     /// <returns>The value returned by <paramref name="func"/>.</returns>
     public async Task<T> OnUiAsync<T>(Func<T> func, CancellationToken ct = default) =>
         await Dispatcher.UIThread.InvokeAsync(func, DispatcherPriority.Normal);
+
+    /// <summary>Dispatches an asynchronous function to the Avalonia UI thread and unwraps its result.</summary>
+    /// <typeparam name="T">The function result type.</typeparam>
+    /// <param name="func">Asynchronous function to start on the UI thread.</param>
+    /// <param name="ct">Optional cancellation token.</param>
+    /// <returns>The value produced by the asynchronous function.</returns>
+    public async Task<T> OnUiAsync<T>(Func<Task<T>> func, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return await Dispatcher.UIThread.InvokeAsync(func, DispatcherPriority.Normal);
+    }
 
     /// <summary>
     /// Dispatches <paramref name="action"/> to the Avalonia UI thread and awaits completion.

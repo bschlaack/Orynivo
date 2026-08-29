@@ -3,7 +3,7 @@ using System.Text.Json.Nodes;
 namespace Orynivo.AI;
 
 /// <summary>
-/// Builds OpenAI function-calling tool definitions for all 23 Orynivo player tools.
+/// Builds OpenAI function-calling tool definitions for all Orynivo player tools.
 /// Each definition matches a method in <see cref="Orynivo.Mcp.McpTools"/> and is
 /// forwarded to the chat-completions API so the model can invoke tools.
 /// </summary>
@@ -130,6 +130,51 @@ internal static class AiToolDefinitions
                 ["limit"] = Int("Maximum number of results per category (1–50, default 10).")
             },
             ["query"]),
+
+        Make("set_current_favorite",
+            "Marks or unmarks the currently playing local or Orynivo Server track as a favorite.",
+            new JsonObject { ["favorite"] = Bool("True to mark the current track as favorite; false to remove it.") },
+            ["favorite"]),
+
+        Make("control_infinite_mix",
+            "Controls Orynivo Infinite Mix. Start uses the saved mix profile and configured local/remote sources.",
+            new JsonObject { ["action"] = Str("One of: start, pause, resume, stop.") },
+            ["action"]),
+
+        Make("list_output_profiles",
+            "Lists configured audio output profiles and identifies the selected profile.",
+            new JsonObject()),
+
+        Make("select_output_profile",
+            "Selects a configured audio output profile by name and safely resumes active playback on it.",
+            new JsonObject { ["profile"] = Str("Exact output profile name from list_output_profiles.") },
+            ["profile"]),
+
+        Make("list_equalizer_profiles",
+            "Lists equalizer profiles, the selected profile, and whether equalization is enabled.",
+            new JsonObject()),
+
+        Make("configure_equalizer",
+            "Selects an equalizer profile and enables or disables PCM equalization.",
+            new JsonObject
+            {
+                ["profile"] = Str("Exact profile name from list_equalizer_profiles; omit to retain the current profile."),
+                ["enabled"] = Bool("Whether equalization should be enabled.")
+            },
+            ["enabled"]),
+
+        Make("get_current_lyrics",
+            "Returns cached lyrics for the currently playing local or Orynivo Server track without starting an external download.",
+            new JsonObject()),
+
+        Make("list_orynivo_servers",
+            "Lists configured Orynivo Server display names without exposing URLs or API keys.",
+            new JsonObject()),
+
+        Make("scan_orynivo_server",
+            "Starts a normal library scan on one configured Orynivo Server. This does not start ReplayGain maintenance.",
+            new JsonObject { ["server"] = Str("Exact server display name from list_orynivo_servers.") },
+            ["server"]),
 
         Make("list_playlists",
             "Lists all playlists in the library, including regular and smart playlists, with their IDs, track counts, and types.",

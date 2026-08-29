@@ -1186,7 +1186,7 @@
                                TextWrapping="Wrap"
                                Margin="0,0,0,12"/>
 
-                    <UniformGrid Columns="2" Rows="12">
+                    <UniformGrid Columns="2" Rows="16">
                         <CheckBox x:Name="McpToolGetNowPlaying"
                                   Content="get_now_playing"
                                   Theme="{StaticResource SettingsCheckBoxTheme}"
@@ -1279,6 +1279,15 @@
                                   Content="fetch_page_as_markdown"
                                   Theme="{StaticResource SettingsCheckBoxTheme}"
                                   Margin="0,0,8,6"/>
+                        <CheckBox x:Name="McpToolSetCurrentFavorite" Content="set_current_favorite" Theme="{StaticResource SettingsCheckBoxTheme}" Margin="0,0,0,6"/>
+                        <CheckBox x:Name="McpToolControlInfiniteMix" Content="control_infinite_mix" Theme="{StaticResource SettingsCheckBoxTheme}" Margin="0,0,8,6"/>
+                        <CheckBox x:Name="McpToolListOutputProfiles" Content="list_output_profiles" Theme="{StaticResource SettingsCheckBoxTheme}" Margin="0,0,0,6"/>
+                        <CheckBox x:Name="McpToolSelectOutputProfile" Content="select_output_profile" Theme="{StaticResource SettingsCheckBoxTheme}" Margin="0,0,8,6"/>
+                        <CheckBox x:Name="McpToolListEqualizerProfiles" Content="list_equalizer_profiles" Theme="{StaticResource SettingsCheckBoxTheme}" Margin="0,0,0,6"/>
+                        <CheckBox x:Name="McpToolConfigureEqualizer" Content="configure_equalizer" Theme="{StaticResource SettingsCheckBoxTheme}" Margin="0,0,8,6"/>
+                        <CheckBox x:Name="McpToolGetCurrentLyrics" Content="get_current_lyrics" Theme="{StaticResource SettingsCheckBoxTheme}" Margin="0,0,0,6"/>
+                        <CheckBox x:Name="McpToolListOrynivoServers" Content="list_orynivo_servers" Theme="{StaticResource SettingsCheckBoxTheme}" Margin="0,0,8,6"/>
+                        <CheckBox x:Name="McpToolScanOrynivoServer" Content="scan_orynivo_server" Theme="{StaticResource SettingsCheckBoxTheme}" Margin="0,0,0,6"/>
                     </UniformGrid>
 
                     <Border Height="1"

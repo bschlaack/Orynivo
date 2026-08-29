@@ -4,6 +4,23 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.37.2] - 2026-08-27
+
+### Added
+
+- Added nine individually permissioned MCP and AI-chat tools for current-track
+  favorites, Infinite Mix, output and equalizer profiles, cached lyrics, and
+  Orynivo Server discovery and library scans. A build-time parity check now
+  keeps the MCP surface, AI schema, dispatcher, and Settings checklist aligned.
+
+### Fixed
+
+- Fixed combined artist-and-title library searches so terms can match across
+  different indexed fields, including searches such as “A-Ha Take on Me” in
+  both local and connected Orynivo Server libraries.
+- AI chat now describes connected Orynivo Server libraries accurately and
+  remote search failures are distinguished from genuine empty results.
+
 ## [0.37.1] - 2026-08-27
 
 ### Added

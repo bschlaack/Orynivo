@@ -570,9 +570,9 @@ fallback or allow client-provided commands/paths to reach the helper.
   the transport quick-pick buttons to jump directly into a settings section;
   the **Integration** navigation group contains the **MCP SERVER** section
   (`Tag="Mcp"`) with an enable checkbox, configurable port field, and per-tool
-  enable/disable checkboxes for all 23 tools (stored in
+  enable/disable checkboxes for all 32 tools (stored in
   `AppSettings.DisabledMcpTools`); `NavigateToSection("Mcp")` jumps there;
-  the tool `UniformGrid` has `Rows="12"` for 23 tools (2 columns). The MCP
+  the tool `UniformGrid` has `Rows="16"` for 32 tools (2 columns). The MCP
   section also holds the **Web browsing** configuration (enable toggle, SearXNG
   URL, block-private-networks toggle, and timeout/response-size/result limits)
   edited via `WebBrowsingValue`
@@ -605,7 +605,7 @@ fallback or allow client-provided commands/paths to reach the helper.
   `%LOCALAPPDATA%\Orynivo\logs\web-browsing.log`. Configured through
   `AppSettings.WebBrowsing` (`WebBrowsingOptions`); `MainWindow` creates the
   service, wires the logger, and updates `Options` on settings save.
-- `Orynivo/Mcp/McpTools.cs`: 23 MCP tools annotated with `[McpServerToolType]`
+- `Orynivo/Mcp/McpTools.cs`: 32 MCP tools annotated with `[McpServerToolType]`
   and `[McpServerTool]`; read-only tools are marked `ReadOnly = true,
   Idempotent = true`; every tool guards with `bridge.IsToolEnabled(name)` and
   returns `"Tool is disabled."` when off; `get_current_time` returns the current
@@ -648,7 +648,7 @@ fallback or allow client-provided commands/paths to reach the helper.
   conversation history is maintained across turns; `AiChatSettings` is read on
   every send so settings changes take effect without restarting the view
 - `Orynivo/AI/AiToolDefinitions.cs`: builds the OpenAI function-calling schema
-  (`JsonObject` list) for all 23 Orynivo tools; definitions match the method
+  (`JsonObject` list) for all 32 Orynivo tools; definitions match the method
   signatures in `McpTools.cs`
 - `Orynivo/AI/AiToolExecutor.cs`: dispatches tool calls received from the LLM
   to `McpTools` methods by name; parses JSON arguments from the model; no MCP

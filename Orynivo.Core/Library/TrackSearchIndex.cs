@@ -268,20 +268,28 @@ public static class TrackSearchIndex
     private static Analyzer CreateAnalyzer()
         => new GermanAnalyzer(Version);
 
-    private static Query? BuildPartialWordQuery(Analyzer analyzer, string[] fieldNames, string queryText)
+    /// <summary>
+    /// Builds a partial-word query whose individual search terms may match different fields.
+    /// Every analysed term must occur in at least one supplied field, allowing combined
+    /// artist/title searches such as <c>A-Ha Take on Me</c>.
+    /// </summary>
+    /// <param name="analyzer">Analyzer used to tokenize and normalize the query.</param>
+    /// <param name="fieldNames">Fields searched for every token.</param>
+    /// <param name="queryText">User-entered free-text query.</param>
+    /// <returns>The Lucene query, or <see langword="null"/> when no searchable terms remain.</returns>
+    internal static Query? BuildPartialWordQuery(Analyzer analyzer, string[] fieldNames, string queryText)
     {
         var outer = new BooleanQuery();
-        foreach (var fieldName in fieldNames)
+        if (fieldNames.Length == 0)
+            return null;
+
+        var terms = AnalyzeTerms(analyzer, fieldNames[0], ExpandGermanUmlautVariants(queryText));
+        foreach (var term in terms)
         {
-            var terms = AnalyzeTerms(analyzer, fieldName, ExpandGermanUmlautVariants(queryText));
-            if (terms.Count == 0)
-                continue;
-
-            var fieldQuery = new BooleanQuery();
-            foreach (var term in terms)
-                fieldQuery.Add(new WildcardQuery(new Term(fieldName, $"*{term}*")), Occur.MUST);
-
-            outer.Add(fieldQuery, Occur.SHOULD);
+            var termAcrossFields = new BooleanQuery();
+            foreach (var fieldName in fieldNames)
+                termAcrossFields.Add(new WildcardQuery(new Term(fieldName, $"*{term}*")), Occur.SHOULD);
+            outer.Add(termAcrossFields, Occur.MUST);
         }
 
         return outer.Clauses.Count == 0 ? null : outer;

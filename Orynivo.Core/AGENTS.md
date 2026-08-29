@@ -51,6 +51,10 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   Existing target artwork wins; favorites are combined rather than cleared.
 - Keep compact query models compact; do not add artwork BLOBs, lyrics, or full
   records to list/facet/folder queries.
+- Free-text Lucene queries are term-centric across their supplied fields: every
+  analysed term is required, but different terms may match different fields.
+  Preserve this behavior so combined artist/title searches work identically in
+  the desktop and Orynivo Server indexes.
 - Track scans preserve personal ratings, cached MusicBrainz rating/vote data,
   and a client-resolved recording MBID when the media tag has no recording ID.
   `MusicBrainzRatingService` prefers a valid recording MBID and permits fallback

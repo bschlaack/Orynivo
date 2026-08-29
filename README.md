@@ -283,6 +283,10 @@ configuration.
 | Playback | `play`, `pause_resume`, `next_track`, `previous_track`, `stop`, `seek`, `set_volume` |
 | Queue | `queue_append`, `queue_play_next`, `clear_queue`, `replace_queue` |
 | Library | `search_library` |
+| Favorites and discovery | `set_current_favorite`, `control_infinite_mix` |
+| Audio configuration | `list_output_profiles`, `select_output_profile`, `list_equalizer_profiles`, `configure_equalizer` |
+| Lyrics | `get_current_lyrics` |
+| Orynivo Server | `list_orynivo_servers`, `scan_orynivo_server` |
 | Playlists | `list_playlists`, `get_playlist_tracks`, `create_playlist`, `create_smart_playlist` |
 | History | `get_play_history` |
 | Web | `search_web`, `fetch_page`, `fetch_page_as_markdown` |
@@ -298,12 +302,12 @@ not exposed to the model.
 
 ### MCP Server
 
-The same 23 tools are available as an embedded **Model Context Protocol (MCP)**
+The same 32 tools are available as an embedded **Model Context Protocol (MCP)**
 HTTP/SSE server for external AI assistants such as
 [Claude Desktop](https://claude.ai/download). Enable it under
 **Settings → Integration → MCP Server**, choose a port (default **49200**),
 and point your assistant at `http://localhost:49200/mcp`. The server binds to
-`localhost` only. Each of the 23 tools has an individual enable/disable toggle
+`localhost` only. Each of the 32 tools has an individual enable/disable toggle
 in Settings so you can limit what an external assistant is allowed to do. The
 web tools (`search_web`, `fetch_page`, `fetch_page_as_markdown`) route through
 the MCP server, not the model directly: searches use a configurable SearXNG
