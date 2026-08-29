@@ -2567,6 +2567,15 @@ internal partial class SettingsView : UserControl
         ("search_web",            nameof(McpToolSearchWeb)),
         ("fetch_page",            nameof(McpToolFetchPage)),
         ("fetch_page_as_markdown", nameof(McpToolFetchPageMarkdown)),
+        ("set_current_favorite", nameof(McpToolSetCurrentFavorite)),
+        ("control_infinite_mix", nameof(McpToolControlInfiniteMix)),
+        ("list_output_profiles", nameof(McpToolListOutputProfiles)),
+        ("select_output_profile", nameof(McpToolSelectOutputProfile)),
+        ("list_equalizer_profiles", nameof(McpToolListEqualizerProfiles)),
+        ("configure_equalizer", nameof(McpToolConfigureEqualizer)),
+        ("get_current_lyrics", nameof(McpToolGetCurrentLyrics)),
+        ("list_orynivo_servers", nameof(McpToolListOrynivoServers)),
+        ("scan_orynivo_server", nameof(McpToolScanOrynivoServer)),
     ];
 
     /// <summary>Initialises each tool checkbox from the persisted disabled-tool set.</summary>
@@ -2596,6 +2605,15 @@ internal partial class SettingsView : UserControl
         McpToolSearchWeb.IsChecked           = !disabled.Contains("search_web");
         McpToolFetchPage.IsChecked           = !disabled.Contains("fetch_page");
         McpToolFetchPageMarkdown.IsChecked   = !disabled.Contains("fetch_page_as_markdown");
+        McpToolSetCurrentFavorite.IsChecked  = !disabled.Contains("set_current_favorite");
+        McpToolControlInfiniteMix.IsChecked  = !disabled.Contains("control_infinite_mix");
+        McpToolListOutputProfiles.IsChecked  = !disabled.Contains("list_output_profiles");
+        McpToolSelectOutputProfile.IsChecked = !disabled.Contains("select_output_profile");
+        McpToolListEqualizerProfiles.IsChecked = !disabled.Contains("list_equalizer_profiles");
+        McpToolConfigureEqualizer.IsChecked  = !disabled.Contains("configure_equalizer");
+        McpToolGetCurrentLyrics.IsChecked    = !disabled.Contains("get_current_lyrics");
+        McpToolListOrynivoServers.IsChecked  = !disabled.Contains("list_orynivo_servers");
+        McpToolScanOrynivoServer.IsChecked   = !disabled.Contains("scan_orynivo_server");
     }
 
     /// <summary>Reads the checkbox states and returns the set of tool names that are disabled.</summary>
@@ -2626,6 +2644,15 @@ internal partial class SettingsView : UserControl
         if (McpToolSearchWeb.IsChecked           != true) disabled.Add("search_web");
         if (McpToolFetchPage.IsChecked           != true) disabled.Add("fetch_page");
         if (McpToolFetchPageMarkdown.IsChecked   != true) disabled.Add("fetch_page_as_markdown");
+        if (McpToolSetCurrentFavorite.IsChecked  != true) disabled.Add("set_current_favorite");
+        if (McpToolControlInfiniteMix.IsChecked  != true) disabled.Add("control_infinite_mix");
+        if (McpToolListOutputProfiles.IsChecked  != true) disabled.Add("list_output_profiles");
+        if (McpToolSelectOutputProfile.IsChecked != true) disabled.Add("select_output_profile");
+        if (McpToolListEqualizerProfiles.IsChecked != true) disabled.Add("list_equalizer_profiles");
+        if (McpToolConfigureEqualizer.IsChecked  != true) disabled.Add("configure_equalizer");
+        if (McpToolGetCurrentLyrics.IsChecked    != true) disabled.Add("get_current_lyrics");
+        if (McpToolListOrynivoServers.IsChecked  != true) disabled.Add("list_orynivo_servers");
+        if (McpToolScanOrynivoServer.IsChecked   != true) disabled.Add("scan_orynivo_server");
         return disabled;
     }
 }

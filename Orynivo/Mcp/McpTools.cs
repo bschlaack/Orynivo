@@ -423,9 +423,23 @@ public sealed class McpTools(McpPlayerBridge bridge)
         {
             OrynivoFullSearchResult result;
             try { result = await client.SearchFullAsync(server, query, limit, ct); }
-            catch { continue; }
-            if (result.Tracks.Count == 0 && result.Albums.Count == 0 && result.Artists.Count == 0)
+            catch
+            {
+                sb.AppendLine();
+                sb.AppendLine(CultureInfo.InvariantCulture,
+                    $"# Orynivo Server: {server.Name}\n- Search unavailable: the server could not be reached.");
                 continue;
+            }
+            if (result.Tracks.Count == 0 && result.Albums.Count == 0 && result.Artists.Count == 0)
+            {
+                if (await client.TestConnectionAsync(server, ct) is null)
+                {
+                    sb.AppendLine();
+                    sb.AppendLine(CultureInfo.InvariantCulture,
+                        $"# Orynivo Server: {server.Name}\n- Search unavailable: the server could not be reached.");
+                }
+                continue;
+            }
 
             sb.AppendLine();
             sb.AppendLine(CultureInfo.InvariantCulture, $"# Orynivo Server: {server.Name}");
@@ -489,6 +503,144 @@ public sealed class McpTools(McpPlayerBridge bridge)
         original.StartsWith("orynivo://", StringComparison.OrdinalIgnoreCase)
             ? original
             : System.IO.Path.GetFileName(RedactKey(resolved));
+
+    // ------------------------------------------------------------------
+    // Recent player features
+    // ------------------------------------------------------------------
+
+    /// <summary>Sets the favorite state of the currently playing library track.</summary>
+    /// <param name="favorite">Requested favorite state.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A confirmation or an explanation when no eligible track is active.</returns>
+    [McpServerTool(Name = "set_current_favorite")]
+    [Description("Marks or unmarks the currently playing local or Orynivo Server track as a favorite.")]
+    public async Task<string> SetCurrentFavoriteAsync(
+        [Description("True to mark the current track as favorite; false to remove it.")] bool favorite,
+        CancellationToken ct = default)
+    {
+        if (!bridge.IsToolEnabled("set_current_favorite")) return "Tool is disabled.";
+        var changed = await bridge.OnUiAsync(
+            () => bridge.SetCurrentFavoriteFunc?.Invoke(favorite) == true,
+            ct);
+        return changed ? $"Current track favorite: {favorite}." : "No eligible library track is playing.";
+    }
+
+    /// <summary>Starts, pauses, resumes, or stops Infinite Mix.</summary>
+    /// <param name="action">Requested Infinite Mix action.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The resulting Infinite Mix state.</returns>
+    [McpServerTool(Name = "control_infinite_mix")]
+    [Description("Controls Orynivo Infinite Mix. Start uses the saved mix profile and configured local/remote sources.")]
+    public async Task<string> ControlInfiniteMixAsync(
+        [Description("One of: start, pause, resume, stop.")] string action,
+        CancellationToken ct = default)
+    {
+        if (!bridge.IsToolEnabled("control_infinite_mix")) return "Tool is disabled.";
+        if (bridge.ControlInfiniteMixFunc is null) return "Infinite Mix is unavailable.";
+        return await bridge.OnUiAsync(async () => await bridge.ControlInfiniteMixFunc(action), ct);
+    }
+
+    /// <summary>Lists configured output profiles.</summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Available output profile names.</returns>
+    [McpServerTool(Name = "list_output_profiles", ReadOnly = true, Idempotent = true)]
+    [Description("Lists configured audio output profiles and identifies the selected profile.")]
+    public async Task<string> ListOutputProfilesAsync(CancellationToken ct = default)
+    {
+        if (!bridge.IsToolEnabled("list_output_profiles")) return "Tool is disabled.";
+        var profiles = await bridge.OnUiAsync(() => bridge.GetOutputProfilesFunc?.Invoke() ?? [], ct);
+        return profiles.Count == 0 ? "No output profiles configured." : string.Join('\n', profiles);
+    }
+
+    /// <summary>Selects a configured output profile.</summary>
+    /// <param name="profile">Profile name.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Confirmation text.</returns>
+    [McpServerTool(Name = "select_output_profile")]
+    [Description("Selects a configured audio output profile by name and safely resumes active playback on it.")]
+    public async Task<string> SelectOutputProfileAsync(
+        [Description("Exact output profile name from list_output_profiles.")] string profile,
+        CancellationToken ct = default)
+    {
+        if (!bridge.IsToolEnabled("select_output_profile")) return "Tool is disabled.";
+        if (bridge.SelectOutputProfileFunc is null) return "Output profile selection is unavailable.";
+        var selected = await bridge.OnUiAsync(async () => await bridge.SelectOutputProfileFunc(profile), ct);
+        return selected ? $"Selected output profile: {profile}" : $"Output profile not found: {profile}";
+    }
+
+    /// <summary>Lists equalizer profiles and the active state.</summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Equalizer state and available profile names.</returns>
+    [McpServerTool(Name = "list_equalizer_profiles", ReadOnly = true, Idempotent = true)]
+    [Description("Lists equalizer profiles, the selected profile, and whether equalization is enabled.")]
+    public async Task<string> ListEqualizerProfilesAsync(CancellationToken ct = default)
+    {
+        if (!bridge.IsToolEnabled("list_equalizer_profiles")) return "Tool is disabled.";
+        var state = await bridge.OnUiAsync(
+            () => bridge.GetEqualizerProfilesFunc?.Invoke() ?? new EqualizerProfileState([], null, false),
+            ct);
+        var profiles = state.Profiles.Count == 0 ? "(none)" : string.Join(", ", state.Profiles);
+        return $"Enabled: {state.Enabled}\nSelected: {state.SelectedProfile ?? "(none)"}\nProfiles: {profiles}";
+    }
+
+    /// <summary>Configures the equalizer profile and enabled state.</summary>
+    /// <param name="profile">Profile name, or empty to retain the current selection.</param>
+    /// <param name="enabled">Requested enabled state.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Confirmation text.</returns>
+    [McpServerTool(Name = "configure_equalizer")]
+    [Description("Selects an equalizer profile and enables or disables PCM equalization.")]
+    public async Task<string> ConfigureEqualizerAsync(
+        [Description("Exact profile name from list_equalizer_profiles; omit to retain the current profile.")] string? profile,
+        [Description("Whether equalization should be enabled.")] bool enabled,
+        CancellationToken ct = default)
+    {
+        if (!bridge.IsToolEnabled("configure_equalizer")) return "Tool is disabled.";
+        if (bridge.ConfigureEqualizerFunc is null) return "Equalizer control is unavailable.";
+        var configured = await bridge.OnUiAsync(async () => await bridge.ConfigureEqualizerFunc(profile, enabled), ct);
+        return configured ? $"Equalizer enabled: {enabled}." : $"Equalizer profile not found: {profile}";
+    }
+
+    /// <summary>Returns cached lyrics for the currently playing track.</summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Plain or synchronized lyrics, or a not-found message.</returns>
+    [McpServerTool(Name = "get_current_lyrics", ReadOnly = true, Idempotent = true)]
+    [Description("Returns cached lyrics for the currently playing local or Orynivo Server track without starting an external download.")]
+    public async Task<string> GetCurrentLyricsAsync(CancellationToken ct = default)
+    {
+        if (!bridge.IsToolEnabled("get_current_lyrics")) return "Tool is disabled.";
+        if (bridge.GetCurrentLyricsFunc is null) return "Lyrics are unavailable.";
+        var lyrics = await bridge.GetCurrentLyricsFunc();
+        return string.IsNullOrWhiteSpace(lyrics) ? "No cached lyrics found for the current track." : lyrics;
+    }
+
+    /// <summary>Lists configured Orynivo Servers without exposing connection details.</summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Configured server display names.</returns>
+    [McpServerTool(Name = "list_orynivo_servers", ReadOnly = true, Idempotent = true)]
+    [Description("Lists configured Orynivo Server display names without exposing URLs or API keys.")]
+    public async Task<string> ListOrynivoServersAsync(CancellationToken ct = default)
+    {
+        if (!bridge.IsToolEnabled("list_orynivo_servers")) return "Tool is disabled.";
+        var names = await bridge.OnUiAsync(() => bridge.GetOrynivoServerNamesFunc?.Invoke() ?? [], ct);
+        return names.Count == 0 ? "No Orynivo Servers configured." : string.Join('\n', names);
+    }
+
+    /// <summary>Starts a normal library scan on a configured Orynivo Server.</summary>
+    /// <param name="server">Server display name.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Confirmation text.</returns>
+    [McpServerTool(Name = "scan_orynivo_server")]
+    [Description("Starts a normal library scan on one configured Orynivo Server. This does not start ReplayGain maintenance.")]
+    public async Task<string> ScanOrynivoServerAsync(
+        [Description("Exact server display name from list_orynivo_servers.")] string server,
+        CancellationToken ct = default)
+    {
+        if (!bridge.IsToolEnabled("scan_orynivo_server")) return "Tool is disabled.";
+        if (bridge.TriggerOrynivoServerScanFunc is null) return "Server scan control is unavailable.";
+        var started = await bridge.TriggerOrynivoServerScanFunc(server);
+        return started ? $"Library scan started on: {server}" : $"Server not found or scan could not start: {server}";
+    }
 
     // ------------------------------------------------------------------
     // Playlist tools

@@ -43,6 +43,12 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   partials instead of creating competing window state or navigation models.
 - Do not block the UI thread with database access, network requests, FFmpeg,
   device enumeration, player disposal, large cache I/O, or large row composition.
+- AI chat and the embedded MCP server expose one permission-gated tool surface.
+  Keep `McpTools`, `AiToolDefinitions`, `AiToolExecutor`, and the Settings tool
+  checklist in exact parity through `scripts/verify-mcp-tool-parity.ps1`.
+  Library search includes every configured Orynivo Server and returns only
+  opaque `orynivo://` references; remote failures must be reported distinctly
+  from genuine empty search results without exposing URLs or API keys.
 - The explicit ReplayGain maintenance action processes the local library and
   each configured Orynivo Server sequentially. It polls the shared remote scan
   status for progress, stops client-side polling when Settings closes,

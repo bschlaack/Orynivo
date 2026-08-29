@@ -91,6 +91,35 @@ public partial class MainWindow
         UpdateInfiniteMixUi();
     }
 
+    /// <summary>Controls Infinite Mix through MCP or the embedded AI chat.</summary>
+    /// <param name="action">One of <c>start</c>, <c>pause</c>, <c>resume</c>, or <c>stop</c>.</param>
+    /// <returns>The resulting state or a validation error.</returns>
+    private async Task<string> ControlInfiniteMixAsync(string action)
+    {
+        switch (action?.Trim().ToLowerInvariant())
+        {
+            case "start":
+                await StartInfiniteMixAsync(editSettings: false);
+                break;
+            case "pause" when _infiniteMixEnabled:
+                _infiniteMixPaused = true;
+                UpdateInfiniteMixUi();
+                break;
+            case "resume" when _infiniteMixEnabled:
+                _infiniteMixPaused = false;
+                UpdateInfiniteMixUi();
+                EnsureInfiniteMixQueue();
+                break;
+            case "stop":
+                StopInfiniteMix();
+                break;
+            default:
+                return "Invalid Infinite Mix action or no active mix. Use start, pause, resume, or stop.";
+        }
+
+        return !_infiniteMixEnabled ? "stopped" : _infiniteMixPaused ? "paused" : "active";
+    }
+
     /// <summary>Updates the shared Infinite Mix buttons and queue status.</summary>
     private void UpdateInfiniteMixUi()
     {

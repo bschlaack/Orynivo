@@ -954,6 +954,24 @@ public partial class MainWindow : Window
         _mcpBridge.RefreshPlaylistsFunc = LoadNavPlaylists;
         _mcpBridge.GetOrynivoServersFunc = () => _settings.OrynivoServers ?? [];
         _mcpBridge.ResolveRemoteTrackFunc = ResolveRemoteMcpTrackAsync;
+        _mcpBridge.SetCurrentFavoriteFunc = SetCurrentTrackFavorite;
+        _mcpBridge.ControlInfiniteMixFunc = ControlInfiniteMixAsync;
+        _mcpBridge.GetOutputProfilesFunc = () => (_settings.OutputProfiles ?? [])
+            .Select(profile => string.Equals(profile.Name, _settings.SelectedOutputProfileName, StringComparison.OrdinalIgnoreCase)
+                ? $"{profile.Name} (selected)"
+                : profile.Name)
+            .ToList();
+        _mcpBridge.SelectOutputProfileFunc = SelectOutputProfileByNameAsync;
+        _mcpBridge.GetEqualizerProfilesFunc = () => new Mcp.EqualizerProfileState(
+            (_settings.EqualizerProfiles ?? []).Select(profile => profile.Name).ToList(),
+            _settings.SelectedEqualizerProfileName,
+            _settings.EqualizerEnabled);
+        _mcpBridge.ConfigureEqualizerFunc = ConfigureEqualizerAsync;
+        _mcpBridge.GetCurrentLyricsFunc = GetCurrentCachedLyricsForToolAsync;
+        _mcpBridge.GetOrynivoServerNamesFunc = () => (_settings.OrynivoServers ?? [])
+            .Select(server => server.Name)
+            .ToList();
+        _mcpBridge.TriggerOrynivoServerScanFunc = TriggerOrynivoServerScanByNameAsync;
     }
 
     /// <summary>
@@ -5164,6 +5182,36 @@ public partial class MainWindow : Window
                 $"LoadRemoteUnifiedRowsAsync server failed tag={tag} server={server.Name} error={ex.GetType().Name}: {ex.Message}");
             return [];
         }
+    }
+
+    /// <summary>Returns cached plain or synchronized lyrics for the current track.</summary>
+    /// <returns>Cached lyrics, or <see langword="null"/> when no eligible track or lyrics exist.</returns>
+    private async Task<string?> GetCurrentCachedLyricsForToolAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_currentFilePath))
+            return null;
+        try
+        {
+            var provider = _currentNowPlayingProvider ?? _localNowPlayingProvider;
+            var lyrics = await provider.GetCachedLyricsAsync(BuildNowPlayingTrackContext(_currentFilePath));
+            return !string.IsNullOrWhiteSpace(lyrics?.Plain)
+                ? lyrics.Plain
+                : lyrics?.Synced;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Starts a normal library scan on the configured server with the supplied name.</summary>
+    /// <param name="serverName">Exact server display name.</param>
+    /// <returns><see langword="true"/> when the server exists and accepted the scan request.</returns>
+    private async Task<bool> TriggerOrynivoServerScanByNameAsync(string serverName)
+    {
+        var server = (_settings.OrynivoServers ?? []).FirstOrDefault(candidate =>
+            string.Equals(candidate.Name, serverName?.Trim(), StringComparison.OrdinalIgnoreCase));
+        return server is not null && await _orynivoClient.TriggerScanAsync(server);
     }
 
     private async Task<IReadOnlyList<LibraryCatalogTrack>> LoadRemoteTracksForUnifiedViewAsync(
@@ -11153,11 +11201,19 @@ public partial class MainWindow : Window
 
     private void NowPlayingFavoriteButton_OnClick(object? sender, RoutedEventArgs e)
     {
+        SetCurrentTrackFavorite(!_currentTrackIsFavorite);
+    }
+
+    /// <summary>Applies a favorite state to the current local or remote library track.</summary>
+    /// <param name="favorite">Requested favorite state.</param>
+    /// <returns><see langword="true"/> when an eligible current track was updated.</returns>
+    private bool SetCurrentTrackFavorite(bool favorite)
+    {
         // Remote Orynivo Server track: toggle the client-side favorite (settings.json).
         if (CurrentOrynivoFavoriteTarget is { } target)
         {
             var (favServer, favId) = target;
-            _currentTrackIsFavorite = !_currentTrackIsFavorite;
+            _currentTrackIsFavorite = favorite;
             InvalidateUnifiedLibraryViewCache();
             var key = GetOrynivoFavoriteKey(favServer.Id, "Track", favId);
             if (_currentTrackIsFavorite)
@@ -11170,13 +11226,13 @@ public partial class MainWindow : Window
                 _currentOrynivoTrackRow.IsFavorite = _currentTrackIsFavorite;
             UpdateNowPlayingFavoriteButton();
             RefreshOrynivoFavoriteRows(favServer, favId, _currentTrackIsFavorite);
-            return;
+            return true;
         }
 
         if (_currentTrackId is not long id)
-            return;
+            return false;
 
-        _currentTrackIsFavorite = !_currentTrackIsFavorite;
+        _currentTrackIsFavorite = favorite;
         InvalidateUnifiedLibraryViewCache();
         try
         {
@@ -11193,6 +11249,7 @@ public partial class MainWindow : Window
             if (row is not null)
                 row.IsFavorite = _currentTrackIsFavorite;
         }
+        return true;
     }
 
     /// <summary>Reflects a remote track favourite change in any currently visible remote track rows.</summary>
@@ -16855,6 +16912,32 @@ public partial class MainWindow : Window
     {
         if (_outputPickerUpdating) return;
         if (OutputPickerComboBox.SelectedItem is not OutputProfile profile) return;
+        await SelectOutputProfileAsync(profile);
+    }
+
+    /// <summary>Selects a configured output profile by display name.</summary>
+    /// <param name="profileName">Exact profile name.</param>
+    /// <returns><see langword="true"/> when the profile exists and was selected.</returns>
+    private async Task<bool> SelectOutputProfileByNameAsync(string profileName)
+    {
+        var requestedName = profileName?.Trim() ?? string.Empty;
+        const string selectedSuffix = " (selected)";
+        if (requestedName.EndsWith(selectedSuffix, StringComparison.OrdinalIgnoreCase))
+            requestedName = requestedName[..^selectedSuffix.Length].TrimEnd();
+
+        var profile = (_settings.OutputProfiles ?? []).FirstOrDefault(candidate =>
+            string.Equals(candidate.Name, requestedName, StringComparison.OrdinalIgnoreCase));
+        if (profile is null)
+            return false;
+        await SelectOutputProfileAsync(profile);
+        return true;
+    }
+
+    /// <summary>Selects an output profile and preserves active playback across device changes.</summary>
+    /// <param name="profile">Profile to select.</param>
+    /// <returns>A task representing the asynchronous device switch.</returns>
+    private async Task SelectOutputProfileAsync(OutputProfile profile)
+    {
         if (string.Equals(profile.Name, _settings.SelectedOutputProfileName, StringComparison.Ordinal)) return;
 
         var outputChanged =
@@ -16958,6 +17041,30 @@ public partial class MainWindow : Window
             UpdateOutputDeviceLockButton();
             StatusTextBlock.Text = ex.Message;
         }
+    }
+
+    /// <summary>Selects an equalizer profile and applies the requested enabled state.</summary>
+    /// <param name="profileName">Profile name, or <see langword="null"/> to retain the selection.</param>
+    /// <param name="enabled">Requested enabled state.</param>
+    /// <returns><see langword="true"/> when the requested profile exists.</returns>
+    private Task<bool> ConfigureEqualizerAsync(string? profileName, bool enabled)
+    {
+        EqualizerProfile? profile = null;
+        if (!string.IsNullOrWhiteSpace(profileName))
+        {
+            profile = (_settings.EqualizerProfiles ?? []).FirstOrDefault(candidate =>
+                string.Equals(candidate.Name, profileName.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (profile is null)
+                return Task.FromResult(false);
+            _settings.SelectedEqualizerProfileName = profile.Name;
+            _settings.EqualizerProfile = profile.Clone();
+        }
+
+        _settings.EqualizerEnabled = enabled;
+        if (_player is IEqualizerAudioPlayer eqPlayer)
+            eqPlayer.UpdateEqualizer(enabled, _settings.EqualizerProfile);
+        _ = Task.Run(() => _settingsStore.Save(_settings));
+        return Task.FromResult(true);
     }
 
     /// <summary>Refreshes the lock icon, tooltip, and availability from the actual player state.</summary>
