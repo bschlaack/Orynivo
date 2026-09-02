@@ -1389,6 +1389,7 @@
                     <TextBox x:Name="AiChatEndpointUrlTextBox"
                              Height="30"
                              HorizontalAlignment="Stretch"
+                             LostFocus="AiChatConnectionValue_OnLostFocus"
                              Margin="0,0,0,14"/>
 
                     <TextBlock Text="{DynamicResource L_AiChatApiKey}"
@@ -1399,6 +1400,7 @@
                              Height="30"
                              PasswordChar="●"
                              HorizontalAlignment="Stretch"
+                             LostFocus="AiChatConnectionValue_OnLostFocus"
                              Margin="0,0,0,4"/>
                     <TextBlock Text="{DynamicResource L_AiChatLocalNote}"
                                FontSize="{DynamicResource FontSizeMeta}"
@@ -1412,7 +1414,33 @@
                     <TextBox x:Name="AiChatModelTextBox"
                              Height="30"
                              HorizontalAlignment="Stretch"
-                             Margin="0,0,0,14"/>
+                             Margin="0,0,0,8"/>
+                    <ComboBox x:Name="AiChatModelComboBox"
+                              Height="30"
+                              PlaceholderText="{DynamicResource L_AiChatAvailableModels}"
+                              SelectionChanged="AiChatModelComboBox_OnSelectionChanged"
+                              HorizontalAlignment="Stretch"
+                              Margin="0,0,0,10"/>
+
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="10"
+                                Margin="0,0,0,8">
+                        <Button x:Name="AiChatLoadModelsButton"
+                                Height="30"
+                                Theme="{StaticResource SettingsButtonTheme}"
+                                Click="AiChatLoadModelsButton_OnClick"
+                                Content="{DynamicResource L_AiChatLoadModels}"/>
+                        <Button x:Name="AiChatTestConnectionButton"
+                                Height="30"
+                                Theme="{StaticResource SettingsButtonTheme}"
+                                Click="AiChatTestConnectionButton_OnClick"
+                                Content="{DynamicResource L_AiChatTestConnection}"/>
+                    </StackPanel>
+                    <TextBlock x:Name="AiChatConnectionStatusTextBlock"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,14"/>
 
                     <TextBlock Text="{DynamicResource L_AiChatMaxTokens}"
                                FontSize="{DynamicResource FontSizeCaption}"

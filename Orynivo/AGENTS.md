@@ -49,6 +49,11 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   Library search includes every configured Orynivo Server and returns only
   opaque `orynivo://` references; remote failures must be reported distinctly
   from genuine empty search results without exposing URLs or API keys.
+- AI endpoint discovery and testing use `AiEndpointService` and the unsaved
+  values currently visible in Settings. Query only the credential-free
+  OpenAI-compatible `/models` URL, accept standard and Ollama model-list shapes,
+  preserve manual model-name entry, cancel superseded requests, and never show
+  response bodies, endpoint URLs, or API keys in status messages or logs.
 - The explicit ReplayGain maintenance action processes the local library and
   each configured Orynivo Server sequentially. It polls the shared remote scan
   status for progress, stops client-side polling when Settings closes,

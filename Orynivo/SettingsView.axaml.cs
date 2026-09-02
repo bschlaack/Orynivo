@@ -18,6 +18,7 @@ using Orynivo.Localization;
 using Orynivo.Streaming;
 using Orynivo.Web;
 using Orynivo.Updates;
+using Orynivo.AI;
 using System.Reflection;
 using AvaloniaApp = Avalonia.Application;
 using UiLanguage = Orynivo.Localization.Language;
@@ -66,6 +67,8 @@ internal partial class SettingsView : UserControl
     private readonly EqualizerProfile? _originalEqualizerProfile;
     private readonly List<EqualizerProfile> _equalizerProfiles = [];
     private readonly List<OutputProfile> _outputProfiles = [];
+    private readonly List<string> _aiModels = [];
+    private readonly AiEndpointService _aiEndpointService = new();
     private EqualizerProfile? _equalizerProfile;
     private OutputProfile? _outputProfile;
     private int _equalizerPreviewVersion;
@@ -76,6 +79,8 @@ internal partial class SettingsView : UserControl
     private bool _metadataAnalysisLoaded;
     private CancellationTokenSource? _missingArtistImagesCts;
     private CancellationTokenSource? _replayGainCalculationCts;
+    private CancellationTokenSource? _aiEndpointProbeCts;
+    private string? _aiModelsLoadedForSignature;
 
     /// <summary>
     /// Initializes a runtime-loader instance with default settings.
@@ -181,6 +186,7 @@ internal partial class SettingsView : UserControl
         AiChatEnabledCheckBox.IsChecked         = settings.AiChat.Enabled;
         AiChatEndpointUrlTextBox.Text           = settings.AiChat.EndpointUrl;
         AiChatApiKeyTextBox.Text                = settings.AiChat.ApiKey;
+        AiChatModelComboBox.ItemsSource         = _aiModels;
         AiChatModelTextBox.Text                 = settings.AiChat.ModelName;
         AiChatMaxTokensNumericUpDown.Value      = settings.AiChat.MaxTokens;
         WebBrowsingEnabledCheckBox.IsChecked    = settings.WebBrowsing.Enabled;
@@ -1099,6 +1105,8 @@ internal partial class SettingsView : UserControl
         _plexStatusCts?.Cancel();
         _missingArtistImagesCts?.Cancel();
         _replayGainCalculationCts?.Cancel();
+        _aiEndpointProbeCts?.Cancel();
+        _aiEndpointService.Dispose();
         Interlocked.Increment(ref _equalizerPreviewVersion);
         if (!_settingsAccepted)
         {
@@ -1132,9 +1140,95 @@ internal partial class SettingsView : UserControl
         ArtistInfoPanel.IsVisible              = tag == "ArtistInfo";
         McpPanel.IsVisible                     = tag == "Mcp";
         AiChatPanel.IsVisible                  = tag == "AiChat";
+        if (tag == "AiChat" && _aiModelsLoadedForSignature is null &&
+            !string.IsNullOrWhiteSpace(AiChatEndpointUrlTextBox.Text))
+        {
+            _ = RefreshAiModelsAsync(showConnectionSuccess: false);
+        }
         if (tag == "Metadata" && !_metadataAnalysisLoaded)
             _ = LoadMetadataProblemsAsync();
     }
+
+    private async void AiChatConnectionValue_OnLostFocus(object? sender, RoutedEventArgs e)
+    {
+        var signature = GetAiEndpointSignature();
+        if (AiChatPanel.IsVisible && signature != _aiModelsLoadedForSignature)
+            await RefreshAiModelsAsync(showConnectionSuccess: false);
+    }
+
+    private async void AiChatLoadModelsButton_OnClick(object? sender, RoutedEventArgs e) =>
+        await RefreshAiModelsAsync(showConnectionSuccess: false);
+
+    private async void AiChatTestConnectionButton_OnClick(object? sender, RoutedEventArgs e) =>
+        await RefreshAiModelsAsync(showConnectionSuccess: true);
+
+    private void AiChatModelComboBox_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (AiChatModelComboBox.SelectedItem is string model)
+            AiChatModelTextBox.Text = model;
+    }
+
+    /// <summary>Loads available models and optionally presents the request as an explicit connection test.</summary>
+    /// <param name="showConnectionSuccess">Whether a successful result should be phrased as a connection test.</param>
+    /// <returns>A task representing the endpoint request and UI update.</returns>
+    private async Task RefreshAiModelsAsync(bool showConnectionSuccess)
+    {
+        _aiEndpointProbeCts?.Cancel();
+        _aiEndpointProbeCts?.Dispose();
+        _aiEndpointProbeCts = new CancellationTokenSource();
+        var cancellationToken = _aiEndpointProbeCts.Token;
+        var endpoint = AiChatEndpointUrlTextBox.Text?.Trim() ?? string.Empty;
+        var apiKey = AiChatApiKeyTextBox.Text?.Trim() ?? string.Empty;
+        var selectedModel = AiChatModelTextBox.Text?.Trim() ?? string.Empty;
+
+        AiChatLoadModelsButton.IsEnabled = false;
+        AiChatTestConnectionButton.IsEnabled = false;
+        AiChatConnectionStatusTextBlock.Text = LocalizationManager.Current.AiChatConnectionTesting;
+        try
+        {
+            var models = await _aiEndpointService.GetModelsAsync(endpoint, apiKey, cancellationToken);
+            _aiModels.Clear();
+            _aiModels.AddRange(models);
+            AiChatModelComboBox.ItemsSource = null;
+            AiChatModelComboBox.ItemsSource = _aiModels;
+            var selectedIndex = _aiModels.FindIndex(model =>
+                string.Equals(model, selectedModel, StringComparison.OrdinalIgnoreCase));
+            if (selectedIndex >= 0)
+                AiChatModelComboBox.SelectedIndex = selectedIndex;
+            else if (string.IsNullOrWhiteSpace(selectedModel) && _aiModels.Count > 0)
+                AiChatModelComboBox.SelectedIndex = 0;
+
+            _aiModelsLoadedForSignature = GetAiEndpointSignature();
+            AiChatConnectionStatusTextBlock.Text = _aiModels.Count == 0
+                ? LocalizationManager.Current.AiChatNoModels
+                : string.Format(
+                    showConnectionSuccess
+                        ? LocalizationManager.Current.AiChatConnectionSucceeded
+                        : LocalizationManager.Current.AiChatModelsLoaded,
+                    _aiModels.Count);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch
+        {
+            _aiModelsLoadedForSignature = null;
+            AiChatConnectionStatusTextBlock.Text = LocalizationManager.Current.AiChatConnectionFailed;
+        }
+        finally
+        {
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                AiChatLoadModelsButton.IsEnabled = true;
+                AiChatTestConnectionButton.IsEnabled = true;
+            }
+        }
+    }
+
+    private string GetAiEndpointSignature() => string.Concat(
+        AiChatEndpointUrlTextBox.Text?.Trim(),
+        "\n",
+        AiChatApiKeyTextBox.Text?.Trim());
 
     private async Task LoadMetadataProblemsAsync()
     {
