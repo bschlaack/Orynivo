@@ -253,7 +253,7 @@ commonly packaged as `libopenal1`) is required for the system/default route.
 
 ## AI Integration
 
-Orynivo includes two complementary AI interfaces that share the same 23
+Orynivo includes two complementary AI interfaces that share the same 32
 player-control, queue-management, and library tools.
 
 ### Embedded AI Chat
@@ -269,8 +269,13 @@ Responses stream token by token. The model calls tools autonomously — asking
 the results, and start playback, all in one turn.
 
 Configure the endpoint URL, optional API key, model name, and max-token limit
-under **Settings → Integration → KI-Chat/AI Chat**. LM Studio and Ollama work
-without an API key.
+under **Settings → Integration → KI-Chat/AI Chat**. Orynivo queries the
+OpenAI-compatible `/v1/models` endpoint when this section is opened or the
+connection values change, presents the returned identifiers in a selectable
+list, and retains a free-form model field for compatibility endpoints that do
+not advertise models. **Load models** refreshes the list manually, while
+**Test connection** validates the current URL and key without saving them.
+LM Studio and Ollama work without an API key.
 The sidebar entry can be shown or hidden independently under
 **Settings → Appearance**, without disabling or deleting the saved AI Chat
 configuration.

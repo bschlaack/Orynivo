@@ -640,6 +640,11 @@ fallback or allow client-provided commands/paths to reach the helper.
 - `Orynivo/AI/AiChatSettings.cs`: persisted configuration for the embedded AI
   chat (endpoint URL, optional API key, model name, max tokens); stored as
   `AppSettings.AiChat`
+- `Orynivo/AI/AiEndpointService.cs`: validates credential-free absolute HTTP/S
+  base URLs and queries the OpenAI-compatible `/models` endpoint with the
+  optional bearer token. It accepts standard `data[].id` and Ollama-compatible
+  `models[].name`/`model` response shapes and never exposes response bodies,
+  endpoint URLs, or credentials through Settings errors.
 - `Orynivo/AI/AiChatService.cs`: HTTP client for OpenAI-compatible
   `/v1/chat/completions` endpoints using streaming SSE; internal tool-call
   loop accumulates streamed function arguments, executes tools via
@@ -647,6 +652,11 @@ fallback or allow client-provided commands/paths to reach the helper.
   `IAsyncEnumerable<AiStreamEvent>` (token, tool-call, error, done events);
   conversation history is maintained across turns; `AiChatSettings` is read on
   every send so settings changes take effect without restarting the view
+- The AI Chat settings section automatically refreshes advertised models when
+  opened or after URL/key edits lose focus. It also provides explicit model
+  refresh and connection-test actions. The persisted free-form model name stays
+  independent of the transient list so compatibility endpoints without a model
+  catalog remain usable.
 - `Orynivo/AI/AiToolDefinitions.cs`: builds the OpenAI function-calling schema
   (`JsonObject` list) for all 32 Orynivo tools; definitions match the method
   signatures in `McpTools.cs`

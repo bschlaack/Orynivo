@@ -4,6 +4,14 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.37.3] - 2026-09-02
+
+### Added
+
+- Added automatic and manual AI model discovery plus a connection test in the
+  AI Chat settings. OpenAI-compatible and Ollama model-list responses populate
+  a selectable list while manual model identifiers remain supported.
+
 ## [0.37.2] - 2026-08-27
 
 ### Added

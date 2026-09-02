@@ -1162,6 +1162,22 @@ public sealed record LocalizedStrings(
     public string AiChatLocalNote { get; init; } = "";
     /// <summary>Gets the label for the model-name field.</summary>
     public string AiChatModel { get; init; } = "";
+    /// <summary>Gets the label for loading models from the configured AI endpoint.</summary>
+    public string AiChatLoadModels { get; init; } = "";
+    /// <summary>Gets the placeholder for the list of models advertised by the endpoint.</summary>
+    public string AiChatAvailableModels { get; init; } = "";
+    /// <summary>Gets the label for testing the configured AI endpoint.</summary>
+    public string AiChatTestConnection { get; init; } = "";
+    /// <summary>Gets the status shown while the AI endpoint is being tested.</summary>
+    public string AiChatConnectionTesting { get; init; } = "";
+    /// <summary>Gets the status shown after models were loaded.</summary>
+    public string AiChatModelsLoaded { get; init; } = "";
+    /// <summary>Gets the status shown after a successful AI endpoint test.</summary>
+    public string AiChatConnectionSucceeded { get; init; } = "";
+    /// <summary>Gets the status shown when the AI endpoint returned no models.</summary>
+    public string AiChatNoModels { get; init; } = "";
+    /// <summary>Gets the status shown when the AI endpoint request failed.</summary>
+    public string AiChatConnectionFailed { get; init; } = "";
     /// <summary>Gets the label for the max-tokens field.</summary>
     public string AiChatMaxTokens { get; init; } = "";
     /// <summary>Gets the watermark text shown inside the chat input box.</summary>
