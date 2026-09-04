@@ -253,6 +253,14 @@ public sealed record PlayedAlbumIdentity(string Album, string Artist);
 /// <param name="Duration">Duration in seconds.</param>
 /// <param name="TrackNumber">Current track number.</param>
 /// <param name="DiscNumber">Current disc number.</param>
+/// <param name="ReplayGainTrack">Current track ReplayGain value.</param>
+/// <param name="MusicBrainzTrackId">MusicBrainz recording identifier.</param>
+/// <param name="TrackTotal">Declared track total for the disc.</param>
+/// <param name="DiscTotal">Declared total number of discs.</param>
+/// <param name="HasAlbumArtwork">Whether the assigned album has cached artwork.</param>
+/// <param name="ArtistImagePath">Cached album-artist image path, when assigned.</param>
+/// <param name="AcoustIdFingerprint">Chromaprint/AcoustID fingerprint, when available.</param>
+/// <param name="FileSize">Physical source size in bytes, when known.</param>
 public sealed record MetadataRepairTrack(
     long Id,
     string Path,
@@ -263,7 +271,15 @@ public sealed record MetadataRepairTrack(
     string? AlbumArtist,
     double? Duration,
     int? TrackNumber,
-    int? DiscNumber);
+    int? DiscNumber,
+    string? ReplayGainTrack = null,
+    string? MusicBrainzTrackId = null,
+    int? TrackTotal = null,
+    int? DiscTotal = null,
+    bool HasAlbumArtwork = false,
+    string? ArtistImagePath = null,
+    string? AcoustIdFingerprint = null,
+    long? FileSize = null);
 
 /// <summary>Library-only metadata values that survive subsequent media-file scans.</summary>
 /// <param name="Path">Stable library path.</param>
@@ -4808,10 +4824,15 @@ public sealed class AudioDatabase : IDisposable
     {
         using var command = _conn.CreateCommand();
         command.CommandText = """
-            SELECT id, path, COALESCE(NULLIF(source_path, ''), path),
-                   title, artist, album, album_artist, duration, track_number, disc_number
-            FROM tracks
-            ORDER BY COALESCE(NULLIF(source_path, ''), path);
+            SELECT t.id, t.path, COALESCE(NULLIF(t.source_path, ''), t.path),
+                   t.title, t.artist, t.album, t.album_artist, t.duration, t.track_number, t.disc_number,
+                   t.replay_gain_track, t.musicbrainz_track_id, t.track_total, t.disc_total,
+                   CASE WHEN a.artwork_id IS NULL THEN 0 ELSE 1 END, ar.image_path
+                   , t.acoustid_fingerprint, t.file_size
+            FROM tracks t
+            LEFT JOIN albums a ON a.id = t.album_id
+            LEFT JOIN artists ar ON ar.id = a.artist_id
+            ORDER BY COALESCE(NULLIF(t.source_path, ''), t.path);
             """;
         using var reader = command.ExecuteReader();
         var result = new List<MetadataRepairTrack>();
@@ -4827,7 +4848,15 @@ public sealed class AudioDatabase : IDisposable
                 reader.IsDBNull(6) ? null : reader.GetString(6),
                 reader.IsDBNull(7) ? null : reader.GetDouble(7),
                 reader.IsDBNull(8) ? null : reader.GetInt32(8),
-                reader.IsDBNull(9) ? null : reader.GetInt32(9)));
+                reader.IsDBNull(9) ? null : reader.GetInt32(9),
+                reader.IsDBNull(10) ? null : reader.GetString(10),
+                reader.IsDBNull(11) ? null : reader.GetString(11),
+                reader.IsDBNull(12) ? null : reader.GetInt32(12),
+                reader.IsDBNull(13) ? null : reader.GetInt32(13),
+                reader.GetInt32(14) != 0,
+                reader.IsDBNull(15) ? null : reader.GetString(15),
+                reader.IsDBNull(16) ? null : reader.GetString(16),
+                reader.IsDBNull(17) ? null : reader.GetInt64(17)));
         }
         return result;
     }

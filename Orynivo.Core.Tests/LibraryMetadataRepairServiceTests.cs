@@ -6,6 +6,173 @@ namespace Orynivo.Core.Tests;
 /// <summary>Verifies physical-folder problem detection and persistent library-only corrections.</summary>
 public sealed class LibraryMetadataRepairServiceTests
 {
+    /// <summary>Honours cancellation before inspecting a folder.</summary>
+    [Fact]
+    public void Analyze_HonoursCancellation()
+    {
+        var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var track = new MetadataRepairTrack(1, "track.flac", "track.flac", "Track", "Artist",
+            "Album", "Artist", 180, 1, 1);
+
+        Assert.Throws<OperationCanceledException>(() =>
+            LibraryMetadataRepairService.Analyze([track], cancellationToken: cancellation.Token));
+    }
+
+    /// <summary>Reports enrichment gaps even when the basic album metadata is internally consistent.</summary>
+    [Fact]
+    public void Analyze_DetectsMissingReplayGainAndMusicBrainzIdentity()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "orynivo-doctor-enrichment");
+        var tracks = new[]
+        {
+            new MetadataRepairTrack(1, Path.Combine(folder, "one.flac"), typeof(LibraryMetadataRepairServiceTests).Assembly.Location,
+                "One", "Artist", "Album", "Artist", 180, 1, 1, null, null),
+            new MetadataRepairTrack(2, Path.Combine(folder, "two.flac"), typeof(LibraryMetadataRepairServiceTests).Assembly.Location,
+                "Two", "Artist", "Album", "Artist", 200, 2, 1, "-7.2 dB", "recording-id")
+        };
+
+        var candidate = Assert.Single(LibraryMetadataRepairService.Analyze(tracks));
+
+        Assert.Equal(1, candidate.MissingReplayGainCount);
+        Assert.Equal(1, candidate.MissingMusicBrainzIdCount);
+        Assert.Equal(LibraryDoctorSeverity.Warning, candidate.HighestSeverity);
+        Assert.Contains(candidate.Findings, finding =>
+            finding.Code == "replaygain" &&
+            finding.RepairCapability == LibraryDoctorRepairCapability.MaintenanceAction);
+    }
+
+    /// <summary>Uses declared per-disc totals to report actual missing positions.</summary>
+    [Fact]
+    public void Analyze_DetectsProvablyIncompleteDisc()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "orynivo-doctor-incomplete");
+        var tracks = new[]
+        {
+            new MetadataRepairTrack(1, Path.Combine(folder, "one.flac"), typeof(LibraryMetadataRepairServiceTests).Assembly.Location,
+                "One", "Artist", "Album", "Artist", 180, 1, 1, "-7 dB", "id-1", 3, 1),
+            new MetadataRepairTrack(2, Path.Combine(folder, "three.flac"), typeof(LibraryMetadataRepairServiceTests).Assembly.Location,
+                "Three", "Artist", "Album", "Artist", 180, 3, 1, "-7 dB", "id-3", 3, 1)
+        };
+
+        var candidate = Assert.Single(LibraryMetadataRepairService.Analyze(tracks));
+
+        Assert.Equal(1, candidate.MissingExpectedTrackCount);
+        Assert.Contains(candidate.Findings, finding => finding.Code == "incomplete-album");
+    }
+
+    /// <summary>Does not report a fully enriched and internally consistent folder.</summary>
+    [Fact]
+    public void Analyze_IgnoresHealthyEnrichedFolder()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "orynivo-doctor-healthy");
+        var tracks = new[]
+        {
+            new MetadataRepairTrack(1, Path.Combine(folder, "one.flac"), typeof(LibraryMetadataRepairServiceTests).Assembly.Location,
+                "One", "Artist", "Album", "Artist", 180, 1, 1, "-7 dB", "id-1", 1, 1, true,
+                typeof(LibraryMetadataRepairServiceTests).Assembly.Location)
+        };
+
+        Assert.Empty(LibraryMetadataRepairService.Analyze(tracks));
+    }
+
+    /// <summary>Checks one shared physical source only once for virtual tracks.</summary>
+    [Fact]
+    public void Analyze_DeduplicatesMissingPhysicalSources()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), $"orynivo-doctor-missing-{Guid.NewGuid():N}");
+        var source = Path.Combine(folder, "missing.flac");
+        var tracks = new[]
+        {
+            new MetadataRepairTrack(1, $"cue://one", source, "One", "Artist", "Album", "Artist", 180, 1, 1),
+            new MetadataRepairTrack(2, $"cue://two", source, "Two", "Artist", "Album", "Artist", 180, 2, 1)
+        };
+
+        var candidate = Assert.Single(LibraryMetadataRepairService.Analyze(tracks));
+
+        Assert.Equal(1, candidate.MissingSourceFileCount);
+        Assert.Equal(LibraryDoctorSeverity.Error, candidate.HighestSeverity);
+    }
+
+    /// <summary>Separates likely file copies from fingerprint matches with another size.</summary>
+    [Fact]
+    public void Analyze_ClassifiesFingerprintDuplicateCandidates()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"orynivo-doctor-duplicates-{Guid.NewGuid():N}");
+        var image = typeof(LibraryMetadataRepairServiceTests).Assembly.Location;
+        var tracks = new[]
+        {
+            new MetadataRepairTrack(1, Path.Combine(root, "a", "one.flac"), Path.Combine(root, "a", "one.flac"),
+                "One", "Artist", "Album A", "Artist", 180, 1, 1, "-7 dB", "id-1", 1, 1, true, image, "fp", 1000),
+            new MetadataRepairTrack(2, Path.Combine(root, "b", "one.flac"), Path.Combine(root, "b", "one.flac"),
+                "One", "Artist", "Album B", "Artist", 180, 1, 1, "-7 dB", "id-2", 1, 1, true, image, "fp", 1000),
+            new MetadataRepairTrack(3, Path.Combine(root, "c", "one.flac"), Path.Combine(root, "c", "one.flac"),
+                "One", "Artist", "Album C", "Artist", 180, 1, 1, "-7 dB", "id-3", 1, 1, true, image, "fp", 900)
+        };
+
+        var candidates = LibraryMetadataRepairService.Analyze(tracks);
+
+        Assert.Equal(2, candidates.Count(candidate => candidate.LikelyDuplicateFileCount == 1));
+        Assert.Equal(1, candidates.Count(candidate => candidate.AlternateRecordingFileCount == 1));
+    }
+
+    /// <summary>Confirms byte-identical files only after hashing their complete contents.</summary>
+    [Fact]
+    public void Analyze_ConfirmsExactDuplicateFilesByContentHash()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"orynivo-doctor-exact-{Guid.NewGuid():N}");
+        var first = Path.Combine(root, "a", "one.flac");
+        var second = Path.Combine(root, "b", "one.flac");
+        Directory.CreateDirectory(Path.GetDirectoryName(first)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(second)!);
+        File.WriteAllBytes(first, [1, 2, 3, 4]);
+        File.WriteAllBytes(second, [1, 2, 3, 4]);
+        try
+        {
+            var image = typeof(LibraryMetadataRepairServiceTests).Assembly.Location;
+            var tracks = new[]
+            {
+                new MetadataRepairTrack(1, first, first, "One", "Artist", "Album A", "Artist",
+                    180, 1, 1, "-7 dB", "id-1", 1, 1, true, image, "fp", 4),
+                new MetadataRepairTrack(2, second, second, "One", "Artist", "Album B", "Artist",
+                    180, 1, 1, "-7 dB", "id-2", 1, 1, true, image, "fp", 4)
+            };
+
+            var candidates = LibraryMetadataRepairService.Analyze(tracks);
+
+            Assert.All(candidates, candidate => Assert.Equal(1, candidate.ExactDuplicateFileCount));
+            Assert.All(candidates, candidate => Assert.Equal(0, candidate.LikelyDuplicateFileCount));
+            Assert.All(candidates, candidate => Assert.Contains(candidate.Findings,
+                finding => finding.Code == "exact-duplicate"));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    /// <summary>Flags conservative spelling variants without merging the affected artists.</summary>
+    [Fact]
+    public void Analyze_DetectsArtistNameVariantsAcrossFolders()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"orynivo-doctor-artists-{Guid.NewGuid():N}");
+        var tracks = new[]
+        {
+            new MetadataRepairTrack(1, Path.Combine(root, "a", "one.flac"), Path.Combine(root, "a", "one.flac"),
+                "One", "A-Ha", "Album A", "A-Ha", 180, 1, 1),
+            new MetadataRepairTrack(2, Path.Combine(root, "b", "one.flac"), Path.Combine(root, "b", "one.flac"),
+                "One", "a ha", "Album B", "a ha", 180, 1, 1)
+        };
+
+        var candidates = LibraryMetadataRepairService.Analyze(tracks);
+
+        Assert.Equal(2, candidates.Count);
+        Assert.All(candidates, candidate => Assert.Equal(1, candidate.ArtistNameVariantCount));
+        Assert.All(candidates, candidate => Assert.Contains(candidate.Findings,
+            finding => finding.Code == "artist-name-variant" &&
+                       finding.RepairCapability == LibraryDoctorRepairCapability.GuidedReview));
+    }
+
     /// <summary>Detects a folder split by inconsistent album titles and missing track numbers.</summary>
     [Fact]
     public void Analyze_DetectsFragmentedPhysicalAlbum()

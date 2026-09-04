@@ -2,13 +2,13 @@
         xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Width="940"
-        Height="720"
+        Height="820"
         MinWidth="760"
         MinHeight="560"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource AppContentBrush}"
         Foreground="{DynamicResource AppPrimaryTextBrush}">
-    <Grid Margin="24" RowDefinitions="Auto,Auto,Auto,2*,Auto,2*,Auto">
+    <Grid Margin="24" RowDefinitions="Auto,Auto,Auto,2*,Auto,*,Auto,2*,Auto">
         <TextBlock Grid.Row="0"
                    Text="{Binding FolderPath}"
                    FontSize="{DynamicResource FontSizeTitle}"
@@ -63,7 +63,25 @@
         <ListBox x:Name="ReleaseListBox"
                  Grid.Row="5"
                  SelectionChanged="ReleaseListBox_OnSelectionChanged"/>
-        <Grid Grid.Row="6" Margin="0,12,0,0" ColumnDefinitions="*,Auto,Auto">
+        <TextBlock x:Name="PreviewLabel"
+                   Grid.Row="6"
+                   Margin="0,12,0,8"
+                   FontSize="{DynamicResource FontSizeBodyStrong}"
+                   FontWeight="SemiBold"/>
+        <DataGrid x:Name="PreviewDataGrid"
+                  Grid.Row="7"
+                  AutoGenerateColumns="False"
+                  CanUserSortColumns="False"
+                  IsReadOnly="True"
+                  HeadersVisibility="Column"
+                  GridLinesVisibility="None">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="#" Binding="{Binding TrackNumber}" Width="55"/>
+                <DataGridTextColumn Header="{DynamicResource L_MetadataCurrentValues}" Binding="{Binding CurrentValues}" Width="*"/>
+                <DataGridTextColumn Header="{DynamicResource L_MetadataProposedValues}" Binding="{Binding ProposedValues}" Width="*"/>
+            </DataGrid.Columns>
+        </DataGrid>
+        <Grid Grid.Row="8" Margin="0,12,0,0" ColumnDefinitions="*,Auto,Auto">
             <TextBlock x:Name="SelectionDetailTextBlock"
                        VerticalAlignment="Center"
                        Foreground="{DynamicResource AppSecondaryTextBrush}"

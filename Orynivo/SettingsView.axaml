@@ -840,6 +840,19 @@
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"
                                Margin="0,0,0,12"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10" Spacing="8">
+                        <TextBlock Text="{DynamicResource L_MetadataSeverity}"
+                                   VerticalAlignment="Center"/>
+                        <ComboBox x:Name="MetadataSeverityFilterComboBox"
+                                  Width="170"
+                                  SelectionChanged="MetadataSeverityFilter_OnSelectionChanged"/>
+                        <TextBlock Text="{DynamicResource L_MetadataIssues}"
+                                   Margin="12,0,0,0"
+                                   VerticalAlignment="Center"/>
+                        <ComboBox x:Name="MetadataIssueFilterComboBox"
+                                  Width="240"
+                                  SelectionChanged="MetadataSeverityFilter_OnSelectionChanged"/>
+                    </StackPanel>
                     <DataGrid x:Name="MetadataProblemsDataGrid"
                               Height="420"
                               AutoGenerateColumns="False"
@@ -850,9 +863,15 @@
                               SelectionChanged="MetadataProblemsDataGrid_OnSelectionChanged"
                               DoubleTapped="MetadataProblemsDataGrid_OnDoubleTapped">
                         <DataGrid.Columns>
+                            <DataGridTextColumn Header="{DynamicResource L_Source}"
+                                                Binding="{Binding Source}"
+                                                Width="120"/>
                             <DataGridTextColumn Header="{DynamicResource L_MetadataFolder}"
                                                 Binding="{Binding Folder}"
                                                 Width="2*"/>
+                            <DataGridTextColumn Header="{DynamicResource L_MetadataSeverity}"
+                                                Binding="{Binding Severity}"
+                                                Width="110"/>
                             <DataGridTextColumn Header="{DynamicResource L_MetadataIssues}"
                                                 Binding="{Binding Issues}"
                                                 Width="2*"/>
@@ -863,10 +882,19 @@
                     </DataGrid>
                     <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
                         <Button Width="180"
+                                x:Name="RefreshMetadataAnalysisButton"
                                 Height="30"
                                 Theme="{StaticResource SettingsButtonTheme}"
                                 Content="{DynamicResource L_MetadataRefreshAnalysis}"
                                 Click="RefreshMetadataAnalysisButton_OnClick"/>
+                        <Button x:Name="CancelMetadataAnalysisButton"
+                                Width="120"
+                                Height="30"
+                                Margin="8,0,0,0"
+                                IsEnabled="False"
+                                Theme="{StaticResource SettingsButtonTheme}"
+                                Content="{DynamicResource L_Cancel}"
+                                Click="CancelMetadataAnalysisButton_OnClick"/>
                         <Button x:Name="OpenMetadataRepairButton"
                                 Width="220"
                                 Height="30"

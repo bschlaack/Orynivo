@@ -90,6 +90,10 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
 - `GET /api/library/summary` returns `DashboardLibrarySummary` directly from an
   aggregate database query so dashboard counters never require complete track
   or album payloads.
+- Authenticated `GET /api/library/doctor` runs Core analysis on the server and
+  returns compact folder counts and typed findings only. Do not expose API
+  keys or complete track rows, and keep older-server failure non-fatal on the
+  desktop client.
 - `GET /api/albums/recommendation-candidates` returns compact album-level
   genre/BPM metadata for client-side Dashboard ranking; recommendation policy
   and listening history remain on the client.

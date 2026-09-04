@@ -531,6 +531,12 @@ public sealed record LocalizedStrings(
     public string MetadataFoundReleases { get; init; } = "";
     /// <summary>Gets the action that applies a selected metadata correction.</summary>
     public string MetadataApplyCorrection { get; init; } = "";
+    /// <summary>Gets the heading for the metadata correction preview.</summary>
+    public string MetadataCorrectionPreview { get; init; } = "";
+    /// <summary>Gets the column heading for current metadata values.</summary>
+    public string MetadataCurrentValues { get; init; } = "";
+    /// <summary>Gets the column heading for proposed metadata values.</summary>
+    public string MetadataProposedValues { get; init; } = "";
     /// <summary>Gets the action that refreshes the metadata-problem analysis.</summary>
     public string MetadataRefreshAnalysis { get; init; } = "";
     /// <summary>Gets the editable MusicBrainz album-query label.</summary>
@@ -549,6 +555,52 @@ public sealed record LocalizedStrings(
     public string MetadataIssueMissingNumbers { get; init; } = "";
     /// <summary>Gets the problem label for duplicate track numbers.</summary>
     public string MetadataIssueDuplicateNumbers { get; init; } = "";
+    /// <summary>Gets the formatted metadata issue for missing ReplayGain values.</summary>
+    public string MetadataIssueMissingReplayGain { get; init; } = "";
+    /// <summary>Gets the formatted metadata issue for missing MusicBrainz recording identifiers.</summary>
+    public string MetadataIssueMissingMusicBrainzIds { get; init; } = "";
+    /// <summary>Gets the Library Doctor severity column label.</summary>
+    public string MetadataSeverity { get; init; } = "";
+    /// <summary>Gets the option that includes every Library Doctor severity.</summary>
+    public string MetadataSeverityAll { get; init; } = "";
+    /// <summary>Gets the option that includes every Library Doctor finding type.</summary>
+    public string MetadataIssueAll { get; init; } = "";
+    /// <summary>Gets the short ReplayGain finding-filter label.</summary>
+    public string MetadataIssueReplayGain { get; init; } = "";
+    /// <summary>Gets the short MusicBrainz-ID finding-filter label.</summary>
+    public string MetadataIssueMusicBrainzIds { get; init; } = "";
+    /// <summary>Gets the formatted finding label for demonstrably incomplete albums.</summary>
+    public string MetadataIssueIncompleteAlbum { get; init; } = "";
+    /// <summary>Gets the missing album-artwork finding label.</summary>
+    public string MetadataIssueAlbumArtwork { get; init; } = "";
+    /// <summary>Gets the missing artist-image finding label.</summary>
+    public string MetadataIssueArtistImage { get; init; } = "";
+    /// <summary>Gets the formatted missing-source-file finding label.</summary>
+    public string MetadataIssueMissingFiles { get; init; } = "";
+    /// <summary>Gets the formatted unreadable-source-file finding label.</summary>
+    public string MetadataIssueUnreadableFiles { get; init; } = "";
+    /// <summary>Gets the formatted likely-duplicate-file finding label.</summary>
+    public string MetadataIssueLikelyDuplicates { get; init; } = "";
+    /// <summary>Gets the formatted label for byte-identical duplicate files.</summary>
+    public string MetadataIssueExactDuplicates { get; init; } = "";
+    /// <summary>Gets the formatted alternate-recording finding label.</summary>
+    public string MetadataIssueAlternateRecordings { get; init; } = "";
+    /// <summary>Gets the formatted label for conservatively matched artist-name variants.</summary>
+    public string MetadataIssueArtistNameVariants { get; init; } = "";
+    /// <summary>Gets the informational finding label.</summary>
+    public string MetadataSeverityInformation { get; init; } = "";
+    /// <summary>Gets the warning finding label.</summary>
+    public string MetadataSeverityWarning { get; init; } = "";
+    /// <summary>Gets the error finding label.</summary>
+    public string MetadataSeverityError { get; init; } = "";
+    /// <summary>Gets the formatted Library Doctor severity summary.</summary>
+    public string MetadataDoctorSummary { get; init; } = "";
+    /// <summary>Gets the message shown when Library Doctor analysis fails.</summary>
+    public string MetadataAnalysisFailed { get; init; } = "";
+    /// <summary>Gets the formatted notice for servers whose Doctor endpoint is unavailable.</summary>
+    public string MetadataDoctorServersUnavailable { get; init; } = "";
+    /// <summary>Gets the message shown after Library Doctor analysis is cancelled.</summary>
+    public string MetadataAnalysisCancelled { get; init; } = "";
     public string Calendar { get; init; } = "";
     public string TopGenres { get; init; } = "";
     /// <summary>Gets the dashboard "most listened albums" section title.</summary>

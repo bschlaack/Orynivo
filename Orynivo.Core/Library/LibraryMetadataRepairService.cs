@@ -1,8 +1,42 @@
 using System.Net.Http.Json;
 using System.Globalization;
 using System.Text.Json;
+using System.Security.Cryptography;
 
 namespace Orynivo.Library;
+
+/// <summary>Severity assigned to one Library Doctor finding.</summary>
+public enum LibraryDoctorSeverity
+{
+    /// <summary>Optional enrichment is missing.</summary>
+    Information,
+    /// <summary>Playback remains possible, but library quality is reduced.</summary>
+    Warning,
+    /// <summary>Core album identity or ordering metadata is inconsistent.</summary>
+    Error
+}
+
+/// <summary>Repair path available for a Library Doctor finding.</summary>
+public enum LibraryDoctorRepairCapability
+{
+    /// <summary>No automatic repair action is available.</summary>
+    None,
+    /// <summary>The existing guided metadata-review flow can repair the finding.</summary>
+    GuidedReview,
+    /// <summary>An existing explicit maintenance action can repair the finding.</summary>
+    MaintenanceAction
+}
+
+/// <summary>One typed Library Doctor finding for a physical album folder.</summary>
+/// <param name="Code">Stable machine-readable finding code.</param>
+/// <param name="Severity">Finding severity.</param>
+/// <param name="AffectedTrackCount">Number of affected tracks.</param>
+/// <param name="RepairCapability">Available repair path.</param>
+public sealed record LibraryDoctorFinding(
+    string Code,
+    LibraryDoctorSeverity Severity,
+    int AffectedTrackCount,
+    LibraryDoctorRepairCapability RepairCapability);
 
 /// <summary>A physical folder whose indexed tracks contain potentially inconsistent album metadata.</summary>
 /// <param name="FolderPath">Physical album-candidate folder.</param>
@@ -12,6 +46,17 @@ namespace Orynivo.Library;
 /// <param name="MissingTitleCount">Number of tracks without a title.</param>
 /// <param name="MissingTrackNumberCount">Number of tracks without a track number.</param>
 /// <param name="DuplicateTrackNumbers">Whether track numbers are duplicated within a disc.</param>
+/// <param name="MissingReplayGainCount">Number of tracks without track ReplayGain.</param>
+/// <param name="MissingMusicBrainzIdCount">Number of tracks without a MusicBrainz recording identifier.</param>
+/// <param name="MissingExpectedTrackCount">Number of track positions demonstrably missing from declared disc totals.</param>
+/// <param name="MissingAlbumArtwork">Whether no assigned album in the folder has cached artwork.</param>
+/// <param name="MissingArtistImage">Whether no assigned album artist has an existing cached image.</param>
+/// <param name="MissingSourceFileCount">Number of distinct physical source files that no longer exist.</param>
+/// <param name="UnreadableSourceFileCount">Number of distinct physical source files that cannot be opened for reading.</param>
+/// <param name="LikelyDuplicateFileCount">Number of physical sources with the same fingerprint and file size elsewhere.</param>
+/// <param name="AlternateRecordingFileCount">Number of physical sources sharing a fingerprint but not the file size.</param>
+/// <param name="ArtistNameVariantCount">Number of artist spellings that share a conservative library identity key.</param>
+/// <param name="ExactDuplicateFileCount">Number of byte-identical physical sources found elsewhere.</param>
 public sealed record MetadataFolderCandidate(
     string FolderPath,
     IReadOnlyList<MetadataRepairTrack> Tracks,
@@ -19,15 +64,58 @@ public sealed record MetadataFolderCandidate(
     int AlbumArtistCount,
     int MissingTitleCount,
     int MissingTrackNumberCount,
-    bool DuplicateTrackNumbers)
+    bool DuplicateTrackNumbers,
+    int MissingReplayGainCount = 0,
+    int MissingMusicBrainzIdCount = 0,
+    int MissingExpectedTrackCount = 0,
+    bool MissingAlbumArtwork = false,
+    bool MissingArtistImage = false,
+    int MissingSourceFileCount = 0,
+    int UnreadableSourceFileCount = 0,
+    int LikelyDuplicateFileCount = 0,
+    int AlternateRecordingFileCount = 0,
+    int ArtistNameVariantCount = 0,
+    int ExactDuplicateFileCount = 0)
 {
+    /// <summary>Gets typed findings used by Library Doctor summaries and filters.</summary>
+    public IReadOnlyList<LibraryDoctorFinding> Findings
+    {
+        get
+        {
+            var findings = new List<LibraryDoctorFinding>();
+            Add(AlbumCount != 1, "album", LibraryDoctorSeverity.Error, Tracks.Count, LibraryDoctorRepairCapability.GuidedReview);
+            Add(AlbumArtistCount != 1, "album-artist", LibraryDoctorSeverity.Error, Tracks.Count, LibraryDoctorRepairCapability.GuidedReview);
+            Add(MissingTitleCount > 0, "title", LibraryDoctorSeverity.Error, MissingTitleCount, LibraryDoctorRepairCapability.GuidedReview);
+            Add(MissingTrackNumberCount > 0, "track-number", LibraryDoctorSeverity.Warning, MissingTrackNumberCount, LibraryDoctorRepairCapability.GuidedReview);
+            Add(DuplicateTrackNumbers, "duplicate-track-number", LibraryDoctorSeverity.Error, Tracks.Count, LibraryDoctorRepairCapability.GuidedReview);
+            Add(MissingReplayGainCount > 0, "replaygain", LibraryDoctorSeverity.Warning, MissingReplayGainCount, LibraryDoctorRepairCapability.MaintenanceAction);
+            Add(MissingMusicBrainzIdCount > 0, "musicbrainz-id", LibraryDoctorSeverity.Information, MissingMusicBrainzIdCount, LibraryDoctorRepairCapability.GuidedReview);
+            Add(MissingExpectedTrackCount > 0, "incomplete-album", LibraryDoctorSeverity.Warning, MissingExpectedTrackCount, LibraryDoctorRepairCapability.None);
+            Add(MissingAlbumArtwork, "album-artwork", LibraryDoctorSeverity.Information, Tracks.Count, LibraryDoctorRepairCapability.MaintenanceAction);
+            Add(MissingArtistImage, "artist-image", LibraryDoctorSeverity.Information, Tracks.Count, LibraryDoctorRepairCapability.MaintenanceAction);
+            Add(MissingSourceFileCount > 0, "missing-file", LibraryDoctorSeverity.Error, MissingSourceFileCount, LibraryDoctorRepairCapability.None);
+            Add(UnreadableSourceFileCount > 0, "unreadable-file", LibraryDoctorSeverity.Error, UnreadableSourceFileCount, LibraryDoctorRepairCapability.None);
+            Add(LikelyDuplicateFileCount > 0, "likely-duplicate", LibraryDoctorSeverity.Warning, LikelyDuplicateFileCount, LibraryDoctorRepairCapability.None);
+            Add(AlternateRecordingFileCount > 0, "alternate-recording", LibraryDoctorSeverity.Information, AlternateRecordingFileCount, LibraryDoctorRepairCapability.None);
+            Add(ArtistNameVariantCount > 0, "artist-name-variant", LibraryDoctorSeverity.Warning, ArtistNameVariantCount, LibraryDoctorRepairCapability.GuidedReview);
+            Add(ExactDuplicateFileCount > 0, "exact-duplicate", LibraryDoctorSeverity.Warning, ExactDuplicateFileCount, LibraryDoctorRepairCapability.None);
+            return findings;
+
+            void Add(bool condition, string code, LibraryDoctorSeverity severity, int count, LibraryDoctorRepairCapability capability)
+            {
+                if (condition)
+                    findings.Add(new LibraryDoctorFinding(code, severity, count, capability));
+            }
+        }
+    }
+
+    /// <summary>Gets the highest severity among this folder's findings.</summary>
+    public LibraryDoctorSeverity HighestSeverity => Findings.Count == 0
+        ? LibraryDoctorSeverity.Information
+        : Findings.Max(static finding => finding.Severity);
+
     /// <summary>Gets whether the candidate contains a metadata inconsistency worth reviewing.</summary>
-    public bool HasProblems =>
-        AlbumCount != 1 ||
-        AlbumArtistCount != 1 ||
-        MissingTitleCount > 0 ||
-        MissingTrackNumberCount > 0 ||
-        DuplicateTrackNumbers;
+    public bool HasProblems => Findings.Count > 0;
 }
 
 /// <summary>One MusicBrainz track proposed for a physical local track.</summary>
@@ -77,17 +165,35 @@ public static class LibraryMetadataRepairService
     /// <summary>Groups indexed tracks by physical album folder and returns inconsistent candidates.</summary>
     /// <param name="tracks">Compact indexed track metadata.</param>
     /// <param name="includeHealthy">Whether candidates without detected inconsistencies are included.</param>
+    /// <param name="cancellationToken">Token used to cancel folder and physical-source analysis.</param>
     /// <returns>Physical folder candidates ordered by path.</returns>
     public static List<MetadataFolderCandidate> Analyze(
         IEnumerable<MetadataRepairTrack> tracks,
-        bool includeHealthy = false)
+        bool includeHealthy = false,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(tracks);
-        return tracks
+        cancellationToken.ThrowIfCancellationRequested();
+        var trackList = tracks.ToList();
+        var fingerprintGroups = trackList
+            .Where(static track => !string.IsNullOrWhiteSpace(track.AcoustIdFingerprint))
+            .GroupBy(static track => track.AcoustIdFingerprint!, StringComparer.Ordinal)
+            .ToDictionary(static group => group.Key, static group => group.ToList(), StringComparer.Ordinal);
+        var contentHashes = BuildDuplicateContentHashes(fingerprintGroups, cancellationToken);
+        var variantArtistKeys = trackList
+            .SelectMany(static track => new[] { track.Artist, track.AlbumArtist })
+            .Where(static name => !string.IsNullOrWhiteSpace(name))
+            .Select(static name => name!.Trim())
+            .GroupBy(ArtistNameNormalizer.CreateComparisonKey, StringComparer.Ordinal)
+            .Where(static group => group.Distinct(StringComparer.Ordinal).Skip(1).Any())
+            .Select(static group => group.Key)
+            .ToHashSet(StringComparer.Ordinal);
+        return trackList
             .GroupBy(track => ResolveAlbumFolder(track.SourcePath), StringComparer.OrdinalIgnoreCase)
             .Where(group => !string.IsNullOrWhiteSpace(group.Key))
             .Select(group =>
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var ordered = group
                     .OrderBy(track => track.DiscNumber ?? 1)
                     .ThenBy(track => track.TrackNumber ?? int.MaxValue)
@@ -99,6 +205,34 @@ public static class LibraryMetadataRepairService
                     .Where(track => track.TrackNumber.HasValue)
                     .GroupBy(track => (Disc: track.DiscNumber ?? 1, Track: track.TrackNumber!.Value))
                     .Any(grouping => grouping.Count() > 1);
+                var missingExpectedTracks = ordered
+                    .GroupBy(track => track.DiscNumber ?? 1)
+                    .Sum(disc =>
+                    {
+                        var declaredTotal = disc.Where(track => track.TrackTotal is > 0)
+                            .Select(track => track.TrackTotal!.Value)
+                            .DefaultIfEmpty(0)
+                            .Max();
+                        if (declaredTotal == 0)
+                            return 0;
+                        var present = disc.Where(track => track.TrackNumber is > 0 && track.TrackNumber <= declaredTotal)
+                            .Select(track => track.TrackNumber!.Value)
+                            .Distinct()
+                            .Count();
+                        return Math.Max(0, declaredTotal - present);
+                    });
+                var (missingFiles, unreadableFiles) = AnalyzeSourceFiles(ordered, cancellationToken);
+                var (exactDuplicates, likelyDuplicates, alternateRecordings) = AnalyzeDuplicateCandidates(
+                    ordered,
+                    fingerprintGroups,
+                    contentHashes);
+                var artistNameVariants = ordered
+                    .SelectMany(static track => new[] { track.Artist, track.AlbumArtist })
+                    .Where(name => !string.IsNullOrWhiteSpace(name) &&
+                                   variantArtistKeys.Contains(ArtistNameNormalizer.CreateComparisonKey(name!)))
+                    .Select(static name => name!.Trim())
+                    .Distinct(StringComparer.Ordinal)
+                    .Count();
                 return new MetadataFolderCandidate(
                     group.Key,
                     ordered,
@@ -106,11 +240,142 @@ public static class LibraryMetadataRepairService
                     albumArtistCount,
                     ordered.Count(track => string.IsNullOrWhiteSpace(track.Title)),
                     ordered.Count(track => !track.TrackNumber.HasValue),
-                    duplicateNumbers);
+                    duplicateNumbers,
+                    ordered.Count(track => string.IsNullOrWhiteSpace(track.ReplayGainTrack)),
+                    ordered.Count(track => string.IsNullOrWhiteSpace(track.MusicBrainzTrackId)),
+                    missingExpectedTracks,
+                    !ordered.Any(track => track.HasAlbumArtwork),
+                    !ordered.Any(track => !string.IsNullOrWhiteSpace(track.ArtistImagePath) && File.Exists(track.ArtistImagePath)),
+                    missingFiles,
+                    unreadableFiles,
+                    likelyDuplicates,
+                    alternateRecordings,
+                    artistNameVariants,
+                    exactDuplicates);
             })
             .Where(candidate => includeHealthy || candidate.HasProblems)
             .OrderBy(candidate => candidate.FolderPath, StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    private static (int ExactDuplicates, int LikelyDuplicates, int AlternateRecordings) AnalyzeDuplicateCandidates(
+        IEnumerable<MetadataRepairTrack> folderTracks,
+        IReadOnlyDictionary<string, List<MetadataRepairTrack>> fingerprintGroups,
+        IReadOnlyDictionary<string, string> contentHashes)
+    {
+        var exact = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var likely = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var alternate = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var track in folderTracks.Where(static track => !string.IsNullOrWhiteSpace(track.AcoustIdFingerprint)))
+        {
+            if (!fingerprintGroups.TryGetValue(track.AcoustIdFingerprint!, out var matches))
+                continue;
+            foreach (var match in matches.Where(match =>
+                         !string.Equals(match.SourcePath, track.SourcePath, StringComparison.OrdinalIgnoreCase)))
+            {
+                if (track.FileSize is > 0 && match.FileSize == track.FileSize)
+                {
+                    if (contentHashes.TryGetValue(track.SourcePath, out var trackHash) &&
+                        contentHashes.TryGetValue(match.SourcePath, out var matchHash))
+                    {
+                        if (string.Equals(trackHash, matchHash, StringComparison.Ordinal))
+                            exact.Add(track.SourcePath);
+                        else
+                            alternate.Add(track.SourcePath);
+                    }
+                    else
+                    {
+                        likely.Add(track.SourcePath);
+                    }
+                }
+                else
+                    alternate.Add(track.SourcePath);
+            }
+        }
+        likely.ExceptWith(exact);
+        alternate.ExceptWith(exact);
+        alternate.ExceptWith(likely);
+        return (exact.Count, likely.Count, alternate.Count);
+    }
+
+    private static Dictionary<string, string> BuildDuplicateContentHashes(
+        IReadOnlyDictionary<string, List<MetadataRepairTrack>> fingerprintGroups,
+        CancellationToken cancellationToken)
+    {
+        var paths = fingerprintGroups.Values
+            .SelectMany(group => group
+                .Where(static track => track.FileSize is > 0)
+                .GroupBy(static track => track.FileSize)
+                .Where(static sizeGroup => sizeGroup
+                    .Select(track => track.SourcePath)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Skip(1)
+                    .Any())
+                .SelectMany(static sizeGroup => sizeGroup.Select(track => track.SourcePath)))
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in paths)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                using var stream = new FileStream(path, FileMode.Open, FileAccess.Read,
+                    FileShare.Read | FileShare.Delete, 64 * 1024, FileOptions.SequentialScan);
+                using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+                var buffer = new byte[64 * 1024];
+                int read;
+                while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    hash.AppendData(buffer, 0, read);
+                }
+                result[path] = Convert.ToHexString(hash.GetHashAndReset());
+            }
+            catch (IOException)
+            {
+                // The existing source-file finding reports this path; retain a likely match only.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // The existing source-file finding reports this path; retain a likely match only.
+            }
+        }
+        return result;
+    }
+
+    private static (int Missing, int Unreadable) AnalyzeSourceFiles(
+        IEnumerable<MetadataRepairTrack> tracks,
+        CancellationToken cancellationToken)
+    {
+        var missing = 0;
+        var unreadable = 0;
+        foreach (var path in tracks.Select(static track => track.SourcePath)
+                     .Where(static path => !string.IsNullOrWhiteSpace(path))
+                     .Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!File.Exists(path))
+            {
+                missing++;
+                continue;
+            }
+
+            try
+            {
+                using var stream = new FileStream(path, FileMode.Open, FileAccess.Read,
+                    FileShare.ReadWrite | FileShare.Delete, 1, FileOptions.SequentialScan);
+                _ = stream.ReadByte();
+            }
+            catch (IOException)
+            {
+                unreadable++;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                unreadable++;
+            }
+        }
+        return (missing, unreadable);
     }
 
     /// <summary>

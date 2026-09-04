@@ -376,6 +376,7 @@ works directly in FFmpeg and browser URLs.
 | `GET /api/tracks/facets` | Lightweight facet rows (genre, format, bitrate) for the Tracks filter |
 | `GET /api/genres/cloud` | Compact hierarchical genre counts and bounded recommendation candidates |
 | `GET /api/library/summary` | Aggregate album, track, artist, and favorite counts without materializing library rows |
+| `GET /api/library/doctor` | Compact read-only Library Doctor folder findings generated on the server |
 | `POST /api/tracks/by-ids` | Track rows for a list of track IDs (facet-filtered results) |
 | `GET /api/folders/tracks` | Lightweight track rows plus playback metadata for building a server library folder tree |
 | `GET /api/artwork/album/{id}?size=96` | Album artwork thumbnail or original image |
@@ -663,12 +664,20 @@ byte-range streaming without FFmpeg.
 - Conservative artist-name normalization for `feat.` credits and unambiguous
   case, accent, spacing, and punctuation variants, with a repair action for
   existing libraries
-- A physical-folder-based metadata review catches albums fragmented by bad tags,
-  missing or duplicate numbering, and inconsistent album artists. It can match
+- A physical-folder-based Library Doctor review catches albums fragmented by
+  bad tags, missing or duplicate numbering, inconsistent album artists,
+  missing cover or artist artwork, missing/unreadable source files, missing track
+  ReplayGain, missing MusicBrainz recording IDs, and AcoustID duplicate
+  candidates. Same-size candidates receive a streaming full-file SHA-256 check
+  that separates byte-identical copies from alternate files or editions. It can match
   a folder from Settings > Library > Review metadata against MusicBrainz by
   editable album/artist search terms, title similarity, and all available
   approximate track durations, then apply a
   confirmed release as persistent library-only metadata without rewriting files.
+  Explicit analysis runs outside the UI thread and can be cancelled. Updated
+  connected Orynivo Servers contribute compact read-only findings through the
+  authenticated API; older or unavailable servers are reported without
+  preventing local results.
 - Live A-Z/# quick navigation beside alphabetically sorted artist, album, and
   track lists
 - Artist and album views with table and virtualized artwork modes, including
@@ -1315,6 +1324,13 @@ and artist profiles, and carries downloaded album artwork plus album favorites
 to a corrected album identity within the same physical directory. Transient
 metadata-read failures are retried and reported as failed files; they never
 replace an existing track's tags with empty values.
+The Library Doctor also highlights conservatively matched artist-name variants
+across the local library. These are review hints only: Orynivo does not merge
+artists automatically because punctuation or spelling differences can still
+identify distinct performers.
+Guided MusicBrainz correction displays the current and proposed album identity
+and a track-by-track title/artist preview. Nothing is written until the user
+selects a release and explicitly applies that correction.
 
 ## Project Structure
 
