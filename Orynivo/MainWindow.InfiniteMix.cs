@@ -43,6 +43,7 @@ public partial class MainWindow
         if (editSettings && !await EditInfiniteMixSettingsAsync())
             return;
 
+        ClearSimilarityMix();
         _infiniteMixEnabled = true;
         _infiniteMixPaused = false;
         _infiniteMixCandidateOffset = 0;
@@ -88,6 +89,7 @@ public partial class MainWindow
     {
         _infiniteMixEnabled = false;
         _infiniteMixPaused = false;
+        ClearSimilarityMix();
         UpdateInfiniteMixUi();
     }
 
@@ -167,6 +169,22 @@ public partial class MainWindow
 
         _lastInfiniteMixRefillAttempt = DateTimeOffset.UtcNow;
         _infiniteMixLoading = true;
+        if (HasActiveSimilarityMix)
+        {
+            try
+            {
+                await RefillSimilarityMixAsync(batchSize, refreshActivePlayback);
+            }
+            catch (Exception exception)
+            {
+                CrashLogger.Log(exception, "Similarity mix refill");
+            }
+            finally
+            {
+                _infiniteMixLoading = false;
+            }
+            return;
+        }
         var showProgress = force && batchSize == InfiniteMixBatchSize;
         if (showProgress)
             ShowInfiniteMixProgress(5);

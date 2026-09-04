@@ -94,6 +94,13 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
   returns compact folder counts and typed findings only. Do not expose API
   keys or complete track rows, and keep older-server failure non-fatal on the
   desktop client.
+- Authenticated `GET /api/tracks/similarity-features` returns deterministic
+  versioned vectors in ID-ordered pages of at most 2,000 rows. Keep the payload
+  free of paths, URLs, credentials, artwork, and full track metadata.
+- Authenticated `POST /api/tracks/audio-features/analyze` schedules at most ten
+  provider-local acoustic analyses and returns immediately. It must decline
+  overlapping scans or batches, serialize through the library gate, use the
+  Core one-thread/low-priority analyzer, and never return physical paths.
 - `GET /api/albums/recommendation-candidates` returns compact album-level
   genre/BPM metadata for client-side Dashboard ranking; recommendation policy
   and listening history remain on the client.

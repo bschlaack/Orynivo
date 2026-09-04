@@ -1118,6 +1118,7 @@ public partial class MainWindow : Window
         CancelAndDispose(ref _plexViewCts);
         CancelAndDispose(ref _unifiedLibraryAppendCts);
         _musicBrainzBackgroundCts.Cancel();
+        CancelAudioFeatureWarmup();
         StopPlayback();
         _windowsMediaTransport?.Dispose();
         _windowsMediaTransport = null;

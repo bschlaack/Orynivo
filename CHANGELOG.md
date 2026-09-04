@@ -4,7 +4,45 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.38.0] - 2026-09-04
+## [0.39.0] - 2026-09-04
+
+### Added
+
+- Added the version-two provider-neutral similarity feature contract and a
+  compact local query that combines effective genres, BPM, explicit mood tags,
+  personal/community ratings, favourites, play count, and recency without
+  audio analysis. This is the shared foundation for local and remote similarity
+  and mood ranking. Core nearest-neighbour ranking combines genre overlap,
+  explicit mood, tempo proximity, preferences, and familiarity while enforcing
+  configurable artist and album diversity.
+- Added the authenticated paginated server similarity-feature endpoint and a
+  client that rebases returned vectors to the configured server's stable,
+  credential-free identity. Older servers return an empty feature page instead
+  of breaking local recommendations.
+- Added a localized **Play more like this** action to single-track context
+  menus. It loads local and available server vectors asynchronously, applies
+  artist/album diversity, resolves provider-local matches back to playable
+  tracks, and starts a newly prepared cross-library queue at the selected song.
+  The temporary similarity profile is connected to Infinite Mix and continues
+  adding distinct lower-ranked matches as playback approaches the queue end.
+- Added calm, balanced, and energetic **Mood mix** actions to the same track
+  context. Mood ranking combines explicit mood tags, normalized tempo,
+  preferences, community rating confidence, and familiarity while retaining
+  the same cross-library artist and album diversity limits.
+- Similarity vectors are retained in a five-minute in-memory cache for fast
+  repeated actions, coalesce concurrent loads, emit count/duration diagnostics,
+  and are invalidated with catalog or preference cache mutations.
+- Added optional versioned acoustic descriptors for similarity ranking. Orynivo
+  progressively caches energy, brightness/transient activity, and dynamics in
+  provider-local SQLite using a bounded 90-second, 8-kHz mono FFmpeg analysis.
+  Desktop and server warm only four missing tracks per cold similarity load,
+  sequentially with one FFmpeg thread, below-normal priority, and a cooperative
+  delay; failed sources wait seven days before another attempt.
+- Added an authenticated server endpoint that accepts a bounded opportunistic
+  acoustic-analysis batch without exposing source paths or blocking the
+  similarity response.
+  
+  ## [0.38.0] - 2026-09-04
 
 ### Added
 

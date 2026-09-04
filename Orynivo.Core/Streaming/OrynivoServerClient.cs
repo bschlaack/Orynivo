@@ -1645,6 +1645,58 @@ public sealed class OrynivoServerClient : IDisposable
         }
     }
 
+    /// <summary>Gets one compact page of similarity feature vectors.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="page">Zero-based page index.</param>
+    /// <param name="pageSize">Requested page size, bounded by the server.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Provider-rebased vectors, or an empty list for older or unavailable servers.</returns>
+    public async Task<List<SimilarityFeatureVector>> GetSimilarityFeaturesAsync(
+        OrynivoServerSettings server,
+        int page = 0,
+        int pageSize = 500,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var vectors = await GetJsonAsync<List<SimilarityFeatureVector>>(
+                server,
+                $"/api/tracks/similarity-features?page={Math.Max(0, page)}&pageSize={Math.Clamp(pageSize, 1, 2000)}",
+                cancellationToken) ?? [];
+            var sourceKey = $"orynivo:{server.Id}";
+            return vectors.Select(vector => vector with { SourceKey = sourceKey }).ToList();
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    /// <summary>Requests one bounded opportunistic acoustic-feature batch on a server.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="limit">Maximum tracks to analyze.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when the server accepted the batch.</returns>
+    public async Task<bool> TriggerAudioFeatureAnalysisAsync(
+        OrynivoServerSettings server,
+        int limit = 4,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(
+                HttpMethod.Post,
+                BuildUrl(server, $"/api/tracks/audio-features/analyze?limit={Math.Clamp(limit, 1, 10)}"));
+            request.Headers.Add("X-Api-Key", server.ApiKey);
+            using var response = await _http.SendAsync(request, cancellationToken);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     /// <summary>
     /// Requests an explicit calculation of missing ReplayGain values on a remote server.
     /// Existing server-side track and album values are preserved.

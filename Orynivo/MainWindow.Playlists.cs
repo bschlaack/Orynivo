@@ -204,6 +204,29 @@ public partial class MainWindow : Window
         appendQueueItem.Tag = paths;
         appendQueueItem.Click += AppendToQueueMenuItem_OnClick;
         items.Add(appendQueueItem);
+
+        if (paths.Count == 1 && CanOfferTrackSimilarity(paths[0]))
+        {
+            var similarItem = CreateFlyoutMenuItem(LocalizationManager.Current.PlayMoreLikeThis);
+            similarItem.Tag = paths[0];
+            similarItem.Click += PlayMoreLikeThisMenuItem_OnClick;
+            items.Add(similarItem);
+
+            var moodItem = CreateFlyoutMenuItem(LocalizationManager.Current.PlayMoodMix);
+            foreach (var (label, mood) in new[]
+                     {
+                         (LocalizationManager.Current.InfiniteMixMoodCalm, SimilarityMood.Calm),
+                         (LocalizationManager.Current.InfiniteMixMoodBalanced, SimilarityMood.Balanced),
+                         (LocalizationManager.Current.InfiniteMixMoodEnergetic, SimilarityMood.Energetic)
+                     })
+            {
+                var child = CreateFlyoutMenuItem(label);
+                child.Tag = new MoodMixActionTag(paths[0], mood);
+                child.Click += PlayMoodMixMenuItem_OnClick;
+                moodItem.Items.Add(child);
+            }
+            items.Add(moodItem);
+        }
         return items;
     }
 

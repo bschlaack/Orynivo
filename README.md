@@ -374,6 +374,8 @@ works directly in FFmpeg and browser URLs.
 | `GET /api/tracks/{id}/lyrics` | Cached plain/synced lyrics for one track |
 | `PUT /api/tracks/{id}/lyrics` | Store client-downloaded lyrics on the server |
 | `GET /api/tracks/facets` | Lightweight facet rows (genre, format, bitrate) for the Tracks filter |
+| `GET /api/tracks/similarity-features?page=&pageSize=` | Paginated versioned similarity vectors (maximum 2,000 per page) |
+| `POST /api/tracks/audio-features/analyze?limit=` | Start an opportunistic acoustic-descriptor batch (maximum 10 tracks) |
 | `GET /api/genres/cloud` | Compact hierarchical genre counts and bounded recommendation candidates |
 | `GET /api/library/summary` | Aggregate album, track, artist, and favorite counts without materializing library rows |
 | `GET /api/library/doctor` | Compact read-only Library Doctor folder findings generated on the server |
@@ -678,6 +680,34 @@ byte-range streaming without FFmpeg.
   connected Orynivo Servers contribute compact read-only findings through the
   authenticated API; older or unavailable servers are reported without
   preventing local results.
+- A versioned provider-neutral similarity feature foundation combines existing
+  genre, BPM, mood-tag, favourite, rating, and listening-history signals in
+  Core. It performs no background audio analysis and is designed for identical
+  local and Orynivo Server ranking contracts. Its deterministic nearest-neighbour
+  ranker applies artist and album diversity limits to avoid repetitive results.
+  Remote vectors are retrieved in bounded authenticated pages and are assigned
+  the configured server's stable identity without embedding its URL or API key.
+  A track's context menu exposes **Play more like this** for local and Orynivo
+  Server library tracks. Orynivo loads and ranks the compact vectors away from
+  the UI thread, creates a diverse cross-library queue, and begins with the
+  selected track. Its transient ranked profile then uses the existing Infinite
+  Mix threshold refill, so playback continues beyond the initial recommendation
+  batch. Starting another mix or stopping Infinite Mix discards that profile.
+  Servers that have not yet added the endpoint are skipped.
+  The adjacent **Mood mix** submenu offers calm, balanced, and energetic quick
+  starts. These use explicit mood tags when available and fall back to tempo
+  plus preference/familiarity signals; they also start with the selected track
+  and continue through Infinite Mix.
+  Repeated similarity and mood actions reuse a five-minute memory-only vector
+  cache. Catalog, favourite, rating, and server-configuration invalidations
+  clear it; no vectors or provider credentials are written to disk.
+  Similarity use also warms optional acoustic descriptors progressively. Each
+  provider analyzes only its own physical files and stores normalized energy,
+  brightness/transient activity, and dynamics in its SQLite library. A cold
+  similarity load schedules at most four tracks per provider; analysis is
+  sequential, limited to 90 seconds of 8-kHz mono audio, runs FFmpeg with one
+  thread at reduced priority, and never delays playback or the current action.
+  Failed sources are retried no sooner than seven days later.
 - Live A-Z/# quick navigation beside alphabetically sorted artist, album, and
   track lists
 - Artist and album views with table and virtualized artwork modes, including

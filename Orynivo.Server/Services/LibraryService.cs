@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Extensions.Logging;
 using Orynivo;
 using Orynivo.Library;
+using Orynivo.Audio;
 
 namespace Orynivo.Server.Services;
 
@@ -17,7 +18,10 @@ public sealed class LibraryService : IHostedService, IDisposable
     private readonly LibraryWatcherService _watcher;
     private readonly ServerLibraryChangeTracker _libraryChangeTracker;
     private readonly SemaphoreSlim _scanGate = new(1, 1);
+    private readonly CancellationTokenSource _shutdownCts = new();
     private readonly object _progressLock = new();
+    private int _audioFeatureAnalysisRunning;
+    private Task _audioFeatureAnalysisTask = Task.CompletedTask;
 
     private bool _scanning;
     private ServerScanStatus _scanStatus = new(false, null, 0, 0, null, null, null);
@@ -90,10 +94,17 @@ public sealed class LibraryService : IHostedService, IDisposable
     }
 
     /// <inheritdoc/>
-    public Task StopAsync(CancellationToken cancellationToken)
+    public async Task StopAsync(CancellationToken cancellationToken)
     {
+        _shutdownCts.Cancel();
+        try
+        {
+            await _audioFeatureAnalysisTask.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+        }
         _watcher.Dispose();
-        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -132,6 +143,52 @@ public sealed class LibraryService : IHostedService, IDisposable
         _scanning = true;
         SetScanStatus(new ServerScanStatus(true, null, 0, 0, null, null, null));
         _ = Task.Run(() => RunReplayGainCalculationAsync(cancellationToken), cancellationToken);
+        return true;
+    }
+
+    /// <summary>Starts one small sequential acoustic-feature batch when no library operation is active.</summary>
+    /// <param name="maximumTracks">Maximum tracks to analyze.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when the opportunistic batch was scheduled.</returns>
+    public bool TriggerAudioFeatureAnalysis(int maximumTracks = 4, CancellationToken cancellationToken = default)
+    {
+        if (_scanning || Interlocked.CompareExchange(ref _audioFeatureAnalysisRunning, 1, 0) != 0)
+            return false;
+        var analysisCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _shutdownCts.Token);
+        _audioFeatureAnalysisTask = Task.Run(async () =>
+        {
+            var entered = false;
+            try
+            {
+                entered = await _scanGate.WaitAsync(0, analysisCts.Token).ConfigureAwait(false);
+                if (!entered)
+                    return;
+                var result = await AudioFeatureMaintenanceService.AnalyzeMissingAsync(
+                    AudioDatabase.OpenDefault,
+                    Math.Clamp(maximumTracks, 1, 10),
+                    TimeSpan.FromMilliseconds(250),
+                    analysisCts.Token).ConfigureAwait(false);
+                _logger.LogInformation(
+                    "Optional audio-feature batch complete: {Examined} examined, {Stored} stored, {Failed} failed",
+                    result.Examined,
+                    result.Stored,
+                    result.Failed);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception exception)
+            {
+                _logger.LogWarning(exception, "Optional audio-feature batch failed");
+            }
+            finally
+            {
+                if (entered)
+                    _scanGate.Release();
+                analysisCts.Dispose();
+                Interlocked.Exchange(ref _audioFeatureAnalysisRunning, 0);
+            }
+        });
         return true;
     }
 
@@ -351,6 +408,8 @@ public sealed class LibraryService : IHostedService, IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
+        _shutdownCts.Cancel();
+        _shutdownCts.Dispose();
         _scanGate.Dispose();
         _watcher.Dispose();
     }
