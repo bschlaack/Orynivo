@@ -506,6 +506,77 @@ public static class LibraryEndpoints
 
             return Results.Ok(new { tracks, albums, artists });
         });
+
+        api.MapGet("/search/structured", (
+            string? q,
+            string? type,
+            int? yearFrom,
+            int? yearTo,
+            long? addedFrom,
+            long? addedBefore,
+            string? sort,
+            int limit = 30) =>
+        {
+            if (string.IsNullOrWhiteSpace(q) && !yearFrom.HasValue && !yearTo.HasValue &&
+                !addedFrom.HasValue && !addedBefore.HasValue && string.IsNullOrWhiteSpace(sort))
+            {
+                return Results.BadRequest(new { error = "Provide a query, filter, or sort order." });
+            }
+            if (yearFrom.HasValue && yearTo.HasValue && yearFrom > yearTo)
+                return Results.BadRequest(new { error = "yearFrom must not be later than yearTo." });
+            if (addedFrom.HasValue && addedBefore.HasValue && addedFrom >= addedBefore)
+                return Results.BadRequest(new { error = "addedFrom must be earlier than addedBefore." });
+
+            limit = Math.Clamp(limit, 1, 50);
+            var resultType = NormalizeResultType(type);
+            var sortOrder = ParseSearchSort(sort, string.IsNullOrWhiteSpace(q));
+            var searchIds = string.IsNullOrWhiteSpace(q)
+                ? null
+                : TrackSearchIndex.SearchByCategory(q, 5000);
+
+            using var db = AudioDatabase.OpenDefault();
+            var allCandidates = db.GetSmartPlaylistTracks();
+            var options = new LibrarySearchFilterOptions(yearFrom, yearTo, addedFrom, addedBefore, sortOrder);
+            var trackCandidates = FilterSearchCandidates(
+                allCandidates,
+                searchIds?.Tracks.Ids,
+                options);
+            var albumCandidates = FilterSearchCandidates(
+                allCandidates,
+                searchIds?.Albums.Ids,
+                options);
+
+            var tracks = resultType is "all" or "tracks"
+                ? db.GetTrackListByIds(trackCandidates.Take(limit).Select(static track => track.Id))
+                    .Select(TrackDto).ToList()
+                : [];
+            var albumSeedTracks = SelectAlbumSeedTracks(albumCandidates, limit);
+            var albums = resultType is "all" or "albums"
+                ? OrderAlbums(
+                    db.GetAlbumsByTrackIds(albumSeedTracks.Select(static track => track.Id)),
+                    albumSeedTracks,
+                    sortOrder)
+                    .Take(limit).Select(AlbumDto).ToList()
+                : [];
+
+            object artists;
+            if (resultType is "all" or "artists")
+            {
+                var hasTemporalFilter = yearFrom.HasValue || yearTo.HasValue ||
+                                        addedFrom.HasValue || addedBefore.HasValue;
+                var artistTrackIds = searchIds is null || hasTemporalFilter
+                    ? trackCandidates.Take(limit * 10).Select(static track => track.Id)
+                    : searchIds.Artists.Ids.Concat(searchIds.AlbumArtists.Ids).Take(400);
+                artists = db.GetArtistsByTrackIds(artistTrackIds).Take(limit)
+                    .Select(a => new { a.Id, Name = a.Artist, a.IsFavorite }).ToList();
+            }
+            else
+            {
+                artists = Array.Empty<object>();
+            }
+
+            return Results.Ok(new { tracks, albums, artists });
+        });
     }
 
     private static object TrackDto(TrackListInfo t) => new
@@ -599,8 +670,75 @@ public static class LibraryEndpoints
         a.ArtworkPath,
         a.ThumbnailPath,
         a.IsFavorite,
-        a.ArtistId
+        a.ArtistId,
+        a.AddedAt
     };
+
+    private static string NormalizeResultType(string? resultType) =>
+        resultType?.Trim().ToLowerInvariant() switch
+        {
+            "tracks" => "tracks",
+            "albums" => "albums",
+            "artists" => "artists",
+            _ => "all"
+        };
+
+    private static LibrarySearchSortOrder ParseSearchSort(string? sort, bool defaultToNewest) =>
+        sort?.Trim().ToLowerInvariant() switch
+        {
+            "added_asc" => LibrarySearchSortOrder.AddedOldest,
+            "added_desc" => LibrarySearchSortOrder.AddedNewest,
+            "year_asc" => LibrarySearchSortOrder.YearOldest,
+            "year_desc" => LibrarySearchSortOrder.YearNewest,
+            "title" => LibrarySearchSortOrder.Title,
+            _ => defaultToNewest ? LibrarySearchSortOrder.AddedNewest : LibrarySearchSortOrder.Relevance
+        };
+
+    private static List<SmartPlaylistTrackInfo> FilterSearchCandidates(
+        IReadOnlyList<SmartPlaylistTrackInfo> candidates,
+        IReadOnlyList<long>? relevantIds,
+        LibrarySearchFilterOptions options)
+    {
+        IEnumerable<SmartPlaylistTrackInfo> selected = candidates;
+        if (relevantIds is not null)
+        {
+            var byId = candidates.ToDictionary(static track => track.Id);
+            selected = relevantIds.Where(byId.ContainsKey).Select(id => byId[id]);
+        }
+        return LibrarySearchFilter.Apply(selected, options);
+    }
+
+    private static IEnumerable<AlbumInfo> OrderAlbums(
+        IEnumerable<AlbumInfo> albums,
+        IReadOnlyList<SmartPlaylistTrackInfo> candidates,
+        LibrarySearchSortOrder sortOrder)
+    {
+        if (sortOrder == LibrarySearchSortOrder.Title)
+            return albums.OrderBy(static album => album.Album, StringComparer.CurrentCultureIgnoreCase);
+        if (sortOrder == LibrarySearchSortOrder.YearNewest)
+            return albums.OrderByDescending(static album => album.Year.HasValue).ThenByDescending(static album => album.Year);
+        if (sortOrder == LibrarySearchSortOrder.YearOldest)
+            return albums.OrderByDescending(static album => album.Year.HasValue).ThenBy(static album => album.Year);
+
+        var order = candidates
+            .Where(static track => track.AlbumId.HasValue)
+            .Select(static track => track.AlbumId!.Value)
+            .Distinct()
+            .Select((id, index) => (id, index))
+            .ToDictionary(static item => item.id, static item => item.index);
+        return albums.OrderBy(album => order.GetValueOrDefault(album.Id, int.MaxValue));
+    }
+
+    private static List<SmartPlaylistTrackInfo> SelectAlbumSeedTracks(
+        IEnumerable<SmartPlaylistTrackInfo> candidates,
+        int limit)
+    {
+        var seen = new HashSet<long>();
+        return candidates
+            .Where(track => track.AlbumId is long albumId && seen.Add(albumId))
+            .Take(limit)
+            .ToList();
+    }
 
     private static object RecentAlbumDto(RecentAlbumInfo a) => new
     {

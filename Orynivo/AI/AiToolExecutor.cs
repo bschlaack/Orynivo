@@ -48,7 +48,16 @@ internal sealed class AiToolExecutor(McpTools tools)
                                                    .ToArray()
                                                : [],
                                            ct),
-            "search_library"        => tools.SearchLibraryAsync(Str(args, "query") ?? "", Int(args, "limit", 10), ct),
+            "search_library"        => tools.SearchLibraryAsync(
+                                           Str(args, "query") ?? "",
+                                           Str(args, "resultType") ?? "all",
+                                           OptInt(args, "yearFrom"),
+                                           OptInt(args, "yearTo"),
+                                           Str(args, "addedFrom"),
+                                           Str(args, "addedTo"),
+                                           Str(args, "sort") ?? "relevance",
+                                           Int(args, "limit", 10),
+                                           ct),
             "set_current_favorite"  => tools.SetCurrentFavoriteAsync(Bool(args, "favorite", false), ct),
             "control_infinite_mix"  => tools.ControlInfiniteMixAsync(Str(args, "action") ?? "", ct),
             "list_output_profiles"  => tools.ListOutputProfilesAsync(ct),

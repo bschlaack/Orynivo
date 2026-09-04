@@ -633,8 +633,10 @@ fallback or allow client-provided commands/paths to reach the helper.
   without stopping the current track; `replace_queue` atomically replaces the
   queue and starts playback of the first new track
 - `Orynivo/Mcp/McpServerService.cs`: starts/stops an embedded Kestrel HTTP/SSE
-  server using `WebApplication`; binds to `http://localhost:{port}` via
-  `builder.WebHost.UseSetting("urls", …)`; maps MCP endpoint at `/mcp`;
+  server using `WebApplication`; binds to `http://localhost:{port}` by default
+  or `http://0.0.0.0:{port}` only when `McpNetworkAccessEnabled` is explicitly
+  enabled; network mode requires `Authorization: Bearer <McpAccessToken>` and
+  compares the generated 256-bit token in constant time; maps MCP at `/mcp`;
   logging is cleared so Kestrel output does not appear in the player console;
   `IAsyncDisposable` — `DisposeAsync` delegates to `StopAsync`
 - `Orynivo/AI/AiChatSettings.cs`: persisted configuration for the embedded AI
@@ -663,6 +665,13 @@ fallback or allow client-provided commands/paths to reach the helper.
 - `Orynivo/AI/AiToolExecutor.cs`: dispatches tool calls received from the LLM
   to `McpTools` methods by name; parses JSON arguments from the model; no MCP
   transport involved — tools are invoked directly against the bridge and database
+- The shared `search_library` tool accepts an empty free-text query when a
+  structured category, release-year range, library-added date range, or sort
+  order is supplied. MCP and AI schema arguments must remain identical. Date
+  filters use an inclusive local-calendar `addedFrom`/`addedTo` contract and
+  are converted to a half-open Unix timestamp range. Returned tracks and albums
+  include release year and library-addition date; remote playback identities
+  remain opaque `orynivo://` references.
 - `Orynivo/AI/AiChatView.axaml/.cs`: embedded chat UI; user bubbles right-
   aligned (accent color), assistant bubbles left-aligned (surface brush),
   tool-call status centered and muted; streams tokens into the last assistant

@@ -1124,6 +1124,16 @@ public sealed record LocalizedStrings(
     public string McpServerEnabled { get; init; } = "";
     /// <summary>Gets the label for the MCP server port input.</summary>
     public string McpServerPort { get; init; } = "";
+    /// <summary>Gets the label for enabling MCP access from the local network.</summary>
+    public string McpNetworkAccess { get; init; } = "";
+    /// <summary>Gets the MCP network-access security hint.</summary>
+    public string McpNetworkAccessHint { get; init; } = "";
+    /// <summary>Gets the label for the MCP bearer token.</summary>
+    public string McpAccessToken { get; init; } = "";
+    /// <summary>Gets the watermark for the MCP bearer-token input.</summary>
+    public string McpAccessTokenWatermark { get; init; } = "";
+    /// <summary>Gets the label for generating a new MCP bearer token.</summary>
+    public string McpGenerateToken { get; init; } = "";
     /// <summary>Gets the integration settings section group header.</summary>
     public string Integration { get; init; } = "";
     /// <summary>Gets the sub-section header for the individual MCP tool toggles.</summary>

@@ -1166,6 +1166,28 @@
                                    ClipValueToMinMax="True"
                                    HorizontalAlignment="Stretch"
                                    Margin="0,0,0,12"/>
+                    <CheckBox x:Name="McpNetworkAccessCheckBox"
+                              Content="{DynamicResource L_McpNetworkAccess}"
+                              Theme="{StaticResource SettingsToggleTheme}"
+                              Margin="0,0,0,8"/>
+                    <TextBlock Text="{DynamicResource L_McpNetworkAccessHint}"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,12"/>
+                    <TextBlock Text="{DynamicResource L_McpAccessToken}"
+                               FontSize="{DynamicResource FontSizeCaption}"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+                        <TextBox x:Name="McpAccessTokenTextBox"
+                                 PasswordChar="●"
+                                 Watermark="{DynamicResource L_McpAccessTokenWatermark}"/>
+                        <Button Grid.Column="1"
+                                Content="{DynamicResource L_McpGenerateToken}"
+                                Click="GenerateMcpAccessToken_Click"
+                                Margin="8,0,0,0"/>
+                    </Grid>
                     <TextBlock x:Name="McpServerStatusTextBlock"
                                FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppMutedTextBrush}"

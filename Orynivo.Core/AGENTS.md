@@ -55,6 +55,11 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   analysed term is required, but different terms may match different fields.
   Preserve this behavior so combined artist/title searches work identically in
   the desktop and Orynivo Server indexes.
+- `LibrarySearchFilter` owns structured release-year and library-added timestamp
+  filtering plus deterministic relevance/title/year/addition ordering shared by
+  desktop and server searches. Date ranges are half-open Unix ranges after the
+  client converts inclusive calendar dates. `SmartPlaylistTrackInfo.AlbumId`
+  supports bounded album grouping and must remain compact.
 - Track scans preserve personal ratings, cached MusicBrainz rating/vote data,
   and a client-resolved recording MBID when the media tag has no recording ID.
   `MusicBrainzRatingService` prefers a valid recording MBID and permits fallback

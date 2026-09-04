@@ -123,13 +123,18 @@ internal static class AiToolDefinitions
             ["paths"]),
 
         Make("search_library",
-            "Searches the music library for tracks, albums, and artists across the local library and every configured remote Orynivo Server. Local tracks return a file path; remote tracks return an orynivo:// reference. Both can be passed directly to the play and queue tools.",
+            "Searches or browses tracks, albums, and artists across the local library and every configured Orynivo Server. Use structured year/date/category/sort arguments for requests such as newly added tracks, items added since a date, or albums released in 1998. Year means release metadata, not a distinct composition year. Local paths and remote orynivo:// references can be passed to playback tools.",
             new JsonObject
             {
-                ["query"] = Str("Free-text search query, e.g. an artist name, album title, or track title."),
+                ["query"] = Str("Optional free-text artist, album, or track query. May be empty when filters or sorting are supplied."),
+                ["resultType"] = Str("Result category: all, tracks, albums, or artists."),
+                ["yearFrom"] = Int("Inclusive minimum release year."),
+                ["yearTo"] = Int("Inclusive maximum release year. Set equal to yearFrom for an exact year."),
+                ["addedFrom"] = Str("Inclusive library-added date in YYYY-MM-DD or ISO-8601 form."),
+                ["addedTo"] = Str("Inclusive library-added date in YYYY-MM-DD or ISO-8601 form."),
+                ["sort"] = Str("Ordering: relevance, added_desc, added_asc, year_desc, year_asc, or title. Use added_desc for newly added items."),
                 ["limit"] = Int("Maximum number of results per category (1–50, default 10).")
-            },
-            ["query"]),
+            }),
 
         Make("set_current_favorite",
             "Marks or unmarks the currently playing local or Orynivo Server track as a favorite.",

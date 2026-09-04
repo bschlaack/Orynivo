@@ -25,6 +25,15 @@ public sealed record ArtistInfo(
 }
 
 /// <summary>Distinct album entry used by the album-grid and album-list views.</summary>
+/// <param name="Id">Database album identifier.</param>
+/// <param name="Album">Album title.</param>
+/// <param name="DisplayArtist">Resolved album-artist display name.</param>
+/// <param name="Year">Release year.</param>
+/// <param name="ArtworkPath">Original or large artwork path.</param>
+/// <param name="ThumbnailPath">Thumbnail artwork path.</param>
+/// <param name="IsFavorite">Whether the album is a favorite.</param>
+/// <param name="ArtistId">Database album-artist identifier.</param>
+/// <param name="AddedAt">Unix timestamp of the newest library addition associated with the album.</param>
 public sealed record AlbumInfo(
     long Id,
     string Album,
@@ -33,7 +42,8 @@ public sealed record AlbumInfo(
     string? ArtworkPath,
     string? ThumbnailPath,
     bool IsFavorite,
-    long? ArtistId = null);
+    long? ArtistId = null,
+    long AddedAt = 0);
 
 /// <summary>Lightweight track row for list and search tables; omits artwork and lyrics payloads.</summary>
 /// <param name="Path">Absolute audio-file path.</param>
@@ -163,6 +173,7 @@ public sealed record TrackRatingInfo(
 /// <param name="LastPlayedAt">Most recent playback timestamp in Unix seconds.</param>
 /// <param name="SortTitle">Resolved title used for alphabetical ordering.</param>
 /// <param name="SourceKey">Stable source key used by source-aware smart playlists.</param>
+/// <param name="AlbumId">Database identifier of the owning album, or <see langword="null"/>.</param>
 public sealed record SmartPlaylistTrackInfo(
     long Id,
     bool IsFavorite,
@@ -177,7 +188,8 @@ public sealed record SmartPlaylistTrackInfo(
     int PlayCount,
     long? LastPlayedAt,
     string SortTitle,
-    string SourceKey = "local");
+    string SourceKey = "local",
+    long? AlbumId = null);
 
 /// <summary>File-system paths for the three artwork variants stored per album (original, 96-px thumb, 320-px thumb).</summary>
 public sealed record ArtworkPaths(string? OriginalPath, string? Thumb96Path, string? Thumb320Path);
@@ -2200,7 +2212,8 @@ public sealed class AudioDatabase : IDisposable
                 t.added_at,
                 COALESCE(ph.play_count, 0) AS play_count,
                 ph.last_played_at,
-                COALESCE(t.sort_title, t.title, t.file_name) AS display_sort_title
+                COALESCE(t.sort_title, t.title, t.file_name) AS display_sort_title,
+                t.album_id
             FROM tracks t
             LEFT JOIN (
                 SELECT
@@ -2229,7 +2242,8 @@ public sealed class AudioDatabase : IDisposable
                 reader.GetInt64(9),
                 reader.GetInt32(10),
                 reader.IsDBNull(11) ? null : reader.GetInt64(11),
-                reader.GetString(12)));
+                reader.GetString(12),
+                AlbumId: reader.IsDBNull(13) ? null : reader.GetInt64(13)));
         return result;
     }
 
@@ -2291,7 +2305,8 @@ public sealed class AudioDatabase : IDisposable
         cmd.CommandText = $"""
             SELECT al.id, al.title, ar.name,
                    CASE WHEN al.year = 0 THEN NULL ELSE al.year END,
-                   aw.thumb_320_path, aw.thumb_96_path, al.is_favorite
+                   aw.thumb_320_path, aw.thumb_96_path, al.is_favorite,
+                   MAX(t.added_at)
             FROM tracks t
             JOIN albums al ON al.id = t.album_id
             LEFT JOIN artists ar ON ar.id = al.artist_id
@@ -2309,7 +2324,8 @@ public sealed class AudioDatabase : IDisposable
                 reader.IsDBNull(3) ? null : reader.GetInt32(3),
                 reader.IsDBNull(4) ? null : reader.GetString(4),
                 reader.IsDBNull(5) ? null : reader.GetString(5),
-                reader.GetInt32(6) != 0));
+                reader.GetInt32(6) != 0,
+                AddedAt: reader.GetInt64(7)));
         return result;
     }
 

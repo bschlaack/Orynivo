@@ -80,6 +80,13 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
   size to the web host.
 - API additions must consider older clients/servers and the existing capability
   probing behavior.
+- Authenticated `GET /api/search/structured` mirrors the MCP/AI Chat structured
+  search contract for result category, release-year range, library-added Unix
+  range, and ordering. It uses compact candidates, limits complete DTO
+  materialization to at most 50 results per category, and returns no playback
+  credentials beyond the existing authenticated DTO contract. Older servers
+  may return 404; the desktop must report that structured search requires a
+  server update rather than treating it as an empty result.
 - `GET /api/library/summary` returns `DashboardLibrarySummary` directly from an
   aggregate database query so dashboard counters never require complete track
   or album payloads.

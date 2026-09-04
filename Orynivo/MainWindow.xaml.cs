@@ -765,7 +765,11 @@ public partial class MainWindow : Window
         if (_settings.McpServerEnabled)
         {
             StartupTimingLog.Write("MainWindow starting MCP server");
-            _ = _mcpServer.StartAsync(_settings.McpServerPort, _mcpBridge);
+            _ = _mcpServer.StartAsync(
+                _settings.McpServerPort,
+                _mcpBridge,
+                _settings.McpNetworkAccessEnabled,
+                _settings.McpAccessToken);
         }
         using (StartupTimingLog.Time("MainWindow.RestorePlaybackQueueState"))
             RestorePlaybackQueueState();
@@ -17129,7 +17133,9 @@ public partial class MainWindow : Window
                 _settings.ShowPlexSection != window.ShowPlexSection;
             var mcpChanged =
                 _settings.McpServerEnabled != window.McpServerEnabled ||
-                _settings.McpServerPort    != window.McpServerPort;
+                _settings.McpServerPort    != window.McpServerPort ||
+                _settings.McpNetworkAccessEnabled != window.McpNetworkAccessEnabled ||
+                !string.Equals(_settings.McpAccessToken, window.McpAccessToken, StringComparison.Ordinal);
             var plexServersChanged = !PlexServerSettingsEqual(
                 _settings.PlexServers,
                 window.SelectedPlexServers);
@@ -17208,6 +17214,8 @@ public partial class MainWindow : Window
                 _settings.IsLocalLibrarySectionExpanded = true;
             _settings.McpServerEnabled        = window.McpServerEnabled;
             _settings.McpServerPort           = window.McpServerPort;
+            _settings.McpNetworkAccessEnabled = window.McpNetworkAccessEnabled;
+            _settings.McpAccessToken          = window.McpAccessToken;
             _settings.DisabledMcpTools        = window.DisabledMcpTools;
             _mcpBridge.DisabledTools          = _settings.DisabledMcpTools;
             _settings.AiChat                  = window.AiChatSettingsValue;
@@ -17242,7 +17250,11 @@ public partial class MainWindow : Window
             if (mcpChanged)
             {
                 if (_settings.McpServerEnabled)
-                    await _mcpServer.StartAsync(_settings.McpServerPort, _mcpBridge);
+                    await _mcpServer.StartAsync(
+                        _settings.McpServerPort,
+                        _mcpBridge,
+                        _settings.McpNetworkAccessEnabled,
+                        _settings.McpAccessToken);
                 else
                     await _mcpServer.StopAsync();
             }
