@@ -932,6 +932,9 @@ public partial class MainWindow : Window
         _mcpBridge.BrowseMobileArtistsFunc = BrowseMobileRemoteArtistsAsync;
         _mcpBridge.BrowseMobileAlbumsFunc = BrowseMobileRemoteAlbumsAsync;
         _mcpBridge.BrowseMobileAlbumTracksFunc = BrowseMobileRemoteAlbumTracksAsync;
+        _mcpBridge.BrowseMobilePlaylistsFunc = BrowseMobileRemotePlaylistsAsync;
+        _mcpBridge.BrowseMobilePlaylistTracksFunc = BrowseMobileRemotePlaylistTracksAsync;
+        _mcpBridge.QueueMobilePlaylistFunc = QueueMobileRemotePlaylistAsync;
         _mcpBridge.QueueMobileTrackFunc = QueueMobileRemoteTrackAsync;
         _mcpBridge.GetCurrentFavoriteFunc = () =>
             _currentTrackId.HasValue || CurrentOrynivoFavoriteTarget is not null
@@ -4947,7 +4950,7 @@ public partial class MainWindow : Window
     // DB-Abfragen
     // ------------------------------------------------------------------
 
-    private List<ContentRow> QueryRows(string view, string? searchQuery = null)
+    private List<ContentRow> QueryRows(string view, string? searchQuery = null, bool registerRemoteMetadata = true)
     {
         try
         {
@@ -4964,7 +4967,7 @@ public partial class MainWindow : Window
                     try { criteria = JsonSerializer.Deserialize<SmartPlaylistCriteria>(playlist.FilterCriteria)!; }
                     catch { return []; }
 
-                    return ResolveUnifiedSmartPlaylistRows(criteria);
+                    return ResolveUnifiedSmartPlaylistRows(criteria, registerRemoteMetadata);
                 }
 
                 var ptracks = db.GetPlaylistTracks(pid).ToList();
@@ -4984,7 +4987,7 @@ public partial class MainWindow : Window
                                     .FirstOrDefault();
                                 if (remoteTrack is not null)
                                 {
-                                    var remoteRow = ToCatalogTrackContentRow(remoteTrack, server);
+                                    var remoteRow = ToCatalogTrackContentRow(remoteTrack, server, registerRemoteMetadata);
                                     remoteRow.Nr = (i + 1).ToString();
                                     remoteRow.PlaylistEntryId = pt.Id;
                                     return remoteRow;
@@ -5449,7 +5452,7 @@ public partial class MainWindow : Window
         EntityType = "Track"
     };
 
-    private ContentRow ToCatalogTrackContentRow(LibraryCatalogTrack track, OrynivoServerSettings? server = null)
+    private ContentRow ToCatalogTrackContentRow(LibraryCatalogTrack track, OrynivoServerSettings? server = null, bool registerRemoteMetadata = true)
     {
         server ??= track.Source == LibraryCatalogSource.OrynivoServer ? _activeOrynivoServer : null;
         var row = new ContentRow
@@ -5502,7 +5505,7 @@ public partial class MainWindow : Window
         if (track.Source == LibraryCatalogSource.OrynivoServer && server is not null)
         {
             row.OrynivoServer = server;
-            _orynivoTracksByUrl[track.PlaybackPath] = row;
+            if (registerRemoteMetadata) _orynivoTracksByUrl[track.PlaybackPath] = row;
         }
         return row;
     }
@@ -5920,7 +5923,7 @@ public partial class MainWindow : Window
             return criteria.Resolve(candidates).Count;
         }, cancellationToken);
 
-    private List<ContentRow> ResolveUnifiedSmartPlaylistRows(SmartPlaylistCriteria criteria)
+    private List<ContentRow> ResolveUnifiedSmartPlaylistRows(SmartPlaylistCriteria criteria, bool registerRemoteMetadata = true)
     {
         var candidates = BuildUnifiedSmartPlaylistCandidates(out var remoteTracks);
         var resolved = criteria.Resolve(candidates);
@@ -5952,7 +5955,7 @@ public partial class MainWindow : Window
             }
             else if (remoteTracks.TryGetValue(candidate.Id, out var remote))
             {
-                row = ToCatalogTrackContentRow(remote.Track, remote.Server);
+                row = ToCatalogTrackContentRow(remote.Track, remote.Server, registerRemoteMetadata);
             }
 
             if (row is null)

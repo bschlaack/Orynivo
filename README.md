@@ -324,9 +324,25 @@ MCP permissions and its token are not reused. Open
 `http://<address-of-the-orynivo-computer>:49201/remote` on a phone, enter the
 remote token, and keep the page open for reconnecting live player updates. The
 bare address `http://<address-of-the-orynivo-computer>:49201` redirects to that
-page as well.
+page as well. Missing or rejected tokens are reported directly on the sign-in
+card. Tokens are held only in the open page's memory, not in browser storage;
+reloading or opening the plain URL requires entering the token again.
+The desktop stores this token in its encrypted credential container and migrates
+tokens from older plaintext settings automatically.
 
-The initial screen shows now-playing and queue state without disclosing file
+Settings lists the computer's active IPv4 addresses. Choose the address reachable
+from your phone and **save the settings first**, then scan the locally generated
+QR code. It includes the dedicated access token in a URL fragment for direct
+sign-in; the page immediately removes the fragment from the address bar.
+The fragment is not sent in HTTP requests, but the QR code itself grants access:
+do not share it or include it in screenshots. QR generation uses the bundled
+MIT-licensed QRCoder library and never contacts an external QR service.
+Use the IP address if your phone cannot resolve the computer name; both devices
+must be on a mutually reachable network. No port forwarding is needed.
+
+The responsive interface has separate **Now playing**, **Library**, **Playlists**,
+and **Up next** sections, with a bottom navigation bar on phones and a larger
+side-by-side artwork/player layout on tablets. It shows state without disclosing file
 paths or authenticated stream URLs. Previous, play/pause, next, stop, seek,
 volume, and direct queue-entry controls are available. Current artwork is
 transferred as a bounded thumbnail and retained through private browser cache
@@ -338,10 +354,22 @@ access is disabled by default. The current track can be marked as a favourite,
 configured output profiles can be selected, and queue entries can be moved or
 removed without opening the desktop window. The library section browses artists,
 their albums, and album tracks from both the local catalog and every configured
-Orynivo Server. Provider identities remain opaque until a selected track is
+Orynivo Server. The Playlists section uses the desktop's shared regular and smart
+playlists, including resolvable local and Orynivo Server tracks. Open a playlist
+to browse its tracks, play the entire list (replacing the queue), or append it
+without replacing the current music. Smart criteria are resolved live. Unresolved
+entries and standalone imported streams not indexed in a library are currently
+omitted by this browser; legacy server-only playlists remain outside the shared
+list, as on the desktop. Refresh reloads newly created or edited playlists.
+Provider identities remain opaque until a selected track is
 resolved inside the desktop for playback. Do not
 forward this unencrypted HTTP port to the internet; use a trusted VPN or an
 HTTPS reverse proxy for access outside the home network.
+
+Remote verification: `dotnet run --project scripts/RemoteSmoke/RemoteSmoke.csproj`
+checks the production host with synthetic data. With Node.js and Playwright
+available, `node scripts/verify-mobile-remote.cjs` checks the embedded UI using a
+mock server and headless Edge; it never controls the actual player.
 
 ### MCP Server
 

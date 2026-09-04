@@ -4,9 +4,20 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.40.0] - 2026-09-05
 
 ### Added
+
+- Added LAN IPv4 address selection and an offline-generated QR code in mobile
+  remote settings. Scanning signs in with the dedicated token from a URL fragment,
+  which is removed immediately; manual visits retain the token prompt.
+- Redesigned the mobile remote with separate playback, library, playlists, and
+  queue sections, responsive cover/player layouts, touch-friendly navigation,
+  playback times, explicit request feedback, and sign-out. Shared regular and
+  smart playlists support track browsing, play-all, and append-all actions.
+  Browser tokens remain memory-only; no credentials go to a QR service.
+  Desktop remote tokens are stored in the encrypted credential container, with
+  automatic migration of existing plaintext settings.
 
 - Began the opt-in mobile web remote with a dedicated LAN port and independent
   bearer token. Its responsive, dependency-free first screen provides live
@@ -26,6 +37,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Allowed authenticated artwork blob URLs in the remote's content security policy,
+  avoided repeated queue rebuilding on position-only updates, and prevented
+  superseded library/search responses from replacing newer results.
+
 - Fixed albums added by a manual Settings library scan remaining absent from
   the Albums view until Orynivo was restarted. Successful scan mutations now
   invalidate the Dashboard, Genre Cloud, and unified Artists/Albums/Tracks
@@ -33,7 +48,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Fixed the mobile remote returning to its token prompt even after successful
   authentication. Live SSE snapshots now use the same camel-case JSON contract
   as the remaining remote API. The remote also has its own Settings navigation
-  page, and opening its bare port redirects to `/remote`.
+  page, and opening its bare port redirects to `/remote`. Invalid and missing
+  tokens now produce localized inline feedback instead of an endless reconnect
+  loop. The responsive page has safe-area spacing, visible keyboard focus, and
+  accessible transport and slider labels; HTML is not cached across upgrades,
+  and oversized API request bodies are rejected.
+
+### Removed
+
+- Removed the completed Discovery and Remote implementation checklist after
+  successful iPhone verification of the mobile remote. Maintained feature
+  documentation remains in the README and project instructions.
 
 ## [0.39.0] - 2026-09-04
 

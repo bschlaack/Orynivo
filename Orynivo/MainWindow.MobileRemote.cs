@@ -7,6 +7,54 @@ namespace Orynivo;
 
 public partial class MainWindow
 {
+    /// <summary>Loads the shared playlist names without exposing paths or smart criteria.</summary>
+    private Task<IReadOnlyList<MobileRemotePlaylist>> BrowseMobileRemotePlaylistsAsync(CancellationToken ct) =>
+        Task.Run<IReadOnlyList<MobileRemotePlaylist>>(() =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            return db.GetAllPlaylists().Select(p => new MobileRemotePlaylist(
+                p.Id, p.Name, p.IsSmartPlaylist ? null : p.TrackCount, p.IsSmartPlaylist)).ToArray();
+        }, ct);
+
+    /// <summary>Resolves the desktop playlist on a worker without mutating UI-owned metadata dictionaries.</summary>
+    private async Task<IReadOnlyList<MobileRemoteTrack>> BrowseMobileRemotePlaylistTracksAsync(long id, CancellationToken ct)
+    {
+        var rows = await Task.Run(() => QueryRows($"Playlist:{id.ToString(CultureInfo.InvariantCulture)}", registerRemoteMetadata: false), ct);
+        return rows.Where(r => r.Id.HasValue).Select(r => new MobileRemoteTrack(
+            r.OrynivoServer is { } server
+                ? $"server:{Uri.EscapeDataString(server.Id)}:{r.Id}"
+                : $"local:{r.Id}",
+            r.Title ?? string.Empty, r.Artist, r.Album,
+            int.TryParse(r.Year, out var year) ? year : null,
+            r.OrynivoServer?.Name ?? Localization.LocalizationManager.Current.LocalSource)).ToArray();
+    }
+
+    /// <summary>Registers resolved playlist metadata on the UI thread and uses the shared queue lifecycle.</summary>
+    private async Task<bool> QueueMobileRemotePlaylistAsync(long id, string action)
+    {
+        if (id <= 0 || action is not ("play" or "append")) return false;
+        var rows = await Task.Run(() => QueryRows($"Playlist:{id.ToString(CultureInfo.InvariantCulture)}", registerRemoteMetadata: false));
+        var playable = rows.Where(r => r.Id.HasValue && !string.IsNullOrEmpty(r.FilePath)).ToList();
+        if (playable.Count == 0) return false;
+        foreach (var row in playable)
+            if (row.OrynivoServer is not null) _orynivoTracksByUrl[row.FilePath!] = row;
+        if (action == "play")
+        {
+            if (_mcpBridge.ReplaceQueueFunc is null) return false;
+            await _mcpBridge.ReplaceQueueFunc(playable.Select(r => r.FilePath!).ToArray());
+        }
+        else
+        {
+            foreach (var row in playable) _queue.Add(CreatePlaylistItem(row.FilePath!));
+            ResetQueuePlaybackState();
+            PersistPlaybackQueue();
+            RefreshQueueRowsIfVisible();
+            RefreshQueueNavigationButtons();
+            await RefreshActiveGaplessQueueAsync();
+        }
+        return true;
+    }
+
     /// <summary>Returns a bounded artist list across local and configured server catalogs.</summary>
     private async Task<IReadOnlyList<MobileRemoteArtist>> BrowseMobileRemoteArtistsAsync(
         string? query,

@@ -120,7 +120,8 @@ public sealed class AppSettings
     public bool MobileRemoteEnabled { get; set; }
     /// <summary>Gets or sets the TCP port used by the mobile web remote.</summary>
     public int MobileRemotePort { get; set; } = 49201;
-    /// <summary>Gets or sets the bearer token dedicated to the mobile web remote.</summary>
+    /// <summary>Gets or sets the mobile bearer token overlaid from the encrypted credential store.</summary>
+    [JsonIgnore]
     public string MobileRemoteAccessToken { get; set; } = string.Empty;
     /// <summary>Gets or sets the set of MCP tool names that are individually disabled.</summary>
     public HashSet<string> DisabledMcpTools { get; set; } = [];

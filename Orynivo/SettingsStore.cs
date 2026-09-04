@@ -125,6 +125,7 @@ public sealed class SettingsStore
     {
         settings.LastFmApiKey = credentials.LastFmApiKey;
         settings.FanartTvApiKey = credentials.FanartTvApiKey;
+        settings.MobileRemoteAccessToken = credentials.MobileRemoteAccessToken;
         settings.AiChat ??= new AI.AiChatSettings();
         settings.AiChat.ApiKey = credentials.AiChatApiKey;
         settings.OrynivoServers ??= [];
@@ -144,6 +145,7 @@ public sealed class SettingsStore
     {
         credentials.LastFmApiKey = settings.LastFmApiKey?.Trim() ?? string.Empty;
         credentials.FanartTvApiKey = settings.FanartTvApiKey?.Trim() ?? string.Empty;
+        credentials.MobileRemoteAccessToken = settings.MobileRemoteAccessToken?.Trim() ?? string.Empty;
         credentials.AiChatApiKey = settings.AiChat?.ApiKey?.Trim() ?? string.Empty;
         credentials.OrynivoServerApiKeys = (settings.OrynivoServers ?? [])
             .Where(server =>
@@ -171,6 +173,7 @@ public sealed class SettingsStore
 
         found |= ImportString(root, "LastFmApiKey", value => credentials.LastFmApiKey = value);
         found |= ImportString(root, "FanartTvApiKey", value => credentials.FanartTvApiKey = value);
+        found |= ImportString(root, "MobileRemoteAccessToken", value => credentials.MobileRemoteAccessToken = value);
         if (TryGetProperty(root, "AiChat", out var aiChat) &&
             aiChat.ValueKind == JsonValueKind.Object)
         {

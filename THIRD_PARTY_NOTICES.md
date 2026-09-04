@@ -22,6 +22,9 @@ packages.
   Microsoft.Data.Sqlite.Core.
 - [NAudio 2.3.0](https://github.com/naudio/NAudio), including NAudio.Core,
   NAudio.Asio, NAudio.Wasapi, NAudio.WinMM, NAudio.Midi, and NAudio.WinForms.
+- [QRCoder 1.7.0](https://github.com/Shane32/QRCoder), used for offline mobile
+  remote QR codes. Its original copyright and license are included in
+  `licenses/QRCoder-MIT.txt`. Only the cross-platform PNG byte renderer is used.
 - [.NET runtime libraries](https://github.com/dotnet/runtime), including
   System.Security.Cryptography.ProtectedData, System.IO.Pipelines,
   System.Memory, and Microsoft.Extensions support libraries.

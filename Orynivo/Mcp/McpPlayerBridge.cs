@@ -84,6 +84,15 @@ public sealed class McpPlayerBridge
     /// <summary>Gets or sets a provider-bound track browser for one mobile album identity.</summary>
     public Func<string, CancellationToken, Task<IReadOnlyList<global::Orynivo.Remote.MobileRemoteTrack>>>? BrowseMobileAlbumTracksFunc { get; set; }
 
+    /// <summary>Gets or sets the shared regular and smart playlist browser.</summary>
+    public Func<CancellationToken, Task<IReadOnlyList<global::Orynivo.Remote.MobileRemotePlaylist>>>? BrowseMobilePlaylistsFunc { get; set; }
+
+    /// <summary>Gets or sets the safe track browser for a shared playlist.</summary>
+    public Func<long, CancellationToken, Task<IReadOnlyList<global::Orynivo.Remote.MobileRemoteTrack>>>? BrowseMobilePlaylistTracksFunc { get; set; }
+
+    /// <summary>Gets or sets the play or append action for a shared playlist.</summary>
+    public Func<long, string, Task<bool>>? QueueMobilePlaylistFunc { get; set; }
+
     /// <summary>Gets or sets a function that resolves a safe mobile track identity and applies a queue action.</summary>
     public Func<string, string, Task<bool>>? QueueMobileTrackFunc { get; set; }
 

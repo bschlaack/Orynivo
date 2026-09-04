@@ -217,6 +217,7 @@ internal partial class SettingsView : UserControl
             UpdateMobileRemoteStatus();
         };
         MobileRemotePortNumericUpDown.ValueChanged += (_, _) => UpdateMobileRemoteStatus();
+        InitializeMobileRemoteAddresses();
         UpdateMobileRemoteStatus();
         AiChatEnabledCheckBox.IsChecked         = settings.AiChat.Enabled;
         AiChatEndpointUrlTextBox.Text           = settings.AiChat.EndpointUrl;
@@ -310,7 +311,7 @@ internal partial class SettingsView : UserControl
             ? LocalizationManager.Current.StatusEnabled
             : LocalizationManager.Current.StatusDisabled;
         var port = (int)(MobileRemotePortNumericUpDown.Value ?? 49201);
-        MobileRemoteAddressTextBlock.Text = $"http://localhost:{port}/remote";
+        UpdateMobileRemoteQr(port, enabled);
     }
 
     /// <summary>Replaces the MCP network-access token with a cryptographically random value.</summary>
@@ -1199,6 +1200,10 @@ internal partial class SettingsView : UserControl
     /// <summary>Stops background work and restores the original live equalizer preview when needed.</summary>
     internal void Deactivate()
     {
+        _mobileRemoteClosed = true;
+        MobileRemoteQrImage.Source = null;
+        _mobileRemoteQr?.Dispose();
+        _mobileRemoteQr = null;
         foreach (var cts in _activeScans.Values)
             cts.Cancel();
         _orynivoStatusCts?.Cancel();

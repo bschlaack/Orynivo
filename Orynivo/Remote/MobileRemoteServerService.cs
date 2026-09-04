@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orynivo.Mcp;
@@ -35,6 +36,7 @@ public sealed class MobileRemoteServerService : IAsyncDisposable
             throw new InvalidOperationException("Mobile remote access requires a dedicated token.");
 
         var builder = WebApplication.CreateBuilder();
+        builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 65_536);
         builder.WebHost.UseSetting("urls", $"http://0.0.0.0:{port}");
         builder.Logging.ClearProviders();
         var app = builder.Build();
@@ -46,7 +48,7 @@ public sealed class MobileRemoteServerService : IAsyncDisposable
             context.Response.Headers["X-Frame-Options"] = "DENY";
             context.Response.Headers["Referrer-Policy"] = "no-referrer";
             context.Response.Headers["Content-Security-Policy"] =
-                "default-src 'self'; connect-src 'self'; img-src 'self' data:; " +
+                "default-src 'self'; connect-src 'self'; img-src 'self' data: blob:; " +
                 "style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; frame-ancestors 'none'";
             if (!context.Request.Path.StartsWithSegments("/remote/api"))
             {
@@ -68,10 +70,20 @@ public sealed class MobileRemoteServerService : IAsyncDisposable
                 return;
             }
 
+            if (context.Request.ContentLength is > 65_536)
+            {
+                context.Response.StatusCode = StatusCodes.Status413PayloadTooLarge;
+                return;
+            }
+
             await next(context).ConfigureAwait(false);
         });
 
-        app.MapGet("/remote", () => Results.Content(MobileRemotePage.Html, "text/html; charset=utf-8"));
+        app.MapGet("/remote", (HttpContext context) =>
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            return Results.Content(MobileRemotePage.Html, "text/html; charset=utf-8");
+        });
         app.MapGet("/", () => Results.Redirect("/remote"));
         app.MapGet("/remote/api/state", async (CancellationToken ct) =>
             Results.Json(await CreateSnapshotAsync(bridge, ct).ConfigureAwait(false)));
@@ -116,6 +128,19 @@ public sealed class MobileRemoteServerService : IAsyncDisposable
             if (bridge.BrowseMobileAlbumTracksFunc is null || string.IsNullOrWhiteSpace(albumId))
                 return Results.BadRequest(new { error = "invalid_album" });
             return Results.Json(await bridge.BrowseMobileAlbumTracksFunc(albumId, ct).ConfigureAwait(false));
+        });
+        app.MapGet("/remote/api/playlists", async (CancellationToken ct) =>
+            Results.Json(bridge.BrowseMobilePlaylistsFunc is { } browse
+                ? await browse(ct).ConfigureAwait(false) : Array.Empty<MobileRemotePlaylist>()));
+        app.MapGet("/remote/api/playlists/{id:long}/tracks", async (long id, CancellationToken ct) =>
+            Results.Json(id > 0 && bridge.BrowseMobilePlaylistTracksFunc is { } browse
+                ? await browse(id, ct).ConfigureAwait(false) : Array.Empty<MobileRemoteTrack>()));
+        app.MapPost("/remote/api/playlists/{id:long}/queue", async (long id, MobileRemotePlaylistAction request, CancellationToken ct) =>
+        {
+            if (id <= 0 || request.Action is not ("play" or "append") || bridge.QueueMobilePlaylistFunc is null)
+                return Results.BadRequest();
+            var accepted = await bridge.OnUiAsync(() => bridge.QueueMobilePlaylistFunc(id, request.Action), ct).ConfigureAwait(false);
+            return accepted ? Results.NoContent() : Results.BadRequest();
         });
         app.MapGet("/remote/api/events", async (HttpContext context, CancellationToken ct) =>
         {
@@ -337,6 +362,17 @@ public sealed record MobileRemoteAlbum(string Id, string Title, string? Artist, 
 /// <param name="Id">Opaque search-result identity.</param>
 /// <param name="Action">One of <c>play</c>, <c>next</c>, or <c>append</c>.</param>
 public sealed record MobileRemoteTrackAction(string Id, string Action);
+
+/// <summary>A shared regular or smart playlist without paths or filter internals.</summary>
+/// <param name="Id">Database playlist identifier.</param>
+/// <param name="Name">Display name.</param>
+/// <param name="TrackCount">Stored count, or null for dynamically resolved smart playlists.</param>
+/// <param name="IsSmart">Whether this playlist resolves smart criteria.</param>
+public sealed record MobileRemotePlaylist(long Id, string Name, int? TrackCount, bool IsSmart);
+
+/// <summary>A whole-playlist playback request.</summary>
+/// <param name="Action">Either play (replace queue) or append.</param>
+public sealed record MobileRemotePlaylistAction(string Action);
 
 /// <summary>A validated edit request for the playback queue.</summary>
 /// <param name="Action">One of <c>remove</c>, <c>up</c>, <c>down</c>, or <c>clear</c>.</param>

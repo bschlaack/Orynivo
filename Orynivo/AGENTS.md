@@ -56,6 +56,9 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   generated bearer token; never reuse MCP enablement, permissions, or tokens.
   Its public page may be loaded without authentication so a user can enter the
   token, but every `/remote/api` request must authenticate in constant time.
+  Do not browser-cache the embedded HTML across upgrades, reject oversized API
+  request bodies before endpoint binding, and stop automatic reconnect after a
+  401 until the user supplies a new token.
   Remote state and queue DTOs must omit physical paths, authenticated stream
   URLs, credentials, and private provider settings. Live updates send compact
   state changes only and reconnect without reloading the complete library.
@@ -72,6 +75,23 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   Favourite changes and output selection must reuse the existing MainWindow
   callbacks. Queue edits must validate indices and pass through the established
   move/remove/clear persistence, gapless-refresh, and Infinite Mix lifecycle.
+  Settings enumerates active non-loopback IPv4 addresses off the UI thread and
+  generates QR codes locally through QRCoder's portable PNG renderer. QR payloads
+  carry the token only in the URL fragment, never in a query string or persisted
+  image. The browser consumes/removes that fragment on initial load or hash
+  navigation; credentials live only in page memory. Plain-URL visits and reloads
+  require token entry. Settings changes must be saved before using their QR code.
+  The desktop token is JsonIgnored and overlaid from ApplicationCredentialStore;
+  loading a legacy plaintext mobile token migrates it and removes it from settings.
+  The remote document, script, and four-language JSON are embedded resources.
+  Preserve blob artwork in the CSP, native keyboard-accessible controls, bounded
+  artist search, stale-response guards, and separate playback/library/playlist/
+  queue navigation. Shared regular and smart playlists reuse desktop resolution,
+  but background browsing must suppress registration into UI-owned remote-track
+  dictionaries; only playback registers resolved rows on the UI thread.
+  Mobile playlist DTOs omit paths and filter internals. Unresolved entries and
+  standalone imported streams are intentionally omitted; do not expose raw
+  playlist paths or authenticated URLs as an alternative.
 - AI endpoint discovery and testing use `AiEndpointService` and the unsaved
   values currently visible in Settings. Query only the credential-free
   OpenAI-compatible `/models` URL, accept standard and Ollama model-list shapes,

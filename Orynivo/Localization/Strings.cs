@@ -1208,6 +1208,10 @@ public sealed record LocalizedStrings(
     public string MobileRemotePort { get; init; } = "";
     /// <summary>Gets the mobile web remote token label.</summary>
     public string MobileRemoteToken { get; init; } = "";
+    /// <summary>Gets the LAN address selector label.</summary>
+    public string MobileRemoteNetworkAddress { get; init; } = "";
+    /// <summary>Gets the QR credential and settings-save warning.</summary>
+    public string MobileRemoteQrHint { get; init; } = "";
     /// <summary>Gets the integration settings section group header.</summary>
     public string Integration { get; init; } = "";
     /// <summary>Gets the sub-section header for the individual MCP tool toggles.</summary>

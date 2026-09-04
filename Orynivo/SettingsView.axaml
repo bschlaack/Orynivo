@@ -1460,10 +1460,19 @@
                                 Click="GenerateMobileRemoteAccessToken_Click"
                                 Margin="8,0,0,0"/>
                     </Grid>
+                    <TextBlock Text="{DynamicResource L_MobileRemoteNetworkAddress}"
+                               FontSize="{DynamicResource FontSizeCaption}" Margin="0,8,0,6"/>
+                    <ComboBox x:Name="MobileRemoteAddressComboBox" HorizontalAlignment="Stretch" Margin="0,0,0,8"/>
                     <TextBlock x:Name="MobileRemoteAddressTextBlock"
                                FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppAccentBrush}"
                                TextWrapping="Wrap"/>
+                    <Image x:Name="MobileRemoteQrImage" Width="240" Height="240"
+                           AutomationProperties.Name="{DynamicResource L_MobileRemoteQrHint}"
+                           HorizontalAlignment="Left" Margin="0,16,0,8" Stretch="Uniform"/>
+                    <TextBlock Text="{DynamicResource L_MobileRemoteQrHint}"
+                               FontSize="{DynamicResource FontSizeCaption}" TextWrapping="Wrap"
+                               Foreground="{DynamicResource AppSecondaryTextBrush}"/>
                 </StackPanel>
 
                 <StackPanel x:Name="AiChatPanel"

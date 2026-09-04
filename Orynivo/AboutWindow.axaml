@@ -73,6 +73,7 @@
                            Text="The Orynivo name, wordmark, logo, and application icon are not granted as trademarks by the Apache License."/>
                 <TextBlock Classes="license" Text="cwASIO — MIT License"/>
                 <TextBlock Classes="license" Text="Avalonia 11.2.0 — MIT License"/>
+                <TextBlock Classes="license" Text="QRCoder 1.7.0 — MIT License"/>
                 <TextBlock Classes="license" Text="SkiaSharp 2.88.9 — MIT License"/>
                 <TextBlock Classes="license" Text="Lucene.NET 4.8.0-beta00017 — Apache License 2.0"/>
                 <TextBlock Classes="license" Text="ModelContextProtocol C# SDK 1.4.0 — Apache License 2.0"/>

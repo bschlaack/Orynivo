@@ -416,6 +416,8 @@ public static class LocalizationManager
         resources["L_MobileRemoteEnabled"] = Current.MobileRemoteEnabled;
         resources["L_MobileRemotePort"] = Current.MobileRemotePort;
         resources["L_MobileRemoteToken"] = Current.MobileRemoteToken;
+        resources["L_MobileRemoteNetworkAddress"] = Current.MobileRemoteNetworkAddress;
+        resources["L_MobileRemoteQrHint"] = Current.MobileRemoteQrHint;
         resources["L_McpToolsHeader"]          = Current.McpToolsHeader;
         resources["L_McpToolsHint"]            = Current.McpToolsHint;
         resources["L_WebBrowsing"]             = Current.WebBrowsing;
@@ -1114,6 +1116,8 @@ public static class LocalizationManager
         , MobileRemoteEnabled = "Mobile Fernbedienung im Netzwerk aktivieren"
         , MobileRemotePort = "Port"
         , MobileRemoteToken = "Zugriffstoken der Fernbedienung"
+        , MobileRemoteNetworkAddress = "IP-Adresse im Heimnetz"
+        , MobileRemoteQrHint = "Zuerst Einstellungen speichern. Im selben WLAN den QR-Code für die direkte Anmeldung scannen. Er enthält den Zugriffstoken: nicht teilen! Beim manuellen URL-Aufruf wird der Token abgefragt. Bei mehreren Adressen die vom Telefon erreichbare wählen."
         , McpToolsHeader   = "Tools"
         , McpToolsHint     = "Einzelne Tools aktivieren oder deaktivieren."
         , WebBrowsing        = "Web-Browsing"
@@ -1792,6 +1796,8 @@ public static class LocalizationManager
         , MobileRemoteEnabled = "Enable mobile remote on the network"
         , MobileRemotePort = "Port"
         , MobileRemoteToken = "Remote access token"
+        , MobileRemoteNetworkAddress = "Home network IP address"
+        , MobileRemoteQrHint = "Save settings first. Scan the QR code on the same Wi-Fi to sign in directly. It contains the access token: do not share it! Opening the URL manually asks for the token. If multiple addresses appear, choose one reachable from your phone."
         , McpToolsHeader   = "Tools"
         , McpToolsHint     = "Enable or disable individual tools."
         , WebBrowsing        = "Web browsing"
@@ -2473,6 +2479,8 @@ public static class LocalizationManager
         , MobileRemoteEnabled = "Activer la télécommande mobile sur le réseau"
         , MobileRemotePort = "Port"
         , MobileRemoteToken = "Jeton d’accès de la télécommande"
+        , MobileRemoteNetworkAddress = "Adresse IP du réseau domestique"
+        , MobileRemoteQrHint = "Enregistrez d’abord les paramètres. Scannez le QR code sur le même Wi-Fi pour vous connecter directement. Il contient le jeton : ne le partagez pas ! L’URL saisie manuellement demande le jeton. Choisissez une adresse accessible depuis le téléphone."
         , McpToolsHeader   = "Outils"
         , McpToolsHint     = "Activer ou désactiver des outils individuels."
         , WebBrowsing        = "Navigation web"
@@ -3151,6 +3159,8 @@ public static class LocalizationManager
         , MobileRemoteEnabled = "Activar el mando móvil en la red"
         , MobileRemotePort = "Puerto"
         , MobileRemoteToken = "Token de acceso del mando"
+        , MobileRemoteNetworkAddress = "Dirección IP de la red doméstica"
+        , MobileRemoteQrHint = "Guarda primero los ajustes. Escanea el QR en la misma Wi-Fi para acceder directamente. Contiene el token: ¡no lo compartas! La URL introducida manualmente solicita el token. Elige una dirección accesible desde el teléfono."
         , McpToolsHeader   = "Herramientas"
         , McpToolsHint     = "Activar o desactivar herramientas individuales."
         , WebBrowsing        = "Navegación web"
