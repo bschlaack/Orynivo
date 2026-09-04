@@ -1198,6 +1198,16 @@ public sealed record LocalizedStrings(
     public string McpAccessTokenWatermark { get; init; } = "";
     /// <summary>Gets the label for generating a new MCP bearer token.</summary>
     public string McpGenerateToken { get; init; } = "";
+    /// <summary>Gets the mobile web remote section title.</summary>
+    public string MobileRemote { get; init; } = "";
+    /// <summary>Gets the mobile web remote security and usage hint.</summary>
+    public string MobileRemoteHint { get; init; } = "";
+    /// <summary>Gets the label for enabling the mobile web remote.</summary>
+    public string MobileRemoteEnabled { get; init; } = "";
+    /// <summary>Gets the mobile web remote port label.</summary>
+    public string MobileRemotePort { get; init; } = "";
+    /// <summary>Gets the mobile web remote token label.</summary>
+    public string MobileRemoteToken { get; init; } = "";
     /// <summary>Gets the integration settings section group header.</summary>
     public string Integration { get; init; } = "";
     /// <summary>Gets the sub-section header for the individual MCP tool toggles.</summary>

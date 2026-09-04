@@ -315,6 +315,34 @@ Library search includes configured Orynivo Server libraries as opaque
 those references inside the app, so API keys and authenticated stream URLs are
 not exposed to the model.
 
+### Mobile web remote
+
+The mobile web remote can be enabled under its separate
+**Settings → Integration → Mobile web remote** page. It listens on its
+own LAN port (default **49201**) and uses a dedicated generated bearer token;
+MCP permissions and its token are not reused. Open
+`http://<address-of-the-orynivo-computer>:49201/remote` on a phone, enter the
+remote token, and keep the page open for reconnecting live player updates. The
+bare address `http://<address-of-the-orynivo-computer>:49201` redirects to that
+page as well.
+
+The initial screen shows now-playing and queue state without disclosing file
+paths or authenticated stream URLs. Previous, play/pause, next, stop, seek,
+volume, and direct queue-entry controls are available. Current artwork is
+transferred as a bounded thumbnail and retained through private browser cache
+headers. The search field queries tracks in the local library and every
+configured Orynivo Server concurrently. Results can be played immediately,
+inserted next, or appended; the browser receives only an opaque identity and
+display metadata, never a physical path, server address, or API key. LAN
+access is disabled by default. The current track can be marked as a favourite,
+configured output profiles can be selected, and queue entries can be moved or
+removed without opening the desktop window. The library section browses artists,
+their albums, and album tracks from both the local catalog and every configured
+Orynivo Server. Provider identities remain opaque until a selected track is
+resolved inside the desktop for playback. Do not
+forward this unencrypted HTTP port to the internet; use a trusted VPN or an
+HTTPS reverse proxy for access outside the home network.
+
 ### MCP Server
 
 The same 32 tools are available as an embedded **Model Context Protocol (MCP)**

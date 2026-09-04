@@ -60,13 +60,20 @@ material implementation step so work can resume safely across sessions.
 
 ## 3. Mobile Web Remote
 
-- [ ] Define a minimal authenticated remote-control API and live-state channel.
-- [ ] Reuse the MCP/network security model while keeping permissions separate.
-- [ ] Implement responsive now-playing, transport, seek, volume, queue, search,
+- [x] Define a minimal authenticated remote-control API and live-state channel.
+- [x] Reuse the MCP/network security model while keeping permissions separate.
+- [x] Implement responsive now-playing, transport, seek, volume, queue, search,
   output selection, favourites, and library browsing.
-- [ ] Add artwork delivery with bounded thumbnails and cache headers.
-- [ ] Add reconnecting live updates without polling the complete library.
-- [ ] Provide opt-in LAN binding, token rotation, and HTTPS/VPN guidance.
+  - [x] Implement responsive now-playing, transport, seek, volume, and direct
+    queue selection.
+  - [x] Add cross-library track search with opaque play-now, play-next, and
+    append actions.
+  - [x] Add current-track favourites, output-profile selection, and complete
+    queue editing.
+  - [x] Add album and artist browsing.
+- [x] Add artwork delivery with bounded thumbnails and cache headers.
+- [x] Add reconnecting live updates without polling the complete library.
+- [x] Provide opt-in LAN binding, token rotation, and HTTPS/VPN guidance.
 - [ ] Validate phone/tablet layouts and keyboard/screen-reader accessibility.
 - [ ] Add tests, documentation, packaging checks, and a security review.
 
@@ -80,3 +87,6 @@ material implementation step so work can resume safely across sessions.
   cross-library “More like this” playback action implemented and verified.
 - [x] Phase 2 Similarity and Mood Search completed and verified, including
   progressive optional acoustic descriptors and Infinite Mix continuation.
+- [x] Phase 3 functional surface completed with an independently authenticated
+  mobile endpoint, reconnecting live state, transport and queue controls,
+  cross-library search, output/favourite actions, and artist/album browsing.

@@ -4,6 +4,37 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Began the opt-in mobile web remote with a dedicated LAN port and independent
+  bearer token. Its responsive, dependency-free first screen provides live
+  now-playing and path-free queue state plus previous, play/pause, next, stop,
+  seek, and volume controls. Reconnecting server-sent updates transfer only a
+  compact player snapshot and never expose local paths or authenticated URLs.
+  Current artwork is delivered as a bounded 640-pixel JPEG with private cache
+  validators, and tapping a queue row starts that exact entry. The remote can
+  now search tracks across the local library and configured Orynivo Servers;
+  opaque results support play-now, play-next, and append actions without
+  exposing physical paths, server addresses, or API keys. Current-track
+  favourites, output-profile selection, and validated queue move, remove, and
+  clear operations are also available from the mobile surface. A provider-bound
+  library browser now navigates artists, their albums, and album tracks across
+  the local catalog and configured servers; tracks retain the same safe
+  play-now, play-next, and append actions.
+
+### Fixed
+
+- Fixed albums added by a manual Settings library scan remaining absent from
+  the Albums view until Orynivo was restarted. Successful scan mutations now
+  invalidate the Dashboard, Genre Cloud, and unified Artists/Albums/Tracks
+  session caches through the same path as file-watcher changes.
+- Fixed the mobile remote returning to its token prompt even after successful
+  authentication. Live SSE snapshots now use the same camel-case JSON contract
+  as the remaining remote API. The remote also has its own Settings navigation
+  page, and opening its bare port redirects to `/remote`.
+
 ## [0.39.0] - 2026-09-04
 
 ### Added

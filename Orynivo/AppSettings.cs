@@ -116,6 +116,12 @@ public sealed class AppSettings
     public bool McpNetworkAccessEnabled { get; set; }
     /// <summary>Gets or sets the bearer token required when MCP network access is enabled.</summary>
     public string McpAccessToken { get; set; } = string.Empty;
+    /// <summary>Gets or sets whether the mobile web remote is available on the local network.</summary>
+    public bool MobileRemoteEnabled { get; set; }
+    /// <summary>Gets or sets the TCP port used by the mobile web remote.</summary>
+    public int MobileRemotePort { get; set; } = 49201;
+    /// <summary>Gets or sets the bearer token dedicated to the mobile web remote.</summary>
+    public string MobileRemoteAccessToken { get; set; } = string.Empty;
     /// <summary>Gets or sets the set of MCP tool names that are individually disabled.</summary>
     public HashSet<string> DisabledMcpTools { get; set; } = [];
     /// <summary>Gets or sets a value indicating whether the Internet Radio sidebar item is visible.</summary>
