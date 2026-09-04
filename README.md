@@ -321,8 +321,12 @@ The same 32 tools are available as an embedded **Model Context Protocol (MCP)**
 HTTP/SSE server for external AI assistants such as
 [Claude Desktop](https://claude.ai/download). Enable it under
 **Settings → Integration → MCP Server**, choose a port (default **49200**),
-and point your assistant at `http://localhost:49200/mcp`. The server binds to
-`localhost` only. Each of the 32 tools has an individual enable/disable toggle
+and point your assistant at `http://localhost:49200/mcp`. It binds to
+`localhost` by default. **Allow access from the local network** is an explicit
+opt-in setting that binds MCP to all interfaces and requires a generated bearer
+token in `Authorization: Bearer <token>` on every MCP request. Use HTTPS through
+a trusted reverse proxy or a VPN when the network is not fully trusted, because
+plain HTTP does not protect the token in transit. Each of the 32 tools has an individual enable/disable toggle
 in Settings so you can limit what an external assistant is allowed to do. The
 web tools (`search_web`, `fetch_page`, `fetch_page_as_markdown`) route through
 the MCP server, not the model directly: searches use a configurable SearXNG

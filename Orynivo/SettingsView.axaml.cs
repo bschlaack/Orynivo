@@ -20,6 +20,7 @@ using Orynivo.Web;
 using Orynivo.Updates;
 using Orynivo.AI;
 using System.Reflection;
+using System.Security.Cryptography;
 using AvaloniaApp = Avalonia.Application;
 using UiLanguage = Orynivo.Localization.Language;
 
@@ -180,9 +181,16 @@ internal partial class SettingsView : UserControl
         RebuildEqualizerEditor();
         McpServerEnabledCheckBox.IsChecked        = settings.McpServerEnabled;
         McpServerPortNumericUpDown.Value          = settings.McpServerPort;
+        McpNetworkAccessCheckBox.IsChecked        = settings.McpNetworkAccessEnabled;
+        McpAccessTokenTextBox.Text                = settings.McpAccessToken;
         InitMcpToolCheckBoxes(settings.DisabledMcpTools);
         UpdateSubsystemStatusBadges();
         McpServerEnabledCheckBox.IsCheckedChanged += (_, _) => UpdateMcpStatusBadge();
+        McpNetworkAccessCheckBox.IsCheckedChanged += (_, _) =>
+        {
+            if (McpNetworkAccessCheckBox.IsChecked == true && string.IsNullOrWhiteSpace(McpAccessTokenTextBox.Text))
+                McpAccessTokenTextBox.Text = GenerateMcpAccessToken();
+        };
         AiChatEnabledCheckBox.IsChecked         = settings.AiChat.Enabled;
         AiChatEndpointUrlTextBox.Text           = settings.AiChat.EndpointUrl;
         AiChatApiKeyTextBox.Text                = settings.AiChat.ApiKey;
@@ -265,6 +273,17 @@ internal partial class SettingsView : UserControl
         McpStatusBadge.State = enabled ? StatusBadgeState.Ok : StatusBadgeState.Off;
         McpStatusBadge.Text = enabled ? loc.StatusEnabled : loc.StatusDisabled;
     }
+
+    /// <summary>Replaces the MCP network-access token with a cryptographically random value.</summary>
+    private void GenerateMcpAccessToken_Click(object? sender, RoutedEventArgs e) =>
+        McpAccessTokenTextBox.Text = GenerateMcpAccessToken();
+
+    /// <summary>Creates a URL-safe 256-bit bearer token.</summary>
+    private static string GenerateMcpAccessToken() =>
+        Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
 
     /// <summary>Raised when the embedded settings view requests save or cancel.</summary>
     internal event EventHandler<bool>? CompletionRequested;
@@ -364,6 +383,24 @@ internal partial class SettingsView : UserControl
     public bool McpServerEnabled => McpServerEnabledCheckBox.IsChecked == true;
     /// <summary>Gets the TCP port configured for the MCP server.</summary>
     public int McpServerPort => (int)(McpServerPortNumericUpDown.Value ?? 49200);
+
+    /// <summary>Gets whether MCP connections from the local network are enabled.</summary>
+    public bool McpNetworkAccessEnabled => McpNetworkAccessCheckBox.IsChecked == true;
+
+    /// <summary>Gets the bearer token used to authenticate network MCP requests.</summary>
+    public string McpAccessToken
+    {
+        get
+        {
+            var token = McpAccessTokenTextBox.Text?.Trim() ?? string.Empty;
+            if (McpNetworkAccessEnabled && string.IsNullOrEmpty(token))
+            {
+                token = GenerateMcpAccessToken();
+                McpAccessTokenTextBox.Text = token;
+            }
+            return token;
+        }
+    }
     /// <summary>Gets the set of MCP tool names that should be disabled.</summary>
     public HashSet<string> DisabledMcpTools => ReadDisabledMcpTools();
     /// <summary>Gets the current AI chat settings from the UI controls.</summary>

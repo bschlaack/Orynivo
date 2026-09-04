@@ -46,6 +46,9 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 - AI chat and the embedded MCP server expose one permission-gated tool surface.
   Keep `McpTools`, `AiToolDefinitions`, `AiToolExecutor`, and the Settings tool
   checklist in exact parity through `scripts/verify-mcp-tool-parity.ps1`.
+- MCP remains loopback-only unless `McpNetworkAccessEnabled` is explicitly
+  selected. Network mode binds to all interfaces and every `/mcp` request must
+  authenticate with the persisted 256-bit bearer token; never log that token.
   Library search includes every configured Orynivo Server and returns only
   opaque `orynivo://` references; remote failures must be reported distinctly
   from genuine empty search results without exposing URLs or API keys.

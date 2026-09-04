@@ -633,8 +633,10 @@ fallback or allow client-provided commands/paths to reach the helper.
   without stopping the current track; `replace_queue` atomically replaces the
   queue and starts playback of the first new track
 - `Orynivo/Mcp/McpServerService.cs`: starts/stops an embedded Kestrel HTTP/SSE
-  server using `WebApplication`; binds to `http://localhost:{port}` via
-  `builder.WebHost.UseSetting("urls", …)`; maps MCP endpoint at `/mcp`;
+  server using `WebApplication`; binds to `http://localhost:{port}` by default
+  or `http://0.0.0.0:{port}` only when `McpNetworkAccessEnabled` is explicitly
+  enabled; network mode requires `Authorization: Bearer <McpAccessToken>` and
+  compares the generated 256-bit token in constant time; maps MCP at `/mcp`;
   logging is cleared so Kestrel output does not appear in the player console;
   `IAsyncDisposable` — `DisposeAsync` delegates to `StopAsync`
 - `Orynivo/AI/AiChatSettings.cs`: persisted configuration for the embedded AI
