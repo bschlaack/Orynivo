@@ -37,6 +37,12 @@ public sealed record PlayerState(
 /// <param name="FileName">File name without directory path.</param>
 public sealed record QueueEntry(int Index, bool IsCurrent, string Path, string FileName);
 
+/// <summary>Bounded artwork payload exposed to trusted local remote-control transports.</summary>
+/// <param name="Data">Encoded image bytes.</param>
+/// <param name="MimeType">Image media type.</param>
+/// <param name="CacheKey">Non-sensitive cache identity for conditional requests.</param>
+public sealed record RemoteArtwork(byte[] Data, string MimeType, string CacheKey);
+
 /// <summary>Snapshot of the configured equalizer profiles exposed to remote-control tools.</summary>
 /// <param name="Profiles">Available profile names.</param>
 /// <param name="SelectedProfile">Selected profile name, or <see langword="null"/>.</param>
@@ -59,6 +65,42 @@ public sealed class McpPlayerBridge
 
     /// <summary>Gets or sets a function that returns the current queue entries.</summary>
     public Func<IReadOnlyList<QueueEntry>>? GetQueueFunc { get; set; }
+
+    /// <summary>Gets or sets an asynchronous function returning bounded current-track artwork.</summary>
+    public Func<Task<RemoteArtwork?>>? GetCurrentArtworkFunc { get; set; }
+
+    /// <summary>Gets or sets a function that starts a queue entry by zero-based index.</summary>
+    public Func<int, Task<bool>>? PlayQueueIndexFunc { get; set; }
+
+    /// <summary>Gets or sets a cross-library track search for the mobile remote.</summary>
+    public Func<string, int, CancellationToken, Task<IReadOnlyList<global::Orynivo.Remote.MobileRemoteTrack>>>? SearchMobileTracksFunc { get; set; }
+
+    /// <summary>Gets or sets a cross-library artist browser for the mobile remote.</summary>
+    public Func<string?, int, CancellationToken, Task<IReadOnlyList<global::Orynivo.Remote.MobileRemoteArtist>>>? BrowseMobileArtistsFunc { get; set; }
+
+    /// <summary>Gets or sets a provider-bound album browser for one mobile artist identity.</summary>
+    public Func<string, CancellationToken, Task<IReadOnlyList<global::Orynivo.Remote.MobileRemoteAlbum>>>? BrowseMobileAlbumsFunc { get; set; }
+
+    /// <summary>Gets or sets a provider-bound track browser for one mobile album identity.</summary>
+    public Func<string, CancellationToken, Task<IReadOnlyList<global::Orynivo.Remote.MobileRemoteTrack>>>? BrowseMobileAlbumTracksFunc { get; set; }
+
+    /// <summary>Gets or sets the shared regular and smart playlist browser.</summary>
+    public Func<CancellationToken, Task<IReadOnlyList<global::Orynivo.Remote.MobileRemotePlaylist>>>? BrowseMobilePlaylistsFunc { get; set; }
+
+    /// <summary>Gets or sets the safe track browser for a shared playlist.</summary>
+    public Func<long, CancellationToken, Task<IReadOnlyList<global::Orynivo.Remote.MobileRemoteTrack>>>? BrowseMobilePlaylistTracksFunc { get; set; }
+
+    /// <summary>Gets or sets the play or append action for a shared playlist.</summary>
+    public Func<long, string, Task<bool>>? QueueMobilePlaylistFunc { get; set; }
+
+    /// <summary>Gets or sets a function that resolves a safe mobile track identity and applies a queue action.</summary>
+    public Func<string, string, Task<bool>>? QueueMobileTrackFunc { get; set; }
+
+    /// <summary>Gets or sets a function returning the current track favorite state, or no value when unavailable.</summary>
+    public Func<bool?>? GetCurrentFavoriteFunc { get; set; }
+
+    /// <summary>Gets or sets a function applying a validated edit to the current queue.</summary>
+    public Func<string, int?, Task<bool>>? EditMobileQueueFunc { get; set; }
 
     /// <summary>Gets or sets a function that starts playback of the given absolute file path.</summary>
     public Func<string, Task>? PlayFileFunc { get; set; }

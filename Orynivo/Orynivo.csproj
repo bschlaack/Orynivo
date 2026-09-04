@@ -81,6 +81,9 @@
 
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
+    <EmbeddedResource Include="Remote\MobileRemote.html" />
+    <EmbeddedResource Include="Remote\MobileRemote.js" />
+    <EmbeddedResource Include="Localization\MobileRemote.json" />
     <AvaloniaResource Include="..\Logo\orynivo.png" Link="Assets\DashboardLogo.png" />
     <AvaloniaResource Include="..\Logo\bg.png" Link="Assets\DashboardHeroBackground.png" />
   </ItemGroup>
@@ -97,6 +100,7 @@
 
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.2.0" />
+    <PackageReference Include="QRCoder" Version="1.7.0" />
     <PackageReference Include="Avalonia.Desktop" Version="11.2.0" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.0" />
     <PackageReference Include="Avalonia.Controls.DataGrid" Version="11.2.0" />

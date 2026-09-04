@@ -238,6 +238,7 @@ public partial class MainWindow : Window
     private WindowsMediaTransportService? _windowsMediaTransport;
     private readonly Mcp.McpPlayerBridge _mcpBridge = new();
     private readonly Mcp.McpServerService _mcpServer = new();
+    private readonly Remote.MobileRemoteServerService _mobileRemoteServer = new();
     private Orynivo.Web.WebBrowsingService? _webBrowsing;
     private static readonly object _webBrowsingLogLock = new();
     private static readonly object UiDiagnosticsLogLock = new();
@@ -771,6 +772,11 @@ public partial class MainWindow : Window
                 _settings.McpNetworkAccessEnabled,
                 _settings.McpAccessToken);
         }
+        if (_settings.MobileRemoteEnabled)
+            _ = _mobileRemoteServer.StartAsync(
+                _settings.MobileRemotePort,
+                _settings.MobileRemoteAccessToken,
+                _mcpBridge);
         using (StartupTimingLog.Time("MainWindow.RestorePlaybackQueueState"))
             RestorePlaybackQueueState();
         LogUiDiagnostics("MainWindow RestorePlaybackQueueState completed");
@@ -895,13 +901,15 @@ public partial class MainWindow : Window
             var status = _player is null ? "stopped"
                 : _player.IsPaused ? "paused"
                 : "playing";
+            var currentQueueItem = _queueIndex >= 0 && _queueIndex < _queue.Count
+                ? _queue[_queueIndex]
+                : null;
             return new Mcp.PlayerState(
                 status,
                 NowPlayingTitleBlock.Text,
                 NowPlayingArtistBlock.Text,
-                null,
-                _player is not null && _queueIndex >= 0 && _queueIndex < _queue.Count
-                    ? _queue[_queueIndex].FilePath : null,
+                currentQueueItem?.Album,
+                _player is not null ? currentQueueItem?.FilePath : null,
                 _player?.Position.TotalSeconds ?? 0,
                 _player?.Duration.TotalSeconds ?? 0,
                 VolumeSlider.Value,
@@ -911,6 +919,28 @@ public partial class MainWindow : Window
         _mcpBridge.GetQueueFunc = () =>
             _queue.Select((item, i) => new Mcp.QueueEntry(
                 i, i == _queueIndex, item.FilePath, item.DisplayTitle)).ToList();
+        _mcpBridge.GetCurrentArtworkFunc = ResolveMobileRemoteArtworkAsync;
+        _mcpBridge.PlayQueueIndexFunc = async index =>
+        {
+            if (index < 0 || index >= _queue.Count)
+                return false;
+            _queueIndex = index;
+            await StartPlaybackAsync(_queue[index].FilePath);
+            return true;
+        };
+        _mcpBridge.SearchMobileTracksFunc = SearchMobileRemoteTracksAsync;
+        _mcpBridge.BrowseMobileArtistsFunc = BrowseMobileRemoteArtistsAsync;
+        _mcpBridge.BrowseMobileAlbumsFunc = BrowseMobileRemoteAlbumsAsync;
+        _mcpBridge.BrowseMobileAlbumTracksFunc = BrowseMobileRemoteAlbumTracksAsync;
+        _mcpBridge.BrowseMobilePlaylistsFunc = BrowseMobileRemotePlaylistsAsync;
+        _mcpBridge.BrowseMobilePlaylistTracksFunc = BrowseMobileRemotePlaylistTracksAsync;
+        _mcpBridge.QueueMobilePlaylistFunc = QueueMobileRemotePlaylistAsync;
+        _mcpBridge.QueueMobileTrackFunc = QueueMobileRemoteTrackAsync;
+        _mcpBridge.GetCurrentFavoriteFunc = () =>
+            _currentTrackId.HasValue || CurrentOrynivoFavoriteTarget is not null
+                ? _currentTrackIsFavorite
+                : null;
+        _mcpBridge.EditMobileQueueFunc = EditMobileRemoteQueueAsync;
         _mcpBridge.PlayFileFunc    = path => StartPlaybackAsync(path);
         _mcpBridge.TogglePauseFunc = TogglePlaybackAsync;
         _mcpBridge.SkipNextFunc    = PlayNextAsync;
@@ -1105,6 +1135,7 @@ public partial class MainWindow : Window
         _uiDiagnosticsHeartbeatTimer = null;
         CloseEmbeddedSettings();
         _ = _mcpServer.StopAsync();
+        _ = _mobileRemoteServer.StopAsync();
         ContentDataGrid.VerticalScroll -= ContentDataGrid_OnVerticalScroll;
         _libraryWatcher?.Dispose();
         _libraryWatcher = null;
@@ -4919,7 +4950,7 @@ public partial class MainWindow : Window
     // DB-Abfragen
     // ------------------------------------------------------------------
 
-    private List<ContentRow> QueryRows(string view, string? searchQuery = null)
+    private List<ContentRow> QueryRows(string view, string? searchQuery = null, bool registerRemoteMetadata = true)
     {
         try
         {
@@ -4936,7 +4967,7 @@ public partial class MainWindow : Window
                     try { criteria = JsonSerializer.Deserialize<SmartPlaylistCriteria>(playlist.FilterCriteria)!; }
                     catch { return []; }
 
-                    return ResolveUnifiedSmartPlaylistRows(criteria);
+                    return ResolveUnifiedSmartPlaylistRows(criteria, registerRemoteMetadata);
                 }
 
                 var ptracks = db.GetPlaylistTracks(pid).ToList();
@@ -4956,7 +4987,7 @@ public partial class MainWindow : Window
                                     .FirstOrDefault();
                                 if (remoteTrack is not null)
                                 {
-                                    var remoteRow = ToCatalogTrackContentRow(remoteTrack, server);
+                                    var remoteRow = ToCatalogTrackContentRow(remoteTrack, server, registerRemoteMetadata);
                                     remoteRow.Nr = (i + 1).ToString();
                                     remoteRow.PlaylistEntryId = pt.Id;
                                     return remoteRow;
@@ -5421,7 +5452,7 @@ public partial class MainWindow : Window
         EntityType = "Track"
     };
 
-    private ContentRow ToCatalogTrackContentRow(LibraryCatalogTrack track, OrynivoServerSettings? server = null)
+    private ContentRow ToCatalogTrackContentRow(LibraryCatalogTrack track, OrynivoServerSettings? server = null, bool registerRemoteMetadata = true)
     {
         server ??= track.Source == LibraryCatalogSource.OrynivoServer ? _activeOrynivoServer : null;
         var row = new ContentRow
@@ -5474,7 +5505,7 @@ public partial class MainWindow : Window
         if (track.Source == LibraryCatalogSource.OrynivoServer && server is not null)
         {
             row.OrynivoServer = server;
-            _orynivoTracksByUrl[track.PlaybackPath] = row;
+            if (registerRemoteMetadata) _orynivoTracksByUrl[track.PlaybackPath] = row;
         }
         return row;
     }
@@ -5892,7 +5923,7 @@ public partial class MainWindow : Window
             return criteria.Resolve(candidates).Count;
         }, cancellationToken);
 
-    private List<ContentRow> ResolveUnifiedSmartPlaylistRows(SmartPlaylistCriteria criteria)
+    private List<ContentRow> ResolveUnifiedSmartPlaylistRows(SmartPlaylistCriteria criteria, bool registerRemoteMetadata = true)
     {
         var candidates = BuildUnifiedSmartPlaylistCandidates(out var remoteTracks);
         var resolved = criteria.Resolve(candidates);
@@ -5924,7 +5955,7 @@ public partial class MainWindow : Window
             }
             else if (remoteTracks.TryGetValue(candidate.Id, out var remote))
             {
-                row = ToCatalogTrackContentRow(remote.Track, remote.Server);
+                row = ToCatalogTrackContentRow(remote.Track, remote.Server, registerRemoteMetadata);
             }
 
             if (row is null)
@@ -16803,6 +16834,7 @@ public partial class MainWindow : Window
                 equalizerPlayer.UpdateEqualizer(enabled, profile);
         });
         var completionHandled = false;
+        view.LocalLibraryChanged += OnWatchedLibraryChanged;
         view.CompletionRequested += async (_, accepted) =>
         {
             if (completionHandled)
@@ -17137,6 +17169,13 @@ public partial class MainWindow : Window
                 _settings.McpServerPort    != window.McpServerPort ||
                 _settings.McpNetworkAccessEnabled != window.McpNetworkAccessEnabled ||
                 !string.Equals(_settings.McpAccessToken, window.McpAccessToken, StringComparison.Ordinal);
+            var mobileRemoteChanged =
+                _settings.MobileRemoteEnabled != window.MobileRemoteEnabled ||
+                _settings.MobileRemotePort != window.MobileRemotePort ||
+                !string.Equals(
+                    _settings.MobileRemoteAccessToken,
+                    window.MobileRemoteAccessToken,
+                    StringComparison.Ordinal);
             var plexServersChanged = !PlexServerSettingsEqual(
                 _settings.PlexServers,
                 window.SelectedPlexServers);
@@ -17217,6 +17256,9 @@ public partial class MainWindow : Window
             _settings.McpServerPort           = window.McpServerPort;
             _settings.McpNetworkAccessEnabled = window.McpNetworkAccessEnabled;
             _settings.McpAccessToken          = window.McpAccessToken;
+            _settings.MobileRemoteEnabled     = window.MobileRemoteEnabled;
+            _settings.MobileRemotePort        = window.MobileRemotePort;
+            _settings.MobileRemoteAccessToken = window.MobileRemoteAccessToken;
             _settings.DisabledMcpTools        = window.DisabledMcpTools;
             _mcpBridge.DisabledTools          = _settings.DisabledMcpTools;
             _settings.AiChat                  = window.AiChatSettingsValue;
@@ -17258,6 +17300,16 @@ public partial class MainWindow : Window
                         _settings.McpAccessToken);
                 else
                     await _mcpServer.StopAsync();
+            }
+            if (mobileRemoteChanged)
+            {
+                if (_settings.MobileRemoteEnabled)
+                    await _mobileRemoteServer.StartAsync(
+                        _settings.MobileRemotePort,
+                        _settings.MobileRemoteAccessToken,
+                        _mcpBridge);
+                else
+                    await _mobileRemoteServer.StopAsync();
             }
             if (themeChanged)
             {

@@ -315,6 +315,9 @@ internal sealed class ApplicationCredentialStore
 /// <summary>Serializable payload stored only inside the encrypted credential container.</summary>
 internal sealed class ApplicationCredentialSnapshot
 {
+    /// <summary>Gets or sets the independently encrypted mobile web remote bearer token.</summary>
+    public string MobileRemoteAccessToken { get; set; } = string.Empty;
+
     /// <summary>Gets or sets the Last.fm API key.</summary>
     public string LastFmApiKey { get; set; } = string.Empty;
 

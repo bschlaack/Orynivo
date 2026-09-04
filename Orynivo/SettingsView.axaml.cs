@@ -80,6 +80,12 @@ internal partial class SettingsView : UserControl
     private bool _initializing = true;
     private bool _rebuildingEqualizerEditor;
     private bool _settingsAccepted;
+
+    /// <summary>
+    /// Occurs after a manual local-library scan has added, updated, or removed
+    /// indexed tracks so catalog consumers can invalidate their session caches.
+    /// </summary>
+    internal event Action? LocalLibraryChanged;
     private bool _plexCredentialsChanged;
     private bool _metadataAnalysisLoaded;
     private IReadOnlyList<MetadataProblemRow> _metadataDoctorRows = [];
@@ -190,6 +196,9 @@ internal partial class SettingsView : UserControl
         McpServerPortNumericUpDown.Value          = settings.McpServerPort;
         McpNetworkAccessCheckBox.IsChecked        = settings.McpNetworkAccessEnabled;
         McpAccessTokenTextBox.Text                = settings.McpAccessToken;
+        MobileRemoteEnabledCheckBox.IsChecked     = settings.MobileRemoteEnabled;
+        MobileRemotePortNumericUpDown.Value       = settings.MobileRemotePort;
+        MobileRemoteAccessTokenTextBox.Text       = settings.MobileRemoteAccessToken;
         InitMcpToolCheckBoxes(settings.DisabledMcpTools);
         UpdateSubsystemStatusBadges();
         McpServerEnabledCheckBox.IsCheckedChanged += (_, _) => UpdateMcpStatusBadge();
@@ -198,6 +207,18 @@ internal partial class SettingsView : UserControl
             if (McpNetworkAccessCheckBox.IsChecked == true && string.IsNullOrWhiteSpace(McpAccessTokenTextBox.Text))
                 McpAccessTokenTextBox.Text = GenerateMcpAccessToken();
         };
+        MobileRemoteEnabledCheckBox.IsCheckedChanged += (_, _) =>
+        {
+            if (MobileRemoteEnabledCheckBox.IsChecked == true &&
+                string.IsNullOrWhiteSpace(MobileRemoteAccessTokenTextBox.Text))
+            {
+                MobileRemoteAccessTokenTextBox.Text = GenerateMcpAccessToken();
+            }
+            UpdateMobileRemoteStatus();
+        };
+        MobileRemotePortNumericUpDown.ValueChanged += (_, _) => UpdateMobileRemoteStatus();
+        InitializeMobileRemoteAddresses();
+        UpdateMobileRemoteStatus();
         AiChatEnabledCheckBox.IsChecked         = settings.AiChat.Enabled;
         AiChatEndpointUrlTextBox.Text           = settings.AiChat.EndpointUrl;
         AiChatApiKeyTextBox.Text                = settings.AiChat.ApiKey;
@@ -281,9 +302,27 @@ internal partial class SettingsView : UserControl
         McpStatusBadge.Text = enabled ? loc.StatusEnabled : loc.StatusDisabled;
     }
 
+    /// <summary>Updates the separate mobile-remote status and browser address.</summary>
+    private void UpdateMobileRemoteStatus()
+    {
+        var enabled = MobileRemoteEnabledCheckBox.IsChecked == true;
+        MobileRemoteStatusBadge.State = enabled ? StatusBadgeState.Ok : StatusBadgeState.Off;
+        MobileRemoteStatusBadge.Text = enabled
+            ? LocalizationManager.Current.StatusEnabled
+            : LocalizationManager.Current.StatusDisabled;
+        var port = (int)(MobileRemotePortNumericUpDown.Value ?? 49201);
+        UpdateMobileRemoteQr(port, enabled);
+    }
+
     /// <summary>Replaces the MCP network-access token with a cryptographically random value.</summary>
     private void GenerateMcpAccessToken_Click(object? sender, RoutedEventArgs e) =>
         McpAccessTokenTextBox.Text = GenerateMcpAccessToken();
+
+    /// <summary>Replaces the mobile remote token with a cryptographically random value.</summary>
+    /// <param name="sender">Event sender.</param>
+    /// <param name="e">Click event arguments.</param>
+    private void GenerateMobileRemoteAccessToken_Click(object? sender, RoutedEventArgs e) =>
+        MobileRemoteAccessTokenTextBox.Text = GenerateMcpAccessToken();
 
     /// <summary>Creates a URL-safe 256-bit bearer token.</summary>
     private static string GenerateMcpAccessToken() =>
@@ -404,6 +443,24 @@ internal partial class SettingsView : UserControl
             {
                 token = GenerateMcpAccessToken();
                 McpAccessTokenTextBox.Text = token;
+            }
+            return token;
+        }
+    }
+    /// <summary>Gets whether LAN access to the mobile web remote is enabled.</summary>
+    public bool MobileRemoteEnabled => MobileRemoteEnabledCheckBox.IsChecked == true;
+    /// <summary>Gets the mobile web remote TCP port.</summary>
+    public int MobileRemotePort => (int)(MobileRemotePortNumericUpDown.Value ?? 49201);
+    /// <summary>Gets the dedicated mobile web remote bearer token, generating one when required.</summary>
+    public string MobileRemoteAccessToken
+    {
+        get
+        {
+            var token = MobileRemoteAccessTokenTextBox.Text?.Trim() ?? string.Empty;
+            if (MobileRemoteEnabled && string.IsNullOrEmpty(token))
+            {
+                token = GenerateMcpAccessToken();
+                MobileRemoteAccessTokenTextBox.Text = token;
             }
             return token;
         }
@@ -1143,6 +1200,10 @@ internal partial class SettingsView : UserControl
     /// <summary>Stops background work and restores the original live equalizer preview when needed.</summary>
     internal void Deactivate()
     {
+        _mobileRemoteClosed = true;
+        MobileRemoteQrImage.Source = null;
+        _mobileRemoteQr?.Dispose();
+        _mobileRemoteQr = null;
         foreach (var cts in _activeScans.Values)
             cts.Cancel();
         _orynivoStatusCts?.Cancel();
@@ -1183,6 +1244,7 @@ internal partial class SettingsView : UserControl
         AppearancePanel.IsVisible              = tag == "Appearance";
         ArtistInfoPanel.IsVisible              = tag == "ArtistInfo";
         McpPanel.IsVisible                     = tag == "Mcp";
+        MobileRemotePanel.IsVisible            = tag == "MobileRemote";
         AiChatPanel.IsVisible                  = tag == "AiChat";
         if (tag == "AiChat" && _aiModelsLoadedForSignature is null &&
             !string.IsNullOrWhiteSpace(AiChatEndpointUrlTextBox.Text))
@@ -2170,6 +2232,8 @@ internal partial class SettingsView : UserControl
                 statusBlock.Text = string.Format(
                     LocalizationManager.Current.ScanCompleted,
                     result.Total, result.Added, result.Updated, result.Removed, failed);
+                if (result.Added > 0 || result.Updated > 0 || result.Removed > 0)
+                    LocalLibraryChanged?.Invoke();
             }
             catch (OperationCanceledException)
             {

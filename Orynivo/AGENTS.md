@@ -52,6 +52,46 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   Library search includes every configured Orynivo Server and returns only
   opaque `orynivo://` references; remote failures must be reported distinctly
   from genuine empty search results without exposing URLs or API keys.
+- The mobile web remote is a separate opt-in LAN endpoint with its own port and
+  generated bearer token; never reuse MCP enablement, permissions, or tokens.
+  Its public page may be loaded without authentication so a user can enter the
+  token, but every `/remote/api` request must authenticate in constant time.
+  Do not browser-cache the embedded HTML across upgrades, reject oversized API
+  request bodies before endpoint binding, and stop automatic reconnect after a
+  401 until the user supplies a new token.
+  Remote state and queue DTOs must omit physical paths, authenticated stream
+  URLs, credentials, and private provider settings. Live updates send compact
+  state changes only and reconnect without reloading the complete library.
+  Current artwork must be decoded off the UI thread, bounded to a 640-pixel
+  JPEG, served only through the authenticated API, and carry private cache
+  validators. Queue selection accepts only a validated zero-based index.
+  Mobile search combines local and configured Orynivo Server tracks away from
+  the UI thread. Results expose only display metadata and opaque local/server
+  identities; resolve those identities inside the desktop immediately before
+  a validated play-now, play-next, or append action.
+  Artist/album browsing must remain provider-bound: expose an opaque provider
+  identity, resolve it internally for the next drill-down, and never return a
+  server address, API key, stream URL, or physical path to the browser.
+  Favourite changes and output selection must reuse the existing MainWindow
+  callbacks. Queue edits must validate indices and pass through the established
+  move/remove/clear persistence, gapless-refresh, and Infinite Mix lifecycle.
+  Settings enumerates active non-loopback IPv4 addresses off the UI thread and
+  generates QR codes locally through QRCoder's portable PNG renderer. QR payloads
+  carry the token only in the URL fragment, never in a query string or persisted
+  image. The browser consumes/removes that fragment on initial load or hash
+  navigation; credentials live only in page memory. Plain-URL visits and reloads
+  require token entry. Settings changes must be saved before using their QR code.
+  The desktop token is JsonIgnored and overlaid from ApplicationCredentialStore;
+  loading a legacy plaintext mobile token migrates it and removes it from settings.
+  The remote document, script, and four-language JSON are embedded resources.
+  Preserve blob artwork in the CSP, native keyboard-accessible controls, bounded
+  artist search, stale-response guards, and separate playback/library/playlist/
+  queue navigation. Shared regular and smart playlists reuse desktop resolution,
+  but background browsing must suppress registration into UI-owned remote-track
+  dictionaries; only playback registers resolved rows on the UI thread.
+  Mobile playlist DTOs omit paths and filter internals. Unresolved entries and
+  standalone imported streams are intentionally omitted; do not expose raw
+  playlist paths or authenticated URLs as an alternative.
 - AI endpoint discovery and testing use `AiEndpointService` and the unsaved
   values currently visible in Settings. Query only the credential-free
   OpenAI-compatible `/models` URL, accept standard and Ollama model-list shapes,
@@ -478,6 +518,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   form the key; library-version, watcher, favorite, and artwork changes advance
   the generation. Independent remote servers load concurrently, and local
   provider database work must not run synchronously on the Avalonia UI thread.
+  A manual local scan launched from Settings must raise
+  `SettingsView.LocalLibraryChanged` after a successful catalog mutation so the
+  same Dashboard, Genre Cloud, and unified-library caches are invalidated as for
+  watcher-driven changes; never require an application restart to see new rows.
 - A cached Genre Cloud level renders immediately and must not retain the
   first-load branch-transition delay.
 - `AppSettings.LastMainView` persists every selectable sidebar leaf tag, not a

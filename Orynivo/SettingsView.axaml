@@ -352,6 +352,15 @@
                     <TextBlock Text="{DynamicResource L_McpServer}" VerticalAlignment="Center"/>
                 </StackPanel>
             </ListBoxItem>
+            <ListBoxItem Tag="MobileRemote"
+                         FontSize="{DynamicResource FontSizeBody}"
+                         Theme="{StaticResource SettingsNavItemTheme}">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Path Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"
+                          Data="M4,5 L20,5 L20,16 L4,16 Z M9,19 L15,19 M12,16 L12,19 M7,8 L17,8"/>
+                    <TextBlock Text="{DynamicResource L_MobileRemote}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </ListBoxItem>
             <ListBoxItem Tag="AiChat"
                          FontSize="{DynamicResource FontSizeBody}"
                          Theme="{StaticResource SettingsNavItemTheme}">
@@ -1222,10 +1231,6 @@
                                TextWrapping="Wrap"
                                Margin="0,0,0,20"/>
 
-                    <Border Height="1"
-                            Background="{DynamicResource AppGridLineBrush}"
-                            Margin="0,0,0,16"/>
-
                     <TextBlock Text="{DynamicResource L_McpToolsHeader}"
                                FontSize="{DynamicResource FontSizeBody}"
                                FontWeight="SemiBold"
@@ -1414,6 +1419,60 @@
                                    FormatString="0"
                                    ClipValueToMinMax="True"
                                    HorizontalAlignment="Stretch"/>
+                </StackPanel>
+
+                <StackPanel x:Name="MobileRemotePanel"
+                            IsVisible="False">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,20" VerticalAlignment="Center">
+                        <TextBlock Text="{DynamicResource L_MobileRemote}"
+                                   FontSize="{DynamicResource FontSizeBodyStrong}"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"/>
+                        <controls:StatusBadge x:Name="MobileRemoteStatusBadge"
+                                              Margin="12,0,0,0"
+                                              VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock Text="{DynamicResource L_MobileRemoteHint}"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,12"/>
+                    <CheckBox x:Name="MobileRemoteEnabledCheckBox"
+                              Content="{DynamicResource L_MobileRemoteEnabled}"
+                              Theme="{StaticResource SettingsToggleTheme}"
+                              Margin="0,0,0,12"/>
+                    <TextBlock Text="{DynamicResource L_MobileRemotePort}"
+                               FontSize="{DynamicResource FontSizeCaption}"
+                               FontWeight="SemiBold" Margin="0,0,0,6"/>
+                    <NumericUpDown x:Name="MobileRemotePortNumericUpDown"
+                                   Height="30" Minimum="1024" Maximum="65535"
+                                   Increment="1" FormatString="0" ClipValueToMinMax="True"
+                                   HorizontalAlignment="Stretch" Margin="0,0,0,12"/>
+                    <TextBlock Text="{DynamicResource L_MobileRemoteToken}"
+                               FontSize="{DynamicResource FontSizeCaption}"
+                               FontWeight="SemiBold" Margin="0,0,0,6"/>
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+                        <TextBox x:Name="MobileRemoteAccessTokenTextBox"
+                                 PasswordChar="●"
+                                 Watermark="{DynamicResource L_McpAccessTokenWatermark}"/>
+                        <Button Grid.Column="1"
+                                Content="{DynamicResource L_McpGenerateToken}"
+                                Click="GenerateMobileRemoteAccessToken_Click"
+                                Margin="8,0,0,0"/>
+                    </Grid>
+                    <TextBlock Text="{DynamicResource L_MobileRemoteNetworkAddress}"
+                               FontSize="{DynamicResource FontSizeCaption}" Margin="0,8,0,6"/>
+                    <ComboBox x:Name="MobileRemoteAddressComboBox" HorizontalAlignment="Stretch" Margin="0,0,0,8"/>
+                    <TextBlock x:Name="MobileRemoteAddressTextBlock"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppAccentBrush}"
+                               TextWrapping="Wrap"/>
+                    <Image x:Name="MobileRemoteQrImage" Width="240" Height="240"
+                           AutomationProperties.Name="{DynamicResource L_MobileRemoteQrHint}"
+                           HorizontalAlignment="Left" Margin="0,16,0,8" Stretch="Uniform"/>
+                    <TextBlock Text="{DynamicResource L_MobileRemoteQrHint}"
+                               FontSize="{DynamicResource FontSizeCaption}" TextWrapping="Wrap"
+                               Foreground="{DynamicResource AppSecondaryTextBrush}"/>
                 </StackPanel>
 
                 <StackPanel x:Name="AiChatPanel"
