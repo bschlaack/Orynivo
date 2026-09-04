@@ -663,8 +663,9 @@ byte-range streaming without FFmpeg.
 - Conservative artist-name normalization for `feat.` credits and unambiguous
   case, accent, spacing, and punctuation variants, with a repair action for
   existing libraries
-- A physical-folder-based metadata review catches albums fragmented by bad tags,
-  missing or duplicate numbering, and inconsistent album artists. It can match
+- A physical-folder-based Library Doctor review catches albums fragmented by
+  bad tags, missing or duplicate numbering, inconsistent album artists,
+  missing track ReplayGain, and missing MusicBrainz recording IDs. It can match
   a folder from Settings > Library > Review metadata against MusicBrainz by
   editable album/artist search terms, title similarity, and all available
   approximate track durations, then apply a

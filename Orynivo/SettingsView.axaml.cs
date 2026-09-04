@@ -38,6 +38,7 @@ internal partial class SettingsView : UserControl
 
     private sealed record MetadataProblemRow(
         string Folder,
+        string Severity,
         string Issues,
         int TrackCount,
         MetadataFolderCandidate Candidate);
@@ -78,6 +79,7 @@ internal partial class SettingsView : UserControl
     private bool _settingsAccepted;
     private bool _plexCredentialsChanged;
     private bool _metadataAnalysisLoaded;
+    private IReadOnlyList<MetadataFolderCandidate> _metadataDoctorCandidates = [];
     private CancellationTokenSource? _missingArtistImagesCts;
     private CancellationTokenSource? _replayGainCalculationCts;
     private CancellationTokenSource? _aiEndpointProbeCts;
@@ -1271,22 +1273,93 @@ internal partial class SettingsView : UserControl
     {
         _metadataAnalysisLoaded = true;
         MetadataStatusTextBlock.Text = LocalizationManager.Current.MetadataSearching;
-        var candidates = await Task.Run(() =>
+        try
         {
-            using var database = AudioDatabase.OpenDefault();
-            return LibraryMetadataRepairService.Analyze(database.GetMetadataRepairTracks());
-        });
+            var candidates = await Task.Run(() =>
+            {
+                using var database = AudioDatabase.OpenDefault();
+                return LibraryMetadataRepairService.Analyze(database.GetMetadataRepairTracks());
+            });
+            _metadataDoctorCandidates = candidates;
+            if (MetadataSeverityFilterComboBox.ItemsSource is null)
+            {
+                var localized = LocalizationManager.Current;
+                MetadataSeverityFilterComboBox.ItemsSource = new[]
+                {
+                    new SettingChoice<LibraryDoctorSeverity?>(null, localized.MetadataSeverityAll),
+                    new SettingChoice<LibraryDoctorSeverity?>(LibraryDoctorSeverity.Error, localized.MetadataSeverityError),
+                    new SettingChoice<LibraryDoctorSeverity?>(LibraryDoctorSeverity.Warning, localized.MetadataSeverityWarning),
+                    new SettingChoice<LibraryDoctorSeverity?>(LibraryDoctorSeverity.Information, localized.MetadataSeverityInformation)
+                };
+                MetadataSeverityFilterComboBox.SelectedIndex = 0;
+            }
+            if (MetadataIssueFilterComboBox.ItemsSource is null)
+            {
+                var localized = LocalizationManager.Current;
+                MetadataIssueFilterComboBox.ItemsSource = new[]
+                {
+                    new SettingChoice<string?>(null, localized.MetadataIssueAll),
+                    new SettingChoice<string?>("album", localized.MetadataIssueAlbums),
+                    new SettingChoice<string?>("album-artist", localized.MetadataIssueArtists),
+                    new SettingChoice<string?>("title", localized.MetadataIssueMissingTitles),
+                    new SettingChoice<string?>("track-number", localized.MetadataIssueMissingNumbers),
+                    new SettingChoice<string?>("duplicate-track-number", localized.MetadataIssueDuplicateNumbers),
+                    new SettingChoice<string?>("replaygain", localized.MetadataIssueReplayGain),
+                    new SettingChoice<string?>("musicbrainz-id", localized.MetadataIssueMusicBrainzIds),
+                    new SettingChoice<string?>("incomplete-album", localized.MetadataIssueIncompleteAlbum)
+                };
+                MetadataIssueFilterComboBox.SelectedIndex = 0;
+            }
+            ApplyMetadataDoctorFilter();
+        }
+        catch (Exception ex)
+        {
+            CrashLogger.Log(ex, "Library Doctor analysis");
+            _metadataDoctorCandidates = [];
+            MetadataProblemsDataGrid.ItemsSource = null;
+            MetadataStatusTextBlock.Text = LocalizationManager.Current.MetadataAnalysisFailed;
+        }
+    }
+
+    private void ApplyMetadataDoctorFilter()
+    {
+        var selected = (MetadataSeverityFilterComboBox.SelectedItem as SettingChoice<LibraryDoctorSeverity?>)?.Value;
+        var issueCode = (MetadataIssueFilterComboBox.SelectedItem as SettingChoice<string?>)?.Value;
+        IEnumerable<MetadataFolderCandidate> filtered = selected.HasValue
+            ? _metadataDoctorCandidates.Where(candidate => candidate.HighestSeverity == selected.Value)
+            : _metadataDoctorCandidates;
+        if (!string.IsNullOrWhiteSpace(issueCode))
+            filtered = filtered.Where(candidate => candidate.Findings.Any(finding => finding.Code == issueCode));
+        var candidates = filtered.ToList();
         MetadataProblemsDataGrid.ItemsSource = candidates
             .Select(candidate => new MetadataProblemRow(
-                candidate.FolderPath,
-                BuildMetadataIssueSummary(candidate),
-                candidate.Tracks.Count,
-                candidate))
-            .ToList();
-        MetadataStatusTextBlock.Text = candidates.Count == 0
-            ? LocalizationManager.Current.NoData
-            : LocalizationManager.FormatEntryCount(candidates.Count);
+                    candidate.FolderPath,
+                    FormatDoctorSeverity(candidate.HighestSeverity),
+                    BuildMetadataIssueSummary(candidate),
+                    candidate.Tracks.Count,
+                    candidate))
+                .ToList();
+            var strings = LocalizationManager.Current;
+            MetadataStatusTextBlock.Text = candidates.Count == 0
+                ? strings.NoData
+                : string.Format(CultureInfo.CurrentCulture, strings.MetadataDoctorSummary,
+                    candidates.Count(candidate => candidate.HighestSeverity == LibraryDoctorSeverity.Error),
+                candidates.Count(candidate => candidate.HighestSeverity == LibraryDoctorSeverity.Warning),
+                candidates.Count(candidate => candidate.HighestSeverity == LibraryDoctorSeverity.Information));
     }
+
+    private void MetadataSeverityFilter_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_metadataAnalysisLoaded)
+            ApplyMetadataDoctorFilter();
+    }
+
+    private static string FormatDoctorSeverity(LibraryDoctorSeverity severity) => severity switch
+    {
+        LibraryDoctorSeverity.Error => LocalizationManager.Current.MetadataSeverityError,
+        LibraryDoctorSeverity.Warning => LocalizationManager.Current.MetadataSeverityWarning,
+        _ => LocalizationManager.Current.MetadataSeverityInformation
+    };
 
     private static string BuildMetadataIssueSummary(MetadataFolderCandidate candidate)
     {
@@ -1302,6 +1375,12 @@ internal partial class SettingsView : UserControl
             issues.Add(strings.MetadataIssueMissingNumbers);
         if (candidate.DuplicateTrackNumbers)
             issues.Add(strings.MetadataIssueDuplicateNumbers);
+        if (candidate.MissingReplayGainCount > 0)
+            issues.Add(string.Format(CultureInfo.CurrentCulture, strings.MetadataIssueMissingReplayGain, candidate.MissingReplayGainCount));
+        if (candidate.MissingMusicBrainzIdCount > 0)
+            issues.Add(string.Format(CultureInfo.CurrentCulture, strings.MetadataIssueMissingMusicBrainzIds, candidate.MissingMusicBrainzIdCount));
+        if (candidate.MissingExpectedTrackCount > 0)
+            issues.Add(string.Format(CultureInfo.CurrentCulture, strings.MetadataIssueIncompleteAlbum, candidate.MissingExpectedTrackCount));
         return string.Join(" · ", issues);
     }
 

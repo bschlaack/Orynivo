@@ -6,6 +6,48 @@ namespace Orynivo.Core.Tests;
 /// <summary>Verifies physical-folder problem detection and persistent library-only corrections.</summary>
 public sealed class LibraryMetadataRepairServiceTests
 {
+    /// <summary>Reports enrichment gaps even when the basic album metadata is internally consistent.</summary>
+    [Fact]
+    public void Analyze_DetectsMissingReplayGainAndMusicBrainzIdentity()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "orynivo-doctor-enrichment");
+        var tracks = new[]
+        {
+            new MetadataRepairTrack(1, Path.Combine(folder, "one.flac"), Path.Combine(folder, "one.flac"),
+                "One", "Artist", "Album", "Artist", 180, 1, 1, null, null),
+            new MetadataRepairTrack(2, Path.Combine(folder, "two.flac"), Path.Combine(folder, "two.flac"),
+                "Two", "Artist", "Album", "Artist", 200, 2, 1, "-7.2 dB", "recording-id")
+        };
+
+        var candidate = Assert.Single(LibraryMetadataRepairService.Analyze(tracks));
+
+        Assert.Equal(1, candidate.MissingReplayGainCount);
+        Assert.Equal(1, candidate.MissingMusicBrainzIdCount);
+        Assert.Equal(LibraryDoctorSeverity.Warning, candidate.HighestSeverity);
+        Assert.Contains(candidate.Findings, finding =>
+            finding.Code == "replaygain" &&
+            finding.RepairCapability == LibraryDoctorRepairCapability.MaintenanceAction);
+    }
+
+    /// <summary>Uses declared per-disc totals to report actual missing positions.</summary>
+    [Fact]
+    public void Analyze_DetectsProvablyIncompleteDisc()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "orynivo-doctor-incomplete");
+        var tracks = new[]
+        {
+            new MetadataRepairTrack(1, Path.Combine(folder, "one.flac"), Path.Combine(folder, "one.flac"),
+                "One", "Artist", "Album", "Artist", 180, 1, 1, "-7 dB", "id-1", 3, 1),
+            new MetadataRepairTrack(2, Path.Combine(folder, "three.flac"), Path.Combine(folder, "three.flac"),
+                "Three", "Artist", "Album", "Artist", 180, 3, 1, "-7 dB", "id-3", 3, 1)
+        };
+
+        var candidate = Assert.Single(LibraryMetadataRepairService.Analyze(tracks));
+
+        Assert.Equal(1, candidate.MissingExpectedTrackCount);
+        Assert.Contains(candidate.Findings, finding => finding.Code == "incomplete-album");
+    }
+
     /// <summary>Detects a folder split by inconsistent album titles and missing track numbers.</summary>
     [Fact]
     public void Analyze_DetectsFragmentedPhysicalAlbum()

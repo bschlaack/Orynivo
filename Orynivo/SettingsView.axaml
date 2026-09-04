@@ -840,6 +840,19 @@
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"
                                Margin="0,0,0,12"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10" Spacing="8">
+                        <TextBlock Text="{DynamicResource L_MetadataSeverity}"
+                                   VerticalAlignment="Center"/>
+                        <ComboBox x:Name="MetadataSeverityFilterComboBox"
+                                  Width="170"
+                                  SelectionChanged="MetadataSeverityFilter_OnSelectionChanged"/>
+                        <TextBlock Text="{DynamicResource L_MetadataIssues}"
+                                   Margin="12,0,0,0"
+                                   VerticalAlignment="Center"/>
+                        <ComboBox x:Name="MetadataIssueFilterComboBox"
+                                  Width="240"
+                                  SelectionChanged="MetadataSeverityFilter_OnSelectionChanged"/>
+                    </StackPanel>
                     <DataGrid x:Name="MetadataProblemsDataGrid"
                               Height="420"
                               AutoGenerateColumns="False"
@@ -853,6 +866,9 @@
                             <DataGridTextColumn Header="{DynamicResource L_MetadataFolder}"
                                                 Binding="{Binding Folder}"
                                                 Width="2*"/>
+                            <DataGridTextColumn Header="{DynamicResource L_MetadataSeverity}"
+                                                Binding="{Binding Severity}"
+                                                Width="110"/>
                             <DataGridTextColumn Header="{DynamicResource L_MetadataIssues}"
                                                 Binding="{Binding Issues}"
                                                 Width="2*"/>

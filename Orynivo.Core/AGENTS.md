@@ -92,6 +92,8 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   scored against available track durations plus title similarity before they
   are offered. Text search must remain usable when local or MusicBrainz
   durations are missing, and fuzzy TOC lookup includes all medium formats.
+  Its Library Doctor analysis also reports missing track ReplayGain and
+  MusicBrainz recording IDs even when basic album metadata is consistent.
 - Remote dashboard totals use `OrynivoServerClient.GetLibrarySummaryAsync` and
   the server's aggregate `/api/library/summary` response; do not replace this
   fast path with complete track or album payloads.

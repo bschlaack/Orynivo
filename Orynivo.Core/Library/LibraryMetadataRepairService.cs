@@ -4,6 +4,39 @@ using System.Text.Json;
 
 namespace Orynivo.Library;
 
+/// <summary>Severity assigned to one Library Doctor finding.</summary>
+public enum LibraryDoctorSeverity
+{
+    /// <summary>Optional enrichment is missing.</summary>
+    Information,
+    /// <summary>Playback remains possible, but library quality is reduced.</summary>
+    Warning,
+    /// <summary>Core album identity or ordering metadata is inconsistent.</summary>
+    Error
+}
+
+/// <summary>Repair path available for a Library Doctor finding.</summary>
+public enum LibraryDoctorRepairCapability
+{
+    /// <summary>No automatic repair action is available.</summary>
+    None,
+    /// <summary>The existing guided metadata-review flow can repair the finding.</summary>
+    GuidedReview,
+    /// <summary>An existing explicit maintenance action can repair the finding.</summary>
+    MaintenanceAction
+}
+
+/// <summary>One typed Library Doctor finding for a physical album folder.</summary>
+/// <param name="Code">Stable machine-readable finding code.</param>
+/// <param name="Severity">Finding severity.</param>
+/// <param name="AffectedTrackCount">Number of affected tracks.</param>
+/// <param name="RepairCapability">Available repair path.</param>
+public sealed record LibraryDoctorFinding(
+    string Code,
+    LibraryDoctorSeverity Severity,
+    int AffectedTrackCount,
+    LibraryDoctorRepairCapability RepairCapability);
+
 /// <summary>A physical folder whose indexed tracks contain potentially inconsistent album metadata.</summary>
 /// <param name="FolderPath">Physical album-candidate folder.</param>
 /// <param name="Tracks">Tracks grouped into the candidate.</param>
@@ -12,6 +45,9 @@ namespace Orynivo.Library;
 /// <param name="MissingTitleCount">Number of tracks without a title.</param>
 /// <param name="MissingTrackNumberCount">Number of tracks without a track number.</param>
 /// <param name="DuplicateTrackNumbers">Whether track numbers are duplicated within a disc.</param>
+/// <param name="MissingReplayGainCount">Number of tracks without track ReplayGain.</param>
+/// <param name="MissingMusicBrainzIdCount">Number of tracks without a MusicBrainz recording identifier.</param>
+/// <param name="MissingExpectedTrackCount">Number of track positions demonstrably missing from declared disc totals.</param>
 public sealed record MetadataFolderCandidate(
     string FolderPath,
     IReadOnlyList<MetadataRepairTrack> Tracks,
@@ -19,15 +55,42 @@ public sealed record MetadataFolderCandidate(
     int AlbumArtistCount,
     int MissingTitleCount,
     int MissingTrackNumberCount,
-    bool DuplicateTrackNumbers)
+    bool DuplicateTrackNumbers,
+    int MissingReplayGainCount = 0,
+    int MissingMusicBrainzIdCount = 0,
+    int MissingExpectedTrackCount = 0)
 {
+    /// <summary>Gets typed findings used by Library Doctor summaries and filters.</summary>
+    public IReadOnlyList<LibraryDoctorFinding> Findings
+    {
+        get
+        {
+            var findings = new List<LibraryDoctorFinding>();
+            Add(AlbumCount != 1, "album", LibraryDoctorSeverity.Error, Tracks.Count, LibraryDoctorRepairCapability.GuidedReview);
+            Add(AlbumArtistCount != 1, "album-artist", LibraryDoctorSeverity.Error, Tracks.Count, LibraryDoctorRepairCapability.GuidedReview);
+            Add(MissingTitleCount > 0, "title", LibraryDoctorSeverity.Error, MissingTitleCount, LibraryDoctorRepairCapability.GuidedReview);
+            Add(MissingTrackNumberCount > 0, "track-number", LibraryDoctorSeverity.Warning, MissingTrackNumberCount, LibraryDoctorRepairCapability.GuidedReview);
+            Add(DuplicateTrackNumbers, "duplicate-track-number", LibraryDoctorSeverity.Error, Tracks.Count, LibraryDoctorRepairCapability.GuidedReview);
+            Add(MissingReplayGainCount > 0, "replaygain", LibraryDoctorSeverity.Warning, MissingReplayGainCount, LibraryDoctorRepairCapability.MaintenanceAction);
+            Add(MissingMusicBrainzIdCount > 0, "musicbrainz-id", LibraryDoctorSeverity.Information, MissingMusicBrainzIdCount, LibraryDoctorRepairCapability.GuidedReview);
+            Add(MissingExpectedTrackCount > 0, "incomplete-album", LibraryDoctorSeverity.Warning, MissingExpectedTrackCount, LibraryDoctorRepairCapability.None);
+            return findings;
+
+            void Add(bool condition, string code, LibraryDoctorSeverity severity, int count, LibraryDoctorRepairCapability capability)
+            {
+                if (condition)
+                    findings.Add(new LibraryDoctorFinding(code, severity, count, capability));
+            }
+        }
+    }
+
+    /// <summary>Gets the highest severity among this folder's findings.</summary>
+    public LibraryDoctorSeverity HighestSeverity => Findings.Count == 0
+        ? LibraryDoctorSeverity.Information
+        : Findings.Max(static finding => finding.Severity);
+
     /// <summary>Gets whether the candidate contains a metadata inconsistency worth reviewing.</summary>
-    public bool HasProblems =>
-        AlbumCount != 1 ||
-        AlbumArtistCount != 1 ||
-        MissingTitleCount > 0 ||
-        MissingTrackNumberCount > 0 ||
-        DuplicateTrackNumbers;
+    public bool HasProblems => Findings.Count > 0;
 }
 
 /// <summary>One MusicBrainz track proposed for a physical local track.</summary>
@@ -99,6 +162,22 @@ public static class LibraryMetadataRepairService
                     .Where(track => track.TrackNumber.HasValue)
                     .GroupBy(track => (Disc: track.DiscNumber ?? 1, Track: track.TrackNumber!.Value))
                     .Any(grouping => grouping.Count() > 1);
+                var missingExpectedTracks = ordered
+                    .GroupBy(track => track.DiscNumber ?? 1)
+                    .Sum(disc =>
+                    {
+                        var declaredTotal = disc.Where(track => track.TrackTotal is > 0)
+                            .Select(track => track.TrackTotal!.Value)
+                            .DefaultIfEmpty(0)
+                            .Max();
+                        if (declaredTotal == 0)
+                            return 0;
+                        var present = disc.Where(track => track.TrackNumber is > 0 && track.TrackNumber <= declaredTotal)
+                            .Select(track => track.TrackNumber!.Value)
+                            .Distinct()
+                            .Count();
+                        return Math.Max(0, declaredTotal - present);
+                    });
                 return new MetadataFolderCandidate(
                     group.Key,
                     ordered,
@@ -106,7 +185,10 @@ public static class LibraryMetadataRepairService
                     albumArtistCount,
                     ordered.Count(track => string.IsNullOrWhiteSpace(track.Title)),
                     ordered.Count(track => !track.TrackNumber.HasValue),
-                    duplicateNumbers);
+                    duplicateNumbers,
+                    ordered.Count(track => string.IsNullOrWhiteSpace(track.ReplayGainTrack)),
+                    ordered.Count(track => string.IsNullOrWhiteSpace(track.MusicBrainzTrackId)),
+                    missingExpectedTracks);
             })
             .Where(candidate => includeHealthy || candidate.HasProblems)
             .OrderBy(candidate => candidate.FolderPath, StringComparer.OrdinalIgnoreCase)

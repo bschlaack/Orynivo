@@ -253,6 +253,10 @@ public sealed record PlayedAlbumIdentity(string Album, string Artist);
 /// <param name="Duration">Duration in seconds.</param>
 /// <param name="TrackNumber">Current track number.</param>
 /// <param name="DiscNumber">Current disc number.</param>
+/// <param name="ReplayGainTrack">Current track ReplayGain value.</param>
+/// <param name="MusicBrainzTrackId">MusicBrainz recording identifier.</param>
+/// <param name="TrackTotal">Declared track total for the disc.</param>
+/// <param name="DiscTotal">Declared total number of discs.</param>
 public sealed record MetadataRepairTrack(
     long Id,
     string Path,
@@ -263,7 +267,11 @@ public sealed record MetadataRepairTrack(
     string? AlbumArtist,
     double? Duration,
     int? TrackNumber,
-    int? DiscNumber);
+    int? DiscNumber,
+    string? ReplayGainTrack = null,
+    string? MusicBrainzTrackId = null,
+    int? TrackTotal = null,
+    int? DiscTotal = null);
 
 /// <summary>Library-only metadata values that survive subsequent media-file scans.</summary>
 /// <param name="Path">Stable library path.</param>
@@ -4809,7 +4817,8 @@ public sealed class AudioDatabase : IDisposable
         using var command = _conn.CreateCommand();
         command.CommandText = """
             SELECT id, path, COALESCE(NULLIF(source_path, ''), path),
-                   title, artist, album, album_artist, duration, track_number, disc_number
+                   title, artist, album, album_artist, duration, track_number, disc_number,
+                   replay_gain_track, musicbrainz_track_id, track_total, disc_total
             FROM tracks
             ORDER BY COALESCE(NULLIF(source_path, ''), path);
             """;
@@ -4827,7 +4836,11 @@ public sealed class AudioDatabase : IDisposable
                 reader.IsDBNull(6) ? null : reader.GetString(6),
                 reader.IsDBNull(7) ? null : reader.GetDouble(7),
                 reader.IsDBNull(8) ? null : reader.GetInt32(8),
-                reader.IsDBNull(9) ? null : reader.GetInt32(9)));
+                reader.IsDBNull(9) ? null : reader.GetInt32(9),
+                reader.IsDBNull(10) ? null : reader.GetString(10),
+                reader.IsDBNull(11) ? null : reader.GetString(11),
+                reader.IsDBNull(12) ? null : reader.GetInt32(12),
+                reader.IsDBNull(13) ? null : reader.GetInt32(13)));
         }
         return result;
     }

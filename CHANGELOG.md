@@ -4,6 +4,23 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Extended metadata review toward the Library Doctor by detecting and showing
+  missing per-track ReplayGain values and MusicBrainz recording identifiers in
+  otherwise consistent physical album folders. Findings now have typed
+  severities and repair capabilities, and the review shows folder priority plus
+  aggregate error, warning, and information counts. Declared per-disc track
+  totals now identify demonstrably incomplete albums without guessing when
+  total metadata is absent.
+### Fixed
+
+- Fixed a Library Doctor database-column typo that closed Orynivo when metadata
+  analysis was refreshed. Analysis failures are now logged and shown in the
+  Settings view instead of escaping from the asynchronous UI event handler.
+
 ## [0.37.4] - 2026-09-04
 
 ### Added
