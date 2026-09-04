@@ -4,7 +4,7 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.38.0] - 2026-09-04
 
 ### Added
 
@@ -34,6 +34,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   different tags, encodes, or editions without loading media into memory.
   Conservatively matched artist-name spelling
   variants are now included as guided-review findings without automatic merges.
+
 ### Fixed
 
 - Fixed a Library Doctor database-column typo that closed Orynivo when metadata
