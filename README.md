@@ -665,11 +665,13 @@ byte-range streaming without FFmpeg.
   existing libraries
 - A physical-folder-based Library Doctor review catches albums fragmented by
   bad tags, missing or duplicate numbering, inconsistent album artists,
-  missing track ReplayGain, and missing MusicBrainz recording IDs. It can match
+  missing cover or artist artwork, missing/unreadable source files, missing track
+  ReplayGain, and missing MusicBrainz recording IDs. It can match
   a folder from Settings > Library > Review metadata against MusicBrainz by
   editable album/artist search terms, title similarity, and all available
   approximate track durations, then apply a
   confirmed release as persistent library-only metadata without rewriting files.
+  Explicit analysis runs outside the UI thread and can be cancelled.
 - Live A-Z/# quick navigation beside alphabetically sorted artist, album, and
   track lists
 - Artist and album views with table and virtualized artwork modes, including

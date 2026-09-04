@@ -565,6 +565,14 @@ public sealed record LocalizedStrings(
     public string MetadataIssueMusicBrainzIds { get; init; } = "";
     /// <summary>Gets the formatted finding label for demonstrably incomplete albums.</summary>
     public string MetadataIssueIncompleteAlbum { get; init; } = "";
+    /// <summary>Gets the missing album-artwork finding label.</summary>
+    public string MetadataIssueAlbumArtwork { get; init; } = "";
+    /// <summary>Gets the missing artist-image finding label.</summary>
+    public string MetadataIssueArtistImage { get; init; } = "";
+    /// <summary>Gets the formatted missing-source-file finding label.</summary>
+    public string MetadataIssueMissingFiles { get; init; } = "";
+    /// <summary>Gets the formatted unreadable-source-file finding label.</summary>
+    public string MetadataIssueUnreadableFiles { get; init; } = "";
     /// <summary>Gets the informational finding label.</summary>
     public string MetadataSeverityInformation { get; init; } = "";
     /// <summary>Gets the warning finding label.</summary>
@@ -575,6 +583,8 @@ public sealed record LocalizedStrings(
     public string MetadataDoctorSummary { get; init; } = "";
     /// <summary>Gets the message shown when Library Doctor analysis fails.</summary>
     public string MetadataAnalysisFailed { get; init; } = "";
+    /// <summary>Gets the message shown after Library Doctor analysis is cancelled.</summary>
+    public string MetadataAnalysisCancelled { get; init; } = "";
     public string Calendar { get; init; } = "";
     public string TopGenres { get; init; } = "";
     /// <summary>Gets the dashboard "most listened albums" section title.</summary>

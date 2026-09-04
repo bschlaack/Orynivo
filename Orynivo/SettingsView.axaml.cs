@@ -80,6 +80,7 @@ internal partial class SettingsView : UserControl
     private bool _plexCredentialsChanged;
     private bool _metadataAnalysisLoaded;
     private IReadOnlyList<MetadataFolderCandidate> _metadataDoctorCandidates = [];
+    private CancellationTokenSource? _metadataAnalysisCts;
     private CancellationTokenSource? _missingArtistImagesCts;
     private CancellationTokenSource? _replayGainCalculationCts;
     private CancellationTokenSource? _aiEndpointProbeCts;
@@ -1271,15 +1272,22 @@ internal partial class SettingsView : UserControl
 
     private async Task LoadMetadataProblemsAsync()
     {
+        _metadataAnalysisCts?.Cancel();
+        _metadataAnalysisCts?.Dispose();
+        _metadataAnalysisCts = new CancellationTokenSource();
+        var cancellationToken = _metadataAnalysisCts.Token;
         _metadataAnalysisLoaded = true;
         MetadataStatusTextBlock.Text = LocalizationManager.Current.MetadataSearching;
+        RefreshMetadataAnalysisButton.IsEnabled = false;
+        CancelMetadataAnalysisButton.IsEnabled = true;
         try
         {
             var candidates = await Task.Run(() =>
             {
                 using var database = AudioDatabase.OpenDefault();
-                return LibraryMetadataRepairService.Analyze(database.GetMetadataRepairTracks());
-            });
+                return LibraryMetadataRepairService.Analyze(
+                    database.GetMetadataRepairTracks(), cancellationToken: cancellationToken);
+            }, cancellationToken);
             _metadataDoctorCandidates = candidates;
             if (MetadataSeverityFilterComboBox.ItemsSource is null)
             {
@@ -1306,11 +1314,19 @@ internal partial class SettingsView : UserControl
                     new SettingChoice<string?>("duplicate-track-number", localized.MetadataIssueDuplicateNumbers),
                     new SettingChoice<string?>("replaygain", localized.MetadataIssueReplayGain),
                     new SettingChoice<string?>("musicbrainz-id", localized.MetadataIssueMusicBrainzIds),
-                    new SettingChoice<string?>("incomplete-album", localized.MetadataIssueIncompleteAlbum)
+                    new SettingChoice<string?>("incomplete-album", localized.MetadataIssueIncompleteAlbum),
+                    new SettingChoice<string?>("album-artwork", localized.MetadataIssueAlbumArtwork),
+                    new SettingChoice<string?>("artist-image", localized.MetadataIssueArtistImage),
+                    new SettingChoice<string?>("missing-file", localized.MetadataIssueMissingFiles),
+                    new SettingChoice<string?>("unreadable-file", localized.MetadataIssueUnreadableFiles)
                 };
                 MetadataIssueFilterComboBox.SelectedIndex = 0;
             }
             ApplyMetadataDoctorFilter();
+        }
+        catch (OperationCanceledException)
+        {
+            MetadataStatusTextBlock.Text = LocalizationManager.Current.MetadataAnalysisCancelled;
         }
         catch (Exception ex)
         {
@@ -1318,6 +1334,14 @@ internal partial class SettingsView : UserControl
             _metadataDoctorCandidates = [];
             MetadataProblemsDataGrid.ItemsSource = null;
             MetadataStatusTextBlock.Text = LocalizationManager.Current.MetadataAnalysisFailed;
+        }
+        finally
+        {
+            if (_metadataAnalysisCts?.Token == cancellationToken)
+            {
+                RefreshMetadataAnalysisButton.IsEnabled = true;
+                CancelMetadataAnalysisButton.IsEnabled = false;
+            }
         }
     }
 
@@ -1381,6 +1405,14 @@ internal partial class SettingsView : UserControl
             issues.Add(string.Format(CultureInfo.CurrentCulture, strings.MetadataIssueMissingMusicBrainzIds, candidate.MissingMusicBrainzIdCount));
         if (candidate.MissingExpectedTrackCount > 0)
             issues.Add(string.Format(CultureInfo.CurrentCulture, strings.MetadataIssueIncompleteAlbum, candidate.MissingExpectedTrackCount));
+        if (candidate.MissingAlbumArtwork)
+            issues.Add(strings.MetadataIssueAlbumArtwork);
+        if (candidate.MissingArtistImage)
+            issues.Add(strings.MetadataIssueArtistImage);
+        if (candidate.MissingSourceFileCount > 0)
+            issues.Add(string.Format(CultureInfo.CurrentCulture, strings.MetadataIssueMissingFiles, candidate.MissingSourceFileCount));
+        if (candidate.UnreadableSourceFileCount > 0)
+            issues.Add(string.Format(CultureInfo.CurrentCulture, strings.MetadataIssueUnreadableFiles, candidate.UnreadableSourceFileCount));
         return string.Join(" · ", issues);
     }
 
@@ -1416,6 +1448,9 @@ internal partial class SettingsView : UserControl
         _metadataAnalysisLoaded = false;
         await LoadMetadataProblemsAsync();
     }
+
+    private void CancelMetadataAnalysisButton_OnClick(object? sender, RoutedEventArgs e) =>
+        _metadataAnalysisCts?.Cancel();
 
     private void ArtistInfoSourceComboBox_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {

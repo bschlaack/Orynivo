@@ -8,13 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Added explicit cancellation and duplicate-start protection to Library Doctor
+  analysis; cancellation is checked between folders and physical source files.
 - Extended metadata review toward the Library Doctor by detecting and showing
   missing per-track ReplayGain values and MusicBrainz recording identifiers in
   otherwise consistent physical album folders. Findings now have typed
   severities and repair capabilities, and the review shows folder priority plus
   aggregate error, warning, and information counts. Declared per-disc track
   totals now identify demonstrably incomplete albums without guessing when
-  total metadata is absent.
+  total metadata is absent, and missing cached album artwork is reported
+  without reopening every audio file. Missing and stale album-artist image
+  paths are reported alongside cover findings. Missing and unreadable physical
+  sources are reported separately, with shared virtual-track sources checked
+  only once per folder.
 ### Fixed
 
 - Fixed a Library Doctor database-column typo that closed Orynivo when metadata

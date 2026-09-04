@@ -879,10 +879,19 @@
                     </DataGrid>
                     <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
                         <Button Width="180"
+                                x:Name="RefreshMetadataAnalysisButton"
                                 Height="30"
                                 Theme="{StaticResource SettingsButtonTheme}"
                                 Content="{DynamicResource L_MetadataRefreshAnalysis}"
                                 Click="RefreshMetadataAnalysisButton_OnClick"/>
+                        <Button x:Name="CancelMetadataAnalysisButton"
+                                Width="120"
+                                Height="30"
+                                Margin="8,0,0,0"
+                                IsEnabled="False"
+                                Theme="{StaticResource SettingsButtonTheme}"
+                                Content="{DynamicResource L_Cancel}"
+                                Click="CancelMetadataAnalysisButton_OnClick"/>
                         <Button x:Name="OpenMetadataRepairButton"
                                 Width="220"
                                 Height="30"
