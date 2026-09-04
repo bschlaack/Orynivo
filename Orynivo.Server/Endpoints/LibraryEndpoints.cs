@@ -46,6 +46,26 @@ public static class LibraryEndpoints
                     finding.RepairCapability)).ToList())).ToList());
         });
 
+        api.MapGet("/tracks/similarity-features", (int? page, int? pageSize) =>
+        {
+            var safePage = Math.Max(0, page ?? 0);
+            var safePageSize = Math.Clamp(pageSize ?? 500, 1, 2000);
+            using var db = AudioDatabase.OpenDefault();
+            var vectors = db.GetSimilarityTrackProfiles(
+                    "server",
+                    safePage * safePageSize,
+                    safePageSize)
+                .Select(SimilarityFeatureService.Create)
+                .ToList();
+            return Results.Ok(vectors);
+        });
+
+        api.MapPost("/tracks/audio-features/analyze", (int? limit, LibraryService libraryService) =>
+            libraryService.TriggerAudioFeatureAnalysis(
+                Math.Clamp(limit ?? 4, 1, 10))
+                ? Results.Accepted()
+                : Results.Conflict());
+
         // --- Artists -------------------------------------------------------
 
         api.MapGet("/artists", () =>

@@ -502,6 +502,18 @@ public sealed record LocalizedStrings(
     public string RecommendationMoodMelancholic { get; init; } = "";
     /// <summary>Gets the message shown when listening history yields no matching recommendations.</summary>
     public string RecommendationNoMatches { get; init; } = "";
+    /// <summary>Gets the command label for starting playback from similar tracks.</summary>
+    public string PlayMoreLikeThis { get; init; } = "";
+    /// <summary>Gets the submenu label for starting a mood-ranked mix.</summary>
+    public string PlayMoodMix { get; init; } = "";
+    /// <summary>Gets the status shown while similarity vectors are loaded.</summary>
+    public string SimilarTracksLoading { get; init; } = "";
+    /// <summary>Gets the status shown when similarity data is unavailable.</summary>
+    public string SimilarTracksUnavailable { get; init; } = "";
+    /// <summary>Gets the status shown when no similar candidates were found.</summary>
+    public string SimilarTracksNoMatches { get; init; } = "";
+    /// <summary>Gets the formatted status after similar tracks were queued.</summary>
+    public string SimilarTracksQueued { get; init; } = "";
     /// <summary>Gets the recommendation view-mode label for the horizontal list.</summary>
     public string RecommendationListView { get; init; } = "";
     /// <summary>Gets the recommendation view-mode label for the cover stage.</summary>

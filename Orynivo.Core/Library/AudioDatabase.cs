@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
+using Orynivo.Audio;
 
 namespace Orynivo.Library;
 
@@ -3081,6 +3082,15 @@ public sealed class AudioDatabase : IDisposable
                 musicbrainz_release_id TEXT,
                 musicbrainz_artist_id TEXT
             );
+
+            CREATE TABLE IF NOT EXISTS track_audio_features (
+                track_id INTEGER PRIMARY KEY REFERENCES tracks(id) ON DELETE CASCADE,
+                version INTEGER NOT NULL,
+                energy REAL,
+                brightness REAL,
+                dynamics REAL,
+                analyzed_at INTEGER NOT NULL
+            );
             """);
         }
 
@@ -5056,6 +5066,150 @@ public sealed class AudioDatabase : IDisposable
                 reader.GetInt64(7) != 0));
         }
         return result;
+    }
+
+    /// <summary>Returns compact local profiles for provider-neutral similarity vectors.</summary>
+    /// <param name="sourceKey">Credential-free source identity attached to each profile.</param>
+    /// <param name="offset">Non-negative row offset.</param>
+    /// <param name="limit">Bounded maximum row count.</param>
+    /// <returns>Indexed tracks with classification, rating, and aggregated history signals.</returns>
+    public List<SimilarityTrackProfile> GetSimilarityTrackProfiles(
+        string sourceKey = "local",
+        int offset = 0,
+        int limit = int.MaxValue)
+    {
+        offset = Math.Max(0, offset);
+        limit = Math.Clamp(limit, 1, int.MaxValue);
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT t.id, t.album_id, t.artist, t.genre, t.bpm, t.mood,
+                   t.is_favorite, t.user_rating, t.musicbrainz_rating,
+                   t.musicbrainz_rating_votes, t.musicbrainz_genres,
+                   t.musicbrainz_tags, COALESCE(ph.play_count, 0), ph.last_played_at,
+                   af.energy, af.brightness, af.dynamics
+            FROM tracks t
+            LEFT JOIN (
+                SELECT track_id, COUNT(*) AS play_count, MAX(started_at) AS last_played_at
+                FROM play_history
+                WHERE media_type = 'track' AND track_id IS NOT NULL
+                  AND position_seconds > 0
+                GROUP BY track_id
+            ) ph ON ph.track_id = t.id
+            LEFT JOIN track_audio_features af ON af.track_id = t.id AND af.version = $audioFeatureVersion
+            ORDER BY t.id
+            LIMIT $limit OFFSET $offset;
+            """;
+        cmd.Parameters.AddWithValue("$limit", limit);
+        cmd.Parameters.AddWithValue("$offset", offset);
+        cmd.Parameters.AddWithValue("$audioFeatureVersion", AudioFeatureAnalysisService.CurrentVersion);
+        using var reader = cmd.ExecuteReader();
+        var result = new List<SimilarityTrackProfile>();
+        while (reader.Read())
+        {
+            result.Add(new SimilarityTrackProfile(
+                reader.GetInt64(0),
+                sourceKey,
+                reader.IsDBNull(1) ? null : reader.GetInt64(1),
+                reader.IsDBNull(2) ? null : reader.GetString(2),
+                MusicBrainzGenreMetadata.Combine(
+                    reader.IsDBNull(3) ? null : reader.GetString(3),
+                    reader.IsDBNull(10) ? null : reader.GetString(10),
+                    reader.IsDBNull(11) ? null : reader.GetString(11)),
+                reader.IsDBNull(4) ? null : reader.GetInt32(4),
+                reader.IsDBNull(5) ? null : reader.GetString(5),
+                reader.GetInt32(6) != 0,
+                reader.GetInt32(7),
+                reader.IsDBNull(8) ? null : reader.GetDouble(8),
+                reader.IsDBNull(9) ? null : reader.GetInt32(9),
+                reader.GetInt32(12),
+                reader.IsDBNull(13) ? null : reader.GetInt64(13),
+                reader.IsDBNull(14) ? null : reader.GetDouble(14),
+                reader.IsDBNull(15) ? null : reader.GetDouble(15),
+                reader.IsDBNull(16) ? null : reader.GetDouble(16)));
+        }
+        return result;
+    }
+
+    /// <summary>Returns a bounded stable batch whose current acoustic descriptor is missing.</summary>
+    /// <param name="limit">Maximum number of candidates.</param>
+    /// <returns>Physical provider-local sources ordered by track identifier.</returns>
+    public List<AudioFeatureAnalysisCandidate> GetTracksMissingAudioFeatures(int limit = 20)
+    {
+        limit = Math.Clamp(limit, 1, 500);
+        using var command = _conn.CreateCommand();
+        command.CommandText = """
+            SELECT t.id, COALESCE(NULLIF(t.source_path, ''), t.path),
+                   t.segment_start, t.segment_end
+            FROM tracks t
+            LEFT JOIN track_audio_features af ON af.track_id = t.id AND af.version = $version
+            WHERE (af.track_id IS NULL OR af.version <> $version OR
+                   (af.energy IS NULL AND af.analyzed_at < $retryBefore))
+              AND COALESCE(NULLIF(t.source_path, ''), t.path) NOT LIKE 'http://%'
+              AND COALESCE(NULLIF(t.source_path, ''), t.path) NOT LIKE 'https://%'
+            ORDER BY t.id
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$version", AudioFeatureAnalysisService.CurrentVersion);
+        command.Parameters.AddWithValue("$retryBefore", DateTimeOffset.UtcNow.AddDays(-7).ToUnixTimeSeconds());
+        command.Parameters.AddWithValue("$limit", limit);
+        using var reader = command.ExecuteReader();
+        var result = new List<AudioFeatureAnalysisCandidate>();
+        while (reader.Read())
+        {
+            result.Add(new AudioFeatureAnalysisCandidate(
+                reader.GetInt64(0),
+                reader.GetString(1),
+                reader.IsDBNull(2) ? null : TimeSpan.FromSeconds(reader.GetDouble(2)),
+                reader.IsDBNull(3) ? null : TimeSpan.FromSeconds(reader.GetDouble(3))));
+        }
+        return result;
+    }
+
+    /// <summary>Stores one current acoustic descriptor without modifying source media.</summary>
+    /// <param name="trackId">Provider-local track identifier.</param>
+    /// <param name="descriptor">Versioned normalized descriptor.</param>
+    public void SetTrackAudioFeatures(long trackId, AudioFeatureDescriptor descriptor)
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+        using var command = _conn.CreateCommand();
+        command.CommandText = """
+            INSERT INTO track_audio_features(track_id, version, energy, brightness, dynamics, analyzed_at)
+            VALUES ($trackId, $version, $energy, $brightness, $dynamics, $analyzedAt)
+            ON CONFLICT(track_id) DO UPDATE SET
+                version = excluded.version,
+                energy = excluded.energy,
+                brightness = excluded.brightness,
+                dynamics = excluded.dynamics,
+                analyzed_at = excluded.analyzed_at;
+            """;
+        command.Parameters.AddWithValue("$trackId", trackId);
+        command.Parameters.AddWithValue("$version", descriptor.Version);
+        command.Parameters.AddWithValue("$energy", Math.Clamp(descriptor.Energy, 0d, 1d));
+        command.Parameters.AddWithValue("$brightness", Math.Clamp(descriptor.Brightness, 0d, 1d));
+        command.Parameters.AddWithValue("$dynamics", Math.Clamp(descriptor.Dynamics, 0d, 1d));
+        command.Parameters.AddWithValue("$analyzedAt", descriptor.AnalyzedAt);
+        command.ExecuteNonQuery();
+    }
+
+    /// <summary>Records an unsuccessful descriptor attempt to prevent a tight retry loop.</summary>
+    /// <param name="trackId">Provider-local track identifier.</param>
+    public void SetTrackAudioFeatureFailure(long trackId)
+    {
+        using var command = _conn.CreateCommand();
+        command.CommandText = """
+            INSERT INTO track_audio_features(track_id, version, energy, brightness, dynamics, analyzed_at)
+            VALUES ($trackId, $version, NULL, NULL, NULL, $analyzedAt)
+            ON CONFLICT(track_id) DO UPDATE SET
+                version = excluded.version,
+                energy = NULL,
+                brightness = NULL,
+                dynamics = NULL,
+                analyzed_at = excluded.analyzed_at;
+            """;
+        command.Parameters.AddWithValue("$trackId", trackId);
+        command.Parameters.AddWithValue("$version", AudioFeatureAnalysisService.CurrentVersion);
+        command.Parameters.AddWithValue("$analyzedAt", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        command.ExecuteNonQuery();
     }
 
     /// <summary>Returns distinct album/artist identities heard within an optional period.</summary>

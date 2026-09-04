@@ -60,6 +60,7 @@ public partial class MainWindow
         Interlocked.Increment(ref _unifiedLibraryCatalogGeneration);
         lock (_unifiedLibraryViewCacheSync)
             _unifiedLibraryViewCache.Clear();
+        InvalidateSimilarityFeatureCache();
     }
 
     /// <summary>Determines whether the current view state is safe to reuse as an unfiltered snapshot.</summary>

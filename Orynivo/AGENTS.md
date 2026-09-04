@@ -395,6 +395,17 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   context together with its display metadata. Otherwise the shared source
   column mislabels that queue row as local. Keep this context memory-only and
   never persist its authenticated playback URL or API key.
+- The single-track **Play more like this** action may combine local and Orynivo
+  Server similarity vectors, but it must load them asynchronously, resolve each
+  provider-local result through its owning catalog, and keep server URLs and
+  credentials out of feature vectors and persisted identities. Its transient
+  ranked candidates refill through the normal Infinite Mix threshold; stopping
+  or starting a regular mix must clear that transient profile. Quick mood mixes
+  use the same transient continuation path and must begin with the track whose
+  context menu launched the action.
+  Compact vectors use one coalesced five-minute memory cache; unified catalog
+  invalidation must also invalidate this cache, and diagnostics may log only
+  aggregate vector counts and elapsed time, never library metadata.
 - Infinite Mix (`MainWindow.InfiniteMix.cs`) uses the persisted
   `AppSettings.InfiniteMix` profile: calm/balanced/energetic mood,
   familiar-to-adventurous discovery, 3/7/30/90-day history, local and selected

@@ -117,6 +117,27 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   tables per track caused Dashboard load time to grow with the complete library.
   Preserve the covering `(album_id, added_at DESC)` index used by the recent
   album aggregation.
+- `SimilarityFeatureService` owns the versioned provider-neutral track feature
+  contract. Version two uses effective genre, BPM, explicit mood, favourite,
+  personal/community rating, listening history, and optional cached acoustic
+  descriptors. Preserve deterministic normalization and credential-free source
+  keys; future descriptor changes must extend the schema explicitly.
+  `RankSimilar` is deterministic, accepts mixed credential-free provider keys,
+  rejects vectors from another schema version, and retains artist/album
+  diversity limits; UI consumers must resolve returned provider-local IDs
+  through their owning catalog.
+  `RankMood` provides deterministic calm, balanced, and energetic ordering from
+  explicit mood tags, normalized BPM, preferences, community confidence, and
+  familiarity, with the same provider-aware diversity constraints.
+  Server vectors are paged by stable track ID order, and the desktop client
+  must replace the server's placeholder source with `orynivo:{server.Id}`;
+  never place a server URL or credential in `SourceKey`.
+- Optional acoustic descriptors live in the provider-local
+  `track_audio_features` table and survive metadata scans. Version changes must
+  trigger bounded reanalysis. `AudioFeatureAnalysisService` decodes at most 90
+  seconds as 8-kHz mono, restricts FFmpeg to one thread and best-effort reduced
+  priority, and produces only normalized energy, brightness, and dynamics.
+  Maintenance is sequential and failed sources have a seven-day retry cooldown.
 - `GenreCloudService` owns the stable hierarchical genre taxonomy, tag
   normalization, count aggregation, breadcrumbs, and bounded provider-local
   candidate selection. Candidate offsets rotate and wrap the stable order for
