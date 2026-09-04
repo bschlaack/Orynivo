@@ -4,6 +4,17 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Extended the shared MCP and AI Chat library search with optional track/album/
+  artist selection, inclusive release-year ranges, exact library-added date
+  ranges, and relevance, title, year, or addition-date ordering across the
+  local library and updated Orynivo Servers.
+
+### Fixed
+
 ## [0.37.3] - 2026-09-02
 
 ### Added

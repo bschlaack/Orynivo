@@ -322,61 +322,96 @@ public sealed class McpTools(McpPlayerBridge bridge)
     // Library search
     // ------------------------------------------------------------------
 
-    /// <summary>Searches the local music library and returns matching tracks, albums, and artists.</summary>
-    /// <param name="query">Free-text search query.</param>
+    /// <summary>Searches the local and remote music libraries with optional temporal and year filters.</summary>
+    /// <param name="query">Optional free-text search query.</param>
+    /// <param name="resultType">Requested result category.</param>
+    /// <param name="yearFrom">Inclusive minimum release year.</param>
+    /// <param name="yearTo">Inclusive maximum release year.</param>
+    /// <param name="addedFrom">Inclusive library-added date in ISO format.</param>
+    /// <param name="addedTo">Inclusive library-added date in ISO format.</param>
+    /// <param name="sort">Requested result ordering.</param>
     /// <param name="limit">Maximum number of results per category.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>A formatted Markdown list of matching tracks, albums, and artists.</returns>
     [McpServerTool(Name = "search_library", ReadOnly = true, Idempotent = true)]
-    [Description("Searches the music library for tracks, albums, and artists across the local library and every configured remote Orynivo Server. Local tracks return a file path; remote tracks return an orynivo:// reference. Both can be passed directly to the play and queue tools.")]
+    [Description("Searches or browses tracks, albums, and artists across the local library and every configured Orynivo Server. Supports release-year ranges, exact library-added date ranges, newest additions, and category selection. Album/track year is release metadata, not a distinct composition-year field. Local paths and remote orynivo:// references can be passed to playback tools.")]
     public async Task<string> SearchLibraryAsync(
-        [Description("Free-text search query, e.g. an artist name, album title, or track title.")] string query,
+        [Description("Optional free-text query such as an artist, album, or track title. May be empty when filters or sorting are supplied.")] string query = "",
+        [Description("Result category: all, tracks, albums, or artists. Default all.")] string resultType = "all",
+        [Description("Inclusive minimum release year, e.g. 1998. Omit when unrestricted.")] int? yearFrom = null,
+        [Description("Inclusive maximum release year, e.g. 1998. Omit when unrestricted.")] int? yearTo = null,
+        [Description("Inclusive library-added date in YYYY-MM-DD or ISO-8601 form. Omit when unrestricted.")] string? addedFrom = null,
+        [Description("Inclusive library-added date in YYYY-MM-DD or ISO-8601 form. Omit when unrestricted.")] string? addedTo = null,
+        [Description("Ordering: relevance, added_desc, added_asc, year_desc, year_asc, or title. Use added_desc for newly added items.")] string sort = "relevance",
         [Description("Maximum number of results per category (1–50, default 10).")] int limit = 10,
         CancellationToken ct = default)
     {
         if (!bridge.IsToolEnabled("search_library")) return "Tool is disabled.";
-        if (string.IsNullOrWhiteSpace(query))
-            return "Provide a search query.";
+        if (!TryParseDateBoundary(addedFrom, inclusiveEnd: false, out var addedFromUnix) ||
+            !TryParseDateBoundary(addedTo, inclusiveEnd: true, out var addedBeforeUnix))
+            return "Use YYYY-MM-DD or ISO-8601 for addedFrom and addedTo.";
+        if (yearFrom.HasValue && yearTo.HasValue && yearFrom > yearTo)
+            return "yearFrom must not be later than yearTo.";
+        if (addedFromUnix.HasValue && addedBeforeUnix.HasValue && addedFromUnix >= addedBeforeUnix)
+            return "addedFrom must not be later than addedTo.";
+
+        var normalizedType = NormalizeResultType(resultType);
+        var sortOrder = ParseSearchSort(sort, string.IsNullOrWhiteSpace(query));
+        var hasStructuredRequest = yearFrom.HasValue || yearTo.HasValue || addedFromUnix.HasValue ||
+                                   addedBeforeUnix.HasValue || sortOrder != LibrarySearchSortOrder.Relevance;
+        if (string.IsNullOrWhiteSpace(query) && !hasStructuredRequest)
+            return "Provide a search query, date/year filter, or sort order.";
         limit = Math.Clamp(limit, 1, 50);
 
-        var ids = await Task.Run(() => TrackSearchIndex.SearchByCategory(query, limit * 3), ct);
+        var ids = string.IsNullOrWhiteSpace(query)
+            ? null
+            : await Task.Run(() => TrackSearchIndex.SearchByCategory(query, 5000), ct);
         var sb = new System.Text.StringBuilder();
 
         using (var db = AudioDatabase.OpenDefault())
         {
             var localSection = new System.Text.StringBuilder();
-            if (ids.Tracks.Ids.Count > 0)
+            var allCandidates = await Task.Run(db.GetSmartPlaylistTracks, ct);
+            var options = new LibrarySearchFilterOptions(yearFrom, yearTo, addedFromUnix, addedBeforeUnix, sortOrder);
+            var trackCandidates = FilterSearchCandidates(allCandidates, ids?.Tracks.Ids, options);
+            var albumCandidates = FilterSearchCandidates(allCandidates, ids?.Albums.Ids, options);
+
+            if (normalizedType is "all" or "tracks" && trackCandidates.Count > 0)
             {
-                var trackIds = ids.Tracks.Ids.Take(limit).ToList();
+                var trackIds = trackCandidates.Take(limit).Select(static track => track.Id).ToList();
                 var tracks = await Task.Run(() => db.GetTrackListByIds(trackIds), ct);
                 if (tracks.Count > 0)
                 {
                     localSection.AppendLine("## Tracks");
                     foreach (var t in tracks)
                         localSection.AppendLine(CultureInfo.InvariantCulture,
-                            $"- {t.Title ?? t.FileName}  —  {t.Artist ?? "?"}  ({t.Path})");
+                            $"- {t.Title ?? t.FileName}  —  {t.Artist ?? "?"}  —  year {FormatYear(t.Year)}  —  added {FormatAddedAt(t.AddedAt)}  ({t.Path})");
                 }
             }
 
-            if (ids.Albums.Ids.Count > 0)
+            if (normalizedType is "all" or "albums" && albumCandidates.Count > 0)
             {
-                var albums = await Task.Run(() => db.GetAlbumsLite(includeArtwork: false), ct);
-                var albumIdSet = ids.Albums.Ids.Take(limit).ToHashSet();
-                var matched = albums.Where(a => albumIdSet.Contains(a.Id)).Take(limit).ToList();
+                var albumSeedTracks = SelectAlbumSeedTracks(albumCandidates, limit);
+                var albums = await Task.Run(
+                    () => db.GetAlbumsByTrackIds(albumSeedTracks.Select(static track => track.Id)), ct);
+                var matched = OrderAlbums(albums, albumSeedTracks, sortOrder).Take(limit).ToList();
                 if (matched.Count > 0)
                 {
                     localSection.AppendLine("## Albums");
                     foreach (var a in matched)
                         localSection.AppendLine(CultureInfo.InvariantCulture,
-                            $"- {a.Album}  —  {a.DisplayArtist ?? "?"}");
+                            $"- {a.Album}  —  {a.DisplayArtist ?? "?"}  —  year {FormatYear(a.Year)}  —  added {FormatAddedAt(a.AddedAt)}");
                 }
             }
 
-            if (ids.Artists.Ids.Count > 0)
+            if (normalizedType is "all" or "artists")
             {
-                var artists = await Task.Run(() => db.GetArtistsLite(), ct);
-                var artistIdSet = ids.Artists.Ids.Take(limit).ToHashSet();
-                var matched = artists.Where(a => artistIdSet.Contains(a.Id)).Take(limit).ToList();
+                var hasTemporalFilter = yearFrom.HasValue || yearTo.HasValue ||
+                                        addedFromUnix.HasValue || addedBeforeUnix.HasValue;
+                var artistTrackIds = ids is null || hasTemporalFilter
+                    ? trackCandidates.Take(limit * 10).Select(static track => track.Id)
+                    : ids.Artists.Ids.Concat(ids.AlbumArtists.Ids).Take(400);
+                var matched = (await Task.Run(() => db.GetArtistsByTrackIds(artistTrackIds), ct)).Take(limit).ToList();
                 if (matched.Count > 0)
                 {
                     localSection.AppendLine("## Artists");
@@ -392,7 +427,8 @@ public sealed class McpTools(McpPlayerBridge bridge)
             }
         }
 
-        await AppendRemoteSearchResultsAsync(sb, query, limit, ct);
+        await AppendRemoteSearchResultsAsync(
+            sb, query, normalizedType, yearFrom, yearTo, addedFromUnix, addedBeforeUnix, sort, limit, ct);
 
         return sb.Length == 0 ? "No results found." : sb.ToString().TrimEnd();
     }
@@ -405,12 +441,24 @@ public sealed class McpTools(McpPlayerBridge bridge)
     /// </summary>
     /// <param name="sb">The output builder to append to.</param>
     /// <param name="query">The search query.</param>
+    /// <param name="resultType">Requested result category.</param>
+    /// <param name="yearFrom">Inclusive minimum release year.</param>
+    /// <param name="yearTo">Inclusive maximum release year.</param>
+    /// <param name="addedFrom">Inclusive lower library-added Unix timestamp.</param>
+    /// <param name="addedBefore">Exclusive upper library-added Unix timestamp.</param>
+    /// <param name="sort">Requested result ordering.</param>
     /// <param name="limit">Maximum results per category and server.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>A task representing the asynchronous search.</returns>
     private async Task AppendRemoteSearchResultsAsync(
         System.Text.StringBuilder sb,
         string query,
+        string resultType,
+        int? yearFrom,
+        int? yearTo,
+        long? addedFrom,
+        long? addedBefore,
+        string sort,
         int limit,
         CancellationToken ct)
     {
@@ -422,12 +470,16 @@ public sealed class McpTools(McpPlayerBridge bridge)
         foreach (var server in servers)
         {
             OrynivoFullSearchResult result;
-            try { result = await client.SearchFullAsync(server, query, limit, ct); }
+            try
+            {
+                result = await client.SearchStructuredAsync(
+                    server, query, resultType, yearFrom, yearTo, addedFrom, addedBefore, sort, limit, ct);
+            }
             catch
             {
                 sb.AppendLine();
                 sb.AppendLine(CultureInfo.InvariantCulture,
-                    $"# Orynivo Server: {server.Name}\n- Search unavailable: the server could not be reached.");
+                    $"# Orynivo Server: {server.Name}\n- Structured search unavailable: update or check the server.");
                 continue;
             }
             if (result.Tracks.Count == 0 && result.Albums.Count == 0 && result.Artists.Count == 0)
@@ -449,7 +501,7 @@ public sealed class McpTools(McpPlayerBridge bridge)
                 sb.AppendLine("## Tracks");
                 foreach (var t in result.Tracks.Take(limit))
                     sb.AppendLine(CultureInfo.InvariantCulture,
-                        $"- {t.Title ?? t.FileName}  —  {t.Artist ?? "?"}  ({BuildOrynivoTrackReference(server, t.Id)})");
+                        $"- {t.Title ?? t.FileName}  —  {t.Artist ?? "?"}  —  year {FormatYear(t.Year)}  —  added {FormatAddedAt(t.AddedAt)}  ({BuildOrynivoTrackReference(server, t.Id)})");
             }
 
             if (result.Albums.Count > 0)
@@ -457,7 +509,7 @@ public sealed class McpTools(McpPlayerBridge bridge)
                 sb.AppendLine("## Albums");
                 foreach (var a in result.Albums.Take(limit))
                     sb.AppendLine(CultureInfo.InvariantCulture,
-                        $"- {a.Album}  —  {a.DisplayArtist ?? "?"}");
+                        $"- {a.Album}  —  {a.DisplayArtist ?? "?"}  —  year {FormatYear(a.Year)}  —  added {FormatAddedAt(a.AddedAt)}");
             }
 
             if (result.Artists.Count > 0)
@@ -468,6 +520,103 @@ public sealed class McpTools(McpPlayerBridge bridge)
             }
         }
     }
+
+    private static string NormalizeResultType(string? resultType) =>
+        resultType?.Trim().ToLowerInvariant() switch
+        {
+            "tracks" => "tracks",
+            "albums" => "albums",
+            "artists" => "artists",
+            _ => "all"
+        };
+
+    private static LibrarySearchSortOrder ParseSearchSort(string? sort, bool defaultToNewest) =>
+        sort?.Trim().ToLowerInvariant() switch
+        {
+            "added_asc" => LibrarySearchSortOrder.AddedOldest,
+            "added_desc" => LibrarySearchSortOrder.AddedNewest,
+            "year_asc" => LibrarySearchSortOrder.YearOldest,
+            "year_desc" => LibrarySearchSortOrder.YearNewest,
+            "title" => LibrarySearchSortOrder.Title,
+            _ => defaultToNewest ? LibrarySearchSortOrder.AddedNewest : LibrarySearchSortOrder.Relevance
+        };
+
+    private static List<SmartPlaylistTrackInfo> FilterSearchCandidates(
+        IReadOnlyList<SmartPlaylistTrackInfo> candidates,
+        IReadOnlyList<long>? relevantIds,
+        LibrarySearchFilterOptions options)
+    {
+        IEnumerable<SmartPlaylistTrackInfo> selected = candidates;
+        if (relevantIds is not null)
+        {
+            var byId = candidates.ToDictionary(static track => track.Id);
+            selected = relevantIds.Where(byId.ContainsKey).Select(id => byId[id]);
+        }
+        return LibrarySearchFilter.Apply(selected, options);
+    }
+
+    private static IEnumerable<AlbumInfo> OrderAlbums(
+        IEnumerable<AlbumInfo> albums,
+        IReadOnlyList<SmartPlaylistTrackInfo> candidates,
+        LibrarySearchSortOrder sortOrder)
+    {
+        if (sortOrder == LibrarySearchSortOrder.Title)
+            return albums.OrderBy(static album => album.Album, StringComparer.CurrentCultureIgnoreCase);
+        if (sortOrder == LibrarySearchSortOrder.YearNewest)
+            return albums.OrderByDescending(static album => album.Year.HasValue).ThenByDescending(static album => album.Year);
+        if (sortOrder == LibrarySearchSortOrder.YearOldest)
+            return albums.OrderByDescending(static album => album.Year.HasValue).ThenBy(static album => album.Year);
+
+        var order = candidates
+            .Where(static track => track.AlbumId.HasValue)
+            .Select(static track => track.AlbumId!.Value)
+            .Distinct()
+            .Select((id, index) => (id, index))
+            .ToDictionary(static item => item.id, static item => item.index);
+        return albums.OrderBy(album => order.GetValueOrDefault(album.Id, int.MaxValue));
+    }
+
+    private static List<SmartPlaylistTrackInfo> SelectAlbumSeedTracks(
+        IEnumerable<SmartPlaylistTrackInfo> candidates,
+        int limit)
+    {
+        var seen = new HashSet<long>();
+        return candidates
+            .Where(track => track.AlbumId is long albumId && seen.Add(albumId))
+            .Take(limit)
+            .ToList();
+    }
+
+    private static bool TryParseDateBoundary(string? value, bool inclusiveEnd, out long? unixTimestamp)
+    {
+        unixTimestamp = null;
+        if (string.IsNullOrWhiteSpace(value))
+            return true;
+
+        if (DateOnly.TryParseExact(value.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                DateTimeStyles.None, out var date))
+        {
+            var local = date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Local);
+            var boundary = new DateTimeOffset(local);
+            unixTimestamp = (inclusiveEnd ? boundary.AddDays(1) : boundary).ToUnixTimeSeconds();
+            return true;
+        }
+
+        if (!DateTimeOffset.TryParse(value.Trim(), CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal, out var timestamp))
+            return false;
+        var unixSeconds = timestamp.ToUnixTimeSeconds();
+        unixTimestamp = inclusiveEnd && unixSeconds < long.MaxValue ? unixSeconds + 1 : unixSeconds;
+        return true;
+    }
+
+    private static string FormatYear(int? year) =>
+        year?.ToString(CultureInfo.InvariantCulture) ?? "unknown";
+
+    private static string FormatAddedAt(long? addedAt) =>
+        addedAt is > 0
+            ? DateTimeOffset.FromUnixTimeSeconds(addedAt.Value).ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+            : "unknown";
 
     /// <summary>Builds the opaque remote-track reference used as a playable path for MCP/AI tools.</summary>
     /// <param name="server">The remote server owning the track.</param>

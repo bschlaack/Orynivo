@@ -663,6 +663,13 @@ fallback or allow client-provided commands/paths to reach the helper.
 - `Orynivo/AI/AiToolExecutor.cs`: dispatches tool calls received from the LLM
   to `McpTools` methods by name; parses JSON arguments from the model; no MCP
   transport involved — tools are invoked directly against the bridge and database
+- The shared `search_library` tool accepts an empty free-text query when a
+  structured category, release-year range, library-added date range, or sort
+  order is supplied. MCP and AI schema arguments must remain identical. Date
+  filters use an inclusive local-calendar `addedFrom`/`addedTo` contract and
+  are converted to a half-open Unix timestamp range. Returned tracks and albums
+  include release year and library-addition date; remote playback identities
+  remain opaque `orynivo://` references.
 - `Orynivo/AI/AiChatView.axaml/.cs`: embedded chat UI; user bubbles right-
   aligned (accent color), assistant bubbles left-aligned (surface brush),
   tool-call status centered and muted; streams tokens into the last assistant

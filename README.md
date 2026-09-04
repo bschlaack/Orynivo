@@ -296,6 +296,16 @@ configuration.
 | History | `get_play_history` |
 | Web | `search_web`, `fetch_page`, `fetch_page_as_markdown` |
 
+`search_library` accepts an optional free-text query plus a result category
+(`all`, `tracks`, `albums`, or `artists`), inclusive `yearFrom`/`yearTo` release
+years, inclusive ISO-8601 `addedFrom`/`addedTo` library dates, and relevance,
+title, release-year, or library-addition ordering. This supports requests such
+as “show newly added tracks”, “albums added since 2026-08-01”, and “albums from
+1998”. The year is the release year stored in the media metadata; Orynivo does
+not currently store a separate composition year. Filtered remote queries need
+an Orynivo Server version that provides the authenticated structured-search
+endpoint.
+
 The model picks the right queue tool automatically: `replace_queue` clears the
 old list and starts playing immediately when the user asks for new content;
 `queue_append` adds to the existing queue when the user wants to add more;

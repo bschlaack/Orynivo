@@ -30,6 +30,10 @@ internal sealed class AiChatService : IDisposable
         choose the closest exact title-and-artist track result, and pass its returned
         local path or orynivo:// reference to the play tool. Do not claim that a remote
         server has no result when the tool reports that its search was unavailable.
+        For requests about newly added items, additions since a date, or a release year,
+        call search_library with its structured resultType, addedFrom/addedTo, yearFrom/yearTo,
+        and sort arguments instead of placing those constraints in the free-text query.
+        Treat the library year as release metadata; do not claim it is a separate composition date.
         Always respond in the same language the user writes in.
         When presenting lists of results, keep formatting concise.
         """;

@@ -40,6 +40,7 @@ public sealed record OrynivoArtistInfo(
 /// <param name="ThumbnailPath">Server-side 96-px thumbnail path, or <see langword="null"/> when the album has no cover.</param>
 /// <param name="IsFavorite">Whether the album is marked as favorite on the server.</param>
 /// <param name="ArtistId">Database ID of the album artist, or <see langword="null"/>.</param>
+/// <param name="AddedAt">Unix timestamp of the newest library addition associated with the album.</param>
 public sealed record OrynivoAlbumInfo(
     long Id,
     string Album,
@@ -48,7 +49,8 @@ public sealed record OrynivoAlbumInfo(
     string? ArtworkPath = null,
     string? ThumbnailPath = null,
     bool IsFavorite = false,
-    long? ArtistId = null);
+    long? ArtistId = null,
+    long? AddedAt = null);
 
 /// <summary>Recently added album entry returned by the Orynivo Server dashboard endpoint.</summary>
 /// <param name="Id">Database album identifier.</param>
@@ -1189,6 +1191,49 @@ public sealed class OrynivoServerClient : IDisposable
                    ?? [];
         }
         catch { return []; }
+    }
+
+    /// <summary>Performs a structured categorised library search on an Orynivo Server.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="query">Optional free-text query.</param>
+    /// <param name="resultType">One of <c>all</c>, <c>tracks</c>, <c>albums</c>, or <c>artists</c>.</param>
+    /// <param name="minimumYear">Inclusive minimum release year.</param>
+    /// <param name="maximumYear">Inclusive maximum release year.</param>
+    /// <param name="addedFrom">Inclusive lower library-added Unix timestamp.</param>
+    /// <param name="addedBefore">Exclusive upper library-added Unix timestamp.</param>
+    /// <param name="sort">Requested result ordering.</param>
+    /// <param name="limit">Maximum result count per category.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Matching tracks, albums, and artists.</returns>
+    /// <exception cref="HttpRequestException">Thrown when the server is unavailable or does not support structured search.</exception>
+    public async Task<OrynivoFullSearchResult> SearchStructuredAsync(
+        OrynivoServerSettings server,
+        string? query,
+        string resultType,
+        int? minimumYear,
+        int? maximumYear,
+        long? addedFrom,
+        long? addedBefore,
+        string sort,
+        int limit = 50,
+        CancellationToken cancellationToken = default)
+    {
+        var parameters = new List<string>
+        {
+            $"type={Uri.EscapeDataString(resultType)}",
+            $"sort={Uri.EscapeDataString(sort)}",
+            $"limit={limit}"
+        };
+        if (!string.IsNullOrWhiteSpace(query)) parameters.Add($"q={Uri.EscapeDataString(query)}");
+        if (minimumYear.HasValue) parameters.Add($"yearFrom={minimumYear.Value}");
+        if (maximumYear.HasValue) parameters.Add($"yearTo={maximumYear.Value}");
+        if (addedFrom.HasValue) parameters.Add($"addedFrom={addedFrom.Value}");
+        if (addedBefore.HasValue) parameters.Add($"addedBefore={addedBefore.Value}");
+        var result = await GetJsonAsync<OrynivoFullSearchResult>(
+            server,
+            $"/api/search/structured?{string.Join('&', parameters)}",
+            cancellationToken);
+        return result ?? new OrynivoFullSearchResult([], [], []);
     }
 
     /// <summary>Returns one compact genre-cloud level and bounded recommendation candidates.</summary>
