@@ -94,6 +94,85 @@ public sealed class LibraryMetadataRepairServiceTests
         Assert.Equal(LibraryDoctorSeverity.Error, candidate.HighestSeverity);
     }
 
+    /// <summary>Separates likely file copies from fingerprint matches with another size.</summary>
+    [Fact]
+    public void Analyze_ClassifiesFingerprintDuplicateCandidates()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"orynivo-doctor-duplicates-{Guid.NewGuid():N}");
+        var image = typeof(LibraryMetadataRepairServiceTests).Assembly.Location;
+        var tracks = new[]
+        {
+            new MetadataRepairTrack(1, Path.Combine(root, "a", "one.flac"), Path.Combine(root, "a", "one.flac"),
+                "One", "Artist", "Album A", "Artist", 180, 1, 1, "-7 dB", "id-1", 1, 1, true, image, "fp", 1000),
+            new MetadataRepairTrack(2, Path.Combine(root, "b", "one.flac"), Path.Combine(root, "b", "one.flac"),
+                "One", "Artist", "Album B", "Artist", 180, 1, 1, "-7 dB", "id-2", 1, 1, true, image, "fp", 1000),
+            new MetadataRepairTrack(3, Path.Combine(root, "c", "one.flac"), Path.Combine(root, "c", "one.flac"),
+                "One", "Artist", "Album C", "Artist", 180, 1, 1, "-7 dB", "id-3", 1, 1, true, image, "fp", 900)
+        };
+
+        var candidates = LibraryMetadataRepairService.Analyze(tracks);
+
+        Assert.Equal(2, candidates.Count(candidate => candidate.LikelyDuplicateFileCount == 1));
+        Assert.Equal(1, candidates.Count(candidate => candidate.AlternateRecordingFileCount == 1));
+    }
+
+    /// <summary>Confirms byte-identical files only after hashing their complete contents.</summary>
+    [Fact]
+    public void Analyze_ConfirmsExactDuplicateFilesByContentHash()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"orynivo-doctor-exact-{Guid.NewGuid():N}");
+        var first = Path.Combine(root, "a", "one.flac");
+        var second = Path.Combine(root, "b", "one.flac");
+        Directory.CreateDirectory(Path.GetDirectoryName(first)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(second)!);
+        File.WriteAllBytes(first, [1, 2, 3, 4]);
+        File.WriteAllBytes(second, [1, 2, 3, 4]);
+        try
+        {
+            var image = typeof(LibraryMetadataRepairServiceTests).Assembly.Location;
+            var tracks = new[]
+            {
+                new MetadataRepairTrack(1, first, first, "One", "Artist", "Album A", "Artist",
+                    180, 1, 1, "-7 dB", "id-1", 1, 1, true, image, "fp", 4),
+                new MetadataRepairTrack(2, second, second, "One", "Artist", "Album B", "Artist",
+                    180, 1, 1, "-7 dB", "id-2", 1, 1, true, image, "fp", 4)
+            };
+
+            var candidates = LibraryMetadataRepairService.Analyze(tracks);
+
+            Assert.All(candidates, candidate => Assert.Equal(1, candidate.ExactDuplicateFileCount));
+            Assert.All(candidates, candidate => Assert.Equal(0, candidate.LikelyDuplicateFileCount));
+            Assert.All(candidates, candidate => Assert.Contains(candidate.Findings,
+                finding => finding.Code == "exact-duplicate"));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    /// <summary>Flags conservative spelling variants without merging the affected artists.</summary>
+    [Fact]
+    public void Analyze_DetectsArtistNameVariantsAcrossFolders()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"orynivo-doctor-artists-{Guid.NewGuid():N}");
+        var tracks = new[]
+        {
+            new MetadataRepairTrack(1, Path.Combine(root, "a", "one.flac"), Path.Combine(root, "a", "one.flac"),
+                "One", "A-Ha", "Album A", "A-Ha", 180, 1, 1),
+            new MetadataRepairTrack(2, Path.Combine(root, "b", "one.flac"), Path.Combine(root, "b", "one.flac"),
+                "One", "a ha", "Album B", "a ha", 180, 1, 1)
+        };
+
+        var candidates = LibraryMetadataRepairService.Analyze(tracks);
+
+        Assert.Equal(2, candidates.Count);
+        Assert.All(candidates, candidate => Assert.Equal(1, candidate.ArtistNameVariantCount));
+        Assert.All(candidates, candidate => Assert.Contains(candidate.Findings,
+            finding => finding.Code == "artist-name-variant" &&
+                       finding.RepairCapability == LibraryDoctorRepairCapability.GuidedReview));
+    }
+
     /// <summary>Detects a folder split by inconsistent album titles and missing track numbers.</summary>
     [Fact]
     public void Analyze_DetectsFragmentedPhysicalAlbum()

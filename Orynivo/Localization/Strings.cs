@@ -531,6 +531,12 @@ public sealed record LocalizedStrings(
     public string MetadataFoundReleases { get; init; } = "";
     /// <summary>Gets the action that applies a selected metadata correction.</summary>
     public string MetadataApplyCorrection { get; init; } = "";
+    /// <summary>Gets the heading for the metadata correction preview.</summary>
+    public string MetadataCorrectionPreview { get; init; } = "";
+    /// <summary>Gets the column heading for current metadata values.</summary>
+    public string MetadataCurrentValues { get; init; } = "";
+    /// <summary>Gets the column heading for proposed metadata values.</summary>
+    public string MetadataProposedValues { get; init; } = "";
     /// <summary>Gets the action that refreshes the metadata-problem analysis.</summary>
     public string MetadataRefreshAnalysis { get; init; } = "";
     /// <summary>Gets the editable MusicBrainz album-query label.</summary>
@@ -573,6 +579,14 @@ public sealed record LocalizedStrings(
     public string MetadataIssueMissingFiles { get; init; } = "";
     /// <summary>Gets the formatted unreadable-source-file finding label.</summary>
     public string MetadataIssueUnreadableFiles { get; init; } = "";
+    /// <summary>Gets the formatted likely-duplicate-file finding label.</summary>
+    public string MetadataIssueLikelyDuplicates { get; init; } = "";
+    /// <summary>Gets the formatted label for byte-identical duplicate files.</summary>
+    public string MetadataIssueExactDuplicates { get; init; } = "";
+    /// <summary>Gets the formatted alternate-recording finding label.</summary>
+    public string MetadataIssueAlternateRecordings { get; init; } = "";
+    /// <summary>Gets the formatted label for conservatively matched artist-name variants.</summary>
+    public string MetadataIssueArtistNameVariants { get; init; } = "";
     /// <summary>Gets the informational finding label.</summary>
     public string MetadataSeverityInformation { get; init; } = "";
     /// <summary>Gets the warning finding label.</summary>
@@ -583,6 +597,8 @@ public sealed record LocalizedStrings(
     public string MetadataDoctorSummary { get; init; } = "";
     /// <summary>Gets the message shown when Library Doctor analysis fails.</summary>
     public string MetadataAnalysisFailed { get; init; } = "";
+    /// <summary>Gets the formatted notice for servers whose Doctor endpoint is unavailable.</summary>
+    public string MetadataDoctorServersUnavailable { get; init; } = "";
     /// <summary>Gets the message shown after Library Doctor analysis is cancelled.</summary>
     public string MetadataAnalysisCancelled { get; init; } = "";
     public string Calendar { get; init; } = "";

@@ -8,6 +8,8 @@ namespace Orynivo;
 /// <summary>Reviews MusicBrainz release candidates for one physical album folder.</summary>
 public partial class MetadataRepairDialog : Window
 {
+    private sealed record PreviewRow(int TrackNumber, string CurrentValues, string ProposedValues);
+
     private readonly MetadataFolderCandidate _candidate;
     private List<MetadataReleaseMatch> _matches = [];
 
@@ -35,6 +37,7 @@ public partial class MetadataRepairDialog : Window
         AlbumQueryLabel.Text = LocalizationManager.Current.MetadataAlbumQuery;
         ArtistQueryLabel.Text = LocalizationManager.Current.MetadataArtistQuery;
         SearchAgainButton.Content = LocalizationManager.Current.SearchAgain;
+        PreviewLabel.Text = LocalizationManager.Current.MetadataCorrectionPreview;
         AlbumQueryTextBox.Text = MostCommon(candidate.Tracks.Select(track => track.Album));
         ArtistQueryTextBox.Text = MostCommon(candidate.Tracks.Select(track => track.AlbumArtist));
         Opened += async (_, _) => await SearchAsync();
@@ -89,12 +92,26 @@ public partial class MetadataRepairDialog : Window
         if (!ApplyButton.IsEnabled)
         {
             SelectionDetailTextBlock.Text = string.Empty;
+            PreviewDataGrid.ItemsSource = null;
             return;
         }
         var match = _matches[index];
+        var currentAlbum = MostCommon(_candidate.Tracks.Select(track => track.Album));
+        var currentArtist = MostCommon(_candidate.Tracks.Select(track => track.AlbumArtist));
         SelectionDetailTextBlock.Text =
+            $"{currentAlbum} — {currentArtist} → {match.Title} — {match.AlbumArtist} · " +
             $"{match.Tracks.Count} {LocalizationManager.Current.MetadataTrackCount} · " +
             $"{Math.Round(match.Confidence * 100):0}%";
+        var localTracks = _candidate.Tracks
+            .OrderBy(track => track.TrackNumber ?? int.MaxValue)
+            .ThenBy(track => track.SourcePath, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        PreviewDataGrid.ItemsSource = localTracks.Zip(match.Tracks, (local, proposed) =>
+            new PreviewRow(
+                proposed.Position,
+                FormatTrackValues(local.Title, local.Artist),
+                FormatTrackValues(proposed.Title, proposed.Artist)))
+            .ToList();
     }
 
     private void ApplyButton_OnClick(object? sender, RoutedEventArgs e)
@@ -107,6 +124,9 @@ public partial class MetadataRepairDialog : Window
     }
 
     private void CancelButton_OnClick(object? sender, RoutedEventArgs e) => Close(false);
+
+    private static string FormatTrackValues(string? title, string? artist) =>
+        $"{title ?? string.Empty} — {artist ?? string.Empty}";
 
     private static string MostCommon(IEnumerable<string?> values) =>
         values.Where(value => !string.IsNullOrWhiteSpace(value))

@@ -863,6 +863,9 @@
                               SelectionChanged="MetadataProblemsDataGrid_OnSelectionChanged"
                               DoubleTapped="MetadataProblemsDataGrid_OnDoubleTapped">
                         <DataGrid.Columns>
+                            <DataGridTextColumn Header="{DynamicResource L_Source}"
+                                                Binding="{Binding Source}"
+                                                Width="120"/>
                             <DataGridTextColumn Header="{DynamicResource L_MetadataFolder}"
                                                 Binding="{Binding Folder}"
                                                 Width="2*"/>

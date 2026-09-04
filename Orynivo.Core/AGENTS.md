@@ -94,6 +94,18 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   durations are missing, and fuzzy TOC lookup includes all medium formats.
   Its Library Doctor analysis also reports missing track ReplayGain and
   MusicBrainz recording IDs even when basic album metadata is consistent.
+  Duplicate candidates require the same non-empty AcoustID fingerprint on
+  distinct physical source paths. Equal file sizes are hashed sequentially and
+  become exact duplicates only when complete SHA-256 content matches; an
+  unavailable hash remains “likely,” while differing size or content means an
+  alternate-file/edition candidate. No class may trigger automatic deletion or
+  metadata merging.
+  Artist spelling variants use the shared conservative comparison key and are
+  guided-review findings only; name similarity must never merge artist records
+  automatically.
+  Remote Library Doctor requests use a separate bounded maintenance timeout;
+  do not increase the normal catalog/streaming client timeout for long-running
+  server-side file checks.
 - Remote dashboard totals use `OrynivoServerClient.GetLibrarySummaryAsync` and
   the server's aggregate `/api/library/summary` response; do not replace this
   fast path with complete track or album payloads.

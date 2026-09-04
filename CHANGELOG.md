@@ -10,6 +10,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Added explicit cancellation and duplicate-start protection to Library Doctor
   analysis; cancellation is checked between folders and physical source files.
+- Added a before/after preview to guided Library Doctor corrections. Selecting
+  a MusicBrainz release now shows the album identity plus every current and
+  proposed track title and artist before the explicit apply action is enabled.
+- Added authenticated, compact Library Doctor findings for Orynivo Servers.
+  Settings analyses local and configured server libraries concurrently, labels
+  each result with its source, tolerates older/unavailable servers, and keeps
+  remote findings read-only until a dedicated safe correction API is available.
 - Extended metadata review toward the Library Doctor by detecting and showing
   missing per-track ReplayGain values and MusicBrainz recording identifiers in
   otherwise consistent physical album folders. Findings now have typed
@@ -20,7 +27,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   without reopening every audio file. Missing and stale album-artist image
   paths are reported alongside cover findings. Missing and unreadable physical
   sources are reported separately, with shared virtual-track sources checked
-  only once per folder.
+  only once per folder. Cross-path AcoustID matches are separated into likely
+  same-size file duplicates and alternate-file or edition candidates; neither
+  is modified automatically. Same-fingerprint, same-size candidates are now
+  streamed through SHA-256 so byte-identical files are distinguished from
+  different tags, encodes, or editions without loading media into memory.
+  Conservatively matched artist-name spelling
+  variants are now included as guided-review findings without automatic merges.
 ### Fixed
 
 - Fixed a Library Doctor database-column typo that closed Orynivo when metadata

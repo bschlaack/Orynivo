@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Routing;
 using Orynivo.Audio;
 using Orynivo.Library;
 using Orynivo.Server.Services;
+using Orynivo.Streaming;
 
 namespace Orynivo.Server.Endpoints;
 
@@ -26,6 +27,23 @@ public static class LibraryEndpoints
         {
             using var db = AudioDatabase.OpenDefault();
             return Results.Ok(db.GetDashboardLibrarySummary());
+        });
+
+        api.MapGet("/library/doctor", (HttpContext context) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            var candidates = LibraryMetadataRepairService.Analyze(
+                db.GetMetadataRepairTracks(),
+                cancellationToken: context.RequestAborted);
+            return Results.Ok(candidates.Select(candidate => new OrynivoLibraryDoctorCandidate(
+                candidate.FolderPath,
+                candidate.Tracks.Count,
+                candidate.HighestSeverity,
+                candidate.Findings.Select(finding => new OrynivoLibraryDoctorFinding(
+                    finding.Code,
+                    finding.Severity,
+                    finding.AffectedTrackCount,
+                    finding.RepairCapability)).ToList())).ToList());
         });
 
         // --- Artists -------------------------------------------------------

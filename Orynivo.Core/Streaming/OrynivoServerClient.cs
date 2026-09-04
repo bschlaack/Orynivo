@@ -387,6 +387,28 @@ public sealed record OrynivoScanStatus(
     string? Error,
     long? LibraryChangedAt = null);
 
+/// <summary>Compact Library Doctor finding returned by an Orynivo Server.</summary>
+/// <param name="Code">Stable finding code.</param>
+/// <param name="Severity">Finding severity.</param>
+/// <param name="Count">Number of affected items.</param>
+/// <param name="RepairCapability">Supported repair category.</param>
+public sealed record OrynivoLibraryDoctorFinding(
+    string Code,
+    LibraryDoctorSeverity Severity,
+    int Count,
+    LibraryDoctorRepairCapability RepairCapability);
+
+/// <summary>Compact server-side Library Doctor result for one physical folder.</summary>
+/// <param name="FolderPath">Physical folder path on the server.</param>
+/// <param name="TrackCount">Number of indexed tracks in the folder.</param>
+/// <param name="HighestSeverity">Highest severity among the findings.</param>
+/// <param name="Findings">Typed findings without track payloads or credentials.</param>
+public sealed record OrynivoLibraryDoctorCandidate(
+    string FolderPath,
+    int TrackCount,
+    LibraryDoctorSeverity HighestSeverity,
+    IReadOnlyList<OrynivoLibraryDoctorFinding> Findings);
+
 /// <summary>Request body used to store a client-refreshed artist profile on a remote Orynivo Server.</summary>
 /// <param name="Biography">Downloaded artist biography, or <see langword="null"/> when no biography was found.</param>
 /// <param name="SourceUrl">Canonical source URL, or <see langword="null"/>.</param>
@@ -423,11 +445,13 @@ public sealed class OrynivoServerClient : IDisposable
     };
 
     private readonly HttpClient _http;
+    private readonly HttpClient _maintenanceHttp;
 
     /// <summary>Initialises a new client with a shared <see cref="HttpClient"/> instance.</summary>
     public OrynivoServerClient()
     {
         _http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+        _maintenanceHttp = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
     }
 
     // ------------------------------------------------------------------
@@ -1595,6 +1619,32 @@ public sealed class OrynivoServerClient : IDisposable
         }
     }
 
+    /// <summary>Gets compact read-only Library Doctor findings from a server.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Findings, or <see langword="null"/> when the endpoint is unavailable.</returns>
+    public async Task<List<OrynivoLibraryDoctorCandidate>?> GetLibraryDoctorAsync(
+        OrynivoServerSettings server,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(
+                HttpMethod.Get,
+                BuildUrl(server, "/api/library/doctor"));
+            request.Headers.Add("X-Api-Key", server.ApiKey);
+            using var response = await _maintenanceHttp.SendAsync(request, cancellationToken);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<List<OrynivoLibraryDoctorCandidate>>(
+                JsonOptions,
+                cancellationToken);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     /// <summary>
     /// Requests an explicit calculation of missing ReplayGain values on a remote server.
     /// Existing server-side track and album values are preserved.
@@ -1895,5 +1945,9 @@ public sealed class OrynivoServerClient : IDisposable
         => server.BaseUrl.TrimEnd('/') + path;
 
     /// <inheritdoc/>
-    public void Dispose() => _http.Dispose();
+    public void Dispose()
+    {
+        _http.Dispose();
+        _maintenanceHttp.Dispose();
+    }
 }

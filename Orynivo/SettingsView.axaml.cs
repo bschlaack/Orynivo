@@ -37,11 +37,14 @@ internal partial class SettingsView : UserControl
     }
 
     private sealed record MetadataProblemRow(
+        string Source,
         string Folder,
+        LibraryDoctorSeverity SeverityValue,
         string Severity,
         string Issues,
         int TrackCount,
-        MetadataFolderCandidate Candidate);
+        IReadOnlySet<string> FindingCodes,
+        MetadataFolderCandidate? Candidate);
 
     private sealed record MissingArtistImageTarget(
         long ArtistId,
@@ -79,7 +82,8 @@ internal partial class SettingsView : UserControl
     private bool _settingsAccepted;
     private bool _plexCredentialsChanged;
     private bool _metadataAnalysisLoaded;
-    private IReadOnlyList<MetadataFolderCandidate> _metadataDoctorCandidates = [];
+    private IReadOnlyList<MetadataProblemRow> _metadataDoctorRows = [];
+    private int _metadataDoctorUnavailableServers;
     private CancellationTokenSource? _metadataAnalysisCts;
     private CancellationTokenSource? _missingArtistImagesCts;
     private CancellationTokenSource? _replayGainCalculationCts;
@@ -1282,13 +1286,39 @@ internal partial class SettingsView : UserControl
         CancelMetadataAnalysisButton.IsEnabled = true;
         try
         {
-            var candidates = await Task.Run(() =>
+            var localTask = Task.Run(() =>
             {
                 using var database = AudioDatabase.OpenDefault();
                 return LibraryMetadataRepairService.Analyze(
                     database.GetMetadataRepairTracks(), cancellationToken: cancellationToken);
             }, cancellationToken);
-            _metadataDoctorCandidates = candidates;
+            using var serverClient = new OrynivoServerClient();
+            var remoteTasks = _orynivoServers.Select(async server =>
+                (Server: server, Candidates: await serverClient.GetLibraryDoctorAsync(server, cancellationToken)))
+                .ToList();
+            var localCandidates = await localTask;
+            var remoteResults = await Task.WhenAll(remoteTasks);
+            _metadataDoctorUnavailableServers = remoteResults.Count(result => result.Candidates is null);
+            var rows = localCandidates.Select(candidate => CreateMetadataProblemRow(
+                    LocalizationManager.Current.LocalSource,
+                    candidate.FolderPath,
+                    candidate.Tracks.Count,
+                    candidate.HighestSeverity,
+                    candidate.Findings.Select<LibraryDoctorFinding, (string Code, int Count)>(
+                        finding => (finding.Code, finding.AffectedTrackCount)),
+                    candidate))
+                .ToList();
+            foreach (var result in remoteResults.Where(result => result.Candidates is not null))
+            {
+                rows.AddRange(result.Candidates!.Select(candidate => CreateMetadataProblemRow(
+                    result.Server.Name,
+                    candidate.FolderPath,
+                    candidate.TrackCount,
+                    candidate.HighestSeverity,
+                    candidate.Findings.Select(finding => (Code: finding.Code, Count: finding.Count)),
+                    null)));
+            }
+            _metadataDoctorRows = rows;
             if (MetadataSeverityFilterComboBox.ItemsSource is null)
             {
                 var localized = LocalizationManager.Current;
@@ -1318,7 +1348,11 @@ internal partial class SettingsView : UserControl
                     new SettingChoice<string?>("album-artwork", localized.MetadataIssueAlbumArtwork),
                     new SettingChoice<string?>("artist-image", localized.MetadataIssueArtistImage),
                     new SettingChoice<string?>("missing-file", localized.MetadataIssueMissingFiles),
-                    new SettingChoice<string?>("unreadable-file", localized.MetadataIssueUnreadableFiles)
+                    new SettingChoice<string?>("unreadable-file", localized.MetadataIssueUnreadableFiles),
+                    new SettingChoice<string?>("likely-duplicate", localized.MetadataIssueLikelyDuplicates),
+                    new SettingChoice<string?>("exact-duplicate", localized.MetadataIssueExactDuplicates),
+                    new SettingChoice<string?>("alternate-recording", localized.MetadataIssueAlternateRecordings),
+                    new SettingChoice<string?>("artist-name-variant", localized.MetadataIssueArtistNameVariants)
                 };
                 MetadataIssueFilterComboBox.SelectedIndex = 0;
             }
@@ -1331,7 +1365,8 @@ internal partial class SettingsView : UserControl
         catch (Exception ex)
         {
             CrashLogger.Log(ex, "Library Doctor analysis");
-            _metadataDoctorCandidates = [];
+            _metadataDoctorRows = [];
+            _metadataDoctorUnavailableServers = 0;
             MetadataProblemsDataGrid.ItemsSource = null;
             MetadataStatusTextBlock.Text = LocalizationManager.Current.MetadataAnalysisFailed;
         }
@@ -1349,27 +1384,23 @@ internal partial class SettingsView : UserControl
     {
         var selected = (MetadataSeverityFilterComboBox.SelectedItem as SettingChoice<LibraryDoctorSeverity?>)?.Value;
         var issueCode = (MetadataIssueFilterComboBox.SelectedItem as SettingChoice<string?>)?.Value;
-        IEnumerable<MetadataFolderCandidate> filtered = selected.HasValue
-            ? _metadataDoctorCandidates.Where(candidate => candidate.HighestSeverity == selected.Value)
-            : _metadataDoctorCandidates;
+        IEnumerable<MetadataProblemRow> filtered = selected.HasValue
+            ? _metadataDoctorRows.Where(row => row.SeverityValue == selected.Value)
+            : _metadataDoctorRows;
         if (!string.IsNullOrWhiteSpace(issueCode))
-            filtered = filtered.Where(candidate => candidate.Findings.Any(finding => finding.Code == issueCode));
+            filtered = filtered.Where(row => row.FindingCodes.Contains(issueCode));
         var candidates = filtered.ToList();
-        MetadataProblemsDataGrid.ItemsSource = candidates
-            .Select(candidate => new MetadataProblemRow(
-                    candidate.FolderPath,
-                    FormatDoctorSeverity(candidate.HighestSeverity),
-                    BuildMetadataIssueSummary(candidate),
-                    candidate.Tracks.Count,
-                    candidate))
-                .ToList();
+        MetadataProblemsDataGrid.ItemsSource = candidates;
             var strings = LocalizationManager.Current;
-            MetadataStatusTextBlock.Text = candidates.Count == 0
+            var summary = candidates.Count == 0
                 ? strings.NoData
                 : string.Format(CultureInfo.CurrentCulture, strings.MetadataDoctorSummary,
-                    candidates.Count(candidate => candidate.HighestSeverity == LibraryDoctorSeverity.Error),
-                candidates.Count(candidate => candidate.HighestSeverity == LibraryDoctorSeverity.Warning),
-                candidates.Count(candidate => candidate.HighestSeverity == LibraryDoctorSeverity.Information));
+                    candidates.Count(candidate => candidate.SeverityValue == LibraryDoctorSeverity.Error),
+                candidates.Count(candidate => candidate.SeverityValue == LibraryDoctorSeverity.Warning),
+                candidates.Count(candidate => candidate.SeverityValue == LibraryDoctorSeverity.Information));
+            MetadataStatusTextBlock.Text = _metadataDoctorUnavailableServers == 0
+                ? summary
+                : $"{summary} · {string.Format(CultureInfo.CurrentCulture, strings.MetadataDoctorServersUnavailable, _metadataDoctorUnavailableServers)}";
     }
 
     private void MetadataSeverityFilter_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -1386,39 +1417,65 @@ internal partial class SettingsView : UserControl
     };
 
     private static string BuildMetadataIssueSummary(MetadataFolderCandidate candidate)
+        => BuildMetadataIssueSummary(candidate.Findings
+            .Select<LibraryDoctorFinding, (string Code, int Count)>(
+                finding => (finding.Code, finding.AffectedTrackCount)));
+
+    private static string BuildMetadataIssueSummary(IEnumerable<(string Code, int Count)> findings)
     {
         var strings = LocalizationManager.Current;
         var issues = new List<string>();
-        if (candidate.AlbumCount != 1)
-            issues.Add(strings.MetadataIssueAlbums);
-        if (candidate.AlbumArtistCount != 1)
-            issues.Add(strings.MetadataIssueArtists);
-        if (candidate.MissingTitleCount > 0)
-            issues.Add(strings.MetadataIssueMissingTitles);
-        if (candidate.MissingTrackNumberCount > 0)
-            issues.Add(strings.MetadataIssueMissingNumbers);
-        if (candidate.DuplicateTrackNumbers)
-            issues.Add(strings.MetadataIssueDuplicateNumbers);
-        if (candidate.MissingReplayGainCount > 0)
-            issues.Add(string.Format(CultureInfo.CurrentCulture, strings.MetadataIssueMissingReplayGain, candidate.MissingReplayGainCount));
-        if (candidate.MissingMusicBrainzIdCount > 0)
-            issues.Add(string.Format(CultureInfo.CurrentCulture, strings.MetadataIssueMissingMusicBrainzIds, candidate.MissingMusicBrainzIdCount));
-        if (candidate.MissingExpectedTrackCount > 0)
-            issues.Add(string.Format(CultureInfo.CurrentCulture, strings.MetadataIssueIncompleteAlbum, candidate.MissingExpectedTrackCount));
-        if (candidate.MissingAlbumArtwork)
-            issues.Add(strings.MetadataIssueAlbumArtwork);
-        if (candidate.MissingArtistImage)
-            issues.Add(strings.MetadataIssueArtistImage);
-        if (candidate.MissingSourceFileCount > 0)
-            issues.Add(string.Format(CultureInfo.CurrentCulture, strings.MetadataIssueMissingFiles, candidate.MissingSourceFileCount));
-        if (candidate.UnreadableSourceFileCount > 0)
-            issues.Add(string.Format(CultureInfo.CurrentCulture, strings.MetadataIssueUnreadableFiles, candidate.UnreadableSourceFileCount));
+        foreach (var (code, count) in findings)
+        {
+            issues.Add(code switch
+            {
+                "album" => strings.MetadataIssueAlbums,
+                "album-artist" => strings.MetadataIssueArtists,
+                "title" => strings.MetadataIssueMissingTitles,
+                "track-number" => strings.MetadataIssueMissingNumbers,
+                "duplicate-track-number" => strings.MetadataIssueDuplicateNumbers,
+                "replaygain" => string.Format(CultureInfo.CurrentCulture, strings.MetadataIssueMissingReplayGain, count),
+                "musicbrainz-id" => string.Format(CultureInfo.CurrentCulture, strings.MetadataIssueMissingMusicBrainzIds, count),
+                "incomplete-album" => string.Format(CultureInfo.CurrentCulture, strings.MetadataIssueIncompleteAlbum, count),
+                "album-artwork" => strings.MetadataIssueAlbumArtwork,
+                "artist-image" => strings.MetadataIssueArtistImage,
+                "missing-file" => string.Format(CultureInfo.CurrentCulture, strings.MetadataIssueMissingFiles, count),
+                "unreadable-file" => string.Format(CultureInfo.CurrentCulture, strings.MetadataIssueUnreadableFiles, count),
+                "likely-duplicate" => string.Format(CultureInfo.CurrentCulture, strings.MetadataIssueLikelyDuplicates, count),
+                "exact-duplicate" => string.Format(CultureInfo.CurrentCulture, strings.MetadataIssueExactDuplicates, count),
+                "alternate-recording" => string.Format(CultureInfo.CurrentCulture, strings.MetadataIssueAlternateRecordings, count),
+                "artist-name-variant" => string.Format(CultureInfo.CurrentCulture, strings.MetadataIssueArtistNameVariants, count),
+                _ => code
+            });
+        }
         return string.Join(" · ", issues);
+    }
+
+    private static MetadataProblemRow CreateMetadataProblemRow(
+        string source,
+        string folder,
+        int trackCount,
+        LibraryDoctorSeverity severity,
+        IEnumerable<(string Code, int Count)> findings,
+        MetadataFolderCandidate? candidate)
+    {
+        var materialized = findings.ToList();
+        return new MetadataProblemRow(
+            source,
+            folder,
+            severity,
+            FormatDoctorSeverity(severity),
+            BuildMetadataIssueSummary(materialized),
+            trackCount,
+            materialized.Select(finding => finding.Code).ToHashSet(StringComparer.Ordinal),
+            candidate);
     }
 
     private async Task OpenSelectedMetadataRepairAsync()
     {
         if (MetadataProblemsDataGrid.SelectedItem is not MetadataProblemRow row)
+            return;
+        if (row.Candidate is null)
             return;
         var dialog = new MetadataRepairDialog(row.Candidate);
         if (await dialog.ShowDialog<bool>(GetHostWindow()) != true || dialog.SelectedMatch is null)
@@ -1438,7 +1495,7 @@ internal partial class SettingsView : UserControl
         await OpenSelectedMetadataRepairAsync();
 
     private void MetadataProblemsDataGrid_OnSelectionChanged(object? sender, SelectionChangedEventArgs e) =>
-        OpenMetadataRepairButton.IsEnabled = MetadataProblemsDataGrid.SelectedItem is MetadataProblemRow;
+        OpenMetadataRepairButton.IsEnabled = MetadataProblemsDataGrid.SelectedItem is MetadataProblemRow { Candidate: not null };
 
     private async void OpenMetadataRepairButton_OnClick(object? sender, RoutedEventArgs e) =>
         await OpenSelectedMetadataRepairAsync();
