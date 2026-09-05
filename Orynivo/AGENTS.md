@@ -467,6 +467,8 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   Compact vectors use one coalesced five-minute memory cache; unified catalog
   invalidation must also invalidate this cache, and diagnostics may log only
   aggregate vector counts and elapsed time, never library metadata.
+  After a similarity or mood mix is queued, navigation must switch to the
+  Up Next view so the generated queue is immediately visible.
 - Infinite Mix (`MainWindow.InfiniteMix.cs`) uses the persisted
   `AppSettings.InfiniteMix` profile: calm/balanced/energetic mood,
   familiar-to-adventurous discovery, 3/7/30/90-day history, local and selected

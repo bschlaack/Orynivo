@@ -8957,12 +8957,13 @@ public partial class MainWindow : Window
 
     private PlaylistItem CreatePlaylistItem(string path)
     {
-        if (TryResolveOrynivoPlaylistReferenceRow(path, out var referencedRow))
-            return ToPlaylistItem(referencedRow);
         if (_orynivoTracksByUrl.TryGetValue(path, out var orynivoRow))
             return ToPlaylistItem(orynivoRow);
         if (_plexTracksByUrl.TryGetValue(path, out var plexRow))
             return ToPlaylistItem(plexRow);
+        // Never perform a synchronous provider/network lookup while building a
+        // queue. Missing metadata is optional; playback resolves the source
+        // asynchronously and the queue item can be enriched later.
         return new PlaylistItem(path);
     }
 
