@@ -108,4 +108,17 @@ public sealed class OrynivoServerSettings
     /// <summary>Gets or sets the pre-shared API key required by every request.</summary>
     [JsonIgnore]
     public string ApiKey { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the server-side profile selected for the active local user.</summary>
+    [JsonIgnore]
+    public string ProfileId { get; set; } = "standard";
 }
+
+/// <summary>Public server profile identity returned by the profile registry endpoint.</summary>
+public sealed record OrynivoServerProfile(string Id, string Name);
+
+/// <summary>Portable playback-history entry exchanged with an Orynivo Server.</summary>
+public sealed record OrynivoHistorySyncEntry(
+    string SyncId, string Path, long StartedAtUnix, double PositionSeconds,
+    double? DurationSeconds, string MediaType, string? Title, string? Subtitle,
+    string? Album, string? ExternalId, string? Genre);

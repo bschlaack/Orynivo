@@ -249,6 +249,14 @@ public static class LocalizationManager
         resources["L_OutputProfileNameExists"] = Current.OutputProfileNameExists;
         resources["L_OutputProfileDeleteTitle"] = Current.OutputProfileDeleteTitle;
         resources["L_OutputProfileDeleteConfirm"] = Current.OutputProfileDeleteConfirm;
+        resources["L_UserProfiles"] = Current.UserProfiles;
+        resources["L_UserProfileActive"] = Current.UserProfileActive;
+        resources["L_UserProfileCreate"] = Current.UserProfileCreate;
+        resources["L_UserProfileRename"] = Current.UserProfileRename;
+        resources["L_UserProfileDelete"] = Current.UserProfileDelete;
+        resources["L_UserProfileName"] = Current.UserProfileName;
+        resources["L_UserProfileMigrateFavorites"] = Current.UserProfileMigrateFavorites;
+        resources["L_UserProfileDeleteConfirm"] = Current.UserProfileDeleteConfirm;
         resources["L_ReplayGain"] = Current.ReplayGain;
         resources["L_ReplayGainHint"] = Current.ReplayGainHint;
         resources["L_CalculateReplayGainDuringScan"] = Current.CalculateReplayGainDuringScan;
@@ -582,6 +590,7 @@ public static class LocalizationManager
         OutputProfileNameExists = "Eine Ausgabe mit diesem Namen ist bereits vorhanden.",
         OutputProfileDeleteTitle = "Ausgabe löschen",
         OutputProfileDeleteConfirm = "Soll die Ausgabe »{0}« wirklich gelöscht werden?",
+        UserProfiles = "Benutzerprofile", UserProfileActive = "Aktives Profil", UserProfileCreate = "Profil anlegen", UserProfileRename = "Profil umbenennen", UserProfileDelete = "Profil löschen", UserProfileName = "Profilname", UserProfileMigrateFavorites = "Sollen die bisherigen persönlichen Daten (Favoriten, Bewertungen und Verlauf) in das neue Profil übernommen werden?", UserProfileDeleteConfirm = "Soll das Profil »{0}« wirklich gelöscht werden?",
         DatabaseOptimizeHint = "Freigegebene Seiten werden entfernt; danach ist die Datei physisch kleiner.",
         GenreCloudCache = "Genre-Wolken-Hintergründe",
         GenreCloudCacheHint = "Zwischengespeicherte Künstler-Mosaike löschen. Sie werden beim nächsten Öffnen einer Genre-Ebene neu erstellt.",
@@ -1282,6 +1291,7 @@ public static class LocalizationManager
         AlsaPrepareFailed = "ALSA could not prepare the output device after seeking.",
         DeviceInfo = "Device information",
         OutputProfile = "Output",
+        UserProfiles = "User profiles", UserProfileActive = "Active profile", UserProfileCreate = "Create profile", UserProfileRename = "Rename profile", UserProfileDelete = "Delete profile", UserProfileName = "Profile name", UserProfileMigrateFavorites = "Copy the existing personal data (favorites, ratings, and history) to the new profile?", UserProfileDeleteConfirm = "Delete profile “{0}”?",
         LocalMedia = "Local",
         OutputProfileCreate = "Create output",
         OutputProfileConfigure = "Configure output",
@@ -1982,6 +1992,7 @@ public static class LocalizationManager
         AlsaPrepareFailed = "ALSA n’a pas pu préparer le périphérique de sortie après le déplacement.",
         DeviceInfo = "Informations sur le périphérique",
         OutputProfile = "Sortie",
+        UserProfiles = "Profils utilisateur", UserProfileActive = "Profil actif", UserProfileCreate = "Créer un profil", UserProfileRename = "Renommer le profil", UserProfileDelete = "Supprimer le profil", UserProfileName = "Nom du profil", UserProfileMigrateFavorites = "Copier les données personnelles existantes (favoris, évaluations et historique) dans le nouveau profil ?", UserProfileDeleteConfirm = "Supprimer le profil « {0} » ?",
         LocalMedia = "Local",
         OutputProfileCreate = "Créer une sortie",
         OutputProfileConfigure = "Configurer la sortie",
@@ -2679,6 +2690,7 @@ public static class LocalizationManager
         AlsaPrepareFailed = "ALSA no pudo preparar el dispositivo de salida después de buscar.",
         DeviceInfo = "Información del dispositivo",
         OutputProfile = "Salida",
+        UserProfiles = "Perfiles de usuario", UserProfileActive = "Perfil activo", UserProfileCreate = "Crear perfil", UserProfileRename = "Renombrar perfil", UserProfileDelete = "Eliminar perfil", UserProfileName = "Nombre del perfil", UserProfileMigrateFavorites = "¿Copiar los datos personales existentes (favoritos, valoraciones e historial) al nuevo perfil?", UserProfileDeleteConfirm = "¿Eliminar el perfil «{0}»?",
         LocalMedia = "Local",
         OutputProfileCreate = "Crear salida",
         OutputProfileConfigure = "Configurar salida",

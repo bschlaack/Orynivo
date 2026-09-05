@@ -430,6 +430,22 @@ public sealed record LocalizedStrings(
     public string OutputProfileDeleteTitle { get; init; } = "";
     /// <summary>Gets the output profile deletion confirmation format string (parameter: profile name).</summary>
     public string OutputProfileDeleteConfirm { get; init; } = "";
+    /// <summary>Gets the user-profile settings section label.</summary>
+    public string UserProfiles { get; init; } = "";
+    /// <summary>Gets the active-profile label.</summary>
+    public string UserProfileActive { get; init; } = "";
+    /// <summary>Gets the profile-create action label.</summary>
+    public string UserProfileCreate { get; init; } = "";
+    /// <summary>Gets the profile-rename action label.</summary>
+    public string UserProfileRename { get; init; } = "";
+    /// <summary>Gets the profile-delete action label.</summary>
+    public string UserProfileDelete { get; init; } = "";
+    /// <summary>Gets the profile name label.</summary>
+    public string UserProfileName { get; init; } = "";
+    /// <summary>Gets the profile migration confirmation format string.</summary>
+    public string UserProfileMigrateFavorites { get; init; } = "";
+    /// <summary>Gets the profile deletion confirmation format string.</summary>
+    public string UserProfileDeleteConfirm { get; init; } = "";
     /// <summary>Gets the label for deleting an equalizer profile.</summary>
     public string EqualizerDelete { get; init; } = "";
     /// <summary>Gets the equalizer profile deletion dialog title.</summary>

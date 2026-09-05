@@ -40,6 +40,7 @@ public sealed class SettingsStore
             NormalizeOutputProfiles(defaultSettings);
             NormalizeInfiniteMix(defaultSettings);
             NormalizeAppearance(defaultSettings);
+            NormalizeUserProfiles(defaultSettings);
             return defaultSettings;
         }
 
@@ -55,6 +56,7 @@ public sealed class SettingsStore
             NormalizeOutputProfiles(settings);
             NormalizeInfiniteMix(settings);
             NormalizeAppearance(settings);
+            NormalizeUserProfiles(settings);
             if (migrated)
             {
                 _credentialStore.Save(credentials);
@@ -71,6 +73,7 @@ public sealed class SettingsStore
             NormalizeOutputProfiles(defaultSettings);
             NormalizeInfiniteMix(defaultSettings);
             NormalizeAppearance(defaultSettings);
+            NormalizeUserProfiles(defaultSettings);
             return defaultSettings;
         }
     }
@@ -84,6 +87,7 @@ public sealed class SettingsStore
         NormalizeOutputProfiles(settings);
         NormalizeInfiniteMix(settings);
         NormalizeAppearance(settings);
+        NormalizeUserProfiles(settings);
         var credentials = _credentialStore.Load();
         CaptureCredentials(settings, credentials);
         _credentialStore.Save(credentials);
@@ -114,6 +118,57 @@ public sealed class SettingsStore
         settings.GenreCloudBackgroundOpacity = double.IsFinite(settings.GenreCloudBackgroundOpacity)
             ? Math.Clamp(settings.GenreCloudBackgroundOpacity, 0, 1)
             : 0.5;
+    }
+
+    /// <summary>Repairs missing profile identity data and migrates legacy settings to the default profile.</summary>
+    /// <param name="settings">Settings whose profile collection is normalized.</param>
+    private static void NormalizeUserProfiles(AppSettings settings)
+    {
+        settings.UserProfiles ??= [];
+        foreach (var profile in settings.UserProfiles)
+        {
+            profile.Id = profile.Id?.Trim() ?? string.Empty;
+            profile.Name = profile.Name?.Trim() ?? string.Empty;
+            profile.ServerProfileIds ??= new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            profile.OrynivoServerFavorites ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            profile.LocalTrackFavorites ??= [];
+            profile.LocalArtistFavorites ??= [];
+            profile.LocalAlbumFavorites ??= [];
+            profile.InfiniteMix ??= new InfiniteMixSettings();
+        }
+
+        var standard = settings.UserProfiles.FirstOrDefault(profile =>
+            string.Equals(profile.Id, "standard", StringComparison.OrdinalIgnoreCase));
+        if (standard is null)
+        {
+            standard = new UserProfile { Id = "standard", Name = "Standard" };
+            settings.UserProfiles.Insert(0, standard);
+        }
+
+        // Legacy personal settings belonged to the implicit single user. Keep
+        // them in the generated Standard profile until profile-aware consumers
+        // are switched over in the following migration phase.
+        if (standard.OrynivoServerFavorites.Count == 0 && settings.OrynivoServerFavorites is not null)
+            standard.OrynivoServerFavorites = new HashSet<string>(
+                settings.OrynivoServerFavorites,
+                StringComparer.OrdinalIgnoreCase);
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var profile in settings.UserProfiles)
+        {
+            if (string.IsNullOrWhiteSpace(profile.Id) || !seen.Add(profile.Id))
+                profile.Id = Guid.NewGuid().ToString("N");
+            if (string.IsNullOrWhiteSpace(profile.Name))
+                profile.Name = string.Equals(profile.Id, standard.Id, StringComparison.OrdinalIgnoreCase)
+                    ? "Standard" : profile.Id;
+        }
+
+        if (string.IsNullOrWhiteSpace(settings.ActiveUserProfileId) ||
+            settings.UserProfiles.All(profile => !string.Equals(
+                profile.Id, settings.ActiveUserProfileId, StringComparison.OrdinalIgnoreCase)))
+        {
+            settings.ActiveUserProfileId = standard.Id;
+        }
     }
 
     /// <summary>Copies decrypted credentials into their runtime settings objects.</summary>

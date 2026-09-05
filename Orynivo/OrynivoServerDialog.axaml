@@ -72,6 +72,8 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <TextBlock Text="{DynamicResource L_OrynivoServerName}"
@@ -116,19 +118,30 @@
                  BorderBrush="{DynamicResource AppInputBorderBrush}"
                  Margin="0,0,0,8"/>
 
+        <TextBlock Grid.Row="6"
+                   Text="Serverprofil"
+                   Foreground="{DynamicResource AppMutedTextBrush}"
+                   Margin="0,0,0,6"/>
+        <ComboBox x:Name="ServerProfileComboBox"
+                  Grid.Row="7"
+                  Height="34"
+                  Margin="0,0,0,14"
+                  IsEnabled="False"
+                  SelectionChanged="ServerProfileComboBox_OnSelectionChanged"/>
+
         <TextBlock x:Name="StatusTextBlock"
-                   Grid.Row="6"
+                   Grid.Row="8"
                    MinHeight="18"
                    Foreground="{DynamicResource AppMutedTextBrush}"
                    TextWrapping="Wrap"
                    Margin="0,0,0,16"/>
 
-        <TextBlock Grid.Row="7"
+        <TextBlock Grid.Row="9"
                    Text="{DynamicResource L_OrynivoServerDirectories}"
                    Foreground="{DynamicResource AppMutedTextBrush}"
                    Margin="0,0,0,6"/>
 
-        <StackPanel Grid.Row="8"
+        <StackPanel Grid.Row="10"
                     Margin="0,0,0,16">
             <ScrollViewer MaxHeight="110"
                           VerticalScrollBarVisibility="Auto">
@@ -152,7 +165,7 @@
             </StackPanel>
         </StackPanel>
 
-        <StackPanel Grid.Row="9"
+        <StackPanel Grid.Row="11"
                     Margin="0,0,0,16">
             <CheckBox x:Name="ServerReplayGainDuringScanCheckBox"
                       Content="{DynamicResource L_OrynivoCalculateReplayGainDuringScan}"
@@ -196,7 +209,7 @@
                        TextWrapping="Wrap"/>
         </StackPanel>
 
-        <StackPanel Grid.Row="10" Margin="0,0,0,16">
+        <StackPanel Grid.Row="12" Margin="0,0,0,16">
             <TextBlock Text="{DynamicResource L_OrynivoServerBackup}"
                        Foreground="{DynamicResource AppMutedTextBrush}"
                        Margin="0,0,0,6"/>
@@ -222,7 +235,7 @@
                        TextWrapping="Wrap"/>
         </StackPanel>
 
-        <Grid Grid.Row="11">
+        <Grid Grid.Row="13">
             <Button x:Name="TestConnectionButton"
                     Content="{DynamicResource L_OrynivoTestConnection}"
                     MinWidth="170"

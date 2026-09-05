@@ -18,6 +18,8 @@ namespace Orynivo;
 public partial class OrynivoServerDialog : Window
 {
     private readonly string _serverId;
+    private string _serverProfileId;
+    private List<OrynivoServerProfile> _serverProfiles = [];
     private readonly List<string> _serverLibraryPaths = [];
     private CancellationTokenSource? _scanStatusCts;
     private bool _serverLibraryPathsLoaded;
@@ -40,6 +42,7 @@ public partial class OrynivoServerDialog : Window
     {
         InitializeComponent();
         _serverId = server?.Id ?? Guid.NewGuid().ToString("N");
+        _serverProfileId = server?.ProfileId ?? "standard";
         NameTextBox.Text   = server?.Name   ?? string.Empty;
         UrlTextBox.Text    = server?.BaseUrl ?? string.Empty;
         ApiKeyTextBox.Text = server?.ApiKey  ?? string.Empty;
@@ -49,7 +52,10 @@ public partial class OrynivoServerDialog : Window
             WindowChrome.ApplyTheme(this);
             NameTextBox.Focus();
             if (server is not null)
+            {
+                _ = LoadServerProfilesAsync();
                 _ = LoadServerLibraryPathsAsync();
+            }
         };
         KeyDown += (_, e) =>
         {
@@ -76,7 +82,10 @@ public partial class OrynivoServerDialog : Window
                 ? string.Format(LocalizationManager.Current.OrynivoConnectionSuccessful, info.Name, info.Version)
                 : LocalizationManager.Current.OrynivoConnectionFailed;
             if (info is not null)
+            {
+                await LoadServerProfilesAsync();
                 await LoadServerLibraryPathsAsync();
+            }
         }
         catch
         {
@@ -143,6 +152,34 @@ public partial class OrynivoServerDialog : Window
         {
             SetBackupControlsEnabled(true);
         }
+    }
+
+    private async Task LoadServerProfilesAsync()
+    {
+        if (!TryCreateServer(out var server))
+            return;
+        try
+        {
+            using var client = new OrynivoServerClient();
+            _serverProfiles = await client.GetProfilesAsync(server);
+            if (_serverProfiles.Count == 0)
+                return;
+            ServerProfileComboBox.ItemsSource = _serverProfiles;
+            ServerProfileComboBox.DisplayMemberBinding = new Avalonia.Data.Binding(nameof(OrynivoServerProfile.Name));
+            ServerProfileComboBox.SelectedItem = _serverProfiles.FirstOrDefault(p =>
+                string.Equals(p.Id, _serverProfileId, StringComparison.OrdinalIgnoreCase)) ?? _serverProfiles[0];
+            ServerProfileComboBox.IsEnabled = true;
+        }
+        catch
+        {
+            ServerProfileComboBox.IsEnabled = false;
+        }
+    }
+
+    private void ServerProfileComboBox_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (ServerProfileComboBox.SelectedItem is OrynivoServerProfile profile)
+            _serverProfileId = profile.Id;
     }
 
     private async void RestoreServerBackupButton_OnClick(object? sender, RoutedEventArgs e)
@@ -327,7 +364,8 @@ public partial class OrynivoServerDialog : Window
             Id      = _serverId,
             Name    = name,
             BaseUrl = url.TrimEnd('/'),
-            ApiKey  = apiKey
+            ApiKey  = apiKey,
+            ProfileId = _serverProfileId
         };
         return true;
     }

@@ -41,6 +41,50 @@ public static class ConfigurationEndpoints
         api.MapGet("/settings/replaygain", (ServerSettings settings) =>
             Results.Ok(new ReplayGainSettingsRequest(settings.CalculateMissingReplayGainDuringScan)));
 
+        api.MapGet("/profiles", (ServerSettings settings) =>
+            Results.Ok(settings.Profiles.Select(static p => new ServerProfileDto(p.Id, p.Name))));
+
+        api.MapPost("/profiles", (ServerProfileRequest request, ServerSettings settings, IWebHostEnvironment env) =>
+        {
+            var name = request.Name?.Trim() ?? string.Empty;
+            if (name.Length == 0)
+                return Results.BadRequest(new { error = "A profile name is required." });
+            if (settings.Profiles.Any(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)))
+                return Results.Conflict(new { error = "A profile with this name already exists." });
+
+            var profile = new ServerProfile { Id = Guid.NewGuid().ToString("N"), Name = name };
+            settings.Profiles.Add(profile);
+            PersistProfiles(env.ContentRootPath, settings);
+            return Results.Created($"/api/profiles/{profile.Id}", new ServerProfileDto(profile.Id, profile.Name));
+        });
+
+        api.MapPut("/profiles/{profileId}", (string profileId, ServerProfileRequest request, ServerSettings settings, IWebHostEnvironment env) =>
+        {
+            var profile = settings.Profiles.FirstOrDefault(p => string.Equals(p.Id, profileId, StringComparison.OrdinalIgnoreCase));
+            var name = request.Name?.Trim() ?? string.Empty;
+            if (profile is null)
+                return Results.NotFound();
+            if (name.Length == 0)
+                return Results.BadRequest(new { error = "A profile name is required." });
+            if (settings.Profiles.Any(p => !ReferenceEquals(p, profile) && string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)))
+                return Results.Conflict(new { error = "A profile with this name already exists." });
+            profile.Name = name;
+            PersistProfiles(env.ContentRootPath, settings);
+            return Results.Ok(new ServerProfileDto(profile.Id, profile.Name));
+        });
+
+        api.MapDelete("/profiles/{profileId}", (string profileId, ServerSettings settings, IWebHostEnvironment env) =>
+        {
+            var profile = settings.Profiles.FirstOrDefault(p => string.Equals(p.Id, profileId, StringComparison.OrdinalIgnoreCase));
+            if (profile is null)
+                return Results.NotFound();
+            if (string.Equals(profile.Id, "standard", StringComparison.OrdinalIgnoreCase))
+                return Results.BadRequest(new { error = "The Standard profile cannot be deleted." });
+            settings.Profiles.Remove(profile);
+            PersistProfiles(env.ContentRootPath, settings);
+            return Results.NoContent();
+        });
+
         api.MapPut(
             "/settings/replaygain",
             (ReplayGainSettingsRequest request, ServerSettings settings, LibraryService libraryService, IWebHostEnvironment env) =>
@@ -186,6 +230,27 @@ public static class ConfigurationEndpoints
             File.WriteAllText(appSettingsPath, root.ToJsonString(options));
         }
     }
+
+    /// <summary>Persists the server profile registry without writing secrets to logs.</summary>
+    internal static void PersistProfiles(string contentRootPath, ServerSettings settings)
+    {
+        var appSettingsPath = ResolveWritableSettingsPath(contentRootPath);
+        lock (AppSettingsWriteLock)
+        {
+            JsonObject root = File.Exists(appSettingsPath)
+                ? JsonNode.Parse(File.ReadAllText(appSettingsPath)) as JsonObject ?? []
+                : [];
+            if (root["Orynivo"] is not JsonObject orynivo)
+            {
+                orynivo = [];
+                root["Orynivo"] = orynivo;
+            }
+            orynivo["Profiles"] = new JsonArray(settings.Profiles
+                .Select(p => (JsonNode?)new JsonObject { ["Id"] = p.Id, ["Name"] = p.Name })
+                .ToArray());
+            File.WriteAllText(appSettingsPath, root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        }
+    }
 }
 
 /// <summary>Request or response payload containing server library root paths.</summary>
@@ -195,6 +260,12 @@ public sealed record LibraryPathsRequest(IReadOnlyList<string> Paths);
 /// <summary>Request or response payload containing the server scan-time ReplayGain preference.</summary>
 /// <param name="CalculateMissingReplayGainDuringScan">Whether missing values are calculated during server scans.</param>
 public sealed record ReplayGainSettingsRequest(bool CalculateMissingReplayGainDuringScan);
+
+/// <summary>Request payload for creating or renaming a server profile.</summary>
+public sealed record ServerProfileRequest(string? Name);
+
+/// <summary>Public server profile identity returned to authenticated clients.</summary>
+public sealed record ServerProfileDto(string Id, string Name);
 
 /// <summary>Response payload for a browsed server directory.</summary>
 /// <param name="Path">Directory path that was listed.</param>

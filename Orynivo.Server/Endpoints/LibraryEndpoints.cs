@@ -82,6 +82,15 @@ public static class LibraryEndpoints
             return artist is null ? Results.NotFound() : Results.Ok(ArtistDto(artist));
         });
 
+        api.MapPut("/artists/{artistId:long}/favorite", (long artistId, FavoriteUpdateRequest request) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            if (db.GetArtistById(artistId) is null)
+                return Results.NotFound();
+            db.SetArtistFavorite(artistId, request.IsFavorite);
+            return Results.Ok(new { artistId, request.IsFavorite });
+        });
+
         api.MapPost("/artists/{artistId:long}/profile", async (
             long artistId,
             ArtistProfileUpdateRequest request,
@@ -175,6 +184,15 @@ public static class LibraryEndpoints
             using var db = AudioDatabase.OpenDefault();
             var album = db.GetAlbumById(albumId);
             return album is null ? Results.NotFound() : Results.Ok(AlbumDto(album));
+        });
+
+        api.MapPut("/albums/{albumId:long}/favorite", (long albumId, FavoriteUpdateRequest request) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            if (db.GetAlbumById(albumId) is null)
+                return Results.NotFound();
+            db.SetAlbumFavorite(albumId, request.IsFavorite);
+            return Results.Ok(new { albumId, request.IsFavorite });
         });
 
         api.MapGet("/albums/recommendation-candidates", () =>
@@ -300,6 +318,34 @@ public static class LibraryEndpoints
                 db.SetTrackMusicBrainzLookupAttempt(trackId, attemptedAt);
             }
             return Results.Ok(db.GetTrackRating(trackId));
+        });
+
+        api.MapPut("/tracks/{trackId:long}/favorite", (long trackId, FavoriteUpdateRequest request) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            if (db.GetTrackById(trackId) is null)
+                return Results.NotFound();
+            db.SetTrackFavorite(trackId, request.IsFavorite);
+            return Results.Ok(new { trackId, request.IsFavorite });
+        });
+
+        api.MapGet("/history/sync", (int limit = 500) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            return Results.Ok(db.GetHistoryForSync(Math.Clamp(limit, 1, 5000)).Select(entry =>
+                new OrynivoHistorySyncEntry(entry.SyncId, entry.Path, entry.StartedAtUnix,
+                    entry.PositionSeconds, entry.DurationSeconds, entry.MediaType, entry.Title,
+                    entry.Subtitle, entry.Album, entry.ExternalId, entry.Genre)).ToList());
+        });
+
+        api.MapPost("/history/sync", (IReadOnlyList<OrynivoHistorySyncEntry> entries) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            foreach (var entry in entries.Take(5000))
+                db.ImportSyncedHistory(new SyncedPlaybackHistoryEntry(entry.SyncId, entry.Path,
+                    entry.StartedAtUnix, entry.PositionSeconds, entry.DurationSeconds, entry.MediaType,
+                    entry.Title, entry.Subtitle, entry.Album, entry.ExternalId, entry.Genre));
+            return Results.Ok(new { imported = Math.Min(entries.Count, 5000) });
         });
 
         // --- Folders -------------------------------------------------------
@@ -917,6 +963,9 @@ public sealed record TrackRatingUpdateRequest(
     long? MusicBrainzRatingFetchedAt,
     string? MusicBrainzGenres,
     string? MusicBrainzTags);
+
+/// <summary>Request body for a profile-scoped server track favorite.</summary>
+public sealed record FavoriteUpdateRequest(bool IsFavorite);
 
 /// <summary>Request body for creating a regular server playlist.</summary>
 /// <param name="Name">Playlist display name.</param>

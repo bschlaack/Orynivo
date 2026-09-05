@@ -4,6 +4,50 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.41.0] - 2026-09-05
+
+### Added
+
+- Began the multi-user profile foundation with stable local profile identities
+  and per-server profile mappings. Existing installations automatically receive
+  a `Standard` profile; personal-state migration and server profile APIs follow
+  in the next implementation phases.
+- Profile creation now offers an explicit legacy-favourite migration choice.
+  Local smart-playlist resolution reads the active profile's track favourite
+  state, while legacy installations are migrated to `Standard` automatically.
+- Playback history, listening statistics and similarity history signals are now
+  filtered by the active profile so personal listening data stays separate.
+- Album and artist catalog views now overlay profile-specific favorite state
+  while keeping shared library metadata unchanged.
+- Orynivo Server now exposes a normalized authenticated profile registry and
+  scopes personal database operations per request with `X-Orynivo-Profile`.
+- Opting into profile migration now includes playback history and Infinite Mix
+  preferences in addition to favorites and personal ratings.
+- The desktop now sends the active profile's mapped server identity with remote
+  catalog, smart-playlist and rating requests.
+- On first start, Orynivo now asks for the initial profile name and whether
+  existing personal data should be migrated before continuing.
+- Added authenticated server profile management (`GET/POST/PUT/DELETE
+  /api/profiles`) with persistent names and protected `standard` profile.
+- The desktop now discovers server profiles and automatically maps matching
+  profile names, falling back to the server's `standard` profile.
+- Every remote request now carries the selected server profile context; the
+  server accepts it as a header or non-secret `profile` query parameter.
+- Remote track favorite changes are mirrored to the server's profile-scoped
+  favorite endpoint while retaining the local profile cache.
+- Remote artist and album favorite changes are now mirrored through matching
+  profile-scoped server endpoints as well.
+- The Orynivo Server connection dialog now loads available server profiles and
+  lets the user select the profile used for this connection.
+- Recent playback history is synchronized in the background with the selected
+  server profile and merged back on other clients, keeping profile-based
+  recommendations consistent across devices.
+
+### Fixed
+
+- Dashboard album artwork now refreshes immediately after a cover search or
+  upload instead of requiring an application restart.
+
 ## [0.40.2] - 2026-09-05
 
 ### Added

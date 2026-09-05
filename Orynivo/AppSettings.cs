@@ -37,6 +37,12 @@ public sealed class AppSettings
     public int SelectedAirPlayPort { get; set; }
     /// <summary>Gets or sets the list of root directories scanned for audio files.</summary>
     public List<string> LibraryPaths { get; set; } = [];
+    /// <summary>Gets or sets the locally defined user profiles.</summary>
+    public List<UserProfile> UserProfiles { get; set; } = [];
+    /// <summary>Gets or sets whether the first-start profile setup has been completed.</summary>
+    public bool UserProfilesInitialized { get; set; }
+    /// <summary>Gets or sets the identifier of the currently active user profile.</summary>
+    public string ActiveUserProfileId { get; set; } = string.Empty;
     /// <summary>Gets or sets the identifier of the last active main-area view.</summary>
     public string LastMainView { get; set; } = "Tracks";
     /// <summary>Gets or sets a value indicating whether the album list uses the artwork grid view.</summary>

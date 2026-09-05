@@ -335,6 +335,20 @@ public sealed record DailyHistoryEntry(
     long? AlbumId,
     string? ExternalId);
 
+/// <summary>Portable playback-history row used for profile synchronization.</summary>
+public sealed record SyncedPlaybackHistoryEntry(
+    string SyncId,
+    string Path,
+    long StartedAtUnix,
+    double PositionSeconds,
+    double? DurationSeconds,
+    string MediaType,
+    string? Title,
+    string? Subtitle,
+    string? Album,
+    string? ExternalId,
+    string? Genre);
+
 /// <summary>Aggregated listening statistics for a single album across every playback source.</summary>
 /// <param name="Title">Album display title.</param>
 /// <param name="Artist">Album artist display name.</param>
@@ -384,6 +398,9 @@ public sealed record PlaybackQueueSnapshot(IReadOnlyList<string> Paths, int Curr
 /// </summary>
 public sealed class AudioDatabase : IDisposable
 {
+    // Async-local context keeps concurrent server requests isolated while the
+    // desktop application can continue to switch one process-wide profile.
+    private static readonly AsyncLocal<string?> ActiveProfileContext = new();
     private static readonly ConcurrentDictionary<string, Lazy<bool>> InitializedSchemas =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly SqliteConnection _conn;
@@ -391,6 +408,76 @@ public sealed class AudioDatabase : IDisposable
     private Dictionary<long, string>? _artistNamesById;
     private Dictionary<string, string>? _trackTitleOverrides;
     private Dictionary<string, TrackMetadataOverride>? _trackMetadataOverrides;
+
+    /// <summary>Gets the profile identifier used for newly recorded personal state.</summary>
+    public static string ActiveProfileId => ActiveProfileContext.Value ?? "standard";
+
+    /// <summary>Changes the profile context used by personal playback-history operations.</summary>
+    /// <param name="profileId">Stable profile identifier, or <see langword="null"/> to use <c>standard</c>.</param>
+    public static void SetActiveProfile(string? profileId)
+    {
+        var normalized = string.IsNullOrWhiteSpace(profileId) ? "standard" : profileId.Trim();
+        ActiveProfileContext.Value = normalized;
+    }
+
+    /// <summary>Migrates legacy global track favourites into a named profile once.</summary>
+    /// <param name="profileId">Destination profile identifier.</param>
+    public static void MigrateLegacyFavoritesToProfile(string profileId)
+    {
+        using var db = OpenDefault();
+        using var command = db._conn.CreateCommand();
+        command.CommandText = """
+            INSERT INTO profile_track_state(profile_id, track_id, is_favorite, user_rating)
+            SELECT $profile, id, is_favorite, user_rating
+            FROM tracks
+            WHERE is_favorite != 0 OR user_rating != 0
+            ON CONFLICT(profile_id, track_id) DO NOTHING;
+            INSERT INTO profile_artist_state(profile_id, artist_id, is_favorite)
+            SELECT $profile, id, is_favorite FROM artists WHERE is_favorite != 0
+            ON CONFLICT(profile_id, artist_id) DO NOTHING;
+            INSERT INTO profile_album_state(profile_id, album_id, is_favorite)
+            SELECT $profile, id, is_favorite FROM albums WHERE is_favorite != 0
+            ON CONFLICT(profile_id, album_id) DO NOTHING;
+            """;
+        Add(command, "$profile", string.IsNullOrWhiteSpace(profileId) ? "standard" : profileId.Trim());
+        command.ExecuteNonQuery();
+    }
+
+    /// <summary>Copies profile-scoped personal state, including playback history, to another profile.</summary>
+    /// <param name="sourceProfileId">Source profile identifier.</param>
+    /// <param name="targetProfileId">Destination profile identifier.</param>
+    public static void CopyProfileTrackState(string sourceProfileId, string targetProfileId)
+    {
+        using var db = OpenDefault();
+        using var command = db._conn.CreateCommand();
+        command.CommandText = """
+            INSERT INTO profile_track_state(profile_id, track_id, is_favorite, user_rating)
+            SELECT $target, track_id, is_favorite, user_rating
+            FROM profile_track_state
+            WHERE profile_id = $source
+            ON CONFLICT(profile_id, track_id) DO UPDATE SET
+                is_favorite = excluded.is_favorite,
+                user_rating = excluded.user_rating;
+            INSERT INTO profile_artist_state(profile_id, artist_id, is_favorite)
+            SELECT $target, artist_id, is_favorite FROM profile_artist_state WHERE profile_id = $source
+            ON CONFLICT(profile_id, artist_id) DO UPDATE SET is_favorite = excluded.is_favorite;
+            INSERT INTO profile_album_state(profile_id, album_id, is_favorite)
+            SELECT $target, album_id, is_favorite FROM profile_album_state WHERE profile_id = $source
+            ON CONFLICT(profile_id, album_id) DO UPDATE SET is_favorite = excluded.is_favorite;
+            INSERT INTO play_history (
+                profile_id, track_id, path, started_at, ended_at, position_seconds,
+                duration_seconds, completed, media_type, title, subtitle, album,
+                external_id, genre)
+            SELECT $target, track_id, path, started_at, ended_at, position_seconds,
+                   duration_seconds, completed, media_type, title, subtitle, album,
+                   external_id, genre
+            FROM play_history
+            WHERE profile_id = $source;
+            """;
+        Add(command, "$source", sourceProfileId);
+        Add(command, "$target", targetProfileId);
+        command.ExecuteNonQuery();
+    }
 
     /// <summary>
     /// Opens (or creates) the SQLite database at <paramref name="dbPath"/>,
@@ -923,7 +1010,7 @@ public sealed class AudioDatabase : IDisposable
     {
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = """
-            SELECT ar.id, ar.name, ar.is_favorite, NULL AS biography, ar.image_path,
+            SELECT ar.id, ar.name, COALESCE((SELECT ps.is_favorite FROM profile_artist_state ps WHERE ps.profile_id = $profile AND ps.artist_id = ar.id), ar.is_favorite), NULL AS biography, ar.image_path,
                    profile_source_url, profile_language, profile_fetched_at,
                    image_is_manual
             FROM artists ar
@@ -936,6 +1023,7 @@ public sealed class AudioDatabase : IDisposable
             ORDER BY CASE WHEN ar.name = '' THEN 1 ELSE 0 END,
                      ar.name COLLATE NOCASE;
             """;
+        Add(cmd, "$profile", ActiveProfileId);
         using var reader = cmd.ExecuteReader();
         var result = new List<ArtistInfo>();
         while (reader.Read())
@@ -958,7 +1046,7 @@ public sealed class AudioDatabase : IDisposable
     {
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = """
-            SELECT ar.id, ar.name, ar.is_favorite, ar.biography, ar.image_path,
+            SELECT ar.id, ar.name, COALESCE((SELECT ps.is_favorite FROM profile_artist_state ps WHERE ps.profile_id = $profile AND ps.artist_id = ar.id), ar.is_favorite), ar.biography, ar.image_path,
                    ar.profile_source_url, ar.profile_language, ar.profile_fetched_at,
                    ar.image_is_manual
             FROM artists ar
@@ -971,6 +1059,7 @@ public sealed class AudioDatabase : IDisposable
             ORDER BY CASE WHEN ar.name = '' THEN 1 ELSE 0 END,
                      ar.name COLLATE NOCASE;
             """;
+        Add(cmd, "$profile", ActiveProfileId);
         using var reader = cmd.ExecuteReader();
         var result = new List<ArtistInfo>();
         while (reader.Read())
@@ -1145,7 +1234,7 @@ public sealed class AudioDatabase : IDisposable
     {
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = """
-            SELECT ar.id, ar.name, ar.is_favorite, ar.biography, ar.image_path,
+            SELECT ar.id, ar.name, COALESCE((SELECT ps.is_favorite FROM profile_artist_state ps WHERE ps.profile_id = $profile AND ps.artist_id = ar.id), ar.is_favorite), ar.biography, ar.image_path,
                    ar.profile_source_url, ar.profile_language, ar.profile_fetched_at,
                    ar.image_is_manual, ar.musicbrainz_artist_id
             FROM tracks t
@@ -1154,6 +1243,7 @@ public sealed class AudioDatabase : IDisposable
             LIMIT 1;
             """;
         Add(cmd, "$path", path);
+        Add(cmd, "$profile", ActiveProfileId);
         using var reader = cmd.ExecuteReader();
         return reader.Read() ? MapArtistInfo(reader) : null;
     }
@@ -1425,7 +1515,7 @@ public sealed class AudioDatabase : IDisposable
                 CASE WHEN al.year = 0 THEN NULL ELSE al.year END AS year,
                 aw.thumb_320_path,
                 aw.thumb_96_path,
-                al.is_favorite,
+                COALESCE((SELECT ps.is_favorite FROM profile_album_state ps WHERE ps.profile_id = $profile AND ps.album_id = al.id), al.is_favorite),
                 al.artist_id
             FROM albums al
             LEFT JOIN artists ar ON ar.id = al.artist_id
@@ -1443,7 +1533,7 @@ public sealed class AudioDatabase : IDisposable
                 CASE WHEN al.year = 0 THEN NULL ELSE al.year END AS year,
                 NULL AS thumb_320_path,
                 NULL AS thumb_96_path,
-                al.is_favorite,
+                COALESCE((SELECT ps.is_favorite FROM profile_album_state ps WHERE ps.profile_id = $profile AND ps.album_id = al.id), al.is_favorite),
                 al.artist_id
             FROM albums al
             LEFT JOIN artists ar ON ar.id = al.artist_id
@@ -1453,6 +1543,7 @@ public sealed class AudioDatabase : IDisposable
                 al.title COLLATE NOCASE,
                 ar.name COLLATE NOCASE;
             """;
+        Add(cmd, "$profile", ActiveProfileId);
         using var reader = cmd.ExecuteReader();
         var result = new List<AlbumInfo>();
         while (reader.Read())
@@ -1482,7 +1573,7 @@ public sealed class AudioDatabase : IDisposable
                 CASE WHEN al.year = 0 THEN NULL ELSE al.year END,
                 aw.thumb_320_path,
                 aw.thumb_96_path,
-                al.is_favorite,
+                COALESCE((SELECT ps.is_favorite FROM profile_album_state ps WHERE ps.profile_id = $profile AND ps.album_id = al.id), al.is_favorite),
                 al.artist_id
             FROM albums al
             LEFT JOIN artists ar ON ar.id = al.artist_id
@@ -1492,6 +1583,7 @@ public sealed class AudioDatabase : IDisposable
             LIMIT 1;
             """;
         Add(cmd, "$album_id", albumId);
+        Add(cmd, "$profile", ActiveProfileId);
         using var reader = cmd.ExecuteReader();
         return reader.Read()
             ? new AlbumInfo(
@@ -1889,14 +1981,15 @@ public sealed class AudioDatabase : IDisposable
         using var cmd = _conn.CreateCommand();
         cmd.CommandText = """
             INSERT INTO play_history (
-                track_id, path, started_at, duration_seconds,
+                profile_id, track_id, path, started_at, duration_seconds,
                 media_type, title, subtitle, album, external_id, genre)
             VALUES (
-                $track_id, $path, $started_at, $duration_seconds,
+                $profile_id, $track_id, $path, $started_at, $duration_seconds,
                 $media_type, $title, $subtitle, $album, $external_id, $genre)
             RETURNING id;
             """;
         Add(cmd, "$track_id", trackId);
+        Add(cmd, "$profile_id", ActiveProfileId);
         Add(cmd, "$path", path);
         Add(cmd, "$started_at", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
         Add(cmd, "$duration_seconds", durationSeconds);
@@ -2192,7 +2285,17 @@ public sealed class AudioDatabase : IDisposable
     public List<TrackFacetInfo> GetTrackFacets()
     {
         using var cmd = _conn.CreateCommand();
-        cmd.CommandText = "SELECT id, is_favorite, genre, format, bitrate, album_id, user_rating, musicbrainz_rating, musicbrainz_rating_votes, musicbrainz_genres, musicbrainz_tags FROM tracks;";
+        cmd.CommandText = """
+            SELECT id,
+                   COALESCE((SELECT ps.is_favorite FROM profile_track_state ps
+                             WHERE ps.profile_id = $profile AND ps.track_id = tracks.id), is_favorite),
+                   genre, format, bitrate, album_id,
+                   COALESCE((SELECT ps.user_rating FROM profile_track_state ps
+                             WHERE ps.profile_id = $profile AND ps.track_id = tracks.id), user_rating),
+                   musicbrainz_rating, musicbrainz_rating_votes, musicbrainz_genres, musicbrainz_tags
+            FROM tracks;
+            """;
+        Add(cmd, "$profile", ActiveProfileId);
         using var reader = cmd.ExecuteReader();
         var result = new List<TrackFacetInfo>();
         while (reader.Read())
@@ -2222,7 +2325,8 @@ public sealed class AudioDatabase : IDisposable
         cmd.CommandText = """
             SELECT
                 t.id,
-                t.is_favorite,
+                COALESCE((SELECT ps.is_favorite FROM profile_track_state ps
+                          WHERE ps.profile_id = $profile AND ps.track_id = t.id), t.is_favorite),
                 t.genre,
                 t.format,
                 t.bitrate,
@@ -2242,11 +2346,12 @@ public sealed class AudioDatabase : IDisposable
                     COUNT(*) AS play_count,
                     MAX(started_at) AS last_played_at
                 FROM play_history
-                WHERE media_type = 'track'
+                WHERE profile_id = $profile AND media_type = 'track'
                   AND track_id IS NOT NULL
                 GROUP BY track_id
             ) ph ON ph.track_id = t.id;
             """;
+        Add(cmd, "$profile", ActiveProfileId);
         using var reader = cmd.ExecuteReader();
         var result = new List<SmartPlaylistTrackInfo>();
         while (reader.Read())
@@ -2491,11 +2596,24 @@ public sealed class AudioDatabase : IDisposable
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(rating, 0);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(rating, 5);
-        using var command = _conn.CreateCommand();
-        command.CommandText = "UPDATE tracks SET user_rating = $rating WHERE id = $id;";
-        Add(command, "$rating", rating);
-        Add(command, "$id", trackId);
-        command.ExecuteNonQuery();
+        if (string.Equals(ActiveProfileId, "standard", StringComparison.Ordinal))
+        {
+            using var command = _conn.CreateCommand();
+            command.CommandText = "UPDATE tracks SET user_rating = $rating WHERE id = $id;";
+            Add(command, "$rating", rating);
+            Add(command, "$id", trackId);
+            command.ExecuteNonQuery();
+        }
+        using var profile = _conn.CreateCommand();
+        profile.CommandText = """
+            INSERT INTO profile_track_state(profile_id, track_id, user_rating)
+            VALUES ($profile, $id, $rating)
+            ON CONFLICT(profile_id, track_id) DO UPDATE SET user_rating = excluded.user_rating;
+            """;
+        Add(profile, "$profile", ActiveProfileId);
+        Add(profile, "$id", trackId);
+        Add(profile, "$rating", rating);
+        profile.ExecuteNonQuery();
     }
 
     /// <summary>Gets personal and cached community rating data for a track.</summary>
@@ -2505,11 +2623,14 @@ public sealed class AudioDatabase : IDisposable
     {
         using var command = _conn.CreateCommand();
         command.CommandText = """
-            SELECT id, user_rating, musicbrainz_track_id, musicbrainz_rating,
+            SELECT id, COALESCE((SELECT ps.user_rating FROM profile_track_state ps
+                                WHERE ps.profile_id = $profile AND ps.track_id = tracks.id), user_rating),
+                   musicbrainz_track_id, musicbrainz_rating,
                    musicbrainz_rating_votes, musicbrainz_rating_fetched_at
             FROM tracks WHERE id = $id LIMIT 1;
             """;
         Add(command, "$id", trackId);
+        Add(command, "$profile", ActiveProfileId);
         using var reader = command.ExecuteReader();
         return reader.Read()
             ? new TrackRatingInfo(
@@ -3038,8 +3159,31 @@ public sealed class AudioDatabase : IDisposable
                 UNIQUE(target_type, target_id)
             );
 
+            CREATE TABLE IF NOT EXISTS profile_track_state (
+                profile_id TEXT NOT NULL,
+                track_id INTEGER NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
+                is_favorite INTEGER NOT NULL DEFAULT 0,
+                user_rating INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY(profile_id, track_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS profile_artist_state (
+                profile_id TEXT NOT NULL,
+                artist_id INTEGER NOT NULL REFERENCES artists(id) ON DELETE CASCADE,
+                is_favorite INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY(profile_id, artist_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS profile_album_state (
+                profile_id TEXT NOT NULL,
+                album_id INTEGER NOT NULL REFERENCES albums(id) ON DELETE CASCADE,
+                is_favorite INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY(profile_id, album_id)
+            );
+
             CREATE TABLE IF NOT EXISTS play_history (
                 id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                profile_id       TEXT NOT NULL DEFAULT 'standard',
                 track_id         INTEGER REFERENCES tracks(id) ON DELETE SET NULL,
                 path             TEXT NOT NULL,
                 started_at       INTEGER NOT NULL,
@@ -3061,6 +3205,7 @@ public sealed class AudioDatabase : IDisposable
             CREATE INDEX IF NOT EXISTS idx_tracks_album_added   ON tracks (album_id, added_at DESC);
             CREATE INDEX IF NOT EXISTS idx_play_history_track   ON play_history (track_id, started_at DESC);
             CREATE INDEX IF NOT EXISTS idx_play_history_started ON play_history (started_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_play_history_profile_started ON play_history (profile_id, started_at DESC);
 
             CREATE TABLE IF NOT EXISTS app_meta (
                 key   TEXT PRIMARY KEY,
@@ -3134,6 +3279,7 @@ public sealed class AudioDatabase : IDisposable
             // Genre captured at playback time so genre statistics can include tracks
             // without a local library row (remote Orynivo Server and Plex tracks).
             EnsureColumn("play_history", "genre", "TEXT");
+            EnsureColumn("play_history", "profile_id", "TEXT NOT NULL DEFAULT 'standard'");
         }
 
         if (!string.Equals(GetMeta("normalized_library_v1"), "done", StringComparison.Ordinal))
@@ -3924,6 +4070,65 @@ public sealed class AudioDatabase : IDisposable
         cmd.ExecuteNonQuery();
     }
 
+    /// <summary>Returns portable history rows for background profile synchronization.</summary>
+    public List<SyncedPlaybackHistoryEntry> GetHistoryForSync(int limit = 500)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT id, path, started_at, COALESCE(position_seconds, 0), duration_seconds,
+                   media_type, title, subtitle, album, external_id, genre
+            FROM play_history
+            WHERE profile_id = $profile
+            ORDER BY started_at DESC, id DESC LIMIT $limit;
+            """;
+        cmd.Parameters.AddWithValue("$profile", ActiveProfileId);
+        cmd.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 5000));
+        using var reader = cmd.ExecuteReader();
+        var result = new List<SyncedPlaybackHistoryEntry>();
+        while (reader.Read())
+        {
+            var id = reader.GetInt64(0);
+            var externalId = reader.IsDBNull(9) ? null : reader.GetString(9);
+            result.Add(new SyncedPlaybackHistoryEntry(
+                externalId ?? $"{Environment.MachineName}:{ActiveProfileId}:{id}",
+                reader.GetString(1), reader.GetInt64(2), reader.GetDouble(3),
+                reader.IsDBNull(4) ? null : reader.GetDouble(4), reader.GetString(5),
+                reader.IsDBNull(6) ? null : reader.GetString(6),
+                reader.IsDBNull(7) ? null : reader.GetString(7),
+                reader.IsDBNull(8) ? null : reader.GetString(8),
+                externalId,
+                reader.IsDBNull(10) ? null : reader.GetString(10)));
+        }
+        return result;
+    }
+
+    /// <summary>Imports a remote history row once for the active profile.</summary>
+    public void ImportSyncedHistory(SyncedPlaybackHistoryEntry entry)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            UPDATE play_history SET position_seconds = $position,
+                duration_seconds = $duration,
+                completed = CASE WHEN $duration IS NOT NULL AND $position >= $duration THEN 1 ELSE completed END
+            WHERE profile_id = $profile AND external_id = $sync_id;
+            INSERT INTO play_history(profile_id, path, started_at, duration_seconds,
+                position_seconds, completed, media_type, title, subtitle, album,
+                external_id, genre)
+            SELECT $profile, $path, $started, $duration, $position,
+                   CASE WHEN $duration IS NOT NULL AND $position >= $duration THEN 1 ELSE 0 END,
+                   $media_type, $title, $subtitle, $album, $external_id, $genre
+            WHERE NOT EXISTS (
+                SELECT 1 FROM play_history WHERE profile_id = $profile AND external_id = $sync_id);
+            """;
+        Add(cmd, "$profile", ActiveProfileId); Add(cmd, "$path", entry.Path);
+        Add(cmd, "$started", entry.StartedAtUnix); Add(cmd, "$duration", entry.DurationSeconds);
+        Add(cmd, "$position", entry.PositionSeconds); Add(cmd, "$media_type", entry.MediaType);
+        Add(cmd, "$title", entry.Title); Add(cmd, "$subtitle", entry.Subtitle);
+        Add(cmd, "$album", entry.Album); Add(cmd, "$external_id", entry.SyncId);
+        Add(cmd, "$genre", entry.Genre); Add(cmd, "$sync_id", entry.SyncId);
+        cmd.ExecuteNonQuery();
+    }
+
     /// <summary>
     /// Invalidates empty rating timestamps produced by the short-lived batched
     /// search implementation, whose search responses did not reliably include
@@ -3965,11 +4170,46 @@ public sealed class AudioDatabase : IDisposable
 
     private void SetFavorite(string table, long id, bool value)
     {
-        using var cmd = _conn.CreateCommand();
-        cmd.CommandText = $"UPDATE {table} SET is_favorite = $value WHERE id = $id;";
-        Add(cmd, "$value", value ? 1 : 0);
-        Add(cmd, "$id", id);
-        cmd.ExecuteNonQuery();
+        if (string.Equals(table, "tracks", StringComparison.Ordinal))
+        {
+            using var profile = _conn.CreateCommand();
+            profile.CommandText = """
+                INSERT INTO profile_track_state(profile_id, track_id, is_favorite)
+                VALUES ($profile, $id, $value)
+                ON CONFLICT(profile_id, track_id) DO UPDATE SET is_favorite = excluded.is_favorite;
+                """;
+            Add(profile, "$profile", ActiveProfileId);
+            Add(profile, "$id", id);
+            Add(profile, "$value", value ? 1 : 0);
+            profile.ExecuteNonQuery();
+        }
+        else if (string.Equals(table, "artists", StringComparison.Ordinal) ||
+                 string.Equals(table, "albums", StringComparison.Ordinal))
+        {
+            var stateTable = table == "artists" ? "profile_artist_state" : "profile_album_state";
+            var idColumn = table == "artists" ? "artist_id" : "album_id";
+            using var profile = _conn.CreateCommand();
+            profile.CommandText = $"""
+                INSERT INTO {stateTable}(profile_id, {idColumn}, is_favorite)
+                VALUES ($profile, $id, $value)
+                ON CONFLICT(profile_id, {idColumn}) DO UPDATE SET is_favorite = excluded.is_favorite;
+                """;
+            Add(profile, "$profile", ActiveProfileId);
+            Add(profile, "$id", id);
+            Add(profile, "$value", value ? 1 : 0);
+            profile.ExecuteNonQuery();
+        }
+        // Keep the legacy columns in sync only for the default profile.  Other
+        // profiles are represented exclusively by the profile state tables so
+        // changing a favorite cannot leak into another user's view.
+        if (string.Equals(ActiveProfileId, "standard", StringComparison.Ordinal))
+        {
+            using var cmd = _conn.CreateCommand();
+            cmd.CommandText = $"UPDATE {table} SET is_favorite = $value WHERE id = $id;";
+            Add(cmd, "$value", value ? 1 : 0);
+            Add(cmd, "$id", id);
+            cmd.ExecuteNonQuery();
+        }
     }
 
     private void MigrateArtworkFiles()
@@ -4708,12 +4948,13 @@ public sealed class AudioDatabase : IDisposable
         cmd.CommandText = """
             SELECT COALESCE(SUM(position_seconds), 0)
             FROM play_history
-            WHERE position_seconds > 0
+            WHERE profile_id = $profile AND position_seconds > 0
               AND ($since IS NULL OR started_at >= $since)
               AND ($until IS NULL OR started_at < $until);
             """;
         cmd.Parameters.AddWithValue("$since", (object?)sinceUnix ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$until", (object?)untilUnix ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$profile", ActiveProfileId);
         return Convert.ToDouble(cmd.ExecuteScalar() ?? 0, CultureInfo.InvariantCulture);
     }
 
@@ -4728,9 +4969,10 @@ public sealed class AudioDatabase : IDisposable
         long start;
         using (var startCmd = _conn.CreateCommand())
         {
-            startCmd.CommandText = "SELECT COALESCE($since, MIN(started_at), $end) FROM play_history;";
+            startCmd.CommandText = "SELECT COALESCE($since, MIN(started_at), $end) FROM play_history WHERE profile_id = $profile;";
             startCmd.Parameters.AddWithValue("$since", (object?)sinceUnix ?? DBNull.Value);
             startCmd.Parameters.AddWithValue("$end", end);
+            startCmd.Parameters.AddWithValue("$profile", ActiveProfileId);
             start = Convert.ToInt64(startCmd.ExecuteScalar() ?? end, CultureInfo.InvariantCulture);
         }
 
@@ -4741,13 +4983,14 @@ public sealed class AudioDatabase : IDisposable
             SELECT MIN($last, CAST((started_at - $start) / $width AS INTEGER)) AS bucket,
                    SUM(position_seconds)
             FROM play_history
-            WHERE position_seconds > 0 AND started_at >= $start AND started_at < $end
+            WHERE profile_id = $profile AND position_seconds > 0 AND started_at >= $start AND started_at < $end
             GROUP BY bucket;
             """;
         cmd.Parameters.AddWithValue("$last", bucketCount - 1);
         cmd.Parameters.AddWithValue("$start", start);
         cmd.Parameters.AddWithValue("$end", end);
         cmd.Parameters.AddWithValue("$width", width);
+        cmd.Parameters.AddWithValue("$profile", ActiveProfileId);
         using var reader = cmd.ExecuteReader();
         while (reader.Read())
         {
@@ -5055,6 +5298,7 @@ public sealed class AudioDatabase : IDisposable
             LEFT JOIN artists ar ON ar.id = a.artist_id
             LEFT JOIN artworks art ON art.id = a.artwork_id;
             """;
+        Add(cmd, "$profile", ActiveProfileId);
         using var reader = cmd.ExecuteReader();
         var result = new List<RecommendationAlbumInfo>();
         while (reader.Read())
@@ -5095,7 +5339,7 @@ public sealed class AudioDatabase : IDisposable
             LEFT JOIN (
                 SELECT track_id, COUNT(*) AS play_count, MAX(started_at) AS last_played_at
                 FROM play_history
-                WHERE media_type = 'track' AND track_id IS NOT NULL
+                WHERE profile_id = $profile AND media_type = 'track' AND track_id IS NOT NULL
                   AND position_seconds > 0
                 GROUP BY track_id
             ) ph ON ph.track_id = t.id
@@ -5105,6 +5349,7 @@ public sealed class AudioDatabase : IDisposable
             """;
         cmd.Parameters.AddWithValue("$limit", limit);
         cmd.Parameters.AddWithValue("$offset", offset);
+        cmd.Parameters.AddWithValue("$profile", ActiveProfileId);
         cmd.Parameters.AddWithValue("$audioFeatureVersion", AudioFeatureAnalysisService.CurrentVersion);
         using var reader = cmd.ExecuteReader();
         var result = new List<SimilarityTrackProfile>();
@@ -5230,11 +5475,12 @@ public sealed class AudioDatabase : IDisposable
             LEFT JOIN tracks t ON t.id = ph.track_id
             LEFT JOIN albums a ON a.id = t.album_id
             LEFT JOIN artists ar ON ar.id = COALESCE(a.artist_id, t.artist_id)
-            WHERE ph.position_seconds > 0
+            WHERE ph.profile_id = $profile AND ph.position_seconds > 0
               AND COALESCE(a.title, t.album, ph.album, '') <> ''
               AND ($since IS NULL OR ph.started_at >= $since);
             """;
         cmd.Parameters.AddWithValue("$since", (object?)sinceUnix ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("$profile", ActiveProfileId);
         using var reader = cmd.ExecuteReader();
         var result = new List<PlayedAlbumIdentity>();
         while (reader.Read())
@@ -5253,11 +5499,12 @@ public sealed class AudioDatabase : IDisposable
                 SELECT CAST(strftime('%d', started_at, 'unixepoch', 'localtime') AS INTEGER) AS day,
                        SUM(COALESCE(position_seconds, 0)) AS secs
                 FROM play_history
-                WHERE strftime('%Y-%m', started_at, 'unixepoch', 'localtime') = $ym
+                WHERE profile_id = $profile AND strftime('%Y-%m', started_at, 'unixepoch', 'localtime') = $ym
                   AND position_seconds > 0
                 GROUP BY day;
                 """;
             cmd.Parameters.AddWithValue("$ym", ym);
+            cmd.Parameters.AddWithValue("$profile", ActiveProfileId);
             using var r = cmd.ExecuteReader();
             while (r.Read())
                 dayTotals[r.GetInt32(0)] = r.GetDouble(1);
@@ -5274,13 +5521,14 @@ public sealed class AudioDatabase : IDisposable
                        COALESCE(t.genre, ph.genre) AS genre
                 FROM play_history ph
                 LEFT JOIN tracks t ON t.id = ph.track_id
-                WHERE strftime('%Y-%m', ph.started_at, 'unixepoch', 'localtime') = $ym
+                WHERE ph.profile_id = $profile AND strftime('%Y-%m', ph.started_at, 'unixepoch', 'localtime') = $ym
                   AND ph.position_seconds > 0
                   AND COALESCE(t.genre, ph.genre) IS NOT NULL
                   AND COALESCE(t.genre, ph.genre) != ''
                 GROUP BY day, COALESCE(t.genre, ph.genre);
                 """;
             cmd.Parameters.AddWithValue("$ym", ym);
+            cmd.Parameters.AddWithValue("$profile", ActiveProfileId);
             using var r = cmd.ExecuteReader();
             while (r.Read())
             {
@@ -5334,13 +5582,14 @@ public sealed class AudioDatabase : IDisposable
             LEFT JOIN tracks t ON t.id = ph.track_id
             LEFT JOIN artists ar ON ar.id = t.artist_id
             LEFT JOIN albums a ON a.id = t.album_id
-            WHERE ph.started_at >= $start
+            WHERE ph.profile_id = $profile AND ph.started_at >= $start
               AND ph.started_at < $end
               AND COALESCE(ph.position_seconds, 0) > 0
             ORDER BY ph.started_at DESC, ph.id DESC;
             """;
         cmd.Parameters.AddWithValue("$start", start);
         cmd.Parameters.AddWithValue("$end", end);
+        cmd.Parameters.AddWithValue("$profile", ActiveProfileId);
 
         using var r = cmd.ExecuteReader();
         var result = new List<DailyHistoryEntry>();
@@ -5388,11 +5637,12 @@ public sealed class AudioDatabase : IDisposable
             LEFT JOIN tracks t ON t.id = ph.track_id
             LEFT JOIN artists ar ON ar.id = t.artist_id
             LEFT JOIN albums a ON a.id = t.album_id
-            WHERE COALESCE(ph.position_seconds, 0) > 0
+            WHERE ph.profile_id = $profile AND COALESCE(ph.position_seconds, 0) > 0
             ORDER BY ph.started_at DESC, ph.id DESC
             LIMIT $limit;
             """;
         cmd.Parameters.AddWithValue("$limit", limit);
+        cmd.Parameters.AddWithValue("$profile", ActiveProfileId);
         using var r = cmd.ExecuteReader();
         var result = new List<DailyHistoryEntry>();
         while (r.Read())
@@ -5430,7 +5680,7 @@ public sealed class AudioDatabase : IDisposable
                    SUM(COALESCE(ph.position_seconds, 0)) AS secs
             FROM play_history ph
             LEFT JOIN tracks t ON t.id = ph.track_id
-            WHERE ph.position_seconds > 0
+            WHERE ph.profile_id = $profile AND ph.position_seconds > 0
               AND COALESCE(t.genre, ph.genre) IS NOT NULL
               AND COALESCE(t.genre, ph.genre) != ''
               {(sinceUnix.HasValue ? "AND ph.started_at >= $since" : string.Empty)}
@@ -5439,6 +5689,7 @@ public sealed class AudioDatabase : IDisposable
             """;
         if (sinceUnix.HasValue)
             cmd.Parameters.AddWithValue("$since", sinceUnix.Value);
+        cmd.Parameters.AddWithValue("$profile", ActiveProfileId);
         using var r = cmd.ExecuteReader();
         while (r.Read())
         {
@@ -5479,13 +5730,14 @@ public sealed class AudioDatabase : IDisposable
             LEFT JOIN albums   a   ON a.id = t.album_id
             LEFT JOIN artists  ar  ON ar.id = a.artist_id
             LEFT JOIN artworks art ON art.id = a.artwork_id
-            WHERE ph.media_type = 'track'
+            WHERE ph.profile_id = $profile AND ph.media_type = 'track'
               AND COALESCE(ph.position_seconds, 0) > 0
               AND TRIM(COALESCE(a.title, t.album, ph.album, '')) != ''
               {(sinceUnix.HasValue ? "AND ph.started_at >= $since" : string.Empty)};
             """;
         if (sinceUnix.HasValue)
             cmd.Parameters.AddWithValue("$since", sinceUnix.Value);
+        cmd.Parameters.AddWithValue("$profile", ActiveProfileId);
 
         using var r = cmd.ExecuteReader();
         while (r.Read())
@@ -5546,13 +5798,14 @@ public sealed class AudioDatabase : IDisposable
             FROM play_history ph
             LEFT JOIN tracks  t  ON t.id = ph.track_id
             LEFT JOIN artists ar ON ar.id = t.artist_id
-            WHERE ph.media_type = 'track'
+            WHERE ph.profile_id = $profile AND ph.media_type = 'track'
               AND COALESCE(ph.position_seconds, 0) > 0
               AND TRIM(COALESCE(ar.name, t.artist, ph.subtitle, '')) != ''
               {(sinceUnix.HasValue ? "AND ph.started_at >= $since" : string.Empty)};
             """;
         if (sinceUnix.HasValue)
             cmd.Parameters.AddWithValue("$since", sinceUnix.Value);
+        cmd.Parameters.AddWithValue("$profile", ActiveProfileId);
 
         using var r = cmd.ExecuteReader();
         while (r.Read())
