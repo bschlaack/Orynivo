@@ -4,6 +4,14 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.41.1] - 2026-09-05
+
+### Fixed
+
+- Fixed startup failure on existing databases whose `play_history` table did
+  not yet contain the profile column. The profile history index is now created
+  only after the compatibility migration adds that column.
+
 ## [0.41.0] - 2026-09-05
 
 ### Added
