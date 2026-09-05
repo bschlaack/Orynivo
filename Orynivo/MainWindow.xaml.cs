@@ -897,6 +897,7 @@ public partial class MainWindow : Window
         Dispatcher.UIThread.Post(AttachContentDataGridVerticalScrollBar, DispatcherPriority.Loaded);
         if (!_settings.UserProfilesInitialized)
             _ = PromptInitialUserProfileAsync();
+        _ = WarmSimilarityFeatureCacheAsync();
     }
 
     private async Task PromptInitialUserProfileAsync()

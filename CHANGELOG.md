@@ -4,6 +4,15 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.41.2] - 2026-09-05
+
+### Fixed
+
+- Similar-title and mood-mix ranking now runs on a background thread, keeping
+  the UI and playback controls responsive for large libraries.
+- Similarity vectors are preloaded in the background after startup, and the
+  similarity action reports its loading and ranking progress.
+
 ## [0.41.1] - 2026-09-05
 
 ### Fixed

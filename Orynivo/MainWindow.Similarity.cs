@@ -52,6 +52,7 @@ public partial class MainWindow
             }
 
             var vectors = await LoadAvailableSimilarityFeaturesAsync();
+            StatusTextBlock.Text = $"{LocalizationManager.Current.SimilarTracksLoading} ({vectors.Count:N0})";
             var seed = vectors.FirstOrDefault(vector =>
                 vector.SourceKey == seedIdentity.Value.SourceKey && vector.TrackId == seedIdentity.Value.TrackId);
             if (seed is null)
@@ -60,12 +61,16 @@ public partial class MainWindow
                 return;
             }
 
-            var matches = SimilarityFeatureService.RankSimilar(
+            // Ranking can traverse tens of thousands of local and remote
+            // vectors. Keep the CPU-heavy calculation off Avalonia's UI thread
+            // so playback controls and navigation remain responsive.
+            var matches = await Task.Run(() => SimilarityFeatureService.RankSimilar(
                 seed,
                 vectors,
                 maximumResults: 500,
                 maximumPerArtist: 10,
-                maximumPerAlbum: 5);
+                maximumPerAlbum: 5));
+            StatusTextBlock.Text = $"{LocalizationManager.Current.SimilarTracksLoading} ({matches.Count:N0})";
             var initialVectors = matches.Take(SimilarityQueueSize).Select(match => match.Vector).ToList();
             var rows = await ResolveSimilarityRowsAsync(initialVectors);
             if (rows.Count == 0)
@@ -116,7 +121,7 @@ public partial class MainWindow
         try
         {
             var vectors = await LoadAvailableSimilarityFeaturesAsync();
-            var ranked = SimilarityFeatureService.RankMood(action.Mood, vectors)
+            var ranked = (await Task.Run(() => SimilarityFeatureService.RankMood(action.Mood, vectors)))
                 .Select(match => match.Vector)
                 .ToList();
             var seedIdentity = await ResolveSimilaritySeedAsync(action.Path);
@@ -188,6 +193,19 @@ public partial class MainWindow
         finally
         {
             _similarityFeatureCacheGate.Release();
+        }
+    }
+
+    /// <summary>Preloads similarity vectors after startup without delaying the UI.</summary>
+    private async Task WarmSimilarityFeatureCacheAsync()
+    {
+        try
+        {
+            await LoadAvailableSimilarityFeaturesAsync();
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine($"Similarity cache warm-up failed: {exception.GetType().Name}");
         }
     }
 
