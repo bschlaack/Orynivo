@@ -5,6 +5,12 @@ using System.Security.Cryptography;
 
 namespace Orynivo.Library;
 
+/// <summary>Measured progress within one metadata-review phase; no media paths are exposed.</summary>
+/// <param name="Phase">Stable phase identifier: folders, hashes, search, or releases.</param>
+/// <param name="Completed">Completed work units within this phase.</param>
+/// <param name="Total">Known total, or zero when not yet known.</param>
+public sealed record MetadataReviewProgress(string Phase, int Completed, int Total);
+
 /// <summary>Severity assigned to one Library Doctor finding.</summary>
 public enum LibraryDoctorSeverity
 {
@@ -166,11 +172,15 @@ public static class LibraryMetadataRepairService
     /// <param name="tracks">Compact indexed track metadata.</param>
     /// <param name="includeHealthy">Whether candidates without detected inconsistencies are included.</param>
     /// <param name="cancellationToken">Token used to cancel folder and physical-source analysis.</param>
+    /// <param name="inspectFiles">Whether to open physical files and hash duplicate candidates; false performs an index-only review.</param>
+    /// <param name="progress">Optional phase progress observer.</param>
     /// <returns>Physical folder candidates ordered by path.</returns>
     public static List<MetadataFolderCandidate> Analyze(
         IEnumerable<MetadataRepairTrack> tracks,
         bool includeHealthy = false,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool inspectFiles = true,
+        IProgress<MetadataReviewProgress>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(tracks);
         cancellationToken.ThrowIfCancellationRequested();
@@ -179,7 +189,9 @@ public static class LibraryMetadataRepairService
             .Where(static track => !string.IsNullOrWhiteSpace(track.AcoustIdFingerprint))
             .GroupBy(static track => track.AcoustIdFingerprint!, StringComparer.Ordinal)
             .ToDictionary(static group => group.Key, static group => group.ToList(), StringComparer.Ordinal);
-        var contentHashes = BuildDuplicateContentHashes(fingerprintGroups, cancellationToken);
+        var contentHashes = inspectFiles
+            ? BuildDuplicateContentHashes(fingerprintGroups, cancellationToken, progress)
+            : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var variantArtistKeys = trackList
             .SelectMany(static track => new[] { track.Artist, track.AlbumArtist })
             .Where(static name => !string.IsNullOrWhiteSpace(name))
@@ -188,17 +200,17 @@ public static class LibraryMetadataRepairService
             .Where(static group => group.Distinct(StringComparer.Ordinal).Skip(1).Any())
             .Select(static group => group.Key)
             .ToHashSet(StringComparer.Ordinal);
-        return trackList
+        var folders = trackList
             .GroupBy(track => ResolveAlbumFolder(track.SourcePath), StringComparer.OrdinalIgnoreCase)
             .Where(group => !string.IsNullOrWhiteSpace(group.Key))
+            .ToList();
+        var completed = 0;
+        progress?.Report(new("folders", 0, folders.Count));
+        return folders
             .Select(group =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var ordered = group
-                    .OrderBy(track => track.DiscNumber ?? 1)
-                    .ThenBy(track => track.TrackNumber ?? int.MaxValue)
-                    .ThenBy(track => track.SourcePath, StringComparer.OrdinalIgnoreCase)
-                    .ToList();
+                var ordered = OrderTracks(group);
                 var albumCount = CountDistinct(ordered.Select(track => track.Album));
                 var albumArtistCount = CountDistinct(ordered.Select(track => track.AlbumArtist));
                 var duplicateNumbers = ordered
@@ -221,7 +233,8 @@ public static class LibraryMetadataRepairService
                             .Count();
                         return Math.Max(0, declaredTotal - present);
                     });
-                var (missingFiles, unreadableFiles) = AnalyzeSourceFiles(ordered, cancellationToken);
+                var (missingFiles, unreadableFiles) = inspectFiles
+                    ? AnalyzeSourceFiles(ordered, cancellationToken) : (0, 0);
                 var (exactDuplicates, likelyDuplicates, alternateRecordings) = AnalyzeDuplicateCandidates(
                     ordered,
                     fingerprintGroups,
@@ -233,6 +246,7 @@ public static class LibraryMetadataRepairService
                     .Select(static name => name!.Trim())
                     .Distinct(StringComparer.Ordinal)
                     .Count();
+                progress?.Report(new("folders", ++completed, folders.Count));
                 return new MetadataFolderCandidate(
                     group.Key,
                     ordered,
@@ -245,7 +259,8 @@ public static class LibraryMetadataRepairService
                     ordered.Count(track => string.IsNullOrWhiteSpace(track.MusicBrainzTrackId)),
                     missingExpectedTracks,
                     !ordered.Any(track => track.HasAlbumArtwork),
-                    !ordered.Any(track => !string.IsNullOrWhiteSpace(track.ArtistImagePath) && File.Exists(track.ArtistImagePath)),
+                    !ordered.Any(track => !string.IsNullOrWhiteSpace(track.ArtistImagePath) &&
+                        (!inspectFiles || File.Exists(track.ArtistImagePath))),
                     missingFiles,
                     unreadableFiles,
                     likelyDuplicates,
@@ -300,7 +315,8 @@ public static class LibraryMetadataRepairService
 
     private static Dictionary<string, string> BuildDuplicateContentHashes(
         IReadOnlyDictionary<string, List<MetadataRepairTrack>> fingerprintGroups,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IProgress<MetadataReviewProgress>? progress)
     {
         var paths = fingerprintGroups.Values
             .SelectMany(group => group
@@ -312,8 +328,10 @@ public static class LibraryMetadataRepairService
                     .Skip(1)
                     .Any())
                 .SelectMany(static sizeGroup => sizeGroup.Select(track => track.SourcePath)))
-            .Distinct(StringComparer.OrdinalIgnoreCase);
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var completed = 0;
+        progress?.Report(new("hashes", 0, paths.Count));
         foreach (var path in paths)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -339,6 +357,7 @@ public static class LibraryMetadataRepairService
             {
                 // The existing source-file finding reports this path; retain a likely match only.
             }
+            progress?.Report(new("hashes", ++completed, paths.Count));
         }
         return result;
     }
@@ -386,18 +405,18 @@ public static class LibraryMetadataRepairService
     /// <param name="albumQuery">Editable release-title query, or empty to use only fuzzy CD-TOC lookup.</param>
     /// <param name="artistQuery">Optional editable release-artist query.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="progress">Optional lookup phase observer.</param>
     /// <returns>Up to ten ranked release-medium matches.</returns>
     public static async Task<List<MetadataReleaseMatch>> LookupAsync(
         MetadataFolderCandidate candidate,
         string? albumQuery = null,
         string? artistQuery = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IProgress<MetadataReviewProgress>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(candidate);
-        var tracks = candidate.Tracks
-            .OrderBy(track => track.TrackNumber ?? int.MaxValue)
-            .ThenBy(track => track.SourcePath, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        var tracks = OrderTracks(candidate.Tracks);
+        progress?.Report(new("search", 0, 0));
         if (tracks.Count == 0)
             return [];
 
@@ -421,7 +440,7 @@ public static class LibraryMetadataRepairService
             releases = await SearchReleaseDetailsAsync(
                 albumQuery.Trim(),
                 artistQuery?.Trim(),
-                cancellationToken);
+                cancellationToken, progress);
         }
 
         var result = new List<MetadataReleaseMatch>();
@@ -523,7 +542,8 @@ public static class LibraryMetadataRepairService
     private static async Task<List<JsonElement>> SearchReleaseDetailsAsync(
         string albumQuery,
         string? artistQuery,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IProgress<MetadataReviewProgress>? progress)
     {
         var exactQuery = $"release:\"{EscapeSearchValue(albumQuery)}\"";
         if (!string.IsNullOrWhiteSpace(artistQuery))
@@ -543,6 +563,7 @@ public static class LibraryMetadataRepairService
         }
 
         var result = new List<JsonElement>();
+        progress?.Report(new("releases", 0, Math.Min(10, releaseIds.Count)));
         foreach (var id in releaseIds.Take(10))
         {
             using var detailResponse = await GetMusicBrainzAsync(
@@ -553,6 +574,7 @@ public static class LibraryMetadataRepairService
                 await detailResponse.Content.ReadAsStreamAsync(cancellationToken),
                 cancellationToken: cancellationToken);
             result.Add(detailDocument.RootElement.Clone());
+            progress?.Report(new("releases", result.Count, Math.Min(10, releaseIds.Count)));
         }
         return result;
     }
@@ -662,11 +684,10 @@ public static class LibraryMetadataRepairService
     {
         ArgumentNullException.ThrowIfNull(candidate);
         ArgumentNullException.ThrowIfNull(match);
-        var local = candidate.Tracks
-            .OrderBy(track => track.TrackNumber ?? int.MaxValue)
-            .ThenBy(track => track.SourcePath, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        var count = Math.Min(local.Count, match.Tracks.Count);
+        var local = OrderTracks(candidate.Tracks);
+        if (local.Count != match.Tracks.Count)
+            throw new ArgumentException("The proposed medium must match the complete folder track count.", nameof(match));
+        var count = local.Count;
         var result = new List<TrackMetadataOverride>(count);
         for (var index = 0; index < count; index++)
         {
@@ -687,6 +708,16 @@ public static class LibraryMetadataRepairService
         }
         return result;
     }
+
+    /// <summary>Returns the shared deterministic ordering used by search, preview, and confirmed corrections.</summary>
+    /// <param name="tracks">Indexed tracks to order.</param>
+    /// <returns>Tracks ordered by disc, track number, physical source, and stable ID.</returns>
+    public static List<MetadataRepairTrack> OrderTracks(IEnumerable<MetadataRepairTrack> tracks) => tracks
+        .OrderBy(track => track.DiscNumber ?? 1)
+        .ThenBy(track => track.TrackNumber ?? int.MaxValue)
+        .ThenBy(track => track.SourcePath, StringComparer.OrdinalIgnoreCase)
+        .ThenBy(track => track.Id)
+        .ToList();
 
     private static string ResolveAlbumFolder(string sourcePath)
         => Path.GetDirectoryName(sourcePath) ?? string.Empty;

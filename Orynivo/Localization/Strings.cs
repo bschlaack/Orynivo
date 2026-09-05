@@ -523,6 +523,40 @@ public sealed record LocalizedStrings(
     /// <summary>Gets the uppercase Settings navigation group heading for metadata tools.</summary>
     /// <summary>Gets the explanatory text for the metadata-problems view.</summary>
     public string MetadataProblemsHint { get; init; } = "";
+    /// <summary>Gets the localized metadata-review MetadataWorkflow text.</summary>
+    public string MetadataWorkflow { get; init; } = "";
+    /// <summary>Gets the empty-result message for the current review filters.</summary>
+    public string MetadataNoFindings { get; init; } = "";
+    /// <summary>Gets the localized metadata-review MetadataInspectFiles text.</summary>
+    public string MetadataInspectFiles { get; init; } = "";
+    /// <summary>Gets the localized metadata-review MetadataQuickHint text.</summary>
+    public string MetadataQuickHint { get; init; } = "";
+    /// <summary>Gets the localized metadata-review MetadataSelectHint text.</summary>
+    public string MetadataSelectHint { get; init; } = "";
+    /// <summary>Gets the localized metadata-review MetadataActionGuide text.</summary>
+    public string MetadataActionGuide { get; init; } = "";
+    /// <summary>Gets the localized metadata-review MetadataRemoteReadOnly text.</summary>
+    public string MetadataRemoteReadOnly { get; init; } = "";
+    /// <summary>Gets the localized metadata-review MetadataReviewGuide text.</summary>
+    public string MetadataReviewGuide { get; init; } = "";
+    /// <summary>Gets the localized metadata-review MetadataPhaseDatabase text.</summary>
+    public string MetadataPhaseDatabase { get; init; } = "";
+    /// <summary>Gets the localized metadata-review MetadataPhaseFolders text.</summary>
+    public string MetadataPhaseFolders { get; init; } = "";
+    /// <summary>Gets the localized metadata-review MetadataPhaseHashes text.</summary>
+    public string MetadataPhaseHashes { get; init; } = "";
+    /// <summary>Gets the localized metadata-review MetadataPhaseServers text.</summary>
+    public string MetadataPhaseServers { get; init; } = "";
+    /// <summary>Gets the localized metadata-review MetadataPhaseReleases text.</summary>
+    public string MetadataPhaseReleases { get; init; } = "";
+    /// <summary>Gets the localized metadata-review MetadataPhaseSaving text.</summary>
+    public string MetadataPhaseSaving { get; init; } = "";
+    /// <summary>Gets the localized metadata-review MetadataRemaining text.</summary>
+    public string MetadataRemaining { get; init; } = "";
+    /// <summary>Gets the localized metadata-review MetadataRemainingUnknown text.</summary>
+    public string MetadataRemainingUnknown { get; init; } = "";
+    /// <summary>Gets the localized metadata-review MetadataElapsed text.</summary>
+    public string MetadataElapsed { get; init; } = "";
     /// <summary>Gets the action that identifies a physical folder as an album.</summary>
     public string IdentifyFolderAsAlbum { get; init; } = "";
     /// <summary>Gets the physical-folder column label.</summary>

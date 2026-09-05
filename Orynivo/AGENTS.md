@@ -209,6 +209,16 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   and artist search terms before each MusicBrainz query, while track count and
   durations remain match evidence. Only a user-confirmed match may be applied,
   and media files remain unchanged.
+  Opening uses index-only analysis (`inspectFiles: false`); physical readability
+  checks and full duplicate hashes require the explicit checkbox and refresh.
+  Publish local findings before awaiting server reports, then append completed
+  server results without clearing selection. Server reports remain read-only.
+  `MetadataReviewActivity` coalesces progress for a UI timer, reports elapsed time
+  and phase-local estimates only for measured work, and never invents a remote
+  ETA. Settings deactivation cancels analysis; dialog close cancels MusicBrainz.
+  Repeated searches must clear selection and preview before loading. Analysis,
+  dialog and correction use Core `OrderTracks`; never silently zip a partial match.
+  Successful corrections invalidate shared library views and refresh analysis.
 - The shared Folder structure sidebar item is visible when either local media
   or at least one Orynivo Server is configured. Server-only setups must be able
   to open `ShowUnifiedFolderTreeAsync` without configuring a local directory.

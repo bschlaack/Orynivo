@@ -106,6 +106,11 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   Remote Library Doctor requests use a separate bounded maintenance timeout;
   do not increase the normal catalog/streaming client timeout for long-running
   server-side file checks.
+  `Analyze(inspectFiles: false)` performs index-only analysis without physical
+  source/image existence checks or duplicate hashes. Default callers retain full
+  checks. Optional progress reports phase counters, never private paths.
+  `OrderTracks` is shared by search, display and persistence (disc, track,
+  source, stable ID). Corrections must reject mismatched track counts.
 - Remote dashboard totals use `OrynivoServerClient.GetLibrarySummaryAsync` and
   the server's aggregate `/api/library/summary` response; do not replace this
   fast path with complete track or album payloads.

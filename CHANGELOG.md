@@ -4,6 +4,25 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.40.2] - 2026-09-05
+
+### Added
+
+- Metadata review now explains the review/compare/confirm workflow, distinguishes
+  read-only server reports from local corrections, and shows phase progress,
+  elapsed time and measured phase-local remaining-time estimates.
+
+### Fixed
+
+- Opening metadata review uses a fast index-only analysis instead of opening
+  every audio file and hashing duplicates. Physical checks remain explicitly
+  available; completed local/server findings become usable independently.
+- Corrected stale MusicBrainz previews after repeated searches and unified
+  disc/track ordering between analysis, preview and correction. Current tracks
+  include physical file names and disc numbers; partial corrections are rejected.
+- Metadata review cancels background work when Settings closes, preserves
+  selection as server results arrive, and invalidates library views after repairs.
+
 ## [0.40.1] - 2026-09-05
 
 ### Fixed

@@ -280,7 +280,11 @@ public sealed record MetadataRepairTrack(
     bool HasAlbumArtwork = false,
     string? ArtistImagePath = null,
     string? AcoustIdFingerprint = null,
-    long? FileSize = null);
+    long? FileSize = null)
+{
+    /// <summary>Gets the physical source file name for identifying tracks with missing title tags.</summary>
+    public string FileName => System.IO.Path.GetFileName(SourcePath);
+}
 
 /// <summary>Library-only metadata values that survive subsequent media-file scans.</summary>
 /// <param name="Path">Stable library path.</param>
