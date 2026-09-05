@@ -1622,16 +1622,18 @@ public sealed class OrynivoServerClient : IDisposable
     /// <summary>Gets compact read-only Library Doctor findings from a server.</summary>
     /// <param name="server">Server connection settings.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="inspectFiles">Whether the server should perform expensive physical-file checks.</param>
     /// <returns>Findings, or <see langword="null"/> when the endpoint is unavailable.</returns>
     public async Task<List<OrynivoLibraryDoctorCandidate>?> GetLibraryDoctorAsync(
         OrynivoServerSettings server,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool inspectFiles = true)
     {
         try
         {
             using var request = new HttpRequestMessage(
                 HttpMethod.Get,
-                BuildUrl(server, "/api/library/doctor"));
+                BuildUrl(server, inspectFiles ? "/api/library/doctor" : "/api/library/doctor?inspectFiles=false"));
             request.Headers.Add("X-Api-Key", server.ApiKey);
             using var response = await _maintenanceHttp.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();

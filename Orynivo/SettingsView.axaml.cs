@@ -91,6 +91,9 @@ internal partial class SettingsView : UserControl
     private IReadOnlyList<MetadataProblemRow> _metadataDoctorRows = [];
     private int _metadataDoctorUnavailableServers;
     private CancellationTokenSource? _metadataAnalysisCts;
+    private bool _metadataAnalysisRunning;
+    private bool _metadataRepairRunning;
+    private bool _metadataDeactivated;
     private CancellationTokenSource? _missingArtistImagesCts;
     private CancellationTokenSource? _replayGainCalculationCts;
     private CancellationTokenSource? _aiEndpointProbeCts;
@@ -1200,6 +1203,7 @@ internal partial class SettingsView : UserControl
     /// <summary>Stops background work and restores the original live equalizer preview when needed.</summary>
     internal void Deactivate()
     {
+        _metadataDeactivated = true;
         _mobileRemoteClosed = true;
         MobileRemoteQrImage.Source = null;
         _mobileRemoteQr?.Dispose();
@@ -1209,6 +1213,7 @@ internal partial class SettingsView : UserControl
         _orynivoStatusCts?.Cancel();
         _plexStatusCts?.Cancel();
         _missingArtistImagesCts?.Cancel();
+        _metadataAnalysisCts?.Cancel();
         _replayGainCalculationCts?.Cancel();
         _aiEndpointProbeCts?.Cancel();
         _aiEndpointService.Dispose();
@@ -1338,29 +1343,50 @@ internal partial class SettingsView : UserControl
 
     private async Task LoadMetadataProblemsAsync()
     {
+        if (_metadataDeactivated || _metadataAnalysisRunning || _metadataRepairRunning)
+            return;
         _metadataAnalysisCts?.Cancel();
         _metadataAnalysisCts?.Dispose();
         _metadataAnalysisCts = new CancellationTokenSource();
         var cancellationToken = _metadataAnalysisCts.Token;
         _metadataAnalysisLoaded = true;
-        MetadataStatusTextBlock.Text = LocalizationManager.Current.MetadataSearching;
+        InitializeMetadataFilters();
+        _metadataAnalysisRunning = true;
+        var inspectFiles = MetadataInspectFilesCheckBox.IsChecked == true;
+        var activity = new MetadataReviewActivity();
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+        void UpdateProgress()
+        {
+            var snapshot = activity.Snapshot();
+            MetadataActivityTextBlock.Text = snapshot.Text;
+            MetadataAnalysisProgressBar.IsIndeterminate = !snapshot.Percent.HasValue;
+            MetadataAnalysisProgressBar.Value = snapshot.Percent ?? 0;
+        }
+        timer.Tick += (_, _) => UpdateProgress();
+        MetadataProgressPanel.IsVisible = true;
+        UpdateProgress();
+        timer.Start();
         RefreshMetadataAnalysisButton.IsEnabled = false;
         CancelMetadataAnalysisButton.IsEnabled = true;
+        MetadataInspectFilesCheckBox.IsEnabled = false;
+        _metadataDoctorRows = [];
+        _metadataDoctorUnavailableServers = 0;
+        ApplyMetadataDoctorFilter();
         try
         {
             var localTask = Task.Run(() =>
             {
                 using var database = AudioDatabase.OpenDefault();
                 return LibraryMetadataRepairService.Analyze(
-                    database.GetMetadataRepairTracks(), cancellationToken: cancellationToken);
+                    database.GetMetadataRepairTracks(), cancellationToken: cancellationToken,
+                    inspectFiles: inspectFiles, progress: activity);
             }, cancellationToken);
             using var serverClient = new OrynivoServerClient();
             var remoteTasks = _orynivoServers.Select(async server =>
-                (Server: server, Candidates: await serverClient.GetLibraryDoctorAsync(server, cancellationToken)))
+                (Server: server, Candidates: await serverClient.GetLibraryDoctorAsync(server, cancellationToken, inspectFiles)))
                 .ToList();
             var localCandidates = await localTask;
-            var remoteResults = await Task.WhenAll(remoteTasks);
-            _metadataDoctorUnavailableServers = remoteResults.Count(result => result.Candidates is null);
+            cancellationToken.ThrowIfCancellationRequested();
             var rows = localCandidates.Select(candidate => CreateMetadataProblemRow(
                     LocalizationManager.Current.LocalSource,
                     candidate.FolderPath,
@@ -1370,62 +1396,39 @@ internal partial class SettingsView : UserControl
                         finding => (finding.Code, finding.AffectedTrackCount)),
                     candidate))
                 .ToList();
-            foreach (var result in remoteResults.Where(result => result.Candidates is not null))
+            _metadataDoctorRows = rows;
+            ApplyMetadataDoctorFilter();
+            activity.Report(new("servers", 0, 0));
+            while (remoteTasks.Count > 0)
             {
-                rows.AddRange(result.Candidates!.Select(candidate => CreateMetadataProblemRow(
+                var finished = await Task.WhenAny(remoteTasks);
+                remoteTasks.Remove(finished);
+                var result = await finished;
+                cancellationToken.ThrowIfCancellationRequested();
+                if (result.Candidates is null)
+                    _metadataDoctorUnavailableServers++;
+                else
+                    rows.AddRange(result.Candidates.Select(candidate => CreateMetadataProblemRow(
                     result.Server.Name,
                     candidate.FolderPath,
                     candidate.TrackCount,
                     candidate.HighestSeverity,
                     candidate.Findings.Select(finding => (Code: finding.Code, Count: finding.Count)),
                     null)));
+                _metadataDoctorRows = rows.ToList();
+                ApplyMetadataDoctorFilter();
             }
             _metadataDoctorRows = rows;
-            if (MetadataSeverityFilterComboBox.ItemsSource is null)
-            {
-                var localized = LocalizationManager.Current;
-                MetadataSeverityFilterComboBox.ItemsSource = new[]
-                {
-                    new SettingChoice<LibraryDoctorSeverity?>(null, localized.MetadataSeverityAll),
-                    new SettingChoice<LibraryDoctorSeverity?>(LibraryDoctorSeverity.Error, localized.MetadataSeverityError),
-                    new SettingChoice<LibraryDoctorSeverity?>(LibraryDoctorSeverity.Warning, localized.MetadataSeverityWarning),
-                    new SettingChoice<LibraryDoctorSeverity?>(LibraryDoctorSeverity.Information, localized.MetadataSeverityInformation)
-                };
-                MetadataSeverityFilterComboBox.SelectedIndex = 0;
-            }
-            if (MetadataIssueFilterComboBox.ItemsSource is null)
-            {
-                var localized = LocalizationManager.Current;
-                MetadataIssueFilterComboBox.ItemsSource = new[]
-                {
-                    new SettingChoice<string?>(null, localized.MetadataIssueAll),
-                    new SettingChoice<string?>("album", localized.MetadataIssueAlbums),
-                    new SettingChoice<string?>("album-artist", localized.MetadataIssueArtists),
-                    new SettingChoice<string?>("title", localized.MetadataIssueMissingTitles),
-                    new SettingChoice<string?>("track-number", localized.MetadataIssueMissingNumbers),
-                    new SettingChoice<string?>("duplicate-track-number", localized.MetadataIssueDuplicateNumbers),
-                    new SettingChoice<string?>("replaygain", localized.MetadataIssueReplayGain),
-                    new SettingChoice<string?>("musicbrainz-id", localized.MetadataIssueMusicBrainzIds),
-                    new SettingChoice<string?>("incomplete-album", localized.MetadataIssueIncompleteAlbum),
-                    new SettingChoice<string?>("album-artwork", localized.MetadataIssueAlbumArtwork),
-                    new SettingChoice<string?>("artist-image", localized.MetadataIssueArtistImage),
-                    new SettingChoice<string?>("missing-file", localized.MetadataIssueMissingFiles),
-                    new SettingChoice<string?>("unreadable-file", localized.MetadataIssueUnreadableFiles),
-                    new SettingChoice<string?>("likely-duplicate", localized.MetadataIssueLikelyDuplicates),
-                    new SettingChoice<string?>("exact-duplicate", localized.MetadataIssueExactDuplicates),
-                    new SettingChoice<string?>("alternate-recording", localized.MetadataIssueAlternateRecordings),
-                    new SettingChoice<string?>("artist-name-variant", localized.MetadataIssueArtistNameVariants)
-                };
-                MetadataIssueFilterComboBox.SelectedIndex = 0;
-            }
             ApplyMetadataDoctorFilter();
         }
         catch (OperationCanceledException)
         {
+            _metadataAnalysisLoaded = false;
             MetadataStatusTextBlock.Text = LocalizationManager.Current.MetadataAnalysisCancelled;
         }
         catch (Exception ex)
         {
+            _metadataAnalysisLoaded = false;
             CrashLogger.Log(ex, "Library Doctor analysis");
             _metadataDoctorRows = [];
             _metadataDoctorUnavailableServers = 0;
@@ -1434,11 +1437,56 @@ internal partial class SettingsView : UserControl
         }
         finally
         {
+            timer.Stop();
+            _metadataAnalysisRunning = false;
+            MetadataProgressPanel.IsVisible = false;
+            MetadataInspectFilesCheckBox.IsEnabled = true;
             if (_metadataAnalysisCts?.Token == cancellationToken)
             {
                 RefreshMetadataAnalysisButton.IsEnabled = true;
                 CancelMetadataAnalysisButton.IsEnabled = false;
             }
+        }
+    }
+
+    private void InitializeMetadataFilters()
+    {
+        if (MetadataSeverityFilterComboBox.ItemsSource is null)
+        {
+            var localized = LocalizationManager.Current;
+            MetadataSeverityFilterComboBox.ItemsSource = new[]
+            {
+                new SettingChoice<LibraryDoctorSeverity?>(null, localized.MetadataSeverityAll),
+                new SettingChoice<LibraryDoctorSeverity?>(LibraryDoctorSeverity.Error, localized.MetadataSeverityError),
+                new SettingChoice<LibraryDoctorSeverity?>(LibraryDoctorSeverity.Warning, localized.MetadataSeverityWarning),
+                new SettingChoice<LibraryDoctorSeverity?>(LibraryDoctorSeverity.Information, localized.MetadataSeverityInformation)
+            };
+            MetadataSeverityFilterComboBox.SelectedIndex = 0;
+        }
+        if (MetadataIssueFilterComboBox.ItemsSource is null)
+        {
+            var localized = LocalizationManager.Current;
+            MetadataIssueFilterComboBox.ItemsSource = new[]
+            {
+                new SettingChoice<string?>(null, localized.MetadataIssueAll),
+                new SettingChoice<string?>("album", localized.MetadataIssueAlbums),
+                new SettingChoice<string?>("album-artist", localized.MetadataIssueArtists),
+                new SettingChoice<string?>("title", localized.MetadataIssueMissingTitles),
+                new SettingChoice<string?>("track-number", localized.MetadataIssueMissingNumbers),
+                new SettingChoice<string?>("duplicate-track-number", localized.MetadataIssueDuplicateNumbers),
+                new SettingChoice<string?>("replaygain", localized.MetadataIssueReplayGain),
+                new SettingChoice<string?>("musicbrainz-id", localized.MetadataIssueMusicBrainzIds),
+                new SettingChoice<string?>("incomplete-album", localized.MetadataIssueIncompleteAlbum),
+                new SettingChoice<string?>("album-artwork", localized.MetadataIssueAlbumArtwork),
+                new SettingChoice<string?>("artist-image", localized.MetadataIssueArtistImage),
+                new SettingChoice<string?>("missing-file", localized.MetadataIssueMissingFiles),
+                new SettingChoice<string?>("unreadable-file", localized.MetadataIssueUnreadableFiles),
+                new SettingChoice<string?>("likely-duplicate", localized.MetadataIssueLikelyDuplicates),
+                new SettingChoice<string?>("exact-duplicate", localized.MetadataIssueExactDuplicates),
+                new SettingChoice<string?>("alternate-recording", localized.MetadataIssueAlternateRecordings),
+                new SettingChoice<string?>("artist-name-variant", localized.MetadataIssueArtistNameVariants)
+            };
+            MetadataIssueFilterComboBox.SelectedIndex = 0;
         }
     }
 
@@ -1452,17 +1500,20 @@ internal partial class SettingsView : UserControl
         if (!string.IsNullOrWhiteSpace(issueCode))
             filtered = filtered.Where(row => row.FindingCodes.Contains(issueCode));
         var candidates = filtered.ToList();
+        var previousSelection = MetadataProblemsDataGrid.SelectedItem as MetadataProblemRow;
         MetadataProblemsDataGrid.ItemsSource = candidates;
-            var strings = LocalizationManager.Current;
-            var summary = candidates.Count == 0
-                ? strings.NoData
-                : string.Format(CultureInfo.CurrentCulture, strings.MetadataDoctorSummary,
-                    candidates.Count(candidate => candidate.SeverityValue == LibraryDoctorSeverity.Error),
+        if (previousSelection is not null && candidates.Contains(previousSelection))
+            MetadataProblemsDataGrid.SelectedItem = previousSelection;
+        var strings = LocalizationManager.Current;
+        var summary = candidates.Count == 0
+            ? strings.MetadataNoFindings
+            : string.Format(CultureInfo.CurrentCulture, strings.MetadataDoctorSummary,
+                candidates.Count(candidate => candidate.SeverityValue == LibraryDoctorSeverity.Error),
                 candidates.Count(candidate => candidate.SeverityValue == LibraryDoctorSeverity.Warning),
                 candidates.Count(candidate => candidate.SeverityValue == LibraryDoctorSeverity.Information));
-            MetadataStatusTextBlock.Text = _metadataDoctorUnavailableServers == 0
-                ? summary
-                : $"{summary} · {string.Format(CultureInfo.CurrentCulture, strings.MetadataDoctorServersUnavailable, _metadataDoctorUnavailableServers)}";
+        MetadataStatusTextBlock.Text = _metadataDoctorUnavailableServers == 0
+            ? summary
+            : $"{summary} · {string.Format(CultureInfo.CurrentCulture, strings.MetadataDoctorServersUnavailable, _metadataDoctorUnavailableServers)}";
     }
 
     private void MetadataSeverityFilter_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -1535,29 +1586,62 @@ internal partial class SettingsView : UserControl
 
     private async Task OpenSelectedMetadataRepairAsync()
     {
+        if (_metadataRepairRunning)
+            return;
         if (MetadataProblemsDataGrid.SelectedItem is not MetadataProblemRow row)
             return;
         if (row.Candidate is null)
             return;
-        var dialog = new MetadataRepairDialog(row.Candidate);
-        if (await dialog.ShowDialog<bool>(GetHostWindow()) != true || dialog.SelectedMatch is null)
-            return;
-        var overrides = LibraryMetadataRepairService.CreateOverrides(row.Candidate, dialog.SelectedMatch);
-        await Task.Run(() =>
+        _metadataRepairRunning = true;
+        OpenMetadataRepairButton.IsEnabled = false;
+        RefreshMetadataAnalysisButton.IsEnabled = false;
+        try
         {
-            using var database = AudioDatabase.OpenDefault();
-            database.ApplyTrackMetadataOverrides(overrides);
-            TrackSearchIndex.Rebuild(database.GetAll());
-        });
-        MetadataStatusTextBlock.Text = LocalizationManager.Current.MetadataRepairSuccess;
-        await LoadMetadataProblemsAsync();
+            var dialog = new MetadataRepairDialog(row.Candidate);
+            if (await dialog.ShowDialog<bool>(GetHostWindow()) != true || dialog.SelectedMatch is null)
+                return;
+            // A pending server result must not republish the old local finding after a repair.
+            _metadataAnalysisCts?.Cancel();
+            while (_metadataAnalysisRunning)
+                await Task.Delay(50);
+            var overrides = LibraryMetadataRepairService.CreateOverrides(row.Candidate, dialog.SelectedMatch);
+            MetadataStatusTextBlock.Text = LocalizationManager.Current.MetadataPhaseSaving;
+            await Task.Run(() =>
+            {
+                using var database = AudioDatabase.OpenDefault();
+                database.ApplyTrackMetadataOverrides(overrides);
+                TrackSearchIndex.Rebuild(database.GetAll());
+            });
+            MetadataStatusTextBlock.Text = LocalizationManager.Current.MetadataRepairSuccess;
+            LocalLibraryChanged?.Invoke();
+            _metadataAnalysisLoaded = false;
+        }
+        catch (Exception ex)
+        {
+            CrashLogger.Log(ex, "Metadata review correction");
+            MetadataStatusTextBlock.Text = LocalizationManager.Current.MetadataAnalysisFailed;
+        }
+        finally
+        {
+            _metadataRepairRunning = false;
+            RefreshMetadataAnalysisButton.IsEnabled = !_metadataAnalysisRunning;
+            OpenMetadataRepairButton.IsEnabled = MetadataProblemsDataGrid.SelectedItem is MetadataProblemRow { Candidate: not null };
+        }
+        if (!_metadataAnalysisLoaded && !_metadataDeactivated)
+            await LoadMetadataProblemsAsync();
     }
 
     private async void MetadataProblemsDataGrid_OnDoubleTapped(object? sender, Avalonia.Input.TappedEventArgs e) =>
         await OpenSelectedMetadataRepairAsync();
 
-    private void MetadataProblemsDataGrid_OnSelectionChanged(object? sender, SelectionChangedEventArgs e) =>
-        OpenMetadataRepairButton.IsEnabled = MetadataProblemsDataGrid.SelectedItem is MetadataProblemRow { Candidate: not null };
+    private void MetadataProblemsDataGrid_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        var row = MetadataProblemsDataGrid.SelectedItem as MetadataProblemRow;
+        OpenMetadataRepairButton.IsEnabled = !_metadataRepairRunning && row?.Candidate is not null;
+        MetadataSelectionTextBlock.Text = row is null ? LocalizationManager.Current.MetadataSelectHint
+            : row.Candidate is null ? LocalizationManager.Current.MetadataRemoteReadOnly
+            : LocalizationManager.Current.MetadataActionGuide;
+    }
 
     private async void OpenMetadataRepairButton_OnClick(object? sender, RoutedEventArgs e) =>
         await OpenSelectedMetadataRepairAsync();

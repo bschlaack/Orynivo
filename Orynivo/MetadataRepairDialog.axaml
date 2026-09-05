@@ -8,17 +8,28 @@
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource AppContentBrush}"
         Foreground="{DynamicResource AppPrimaryTextBrush}">
+    <Window.Styles>
+        <Style Selector="DataGridColumnHeader">
+            <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+        </Style>
+        <Style Selector="ListBox">
+            <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+        </Style>
+    </Window.Styles>
     <Grid Margin="24" RowDefinitions="Auto,Auto,Auto,2*,Auto,*,Auto,2*,Auto">
         <TextBlock Grid.Row="0"
                    Text="{Binding FolderPath}"
                    FontSize="{DynamicResource FontSizeTitle}"
                    FontWeight="SemiBold"
                    TextWrapping="Wrap"/>
-        <TextBlock x:Name="StatusTextBlock"
-                   Grid.Row="1"
-                   Margin="0,8,0,12"
-                   Foreground="{DynamicResource AppSecondaryTextBrush}"
-                   TextWrapping="Wrap"/>
+        <StackPanel Grid.Row="1" Margin="0,8,0,12" Spacing="8">
+            <TextBlock Text="{DynamicResource L_MetadataReviewGuide}" TextWrapping="Wrap"
+                       FontSize="{DynamicResource FontSizeCaption}" Foreground="{DynamicResource AppSecondaryTextBrush}"/>
+            <TextBlock x:Name="StatusTextBlock" TextWrapping="Wrap"/>
+            <ProgressBar x:Name="SearchProgressBar" Height="6" Minimum="0" Maximum="100" IsVisible="False"/>
+        </StackPanel>
         <Grid Grid.Row="2" ColumnDefinitions="*,*,Auto" Margin="0,0,0,12">
             <StackPanel Margin="0,0,8,0">
                 <TextBlock x:Name="AlbumQueryLabel"
@@ -49,7 +60,9 @@
                   HeadersVisibility="Column"
                   GridLinesVisibility="None">
             <DataGrid.Columns>
+                <DataGridTextColumn Header="{DynamicResource L_DiscNumber}" Binding="{Binding DiscNumber}" Width="105"/>
                 <DataGridTextColumn Header="#" Binding="{Binding TrackNumber}" Width="55"/>
+                <DataGridTextColumn Header="{DynamicResource L_FileName}" Binding="{Binding FileName}" Width="*"/>
                 <DataGridTextColumn Header="{DynamicResource L_Title}" Binding="{Binding Title}" Width="2*"/>
                 <DataGridTextColumn Header="{DynamicResource L_Artist}" Binding="{Binding Artist}" Width="*"/>
                 <DataGridTextColumn Header="{DynamicResource L_Album}" Binding="{Binding Album}" Width="*"/>

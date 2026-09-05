@@ -94,6 +94,9 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
   returns compact folder counts and typed findings only. Do not expose API
   keys or complete track rows, and keep older-server failure non-fatal on the
   desktop client.
+  The optional `inspectFiles=false` query requests index-only analysis; omitted
+  or true preserves full physical-file checks for existing clients. This route
+  does not currently expose live per-phase progress or an ETA.
 - Authenticated `GET /api/tracks/similarity-features` returns deterministic
   versioned vectors in ID-ordered pages of at most 2,000 rows. Keep the payload
   free of paths, URLs, credentials, artwork, and full track metadata.

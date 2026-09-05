@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Orynivo.Library;
 using Orynivo.Localization;
 
@@ -12,6 +13,8 @@ public partial class MetadataRepairDialog : Window
 
     private readonly MetadataFolderCandidate _candidate;
     private List<MetadataReleaseMatch> _matches = [];
+    private CancellationTokenSource? _searchCts;
+    private bool _closed;
 
     /// <summary>Initializes an empty designer instance.</summary>
     public MetadataRepairDialog()
@@ -21,7 +24,8 @@ public partial class MetadataRepairDialog : Window
 
     /// <summary>Initializes the review dialog for a physical folder candidate.</summary>
     /// <param name="candidate">Folder candidate to identify.</param>
-    public MetadataRepairDialog(MetadataFolderCandidate candidate)
+    /// <param name="searchOnOpen">Whether opening starts a MusicBrainz query immediately.</param>
+    public MetadataRepairDialog(MetadataFolderCandidate candidate, bool searchOnOpen = true)
     {
         _candidate = candidate;
         InitializeComponent();
@@ -33,14 +37,18 @@ public partial class MetadataRepairDialog : Window
             CancelLabel = LocalizationManager.Current.Cancel,
             ApplyLabel = LocalizationManager.Current.MetadataApplyCorrection
         };
-        CurrentTracksDataGrid.ItemsSource = candidate.Tracks;
+        CurrentTracksDataGrid.ItemsSource = LibraryMetadataRepairService.OrderTracks(candidate.Tracks);
         AlbumQueryLabel.Text = LocalizationManager.Current.MetadataAlbumQuery;
         ArtistQueryLabel.Text = LocalizationManager.Current.MetadataArtistQuery;
         SearchAgainButton.Content = LocalizationManager.Current.SearchAgain;
         PreviewLabel.Text = LocalizationManager.Current.MetadataCorrectionPreview;
         AlbumQueryTextBox.Text = MostCommon(candidate.Tracks.Select(track => track.Album));
         ArtistQueryTextBox.Text = MostCommon(candidate.Tracks.Select(track => track.AlbumArtist));
-        Opened += async (_, _) => await SearchAsync();
+        if (string.IsNullOrWhiteSpace(ArtistQueryTextBox.Text))
+            ArtistQueryTextBox.Text = MostCommon(candidate.Tracks.Select(track => track.Artist));
+        Closed += (_, _) => { _closed = true; _searchCts?.Cancel(); };
+        if (searchOnOpen)
+            Opened += async (_, _) => await SearchAsync();
     }
 
     /// <summary>Gets the MusicBrainz match confirmed by the user.</summary>
@@ -48,22 +56,57 @@ public partial class MetadataRepairDialog : Window
 
     private async Task SearchAsync()
     {
+        _searchCts?.Cancel();
+        using var cts = new CancellationTokenSource();
+        _searchCts = cts;
+        var activity = new MetadataReviewActivity();
+        activity.Report(new("search", 0, 0));
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+        void UpdateProgress()
+        {
+            var snapshot = activity.Snapshot();
+            StatusTextBlock.Text = snapshot.Text;
+            SearchProgressBar.IsIndeterminate = !snapshot.Percent.HasValue;
+            SearchProgressBar.Value = snapshot.Percent ?? 0;
+        }
+        timer.Tick += (_, _) => UpdateProgress();
+        SearchProgressBar.IsVisible = true;
+        UpdateProgress();
+        timer.Start();
+        ReleaseListBox.SelectedIndex = -1;
+        ReleaseListBox.ItemsSource = null;
+        PreviewDataGrid.ItemsSource = null;
+        SelectionDetailTextBlock.Text = string.Empty;
+        _matches = [];
         SearchAgainButton.IsEnabled = false;
         ApplyButton.IsEnabled = false;
-        StatusTextBlock.Text = LocalizationManager.Current.MetadataSearching;
         var searchFailed = false;
         try
         {
             _matches = await LibraryMetadataRepairService.LookupAsync(
                 _candidate,
                 AlbumQueryTextBox.Text,
-                ArtistQueryTextBox.Text);
+                ArtistQueryTextBox.Text, cts.Token, activity);
         }
+        catch (OperationCanceledException) { return; }
         catch
         {
             _matches = [];
             searchFailed = true;
         }
+        finally
+        {
+            timer.Stop();
+            if (_searchCts == cts)
+                _searchCts = null;
+            if (!_closed)
+            {
+                SearchProgressBar.IsVisible = false;
+                SearchAgainButton.IsEnabled = true;
+            }
+        }
+        if (_closed)
+            return;
 
         ReleaseListBox.ItemsSource = _matches.Select(match =>
         {
@@ -102,10 +145,8 @@ public partial class MetadataRepairDialog : Window
             $"{currentAlbum} — {currentArtist} → {match.Title} — {match.AlbumArtist} · " +
             $"{match.Tracks.Count} {LocalizationManager.Current.MetadataTrackCount} · " +
             $"{Math.Round(match.Confidence * 100):0}%";
-        var localTracks = _candidate.Tracks
-            .OrderBy(track => track.TrackNumber ?? int.MaxValue)
-            .ThenBy(track => track.SourcePath, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        var localTracks = LibraryMetadataRepairService.OrderTracks(_candidate.Tracks);
+        ApplyButton.IsEnabled = localTracks.Count == match.Tracks.Count;
         PreviewDataGrid.ItemsSource = localTracks.Zip(match.Tracks, (local, proposed) =>
             new PreviewRow(
                 proposed.Position,

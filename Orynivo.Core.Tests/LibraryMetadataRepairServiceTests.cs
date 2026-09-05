@@ -6,6 +6,48 @@ namespace Orynivo.Core.Tests;
 /// <summary>Verifies physical-folder problem detection and persistent library-only corrections.</summary>
 public sealed class LibraryMetadataRepairServiceTests
 {
+    /// <summary>The quick review neither probes missing sources nor labels them as missing files.</summary>
+    [Fact]
+    public void Analyze_QuickReviewSkipsPhysicalChecksAndReportsProgress()
+    {
+        var track = new MetadataRepairTrack(1, "missing.flac", Path.Combine(Path.GetTempPath(), "absent", "missing.flac"),
+            "Title", "Artist", "Album", "Artist", 180, 1, 1);
+        var progress = new CapturedProgress();
+        var row = Assert.Single(LibraryMetadataRepairService.Analyze([track], inspectFiles: false, progress: progress));
+        Assert.Equal(0, row.MissingSourceFileCount);
+        Assert.Contains(row.Findings, finding => finding.Code == "musicbrainz-id");
+        Assert.Equal(new MetadataReviewProgress("folders", 1, 1), progress.Values.Last());
+        Assert.DoesNotContain(progress.Values, value => value.Phase == "hashes");
+    }
+
+    /// <summary>Search and correction preserve disc-first ordering and refuse partial mappings.</summary>
+    [Fact]
+    public void CreateOverrides_PreservesSharedDiscOrderAndRejectsPartialMatch()
+    {
+        var tracks = new[]
+        {
+            new MetadataRepairTrack(3, "c", "c.flac", "C", "A", "B", "A", 180, 1, 2),
+            new MetadataRepairTrack(2, "b", "b.flac", "B", "A", "B", "A", 180, 2, 1),
+            new MetadataRepairTrack(1, "a", "a.flac", "A", "A", "B", "A", 180, 1, 1)
+        };
+        var candidate = new MetadataFolderCandidate("folder", tracks, 1, 1, 0, 0, false);
+        var match = new MetadataReleaseMatch("release", "Album", "Artist", null, 2000, 1, 1,
+            [new(1, "One", "Artist", null, null), new(2, "Two", "Artist", null, null), new(3, "Three", "Artist", null, null)], 1);
+        Assert.Equal(new long[] { 1, 2, 3 }, LibraryMetadataRepairService.OrderTracks(tracks).Select(t => t.Id));
+        Assert.Equal(new[] { "a", "b", "c" }, LibraryMetadataRepairService.CreateOverrides(candidate, match).Select(t => t.Path));
+        Assert.Throws<ArgumentException>(() => LibraryMetadataRepairService.CreateOverrides(candidate, match with { Tracks = match.Tracks.Take(2).ToList() }));
+    }
+
+    /// <summary>Captures synchronous progress for deterministic assertions.</summary>
+    private sealed class CapturedProgress : IProgress<MetadataReviewProgress>
+    {
+        /// <summary>Gets reported phase counters.</summary>
+        public List<MetadataReviewProgress> Values { get; } = [];
+        /// <summary>Records one progress update.</summary>
+        /// <param name="value">Phase counter to retain.</param>
+        public void Report(MetadataReviewProgress value) => Values.Add(value);
+    }
+
     /// <summary>Honours cancellation before inspecting a folder.</summary>
     [Fact]
     public void Analyze_HonoursCancellation()

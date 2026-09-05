@@ -434,7 +434,7 @@ works directly in FFmpeg and browser URLs.
 | `POST /api/tracks/audio-features/analyze?limit=` | Start an opportunistic acoustic-descriptor batch (maximum 10 tracks) |
 | `GET /api/genres/cloud` | Compact hierarchical genre counts and bounded recommendation candidates |
 | `GET /api/library/summary` | Aggregate album, track, artist, and favorite counts without materializing library rows |
-| `GET /api/library/doctor` | Compact read-only Library Doctor folder findings generated on the server |
+| `GET /api/library/doctor` | Compact read-only Library Doctor folder findings; `inspectFiles=false` skips physical file reads/hashing (omitting it retains full checks) |
 | `POST /api/tracks/by-ids` | Track rows for a list of track IDs (facet-filtered results) |
 | `GET /api/folders/tracks` | Lightweight track rows plus playback metadata for building a server library folder tree |
 | `GET /api/artwork/album/{id}?size=96` | Album artwork thumbnail or original image |
@@ -697,6 +697,20 @@ byte-range streaming without FFmpeg.
   playback-history workflows while retaining the shared physical audio file
 - Automatic recursive library monitoring with debounced create, update, rename,
   and delete handling, plus periodic full reconciliation as a safety net
+- **Settings → Review metadata** starts with a fast review of indexed folder
+  metadata. It does not read audio files or contact MusicBrainz during this
+  initial analysis. Enable **Also inspect files** and refresh to check physical
+  readability and calculate duplicate-file checksums. Updated servers support
+  the same quick mode; older servers may still perform their full review.
+  Completed findings are available while other sources are still loading.
+  Progress shows the active phase, elapsed time and a measured estimate for that
+  phase when possible. Server reports do not supply a remaining-time estimate.
+  Select a local folder, open its MusicBrainz review, edit search terms if needed,
+  and compare current/proposed tracks before applying. File names and disc numbers
+  identify tracks with missing tags. Corrections affect only the library, never
+  audio-file tags. Server findings here are read-only; use server ReplayGain
+  maintenance or album/artist views for those separate tasks. Missing files and
+  duplicate candidates require manual review, never automatic deletion.
 - Metadata and embedded artwork extraction through TagLibSharp
 - Artist, album, track, and folder views
 - Resizable table columns whose widths are preserved separately for each

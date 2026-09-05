@@ -29,12 +29,13 @@ public static class LibraryEndpoints
             return Results.Ok(db.GetDashboardLibrarySummary());
         });
 
-        api.MapGet("/library/doctor", (HttpContext context) =>
+        api.MapGet("/library/doctor", (HttpContext context, bool? inspectFiles) =>
         {
             using var db = AudioDatabase.OpenDefault();
             var candidates = LibraryMetadataRepairService.Analyze(
                 db.GetMetadataRepairTracks(),
-                cancellationToken: context.RequestAborted);
+                cancellationToken: context.RequestAborted,
+                inspectFiles: inspectFiles ?? true);
             return Results.Ok(candidates.Select(candidate => new OrynivoLibraryDoctorCandidate(
                 candidate.FolderPath,
                 candidate.Tracks.Count,
