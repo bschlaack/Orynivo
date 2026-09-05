@@ -44,14 +44,14 @@ public partial class MainWindow
         StatusTextBlock.Text = LocalizationManager.Current.SimilarTracksLoading;
         try
         {
-            var seedIdentity = await ResolveSimilaritySeedAsync(path);
+            var seedIdentity = await ResolveSimilaritySeedAsync(path).ConfigureAwait(true);
             if (seedIdentity is null)
             {
                 StatusTextBlock.Text = LocalizationManager.Current.SimilarTracksUnavailable;
                 return;
             }
 
-            var vectors = await LoadAvailableSimilarityFeaturesAsync();
+            var vectors = await LoadAvailableSimilarityFeaturesAsync().ConfigureAwait(true);
             StatusTextBlock.Text = $"{LocalizationManager.Current.SimilarTracksLoading} ({vectors.Count:N0})";
             var seed = vectors.FirstOrDefault(vector =>
                 vector.SourceKey == seedIdentity.Value.SourceKey && vector.TrackId == seedIdentity.Value.TrackId);
@@ -72,14 +72,19 @@ public partial class MainWindow
                 maximumPerAlbum: 5));
             StatusTextBlock.Text = $"{LocalizationManager.Current.SimilarTracksLoading} ({matches.Count:N0})";
             var initialVectors = matches.Take(SimilarityQueueSize).Select(match => match.Vector).ToList();
-            var rows = await ResolveSimilarityRowsAsync(initialVectors);
+            // Keep provider mapping, DTO conversion and any synchronous cache
+            // work off the UI thread as well; remote providers may perform
+            // substantial JSON/materialization even after the HTTP await.
+            var rows = await Task.Run(
+                () => ResolveSimilarityRowsAsync(initialVectors));
             if (rows.Count == 0)
             {
                 StatusTextBlock.Text = LocalizationManager.Current.SimilarTracksNoMatches;
                 return;
             }
 
-            var seedItem = CreatePlaylistItem(path);
+            var activePlaybackPath = _player is not null ? _currentFilePath : null;
+            var keepCurrentPlayback = !string.IsNullOrWhiteSpace(activePlaybackPath);
             StopInfiniteMix();
             _similarityMixCandidates = matches.Select(match => match.Vector).ToList();
             _similarityMixCursor = initialVectors.Count;
@@ -87,16 +92,23 @@ public partial class MainWindow
             _infiniteMixPaused = false;
             _lastInfiniteMixRefillAttempt = DateTimeOffset.MinValue;
             _queue.Clear();
-            _queue.Add(seedItem);
+            // Keep an already playing title at the head of the queue. Replacing
+            // the queue must never tear down the active player.
+            if (!string.IsNullOrWhiteSpace(activePlaybackPath))
+                _queue.Add(CreatePlaylistItem(activePlaybackPath));
+            if (!string.Equals(activePlaybackPath, path, StringComparison.OrdinalIgnoreCase))
+                _queue.Add(CreatePlaylistItem(path));
             foreach (var row in rows.Where(row => !string.Equals(row.FilePath, path, StringComparison.OrdinalIgnoreCase)))
                 _queue.Add(ToPlaylistItem(row));
-            _queueIndex = 0;
+            _queueIndex = _queue.Count > 0 ? 0 : -1;
             ResetQueuePlaybackState();
             PersistPlaybackQueue();
             RefreshQueueRowsIfVisible();
             RefreshQueueNavigationButtons();
             UpdateInfiniteMixUi();
-            await StartPlaybackAsync(path);
+            if (!keepCurrentPlayback && _queue.Count > 0)
+                await StartPlaybackAsync(path);
+            await ShowTopLevelViewAsync("Queue");
             StatusTextBlock.Text = string.Format(
                 LocalizationManager.Current.SimilarTracksQueued,
                 _queue.Count - 1);
@@ -120,21 +132,24 @@ public partial class MainWindow
         StatusTextBlock.Text = LocalizationManager.Current.SimilarTracksLoading;
         try
         {
-            var vectors = await LoadAvailableSimilarityFeaturesAsync();
+            var vectors = await LoadAvailableSimilarityFeaturesAsync().ConfigureAwait(true);
             var ranked = (await Task.Run(() => SimilarityFeatureService.RankMood(action.Mood, vectors)))
                 .Select(match => match.Vector)
                 .ToList();
-            var seedIdentity = await ResolveSimilaritySeedAsync(action.Path);
+            var seedIdentity = await ResolveSimilaritySeedAsync(action.Path).ConfigureAwait(true);
             if (seedIdentity is { } identity)
                 ranked.RemoveAll(vector => vector.SourceKey == identity.SourceKey && vector.TrackId == identity.TrackId);
             var initialVectors = ranked.Take(SimilarityQueueSize).ToList();
-            var rows = await ResolveSimilarityRowsAsync(initialVectors);
+            var rows = await Task.Run(
+                () => ResolveSimilarityRowsAsync(initialVectors));
             if (rows.Count == 0)
             {
                 StatusTextBlock.Text = LocalizationManager.Current.SimilarTracksNoMatches;
                 return;
             }
 
+            var activePlaybackPath = _player is not null ? _currentFilePath : null;
+            var keepCurrentPlayback = !string.IsNullOrWhiteSpace(activePlaybackPath);
             StopInfiniteMix();
             _similarityMixCandidates = ranked;
             _similarityMixCursor = initialVectors.Count;
@@ -142,16 +157,21 @@ public partial class MainWindow
             _infiniteMixPaused = false;
             _lastInfiniteMixRefillAttempt = DateTimeOffset.MinValue;
             _queue.Clear();
-            _queue.Add(CreatePlaylistItem(action.Path));
+            if (!string.IsNullOrWhiteSpace(activePlaybackPath))
+                _queue.Add(CreatePlaylistItem(activePlaybackPath));
+            if (!string.Equals(activePlaybackPath, action.Path, StringComparison.OrdinalIgnoreCase))
+                _queue.Add(CreatePlaylistItem(action.Path));
             foreach (var row in rows.Where(row => !string.Equals(row.FilePath, action.Path, StringComparison.OrdinalIgnoreCase)))
                 _queue.Add(ToPlaylistItem(row));
-            _queueIndex = 0;
+            _queueIndex = _queue.Count > 0 ? 0 : -1;
             ResetQueuePlaybackState();
             PersistPlaybackQueue();
             RefreshQueueRowsIfVisible();
             RefreshQueueNavigationButtons();
             UpdateInfiniteMixUi();
-            await StartPlaybackAsync(action.Path);
+            if (!keepCurrentPlayback && _queue.Count > 0)
+                await StartPlaybackAsync(action.Path);
+            await ShowTopLevelViewAsync("Queue");
             StatusTextBlock.Text = string.Format(LocalizationManager.Current.SimilarTracksQueued, _queue.Count - 1);
         }
         catch (Exception exception)
@@ -164,8 +184,10 @@ public partial class MainWindow
     private async Task<List<SimilarityFeatureVector>> LoadAvailableSimilarityFeaturesAsync()
     {
         if (_similarityFeatureCache is { } cached && DateTimeOffset.UtcNow < _similarityFeatureCacheExpiresAt)
+        {
             return cached.ToList();
-        await _similarityFeatureCacheGate.WaitAsync();
+        }
+        await _similarityFeatureCacheGate.WaitAsync().ConfigureAwait(false);
         try
         {
             if (_similarityFeatureCache is { } refreshed && DateTimeOffset.UtcNow < _similarityFeatureCacheExpiresAt)
@@ -178,7 +200,7 @@ public partial class MainWindow
                 return db.GetSimilarityTrackProfiles().Select(SimilarityFeatureService.Create).ToList();
             });
             var remoteTasks = (_settings.OrynivoServers ?? []).Select(LoadAllSimilarityFeaturesAsync).ToArray();
-            await Task.WhenAll(remoteTasks.Cast<Task>().Append(localTask));
+            await Task.WhenAll(remoteTasks.Cast<Task>().Append(localTask)).ConfigureAwait(false);
             var loaded = localTask.Result.Concat(remoteTasks.SelectMany(task => task.Result)).ToList();
             if (generation == Volatile.Read(ref _similarityFeatureCacheGeneration))
             {
@@ -316,7 +338,8 @@ public partial class MainWindow
         var result = new List<SimilarityFeatureVector>();
         for (var page = 0; ; page++)
         {
-            var vectors = await _orynivoClient.GetSimilarityFeaturesAsync(server, page, SimilarityPageSize);
+            var vectors = await _orynivoClient.GetSimilarityFeaturesAsync(server, page, SimilarityPageSize)
+                .ConfigureAwait(false);
             result.AddRange(vectors);
             if (vectors.Count < SimilarityPageSize)
                 return result;
@@ -327,7 +350,7 @@ public partial class MainWindow
     {
         var resolved = new Dictionary<(string SourceKey, long TrackId), ContentRow>();
         var localIds = vectors.Where(vector => vector.SourceKey == "local").Select(vector => vector.TrackId).ToList();
-        foreach (var track in await _localCatalogProvider.GetTracksByIdsAsync(localIds))
+        foreach (var track in await _localCatalogProvider.GetTracksByIdsAsync(localIds).ConfigureAwait(false))
             resolved[("local", track.Id)] = ToCatalogTrackContentRow(track);
 
         foreach (var group in vectors.Where(vector => vector.SourceKey.StartsWith("orynivo:", StringComparison.Ordinal))
@@ -338,7 +361,8 @@ public partial class MainWindow
             if (server is null)
                 continue;
             var tracks = await CreateOrynivoCatalogProvider(server)
-                .GetTracksByIdsAsync(group.Select(vector => vector.TrackId).ToList());
+                .GetTracksByIdsAsync(group.Select(vector => vector.TrackId).ToList())
+                .ConfigureAwait(false);
             foreach (var track in tracks)
                 resolved[(group.Key, track.Id)] = ToCatalogTrackContentRow(track, server);
         }

@@ -4,6 +4,16 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+## [0.41.3] - 2026-09-05
+
+### Fixed
+
+- Similar-title and mood-mix actions now navigate directly to **Als Nächstes**
+  after rebuilding the queue, so the queued recommendations are immediately
+  visible while the current title continues playing.
+
 ## [0.41.2] - 2026-09-05
 
 ### Fixed
@@ -12,6 +22,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the UI and playback controls responsive for large libraries.
 - Similarity vectors are preloaded in the background after startup, and the
   similarity action reports its loading and ranking progress.
+- Fixed a UI freeze when starting similarity playback for remote `orynivo://`
+  tracks by avoiding synchronous server lookups when metadata is already cached.
+- Queue construction no longer performs any synchronous provider fallback at
+  all; missing remote metadata cannot block similarity playback.
+- Starting a similarity mix for the currently playing title now keeps that
+  title playing and rebuilds the queue behind it instead of stopping/restarting
+  the current song.
 
 ## [0.41.1] - 2026-09-05
 
