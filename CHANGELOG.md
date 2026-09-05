@@ -4,6 +4,15 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.40.1] - 2026-09-05
+
+### Fixed
+
+- Fixed smart playlists missing server tracks (including favorites) because the
+  client treated the server's capped 5,000-track page as the complete catalog.
+  All pages are now loaded, previously incomplete track caches are rebuilt
+  automatically, and cold smart-playlist loading allows more time per server.
+
 ## [0.40.0] - 2026-09-05
 
 ### Added
