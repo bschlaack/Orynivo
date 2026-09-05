@@ -3205,7 +3205,6 @@ public sealed class AudioDatabase : IDisposable
             CREATE INDEX IF NOT EXISTS idx_tracks_album_added   ON tracks (album_id, added_at DESC);
             CREATE INDEX IF NOT EXISTS idx_play_history_track   ON play_history (track_id, started_at DESC);
             CREATE INDEX IF NOT EXISTS idx_play_history_started ON play_history (started_at DESC);
-            CREATE INDEX IF NOT EXISTS idx_play_history_profile_started ON play_history (profile_id, started_at DESC);
 
             CREATE TABLE IF NOT EXISTS app_meta (
                 key   TEXT PRIMARY KEY,
@@ -3281,6 +3280,10 @@ public sealed class AudioDatabase : IDisposable
             EnsureColumn("play_history", "genre", "TEXT");
             EnsureColumn("play_history", "profile_id", "TEXT NOT NULL DEFAULT 'standard'");
         }
+
+        // Older databases do not have play_history.profile_id until the
+        // compatibility migration above has run; create this index afterwards.
+        Execute("CREATE INDEX IF NOT EXISTS idx_play_history_profile_started ON play_history (profile_id, started_at DESC);");
 
         if (!string.Equals(GetMeta("normalized_library_v1"), "done", StringComparison.Ordinal))
         {
