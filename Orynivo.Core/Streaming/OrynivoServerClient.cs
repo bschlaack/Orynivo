@@ -725,6 +725,45 @@ public sealed class OrynivoServerClient : IDisposable
         catch { return []; }
     }
 
+    /// <summary>Loads the non-secret profile identities configured on a server.</summary>
+    public async Task<List<OrynivoServerProfile>> GetProfilesAsync(
+        OrynivoServerSettings server,
+        CancellationToken cancellationToken = default)
+    {
+        try { return await GetJsonAsync<List<OrynivoServerProfile>>(server, "/api/profiles", cancellationToken) ?? []; }
+        catch { return []; }
+    }
+
+    /// <summary>Loads recent playback history for the selected server profile.</summary>
+    public async Task<List<OrynivoHistorySyncEntry>> GetHistorySyncAsync(
+        OrynivoServerSettings server, int limit = 500, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await GetJsonAsync<List<OrynivoHistorySyncEntry>>(
+                server, $"/api/history/sync?limit={Math.Clamp(limit, 1, 5000)}", cancellationToken) ?? [];
+        }
+        catch { return []; }
+    }
+
+    /// <summary>Uploads local playback history to the selected server profile.</summary>
+    public async Task<bool> PushHistorySyncAsync(
+        OrynivoServerSettings server, IReadOnlyList<OrynivoHistorySyncEntry> entries,
+        CancellationToken cancellationToken = default)
+    {
+        if (entries.Count == 0) return true;
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, BuildUrl(server, "/api/history/sync"))
+            { Content = JsonContent.Create(entries, options: JsonOptions) };
+            request.Headers.Add("X-Api-Key", server.ApiKey);
+            AddProfileHeader(request, server);
+            using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
     /// <summary>Loads one album without transferring the complete remote album catalog.</summary>
     /// <param name="server">Server connection settings.</param>
     /// <param name="albumId">Provider-local album identifier.</param>
@@ -1361,6 +1400,7 @@ public sealed class OrynivoServerClient : IDisposable
                 Content = JsonContent.Create(update, options: JsonOptions)
             };
             request.Headers.Add("X-Api-Key", server.ApiKey);
+            AddProfileHeader(request, server);
             using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
             return response.IsSuccessStatusCode;
         }
@@ -1368,6 +1408,65 @@ public sealed class OrynivoServerClient : IDisposable
         {
             return false;
         }
+    }
+
+    /// <summary>Stores the active profile's favorite state for a remote track.</summary>
+    public async Task<bool> UpdateTrackFavoriteAsync(
+        OrynivoServerSettings server,
+        long trackId,
+        bool isFavorite,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(
+                HttpMethod.Put,
+                BuildUrl(server, $"/api/tracks/{trackId}/favorite"))
+            {
+                Content = JsonContent.Create(new { isFavorite }, options: JsonOptions)
+            };
+            request.Headers.Add("X-Api-Key", server.ApiKey);
+            AddProfileHeader(request, server);
+            using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>Stores the active profile's favorite state for a remote artist.</summary>
+    public Task<bool> UpdateArtistFavoriteAsync(
+        OrynivoServerSettings server,
+        long artistId,
+        bool isFavorite,
+        CancellationToken cancellationToken = default) =>
+        UpdateFavoriteAsync(server, $"/api/artists/{artistId}/favorite", isFavorite, cancellationToken);
+
+    /// <summary>Stores the active profile's favorite state for a remote album.</summary>
+    public Task<bool> UpdateAlbumFavoriteAsync(
+        OrynivoServerSettings server,
+        long albumId,
+        bool isFavorite,
+        CancellationToken cancellationToken = default) =>
+        UpdateFavoriteAsync(server, $"/api/albums/{albumId}/favorite", isFavorite, cancellationToken);
+
+    private async Task<bool> UpdateFavoriteAsync(
+        OrynivoServerSettings server,
+        string path,
+        bool isFavorite,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Put, BuildUrl(server, path))
+            {
+                Content = JsonContent.Create(new { isFavorite }, options: JsonOptions)
+            };
+            request.Headers.Add("X-Api-Key", server.ApiKey);
+            AddProfileHeader(request, server);
+            using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
     }
 
     /// <summary>Gets cached or newly generated waveform data for a remote server track.</summary>
@@ -1610,6 +1709,7 @@ public sealed class OrynivoServerClient : IDisposable
                     options: JsonOptions)
             };
             request.Headers.Add("X-Api-Key", server.ApiKey);
+            AddProfileHeader(request, server);
             using var response = await _http.SendAsync(request, cancellationToken);
             return response.IsSuccessStatusCode;
         }
@@ -1690,6 +1790,7 @@ public sealed class OrynivoServerClient : IDisposable
                 HttpMethod.Post,
                 BuildUrl(server, $"/api/tracks/audio-features/analyze?limit={Math.Clamp(limit, 1, 10)}"));
             request.Headers.Add("X-Api-Key", server.ApiKey);
+            AddProfileHeader(request, server);
             using var response = await _http.SendAsync(request, cancellationToken);
             return response.IsSuccessStatusCode;
         }
@@ -1716,6 +1817,7 @@ public sealed class OrynivoServerClient : IDisposable
                 HttpMethod.Post,
                 BuildUrl(server, "/api/replaygain"));
             request.Headers.Add("X-Api-Key", server.ApiKey);
+            AddProfileHeader(request, server);
             using var response = await _http.SendAsync(request, cancellationToken);
             return response.IsSuccessStatusCode;
         }
@@ -1950,6 +2052,8 @@ public sealed class OrynivoServerClient : IDisposable
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, BuildUrl(server, path));
         request.Headers.Add("X-Api-Key", server.ApiKey);
+        if (!string.IsNullOrWhiteSpace(server.ProfileId))
+            request.Headers.Add("X-Orynivo-Profile", server.ProfileId);
         using var response = await _http.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<T>(JsonOptions, cancellationToken);
@@ -1973,6 +2077,7 @@ public sealed class OrynivoServerClient : IDisposable
                 Content = content
             };
             request.Headers.Add("X-Api-Key", server.ApiKey);
+            AddProfileHeader(request, server);
             using var response = await _http.SendAsync(request, cancellationToken);
             return response.IsSuccessStatusCode;
         }
@@ -1996,7 +2101,19 @@ public sealed class OrynivoServerClient : IDisposable
     }
 
     private static string BuildUrl(OrynivoServerSettings server, string path)
-        => server.BaseUrl.TrimEnd('/') + path;
+    {
+        var separator = path.Contains('?') ? '&' : '?';
+        var profile = string.IsNullOrWhiteSpace(server.ProfileId)
+            ? "standard"
+            : server.ProfileId.Trim();
+        return $"{server.BaseUrl.TrimEnd('/')}{path}{separator}profile={Uri.EscapeDataString(profile)}";
+    }
+
+    private static void AddProfileHeader(HttpRequestMessage request, OrynivoServerSettings server)
+    {
+        if (!string.IsNullOrWhiteSpace(server.ProfileId))
+            request.Headers.Add("X-Orynivo-Profile", server.ProfileId);
+    }
 
     /// <inheritdoc/>
     public void Dispose()

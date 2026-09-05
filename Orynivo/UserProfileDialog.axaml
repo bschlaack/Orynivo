@@ -1,0 +1,19 @@
+<Window x:Class="Orynivo.UserProfileDialog"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{DynamicResource L_UserProfileCreate}"
+        Width="420" SizeToContent="Height" CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppSurfaceBrush}">
+  <StackPanel Margin="24" Spacing="12">
+    <TextBlock Text="{DynamicResource L_UserProfileName}" FontSize="16"/>
+    <TextBox x:Name="NameTextBox" Height="30" TextChanged="NameTextBox_OnTextChanged"/>
+    <CheckBox x:Name="MigrateFavoritesCheckBox"
+              Content="{DynamicResource L_UserProfileMigrateFavorites}" IsChecked="True"/>
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button Content="{DynamicResource L_Cancel}" Click="CancelButton_OnClick"/>
+      <Button x:Name="CreateButton" Content="{DynamicResource L_UserProfileCreate}"
+              IsEnabled="False" Click="CreateButton_OnClick"/>
+    </StackPanel>
+  </StackPanel>
+</Window>

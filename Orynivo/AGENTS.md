@@ -39,6 +39,13 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 
 ## Client Invariants
 
+- Local user-profile identity is persisted separately from the shared library
+  catalog. `UserProfileManager` normalizes the legacy single-user installation
+  to a `standard` profile and carries per-server profile mappings plus personal
+  remote-favourite/recommendation containers. Profile-aware local state and
+  server profile authentication must use this context; never duplicate or
+  partition shared audio metadata/artwork.
+
 - `MainWindow` remains one partial Avalonia class; use the existing domain-sized
   partials instead of creating competing window state or navigation models.
 - Do not block the UI thread with database access, network requests, FFmpeg,

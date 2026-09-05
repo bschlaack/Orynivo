@@ -124,6 +124,9 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _playbackCts;
     private readonly SettingsStore _settingsStore = new();
     private AppSettings _settings = new();
+    private UserProfileManager? _profileManager;
+    private UserProfile ActiveUserProfile => _profileManager?.ActiveProfile
+        ?? throw new InvalidOperationException("The user profile context is not initialized.");
     private LibraryWatcherService? _libraryWatcher;
     private int _libraryWatcherRefreshPending;
     private bool _libraryScanActive;
@@ -892,6 +895,34 @@ public partial class MainWindow : Window
         // exposing its vertical movement through a ScrollViewer.
         ContentDataGrid.VerticalScroll += ContentDataGrid_OnVerticalScroll;
         Dispatcher.UIThread.Post(AttachContentDataGridVerticalScrollBar, DispatcherPriority.Loaded);
+        if (!_settings.UserProfilesInitialized)
+            _ = PromptInitialUserProfileAsync();
+    }
+
+    private async Task PromptInitialUserProfileAsync()
+    {
+        if (_settings.UserProfilesInitialized || _profileManager is null)
+            return;
+        var dialog = new UserProfileDialog();
+        if (await dialog.ShowDialog<bool>(this) && !string.IsNullOrWhiteSpace(dialog.ProfileName))
+        {
+            // The first profile represents the existing installation. Rename
+            // Standard in place so no personal history or favorites are lost.
+            _profileManager.Rename("standard", dialog.ProfileName);
+            var profile = _profileManager.ActiveProfile;
+            _settings.UserProfilesInitialized = true;
+            if (dialog.MigrateFavorites)
+                await Task.Run(() => AudioDatabase.MigrateLegacyFavoritesToProfile(profile.Id));
+            AudioDatabase.SetActiveProfile(profile.Id);
+            ApplyServerProfileContext();
+            _settingsStore.Save(_settings);
+        }
+        else
+        {
+            // Do not ask repeatedly when the user intentionally skips setup.
+            _settings.UserProfilesInitialized = true;
+            _settingsStore.Save(_settings);
+        }
     }
 
     private void InitMcpBridge()
@@ -1296,6 +1327,10 @@ public partial class MainWindow : Window
     private void LoadSettings()
     {
         _settings = _settingsStore.Load();
+        _profileManager = new UserProfileManager(_settings);
+        AudioDatabase.SetActiveProfile(_profileManager.ActiveProfile.Id);
+        ApplyServerProfileContext();
+        _ = RefreshServerProfileMappingsAsync();
         _settings.DataGridColumnWidths ??= new Dictionary<string, List<double>>(StringComparer.Ordinal);
         _settings.VisibleDataGridColumns ??= new Dictionary<string, List<string>>(StringComparer.Ordinal);
         _settings.DataGridColumnOrders ??= new Dictionary<string, List<string>>(StringComparer.Ordinal);
@@ -3178,7 +3213,7 @@ public partial class MainWindow : Window
     private static string GetServerSourceKey(string serverId) => $"server:{serverId}";
 
     private bool IsOrynivoFavorite(OrynivoServerSettings server, string entityType, long id)
-        => _settings.OrynivoServerFavorites.Contains(GetOrynivoFavoriteKey(server.Id, entityType, id));
+        => ActiveUserProfile.OrynivoServerFavorites.Contains(GetOrynivoFavoriteKey(server.Id, entityType, id));
 
     /// <summary>Returns the server-side track IDs the client currently marks as favourites for a remote server.</summary>
     /// <param name="server">Remote server whose client-side track favourites are collected.</param>
@@ -3187,7 +3222,7 @@ public partial class MainWindow : Window
     {
         var prefix = $"{server.Id}:Track:";
         var ids = new List<long>();
-        foreach (var key in _settings.OrynivoServerFavorites)
+        foreach (var key in ActiveUserProfile.OrynivoServerFavorites)
         {
             if (key.StartsWith(prefix, StringComparison.Ordinal) &&
                 long.TryParse(key.AsSpan(prefix.Length), out var id))
@@ -10045,9 +10080,9 @@ public partial class MainWindow : Window
             {
                 var key = GetOrynivoFavoriteKey(_activeOrynivoServer.Id, "Album", id);
                 if (row.IsFavorite)
-                    _settings.OrynivoServerFavorites.Add(key);
+                    ActiveUserProfile.OrynivoServerFavorites.Add(key);
                 else
-                    _settings.OrynivoServerFavorites.Remove(key);
+                    ActiveUserProfile.OrynivoServerFavorites.Remove(key);
             }
             _settingsStore.Save(_settings);
             e.Handled = true;
@@ -10300,6 +10335,8 @@ public partial class MainWindow : Window
         }
 
         InvalidateUnifiedLibraryViewCache();
+        if (DashboardScrollViewer.IsVisible)
+            await BuildDashboardAsync();
 
         if (_activeAlbumFilterId == albumId && row.EntityType != "OrynivoAlbum")
             await ReloadAlbumDetailHeaderAsync(albumId);
@@ -10533,7 +10570,10 @@ public partial class MainWindow : Window
         // On the dashboard surface the card is already refreshed above; do not
         // rebuild the (hidden) Albums list, which would also overwrite the count.
         if (DashboardScrollViewer.IsVisible)
+        {
+            await BuildDashboardAsync();
             return;
+        }
         if (_activeAlbumFilterId == albumId)
             await ReloadAlbumDetailHeaderAsync(albumId);
     }
@@ -10586,6 +10626,8 @@ public partial class MainWindow : Window
         ApplyRemoteArtwork(row, selected.ImageData);
         DeleteOrynivoAlbumListCache(server);
         InvalidateUnifiedLibraryViewCache();
+        if (DashboardScrollViewer.IsVisible)
+            await BuildDashboardAsync();
         StatusTextBlock.Text = string.Empty;
     }
 
@@ -11240,7 +11282,8 @@ public partial class MainWindow : Window
     /// <returns><see langword="true"/> when an eligible current track was updated.</returns>
     private bool SetCurrentTrackFavorite(bool favorite)
     {
-        // Remote Orynivo Server track: toggle the client-side favorite (settings.json).
+        // Remote Orynivo Server track: persist the profile-scoped state locally and
+        // mirror it to the server when the endpoint is available.
         if (CurrentOrynivoFavoriteTarget is { } target)
         {
             var (favServer, favId) = target;
@@ -11248,15 +11291,16 @@ public partial class MainWindow : Window
             InvalidateUnifiedLibraryViewCache();
             var key = GetOrynivoFavoriteKey(favServer.Id, "Track", favId);
             if (_currentTrackIsFavorite)
-                _settings.OrynivoServerFavorites.Add(key);
+                ActiveUserProfile.OrynivoServerFavorites.Add(key);
             else
-                _settings.OrynivoServerFavorites.Remove(key);
+                ActiveUserProfile.OrynivoServerFavorites.Remove(key);
             _settingsStore.Save(_settings);
 
             if (_currentOrynivoTrackRow is not null)
                 _currentOrynivoTrackRow.IsFavorite = _currentTrackIsFavorite;
             UpdateNowPlayingFavoriteButton();
             RefreshOrynivoFavoriteRows(favServer, favId, _currentTrackIsFavorite);
+            _ = _orynivoClient.UpdateTrackFavoriteAsync(favServer, favId, _currentTrackIsFavorite);
             return true;
         }
 
@@ -11323,9 +11367,10 @@ public partial class MainWindow : Window
                 {
                     var key = GetOrynivoFavoriteKey(server.Id, "Artist", artist.Id);
                     if (isFavorite)
-                        _settings.OrynivoServerFavorites.Add(key);
+                        ActiveUserProfile.OrynivoServerFavorites.Add(key);
                     else
-                        _settings.OrynivoServerFavorites.Remove(key);
+                        ActiveUserProfile.OrynivoServerFavorites.Remove(key);
+                    _ = _orynivoClient.UpdateArtistFavoriteAsync(server, artist.Id, isFavorite);
                 }
             }
             catch
@@ -11405,9 +11450,15 @@ public partial class MainWindow : Window
             {
                 var key = GetOrynivoFavoriteKey(_activeOrynivoServer.Id, entityType, entityId);
                 if (row.IsFavorite)
-                    _settings.OrynivoServerFavorites.Add(key);
+                    ActiveUserProfile.OrynivoServerFavorites.Add(key);
                 else
-                    _settings.OrynivoServerFavorites.Remove(key);
+                    ActiveUserProfile.OrynivoServerFavorites.Remove(key);
+                if (entityType == "Artist")
+                    _ = _orynivoClient.UpdateArtistFavoriteAsync(_activeOrynivoServer, entityId, row.IsFavorite);
+                else if (entityType == "Album")
+                    _ = _orynivoClient.UpdateAlbumFavoriteAsync(_activeOrynivoServer, entityId, row.IsFavorite);
+                else if (entityType == "Track")
+                    _ = _orynivoClient.UpdateTrackFavoriteAsync(_activeOrynivoServer, entityId, row.IsFavorite);
             }
             _settingsStore.Save(_settings);
             if (_trackFavoritesOnly && !row.IsFavorite)
@@ -11462,9 +11513,10 @@ public partial class MainWindow : Window
             var server = part.Server!;
             var key = GetOrynivoFavoriteKey(server.Id, "Album", part.AlbumId);
             if (isFavorite)
-                _settings.OrynivoServerFavorites.Add(key);
+                ActiveUserProfile.OrynivoServerFavorites.Add(key);
             else
-                _settings.OrynivoServerFavorites.Remove(key);
+                ActiveUserProfile.OrynivoServerFavorites.Remove(key);
+            _ = _orynivoClient.UpdateAlbumFavoriteAsync(server, part.AlbumId, isFavorite);
             hasRemote = true;
         }
         if (hasRemote)
@@ -13800,6 +13852,7 @@ public partial class MainWindow : Window
         {
             _currentPlayHistoryId = null;
             InvalidateDashboardCatalogCache();
+            _ = SyncProfileHistoryInBackgroundAsync();
         }
     }
 
@@ -16830,6 +16883,7 @@ public partial class MainWindow : Window
         });
         var completionHandled = false;
         view.LocalLibraryChanged += OnWatchedLibraryChanged;
+        view.ProfileChanged += profileId => _ = OnUserProfileChangedAsync(profileId);
         view.CompletionRequested += async (_, accepted) =>
         {
             if (completionHandled)
@@ -16849,6 +16903,95 @@ public partial class MainWindow : Window
         };
         SettingsViewHost.Content = view;
         SettingsViewHost.IsVisible = true;
+    }
+
+    /// <summary>Applies a newly selected profile and refreshes profile-sensitive views.</summary>
+    /// <param name="profileId">Stable identifier of the selected profile.</param>
+    private async Task OnUserProfileChangedAsync(string profileId)
+    {
+        AudioDatabase.SetActiveProfile(profileId);
+        ApplyServerProfileContext();
+        _settingsStore.Save(_settings);
+        StopInfiniteMix();
+        InvalidateDashboardCatalogCache();
+        InvalidateGenreCloudViewCache();
+        InvalidateUnifiedLibraryViewCache();
+        if (!string.IsNullOrWhiteSpace(_currentTopLevelTag))
+            await ShowTopLevelViewAsync(_currentTopLevelTag);
+    }
+
+    /// <summary>Applies the active local profile's server-profile mappings to remote clients.</summary>
+    private void ApplyServerProfileContext()
+    {
+        if (_profileManager is null)
+            return;
+        var profile = _profileManager.ActiveProfile;
+        foreach (var server in _settings.OrynivoServers)
+        {
+            server.ProfileId = profile.ServerProfileIds.TryGetValue(server.Id, out var mapped)
+                && !string.IsNullOrWhiteSpace(mapped)
+                ? mapped
+                : "standard";
+        }
+    }
+
+    private async Task RefreshServerProfileMappingsAsync()
+    {
+        if (_profileManager is null || _settings.OrynivoServers.Count == 0)
+            return;
+        using var client = new OrynivoServerClient();
+        var profile = _profileManager.ActiveProfile;
+        foreach (var server in _settings.OrynivoServers)
+        {
+            var profiles = await client.GetProfilesAsync(server);
+            if (profiles.Count == 0)
+                continue;
+            if (!profile.ServerProfileIds.TryGetValue(server.Id, out var mapped) ||
+                profiles.All(p => !string.Equals(p.Id, mapped, StringComparison.OrdinalIgnoreCase)))
+            {
+                var sameName = profiles.FirstOrDefault(p =>
+                    string.Equals(p.Name, profile.Name, StringComparison.OrdinalIgnoreCase));
+                profile.ServerProfileIds[server.Id] = sameName?.Id
+                    ?? profiles.FirstOrDefault(p => string.Equals(p.Id, "standard", StringComparison.OrdinalIgnoreCase))?.Id
+                    ?? profiles[0].Id;
+            }
+        }
+        ApplyServerProfileContext();
+        _settingsStore.Save(_settings);
+        _ = SyncProfileHistoryInBackgroundAsync();
+    }
+
+    /// <summary>Replicates the active profile's recent history without blocking the UI.</summary>
+    private async Task SyncProfileHistoryInBackgroundAsync()
+    {
+        try
+        {
+            List<SyncedPlaybackHistoryEntry> local;
+            using (var db = AudioDatabase.OpenDefault())
+                local = db.GetHistoryForSync(1000);
+            var payload = local.Select(entry => new OrynivoHistorySyncEntry(
+                entry.SyncId, entry.Path, entry.StartedAtUnix, entry.PositionSeconds,
+                entry.DurationSeconds, entry.MediaType, entry.Title, entry.Subtitle,
+                entry.Album, entry.ExternalId, entry.Genre)).ToList();
+            foreach (var server in _settings.OrynivoServers ?? [])
+            {
+                var remote = await _orynivoClient.GetHistorySyncAsync(server, 1000).ConfigureAwait(false);
+                using (var db = AudioDatabase.OpenDefault())
+                {
+                    foreach (var entry in remote)
+                        db.ImportSyncedHistory(new SyncedPlaybackHistoryEntry(
+                            entry.SyncId, entry.Path, entry.StartedAtUnix, entry.PositionSeconds,
+                            entry.DurationSeconds, entry.MediaType, entry.Title, entry.Subtitle,
+                            entry.Album, entry.ExternalId, entry.Genre));
+                }
+                await _orynivoClient.PushHistorySyncAsync(server, payload).ConfigureAwait(false);
+            }
+            InvalidateDashboardCatalogCache();
+        }
+        catch (Exception ex)
+        {
+            CrashLogger.Log(ex, "Background profile history synchronization");
+        }
     }
 
     private void CloseEmbeddedSettings()

@@ -45,4 +45,17 @@ public sealed class ServerSettings
     /// returned by the <c>/api/info</c> endpoint.
     /// </summary>
     public string ServerName { get; set; } = "Orynivo Server";
+
+    /// <summary>Gets or sets the profiles allowed to store personal server state.</summary>
+    public List<ServerProfile> Profiles { get; set; } = [new ServerProfile()];
+}
+
+/// <summary>Stable server-side profile identity shared with a desktop client.</summary>
+public sealed class ServerProfile
+{
+    /// <summary>Gets or sets the profile identifier.</summary>
+    public string Id { get; set; } = "standard";
+
+    /// <summary>Gets or sets the display name.</summary>
+    public string Name { get; set; } = "Standard";
 }

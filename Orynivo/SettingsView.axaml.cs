@@ -61,6 +61,7 @@ internal partial class SettingsView : UserControl
         bool ReplayGainOnly);
 
     private readonly AppSettings _settings;
+    private readonly SettingsStore _settingsStore = new();
     private readonly List<string> _libraryPaths = [];
     private readonly List<PlexServerSettings> _plexServers = [];
     private readonly Dictionary<string, string> _plexTokens = [];
@@ -80,12 +81,16 @@ internal partial class SettingsView : UserControl
     private bool _initializing = true;
     private bool _rebuildingEqualizerEditor;
     private bool _settingsAccepted;
+    private UserProfileManager? _profileManager;
+    private bool _profileSelectionUpdating;
 
     /// <summary>
     /// Occurs after a manual local-library scan has added, updated, or removed
     /// indexed tracks so catalog consumers can invalidate their session caches.
     /// </summary>
     internal event Action? LocalLibraryChanged;
+    /// <summary>Raised after the active user profile changes.</summary>
+    internal event Action<string>? ProfileChanged;
     private bool _plexCredentialsChanged;
     private bool _metadataAnalysisLoaded;
     private IReadOnlyList<MetadataProblemRow> _metadataDoctorRows = [];
@@ -118,6 +123,7 @@ internal partial class SettingsView : UserControl
     {
         InitializeComponent();
         _settings = settings;
+        _profileManager = new UserProfileManager(settings);
         _onLibraryPathsChanged = onLibraryPathsChanged;
         _onEqualizerPreviewChanged = onEqualizerPreviewChanged;
         _originalEqualizerEnabled = settings.EqualizerEnabled;
@@ -253,6 +259,9 @@ internal partial class SettingsView : UserControl
         _libraryPaths.AddRange(settings.LibraryPaths);
         _plexServers.AddRange((settings.PlexServers ?? []).Select(ClonePlexServer));
         _orynivoServers.AddRange((settings.OrynivoServers ?? []).Select(CloneOrynivoServer));
+        UserProfileComboBox.ItemsSource = _profileManager.Profiles;
+        UserProfileComboBox.DisplayMemberBinding = new Avalonia.Data.Binding(nameof(UserProfile.DisplayName));
+        UserProfileComboBox.SelectedItem = _profileManager.ActiveProfile;
         try
         {
             foreach (var credential in new WindowsPlexCredentialStore().LoadAll())
@@ -1247,6 +1256,7 @@ internal partial class SettingsView : UserControl
         MetadataPanel.IsVisible                = tag == "Metadata";
         StreamingPanel.IsVisible               = tag == "Streaming";
         AppearancePanel.IsVisible              = tag == "Appearance";
+        UserProfilesPanel.IsVisible            = tag == "UserProfiles";
         ArtistInfoPanel.IsVisible              = tag == "ArtistInfo";
         McpPanel.IsVisible                     = tag == "Mcp";
         MobileRemotePanel.IsVisible            = tag == "MobileRemote";
@@ -1258,6 +1268,86 @@ internal partial class SettingsView : UserControl
         }
         if (tag == "Metadata" && !_metadataAnalysisLoaded)
             _ = LoadMetadataProblemsAsync();
+    }
+
+    private void UserProfileComboBox_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_profileSelectionUpdating || UserProfileComboBox.SelectedItem is not UserProfile profile ||
+            _profileManager is null || !_profileManager.Activate(profile.Id))
+            return;
+        AudioDatabase.SetActiveProfile(profile.Id);
+        ProfileChanged?.Invoke(profile.Id);
+    }
+
+    private async void CreateUserProfileButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (_profileManager is null)
+            return;
+        var dialog = new UserProfileDialog();
+        if (await dialog.ShowDialog<bool>(GetHostWindow()) != true)
+            return;
+        try
+        {
+            var profile = _profileManager.Create(dialog.ProfileName, dialog.MigrateFavorites);
+            _profileSelectionUpdating = true;
+            UserProfileComboBox.SelectedItem = profile;
+            _profileSelectionUpdating = false;
+            AudioDatabase.SetActiveProfile(profile.Id);
+            _settingsStore.Save(_settings);
+            ProfileChanged?.Invoke(profile.Id);
+        }
+        catch (Exception ex)
+        {
+            await AppMessageBox.ShowAsync(ex.Message, LocalizationManager.Current.UserProfiles, GetHostWindow());
+        }
+    }
+
+    private async void RenameUserProfileButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (_profileManager is null || UserProfileComboBox.SelectedItem is not UserProfile profile)
+            return;
+        var dialog = new UserProfileDialog(showMigration: false);
+        if (await dialog.ShowDialog<bool>(GetHostWindow()) != true)
+            return;
+        try
+        {
+            _profileManager.Rename(profile.Id, dialog.ProfileName);
+            UserProfileComboBox.ItemsSource = null;
+            UserProfileComboBox.ItemsSource = _profileManager.Profiles;
+            UserProfileComboBox.DisplayMemberBinding = new Avalonia.Data.Binding(nameof(UserProfile.DisplayName));
+            UserProfileComboBox.SelectedItem = profile;
+            _settingsStore.Save(_settings);
+        }
+        catch (Exception ex)
+        {
+            await AppMessageBox.ShowAsync(ex.Message, LocalizationManager.Current.UserProfiles, GetHostWindow());
+        }
+    }
+
+    private async void DeleteUserProfileButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (_profileManager is null || UserProfileComboBox.SelectedItem is not UserProfile profile)
+            return;
+        if (!await AppMessageBox.ConfirmAsync(
+                string.Format(LocalizationManager.Current.UserProfileDeleteConfirm, profile.DisplayName),
+                LocalizationManager.Current.UserProfileDelete,
+                GetHostWindow()))
+            return;
+        try
+        {
+            _profileManager.Delete(profile.Id);
+            UserProfileComboBox.ItemsSource = null;
+            UserProfileComboBox.ItemsSource = _profileManager.Profiles;
+            UserProfileComboBox.DisplayMemberBinding = new Avalonia.Data.Binding(nameof(UserProfile.DisplayName));
+            UserProfileComboBox.SelectedItem = _profileManager.ActiveProfile;
+            AudioDatabase.SetActiveProfile(_profileManager.ActiveProfile.Id);
+            _settingsStore.Save(_settings);
+            ProfileChanged?.Invoke(_profileManager.ActiveProfile.Id);
+        }
+        catch (Exception ex)
+        {
+            await AppMessageBox.ShowAsync(ex.Message, LocalizationManager.Current.UserProfiles, GetHostWindow());
+        }
     }
 
     private async void AiChatConnectionValue_OnLostFocus(object? sender, RoutedEventArgs e)

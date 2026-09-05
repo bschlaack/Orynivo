@@ -34,6 +34,19 @@ var settings = builder.Configuration
     .GetSection("Orynivo")
     .Get<ServerSettings>() ?? new ServerSettings();
 
+// Keep older configuration files valid and guarantee a stable migration target.
+settings.Profiles ??= [];
+if (settings.Profiles.Count == 0)
+    settings.Profiles.Add(new ServerProfile());
+if (!settings.Profiles.Any(p => string.Equals(p.Id, "standard", StringComparison.OrdinalIgnoreCase)))
+    settings.Profiles.Insert(0, new ServerProfile());
+settings.Profiles = settings.Profiles
+    .Where(p => !string.IsNullOrWhiteSpace(p.Id))
+    .Select(p => { p.Id = p.Id.Trim(); p.Name = string.IsNullOrWhiteSpace(p.Name) ? p.Id : p.Name.Trim(); return p; })
+    .GroupBy(p => p.Id, StringComparer.OrdinalIgnoreCase)
+    .Select(g => g.First())
+    .ToList();
+
 LibraryScanner.ConfigureReplayGainThrottling(
     settings.ReplayGainFfmpegThreads,
     settings.ReplayGainDelayMilliseconds);
@@ -80,6 +93,7 @@ var installType = File.Exists(installTypePath)
 var updateSupported = OperatingSystem.IsLinux() && installType is "deb" or "rpm";
 
 app.UseMiddleware<ApiKeyMiddleware>();
+app.UseMiddleware<ProfileContextMiddleware>();
 app.UseCors();
 
 // ---- Endpoints ------------------------------------------------------------

@@ -19,6 +19,7 @@ Logo/only_logo.ai
 .vs/
 .vscode/
 .claude/
+/.codex/multi-profile-plan.md
 *.user
 *.suo
 *.userosscache

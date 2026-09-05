@@ -2064,9 +2064,9 @@ public partial class MainWindow : Window
             {
                 var key = GetOrynivoFavoriteKey(favoriteServer.Id, "Track", favoriteRemoteTrackId);
                 if (isFavorite)
-                    _settings.OrynivoServerFavorites.Add(key);
+                    ActiveUserProfile.OrynivoServerFavorites.Add(key);
                 else
-                    _settings.OrynivoServerFavorites.Remove(key);
+                    ActiveUserProfile.OrynivoServerFavorites.Remove(key);
                 _settingsStore.Save(_settings);
                 RefreshOrynivoFavoriteRows(favoriteServer, favoriteRemoteTrackId, isFavorite);
             }
