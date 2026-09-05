@@ -665,7 +665,8 @@ byte-range streaming without FFmpeg.
   they are opened or queued, so `?key=` stream URLs are not persisted.
   Playlist tables show the favorite heart first and the source column next to
   it. Smart playlists resolve against the combined local and configured
-  Orynivo Server track set.
+  Orynivo Server track set. Server catalogs are loaded across all pages; outdated
+  incomplete track caches are rebuilt automatically without changing favorites.
 - Remote Orynivo Server artists, albums, and tracks can be marked as favorites;
   those favorite flags are stored only in the Windows client's settings.
 - Remote Orynivo Server album covers and artist images can be searched from the

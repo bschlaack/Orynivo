@@ -381,6 +381,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 - Main-window placement is persisted only from the normal state. When maximized
   startup is disabled, validate the saved rectangle against current screens and
   center the window if its previous monitor is no longer attached.
+- Full server track catalogs must request at most 5,000 tracks per page, matching
+  the server cap; requesting more falsely signals the end of pagination. Track
+  cache schema version 1 rejects legacy potentially truncated caches. Reapply
+  current client favorites after loading cached tracks.
 - Interactive cards use the shared cyan-violet gradient hover border. Main
   sidebar entries carry a source-appropriate shared vector icon; smart playlists
   use the shared 13-px icon footprint and spacing but retain a dedicated orange

@@ -301,7 +301,8 @@ public partial class MainWindow : Window
     private sealed record OrynivoTrackListCache(
         long LibraryChangedAt,
         long CachedAt,
-        List<LibraryCatalogTrack> Tracks);
+        List<LibraryCatalogTrack> Tracks,
+        int SchemaVersion);
     private sealed record OrynivoArtistListCache(
         long LibraryChangedAt,
         long CachedAt,
@@ -3423,15 +3424,9 @@ public partial class MainWindow : Window
 
         if (tracks is null)
         {
-            // Use a large page size so even big libraries load in one or two
-            // requests. A page size of 500 issued one round-trip per 500 tracks,
-            // which on a ~75k-track library meant ~150 sequential HTTP requests and
-            // over a minute of loading, leaving the Tracks view apparently empty
-            // (only the small favourites set, fetched in a single by-id request,
-            // appeared). The server returns tens of thousands of rows per request in
-            // well under a second, so a large page loads the whole library almost
-            // instantly while staying comfortably below the client's HTTP timeout.
-            const int pageSize = 50000;
+            // Match the server's maximum page size. Requesting more makes the
+            // capped first page look like the final page and truncates the cache.
+            const int pageSize = 5000;
             tracks = [];
             for (var page = 0; ; page++)
             {
@@ -3471,7 +3466,7 @@ public partial class MainWindow : Window
             if (!File.Exists(path))
                 return false;
             var cache = JsonSerializer.Deserialize<OrynivoTrackListCache>(File.ReadAllText(path));
-            if (cache?.Tracks is null || cache.LibraryChangedAt != libraryChangedAt)
+            if (cache?.Tracks is null || cache.SchemaVersion != 1 || cache.LibraryChangedAt != libraryChangedAt)
                 return false;
             tracks = cache.Tracks
                 .Select(track => track with
@@ -3502,7 +3497,7 @@ public partial class MainWindow : Window
                 tracks.Select(track => track with
                 {
                     PlaybackPath = $"orynivo://{server.Id}/track/{track.Id}"
-                }).ToList());
+                }).ToList(), SchemaVersion: 1);
             File.WriteAllText(path, JsonSerializer.Serialize(cache));
         }
         catch
@@ -5885,7 +5880,7 @@ public partial class MainWindow : Window
         {
             try
             {
-                using var serverCts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+                using var serverCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
                 var provider = CreateOrynivoCatalogProvider(server);
                 var tracks = LoadAllOrynivoTracksAsync(server, provider, serverCts.Token)
                     .GetAwaiter()

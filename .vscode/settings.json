@@ -1,3 +1,4 @@
 {
-    "C_Cpp.codeAnalysis.clangTidy.path": "C:\\tools\\llvm-mos\\bin\\clang-tidy.exe"
+    "C_Cpp.codeAnalysis.clangTidy.path": "C:\\tools\\llvm-mos\\bin\\clang-tidy.exe",
+    "cmake.sourceDirectory": "X:/projects/c#/Orynivo/Native/AirPlay2Bridge"
 }
