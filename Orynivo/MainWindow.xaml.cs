@@ -784,6 +784,10 @@ public partial class MainWindow : Window
         using (StartupTimingLog.Time("MainWindow.RestorePlaybackQueueState"))
             RestorePlaybackQueueState();
         LogUiDiagnostics("MainWindow RestorePlaybackQueueState completed");
+        // Remote queue entries are persisted as credential-free stable references.
+        // Hydrate their metadata after startup so restoring the queue never blocks
+        // construction of the main window on network I/O.
+        _ = HydrateRestoredOrynivoQueueAsync();
         _libraryWatcher = new LibraryWatcherService(
             OnWatchedLibraryChanged,
             OnLibraryScanActivity,
@@ -1956,7 +1960,10 @@ public partial class MainWindow : Window
 
         if (paths.Count == 0 && _settings.PlaybackQueuePaths.Count > 0)
         {
-            paths = _settings.PlaybackQueuePaths.Where(CanPersistQueuePath).ToList();
+            paths = _settings.PlaybackQueuePaths
+                .Select(NormalizePersistedQueuePath)
+                .Where(CanPersistQueuePath)
+                .ToList();
             currentIndex = paths.Count == 0
                 ? -1
                 : Math.Clamp(_settings.PlaybackQueueIndex, 0, paths.Count - 1);
@@ -1965,8 +1972,11 @@ public partial class MainWindow : Window
                 _settingsStore.Save(_settings);
         }
 
-        var restoredPaths = paths.Where(CanPersistQueuePath).ToList();
-        if (restoredPaths.Count != paths.Count)
+        // Migrate queue entries written by older builds, which could contain an
+        // authenticated Orynivo stream URL, to the stable credential-free form.
+        var normalizedPaths = paths.Select(NormalizePersistedQueuePath).ToList();
+        var restoredPaths = normalizedPaths.Where(CanPersistQueuePath).ToList();
+        if (!normalizedPaths.SequenceEqual(paths, StringComparer.Ordinal) || restoredPaths.Count != paths.Count)
         {
             currentIndex = currentIndex < 0
                 ? -1
@@ -1986,13 +1996,48 @@ public partial class MainWindow : Window
         RefreshQueueNavigationButtons();
     }
 
+    /// <summary>Loads metadata for restored Orynivo Server queue references in the background.</summary>
+    private async Task HydrateRestoredOrynivoQueueAsync()
+    {
+        var references = _queue
+            .Select((item, index) => (item, index))
+            .Where(entry => entry.item.FilePath.StartsWith("orynivo://", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        foreach (var (item, index) in references)
+        {
+            try
+            {
+                var playablePath = await ResolveRemoteMcpTrackAsync(item.FilePath);
+                if (string.IsNullOrWhiteSpace(playablePath) ||
+                    !await Dispatcher.UIThread.InvokeAsync(() =>
+                        index < _queue.Count && ReferenceEquals(_queue[index], item)))
+                    continue;
+                if (_orynivoTracksByUrl.TryGetValue(playablePath, out var row))
+                {
+                    _queue[index] = ToPlaylistItem(row);
+                    PersistPlaybackQueue();
+                }
+            }
+            catch
+            {
+                // A temporarily unavailable server must not prevent local startup.
+            }
+        }
+
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            if (_currentTopLevelTag == "Queue")
+                RefreshQueueRows();
+        });
+    }
+
     private void CapturePlaybackQueueState()
     {
         var persisted = new List<string>();
         var persistedIndex = -1;
         for (var index = 0; index < _queue.Count; index++)
         {
-            var path = _queue[index].FilePath;
+            var path = GetPersistableQueuePath(_queue[index]);
             if (!CanPersistQueuePath(path))
                 continue;
             if (index == _queueIndex)
@@ -2018,6 +2063,43 @@ public partial class MainWindow : Window
 
         db.SavePlaybackQueue(persisted, currentIndex);
         ClearLegacyPlaybackQueueSettings();
+    }
+
+    /// <summary>Returns a credential-free stable identity for a queue item.</summary>
+    private string GetPersistableQueuePath(PlaylistItem item)
+    {
+        var path = item.FilePath;
+        if (path.StartsWith("orynivo://", StringComparison.OrdinalIgnoreCase))
+            return path;
+        if (_orynivoTracksByUrl.TryGetValue(path, out var row) &&
+            row.OrynivoServer is { } server && row.Id is long trackId)
+            return BuildOrynivoPlaylistReference(server, trackId);
+        return path;
+    }
+
+    /// <summary>Converts a legacy authenticated Orynivo stream URL to a stable reference.</summary>
+    private string NormalizePersistedQueuePath(string path)
+    {
+        if (!Uri.TryCreate(path, UriKind.Absolute, out var uri) ||
+            uri.Scheme is not ("http" or "https"))
+            return path;
+
+        foreach (var server in _settings.OrynivoServers ?? [])
+        {
+            if (!Uri.TryCreate(server.BaseUrl, UriKind.Absolute, out var baseUri) ||
+                !string.Equals(uri.Host, baseUri.Host, StringComparison.OrdinalIgnoreCase) ||
+                uri.Port != baseUri.Port)
+                continue;
+            var prefix = baseUri.AbsolutePath.TrimEnd('/');
+            var streamPrefix = $"{prefix}/api/stream/";
+            if (!uri.AbsolutePath.StartsWith(streamPrefix, StringComparison.OrdinalIgnoreCase) ||
+                !long.TryParse(uri.AbsolutePath[streamPrefix.Length..], NumberStyles.Integer,
+                    CultureInfo.InvariantCulture, out var trackId))
+                continue;
+            return BuildOrynivoPlaylistReference(server, trackId);
+        }
+
+        return path;
     }
 
     /// <summary>Restores the queue that was playing before the most recent wholesale replacement.</summary>
@@ -7226,8 +7308,7 @@ public partial class MainWindow : Window
     private void TrackDataGrid_OnLoadingRow(object? sender, DataGridRowEventArgs e)
     {
         ApplyNowPlayingClass(e.Row);
-        if (ReferenceEquals(sender, SearchTracksDataGrid))
-            SetPlaylistContextFlyout(e.Row);
+        SetPlaylistContextFlyout(e.Row);
     }
 
     private void PlaylistDataGrid_OnLoadingRow(object? sender, DataGridRowEventArgs e) =>
@@ -7261,30 +7342,103 @@ public partial class MainWindow : Window
         if (!isTrack && !isAlbum)
             return;
 
-        row.ContextFlyout = _activeOrynivoPlaylistServer is not null &&
-                            isTrack &&
-                            contentRow.PlaylistEntryId.HasValue
+        var menu = _activeOrynivoPlaylistServer is not null &&
+                   isTrack &&
+                   contentRow.PlaylistEntryId.HasValue
             ? BuildRemoveFromOrynivoPlaylistContextFlyout(
                 _activeOrynivoPlaylistServer,
                 contentRow.PlaylistEntryId.Value,
                 contentRow.FilePath)
             : contentRow.EntityType.StartsWith("Plex", StringComparison.Ordinal) ||
-                            (!CanPersistQueuePath(contentRow.FilePath) &&
-                             contentRow.EntityType != "OrynivoTrack")
+              (!CanPersistQueuePath(contentRow.FilePath) &&
+               contentRow.EntityType != "OrynivoTrack")
             ? BuildQueueContextFlyout([contentRow.FilePath])
             : _activePlaylistId.HasValue &&
-                            isTrack &&
-                            contentRow.PlaylistEntryId.HasValue
+              isTrack &&
+              contentRow.PlaylistEntryId.HasValue
             ? BuildRemoveFromPlaylistContextFlyout(
                 contentRow.PlaylistEntryId.Value,
                 contentRow.FilePath)
             : BuildPlaylistContextFlyout(GetPathsForRow(contentRow));
+        if (isTrack)
+        {
+            menu.Items.Add(new Separator());
+            var infoItem = CreateFlyoutMenuItem(LocalizationManager.Current.ShowTrackInfo);
+            infoItem.Tag = contentRow;
+            infoItem.Click += TrackInfoMenuItem_OnClick;
+            menu.Items.Add(infoItem);
+        }
+        row.ContextFlyout = menu;
         row.AddHandler(
             PointerPressedEvent,
             PlaylistContextItem_OnPreviewMouseRightButtonDown,
             RoutingStrategies.Tunnel,
             handledEventsToo: true);
     }
+
+    private async void TrackInfoMenuItem_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: ContentRow row })
+            return;
+
+        e.Handled = true;
+        var title = $"{LocalizationManager.Current.TrackInfo}: {DisplayTrackInfoValue(row.Title)}";
+        var dialog = new TrackInfoDialog(title, BuildTrackInfoEntries(row));
+        await dialog.ShowDialog(this);
+    }
+
+    private static IReadOnlyList<TrackInfoDialog.TrackInfoEntry> BuildTrackInfoEntries(ContentRow row)
+    {
+        var physicalPath = row.SourcePath;
+        if (string.IsNullOrWhiteSpace(physicalPath) ||
+            IsHttpUrl(physicalPath) ||
+            physicalPath.StartsWith("orynivo://", StringComparison.OrdinalIgnoreCase))
+        {
+            physicalPath = !IsHttpUrl(row.FilePath) &&
+                           !row.FilePath.StartsWith("orynivo://", StringComparison.OrdinalIgnoreCase)
+                ? row.FilePath
+                : null;
+        }
+
+        var path = row.OrynivoServer is { } server && !string.IsNullOrWhiteSpace(physicalPath)
+            ? $"{server.Name}: {physicalPath}"
+            : row.PlexServerId is null
+                ? physicalPath
+                : null;
+
+        return
+        [
+            new(LocalizationManager.Current.PhysicalPath, DisplayTrackInfoValue(path)),
+            new(LocalizationManager.Current.Title, DisplayTrackInfoValue(row.Title)),
+            new(LocalizationManager.Current.Artist, DisplayTrackInfoValue(row.Artist)),
+            new(LocalizationManager.Current.Album, DisplayTrackInfoValue(row.Album)),
+            new(LocalizationManager.Current.AlbumArtist, DisplayTrackInfoValue(row.AlbumArtist)),
+            new(LocalizationManager.Current.Genre, DisplayTrackInfoValue(row.Genre)),
+            new(LocalizationManager.Current.Year, DisplayTrackInfoValue(row.Year)),
+            new(LocalizationManager.Current.TrackNumber, DisplayTrackInfoValue(row.TrackNumber)),
+            new(LocalizationManager.Current.DiscNumber, DisplayTrackInfoValue(row.DiscNumber)),
+            new(LocalizationManager.Current.Duration, DisplayTrackInfoValue(row.Duration)),
+            new(LocalizationManager.Current.Format, DisplayTrackInfoValue(row.Format)),
+            new(LocalizationManager.Current.Bitrate, DisplayTrackInfoValue(row.Bitrate)),
+            new(LocalizationManager.Current.SampleRate, DisplayTrackInfoValue(row.SampleRate)),
+            new(LocalizationManager.Current.BitDepth, DisplayTrackInfoValue(row.BitDepth)),
+            new(LocalizationManager.Current.Channels, DisplayTrackInfoValue(row.Channels)),
+            new(LocalizationManager.Current.Composer, DisplayTrackInfoValue(row.Composer)),
+            new(LocalizationManager.Current.Bpm, DisplayTrackInfoValue(row.Bpm)),
+            new(LocalizationManager.Current.FileName, DisplayTrackInfoValue(row.FileName)),
+            new(LocalizationManager.Current.FileSize, DisplayTrackInfoValue(row.FileSize)),
+            new(LocalizationManager.Current.AddedAt, DisplayTrackInfoValue(row.AddedAt)),
+            new(LocalizationManager.Current.ReplayGainTrackColumn, DisplayTrackInfoValue(row.ReplayGainTrack)),
+            new(LocalizationManager.Current.ReplayGainAlbumColumn, DisplayTrackInfoValue(row.ReplayGainAlbum)),
+            new(LocalizationManager.Current.Favorites, row.FavoriteGlyph),
+            new(LocalizationManager.Current.SourceColumn, DisplayTrackInfoValue(row.SourceName)),
+            new(LocalizationManager.Current.PersonalRating, row.UserRatingGlyph),
+            new(LocalizationManager.Current.MusicBrainzRating, row.MusicBrainzRatingDisplay)
+        ];
+    }
+
+    private static string DisplayTrackInfoValue(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? LocalizationManager.Current.Unknown : value;
 
     private MenuFlyout BuildOrynivoArtworkContextFlyout(ContentRow row)
     {
@@ -7780,7 +7934,6 @@ public partial class MainWindow : Window
             }
 
             row.Nr = (index + 1).ToString(CultureInfo.CurrentCulture);
-            row.EntityType = "Queue";
             row.QueueItem = item;
             _queueRows.Add(row);
         }
@@ -8713,7 +8866,7 @@ public partial class MainWindow : Window
 
     private async Task HandleContentRowDoubleClickAsync(ContentRow row)
     {
-        if (row.EntityType == "Queue" && row.QueueItem is not null)
+        if (row.QueueItem is not null && _currentTopLevelTag == "Queue")
         {
             var queueIndex = IndexOfQueueItem(row.QueueItem);
             if (queueIndex < 0)
@@ -12432,6 +12585,13 @@ public partial class MainWindow : Window
         PodcastPlayback? podcastPlayback = null,
         TimeSpan initialPosition = default)
     {
+        if (filePath.StartsWith("orynivo://", StringComparison.OrdinalIgnoreCase))
+        {
+            var resolvedPath = await ResolveRemoteMcpTrackAsync(filePath);
+            if (string.IsNullOrWhiteSpace(resolvedPath))
+                throw new InvalidOperationException(LocalizationManager.Current.PlaybackStopped);
+            filePath = resolvedPath;
+        }
         await StopPlaybackAsync();
         _currentFilePath = filePath;
         _currentRadioStation = radioStation;

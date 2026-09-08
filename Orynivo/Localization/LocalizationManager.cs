@@ -235,6 +235,9 @@ public static class LocalizationManager
         resources["L_AcceptArtistImage"] = Current.AcceptArtistImage;
         resources["L_RejectArtistImage"] = Current.RejectArtistImage;
         resources["L_ShowAllAlbumTracks"] = Current.ShowAllAlbumTracks;
+        resources["L_TrackInfo"] = Current.TrackInfo;
+        resources["L_ShowTrackInfo"] = Current.ShowTrackInfo;
+        resources["L_PhysicalPath"] = Current.PhysicalPath;
         resources["L_OutputType"] = Current.OutputType;
         resources["L_AsioOutputDevice"] = Current.AsioOutputDevice;
         resources["L_CwAsioOutputDevice"] = Current.CwAsioOutputDevice;
@@ -1125,6 +1128,9 @@ public static class LocalizationManager
         , ExportM3u8Playlist = "Als M3U8 exportieren"
         , SaveAlbumAsPlaylist = "Als Playlist speichern"
         , AlbumPath = "Albumpfad"
+        , TrackInfo = "Titelinformationen"
+        , ShowTrackInfo = "Titelinformationen anzeigen"
+        , PhysicalPath = "Physischer Dateipfad"
         , UpNext = "Als Nächstes"
         , GenreExplorer = "Genre-Wolke"
         , GenreCloudHint = "Entdecke Genres aus deiner lokalen Bibliothek und allen verbundenen Orynivo Servern. Wähle ein Genre, um tiefer einzusteigen."
@@ -1823,6 +1829,9 @@ public static class LocalizationManager
         , ExportM3u8Playlist = "Export as M3U8"
         , SaveAlbumAsPlaylist = "Save as playlist"
         , AlbumPath = "Album path"
+        , TrackInfo = "Track information"
+        , ShowTrackInfo = "Show track information"
+        , PhysicalPath = "Physical file path"
         , UpNext = "Up next"
         , GenreExplorer = "Genre cloud"
         , GenreCloudHint = "Explore genres from your local library and every connected Orynivo Server. Select a genre to drill down."
@@ -2524,6 +2533,9 @@ public static class LocalizationManager
         , ExportM3u8Playlist = "Exporter au format M3U8"
         , SaveAlbumAsPlaylist = "Enregistrer comme playlist"
         , AlbumPath = "Chemin de l’album"
+        , TrackInfo = "Informations sur le titre"
+        , ShowTrackInfo = "Afficher les informations du titre"
+        , PhysicalPath = "Chemin physique du fichier"
         , UpNext = "À suivre"
         , GenreExplorer = "Nuage de genres"
         , GenreCloudHint = "Explorez les genres de votre bibliothèque locale et de tous les serveurs Orynivo connectés. Sélectionnez un genre pour l’affiner."
@@ -3222,6 +3234,9 @@ public static class LocalizationManager
         , ExportM3u8Playlist = "Exportar como M3U8"
         , SaveAlbumAsPlaylist = "Guardar como lista"
         , AlbumPath = "Ruta del álbum"
+        , TrackInfo = "Información de la pista"
+        , ShowTrackInfo = "Mostrar información de la pista"
+        , PhysicalPath = "Ruta física del archivo"
         , UpNext = "A continuación"
         , GenreExplorer = "Nube de géneros"
         , GenreCloudHint = "Explora los géneros de tu biblioteca local y de todos los servidores Orynivo conectados. Selecciona un género para profundizar."

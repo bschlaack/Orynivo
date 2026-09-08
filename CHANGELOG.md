@@ -4,15 +4,28 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.41.4] - 2026-09-08
 
 ### Added
+
+- Added **Show track information** to track context menus, including **Up
+  Next**. The modal lists the physical file path first, followed by all
+  metadata represented by the selectable track columns.
 
 ### Fixed
 
 - The **Up Next** table now offers the same selectable track columns as
   the Tracks view, keeps its scroll position when playback advances, and
   renders album and artist names as navigation links.
+- Restored **Up Next** entries from configured Orynivo Servers now survive
+  application restarts through credential-free server track references and
+  are hydrated asynchronously without delaying startup.
+- **Show track information** now displays the remote physical source path,
+  prefixed with the configured Orynivo Server name, instead of showing an
+  unknown value.
+- The full **Recently played** view now resolves missing legacy local
+  history IDs in one batch, so artist and album navigation remains available
+  beyond the first dashboard cards.
 
 ## [0.41.3] - 2026-09-05
 

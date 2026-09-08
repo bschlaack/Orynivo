@@ -1,0 +1,68 @@
+<Window x:Class="Orynivo.TrackInfoDialog"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{Binding DialogTitle}"
+        Icon="avares://Orynivo/Assets/Orynivo.ico"
+        Width="820"
+        Height="680"
+        MinWidth="560"
+        MinHeight="420"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppContentBrush}">
+    <Window.Styles>
+        <Style Selector="Border.infoRow">
+            <Setter Property="Background" Value="{DynamicResource AppSurfaceBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppGridLineBrush}"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="Padding" Value="12,9"/>
+        </Style>
+        <Style Selector="TextBlock.infoLabel">
+            <Setter Property="Foreground" Value="{DynamicResource AppMutedTextBrush}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+        <Style Selector="TextBlock.infoValue">
+            <Setter Property="Foreground" Value="{DynamicResource AppPrimaryTextBrush}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style Selector="Button.dialogAction">
+            <Setter Property="Background" Value="{DynamicResource AppButtonBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppButtonTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppButtonBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="18,8"/>
+            <Setter Property="MinHeight" Value="30"/>
+        </Style>
+    </Window.Styles>
+
+    <Grid Margin="20" RowDefinitions="Auto,*,Auto">
+        <TextBlock Text="{Binding DialogTitle}"
+                   FontSize="{DynamicResource FontSizeTitle}"
+                   FontWeight="SemiBold"
+                   Foreground="{DynamicResource AppPrimaryTextBrush}"/>
+
+        <ScrollViewer Grid.Row="1"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Rows}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Classes="infoRow">
+                            <Grid ColumnDefinitions="220,*">
+                                <TextBlock Classes="infoLabel" Text="{Binding Label}"/>
+                                <TextBlock Grid.Column="1" Classes="infoValue" Text="{Binding Value}"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <Button Grid.Row="2"
+                Classes="dialogAction"
+                HorizontalAlignment="Right"
+                Content="{DynamicResource L_Close}"
+                Click="CloseButton_OnClick"/>
+    </Grid>
+</Window>

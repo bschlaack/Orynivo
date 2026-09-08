@@ -718,6 +718,10 @@ byte-range streaming without FFmpeg.
 - Context-sensitive column selection by right-clicking a table header, including
   optional technical and tag metadata for local tracks and appropriate catalog
   fields for radio and podcasts
+- Track context menus include **Show track information**, which displays the
+  physical file path first and then the complete available track metadata.
+  Remote playback URLs and credentials are never shown; Orynivo Server paths
+  include the configured server name (for example, `Plex Orynivo: /u02/flac/file.flac`).
 - Drag-and-drop table-column ordering persisted independently for each table
   and main-content view
 - Space-saving accordion sections in the main sidebar, with configurable
