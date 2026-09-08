@@ -382,6 +382,25 @@ public partial class MainWindow : Window
                     break;
             }
 
+            // Older history rows can predate the stored track/artist/album IDs.
+            // Resolve those local paths in one database query so every card in
+            // the full history view receives the same navigation targets as the
+            // most recent entries.
+            var localRows = db.GetTrackListByPaths(deduped.Select(entry => entry.Path))
+                .ToDictionary(track => track.Path, StringComparer.OrdinalIgnoreCase);
+            for (var index = 0; index < deduped.Count; index++)
+            {
+                var entry = deduped[index];
+                if (!localRows.TryGetValue(entry.Path, out var track))
+                    continue;
+                deduped[index] = entry with
+                {
+                    TrackId = entry.TrackId ?? track.Id,
+                    ArtistId = entry.ArtistId ?? track.ArtistId,
+                    AlbumId = entry.AlbumId ?? track.AlbumId
+                };
+            }
+
             var localTrackIds = deduped
                 .Where(entry => entry.TrackId is long)
                 .Select(entry => entry.TrackId!.Value)

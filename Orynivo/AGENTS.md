@@ -456,6 +456,17 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   context together with its display metadata. Otherwise the shared source
   column mislabels that queue row as local. Keep this context memory-only and
   never persist its authenticated playback URL or API key.
+- The Up Next table uses the same selectable track-column set as the Tracks
+  view. Album and artist cells remain navigation links, and queue refreshes
+  during track transitions must restore the prior pixel scroll offset.
+- Track context menus, including Up Next, expose **Show track information**;
+  the modal lists the physical file path first and then every selectable track
+  metadata field without exposing authenticated remote playback URLs. Remote
+  Orynivo Server paths use the configured server name as a prefix.
+- Persisted Up Next entries from Orynivo Server must use stable
+  `orynivo://serverId/track/trackId` references rather than credential-bearing
+  stream URLs. Restore those references asynchronously after startup and
+  resolve them only when playback or metadata requires it.
 - The single-track **Play more like this** action may combine local and Orynivo
   Server similarity vectors, but it must load them asynchronously, resolve each
   provider-local result through its owning catalog, and keep server URLs and
@@ -555,6 +566,8 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 - Dashboard Recently Played cards show the persisted album below the artist.
   When the history identity can resolve a local, Orynivo Server, or Plex album,
   the album name opens that source's album detail without triggering card playback.
+  The full Recently Played view must batch-resolve missing local history IDs so
+  older entries expose the same artist and album links as newer entries.
 - A title action in `DailyHistoryDialog` starts the selected history entry
   directly through `PlayHistoryEntryInPlaceAsync`. It must never navigate to,
   bind, or `ScrollIntoView` the complete unified Tracks table first; that path

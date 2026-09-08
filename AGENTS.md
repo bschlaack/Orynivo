@@ -2457,6 +2457,16 @@ Keep `CHANGELOG.md` updated for every notable user-visible, architectural,
 build, compatibility, or bug-fix change. Add ongoing work under **Unreleased**
 and move those entries into a dated version section when preparing a release.
 
+### Documentation language
+
+- `README.md`, `CHANGELOG.md`, and the separate `Orynivo.wiki` repository must
+  use Orynivo's official English UI and feature names (for example **AI Chat**,
+  **Up Next**, **Play more like this**, **Create output**, **Configure output**,
+  and **Delete output**) whenever they refer to visible product functions.
+- Apply this consistently to historical entries as well as new documentation;
+  explanatory prose may remain in its surrounding language, but UI labels must
+  not be translated ad hoc.
+
 ## Localization Rule
 
 - Do not hard-code new visible UI text or status/error messages in XAML or code-behind

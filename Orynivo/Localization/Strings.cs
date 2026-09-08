@@ -162,6 +162,13 @@ public sealed record LocalizedStrings(
     string CrashMessage,
     string CrashMessageWithoutLog)
 {
+    /// <summary>Gets the title of the complete track-information dialog.</summary>
+    public string TrackInfo { get; init; } = "";
+    /// <summary>Gets the context-menu label for opening complete track information.</summary>
+    public string ShowTrackInfo { get; init; } = "";
+    /// <summary>Gets the label for the physical source path in track information.</summary>
+    public string PhysicalPath { get; init; } = "";
+
     /// <summary>Gets the action label for releasing the currently held exclusive output device.</summary>
     public string ReleaseOutputDevice { get; init; } = "";
     /// <summary>Gets the action label for reacquiring the output device and resuming playback.</summary>

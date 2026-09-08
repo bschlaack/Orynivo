@@ -258,7 +258,7 @@ player-control, queue-management, and library tools.
 
 ### Embedded AI Chat
 
-The **KI-Chat** sidebar view connects to any OpenAI-compatible LLM endpoint —
+The **AI Chat** sidebar view connects to any OpenAI-compatible LLM endpoint —
 [LM Studio](https://lmstudio.ai/), [Ollama](https://ollama.com/), OpenAI,
 Anthropic (via compatibility layer), or any custom `/v1/chat/completions`
 provider. No external configuration file or MCP server is required: tools are
@@ -269,7 +269,7 @@ Responses stream token by token. The model calls tools autonomously — asking
 the results, and start playback, all in one turn.
 
 Configure the endpoint URL, optional API key, model name, and max-token limit
-under **Settings → Integration → KI-Chat/AI Chat**. Orynivo queries the
+under **Settings → Integration → AI Chat**. Orynivo queries the
 OpenAI-compatible `/v1/models` endpoint when this section is opened or the
 connection values change, presents the returned identifiers in a selectable
 list, and retains a free-form model field for compatibility endpoints that do
@@ -718,6 +718,10 @@ byte-range streaming without FFmpeg.
 - Context-sensitive column selection by right-clicking a table header, including
   optional technical and tag metadata for local tracks and appropriate catalog
   fields for radio and podcasts
+- Track context menus include **Show track information**, which displays the
+  physical file path first and then the complete available track metadata.
+  Remote playback URLs and credentials are never shown; Orynivo Server paths
+  include the configured server name (for example, `Plex Orynivo: /u02/flac/file.flac`).
 - Drag-and-drop table-column ordering persisted independently for each table
   and main-content view
 - Space-saving accordion sections in the main sidebar, with configurable
