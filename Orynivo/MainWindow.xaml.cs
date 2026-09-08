@@ -7447,12 +7447,10 @@ public partial class MainWindow : Window
                 AddTrackColumns(includeFavorite: false, includeSource: false, includeGenreByDefault: false);
                 break;
             case "Queue":
-                AddSourceBadge();
                 Add("#", nameof(ContentRow.Nr), 38, "position", right: true);
-                Add(LocalizationManager.Current.Title, nameof(ContentRow.Title), 0, "title", star: true, starWeight: 2.3);
-                Add(LocalizationManager.Current.Artist, nameof(ContentRow.Artist), 0, "artist", star: true, starWeight: 1.05);
-                Add(LocalizationManager.Current.Album, nameof(ContentRow.Album), 0, "album", star: true, starWeight: 1.05);
-                Add(LocalizationManager.Current.Duration, nameof(ContentRow.Duration), 80, "duration", right: true);
+                // Queue uses the same selectable track columns as Tracks. The
+                // queue number and actions remain fixed utility columns.
+                AddTrackColumns(includeFavorite: true, includeSource: true, includeGenreByDefault: true);
                 AddQueueActions();
                 break;
             default: // Tracks
@@ -7743,6 +7741,10 @@ public partial class MainWindow : Window
 
     private void RefreshQueueRows()
     {
+        var preserveScrollOffset = _currentTopLevelTag == "Queue" &&
+                                    ReferenceEquals(ContentDataGrid.ItemsSource, _queueRows)
+            ? _contentDataGridVerticalScrollBar?.Value
+            : null;
         _queueRows.Clear();
         using var db = AudioDatabase.OpenDefault();
         var localTracks = db.GetTrackListByPaths(_queue.Select(item => item.FilePath))
@@ -7757,28 +7759,11 @@ public partial class MainWindow : Window
             }
             else if (_plexTracksByUrl.TryGetValue(item.FilePath, out var plexRow))
             {
-                row = new ContentRow
-                {
-                    Title = plexRow.Title,
-                    Artist = plexRow.Artist,
-                    Album = plexRow.Album,
-                    Duration = plexRow.Duration,
-                    Format = plexRow.Format,
-                    FilePath = item.FilePath
-                };
+                row = CreateQueueRow(plexRow);
             }
             else if (_orynivoTracksByUrl.TryGetValue(item.FilePath, out var orynivoRow))
             {
-                row = new ContentRow
-                {
-                    Title = orynivoRow.Title,
-                    Artist = orynivoRow.Artist,
-                    Album = orynivoRow.Album,
-                    Duration = orynivoRow.Duration,
-                    Format = orynivoRow.Format,
-                    FilePath = item.FilePath,
-                    OrynivoServer = orynivoRow.OrynivoServer
-                };
+                row = CreateQueueRow(orynivoRow);
             }
             else
             {
@@ -7806,7 +7791,67 @@ public partial class MainWindow : Window
         SaveQueueAsPlaylistButton.IsEnabled =
             _queue.Any(item => CanPersistQueuePath(item.FilePath));
         Dispatcher.UIThread.Post(UpdateNowPlayingRowHighlights, DispatcherPriority.Loaded);
+        if (preserveScrollOffset is double offset)
+        {
+            Dispatcher.UIThread.Post(() =>
+            {
+                AttachContentDataGridVerticalScrollBar();
+                if (_contentDataGridVerticalScrollBar is { } scrollBar)
+                    scrollBar.Value = Math.Clamp(offset, scrollBar.Minimum, scrollBar.Maximum);
+            }, DispatcherPriority.Loaded);
+        }
     }
+
+    /// <summary>Copies catalog metadata into a queue-owned row without mutating provider caches.</summary>
+    /// <param name="source">Catalog row to copy.</param>
+    /// <returns>A queue row retaining navigation, source, and track metadata.</returns>
+    private static ContentRow CreateQueueRow(ContentRow source) => new()
+    {
+        Id = source.Id,
+        ArtistId = source.ArtistId,
+        AlbumId = source.AlbumId,
+        Title = source.Title,
+        AlphabetIndexText = source.AlphabetIndexText,
+        Artist = source.Artist,
+        Album = source.Album,
+        AlbumArtist = source.AlbumArtist,
+        Year = source.Year,
+        TrackNumber = source.TrackNumber,
+        DiscNumber = source.DiscNumber,
+        Genre = source.Genre,
+        Bitrate = source.Bitrate,
+        SampleRate = source.SampleRate,
+        SampleRateHz = source.SampleRateHz,
+        BitDepth = source.BitDepth,
+        Channels = source.Channels,
+        ChannelCount = source.ChannelCount,
+        Composer = source.Composer,
+        Bpm = source.Bpm,
+        FileName = source.FileName,
+        FileSize = source.FileSize,
+        AddedAt = source.AddedAt,
+        ReplayGainTrack = source.ReplayGainTrack,
+        ReplayGainAlbum = source.ReplayGainAlbum,
+        MusicBrainzTrackId = source.MusicBrainzTrackId,
+        Folder = source.Folder,
+        EntityType = source.EntityType,
+        ExternalId = source.ExternalId,
+        PlexServerId = source.PlexServerId,
+        PlexAlbumRatingKey = source.PlexAlbumRatingKey,
+        PlexArtistRatingKey = source.PlexArtistRatingKey,
+        OrynivoServer = source.OrynivoServer,
+        Duration = source.Duration,
+        Format = source.Format,
+        FilePath = source.FilePath,
+        SourcePath = source.SourcePath,
+        PlexPartUrls = source.PlexPartUrls,
+        KnownDuration = source.KnownDuration,
+        IsFavorite = source.IsFavorite,
+        UserRating = source.UserRating,
+        MusicBrainzRating = source.MusicBrainzRating,
+        MusicBrainzRatingVotes = source.MusicBrainzRatingVotes,
+        MusicBrainzRatingFetchedAt = source.MusicBrainzRatingFetchedAt
+    };
 
     private async void QueueMoveUpButton_OnClick(object? sender, RoutedEventArgs e)
     {

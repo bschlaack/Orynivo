@@ -6,11 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+### Fixed
+
+- The **Up Next** table now offers the same selectable track columns as
+  the Tracks view, keeps its scroll position when playback advances, and
+  renders album and artist names as navigation links.
+
 ## [0.41.3] - 2026-09-05
 
 ### Fixed
 
-- Similar-title and mood-mix actions now navigate directly to **Als Nächstes**
+- Similar-title and mood-mix actions now navigate directly to **Up Next**
   after rebuilding the queue, so the queued recommendations are immediately
   visible while the current title continues playing.
 
@@ -2437,7 +2445,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- **Embedded AI Chat** — a new sidebar view (KI-Chat / AI Chat) that sends
+- **Embedded AI Chat** — a new **AI Chat** sidebar view that sends
   natural-language questions about the music library to any
   OpenAI-compatible LLM endpoint (LM Studio, Ollama, OpenAI, Anthropic
   compatibility layer, or any `/v1/chat/completions` provider). The model
@@ -2462,7 +2470,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Internet Radio, Podcasts, and **Als Nächstes** (Up Next) sidebar items can
+- Internet Radio, Podcasts, and **Up Next** sidebar items can
   now be hidden individually in Settings > Appearance, consistent with the
   existing accordion-section toggles.
   (`AppSettings.ShowInternetRadioItem`, `ShowPodcastsItem`, `ShowQueueItem`)
@@ -2512,11 +2520,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Increased the transport album artwork from 42 × 42 px to 58 × 58 px to
   better fill the taller transport bar.
 - Added named **output profiles** to Settings. The output device section is
-  replaced by a dropdown listing saved profiles and three buttons: **Ausgabe
-  erstellen** opens a dialog to pick a name, backend (WASAPI, Steinberg ASIO, or
+  replaced by a dropdown listing saved profiles and three buttons: **Create
+  output** opens a dialog to pick a name, backend (WASAPI, Steinberg ASIO, or
   cwASIO), and device, then saves and immediately selects the new profile;
-  **Ausgabe konfigurieren** re-opens the dialog for the selected profile;
-  **Ausgabe löschen** removes it after confirmation. Both action buttons are
+  **Configure output** re-opens the dialog for the selected profile;
+  **Delete output** removes it after confirmation. Both action buttons are
   disabled when no profile is selected. An existing single-device configuration
   is automatically migrated to a profile named "Standard" on first launch.
   (`OutputProfile`, `OutputProfileDialog`, `AppSettings.OutputProfiles`,

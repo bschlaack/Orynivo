@@ -258,7 +258,7 @@ player-control, queue-management, and library tools.
 
 ### Embedded AI Chat
 
-The **KI-Chat** sidebar view connects to any OpenAI-compatible LLM endpoint —
+The **AI Chat** sidebar view connects to any OpenAI-compatible LLM endpoint —
 [LM Studio](https://lmstudio.ai/), [Ollama](https://ollama.com/), OpenAI,
 Anthropic (via compatibility layer), or any custom `/v1/chat/completions`
 provider. No external configuration file or MCP server is required: tools are
@@ -269,7 +269,7 @@ Responses stream token by token. The model calls tools autonomously — asking
 the results, and start playback, all in one turn.
 
 Configure the endpoint URL, optional API key, model name, and max-token limit
-under **Settings → Integration → KI-Chat/AI Chat**. Orynivo queries the
+under **Settings → Integration → AI Chat**. Orynivo queries the
 OpenAI-compatible `/v1/models` endpoint when this section is opened or the
 connection values change, presents the returned identifiers in a selectable
 list, and retains a free-form model field for compatibility endpoints that do
