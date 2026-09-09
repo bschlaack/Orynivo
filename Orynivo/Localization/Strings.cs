@@ -874,6 +874,8 @@ public sealed record LocalizedStrings(
     public string LanguageEnglish { get; init; } = "";
     public string LanguageFrench { get; init; } = "";
     public string LanguageSpanish { get; init; } = "";
+    public string LanguageRussian { get; init; } = "";
+    public string LanguageChineseSimplified { get; init; } = "";
     public string PcmIntegerFormat { get; init; } = "";
     public string PcmContainerFormat { get; init; } = "";
     public string PcmFloatFormat { get; init; } = "";

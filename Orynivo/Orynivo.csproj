@@ -84,6 +84,7 @@
     <EmbeddedResource Include="Remote\MobileRemote.html" />
     <EmbeddedResource Include="Remote\MobileRemote.js" />
     <EmbeddedResource Include="Localization\MobileRemote.json" />
+    <EmbeddedResource Include="Localization\Overrides\*.json" />
     <AvaloniaResource Include="..\Logo\orynivo.png" Link="Assets\DashboardLogo.png" />
     <AvaloniaResource Include="..\Logo\bg.png" Link="Assets\DashboardHeroBackground.png" />
   </ItemGroup>

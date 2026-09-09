@@ -15,5 +15,11 @@ public enum Language
     French,
 
     /// <summary>Spanish.</summary>
-    Spanish
+    Spanish,
+
+    /// <summary>Russian.</summary>
+    Russian,
+
+    /// <summary>Simplified Chinese.</summary>
+    ChineseSimplified
 }

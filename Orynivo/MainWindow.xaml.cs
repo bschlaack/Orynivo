@@ -16627,6 +16627,8 @@ public partial class MainWindow : Window
         Orynivo.Localization.Language.German => "de",
         Orynivo.Localization.Language.French => "fr",
         Orynivo.Localization.Language.Spanish => "es",
+        Orynivo.Localization.Language.Russian => "ru",
+        Orynivo.Localization.Language.ChineseSimplified => "zh",
         _ => "en"
     };
 
@@ -17664,7 +17666,12 @@ public partial class MainWindow : Window
             if (languageChanged)
             {
                 LocalizationManager.Apply(_settings.Language);
+                // Recreate dynamic navigation entries so headers such as the
+                // local Playlists group use the newly selected language.
+                LoadNavPlaylists();
                 UpdateOutputDeviceLockButton();
+                if (string.Equals(_currentTopLevelTag, "Dashboard", StringComparison.Ordinal))
+                    await BuildDashboardAsync();
             }
             if (genreCloudBackgroundChanged)
             {
