@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Reflection;
+using System.Text.Json;
 using AvaloniaApp = Avalonia.Application;
 
 namespace Orynivo.Localization;
@@ -35,18 +37,23 @@ public static class LocalizationManager
             Language.English => CultureInfo.GetCultureInfo("en-US"),
             Language.French => CultureInfo.GetCultureInfo("fr-FR"),
             Language.Spanish => CultureInfo.GetCultureInfo("es-ES"),
+            Language.Russian => CultureInfo.GetCultureInfo("ru-RU"),
+            Language.ChineseSimplified => CultureInfo.GetCultureInfo("zh-CN"),
             _ => CultureInfo.GetCultureInfo("de-DE")
         };
         CultureInfo.CurrentCulture = culture;
         CultureInfo.CurrentUICulture = culture;
 
-        Current = language switch
+        var baseStrings = language switch
         {
             Language.English => English,
             Language.French => French,
             Language.Spanish => Spanish,
+            Language.Russian => Russian,
+            Language.ChineseSimplified => ChineseSimplified,
             _ => German
         };
+        Current = LoadExternalOverrides(baseStrings, language);
 
         var resources = AvaloniaApp.Current!.Resources;
         resources["L_LocalLibrary"] = Current.LocalLibrary;
@@ -483,6 +490,58 @@ public static class LocalizationManager
         resources["L_AiChatToolResultFallback"] = Current.AiChatToolResultFallback;
     }
 
+    /// <summary>
+    /// Applies optional translator-maintained JSON overrides to the built-in
+    /// language set. Missing files or keys intentionally keep the reviewed
+    /// in-code fallback value.
+    /// </summary>
+    /// <param name="baseStrings">The built-in language strings.</param>
+    /// <param name="language">The selected language.</param>
+    /// <returns>The language strings after applying valid overrides.</returns>
+    private static LocalizedStrings LoadExternalOverrides(LocalizedStrings baseStrings, Language language)
+    {
+        var resourceSuffix = language switch
+        {
+            Language.Russian => ".Localization.Overrides.ru-RU.json",
+            Language.ChineseSimplified => ".Localization.Overrides.zh-CN.json",
+            _ => null
+        };
+        if (resourceSuffix is null)
+            return baseStrings;
+
+        try
+        {
+            var resourceName = typeof(LocalizationManager).Assembly
+                .GetManifestResourceNames()
+                .FirstOrDefault(name => name.EndsWith(resourceSuffix, StringComparison.Ordinal));
+            if (resourceName is null)
+                return baseStrings;
+
+            using var stream = typeof(LocalizationManager).Assembly.GetManifestResourceStream(resourceName);
+            if (stream is null)
+                return baseStrings;
+            var overrides = JsonSerializer.Deserialize<Dictionary<string, string>>(stream);
+            if (overrides is null || overrides.Count == 0)
+                return baseStrings;
+
+            var result = baseStrings with { };
+            foreach (var property in typeof(LocalizedStrings).GetProperties(BindingFlags.Instance | BindingFlags.Public))
+            {
+                if (!property.CanWrite || property.PropertyType != typeof(string) ||
+                    !overrides.TryGetValue(property.Name, out var value) || value is null)
+                    continue;
+                property.SetValue(result, value);
+            }
+            return result;
+        }
+        catch
+        {
+            // A malformed optional override must never prevent the application
+            // from starting; the built-in translations remain usable.
+            return baseStrings;
+        }
+    }
+
     private static readonly LocalizedStrings German = new(
         "BIBLIOTHEK", "Künstler", "Alben", "Tracks", "Ordnerstruktur", "Suche", "Playlists", "Über", "Einstellungen",
         "Filter", "Favoriten", "Audiotypen", "Bitrate",
@@ -869,6 +928,7 @@ public static class LocalizationManager
         FoldersIntroTitle = "Ordnerstruktur",
         FoldersIntroHint = "Navigiere deine Musik entlang der eingebundenen Bibliotheksordner und spiele Tracks direkt aus ihrem Ordnerkontext.",
         LanguageGerman = "Deutsch", LanguageEnglish = "Englisch", LanguageFrench = "Französisch", LanguageSpanish = "Spanisch",
+        LanguageRussian = "Russisch", LanguageChineseSimplified = "Chinesisch (vereinfacht)",
         PcmIntegerFormat = "{0}-Bit PCM, Little Endian ({1})",
         PcmContainerFormat = "{0}-Bit PCM im {1}-Bit-Container, Little Endian ({2})",
         PcmFloatFormat = "{0}-Bit-Gleitkomma-PCM, Little Endian ({1})",
@@ -1570,6 +1630,7 @@ public static class LocalizationManager
         FoldersIntroTitle = "Folder structure",
         FoldersIntroHint = "Navigate your music through configured library folders and play tracks from their folder context.",
         LanguageGerman = "German", LanguageEnglish = "English", LanguageFrench = "French", LanguageSpanish = "Spanish",
+        LanguageRussian = "Russian", LanguageChineseSimplified = "Simplified Chinese",
         PcmIntegerFormat = "{0}-bit PCM, little endian ({1})",
         PcmContainerFormat = "{0}-bit PCM in a {1}-bit container, little endian ({2})",
         PcmFloatFormat = "{0}-bit floating-point PCM, little endian ({1})",
@@ -2274,6 +2335,7 @@ public static class LocalizationManager
         FoldersIntroTitle = "Arborescence",
         FoldersIntroHint = "Naviguez dans vos dossiers de bibliothèque et lancez les titres depuis leur contexte de dossier.",
         LanguageGerman = "Allemand", LanguageEnglish = "Anglais", LanguageFrench = "Français", LanguageSpanish = "Espagnol",
+        LanguageRussian = "Russe", LanguageChineseSimplified = "Chinois simplifié",
         PcmIntegerFormat = "PCM {0} bits, petit-boutiste ({1})",
         PcmContainerFormat = "PCM {0} bits dans un conteneur {1} bits, petit-boutiste ({2})",
         PcmFloatFormat = "PCM flottant {0} bits, petit-boutiste ({1})",
@@ -2975,6 +3037,7 @@ public static class LocalizationManager
         FoldersIntroTitle = "Estructura de carpetas",
         FoldersIntroHint = "Navega tu música por las carpetas configuradas y reproduce pistas desde su contexto de carpeta.",
         LanguageGerman = "Alemán", LanguageEnglish = "Inglés", LanguageFrench = "Francés", LanguageSpanish = "Español",
+        LanguageRussian = "Ruso", LanguageChineseSimplified = "Chino simplificado",
         PcmIntegerFormat = "PCM de {0} bits, little endian ({1})",
         PcmContainerFormat = "PCM de {0} bits en contenedor de {1} bits, little endian ({2})",
         PcmFloatFormat = "PCM de coma flotante de {0} bits, little endian ({1})",
@@ -3308,6 +3371,119 @@ public static class LocalizationManager
         , AiChatNotEnabled      = "El Chat IA no está activado. Actívalo en Ajustes › Chat IA."
         , AiChatEmptyResponse   = "El modelo devolvió una respuesta vacía."
         , AiChatToolResultFallback = "El modelo no devolvió una respuesta final después de llamar a la herramienta. Resultado de la herramienta:"
+    };
+
+    // Russian and Simplified Chinese inherit the complete English resource set
+    // so newly added strings remain available. Frequently used navigation,
+    // playback, library, and information labels are translated here first;
+    // the remaining values intentionally stay in English until reviewed
+    // translations are added.
+    private static readonly LocalizedStrings Russian = English with
+    {
+        LocalLibrary = "Локальная библиотека", Artists = "Исполнители", Albums = "Альбомы",
+        Tracks = "Треки", FolderStructure = "Структура папок", Search = "Поиск",
+        Playlists = "Плейлисты", About = "О программе", Settings = "Настройки",
+        Filter = "Фильтр", Favorites = "Избранное", Appearance = "Внешний вид",
+        ColorScheme = "Цветовая схема", Language = "Язык", Playback = "Воспроизведение",
+        OutputDevice = "Устройство вывода", Library = "Библиотека", Directories = "Папки",
+        AddDirectory = "Добавить папку", Save = "Сохранить", Cancel = "Отмена",
+        Table = "Таблица", Artwork = "Обложка", Unknown = "Неизвестно",
+        AlbumArtist = "Исполнитель альбома", Year = "Год", Title = "Название",
+        Artist = "Исполнитель", Album = "Альбом", Genre = "Жанр", Duration = "Длительность",
+        Format = "Формат", Bitrate = "Битрейт", SearchAgain = "Искать снова",
+        DeleteCover = "Удалить обложку", SearchCover = "Искать обложку",
+        AddToPlaylist = "Добавить в плейлист", NewPlaylist = "Новый плейлист",
+        CreatePlaylist = "Создать плейлист", DeletePlaylist = "Удалить плейлист",
+        RemoveFromPlaylist = "Удалить из плейлиста", Lyrics = "Тексты песен",
+        ShowLyrics = "Показать текст", CloseLyrics = "Закрыть текст",
+        ArtistInfo = "Информация об исполнителе", ShowArtistInfo = "Показать информацию",
+        RefreshArtistInfo = "Обновить информацию", ArtistInfoLoading = "Загрузка информации об исполнителе …",
+        ArtistInfoNotFound = "Информация об исполнителе не найдена", TrackInfo = "Информация о треке",
+        ShowTrackInfo = "Показать информацию о треке", PhysicalPath = "Физический путь",
+        ReleaseOutputDevice = "Освободить устройство вывода", ReacquireOutputDevice = "Занять устройство вывода",
+        OutputDeviceReleased = "Устройство вывода освобождено", CheckForUpdates = "Проверить обновления",
+        Updates = "Обновления", ScanRunning = "Сканирование выполняется …",
+        PlaybackStopped = "Воспроизведение остановлено", PlaybackFinished = "Воспроизведение завершено",
+        UpNext = "Далее", SourceColumn = "Источник", PersonalRating = "Моя оценка",
+        Dashboard = "Панель управления", InternetRadio = "Интернет-радио", Podcasts = "Подкасты",
+        AiChat = "Чат с ИИ", GenreExplorer = "Облако жанров", ShowAll = "Показать всё",
+        RecentAlbums = "Недавно добавленные альбомы", DashboardRandomPlayback = "Случайное воспроизведение",
+        DashboardIntroTitle = "Ваш музыкальный обзор",
+        DashboardIntroHint = "Недавно добавленные альбомы, история прослушивания и любимые жанры — в одном месте.",
+        RestoreQueue = "Последняя очередь", ClearQueue = "Очистить очередь",
+        SaveQueueAsPlaylist = "Сохранить очередь как плейлист", InfiniteMixStart = "Запустить бесконечный микс",
+        GenreCloudInfiniteMix = "Бесконечный микс из облака жанров",
+        InfiniteMixStop = "Остановить бесконечный микс", InfiniteMixActive = "Бесконечный микс активен",
+        InfiniteMixCalculating = "Расчёт бесконечного микса …", InfiniteMixSettingsTitle = "Настройки бесконечного микса",
+        InfiniteMixSettingsHint = "Настройте настроение, источники и период истории.", InfiniteMixMood = "Настроение",
+        InfiniteMixMoodCalm = "Спокойное", InfiniteMixMoodBalanced = "Сбалансированное", InfiniteMixMoodEnergetic = "Энергичное",
+        InfiniteMixDiscovery = "Новизна", InfiniteMixFamiliar = "Знакомое", InfiniteMixAdventurous = "Необычное",
+        InfiniteMixPeriod = "Период истории", InfiniteMixSources = "Источники", InfiniteMixWeightFavorites = "Учитывать избранное",
+        InfiniteMixPreferRare = "Предпочитать редкие треки", InfiniteMixIncludeGenres = "Включаемые жанры",
+        InfiniteMixExcludeGenres = "Исключаемые жанры", InfiniteMixAddGenre = "Добавить жанр",
+        InfiniteMixPaused = "Бесконечный микс приостановлен", InfiniteMixReplaceNext = "Выбрать другое предложение",
+        InfiniteMixMoreLikeThis = "Больше похожего", InfiniteMixLessLikeThis = "Меньше похожего",
+        InfiniteMixExcludeTrack = "Исключить трек", GreetingMorning = "Доброе утро",
+        GreetingAfternoon = "Добрый день", GreetingEvening = "Добрый вечер", DashboardTagline = "Ваш музыкальный обзор",
+        DashboardWelcomeBack = "С возвращением", DashboardHeroHint = "Недавно добавленные альбомы и статистика прослушивания.",
+        InfiniteMixPause = "Пауза микса",
+        InfiniteMixResume = "Продолжить микс", InfiniteMixAdjust = "Настроить микс",
+        PlayNext = "Воспроизвести следующим", Shuffle = "Перемешать",
+        SelectColumns = "Выбрать столбцы", DashboardQuickAccess = "Быстрый доступ",
+        RecentlyPlayed = "Недавно прослушанные", ArtistInfoDownloading = "Загрузка информации об исполнителе …",
+        LanguageGerman = "Немецкий", LanguageEnglish = "Английский", LanguageFrench = "Французский",
+        LanguageSpanish = "Испанский", LanguageRussian = "Русский", LanguageChineseSimplified = "Китайский (упрощённый)"
+    };
+
+    private static readonly LocalizedStrings ChineseSimplified = English with
+    {
+        LocalLibrary = "本地媒体库", Artists = "艺术家", Albums = "专辑", Tracks = "曲目",
+        FolderStructure = "文件夹结构", Search = "搜索", Playlists = "播放列表", About = "关于",
+        Settings = "设置", Filter = "筛选", Favorites = "收藏", Appearance = "外观",
+        ColorScheme = "配色方案", Language = "语言", Playback = "播放", OutputDevice = "输出设备",
+        Library = "媒体库", Directories = "目录", AddDirectory = "添加目录", Save = "保存",
+        Cancel = "取消", Table = "表格", Artwork = "封面", Unknown = "未知",
+        AlbumArtist = "专辑艺术家", Year = "年份", Title = "标题", Artist = "艺术家",
+        Album = "专辑", Genre = "流派", Duration = "时长", Format = "格式", Bitrate = "比特率",
+        SearchAgain = "再次搜索", DeleteCover = "删除封面", SearchCover = "搜索封面",
+        AddToPlaylist = "添加到播放列表", NewPlaylist = "新建播放列表", CreatePlaylist = "创建播放列表",
+        DeletePlaylist = "删除播放列表", RemoveFromPlaylist = "从播放列表移除", Lyrics = "歌词",
+        ShowLyrics = "显示歌词", CloseLyrics = "关闭歌词", ArtistInfo = "艺术家信息",
+        ShowArtistInfo = "显示艺术家信息", RefreshArtistInfo = "刷新艺术家信息",
+        ArtistInfoLoading = "正在加载艺术家信息 …", ArtistInfoNotFound = "未找到艺术家信息",
+        TrackInfo = "曲目信息", ShowTrackInfo = "显示曲目信息", PhysicalPath = "物理路径",
+        ReleaseOutputDevice = "释放输出设备", ReacquireOutputDevice = "重新占用输出设备",
+        OutputDeviceReleased = "输出设备已释放", CheckForUpdates = "检查更新", Updates = "更新",
+        ScanRunning = "正在扫描 …", PlaybackStopped = "播放已停止", PlaybackFinished = "播放已完成",
+        UpNext = "下一首", SourceColumn = "来源", PersonalRating = "我的评分",
+        Dashboard = "仪表板", InternetRadio = "网络电台", Podcasts = "播客",
+        AiChat = "AI 聊天", GenreExplorer = "流派云", ShowAll = "显示全部",
+        RestoreQueue = "上次队列", ClearQueue = "清空队列",
+        SaveQueueAsPlaylist = "将队列保存为播放列表", InfiniteMixStart = "开始无限混音",
+        GenreCloudInfiniteMix = "根据流派云开始无限混音",
+        InfiniteMixStop = "停止无限混音", InfiniteMixActive = "无限混音已启用",
+        InfiniteMixCalculating = "正在计算无限混音 …", InfiniteMixSettingsTitle = "无限混音设置",
+        InfiniteMixSettingsHint = "设置心情、来源和历史时间范围。", InfiniteMixMood = "心情",
+        InfiniteMixMoodCalm = "平静", InfiniteMixMoodBalanced = "均衡", InfiniteMixMoodEnergetic = "活力",
+        InfiniteMixDiscovery = "探索程度", InfiniteMixFamiliar = "熟悉", InfiniteMixAdventurous = "新颖",
+        InfiniteMixPeriod = "历史时间范围", InfiniteMixSources = "来源", InfiniteMixWeightFavorites = "偏好收藏",
+        InfiniteMixPreferRare = "优先播放较少播放的曲目", InfiniteMixIncludeGenres = "包含的流派",
+        InfiniteMixExcludeGenres = "排除的流派", InfiniteMixAddGenre = "添加流派",
+        InfiniteMixPaused = "无限混音已暂停", InfiniteMixReplaceNext = "换一个推荐",
+        InfiniteMixMoreLikeThis = "更多类似曲目", InfiniteMixLessLikeThis = "更少类似曲目",
+        InfiniteMixExcludeTrack = "排除此曲", GreetingMorning = "早上好", GreetingAfternoon = "下午好",
+        GreetingEvening = "晚上好", DashboardTagline = "您的音乐概览", DashboardWelcomeBack = "欢迎回来",
+        DashboardHeroHint = "查看最近添加的专辑和聆听统计。",
+        RecentAlbums = "最近添加的专辑", DashboardRandomPlayback = "随机播放",
+        DashboardIntroTitle = "聆听概览",
+        DashboardIntroHint = "查看最近添加的专辑、聆听历史和喜爱的流派。",
+        InfiniteMixPause = "暂停混音",
+        InfiniteMixResume = "继续混音", InfiniteMixAdjust = "调整混音",
+        PlayNext = "接下来播放", Shuffle = "随机播放", SelectColumns = "选择列",
+        DashboardQuickAccess = "快速访问", RecentlyPlayed = "最近播放",
+        ArtistInfoDownloading = "正在下载艺术家信息 …",
+        LanguageGerman = "德语", LanguageEnglish = "英语", LanguageFrench = "法语",
+        LanguageSpanish = "西班牙语", LanguageRussian = "俄语", LanguageChineseSimplified = "简体中文"
     };
 
     /// <summary>Gets the currently active <see cref="LocalizedStrings"/> instance.</summary>

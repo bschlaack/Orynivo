@@ -4,10 +4,42 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.41.5] - 2026-09-09
+
+### Added
+
+- Extended the static product website with Russian and Simplified Chinese
+  pages, language-selector entries, localized metadata, hreflang links, and
+  sitemap URLs. README and wiki language references now list all six locales.
+- Added translator-maintained JSON override files for Russian and Simplified
+  Chinese under `Orynivo/Localization/Overrides`; missing entries continue to
+  use the reviewed built-in fallback.
+
+### Fixed
+
+- Fixed a runtime language-switch issue where the dynamically created local
+  Playlists navigation group could retain the Simplified Chinese label while
+  Russian was active. The navigation and open Dashboard are now refreshed when
+  the language changes.
+- Added Russian and Simplified Chinese translations for Own Radios, Own
+  Podcasts, Plex Servers, album recommendations, and recommendation filters.
+- Added Russian and Simplified Chinese translations for the Radio Browser,
+  Podcast, Artists, Albums, Tracks, Folders, Genre Cloud, metadata, and artist
+  action views.
+- Added a localization parity check so Russian and Simplified Chinese override
+  files cannot silently drift apart.
+- Completed Russian and Simplified Chinese coverage for update/window options,
+  Plex setup, metadata summaries, and DoP playback hints.
+
 ## [0.41.4] - 2026-09-08
 
 ### Added
 
+- Added Russian and Simplified Chinese (`zh-CN`) as selectable interface
+  languages, including culture-aware formatting and artist-profile language
+  selection.
+- Expanded Russian and Simplified Chinese coverage across the Dashboard,
+  Up Next, Infinite Mix, player, table, and settings labels.
 - Added **Show track information** to track context menus, including **Up
   Next**. The modal lists the physical file path first, followed by all
   metadata represented by the selectable track columns.

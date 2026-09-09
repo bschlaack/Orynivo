@@ -1,9 +1,9 @@
 # Orynivo Product Website
 
 Static, responsive product website for Orynivo. English is the default
-language; German, French, and Spanish are directly selectable. All required
+language; German, French, Spanish, Russian, and Simplified Chinese are directly selectable. All required
 files and media assets live in this directory. Search engines receive static
-localized pages at `/`, `/de/`, `/fr/`, and `/es/`, complete with canonical
+localized pages at `/`, `/de/`, `/fr/`, `/es/`, `/ru/`, and `/zh/`, complete with canonical
 URLs, hreflang references, and structured software data.
 
 All application screenshots use the fictional Neon Harbor demo library. Keep
