@@ -461,14 +461,14 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   during track transitions must restore the prior pixel scroll offset.
 - Interface languages include German, English, French, Spanish, Russian, and
   Simplified Chinese (`zh-CN`). New visible strings must be added to every
-  language resource; Russian and Chinese may temporarily inherit reviewed
-  English fallback text only for strings not yet translated.
+  complete built-in language resource in LocalizationManager.cs. All six
+  languages use the same constructor/property schema; do not add overlays
+  or inherit English text for untranslated entries.
   Dynamic navigation headers and the open Dashboard must be rebuilt after a
   runtime language change so they cannot retain labels from the previous
   language.
-  Translator-maintained JSON overrides live under
-  `Localization/Overrides`; keep format placeholders intact and let missing
-  entries fall back to the reviewed built-in resource.
+  Keep format placeholders intact. Run scripts/verify-localization-parity.ps1
+  from the repository root to check all six resource sets and the website.
 - Track context menus, including Up Next, expose **Show track information**;
   the modal lists the physical file path first and then every selectable track
   metadata field without exposing authenticated remote playback URLs. Remote

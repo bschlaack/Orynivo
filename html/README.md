@@ -18,6 +18,13 @@ node html/generate-localized-pages.js
 
 ## Local Preview
 
+All six languages use the same named fields in `i18n.js`; no supplemental
+RU/ZH dictionaries or positional translation arrays are used. Metadata and
+gallery titles are shared by the generator and browser. Missing resource
+values fail validation. Accessible labels and image descriptions are generated
+in the selected language as well. Run `node scripts/verify-localization.cjs`
+from the repository root after regeneration.
+
 ```powershell
 python -m http.server 8080 --directory html
 ```

@@ -17,8 +17,8 @@ Before completing any code change:
    Russian, and Simplified Chinese localization resources; never hard-code
    visible UI text.
    For every new feature, also update all currently supported interface
-   languages (including Russian and Simplified Chinese) in the translator
-   override files under `Orynivo/Localization/Overrides`. Run
+   languages (including Russian and Simplified Chinese) in the complete
+   built-in resources in `Orynivo/Localization/LocalizationManager.cs`. Run
    `scripts/verify-localization-parity.ps1` before completing the change so
    language files cannot silently drift apart.
 7. Verify that credentials, authenticated URLs, and secrets are not persisted,

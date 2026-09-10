@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const vm = require('vm');
+const {translations, pageMetadata, languageUrls} = require('./i18n.js');
 const root = __dirname;
 const sourcePath = fs.existsSync(path.join(root, 'de', 'index.html')) ? path.join(root, 'de', 'index.html') : path.join(root, 'index.html');
 const source = fs.readFileSync(sourcePath, 'utf8')
@@ -12,30 +12,19 @@ const source = fs.readFileSync(sourcePath, 'utf8')
   .replace(/<body data-page-language="[^"]+">/, '<body>')
   .replace(/ loading="lazy" decoding="async"/g, '')
   .replace(/ width="\d+" height="\d+"/g, '');
-const i18nSource = fs.readFileSync(path.join(root, 'i18n.js'), 'utf8');
-const context = {};
-vm.createContext(context);
-vm.runInContext(`${i18nSource.slice(0, i18nSource.indexOf('const languageIndex'))};globalThis.data=translations;`, context);
-const indexes = { en: 0, fr: 1, es: 2, ru: 3, zh: 4 };
-const metadata = {
-  en: ['Orynivo – Hi-Res music player for Windows, Linux & macOS', 'Orynivo is the modern open-source music player for Windows, Linux and macOS—with Hi-Res, DSD, a library server, radio, podcasts and AI chat.'],
-  de: ['Orynivo – Hi-Res-Musikplayer für Windows, Linux & macOS', 'Orynivo ist der moderne, quelloffene Musikplayer für Windows, Linux und macOS – mit Hi-Res, DSD, Bibliotheksserver, Radio, Podcasts und KI-Chat.'],
-  fr: ['Orynivo – Lecteur Hi-Res pour Windows, Linux et macOS', 'Orynivo est un lecteur de musique open source moderne pour Windows, Linux et macOS, avec Hi-Res, DSD, serveur, radio, podcasts et chat IA.'],
-  es: ['Orynivo – Reproductor Hi-Res para Windows, Linux y macOS', 'Orynivo es un reproductor de música moderno y de código abierto para Windows, Linux y macOS, con Hi-Res, DSD, servidor, radio, pódcasts y chat de IA.'],
-  ru: ['Orynivo — Hi-Res музыкальный проигрыватель для Windows, Linux и macOS', 'Orynivo — современный музыкальный проигрыватель с открытым исходным кодом для Windows, Linux и macOS: Hi-Res, DSD, сервер библиотеки, радио, подкасты и AI-чат.'],
-  zh: ['Orynivo — Windows、Linux 和 macOS 的 Hi-Res 音乐播放器', 'Orynivo 是适用于 Windows、Linux 和 macOS 的现代开源音乐播放器，支持 Hi-Res、DSD、媒体库服务器、广播、播客和 AI 聊天。']
-};
-const urls = { en: 'https://orynivo.app/', de: 'https://orynivo.app/de/', fr: 'https://orynivo.app/fr/', es: 'https://orynivo.app/es/', ru: 'https://orynivo.app/ru/', zh: 'https://orynivo.app/zh/' };
+const metadata = Object.fromEntries(Object.entries(pageMetadata).map(([key, value]) => [key, [value.title, value.description]]));
+const urls = Object.fromEntries(Object.entries(languageUrls).map(([key, value]) => [key, 'https://orynivo.app' + value]));
 function translateText(html, language) {
   if (language === 'de') return html;
   return html.replace(/>([^<>]+)</g, (whole, value) => {
     const key = value.trim();
-    const translated = context.data[key]?.[indexes[language]];
+    const translated = translations[key]?.[language];
     return translated ? `>${value.slice(0, value.indexOf(key))}${translated}${value.slice(value.indexOf(key) + key.length)}<` : whole;
   });
 }
 function build(language) {
   let html = translateText(source, language)
+    .replace(/(alt|aria-label|data-title)="([^"]*)"/g, (whole, attr, key) => translations[key] ? `${attr}="${translations[key][language].replace(/"/g, '&quot;')}"` : whole)
     .replace(/<html lang="[^"]+">/, `<html lang="${language}">`)
     .replace(/<title>[^<]*<\/title>/, `<title>${metadata[language][0]}</title>`)
     .replace(/<meta name="description" content="[^"]*">/, `<meta name="description" content="${metadata[language][1]}">`)
