@@ -716,8 +716,8 @@ byte-range streaming without FFmpeg.
 - Metadata and embedded artwork extraction through TagLibSharp
 - Artist, album, track, and folder views
 - Localized interface languages: German, English, French, Spanish, Russian,
-  and Simplified Chinese. Translator-maintained Russian and Chinese override
-  files are documented in `Orynivo/Localization/Overrides/README.md`.
+  and Simplified Chinese. All six use the same complete built-in resources,
+  documented in `Orynivo/Localization/README.md`.
 - Resizable table columns whose widths are preserved separately for each
   library, search, playlist, Plex, radio, podcast, and history table
 - Context-sensitive column selection by right-clicking a table header, including
@@ -1457,7 +1457,7 @@ Orynivo/
 ├── Orynivo/                 Windows/Linux desktop (Avalonia UI)
 │   ├── Audio/               ASIO, WASAPI, PCM, and DSD playback
 │   ├── Controls/            Custom Avalonia controls
-│   ├── Localization/        Built-in resources plus translator JSON overrides
+│   ├── Localization/        Complete built-in resources for all six languages
 │   ├── Mcp/                 Embedded MCP server, player bridge, and tools
 │   ├── Streaming/           Windows credential stores and Plex client
 │   └── MainWindow.*         Main user interface and navigation

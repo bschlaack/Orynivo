@@ -4,6 +4,17 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.41.5] - 2026-09-10
+
+### Fixed
+
+- Unified all six desktop languages as complete built-in resources (853 keys
+  each), removing Russian/Chinese JSON overlays and English inheritance.
+  Completed missing translations and repaired message format placeholders.
+- Unified website translation resources and corrected Russian/Chinese wording,
+  gallery titles and accessible labels. Added six-language coverage,
+  placeholder and gallery initialization checks.
+
 ## [0.41.5] - 2026-09-09
 
 ### Added
