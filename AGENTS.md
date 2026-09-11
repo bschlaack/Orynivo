@@ -14,10 +14,10 @@ Before completing any code change:
 5. Add or update English XML documentation for every affected public or
    internal C# type and member, including parameter and return documentation.
 6. Add every new or changed visible string to German, English, French, Spanish,
-   Russian, and Simplified Chinese localization resources; never hard-code
+   Russian, Simplified Chinese, and Hindi localization resources; never hard-code
    visible UI text.
    For every new feature, also update all currently supported interface
-   languages (including Russian and Simplified Chinese) in the complete
+   languages (including Russian, Simplified Chinese and Hindi) in the complete
    built-in resources in `Orynivo/Localization/LocalizationManager.cs`. Run
    `scripts/verify-localization-parity.ps1` before completing the change so
    language files cannot silently drift apart.
@@ -57,7 +57,7 @@ Avalonia desktop music library with:
 - MIT-licensed cwASIO bridge in `Native/CwAsioBridge/`
 - Static localized product website in `html/`; edit the German source page and
   `i18n.js`, then run `node html/generate-localized-pages.js` so English,
-  German, French, Spanish, Russian, and Simplified Chinese pages remain
+  German, French, Spanish, Russian, Simplified Chinese, and Hindi pages remain
   synchronized. Its five-minute
   quick-start styles live in `html/quickstart.css`.
 - Structured public contribution forms live in `.github/ISSUE_TEMPLATE/`.
@@ -713,7 +713,7 @@ fallback or allow client-provided commands/paths to reach the helper.
   for column visibility at the clicked header; entries remain open while
   toggling multiple columns
 - `Orynivo/Localization/*`: language model and localized German, English,
-  French, Spanish, Russian, and Simplified Chinese strings
+  French, Spanish, Russian, Simplified Chinese, and Hindi strings
 - `Orynivo/StartupWindow.*`: lightweight splash screen shown during initial
   database preparation and migration
 - `Orynivo/Assets/Orynivo_Logo.png`: embedded full logo used by the splash
@@ -1086,7 +1086,7 @@ fallback or allow client-provided commands/paths to reach the helper.
   tile visibility from zero to one; Settings presents it as a percentage slider
   and defaults new profiles to 50 percent
 - `AppSettings.Language` stores `German`, `English`, `French`, `Spanish`,
-  `Russian`, or `Chinese`
+  `Russian`, `ChineseSimplified`, or `Hindi`
 - `Orynivo/Library/TrackRecord.cs`: database track model containing tags and
   technical metadata
 - `Orynivo/Library/PlaylistRecord.cs`: playlist model including denormalized
@@ -1589,7 +1589,7 @@ fallback or allow client-provided commands/paths to reach the helper.
 - `ContentRow.PlaylistEntryId` contains `playlist_tracks.id` only in regular
   playlist views
 - Playlist localization keys must exist in German, English, French, Spanish,
-  Russian, and Simplified Chinese
+  Russian, Simplified Chinese, and Hindi
 
 ## Editable Playback Queue
 
@@ -2481,7 +2481,7 @@ and move those entries into a dated version section when preparing a release.
 - Do not hard-code new visible UI text or status/error messages in XAML or code-behind
 - Store all such text under `Orynivo/Localization/`
 - Every new or changed string must be provided in German, English, French,
-  Spanish, Russian, and Simplified Chinese
+  Spanish, Russian, Simplified Chinese, and Hindi
 - A text change is complete only after all supported language resources contain
   meaningful translations
 

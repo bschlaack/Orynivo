@@ -12,7 +12,7 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   and macOS compile the `net8.0` compatibility build; Windows continues to
   target `net8.0-windows10.0.19041.0`.
 - New visible text must use `LocalizationManager` and exist in German, English,
-  French, Spanish, Russian, and Simplified Chinese.
+  French, Spanish, Russian, Simplified Chinese, and Hindi.
 - `ApplicationCredentialStore` is the only persistent client credential
   container. It uses current-user DPAPI on Windows and AES-GCM plus a
   current-user-only random key file on Linux/macOS. Last.fm, Fanart.tv,
@@ -90,7 +90,7 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   require token entry. Settings changes must be saved before using their QR code.
   The desktop token is JsonIgnored and overlaid from ApplicationCredentialStore;
   loading a legacy plaintext mobile token migrates it and removes it from settings.
-  The remote document, script, and six-language JSON are embedded resources.
+  The remote document, script, and localized JSON are embedded resources.
   Preserve blob artwork in the CSP, native keyboard-accessible controls, bounded
   artist search, stale-response guards, and separate playback/library/playlist/
   queue navigation. Shared regular and smart playlists reuse desktop resolution,
@@ -460,15 +460,15 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   view. Album and artist cells remain navigation links, and queue refreshes
   during track transitions must restore the prior pixel scroll offset.
 - Interface languages include German, English, French, Spanish, Russian, and
-  Simplified Chinese (`zh-CN`). New visible strings must be added to every
-  complete built-in language resource in LocalizationManager.cs. All six
+  Simplified Chinese (`zh-CN`), and Hindi (`hi-IN`). New visible strings must be added to every
+  complete built-in language resource in LocalizationManager.cs. All seven
   languages use the same constructor/property schema; do not add overlays
   or inherit English text for untranslated entries.
   Dynamic navigation headers and the open Dashboard must be rebuilt after a
   runtime language change so they cannot retain labels from the previous
   language.
   Keep format placeholders intact. Run scripts/verify-localization-parity.ps1
-  from the repository root to check all six resource sets and the website.
+  from the repository root to check all seven resource sets and the website.
 - Track context menus, including Up Next, expose **Show track information**;
   the modal lists the physical file path first and then every selectable track
   metadata field without exposing authenticated remote playback URLs. Remote

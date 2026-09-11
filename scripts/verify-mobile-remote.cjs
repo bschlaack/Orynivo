@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '..');
 const words = JSON.parse(fs.readFileSync(path.join(root,'Orynivo/Localization/MobileRemote.json'),'utf8'));
-for (const lang of ['de','en','fr','es']) assert.deepEqual(Object.keys(words[lang]).sort(),Object.keys(words.en).sort());
+for (const lang of Object.keys(words)) assert.deepEqual(Object.keys(words[lang]).sort(),Object.keys(words.en).sort());
 const script = fs.readFileSync(path.join(root,'Orynivo/Remote/MobileRemote.js'),'utf8');
 const html = fs.readFileSync(path.join(root,'Orynivo/Remote/MobileRemote.html'),'utf8')
     .replace('/*REMOTE_WORDS*/','const words = '+JSON.stringify(words)+';').replace('/*REMOTE_SCRIPT*/',script);
@@ -100,16 +100,18 @@ const server = http.createServer(async(req,res)=>{
         await page.waitForSelector('#app',{state:'visible'});
         await page.locator('#logout').click();
         assert(await page.locator('#login').isVisible(),'Sign out must clear authentication');
-        for(const lang of ['en','fr','es']){
+        for(const lang of Object.keys(words).filter(lang => lang !== 'de')){
             const c=await browser.newContext({locale:lang,viewport:{width:320,height:700}});
             const p=await c.newPage();p.on('pageerror',e=>errors.push(e.message));
             await p.goto(url+'#token='+encodeURIComponent(token));
             await p.waitForSelector('#app',{state:'visible'});
+            assert.equal(await p.locator('html').getAttribute('lang'),lang);
+            assert.equal(await p.locator('#logout').textContent(),words[lang].logout);
             assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,lang+' 320px overflow');
             await c.close();
         }
         assert.deepEqual(errors,[]);
         assert(requests.every(x=>!x.includes(token)&&!x.includes('token=')),'No token may occur in request URLs');
-        console.log('PASS: QR login, manual/invalid/expired login, in-memory credentials, playlist play/append/track actions, library navigation, artwork CSP, 4 languages, 320/390/1024px layout.');
+        console.log('PASS: QR login, manual/invalid/expired login, in-memory credentials, playlist actions, navigation, artwork CSP, all '+Object.keys(words).length+' mobile languages, 320/390/1024px layout.');
     } finally {await browser.close();server.closeAllConnections();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;server.closeAllConnections();server.close();});

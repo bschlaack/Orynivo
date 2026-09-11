@@ -4,6 +4,8 @@ using Orynivo.Localization;
 foreach (var language in Enum.GetValues<Language>().Concat(Enum.GetValues<Language>().Reverse()))
 {
     LocalizationManager.Apply(language);
+    if (language == Language.Hindi && System.Globalization.CultureInfo.CurrentUICulture.Name != "hi-IN")
+        throw new InvalidOperationException("Hindi must activate hi-IN culture.");
     var strings = LocalizationManager.Current;
     foreach (var property in typeof(LocalizedStrings).GetProperties())
     {

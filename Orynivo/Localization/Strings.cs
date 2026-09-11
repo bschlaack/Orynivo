@@ -876,6 +876,9 @@ public sealed record LocalizedStrings(
     public string LanguageSpanish { get; init; } = "";
     public string LanguageRussian { get; init; } = "";
     public string LanguageChineseSimplified { get; init; } = "";
+
+    /// <summary>Gets the localized name of the Hindi interface language.</summary>
+    public string LanguageHindi { get; init; } = "";
     public string PcmIntegerFormat { get; init; } = "";
     public string PcmContainerFormat { get; init; } = "";
     public string PcmFloatFormat { get; init; } = "";
