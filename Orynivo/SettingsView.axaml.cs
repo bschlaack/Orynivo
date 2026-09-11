@@ -151,7 +151,8 @@ internal partial class SettingsView : UserControl
             new SettingChoice<UiLanguage>(UiLanguage.French, LocalizationManager.Current.LanguageFrench),
             new SettingChoice<UiLanguage>(UiLanguage.Spanish, LocalizationManager.Current.LanguageSpanish),
             new SettingChoice<UiLanguage>(UiLanguage.Russian, LocalizationManager.Current.LanguageRussian),
-            new SettingChoice<UiLanguage>(UiLanguage.ChineseSimplified, LocalizationManager.Current.LanguageChineseSimplified)
+            new SettingChoice<UiLanguage>(UiLanguage.ChineseSimplified, LocalizationManager.Current.LanguageChineseSimplified),
+            new SettingChoice<UiLanguage>(UiLanguage.Hindi, LocalizationManager.Current.LanguageHindi)
         };
         LanguageComboBox.ItemsSource = languageChoices;
         LanguageComboBox.SelectedItem = languageChoices.First(choice => choice.Value == settings.Language);

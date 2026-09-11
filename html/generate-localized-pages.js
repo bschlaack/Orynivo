@@ -31,9 +31,9 @@ function build(language) {
     .replace(/<meta property="og:title" content="[^"]*">/, `<meta property="og:title" content="${metadata[language][0]}">`)
     .replace(/<meta property="og:description" content="[^"]*">/, `<meta property="og:description" content="${metadata[language][1]}">`)
     .replace(/<meta property="og:image" content="[^"]*">/, '<meta property="og:image" content="https://orynivo.app/assets/og.png">')
-    .replace(/(<meta property="og:type" content="website">)/, `$1\n  <meta property="og:site_name" content="Orynivo">\n  <meta property="og:url" content="${urls[language]}">\n  <meta property="og:locale" content="${{en:'en_US',de:'de_DE',fr:'fr_FR',es:'es_ES',ru:'ru_RU',zh:'zh_CN'}[language]}">`)
+    .replace(/(<meta property="og:type" content="website">)/, `$1\n  <meta property="og:site_name" content="Orynivo">\n  <meta property="og:url" content="${urls[language]}">\n  <meta property="og:locale" content="${{en:'en_US',de:'de_DE',fr:'fr_FR',es:'es_ES',ru:'ru_RU',zh:'zh_CN',hi:'hi_IN'}[language]}">`)
     .replace(/(<meta name="twitter:card" content="summary_large_image">)/, `$1\n  <meta name="twitter:title" content="${metadata[language][0]}">\n  <meta name="twitter:description" content="${metadata[language][1]}">\n  <meta name="twitter:image" content="https://orynivo.app/assets/og.png">`)
-    .replace(/(<link rel="icon"[^>]+>)/, `<link rel="canonical" href="${urls[language]}">\n  <link rel="alternate" hreflang="x-default" href="https://orynivo.app/">\n  <link rel="alternate" hreflang="en" href="https://orynivo.app/">\n  <link rel="alternate" hreflang="de" href="https://orynivo.app/de/">\n  <link rel="alternate" hreflang="fr" href="https://orynivo.app/fr/">\n  <link rel="alternate" hreflang="es" href="https://orynivo.app/es/">\n  <link rel="alternate" hreflang="ru" href="https://orynivo.app/ru/">\n  <link rel="alternate" hreflang="zh" href="https://orynivo.app/zh/">\n  $1`)
+    .replace(/(<link rel="icon"[^>]+>)/, `<link rel="canonical" href="${urls[language]}">\n  <link rel="alternate" hreflang="x-default" href="https://orynivo.app/">\n  ${Object.entries(urls).map(([lang, url]) => `<link rel="alternate" hreflang="${lang}" href="${url}">`).join('\n  ')}\n  $1`)
     .replace('</head>', `  <script type="application/ld+json">${JSON.stringify({'@context':'https://schema.org','@type':'SoftwareApplication',name:'Orynivo',url:urls[language],applicationCategory:'MultimediaApplication',operatingSystem:'Windows 10, Windows 11, Linux, macOS',description:metadata[language][1],license:'https://www.apache.org/licenses/LICENSE-2.0',isAccessibleForFree:true,downloadUrl:'https://github.com/bschlaack/Orynivo/releases/latest',softwareHelp:'https://github.com/bschlaack/Orynivo/wiki',author:{'@type':'Person',name:'Björn Schlaack'}})}</script>\n</head>`)
     .replace(/assets\/screenshots\/([a-z-]+)\.png/g, 'assets/screenshots/$1.webp')
     .replace(/data-shot="([a-z-]+)\.png"/g, 'data-shot="$1.webp"')
@@ -47,4 +47,14 @@ function build(language) {
   fs.mkdirSync(path.dirname(destination), {recursive:true});
   fs.writeFileSync(destination, html);
 }
-['de', 'fr', 'es', 'ru', 'zh', 'en'].forEach(build);
+Object.keys(languageUrls).forEach(build);
+
+// Derive the sitemap from the same supported locales as the selector and resources.
+const alternates = Object.entries(urls).map(([lang, url]) =>
+  `<xhtml:link rel="alternate" hreflang="${lang}" href="${url}"/>`).join('')
+  + '<xhtml:link rel="alternate" hreflang="x-default" href="https://orynivo.app/"/>';
+fs.writeFileSync(path.join(root, 'sitemap.xml'),
+  '<?xml version="1.0" encoding="UTF-8"?>\n'
+  + '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n'
+  + Object.values(urls).map(url => `  <url><loc>${url}</loc>${alternates}</url>`).join('\n')
+  + '\n</urlset>\n');

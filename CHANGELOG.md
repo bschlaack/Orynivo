@@ -4,6 +4,17 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.41.7] - 2026-09-11
+
+### Added
+
+- Added Hindi (हिन्दी, hi-IN) as a complete built-in desktop language and a
+  static website locale with language selection, metadata, gallery and sitemap
+  support. The mobile remote also supports Hindi. Localization and runtime
+  checks now include the new language.
+- Artist biography requests now preserve Hindi, Russian and Chinese language
+  selection instead of silently replacing those language codes with English.
+
 ## [0.41.6] - 2026-09-10
 
 ### Fixed

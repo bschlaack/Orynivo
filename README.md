@@ -38,7 +38,7 @@ the ability to reach that library from any device on the local network.
   editable external lookup name without changing the library artist name
   while the artist's albums render before profile loading and remain available
   throughout it; profile text follows German, English, French, Spanish,
-  Russian, or Simplified Chinese
+  Russian, Simplified Chinese, or Hindi
 - Hierarchical Genre Cloud with source-aware track and album recommendations
   across the local library and connected Orynivo Servers, backed by a subtle
   cached grayscale mosaic of matching artist images
@@ -82,8 +82,8 @@ the ability to reach that library from any device on the local network.
 
 The official website is available at [orynivo.app](https://orynivo.app/). Its
 self-contained responsive source lives in [`html/`](html/). It
-defaults to English, can switch to German, French, Spanish, Russian, or
-Simplified Chinese, and includes
+defaults to English, can switch to German, French, Spanish, Russian,
+Simplified Chinese or Hindi, and includes
 current application screenshots, feature and installation guides, and download
 links that resolve through GitHub's latest public release API. See
 [`html/README.md`](html/README.md) for local preview and publishing notes.
@@ -716,7 +716,7 @@ byte-range streaming without FFmpeg.
 - Metadata and embedded artwork extraction through TagLibSharp
 - Artist, album, track, and folder views
 - Localized interface languages: German, English, French, Spanish, Russian,
-  and Simplified Chinese. All six use the same complete built-in resources,
+  Simplified Chinese, and Hindi. All seven use the same complete built-in resources,
   documented in `Orynivo/Localization/README.md`.
 - Resizable table columns whose widths are preserved separately for each
   library, search, playlist, Plex, radio, podcast, and history table
@@ -949,7 +949,7 @@ byte-range streaming without FFmpeg.
   explicitly requesting a rating takes priority. Known recordings refresh
   after 30 days, while unresolved artist/title matches wait 90 days before a
   retry so ambiguous metadata does not generate repeated requests.
-- German, English, French, Spanish, Russian, and Simplified Chinese user
+- German, English, French, Spanish, Russian, Simplified Chinese, and Hindi user
   interfaces
 - Multiple Plex Media Server configurations with protected access tokens and
   music-library discovery, artist/album/track browsing, folder navigation, and
@@ -1457,7 +1457,7 @@ Orynivo/
 ├── Orynivo/                 Windows/Linux desktop (Avalonia UI)
 │   ├── Audio/               ASIO, WASAPI, PCM, and DSD playback
 │   ├── Controls/            Custom Avalonia controls
-│   ├── Localization/        Complete built-in resources for all six languages
+│   ├── Localization/        Complete built-in resources for all seven languages
 │   ├── Mcp/                 Embedded MCP server, player bridge, and tools
 │   ├── Streaming/           Windows credential stores and Plex client
 │   └── MainWindow.*         Main user interface and navigation

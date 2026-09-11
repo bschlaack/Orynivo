@@ -21,5 +21,8 @@ public enum Language
     Russian,
 
     /// <summary>Simplified Chinese.</summary>
-    ChineseSimplified
+    ChineseSimplified,
+
+    /// <summary>Hindi (India).</summary>
+    Hindi
 }

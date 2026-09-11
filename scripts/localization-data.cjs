@@ -9,7 +9,9 @@ function readDesktop() {
   const parameters = [...model.split(')')[0].matchAll(/string (\w+)/g)].map(m => m[1]);
   const properties = [...model.matchAll(/public string (\w+) \{ get; init; \}/g)].map(m => m[1]);
   const result = {};
-  for (const name of ['German', 'English', 'French', 'Spanish', 'Russian', 'ChineseSimplified']) {
+  const languageSource = fs.readFileSync(path.join(root, 'Orynivo/Localization/Language.cs'), 'utf8');
+  const languages = [...languageSource.matchAll(/^\s{4}(\w+)\s*,?\s*$/gm)].map(m => m[1]);
+  for (const name of languages) {
     const start = source.indexOf(`private static readonly LocalizedStrings ${name} = `);
     const end = source.indexOf('\n    };', start) + 7;
     const block = source.slice(start, end);

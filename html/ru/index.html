@@ -25,6 +25,7 @@
   <link rel="alternate" hreflang="es" href="https://orynivo.app/es/">
   <link rel="alternate" hreflang="ru" href="https://orynivo.app/ru/">
   <link rel="alternate" hreflang="zh" href="https://orynivo.app/zh/">
+  <link rel="alternate" hreflang="hi" href="https://orynivo.app/hi/">
   <link rel="icon" href="/assets/brand/icon.png">
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/quickstart.css">
@@ -54,6 +55,7 @@
         <button type="button" data-language="es">ES</button>
         <button type="button" data-language="ru">RU</button>
         <button type="button" data-language="zh">中文</button>
+        <button type="button" data-language="hi">हिन्दी</button>
       </div>
       <a class="nav-github" href="https://github.com/bschlaack/Orynivo" target="_blank" rel="noreferrer">GitHub ↗</a>
     </nav>
@@ -80,8 +82,8 @@
           <div class="window-bar"><i></i><i></i><i></i><span>Orynivo</span></div>
           <img src="/assets/screenshots/artists.webp" width="1920" height="1044" alt="Исполнители и обложки альбомов в Orynivo">
         </figure>
-        <div class="quality-card"><strong>Bitperfect</strong><span>PCM · DSD · DoP</span></div>
-        <div class="format-card"><b>24</b><span>Bit</span><b>192</b><span>kHz</span></div>
+        <div class="quality-card"><strong>Бит-перфект</strong><span>PCM · DSD · DoP</span></div>
+        <div class="format-card"><b>24</b><span>бит</span><b>192</b><span>kHz</span></div>
       </div>
     </section>
 
@@ -92,12 +94,12 @@
     <section class="language-callout reveal" aria-label="Языки приложения">
       <div class="language-callout-icon" aria-hidden="true">A·文</div>
       <div>
-        <p class="eyebrow">Одно приложение · Шесть языков</p>
+        <p class="eyebrow">Одно приложение · Семь языков</p>
         <h2>Приложение говорит на вашем языке.</h2>
-        <p>Весь интерфейс Orynivo можно в любой момент переключить на английский, немецкий, французский, испанский, русский или упрощённый китайский язык.</p>
+        <p>Весь интерфейс Orynivo можно в любой момент переключить на английский, немецкий, французский, испанский, русский, упрощённый китайский или хинди.</p>
       </div>
       <div class="app-language-list" aria-label="Доступные языки приложения">
-        <span>English</span><i></i><span>Deutsch</span><i></i><span>Français</span><i></i><span>Español</span><i></i><span>Русский</span><i></i><span>简体中文</span>
+        <span>English</span><i></i><span>Deutsch</span><i></i><span>Français</span><i></i><span>Español</span><i></i><span>Русский</span><i></i><span>简体中文</span><i></i><span>हिन्दी</span>
       </div>
     </section>
 
@@ -108,7 +110,7 @@
         <p>Без обязательного облака, подписки и сбора данных. Только ваша музыка — упорядоченная, доступная и воспроизводимая в наилучшем качестве.</p>
       </div>
       <div class="feature-grid">
-        <article class="feature-card featured reveal"><span class="feature-no">01</span><div class="icon">≋</div><h3>Hi‑Res & DSD</h3><p>Нативное воспроизведение DSF/DFF, DoP или качественное преобразование в PCM. В Windows — через ASIO/cwASIO и WASAPI, в Linux — напрямую через ALSA.</p><ul><li>Побитово точный звуковой тракт</li><li>Gapless PCM</li><li>До 32 бит / 768 кГц*</li></ul></article>
+        <article class="feature-card featured reveal"><span class="feature-no">01</span><div class="icon">≋</div><h3>Hi‑Res и DSD</h3><p>Нативное воспроизведение DSF/DFF, DoP или качественное преобразование в PCM. В Windows — через ASIO/cwASIO и WASAPI, в Linux — напрямую через ALSA.</p><ul><li>Побитово точный звуковой тракт</li><li>PCM без пауз</li><li>До 32 бит / 768 кГц*</li></ul></article>
         <article class="feature-card reveal"><span class="feature-no">02</span><div class="icon">⌘</div><h3>Ваша библиотека</h3><p>Просматривайте исполнителей, альбомы, треки и папки. Поддерживаются CUE, главы MKA, умные плейлисты, избранное и исправление метаданных.</p></article>
         <article class="feature-card reveal"><span class="feature-no">03</span><div class="icon">⌁</div><h3>Музыка во всей сети</h3><p>Orynivo Server открывает доступ к удалённым библиотекам в домашней сети: обложки, поиск, плейлисты, звуковые волны и защищённая передача музыки.</p></article>
         <article class="feature-card reveal"><span class="feature-no">04</span><div class="icon">◉</div><h3>Больше, чем файлы</h3><p>Открывайте интернет-радио и подкасты, управляйте текстами песен и пользуйтесь встроенным чатом с ИИ на основе локальных или совместимых моделей.</p></article>
@@ -147,7 +149,7 @@
         <div class="release-pill"><span class="pulse"></span><div><small>Текущая версия</small><strong id="release-version">v0.30.3</strong></div><a id="release-notes" href="https://github.com/bschlaack/Orynivo/releases/latest" target="_blank" rel="noreferrer">Примечания к выпуску ↗</a></div>
       </div>
       <div class="download-grid" id="download-grid" aria-live="polite">
-        <article class="download-card recommended"><span class="badge">Рекомендуется</span><div class="platform-mark">⊞</div><h3>Windows</h3><p>Windows 10 или 11 · x64</p><a class="button primary asset-link" data-match="win-x64-Setup.exe" href="https://github.com/bschlaack/Orynivo/releases/latest">Скачать установщик</a><a class="text-link asset-link" data-match="win-x64-Portable.zip" href="https://github.com/bschlaack/Orynivo/releases/latest">Portable ZIP</a></article>
+        <article class="download-card recommended"><span class="badge">Рекомендуется</span><div class="platform-mark">⊞</div><h3>Windows</h3><p>Windows 10 или 11 · x64</p><a class="button primary asset-link" data-match="win-x64-Setup.exe" href="https://github.com/bschlaack/Orynivo/releases/latest">Скачать установщик</a><a class="text-link asset-link" data-match="win-x64-Portable.zip" href="https://github.com/bschlaack/Orynivo/releases/latest">Портативный ZIP</a></article>
         <article class="download-card"><div class="platform-mark">◒</div><h3>Linux</h3><p>x64 и ARM64</p><div class="asset-buttons"><a class="mini asset-link" data-match="_amd64.deb" data-exclude="server" href="https://github.com/bschlaack/Orynivo/releases/latest">DEB</a><a class="mini asset-link" data-match=".x86_64.rpm" data-exclude="server" href="https://github.com/bschlaack/Orynivo/releases/latest">RPM</a><a class="mini asset-link" data-match="x86_64.pkg.tar.zst" href="https://github.com/bschlaack/Orynivo/releases/latest">Arch</a></div><a class="text-link" href="https://github.com/bschlaack/Orynivo/releases/latest" target="_blank" rel="noreferrer">ARM64 и переносимые архивы ↗</a></article>
         <article class="download-card"><div class="platform-mark">●</div><h3>macOS</h3><p>Apple Silicon и Intel</p><a class="button secondary asset-link" data-match="osx-arm64.pkg" href="https://github.com/bschlaack/Orynivo/releases/latest">Apple Silicon PKG</a><a class="text-link asset-link" data-match="osx-x64.pkg" href="https://github.com/bschlaack/Orynivo/releases/latest">Intel PKG</a></article>
         <article class="download-card server-card"><div class="platform-mark">⌁</div><h3>Orynivo Server</h3><p>Сервер музыкальной библиотеки без графического интерфейса для Linux x64/ARM64</p><div class="asset-buttons"><a class="mini asset-link" data-match="server_" data-tail="_amd64.deb" href="https://github.com/bschlaack/Orynivo/releases/latest">DEB</a><a class="mini asset-link" data-match="server-" data-tail=".x86_64.rpm" href="https://github.com/bschlaack/Orynivo/releases/latest">RPM</a></div><a class="text-link" id="server-setup-link" href="#server-install">Настроить сервер ↓</a></article>

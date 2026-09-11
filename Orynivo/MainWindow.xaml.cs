@@ -16629,6 +16629,7 @@ public partial class MainWindow : Window
         Orynivo.Localization.Language.Spanish => "es",
         Orynivo.Localization.Language.Russian => "ru",
         Orynivo.Localization.Language.ChineseSimplified => "zh",
+        Orynivo.Localization.Language.Hindi => "hi",
         _ => "en"
     };
 
