@@ -10535,8 +10535,6 @@ public partial class MainWindow : Window
         }
 
         InvalidateUnifiedLibraryViewCache();
-        if (DashboardScrollViewer.IsVisible)
-            await BuildDashboardAsync();
 
         if (_activeAlbumFilterId == albumId && row.EntityType != "OrynivoAlbum")
             await ReloadAlbumDetailHeaderAsync(albumId);
@@ -10767,13 +10765,11 @@ public partial class MainWindow : Window
         // dashboard recent-album card) updates immediately.
         UpdateRowArtworkFromBytes(row, selected.ImageData);
 
-        // On the dashboard surface the card is already refreshed above; do not
-        // rebuild the (hidden) Albums list, which would also overwrite the count.
+        // Dashboard and its Show all pages share this viewer. The bound card is
+        // already refreshed; rebuilding Dashboard would replace the current page
+        // and lose its scroll position.
         if (DashboardScrollViewer.IsVisible)
-        {
-            await BuildDashboardAsync();
             return;
-        }
         if (_activeAlbumFilterId == albumId)
             await ReloadAlbumDetailHeaderAsync(albumId);
     }
@@ -10826,8 +10822,6 @@ public partial class MainWindow : Window
         ApplyRemoteArtwork(row, selected.ImageData);
         DeleteOrynivoAlbumListCache(server);
         InvalidateUnifiedLibraryViewCache();
-        if (DashboardScrollViewer.IsVisible)
-            await BuildDashboardAsync();
         StatusTextBlock.Text = string.Empty;
     }
 

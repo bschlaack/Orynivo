@@ -674,6 +674,12 @@ byte-range streaming without FFmpeg.
 - Remote Orynivo Server album covers and artist images can be searched from the
   Windows client; the client uploads the selected image bytes to the server, and
   the server stores them in its own artwork cache.
+- Album cover searches display small previews as they arrive (up to three
+  concurrent downloads). Only the selected original is downloaded for saving;
+  failed downloads can be retried without losing the displayed previews.
+  Searches are cancelled when replaced or closed. Metadata-free timing records
+  in `logs/cover-search-performance.log` separate preview arrival, decoding, and
+  UI publication for troubleshooting; they contain no album names or URLs.
 - Remote Orynivo Server artist biographies can be refreshed from the Windows
   client. Last.fm or Wikipedia requests run on the client; the server receives
   only the resulting biography, source URL, language, and optional image bytes

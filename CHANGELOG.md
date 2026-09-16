@@ -4,6 +4,24 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.41.8] - 2026-09-16
+
+### Fixed
+
+- Assigning local or remote album artwork now preserves the Dashboard's
+  recently-added Show all page and scroll position, updating the bound cover
+  in place instead of replacing the page with the Dashboard.
+
+- Clarified that the Dashboard's most-listened-albums values are minutes by
+  adding the unit to the heading in all seven interface languages.
+
+- Cover searches now progressively display bounded 250-pixel previews with at
+  most three concurrent downloads, time budgets, and one transient-error retry.
+  Failed candidates no longer discard successful results. Original artwork is
+  downloaded only after selection, preview decoding runs off the UI thread,
+  and superseded/closed searches are cancelled. Added metadata-free phase timing
+  diagnostics and regression checks for the shared Windows/Linux workflow.
+
 ## [0.41.7] - 2026-09-11
 
 ### Added

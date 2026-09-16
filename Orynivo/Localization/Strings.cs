@@ -905,6 +905,10 @@ public sealed record LocalizedStrings(
     public string ArtistImageSearchFailed { get; init; } = "";
     public string UseSelectedArtistImage { get; init; } = "";
     public string ArtistImageDownloadFailed { get; init; } = "";
+    /// <summary>Recoverable cover search or original download failure.</summary>
+    public string CoverSearchFailed { get; init; } = "";
+    /// <summary>Status while downloading the explicitly selected original cover.</summary>
+    public string CoverOriginalLoading { get; init; } = "";
     public string ArtistProfileSearchTitle { get; init; } = "";
     public string ArtistProfileSearchHint { get; init; } = "";
     public string ArtistProfileSearchQuery { get; init; } = "";

@@ -49,7 +49,7 @@
                          Height="28"
                          VerticalContentAlignment="Center"/>
             </StackPanel>
-            <Button Classes="accent"
+            <Button x:Name="SearchButton" Classes="accent"
                     Grid.Column="1"
                     MinWidth="126"
                     Height="30"
@@ -97,7 +97,7 @@
                 </DataTemplate>
             </ListBox.ItemTemplate>
         </ListBox>
-        <Button Classes="accent"
+        <Button x:Name="UseCoverButton" Classes="accent"
                 Grid.Row="3"
                 MinWidth="220"
                 MinHeight="34"

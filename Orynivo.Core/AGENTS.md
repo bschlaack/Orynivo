@@ -11,6 +11,13 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
 
 ## Core Invariants
 
+- Manual cover searches fetch only bounded CAA `front-250` previews, with three
+  concurrent workers, a 35-second search budget and one retry for transient
+  failures. Keep successes when another candidate fails. Fetch `front` originals
+  only after explicit selection; never silently save a preview as the original.
+  Preserve punctuation-aware query fallbacks. The transport regression harness
+  is `scripts/CoverSearchSmoke` (offline by default; `--live` is opt-in).
+
 - Keep the project cross-platform `net8.0`; do not introduce Avalonia, Windows,
   DPAPI, WASAPI, ASIO, or other platform-specific dependencies.
 - Put shared library scanning, SQLite persistence, search, streaming models and
