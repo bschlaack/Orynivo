@@ -39,6 +39,12 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 
 ## Client Invariants
 
+- CoverSearchWindow publishes previews incrementally, decodes off the UI thread,
+  cancels superseded/closed searches, rejects stale callbacks and duplicate
+  starts, and disposes preview bitmaps. Original download failure keeps the
+  dialog open for retry. Its bounded background timing log must contain only
+  fixed phase names, elapsed times and byte counts, never queries or URLs.
+
 - Local user-profile identity is persisted separately from the shared library
   catalog. `UserProfileManager` normalizes the legacy single-user installation
   to a `standard` profile and carries per-server profile mappings plus personal

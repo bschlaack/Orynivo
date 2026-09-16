@@ -4,6 +4,22 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+### Fixed
+
+- Clarified that the Dashboard's most-listened-albums values are minutes by
+  adding the unit to the heading in all seven interface languages.
+
+- Cover searches now progressively display bounded 250-pixel previews with at
+  most three concurrent downloads, time budgets, and one transient-error retry.
+  Failed candidates no longer discard successful results. Original artwork is
+  downloaded only after selection, preview decoding runs off the UI thread,
+  and superseded/closed searches are cancelled. Added metadata-free phase timing
+  diagnostics and regression checks for the shared Windows/Linux workflow.
+
 ## [0.41.7] - 2026-09-11
 
 ### Added

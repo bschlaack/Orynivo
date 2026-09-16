@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Diagnostics;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -23,7 +24,13 @@ public partial class CoverSearchWindow : Window
     private readonly DispatcherTimer _busyTimer;
     private readonly string[] _busyFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
     private int _busyFrameIndex;
+    private CancellationTokenSource? _searchCancellation;
+    private readonly CancellationTokenSource _lifetime = new();
+    private bool _selecting;
+    private bool _closed;
+    private (string Album, string Artist) _activeQuery;
 
+    /// <summary>Selected original artwork, populated only after a successful original download.</summary>
     public CoverSearchResult? SelectedResult { get; private set; }
 
     /// <summary>
@@ -58,6 +65,15 @@ public partial class CoverSearchWindow : Window
         };
         QueryTextBox.KeyDown += SearchTextBox_OnKeyDown;
         ArtistQueryTextBox.KeyDown += SearchTextBox_OnKeyDown;
+        Closed += (_, _) =>
+        {
+            _closed = true;
+            _searchCancellation?.Cancel();
+            _lifetime.Cancel();
+            _lifetime.Dispose();
+            _busyTimer.Stop();
+            ClearResults();
+        };
     }
 
     private async void SearchAgainButton_OnClick(object? sender, RoutedEventArgs e) =>
@@ -74,45 +90,125 @@ public partial class CoverSearchWindow : Window
 
     private async Task SearchAsync()
     {
-        _results.Clear();
+        if (_closed || _selecting)
+            return;
+        var query = (QueryTextBox.Text ?? string.Empty, ArtistQueryTextBox.Text ?? string.Empty);
+        if (_searchCancellation is not null && _activeQuery == query)
+            return;
+        _activeQuery = query;
+        // A new query supersedes the previous one; stale callbacks must never touch the UI.
+        _searchCancellation?.Cancel();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _searchCancellation = cancellation;
+        ClearResults();
+        var elapsed = Stopwatch.StartNew();
         BusyIndicatorTextBlock.IsVisible = true;
         StatusTextBlock.Text = LocalizationManager.Current.CoverSearchRunning;
         _busyTimer.Start();
         try
         {
-            var results = await MusicBrainzCoverSearch.SearchByAlbumTitleAsync(
-                QueryTextBox.Text ?? string.Empty,
-                ArtistQueryTextBox.Text);
-            foreach (var result in results)
-                _results.Add(new CoverResultViewModel(result, CreateBitmap(result.ImageData)));
+            await MusicBrainzCoverSearch.SearchByAlbumTitleAsync(
+                query.Item1,
+                query.Item2, cancellation.Token, async result =>
+                {
+                    CoverSearchDiagnostics.Record("preview-downloaded", elapsed.ElapsedMilliseconds, bytes: result.ImageData.Length);
+                    var decode = Stopwatch.StartNew();
+                    var bitmap = await Task.Run(() =>
+                    {
+                        try { return CreateBitmap(result.ImageData); }
+                        catch (Exception ex) { throw new InvalidDataException("Invalid preview.", ex); }
+                    }, cancellation.Token);
+                    var decodeMs = decode.ElapsedMilliseconds;
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        if (_closed || cancellation.IsCancellationRequested || _searchCancellation != cancellation)
+                        {
+                            bitmap.Dispose();
+                            return;
+                        }
+                        _results.Add(new CoverResultViewModel(result, bitmap));
+                        CoverSearchDiagnostics.Record("preview", elapsed.ElapsedMilliseconds, decodeMs, result.ImageData.Length);
+                    });
+                });
 
-            StatusTextBlock.Text = _results.Count == 0
-                ? LocalizationManager.Current.CoverSearchNoResults
-                : string.Empty;
+            if (_searchCancellation == cancellation && !_closed && !_selecting)
+                StatusTextBlock.Text = _results.Count == 0
+                    ? LocalizationManager.Current.CoverSearchNoResults
+                    : string.Empty;
         }
-        catch (Exception ex)
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        catch (Exception)
         {
-            StatusTextBlock.Text = ex.Message;
+            if (_searchCancellation == cancellation && !_closed && !_selecting)
+                StatusTextBlock.Text = LocalizationManager.Current.CoverSearchFailed;
         }
         finally
         {
-            _busyTimer.Stop();
-            BusyIndicatorTextBlock.IsVisible = false;
+            CoverSearchDiagnostics.Record("search-complete", elapsed.ElapsedMilliseconds);
+            if (_searchCancellation == cancellation)
+            {
+                _searchCancellation = null;
+                if (!_closed && !_selecting)
+                {
+                    _busyTimer.Stop();
+                    BusyIndicatorTextBlock.IsVisible = false;
+                }
+            }
         }
     }
 
-    private void UseSelectedCoverButton_OnClick(object? sender, RoutedEventArgs e)
+    private async void UseSelectedCoverButton_OnClick(object? sender, RoutedEventArgs e)
     {
-        if (ResultsListBox.SelectedItem is not CoverResultViewModel selected)
+        if (_closed || _selecting || ResultsListBox.SelectedItem is not CoverResultViewModel selected)
             return;
 
-        SelectedResult = selected.Result;
-        Close(true);
+        _selecting = true;
+        _searchCancellation?.Cancel();
+        SearchButton.IsEnabled = UseCoverButton.IsEnabled = false;
+        StatusTextBlock.Text = LocalizationManager.Current.CoverOriginalLoading;
+        BusyIndicatorTextBlock.IsVisible = true;
+        _busyTimer.Start();
+        var timer = Stopwatch.StartNew();
+        try
+        {
+            var original = await MusicBrainzCoverSearch.DownloadOriginalAsync(selected.Result, _lifetime.Token);
+            // Reject corrupt originals before the caller persists them.
+            await Task.Run(() => { using var image = CreateBitmap(original.ImageData); }, _lifetime.Token);
+            if (!_closed)
+            {
+                SelectedResult = original;
+                Close(true);
+            }
+        }
+        catch (OperationCanceledException) when (_closed) { }
+        catch (Exception)
+        {
+            if (!_closed)
+                StatusTextBlock.Text = LocalizationManager.Current.CoverSearchFailed;
+        }
+        finally
+        {
+            CoverSearchDiagnostics.Record("original-complete", timer.ElapsedMilliseconds);
+            _selecting = false;
+            if (!_closed)
+            {
+                SearchButton.IsEnabled = UseCoverButton.IsEnabled = true;
+                _busyTimer.Stop();
+                BusyIndicatorTextBlock.IsVisible = false;
+            }
+        }
+    }
+
+    private void ClearResults()
+    {
+        foreach (var result in _results)
+            result.Image.Dispose();
+        _results.Clear();
     }
 
     private static Bitmap CreateBitmap(byte[] data)
     {
         using var stream = new MemoryStream(data);
-        return new Bitmap(stream);
+        return Bitmap.DecodeToWidth(stream, 250);
     }
 }
