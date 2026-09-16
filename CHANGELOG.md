@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Assigning local or remote album artwork now preserves the Dashboard's
+  recently-added Show all page and scroll position, updating the bound cover
+  in place instead of replacing the page with the Dashboard.
+
 - Clarified that the Dashboard's most-listened-albums values are minutes by
   adding the unit to the heading in all seven interface languages.
 

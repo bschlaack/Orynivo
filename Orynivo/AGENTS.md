@@ -39,6 +39,11 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 
 ## Client Invariants
 
+- Dashboard and its Show all pages share DashboardScrollViewer. Album artwork
+  assignment must update the bound ContentRow in place, never call
+  BuildDashboardAsync merely because that viewer is visible; this would replace
+  the current Show all page and discard its scroll position.
+
 - CoverSearchWindow publishes previews incrementally, decodes off the UI thread,
   cancels superseded/closed searches, rejects stale callbacks and duplicate
   starts, and disposes preview bitmaps. Original download failure keeps the
