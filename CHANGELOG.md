@@ -53,6 +53,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   taxonomy (multi-parent ancestry queries, name/alias/delimiter normalization,
   dynamic unmapped keys, and display-name resolution).
 
+- Added the cross-platform Last.fm scrobbling core in `Orynivo.Core`
+  (`LastFmSignature` MD5 request signing, `ScrobbleRules` eligibility, and a
+  `LastFmClient` for token/session authentication, now-playing updates, and
+  scrobble submission) with regression tests for the signature vector and the
+  scrobble thresholds. Desktop wiring follows.
+
 ### Changed
 
 - Split the monolithic `Orynivo/MainWindow.xaml.cs` (17,774 lines) into
