@@ -175,6 +175,16 @@ public partial class MainWindow : Window
         {
             _currentPlayHistoryId = null;
         }
+
+        _lastFmScrobbler.SetNowPlaying(
+            new Scrobbling.LastFmTrack(
+                NowPlayingArtistBlock.Text ?? string.Empty,
+                NowPlayingTitleBlock.Text ?? string.Empty,
+                _currentAlbumTitle,
+                _currentPlaybackDuration > TimeSpan.Zero
+                    ? (int)_currentPlaybackDuration.TotalSeconds
+                    : null),
+            DateTimeOffset.Now);
     }
 
     private async void PreviousButton_OnClick(object? sender, RoutedEventArgs e) =>
@@ -309,6 +319,10 @@ public partial class MainWindow : Window
 
     private void RecordPlaybackEnd(bool completed, double? positionSeconds = null)
     {
+        _lastFmScrobbler.Complete(
+            TimeSpan.FromSeconds(positionSeconds ?? _player?.Position.TotalSeconds ?? 0),
+            _currentPlaybackDuration);
+
         if (_currentPlayHistoryId is not long historyId)
             return;
         try

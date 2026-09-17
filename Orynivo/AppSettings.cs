@@ -101,6 +101,16 @@ public sealed class AppSettings
     /// <summary>Gets or sets the Last.fm API key used when <see cref="ArtistInfoSource"/> is <see cref="ArtistInfoSource.LastFm"/>.</summary>
     [JsonIgnore]
     public string LastFmApiKey { get; set; } = string.Empty;
+    /// <summary>Gets or sets a value indicating whether completed tracks are scrobbled to Last.fm.</summary>
+    public bool LastFmScrobblingEnabled { get; set; }
+    /// <summary>Gets or sets the connected Last.fm username shown in Settings.</summary>
+    public string LastFmUsername { get; set; } = string.Empty;
+    /// <summary>Gets or sets the Last.fm API secret overlaid from the encrypted credential store.</summary>
+    [JsonIgnore]
+    public string LastFmApiSecret { get; set; } = string.Empty;
+    /// <summary>Gets or sets the Last.fm session key overlaid from the encrypted credential store.</summary>
+    [JsonIgnore]
+    public string LastFmSessionKey { get; set; } = string.Empty;
     /// <summary>Gets or sets the Fanart.tv API key used for preferred curated artist thumbnails.</summary>
     [JsonIgnore]
     public string FanartTvApiKey { get; set; } = string.Empty;

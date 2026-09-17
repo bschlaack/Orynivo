@@ -57,7 +57,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (`LastFmSignature` MD5 request signing, `ScrobbleRules` eligibility, and a
   `LastFmClient` for token/session authentication, now-playing updates, and
   scrobble submission) with regression tests for the signature vector and the
-  scrobble thresholds. Desktop wiring follows.
+  scrobble thresholds.
+- Wired Last.fm scrobbling into the desktop client: a `LastFmScrobblingService`
+  with authorization, now-playing and eligible scrobble submission, a persisted
+  offline queue (`PendingScrobbleStore`, bounded to 500 entries), new
+  `LastFmScrobblingEnabled`/`LastFmUsername` settings, and API-secret/session-key
+  storage through the encrypted credential container. Playback start and end now
+  feed the scrobbler. The Settings UI and localization follow.
 
 ### Changed
 

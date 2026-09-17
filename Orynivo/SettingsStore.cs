@@ -179,6 +179,8 @@ public sealed class SettingsStore
         ApplicationCredentialSnapshot credentials)
     {
         settings.LastFmApiKey = credentials.LastFmApiKey;
+        settings.LastFmApiSecret = credentials.LastFmApiSecret;
+        settings.LastFmSessionKey = credentials.LastFmSessionKey;
         settings.FanartTvApiKey = credentials.FanartTvApiKey;
         settings.MobileRemoteAccessToken = credentials.MobileRemoteAccessToken;
         settings.AiChat ??= new AI.AiChatSettings();
@@ -199,6 +201,8 @@ public sealed class SettingsStore
         ApplicationCredentialSnapshot credentials)
     {
         credentials.LastFmApiKey = settings.LastFmApiKey?.Trim() ?? string.Empty;
+        credentials.LastFmApiSecret = settings.LastFmApiSecret?.Trim() ?? string.Empty;
+        credentials.LastFmSessionKey = settings.LastFmSessionKey?.Trim() ?? string.Empty;
         credentials.FanartTvApiKey = settings.FanartTvApiKey?.Trim() ?? string.Empty;
         credentials.MobileRemoteAccessToken = settings.MobileRemoteAccessToken?.Trim() ?? string.Empty;
         credentials.AiChatApiKey = settings.AiChat?.ApiKey?.Trim() ?? string.Empty;
