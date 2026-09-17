@@ -93,6 +93,9 @@ internal partial class SettingsView : UserControl
     /// indexed tracks so catalog consumers can invalidate their session caches.
     /// </summary>
     internal event Action? LocalLibraryChanged;
+
+    /// <summary>Raised when the user asks to review and resolve duplicate files.</summary>
+    internal event Action? DuplicateResolutionRequested;
     /// <summary>Raised after the active user profile changes.</summary>
     internal event Action<string>? ProfileChanged;
     private bool _plexCredentialsChanged;
@@ -1787,6 +1790,12 @@ internal partial class SettingsView : UserControl
 
     private void CancelMetadataAnalysisButton_OnClick(object? sender, RoutedEventArgs e) =>
         _metadataAnalysisCts?.Cancel();
+
+    /// <summary>Requests a duplicate-resolution review from the host window.</summary>
+    /// <param name="sender">The button.</param>
+    /// <param name="e">The click event data.</param>
+    private void ResolveDuplicatesButton_OnClick(object? sender, RoutedEventArgs e)
+        => DuplicateResolutionRequested?.Invoke();
 
     /// <summary>Refreshes the Last.fm scrobbling connection status text.</summary>
     private void UpdateLastFmScrobblingStatus()

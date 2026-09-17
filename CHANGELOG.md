@@ -4,7 +4,7 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.42.0] - 2026-09-17
 
 ### Added
 
@@ -70,6 +70,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   All new strings exist in German, English, French, Spanish, Russian, Simplified
   Chinese, and Hindi.
 
+- Added a **Duplicate files** action to Settings > Review metadata: it opens a
+  review dialog listing Library Doctor duplicate groups with the first file of
+  each group kept by default, an explicit confirmation, and an optional
+  "delete the files from disk" step. Nothing is removed without confirmation.
 - Added `LibraryScanner.RemoveTracksByPaths` in `Orynivo.Core`: a confirmed
   removal deletes the matching rows from SQLite, Lucene, and the waveform cache
   together, includes virtual CUE/MKA tracks that share a removed physical source,

@@ -1392,4 +1392,28 @@ public sealed record LocalizedStrings(
     public string CrossfeedMedium { get; init; } = "";
     /// <summary>Gets the strong crossfeed strength name.</summary>
     public string CrossfeedStrong { get; init; } = "";
+    /// <summary>Gets the duplicate-resolution dialog title and action label.</summary>
+    public string DuplicateResolutionTitle { get; init; } = "";
+    /// <summary>Gets the duplicate-resolution explanatory text.</summary>
+    public string DuplicateResolutionHint { get; init; } = "";
+    /// <summary>Gets the duplicate group header format (kind and file count).</summary>
+    public string DuplicateResolutionGroupHeader { get; init; } = "";
+    /// <summary>Gets the byte-identical duplicate group label.</summary>
+    public string DuplicateResolutionExact { get; init; } = "";
+    /// <summary>Gets the likely-duplicate group label.</summary>
+    public string DuplicateResolutionLikely { get; init; } = "";
+    /// <summary>Gets the selected-for-removal count format.</summary>
+    public string DuplicateResolutionSelected { get; init; } = "";
+    /// <summary>Gets the remove-from-library action label.</summary>
+    public string DuplicateResolutionRemove { get; init; } = "";
+    /// <summary>Gets the also-delete-files option label.</summary>
+    public string DuplicateResolutionDeleteFiles { get; init; } = "";
+    /// <summary>Gets the library-only removal confirmation format.</summary>
+    public string DuplicateResolutionConfirmRemove { get; init; } = "";
+    /// <summary>Gets the delete-files removal confirmation format.</summary>
+    public string DuplicateResolutionConfirmDeleteFiles { get; init; } = "";
+    /// <summary>Gets the message shown when no duplicates were found.</summary>
+    public string DuplicateResolutionNoneFound { get; init; } = "";
+    /// <summary>Gets the removal result format.</summary>
+    public string DuplicateResolutionRemoved { get; init; } = "";
 }

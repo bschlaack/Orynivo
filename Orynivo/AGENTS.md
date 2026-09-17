@@ -272,6 +272,12 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   Repeated searches must clear selection and preview before loading. Analysis,
   dialog and correction use Core `OrderTracks`; never silently zip a partial match.
   Successful corrections invalidate shared library views and refresh analysis.
+  The same section exposes a **Duplicate files** action that opens
+  `DuplicateResolutionDialog` over `LibraryMetadataRepairService.FindDuplicateGroups`
+  and `LibraryScanner.RemoveTracksByPaths`. The first file of each group is kept
+  by default, removal requires explicit confirmation, and deleting files from
+  disk is a separate opt-in. Never remove anything without that confirmation, and
+  invalidate the shared library view cache after a successful removal.
 - The shared Folder structure sidebar item is visible when either local media
   or at least one Orynivo Server is configured. Server-only setups must be able
   to open `ShowUnifiedFolderTreeAsync` without configuring a local directory.

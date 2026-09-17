@@ -916,6 +916,14 @@
                             <TextBlock Text="{DynamicResource L_MetadataQuickHint}" TextWrapping="Wrap"
                                        Foreground="{DynamicResource AppSecondaryTextBrush}"
                                        FontSize="{DynamicResource FontSizeCaption}"/>
+                            <Button x:Name="ResolveDuplicatesButton"
+                                    MinWidth="220"
+                                    Height="30"
+                                    Padding="12,0"
+                                    HorizontalAlignment="Left"
+                                    Theme="{StaticResource SettingsButtonTheme}"
+                                    Content="{DynamicResource L_DuplicateResolutionTitle}"
+                                    Click="ResolveDuplicatesButton_OnClick"/>
                             <StackPanel x:Name="MetadataProgressPanel" IsVisible="False" Spacing="8">
                                 <TextBlock x:Name="MetadataActivityTextBlock" TextWrapping="Wrap"
                                            FontSize="{DynamicResource FontSizeBody}"/>

@@ -286,6 +286,7 @@ public partial class MainWindow : Window
         var completionHandled = false;
         view.LocalLibraryChanged += OnWatchedLibraryChanged;
         view.ProfileChanged += profileId => _ = OnUserProfileChangedAsync(profileId);
+        view.DuplicateResolutionRequested += () => _ = OpenDuplicateResolutionAsync();
         view.CompletionRequested += async (_, accepted) =>
         {
             if (completionHandled)

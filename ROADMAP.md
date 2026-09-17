@@ -149,7 +149,7 @@ Implemented:
 Tests: option validation and mapping (`Orynivo.Server.Tests`), stream-URL
 building (`Orynivo.Core.Tests`).
 
-## 6. Library Doctor duplicate resolution — `In progress`
+## 6. Library Doctor duplicate resolution — `Done`
 
 Turn the existing read-only duplicate findings into a user-confirmed workflow.
 
@@ -163,8 +163,10 @@ Steps:
   removes confirmed paths from SQLite, Lucene, and the waveform cache together,
   includes virtual CUE/MKA tracks that share a removed physical source, and
   optionally deletes the files from disk. 3 tests cover the row selection.
-- 6c Desktop review UI — `Todo`: a per-group "keep this / remove the others"
-  list in `MetadataRepairDialog` with explicit confirmation and seven-language
+- 6c Desktop review UI — `Done`: the Settings **Review metadata** section exposes
+  a "Duplicate files" action that opens `DuplicateResolutionDialog`. Each group
+  lists its files with the first one kept by default; removal is explicitly
+  confirmed and can optionally delete the files from disk. Seven-language
   localization.
 
 Never automatic; no action without confirmation.
