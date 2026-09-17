@@ -583,7 +583,7 @@ public static class LocalizationManager
         "Ein unerwarteter Fehler ist aufgetreten. Der Fehlerbericht konnte nicht gespeichert werden. Orynivo wird beendet.")
     {
         AutoAcceptFanartTvImages = "Fanart.tv-Funde automatisch übernehmen",
-        Crossfeed = "Kopfhörer-Übersprechen",
+        Crossfeed = "Kopfhörer-Crossfeed",
         CrossfeedEnabled = "Kopfhörer-Stereobreite reduzieren",
         CrossfeedStrength = "Stärke",
         CrossfeedLight = "Leicht",
@@ -2046,7 +2046,7 @@ public static class LocalizationManager
         "Une erreur inattendue s’est produite. Le rapport n’a pas pu être enregistré. Orynivo va maintenant se fermer.")
     {
         AutoAcceptFanartTvImages = "Accepter automatiquement les résultats Fanart.tv",
-        Crossfeed = "Mélange inter-auriculaire",
+        Crossfeed = "Crossfeed pour casque",
         CrossfeedEnabled = "Réduire la séparation stéréo au casque",
         CrossfeedStrength = "Intensité",
         CrossfeedLight = "Léger",
@@ -2766,7 +2766,7 @@ public static class LocalizationManager
         "Se produjo un error inesperado. No se pudo guardar el informe. Orynivo se cerrará ahora.")
     {
         AutoAcceptFanartTvImages = "Aceptar automáticamente los resultados de Fanart.tv",
-        Crossfeed = "Mezcla entre canales",
+        Crossfeed = "Crossfeed para auriculares",
         CrossfeedEnabled = "Reducir la separación estéreo con auriculares",
         CrossfeedStrength = "Intensidad",
         CrossfeedLight = "Suave",
@@ -4266,7 +4266,7 @@ private static readonly LocalizedStrings Russian = new(
         AiChatEmptyResponse = "Модель вернула пустой ответ.",
         AiChatToolResultFallback = "После вызова инструмента модель не вернула окончательный ответ. Результат инструмента:",
         AutoAcceptFanartTvImages = "Автоматически принимать результаты Fanart.tv",
-        Crossfeed = "Перекрёстное смешивание",
+        Crossfeed = "Кроссфид для наушников",
         CrossfeedEnabled = "Уменьшить стереоразделение в наушниках",
         CrossfeedStrength = "Интенсивность",
         CrossfeedLight = "Слабое",
@@ -5141,7 +5141,7 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "模型返回了空响应。",
         AiChatToolResultFallback = "调用工具后，模型未返回最终答复。工具结果：",
         AutoAcceptFanartTvImages = "自动接受 Fanart.tv 的结果",
-        Crossfeed = "耳机串音混合",
+        Crossfeed = "耳机 Crossfeed",
         CrossfeedEnabled = "减小耳机声道的分离度",
         CrossfeedStrength = "强度",
         CrossfeedLight = "轻",
