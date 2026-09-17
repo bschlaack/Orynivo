@@ -329,8 +329,11 @@ runtime dependency.
   virtual tracks; `GET /api/stream/{trackId}?ss=<seconds>` performs a fast
   server-side seek by transcoding the local file from that offset to FLAC (used
   by remote clients so in-track seeking does not binary-search a seektable-less
-  file over HTTP); the transcode/FFmpeg process is stopped when the client
-  disconnects; album, artist, and track artwork endpoints (track artwork is
+  file over HTTP); `?format=opus|aac&bitrate=<64-320>` requests a validated
+  lossy transcode (`StreamTranscodeOptions`) for regular files and virtual
+  segments alike, returning 400 for unsupported requests; the transcode/FFmpeg
+  process is stopped when the client disconnects; album, artist, and track
+  artwork endpoints (track artwork is
   served both by file path via `/api/artwork/track?p=` and by database ID via
   `/api/artwork/track/{id}` with an optional `?size=`); album artwork
   requests fall back to an on-demand embedded-artwork repair for the requested
@@ -1042,7 +1045,8 @@ fallback or allow client-provided commands/paths to reach the helper.
   `settings.json` and reflected in any visible remote track rows. For local
   tracks it still writes `tracks.is_favorite`.
 - `Orynivo/OrynivoServerDialog.axaml/.cs`: themed dialog for adding or editing a
-  remote Orynivo Server (name, URL, API key, Test Connection); it can load, add,
+  remote Orynivo Server (name, URL, API key, per-server streaming quality, Test
+  Connection); it can load, add,
   remove, and save the remote server's music directories through the server API,
   start a remote scan, and show live scan progress; returned server record is
   stored in `AppSettings.OrynivoServers`

@@ -70,6 +70,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   All new strings exist in German, English, French, Spanish, Russian, Simplified
   Chinese, and Hindi.
 
+- Added optional lossy remote transcoding to the server stream endpoint:
+  `GET /api/stream/{id}?format=opus|aac&bitrate=<64-320>` re-encodes through
+  FFmpeg for bandwidth-limited clients, with per-format defaults, validated
+  ranges, and a 400 for unsupported requests. Clients select a per-server
+  streaming quality (Original / Opus 128 / AAC 192) in the Orynivo Server
+  dialog; the parameters are optional so older clients are unaffected.
 - Added optional loudness normalization for radio and podcast streams: a slow,
   bounded `StreamingLoudnessNormalizer` in `Orynivo.Core` that evens out their
   loudness relative to the ReplayGain-normalized library. It runs only for

@@ -1368,6 +1368,14 @@ public sealed record LocalizedStrings(
     public string LastFmScrobblingAuthorizeHint { get; init; } = "";
     /// <summary>Gets the Last.fm connection failure message.</summary>
     public string LastFmScrobblingConnectFailed { get; init; } = "";
+    /// <summary>Gets the per-server streaming-quality field label.</summary>
+    public string StreamingQuality { get; init; } = "";
+    /// <summary>Gets the streaming-quality option for the original stream.</summary>
+    public string StreamingQualityOriginal { get; init; } = "";
+    /// <summary>Gets the streaming-quality option for Opus 128 kbps.</summary>
+    public string StreamingQualityOpus { get; init; } = "";
+    /// <summary>Gets the streaming-quality option for AAC 192 kbps.</summary>
+    public string StreamingQualityAac { get; init; } = "";
     /// <summary>Gets the streaming-loudness section label.</summary>
     public string StreamingLoudnessNormalization { get; init; } = "";
     /// <summary>Gets the label for enabling streaming loudness normalization.</summary>

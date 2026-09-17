@@ -112,6 +112,18 @@ public sealed class OrynivoServerSettings
     /// <summary>Gets or sets the server-side profile selected for the active local user.</summary>
     [JsonIgnore]
     public string ProfileId { get; set; } = "standard";
+
+    /// <summary>
+    /// Gets or sets the requested lossy streaming format (<c>opus</c> or <c>aac</c>),
+    /// or <see langword="null"/> to stream the original file.
+    /// </summary>
+    public string? StreamingFormat { get; set; }
+
+    /// <summary>
+    /// Gets or sets the requested lossy streaming bitrate in kilobits per second, or
+    /// <see langword="null"/> for the format default.
+    /// </summary>
+    public int? StreamingBitrateKbps { get; set; }
 }
 
 /// <summary>Public server profile identity returned by the profile registry endpoint.</summary>

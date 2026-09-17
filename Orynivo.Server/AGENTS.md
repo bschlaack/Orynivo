@@ -35,6 +35,10 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
 - Materialize SQLite-backed endpoint results before disposing their connection.
 - Preserve byte-range streaming and cancellation of FFmpeg/transcode processes
   when clients disconnect.
+- `GET /api/stream/{id}` accepts an optional validated lossy transcode
+  (`?format=opus|aac&bitrate=<64-320>` via `StreamTranscodeOptions`); unsupported
+  requests return 400. The parameters are optional so older clients are
+  unaffected, and the same FFmpeg pipe/cancellation path is reused.
 - `cue://` tracks and `mka://chapter/` tracks are virtual source segments and
   are transcoded from their stored physical source and time boundaries.
 - Normal full scans and watcher updates use

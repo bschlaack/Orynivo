@@ -128,21 +128,26 @@ safety, reset.
 
 Follow-up: an optional target selector (e.g. -16/-18/-20 dBFS).
 
-## 5. Remote transcoding with bitrate selection — `Todo`
+## 5. Remote transcoding with bitrate selection — `Done`
 
 Bandwidth-friendly streaming for the mobile remote and slow links.
 
-**Design**
+Implemented:
 
-- `Orynivo.Server/Endpoints/StreamEndpoints.cs`: optional `?format=opus|aac`
-  and `?bitrate=` transcoding through FFmpeg, reusing the existing
-  pipe/transcode cancellation path.
-- Capability probe so older clients keep requesting the original stream.
-- Desktop/mobile: a per-server quality preference.
+- `Orynivo.Server/Endpoints/StreamTranscodeOptions.cs`: validates
+  `?format=opus|aac` and `?bitrate=` (64-320 kbps, per-format default) and maps
+  them to FFmpeg output arguments and a response content type.
+- `StreamEndpoints` transcodes regular files and virtual segments alike through
+  the existing FFmpeg pipe/cancellation path when a lossy format is requested;
+  an unsupported request returns 400. The parameters are optional, so older
+  clients keep receiving the original stream unchanged.
+- `OrynivoServerSettings.StreamingFormat`/`StreamingBitrateKbps` and
+  `OrynivoServerClient.GetStreamUrl` append the parameters; the server dialog
+  exposes a streaming-quality selector (Original / Opus 128 / AAC 192) with
+  seven-language localization.
 
-**Tests**: request validation, capability probing, option parsing.
-
-**Commit**: `feat(server): add lossy remote transcoding with bitrate selection`
+Tests: option validation and mapping (`Orynivo.Server.Tests`), stream-URL
+building (`Orynivo.Core.Tests`).
 
 ## 6. Library Doctor duplicate resolution — `Todo`
 

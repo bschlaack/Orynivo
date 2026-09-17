@@ -18,6 +18,7 @@ namespace Orynivo;
 public partial class OrynivoServerDialog : Window
 {
     private readonly string _serverId;
+    private readonly List<StreamingQualityChoice> _streamingQualities = [];
     private string _serverProfileId;
     private List<OrynivoServerProfile> _serverProfiles = [];
     private readonly List<string> _serverLibraryPaths = [];
@@ -46,6 +47,22 @@ public partial class OrynivoServerDialog : Window
         NameTextBox.Text   = server?.Name   ?? string.Empty;
         UrlTextBox.Text    = server?.BaseUrl ?? string.Empty;
         ApiKeyTextBox.Text = server?.ApiKey  ?? string.Empty;
+        _streamingQualities.AddRange(
+        [
+            new StreamingQualityChoice(null, null),
+            new StreamingQualityChoice("opus", 128),
+            new StreamingQualityChoice("aac", 192)
+        ]);
+        StreamingQualityComboBox.ItemsSource = new[]
+        {
+            LocalizationManager.Current.StreamingQualityOriginal,
+            LocalizationManager.Current.StreamingQualityOpus,
+            LocalizationManager.Current.StreamingQualityAac
+        };
+        var qualityIndex = _streamingQualities.FindIndex(choice =>
+            string.Equals(choice.Format, server?.StreamingFormat, StringComparison.OrdinalIgnoreCase) &&
+            choice.BitrateKbps == server?.StreamingBitrateKbps);
+        StreamingQualityComboBox.SelectedIndex = qualityIndex < 0 ? 0 : qualityIndex;
         RebuildServerDirectoryList();
         Opened += (_, _) =>
         {
@@ -359,16 +376,28 @@ public partial class OrynivoServerDialog : Window
             return false;
         }
 
+        var qualityIndex = StreamingQualityComboBox.SelectedIndex;
+        var quality = qualityIndex >= 0 && qualityIndex < _streamingQualities.Count
+            ? _streamingQualities[qualityIndex]
+            : _streamingQualities[0];
+
         server = new OrynivoServerSettings
         {
             Id      = _serverId,
             Name    = name,
             BaseUrl = url.TrimEnd('/'),
             ApiKey  = apiKey,
-            ProfileId = _serverProfileId
+            ProfileId = _serverProfileId,
+            StreamingFormat = quality.Format,
+            StreamingBitrateKbps = quality.BitrateKbps
         };
         return true;
     }
+
+    /// <summary>One selectable streaming-quality preset.</summary>
+    /// <param name="Format">Lossy format, or <see langword="null"/> for the original stream.</param>
+    /// <param name="BitrateKbps">Bitrate in kbps, or <see langword="null"/> for the format default.</param>
+    private sealed record StreamingQualityChoice(string? Format, int? BitrateKbps);
 
     private async Task LoadServerLibraryPathsAsync()
     {
