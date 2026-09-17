@@ -199,6 +199,9 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   provider-local `artist-images/<id>.*` cache variants.
 - Web page fetching must retain SSRF protection, connect-time address checks,
   redirect and size limits, text-only responses, timeouts, and audit logging.
+  The loopback/private/link-local/CGNAT/multicast/reserved address classification
+  lives in the tested `Orynivo.Web.PrivateNetworkPolicy`; keep it there rather
+  than inlining the range checks.
 - Streaming URL builders may carry credentials for immediate playback, but such
   URLs must never be persisted, logged, documented, or returned to a model.
 - Shared release-update models verify the ECDSA P-256 signed manifest before an

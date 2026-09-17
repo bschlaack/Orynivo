@@ -5,7 +5,6 @@ using Orynivo.Server.Endpoints;
 using Orynivo.Server.Middleware;
 using Orynivo.Server.Services;
 using System.Reflection;
-using System.Runtime.InteropServices;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -98,29 +97,8 @@ app.UseCors();
 
 // ---- Endpoints ------------------------------------------------------------
 
-// Health — no authentication required
-app.MapGet("/api/health", () => Results.Ok(new
-{
-    Status  = "ok",
-    Server  = settings.ServerName,
-    Version = serverVersion,
-    Time    = DateTimeOffset.UtcNow
-}));
-
-// Server info — authenticated
-app.MapGet("/api/info", () => Results.Ok(new
-{
-    Name       = settings.ServerName,
-    Version    = serverVersion,
-    ApiVersion = 1,
-    Paths      = settings.LibraryPaths,
-    OperatingSystem = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "windows"
-        : RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? "linux"
-        : RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? "macos" : "unknown",
-    Architecture = RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant(),
-    InstallType = installType,
-    UpdateSupported = updateSupported
-}));
+// Health (no authentication) and server info (authenticated).
+app.MapCoreEndpoints(settings, serverVersion, installType, updateSupported);
 
 // Library scan trigger
 app.MapPost("/api/scan", (LibraryService svc) =>

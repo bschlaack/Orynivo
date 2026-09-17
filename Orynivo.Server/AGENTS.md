@@ -19,6 +19,11 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
   the health bypass, header/query key acceptance, missing/wrong/empty key
   rejection, case-sensitive comparison, profile scoping, the `standard`
   default, query-based profile selection, and the unknown-profile 403.
+- `/api/health` and `/api/info` are mapped through
+  `Endpoints.CoreEndpoints.MapCoreEndpoints` so they can be exercised with an
+  in-memory `TestServer` through the real middleware pipeline. Keep new
+  dependency-free endpoints in that mapping method rather than inline in
+  `Program.cs`.
 - Personal-state requests may optionally select a configured profile with
   `X-Orynivo-Profile` (or the non-secret `profile` query parameter); unknown
   profile IDs are rejected and the profile context is async-local so concurrent

@@ -37,6 +37,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   covers reference build/parse round-trips, malformed-value rejection, affinity
   aggregation, favorite weighting, the tie-break variation, and case-insensitive
   recording-MBID grouping.
+- Extracted the web-browsing SSRF address classification into the testable
+  `Orynivo.Web.PrivateNetworkPolicy`. `Orynivo.Core.Tests` now covers the IPv4,
+  IPv6, and IPv4-mapped loopback, private, link-local, CGNAT, multicast, and
+  reserved ranges.
+- Extracted the server health and info endpoints into
+  `Orynivo.Server.Endpoints.CoreEndpoints` and added in-memory `TestServer`
+  integration tests that exercise `/api/health` and `/api/info` through the real
+  API key and profile-context middleware pipeline (health bypass, header/query
+  key acceptance, missing key, unknown-profile 403).
+- Added `Orynivo.Core.Tests` coverage for the HTML-to-text/Markdown extractor
+  (script/style removal, entity decoding, headings, links, lists, plain-text
+  passthrough), for `SeekDiagnostics.SanitizeUrl` (secret query-parameter
+  redaction, user-info removal, non-HTTP passthrough), and for the genre
+  taxonomy (multi-parent ancestry queries, name/alias/delimiter normalization,
+  dynamic unmapped keys, and display-name resolution).
 
 ### Changed
 
