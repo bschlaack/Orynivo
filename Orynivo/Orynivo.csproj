@@ -103,7 +103,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="11.2.0" />
+    <PackageReference Include="Avalonia" Version="12.1.2" />
     <PackageReference Include="QRCoder" Version="1.7.0" />
     <PackageReference Include="Avalonia.Desktop" Version="11.2.0" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.2.0" />
