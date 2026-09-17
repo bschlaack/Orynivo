@@ -792,9 +792,13 @@ fallback or allow client-provided commands/paths to reach the helper.
   `%LOCALAPPDATA%\Orynivo\settings.json`, overlays secrets from
   `ApplicationCredentialStore`, and migrates legacy plaintext JSON credentials
 - `Orynivo/ApplicationCredentialStore.cs`: the single encrypted current-user
-  credential container for Last.fm, Fanart.tv, AI Chat, Orynivo Server, Plex,
-  and generic streaming credentials. Windows uses current-user DPAPI; Linux and
-  macOS use AES-GCM with a separate random key restricted to user read/write.
+  credential container for Last.fm (artist info, API secret, and scrobbling
+  session key), Fanart.tv, AI Chat, Orynivo Server, Plex, and generic streaming
+  credentials. Windows uses current-user DPAPI; Linux and macOS use AES-GCM with
+  a separate random key restricted to user read/write. Last.fm scrobbling lives
+  in `Orynivo/Scrobbling/` (`LastFmScrobblingService`, `PendingScrobbleStore`);
+  it must never block or fail playback, and its settings are configured under
+  **Artist information**.
 - `Orynivo/Streaming/IStreamingCatalog.cs` and `IStreamingPlaybackProvider.cs`:
   provider-neutral contracts for future streaming catalog and playback integrations
 - `Orynivo/Streaming/QobuzStreamingProvider.cs`: inactive Qobuz scaffold; do not

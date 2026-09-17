@@ -63,7 +63,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   offline queue (`PendingScrobbleStore`, bounded to 500 entries), new
   `LastFmScrobblingEnabled`/`LastFmUsername` settings, and API-secret/session-key
   storage through the encrypted credential container. Playback start and end now
-  feed the scrobbler. The Settings UI and localization follow.
+  feed the scrobbler, and queued scrobbles are flushed at startup.
+- Added the Last.fm scrobbling settings to **Artist information**: an enable
+  toggle, API key and API secret fields, a two-step Connect flow that opens the
+  Last.fm authorization page, Disconnect, and a localized connection status.
+  All new strings exist in German, English, French, Spanish, Russian, Simplified
+  Chinese, and Hindi.
 
 ### Changed
 

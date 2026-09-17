@@ -1350,4 +1350,22 @@ public sealed record LocalizedStrings(
     public string AiChatToolResultFallback { get; init; } = "";
     /// <summary>Gets the option for automatically accepting Fanart.tv artist-image results.</summary>
     public string AutoAcceptFanartTvImages { get; init; } = "";
+    /// <summary>Gets the Last.fm scrobbling settings label.</summary>
+    public string LastFmScrobbling { get; init; } = "";
+    /// <summary>Gets the label for enabling Last.fm scrobbling.</summary>
+    public string LastFmScrobblingEnabled { get; init; } = "";
+    /// <summary>Gets the Last.fm API secret field label.</summary>
+    public string LastFmApiSecret { get; init; } = "";
+    /// <summary>Gets the Last.fm connect action label.</summary>
+    public string LastFmConnect { get; init; } = "";
+    /// <summary>Gets the Last.fm disconnect action label.</summary>
+    public string LastFmDisconnect { get; init; } = "";
+    /// <summary>Gets the connected Last.fm username status format.</summary>
+    public string LastFmScrobblingConnected { get; init; } = "";
+    /// <summary>Gets the not-connected Last.fm status text.</summary>
+    public string LastFmScrobblingNotConnected { get; init; } = "";
+    /// <summary>Gets the hint shown after opening the Last.fm authorization page.</summary>
+    public string LastFmScrobblingAuthorizeHint { get; init; } = "";
+    /// <summary>Gets the Last.fm connection failure message.</summary>
+    public string LastFmScrobblingConnectFailed { get; init; } = "";
 }

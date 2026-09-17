@@ -231,6 +231,15 @@ public static class LocalizationManager
         resources["L_ArtistInfoSourceSetting"] = Current.ArtistInfoSourceSetting;
         resources["L_LastFmApiKey"] = Current.LastFmApiKey;
         resources["L_LastFmApiKeyHint"] = Current.LastFmApiKeyHint;
+        resources["L_LastFmScrobbling"] = Current.LastFmScrobbling;
+        resources["L_LastFmScrobblingEnabled"] = Current.LastFmScrobblingEnabled;
+        resources["L_LastFmApiSecret"] = Current.LastFmApiSecret;
+        resources["L_LastFmConnect"] = Current.LastFmConnect;
+        resources["L_LastFmDisconnect"] = Current.LastFmDisconnect;
+        resources["L_LastFmScrobblingConnected"] = Current.LastFmScrobblingConnected;
+        resources["L_LastFmScrobblingNotConnected"] = Current.LastFmScrobblingNotConnected;
+        resources["L_LastFmScrobblingAuthorizeHint"] = Current.LastFmScrobblingAuthorizeHint;
+        resources["L_LastFmScrobblingConnectFailed"] = Current.LastFmScrobblingConnectFailed;
         resources["L_FanartTvApiKey"] = Current.FanartTvApiKey;
         resources["L_FanartTvApiKeyHint"] = Current.FanartTvApiKeyHint;
         resources["L_DownloadMissingArtistImages"] = Current.DownloadMissingArtistImages;
@@ -568,6 +577,15 @@ public static class LocalizationManager
         "Ein unerwarteter Fehler ist aufgetreten. Der Fehlerbericht konnte nicht gespeichert werden. Orynivo wird beendet.")
     {
         AutoAcceptFanartTvImages = "Fanart.tv-Funde automatisch übernehmen",
+        LastFmScrobbling = "Last.fm-Scrobbling",
+        LastFmScrobblingEnabled = "Gehörte Titel scrobbeln",
+        LastFmApiSecret = "API-Geheimnis",
+        LastFmConnect = "Verbinden",
+        LastFmDisconnect = "Trennen",
+        LastFmScrobblingConnected = "Verbunden als {0}",
+        LastFmScrobblingNotConnected = "Nicht verbunden",
+        LastFmScrobblingAuthorizeHint = "Orynivo im Browser autorisieren und dann erneut auf „Verbinden“ klicken.",
+        LastFmScrobblingConnectFailed = "Verbindung zu Last.fm fehlgeschlagen.",
         OutputType = "Ausgabeart",
         AsioOutputDevice = "ASIO-Ausgabegerät",
         CwAsioOutputDevice = "cwASIO-Ausgabegerät",
@@ -1293,6 +1311,15 @@ public static class LocalizationManager
         "An unexpected error occurred. The crash report could not be saved. Orynivo will now close.")
     {
         AutoAcceptFanartTvImages = "Automatically accept Fanart.tv results",
+        LastFmScrobbling = "Last.fm scrobbling",
+        LastFmScrobblingEnabled = "Scrobble played tracks",
+        LastFmApiSecret = "API secret",
+        LastFmConnect = "Connect",
+        LastFmDisconnect = "Disconnect",
+        LastFmScrobblingConnected = "Connected as {0}",
+        LastFmScrobblingNotConnected = "Not connected",
+        LastFmScrobblingAuthorizeHint = "Authorize Orynivo in the browser, then click Connect again.",
+        LastFmScrobblingConnectFailed = "Could not connect to Last.fm.",
         OutputType = "Output type", AsioOutputDevice = "ASIO output device", WasapiOutputDevice = "WASAPI output device",
         AirPlay = "AirPlay 2", AirPlayOutputDevice = "AirPlay 2 output device",
         NoAirPlayDevices = "No AirPlay 2 devices were found on the local network.",
@@ -2001,6 +2028,15 @@ public static class LocalizationManager
         "Une erreur inattendue s’est produite. Le rapport n’a pas pu être enregistré. Orynivo va maintenant se fermer.")
     {
         AutoAcceptFanartTvImages = "Accepter automatiquement les résultats Fanart.tv",
+        LastFmScrobbling = "Scrobbling Last.fm",
+        LastFmScrobblingEnabled = "Scrobbler les titres écoutés",
+        LastFmApiSecret = "Secret de l'API",
+        LastFmConnect = "Connecter",
+        LastFmDisconnect = "Déconnecter",
+        LastFmScrobblingConnected = "Connecté en tant que {0}",
+        LastFmScrobblingNotConnected = "Non connecté",
+        LastFmScrobblingAuthorizeHint = "Autorisez Orynivo dans le navigateur, puis cliquez à nouveau sur Connecter.",
+        LastFmScrobblingConnectFailed = "Impossible de se connecter à Last.fm.",
         OutputType = "Type de sortie", AsioOutputDevice = "Périphérique de sortie ASIO", WasapiOutputDevice = "Périphérique de sortie WASAPI",
         AirPlay = "AirPlay 2", AirPlayOutputDevice = "Périphérique de sortie AirPlay 2",
         NoAirPlayDevices = "Aucun appareil AirPlay 2 n’a été trouvé sur le réseau local.",
@@ -2706,6 +2742,15 @@ public static class LocalizationManager
         "Se produjo un error inesperado. No se pudo guardar el informe. Orynivo se cerrará ahora.")
     {
         AutoAcceptFanartTvImages = "Aceptar automáticamente los resultados de Fanart.tv",
+        LastFmScrobbling = "Scrobbling de Last.fm",
+        LastFmScrobblingEnabled = "Scrobble de las pistas escuchadas",
+        LastFmApiSecret = "Secreto de la API",
+        LastFmConnect = "Conectar",
+        LastFmDisconnect = "Desconectar",
+        LastFmScrobblingConnected = "Conectado como {0}",
+        LastFmScrobblingNotConnected = "No conectado",
+        LastFmScrobblingAuthorizeHint = "Autoriza Orynivo en el navegador y vuelve a pulsar Conectar.",
+        LastFmScrobblingConnectFailed = "No se pudo conectar con Last.fm.",
         OutputType = "Tipo de salida", AsioOutputDevice = "Dispositivo de salida ASIO", WasapiOutputDevice = "Dispositivo de salida WASAPI",
         AirPlay = "AirPlay 2", AirPlayOutputDevice = "Dispositivo de salida AirPlay 2",
         NoAirPlayDevices = "No se encontraron dispositivos AirPlay 2 en la red local.",
@@ -4190,7 +4235,16 @@ private static readonly LocalizedStrings Russian = new(
         AiChatNotEnabled = "Чат с ИИ отключён. Включите его в настройках.",
         AiChatEmptyResponse = "Модель вернула пустой ответ.",
         AiChatToolResultFallback = "После вызова инструмента модель не вернула окончательный ответ. Результат инструмента:",
-        AutoAcceptFanartTvImages = "Автоматически принимать результаты Fanart.tv"
+        AutoAcceptFanartTvImages = "Автоматически принимать результаты Fanart.tv",
+        LastFmScrobbling = "Скробблинг Last.fm",
+        LastFmScrobblingEnabled = "Скробблить прослушанные треки",
+        LastFmApiSecret = "Секрет API",
+        LastFmConnect = "Подключить",
+        LastFmDisconnect = "Отключить",
+        LastFmScrobblingConnected = "Подключено как {0}",
+        LastFmScrobblingNotConnected = "Не подключено",
+        LastFmScrobblingAuthorizeHint = "Авторизуйте Orynivo в браузере, затем снова нажмите «Подключить».",
+        LastFmScrobblingConnectFailed = "Не удалось подключиться к Last.fm.",
     };
 
 private static readonly LocalizedStrings ChineseSimplified = new(
@@ -5050,7 +5104,16 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatNotEnabled = "AI 聊天未启用。请在设置中启用。",
         AiChatEmptyResponse = "模型返回了空响应。",
         AiChatToolResultFallback = "调用工具后，模型未返回最终答复。工具结果：",
-        AutoAcceptFanartTvImages = "自动接受 Fanart.tv 的结果"
+        AutoAcceptFanartTvImages = "自动接受 Fanart.tv 的结果",
+        LastFmScrobbling = "Last.fm 记录",
+        LastFmScrobblingEnabled = "记录已播放的曲目",
+        LastFmApiSecret = "API 密钥",
+        LastFmConnect = "连接",
+        LastFmDisconnect = "断开连接",
+        LastFmScrobblingConnected = "已连接为 {0}",
+        LastFmScrobblingNotConnected = "未连接",
+        LastFmScrobblingAuthorizeHint = "在浏览器中授权 Orynivo，然后再次点击“连接”。",
+        LastFmScrobblingConnectFailed = "无法连接到 Last.fm。",
     };
 
     private static readonly LocalizedStrings Hindi = new(
@@ -5910,6 +5973,15 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "मॉडल ने खाली उत्तर दिया।",
         AiChatToolResultFallback = "टूल कॉल के बाद मॉडल ने अंतिम उत्तर नहीं दिया। टूल परिणाम:",
         AutoAcceptFanartTvImages = "Fanart.tv परिणाम स्वतः स्वीकार करें",
+        LastFmScrobbling = "Last.fm स्क्रोब्लिंग",
+        LastFmScrobblingEnabled = "सुने गए ट्रैक स्क्रॉबल करें",
+        LastFmApiSecret = "API सीक्रेट",
+        LastFmConnect = "कनेक्ट करें",
+        LastFmDisconnect = "डिस्कनेक्ट करें",
+        LastFmScrobblingConnected = "{0} के रूप में जुड़ा हुआ",
+        LastFmScrobblingNotConnected = "जुड़ा नहीं है",
+        LastFmScrobblingAuthorizeHint = "ब्राउज़र में Orynivo को अधिकृत करें, फिर कनेक्ट पर दोबारा क्लिक करें।",
+        LastFmScrobblingConnectFailed = "Last.fm से कनेक्ट नहीं हो सका।",
         LanguageHindi = "हिन्दी",
     };
 

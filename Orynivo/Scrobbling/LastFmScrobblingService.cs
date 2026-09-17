@@ -24,6 +24,7 @@ internal sealed class LastFmScrobblingService
     private LastFmClient? _client;
     private LastFmTrack? _current;
     private DateTimeOffset _currentStartedAt;
+    private string _pendingToken = string.Empty;
 
     /// <summary>Initializes the service.</summary>
     /// <param name="pending">Store for scrobbles awaiting submission.</param>
@@ -68,26 +69,26 @@ internal sealed class LastFmScrobblingService
             return null;
 
         var token = await _client.GetTokenAsync(cancellationToken).ConfigureAwait(false);
-        return string.IsNullOrEmpty(token)
-            ? null
-            : $"https://www.last.fm/api/auth/?api_key={Uri.EscapeDataString(_apiKey)}&token={Uri.EscapeDataString(token)}";
-    }
-
-    /// <summary>Exchanges an authorized token for a session key.</summary>
-    /// <param name="token">The token from the authorization page.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The authorized session, or <see langword="null"/> on failure.</returns>
-    internal async Task<LastFmSession?> CompleteAuthorizationAsync(
-        string token,
-        CancellationToken cancellationToken = default)
-    {
-        if (_client is null || string.IsNullOrWhiteSpace(token))
+        if (string.IsNullOrEmpty(token))
             return null;
 
-        var session = await _client.GetSessionAsync(token.Trim(), cancellationToken).ConfigureAwait(false);
+        _pendingToken = token;
+        return $"https://www.last.fm/api/auth/?api_key={Uri.EscapeDataString(_apiKey)}&token={Uri.EscapeDataString(token)}";
+    }
+
+    /// <summary>Exchanges the pending authorized token for a session key.</summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The authorized session, or <see langword="null"/> on failure.</returns>
+    internal async Task<LastFmSession?> CompleteAuthorizationAsync(CancellationToken cancellationToken = default)
+    {
+        if (_client is null || _pendingToken.Length == 0)
+            return null;
+
+        var session = await _client.GetSessionAsync(_pendingToken, cancellationToken).ConfigureAwait(false);
         if (session is null)
             return null;
 
+        _pendingToken = string.Empty;
         _sessionKey = session.SessionKey;
         Username = session.Username;
         return session;
@@ -96,6 +97,7 @@ internal sealed class LastFmScrobblingService
     /// <summary>Clears the authorized session.</summary>
     internal void Disconnect()
     {
+        _pendingToken = string.Empty;
         _sessionKey = string.Empty;
         Username = string.Empty;
     }

@@ -69,6 +69,10 @@ internal partial class SettingsView : UserControl
     private readonly Dictionary<string, CancellationTokenSource> _activeScans = [];
     private readonly Action<List<string>>? _onLibraryPathsChanged;
     private readonly Action<bool, EqualizerProfile?>? _onEqualizerPreviewChanged;
+    private readonly Func<Task<string?>>? _onLastFmBeginAuthorization;
+    private readonly Func<Task<string?>>? _onLastFmCompleteAuthorization;
+    private readonly Action? _onLastFmDisconnect;
+    private string? _lastFmPendingAuthorization;
     private readonly bool _originalEqualizerEnabled;
     private readonly EqualizerProfile? _originalEqualizerProfile;
     private readonly List<EqualizerProfile> _equalizerProfiles = [];
@@ -116,16 +120,25 @@ internal partial class SettingsView : UserControl
     /// <param name="settings">Settings displayed and edited by the window.</param>
     /// <param name="onLibraryPathsChanged">Optional callback for immediate library-path updates.</param>
     /// <param name="onEqualizerPreviewChanged">Optional callback for live equalizer preview changes.</param>
+    /// <param name="onLastFmBeginAuthorization">Optional callback returning the Last.fm authorization URL.</param>
+    /// <param name="onLastFmCompleteAuthorization">Optional callback completing Last.fm authorization and returning the username.</param>
+    /// <param name="onLastFmDisconnect">Optional callback clearing the Last.fm session.</param>
     public SettingsView(
         AppSettings settings,
         Action<List<string>>? onLibraryPathsChanged = null,
-        Action<bool, EqualizerProfile?>? onEqualizerPreviewChanged = null)
+        Action<bool, EqualizerProfile?>? onEqualizerPreviewChanged = null,
+        Func<Task<string?>>? onLastFmBeginAuthorization = null,
+        Func<Task<string?>>? onLastFmCompleteAuthorization = null,
+        Action? onLastFmDisconnect = null)
     {
         InitializeComponent();
         _settings = settings;
         _profileManager = new UserProfileManager(settings);
         _onLibraryPathsChanged = onLibraryPathsChanged;
         _onEqualizerPreviewChanged = onEqualizerPreviewChanged;
+        _onLastFmBeginAuthorization = onLastFmBeginAuthorization;
+        _onLastFmCompleteAuthorization = onLastFmCompleteAuthorization;
+        _onLastFmDisconnect = onLastFmDisconnect;
         _originalEqualizerEnabled = settings.EqualizerEnabled;
         _originalEqualizerProfile = settings.EqualizerProfile?.Clone();
         _outputProfiles.AddRange((settings.OutputProfiles ?? []).Select(CloneOutputProfile));
@@ -256,9 +269,11 @@ internal partial class SettingsView : UserControl
         ArtistInfoSourceComboBox.ItemsSource = Enum.GetValues<ArtistInfoSource>();
         ArtistInfoSourceComboBox.SelectedItem = settings.ArtistInfoSource;
         LastFmApiKeyTextBox.Text = settings.LastFmApiKey ?? string.Empty;
+        LastFmApiSecretTextBox.Text = settings.LastFmApiSecret ?? string.Empty;
+        LastFmScrobblingEnabledCheckBox.IsChecked = settings.LastFmScrobblingEnabled;
         FanartTvApiKeyTextBox.Text = settings.FanartTvApiKey ?? string.Empty;
         QobuzApplicationIdTextBox.Text = settings.QobuzApplicationId ?? string.Empty;
-        LastFmPanel.IsVisible = settings.ArtistInfoSource == ArtistInfoSource.LastFm;
+        UpdateLastFmScrobblingStatus();
         _libraryPaths.AddRange(settings.LibraryPaths);
         _plexServers.AddRange((settings.PlexServers ?? []).Select(ClonePlexServer));
         _orynivoServers.AddRange((settings.OrynivoServers ?? []).Select(CloneOrynivoServer));
@@ -429,6 +444,10 @@ internal partial class SettingsView : UserControl
     public ArtistInfoSource SelectedArtistInfoSource =>
         ArtistInfoSourceComboBox.SelectedItem is ArtistInfoSource src ? src : ArtistInfoSource.Wikipedia;
     public string SelectedLastFmApiKey => LastFmApiKeyTextBox.Text?.Trim() ?? string.Empty;
+    /// <summary>Gets the entered Last.fm API secret without surrounding whitespace.</summary>
+    public string SelectedLastFmApiSecret => LastFmApiSecretTextBox.Text?.Trim() ?? string.Empty;
+    /// <summary>Gets a value indicating whether Last.fm scrobbling is enabled.</summary>
+    public bool SelectedLastFmScrobblingEnabled => LastFmScrobblingEnabledCheckBox.IsChecked == true;
     /// <summary>Gets the configured Fanart.tv API key without surrounding whitespace.</summary>
     public string SelectedFanartTvApiKey => FanartTvApiKeyTextBox.Text?.Trim() ?? string.Empty;
     public string SelectedQobuzApplicationId => QobuzApplicationIdTextBox.Text?.Trim() ?? string.Empty;
@@ -1748,9 +1767,62 @@ internal partial class SettingsView : UserControl
     private void CancelMetadataAnalysisButton_OnClick(object? sender, RoutedEventArgs e) =>
         _metadataAnalysisCts?.Cancel();
 
-    private void ArtistInfoSourceComboBox_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    /// <summary>Refreshes the Last.fm scrobbling connection status text.</summary>
+    private void UpdateLastFmScrobblingStatus()
     {
-        LastFmPanel.IsVisible = SelectedArtistInfoSource == ArtistInfoSource.LastFm;
+        var username = _settings.LastFmUsername;
+        LastFmScrobblingStatusTextBlock.Text = string.IsNullOrWhiteSpace(username)
+            ? LocalizationManager.Current.LastFmScrobblingNotConnected
+            : string.Format(LocalizationManager.Current.LastFmScrobblingConnected, username);
+    }
+
+    /// <summary>Starts or completes the two-step Last.fm authorization flow.</summary>
+    /// <param name="sender">The connect button.</param>
+    /// <param name="e">The click event data.</param>
+    private async void LastFmConnectButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (_lastFmPendingAuthorization is null)
+            {
+                var url = _onLastFmBeginAuthorization is null ? null : await _onLastFmBeginAuthorization();
+                if (string.IsNullOrEmpty(url))
+                {
+                    LastFmScrobblingStatusTextBlock.Text = LocalizationManager.Current.LastFmScrobblingConnectFailed;
+                    return;
+                }
+
+                _lastFmPendingAuthorization = url;
+                if (TopLevel.GetTopLevel(this)?.Launcher is { } launcher)
+                    await launcher.LaunchUriAsync(new Uri(url));
+                LastFmScrobblingStatusTextBlock.Text = LocalizationManager.Current.LastFmScrobblingAuthorizeHint;
+                return;
+            }
+
+            var username = _onLastFmCompleteAuthorization is null ? null : await _onLastFmCompleteAuthorization();
+            _lastFmPendingAuthorization = null;
+            if (string.IsNullOrEmpty(username))
+            {
+                LastFmScrobblingStatusTextBlock.Text = LocalizationManager.Current.LastFmScrobblingConnectFailed;
+                return;
+            }
+
+            UpdateLastFmScrobblingStatus();
+        }
+        catch
+        {
+            LastFmScrobblingStatusTextBlock.Text = LocalizationManager.Current.LastFmScrobblingConnectFailed;
+        }
+    }
+
+    /// <summary>Clears the Last.fm session.</summary>
+    /// <param name="sender">The disconnect button.</param>
+    /// <param name="e">The click event data.</param>
+    private void LastFmDisconnectButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        _lastFmPendingAuthorization = null;
+        _onLastFmDisconnect?.Invoke();
+        UpdateLastFmScrobblingStatus();
     }
 
     // ------------------------------------------------------------------

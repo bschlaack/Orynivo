@@ -266,6 +266,22 @@ public partial class MainWindow : Window
         {
             if (_player is IEqualizerAudioPlayer equalizerPlayer)
                 equalizerPlayer.UpdateEqualizer(enabled, profile);
+        },
+        onLastFmBeginAuthorization: () => _lastFmScrobbler.BeginAuthorizationAsync(),
+        onLastFmCompleteAuthorization: async () =>
+        {
+            var session = await _lastFmScrobbler.CompleteAuthorizationAsync();
+            if (session is null)
+                return null;
+            _settings.LastFmSessionKey = session.SessionKey;
+            _settings.LastFmUsername = session.Username;
+            return session.Username;
+        },
+        onLastFmDisconnect: () =>
+        {
+            _lastFmScrobbler.Disconnect();
+            _settings.LastFmSessionKey = string.Empty;
+            _settings.LastFmUsername = string.Empty;
         });
         var completionHandled = false;
         view.LocalLibraryChanged += OnWatchedLibraryChanged;
@@ -770,6 +786,8 @@ public partial class MainWindow : Window
             _settings.GenreCloudBackgroundOpacity = window.SelectedGenreCloudBackgroundOpacity;
             _settings.ArtistInfoSource       = window.SelectedArtistInfoSource;
             _settings.LastFmApiKey           = window.SelectedLastFmApiKey;
+            _settings.LastFmApiSecret        = window.SelectedLastFmApiSecret;
+            _settings.LastFmScrobblingEnabled = window.SelectedLastFmScrobblingEnabled;
             _settings.FanartTvApiKey         = window.SelectedFanartTvApiKey;
             _settings.QobuzApplicationId      = window.SelectedQobuzApplicationId;
             _settings.PlexServers             = window.SelectedPlexServers.ToList();
@@ -814,6 +832,12 @@ public partial class MainWindow : Window
                 }
             }
             await Task.Run(() => _settingsStore.Save(_settings));
+            _lastFmScrobbler.Configure(
+                _settings.LastFmScrobblingEnabled,
+                _settings.LastFmApiKey,
+                _settings.LastFmApiSecret,
+                _settings.LastFmSessionKey,
+                _settings.LastFmUsername);
             if (mcpChanged)
             {
                 if (_settings.McpServerEnabled)

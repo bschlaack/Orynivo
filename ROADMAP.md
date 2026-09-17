@@ -1,0 +1,236 @@
+# Orynivo Feature Roadmap
+
+A resumable work plan for the agreed feature set. Each item is a **Hauptpunkt**
+that ends with its own commit. Work top to bottom unless a priority changes.
+
+## How to resume
+
+1. Read this file and the item's `Status`.
+2. Follow the repository completion checklist in `AGENTS.md`
+   (build, tests, `CHANGELOG.md`, `README.md`, the applicable nested `AGENTS.md`,
+   XML docs, seven-language localization).
+3. Run all three test projects before finishing an item:
+   `dotnet test Orynivo.Core.Tests/Orynivo.Core.Tests.csproj`,
+   `dotnet test Orynivo.Tests/Orynivo.Tests.csproj`,
+   `dotnet test Orynivo.Server.Tests/Orynivo.Server.Tests.csproj`.
+4. Mark the item `Done` and add its commit hash.
+
+Status legend: `Todo` · `In progress` · `Done` · `Blocked`.
+
+## Explicitly out of scope
+
+- Third-party music-service imports (Spotify/Apple Music/…): unclear licensing
+  and ToS; the Qobuz scaffold stays inactive.
+- Automatic duplicate deletion or automatic metadata merging: violates the
+  documented library invariants. Any such action stays user-confirmed.
+
+---
+
+## 1. Last.fm scrobbling — `Done`
+
+Highest-value missing standard feature. Additive: it never touches the audio
+path, so it cannot regress playback.
+
+Steps:
+
+- 1a Core scrobbling layer — `Done` (`LastFmSignature`, `ScrobbleRules`,
+  `LastFmClient`, `LastFmTrack`, `LastFmSession`; 15 tests).
+- 1b Desktop service, settings/credential plumbing, offline queue, and playback
+  hooks — `Done` (`LastFmScrobblingService`, `PendingScrobbleStore`; 6 tests).
+- 1c Settings UI (enable toggle, API key/secret fields, two-step Connect,
+  Disconnect, status) and seven-language localization — `Done`.
+
+Remaining follow-up (optional): flush queued scrobbles periodically while the
+app is running, not only at startup.
+
+**Design**
+
+- `Orynivo.Core/Scrobbling/LastFmSignature.cs`: pure md5 signature builder
+  (sorted `key`+`value` concatenation plus the API secret).
+- `Orynivo.Core/Scrobbling/ScrobbleRules.cs`: pure eligibility rules
+  (>= 30 s duration, played >= 50 % or >= 4 minutes).
+- `Orynivo.Core/Scrobbling/LastFmClient.cs`: HTTP methods for `auth.getToken`,
+  `auth.getSession`, `track.updateNowPlaying`, `track.scrobble`.
+- `Orynivo.Core/Scrobbling/ScrobbleQueue.cs`: persisted pending scrobbles,
+  flushed when the network is available.
+- Desktop: `AppSettings.LastFmScrobbling` (enabled, username), secrets
+  (`api_key`, `api_secret`, `session_key`) via `ApplicationCredentialStore`,
+  an auth dialog that opens the Last.fm authorization page, and
+  now-playing/scrobble hooks on playback start and completion.
+- Localization: connection/enable/labels in all seven languages.
+
+**Tests**: signature stability and ordering, eligibility boundaries, queue
+persistence/ordering.
+
+**Commit**: `feat(scrobbling): add Last.fm scrobbling with offline queue`
+
+## 2. Headphone crossfeed — `Todo`
+
+Blend left/right channels to reduce the unnatural separation of headphone
+listening. Runs after ReplayGain, before the output stage; **off by default**.
+
+**Design**
+
+- `Orynivo.Core/Audio/CrossfeedProcessor.cs`: stereo, BS2B-style one-pole
+  blend with interaural delay; `Update`/`Reset`/`Process` mirroring
+  `ParametricEqualizer`.
+- `Orynivo/CrossfeedSettings` (strength presets: off/light/medium/strong).
+- Wire into `FfmpegAudioPlayer` and `WasapiAudioPlayer` via a new
+  `ICrossfeedAudioPlayer` interface, next to the equalizer.
+- Settings UI toggle + strength selector; localization in seven languages.
+
+**Tests**: bypass when disabled, mono-compatibility (correlated input stays
+centered), no NaN/denormal output, strength monotonicity.
+
+**Commit**: `feat(playback): add optional headphone crossfeed`
+
+## 3. Linux MPRIS and media keys — `Todo`
+
+Platform parity with the Windows SMTC integration.
+
+**Design**
+
+- `Orynivo/Compatibility/Linux/MprisMediaTransport.cs` using the existing
+  `Tmds.DBus.Protocol` dependency: `org.mpris.MediaPlayer2.Player` with
+  Play/Pause/Next/Previous/Stop/Seek, metadata, and position.
+- Reuse the existing shared transport methods so state, history, and UI stay
+  synchronized.
+- Hide on non-Linux targets, like the SMTC service is Windows-only.
+
+**Tests**: pure metadata/DBus-signature mapping where feasible.
+
+**Commit**: `feat(linux): expose MPRIS media transport and media keys`
+
+## 4. Streaming loudness normalization — `Todo`
+
+Fix the loudness jump between the library (ReplayGain) and radio/podcasts.
+
+**Design**
+
+- `Orynivo.Core/Audio/StreamingLoudnessNormalizer.cs`: sliding-window RMS/peak
+  gain toward a target, applied to radio/podcast PCM only.
+- Setting: enable + target (e.g. -14/-16/-18 LUFS-equivalent) with a toggle.
+- Never applies to library tracks (which use ReplayGain) or native DSD.
+
+**Tests**: gain converges toward the target, bounded adjustment, disabled
+passthrough.
+
+**Commit**: `feat(playback): normalize loudness for radio and podcasts`
+
+## 5. Remote transcoding with bitrate selection — `Todo`
+
+Bandwidth-friendly streaming for the mobile remote and slow links.
+
+**Design**
+
+- `Orynivo.Server/Endpoints/StreamEndpoints.cs`: optional `?format=opus|aac`
+  and `?bitrate=` transcoding through FFmpeg, reusing the existing
+  pipe/transcode cancellation path.
+- Capability probe so older clients keep requesting the original stream.
+- Desktop/mobile: a per-server quality preference.
+
+**Tests**: request validation, capability probing, option parsing.
+
+**Commit**: `feat(server): add lossy remote transcoding with bitrate selection`
+
+## 6. Library Doctor duplicate resolution — `Todo`
+
+Turn the existing read-only duplicate findings into a user-confirmed workflow.
+
+**Design**
+
+- `MetadataRepairDialog`/Library Doctor: a review list with per-group
+  "keep this / remove the others" selection, always explicit.
+- Reuse `LibraryScanner`/`AudioDatabase` deletion paths; update SQLite, Lucene,
+  and the waveform cache together.
+- Never automatic; no action without a confirmation.
+
+**Tests**: grouping/selection logic as pure helpers.
+
+**Commit**: `feat(library): add confirmed duplicate resolution to Library Doctor`
+
+## 7. Bulk editing in tables — `Todo`
+
+Multi-select rows, then set genre, personal rating, or favorite in one step.
+
+**Design**
+
+- `DataGrid.SelectionMode="Extended"` for the track tables; a bulk action bar.
+- Local: transactional `AudioDatabase` updates; remote: batched rating/favorite
+  API calls.
+- Preserve the existing single-row behavior and column masks.
+
+**Tests**: batch-building logic, mixed local/remote selection handling.
+
+**Commit**: `feat(library): add bulk genre, rating and favorite editing`
+
+## 8. Smart playlist "similar to track" — `Todo`
+
+**Design**
+
+- Extend `SmartPlaylistCriteria` with a similarity reference (provider-local
+  source key + track id) and a strength.
+- Resolve through the existing `SimilarityFeatureService` in `Orynivo.Core` so
+  both desktop and server resolve identically.
+
+**Tests**: criteria serialization compatibility, resolver behavior.
+
+**Commit**: `feat(playlists): add a similarity criterion to smart playlists`
+
+## 9. Mood/activity presets — `Todo`
+
+**Design**
+
+- Presets (Focus, Workout, Wind down) over the existing acoustic descriptors
+  (energy/brightness/dynamics) and BPM, reusing the Infinite Mix queue path.
+- Shown beside the existing mood selector.
+
+**Tests**: preset ranking determinism.
+
+**Commit**: `feat(infinite-mix): add mood and activity presets`
+
+## 10. Harmonic mixing (Camelot) — `Todo`
+
+**Design**
+
+- Add musical-key detection to `AudioFeatureAnalysisService` (bounded, cached
+  like the other descriptors).
+- Order Infinite Mix batches by Camelot-wheel adjacency.
+
+**Tests**: Camelot mapping and adjacency.
+
+**Commit**: `feat(infinite-mix): add harmonic mixing on the Camelot wheel`
+
+## 11. Year-in-review export — `Todo`
+
+**Design**
+
+- Render the existing Dashboard statistics for a chosen year into a shareable
+  image/PDF.
+- No new data collection.
+
+**Tests**: layout/aggregation helpers.
+
+**Commit**: `feat(dashboard): add a year-in-review export`
+
+## 12. Karaoke fullscreen lyrics — `Todo`
+
+**Design**
+
+- A fullscreen mode for the existing synced-lyrics view with large,
+  centered, animated lines.
+
+**Tests**: lyric-line selection timing (pure).
+
+**Commit**: `feat(lyrics): add a fullscreen karaoke view`
+
+## 13. Scheduled auto-backup with retention — `Todo`
+
+**Design**
+
+- Optional scheduled library backup using the existing `LibraryBackupService`,
+  with a retention count and a last-run timestamp in settings.
+
+**Tests**: retention selection (pure).
+
+**Commit**: `feat(backup): add scheduled backups with retention`
