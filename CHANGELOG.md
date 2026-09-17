@@ -4,23 +4,6 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.42.1] - 2026-09-17
-
-### Fixed
-
-- Release asset uploads now retry transient GitHub 5xx responses with bounded
-  backoff instead of failing the complete release; the signed update-manifest
-  upload retries the same way.
-- Dependabot no longer proposes NuGet upgrades that cannot build against the
-  pinned .NET 8 SDK and toolchain. Avalonia is held on the 11.2 line (11.3
-  deprecates the legacy drag-and-drop API and 12 requires Roslyn 4.14), and major
-  upgrades of Microsoft.Data.Sqlite and Microsoft.NET.Test.Sdk are ignored
-  because those lines target newer runtimes. Upgrades are migrated deliberately.
-- Stabilized `Orynivo.Core.Tests` in CI: the isolated test data root is now set
-  from a module initializer before any type caches `AppPaths.DataRoot`, so the
-  artist-attribution tests no longer run against the real user data directory
-  (or share leftover rows) depending on test ordering.
-
 ## [0.42.0] - 2026-09-17
 
 ### Added
@@ -168,6 +151,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   used `HashCode.Combine`, which is seeded randomly per process, so equal-score
   candidates could be ordered differently on every start. It now uses a stable
   FNV-1a hash over the server and track identifiers.
+- Release asset uploads now retry transient GitHub 5xx responses with bounded
+  backoff instead of failing the complete release; the signed update-manifest
+  upload retries the same way.
+- Dependabot no longer proposes NuGet upgrades that cannot build against the
+  pinned .NET 8 SDK and toolchain. Avalonia is held on the 11.2 line (11.3
+  deprecates the legacy drag-and-drop API and 12 requires Roslyn 4.14), and major
+  upgrades of Microsoft.Data.Sqlite and Microsoft.NET.Test.Sdk are ignored
+  because those lines target newer runtimes. Upgrades are migrated deliberately.
+- Stabilized `Orynivo.Core.Tests` in CI: the isolated test data root is now set
+  from a module initializer before any type caches `AppPaths.DataRoot`, so the
+  artist-attribution tests no longer run against the real user data directory
+  (or share leftover rows) depending on test ordering.
 
 ## [0.41.8] - 2026-09-16
 
