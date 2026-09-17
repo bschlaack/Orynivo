@@ -116,7 +116,10 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   `LibraryMetadataRepairService.FindDuplicateGroups` exposes the same evidence as
   `LibraryDuplicateGroup` records (`Exact`/`Likely`) for a user-confirmed review;
   it is read-only and must never remove, move, or merge anything. Any removal
-  stays explicit and user-confirmed.
+  stays explicit and user-confirmed and goes through
+  `LibraryScanner.RemoveTracksByPaths`, which keeps SQLite, Lucene, and the
+  waveform cache in sync, removes virtual CUE/MKA tracks that share a removed
+  physical source, and only deletes files from disk when the caller asks for it.
   Artist spelling variants use the shared conservative comparison key and are
   guided-review findings only; name similarity must never merge artist records
   automatically.

@@ -70,6 +70,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   All new strings exist in German, English, French, Spanish, Russian, Simplified
   Chinese, and Hindi.
 
+- Added `LibraryScanner.RemoveTracksByPaths` in `Orynivo.Core`: a confirmed
+  removal deletes the matching rows from SQLite, Lucene, and the waveform cache
+  together, includes virtual CUE/MKA tracks that share a removed physical source,
+  and can optionally delete the files from disk. It is never called implicitly.
 - Added `LibraryMetadataRepairService.FindDuplicateGroups` in `Orynivo.Core`,
   which reuses the Library Doctor AcoustID/SHA-256 evidence to return duplicate
   file groups (exact byte-identical files and likely same-size matches). It is

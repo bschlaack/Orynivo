@@ -159,9 +159,10 @@ Steps:
   reuses the Library Doctor fingerprint/SHA-256 evidence and returns
   `LibraryDuplicateGroup` records (`Exact` for byte-identical files, `Likely` for
   unhashed same-size matches; alternate recordings are never reported). 6 tests.
-- 6b Core library removal API — `Todo`: remove confirmed paths from SQLite,
-  Lucene, and the waveform cache together (and optionally delete the files from
-  disk), reusing the `LibraryScanner` cleanup pattern.
+- 6b Core library removal API — `Done`: `LibraryScanner.RemoveTracksByPaths`
+  removes confirmed paths from SQLite, Lucene, and the waveform cache together,
+  includes virtual CUE/MKA tracks that share a removed physical source, and
+  optionally deletes the files from disk. 3 tests cover the row selection.
 - 6c Desktop review UI — `Todo`: a per-group "keep this / remove the others"
   list in `MetadataRepairDialog` with explicit confirmation and seven-language
   localization.

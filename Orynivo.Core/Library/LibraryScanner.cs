@@ -749,6 +749,101 @@ public static class LibraryScanner
         return db.DeleteCueTracks(cuePath, exceptPaths);
     }
 
+    /// <summary>
+    /// Removes the supplied physical source paths from the library (SQLite, Lucene,
+    /// and the waveform cache) and optionally deletes the files from disk. Callers
+    /// must confirm the removal with the user first; nothing is removed implicitly.
+    /// Virtual CUE/MKA tracks that share a removed physical source are removed with it.
+    /// </summary>
+    /// <param name="paths">Physical source paths to remove.</param>
+    /// <param name="deleteFiles">Whether the physical files are also deleted from disk.</param>
+    /// <returns>The track paths that were removed from the library.</returns>
+    public static IReadOnlyList<string> RemoveTracksByPaths(
+        IReadOnlyCollection<string> paths,
+        bool deleteFiles = false)
+    {
+        ArgumentNullException.ThrowIfNull(paths);
+        var targets = NormalizeRemovalPaths(paths);
+        if (targets.Count == 0)
+            return [];
+
+        using var db = AudioDatabase.OpenDefault();
+        var removedPaths = new List<string>();
+        var removedSources = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var track in SelectRemovalTargets(
+                     db.GetTrackCleanupRecords(),
+                     static track => track.Path,
+                     static track => track.SourcePath,
+                     targets))
+        {
+            DeleteWaveformForTrack(track);
+            if (!db.Delete(track.Path))
+                continue;
+
+            removedPaths.Add(track.Path);
+            if (!string.IsNullOrWhiteSpace(track.SourcePath))
+                removedSources.Add(track.SourcePath);
+        }
+
+        if (removedPaths.Count > 0)
+            TrackSearchIndex.RemovePaths(removedPaths);
+
+        if (deleteFiles)
+        {
+            foreach (var source in removedSources)
+            {
+                try { System.IO.File.Delete(source); }
+                catch { /* Best effort: a locked or already missing file is not fatal. */ }
+            }
+        }
+
+        return removedPaths;
+    }
+
+    /// <summary>
+    /// Selects the library rows that belong to the supplied physical source paths. A
+    /// row matches when its physical source, or its own path for whole-file tracks,
+    /// equals a target, so virtual tracks sharing a removed source are included.
+    /// </summary>
+    /// <typeparam name="T">Row type.</typeparam>
+    /// <param name="records">Cleanup records for the complete library.</param>
+    /// <param name="pathSelector">Selects a row's track path.</param>
+    /// <param name="sourcePathSelector">Selects a row's physical source path, if any.</param>
+    /// <param name="targetPaths">Normalized physical source paths to remove.</param>
+    /// <returns>The matching rows in input order.</returns>
+    internal static List<T> SelectRemovalTargets<T>(
+        IEnumerable<T> records,
+        Func<T, string> pathSelector,
+        Func<T, string?> sourcePathSelector,
+        IReadOnlySet<string> targetPaths)
+    {
+        var result = new List<T>();
+        foreach (var record in records)
+        {
+            var path = pathSelector(record);
+            var sourcePath = sourcePathSelector(record);
+            var effectiveSource = string.IsNullOrWhiteSpace(sourcePath) ? path : sourcePath;
+            if (targetPaths.Contains(effectiveSource) || targetPaths.Contains(path))
+                result.Add(record);
+        }
+
+        return result;
+    }
+
+    private static HashSet<string> NormalizeRemovalPaths(IEnumerable<string> paths)
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in paths)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                continue;
+            try { result.Add(Path.GetFullPath(path)); }
+            catch { result.Add(path); }
+        }
+
+        return result;
+    }
+
     private static void DeleteWaveformForTrack(TrackRecord track)
     {
         if (track.Duration is not > 0)
