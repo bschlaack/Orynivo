@@ -109,4 +109,16 @@ jobs:
       - name: Upload manifest and signature
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$TAG" update-manifest.json update-manifest.sig --repo "$GITHUB_REPOSITORY" --clobber
+        run: |
+          # GitHub can answer a transient 5xx for release uploads; retry boundedly.
+          for attempt in 1 2 3 4 5; do
+            if gh release upload "$TAG" update-manifest.json update-manifest.sig --repo "$GITHUB_REPOSITORY" --clobber; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              echo "Manifest upload failed after ${attempt} attempts." >&2
+              exit 1
+            fi
+            echo "Manifest upload failed (attempt ${attempt}/5); retrying in $((attempt * 5))s." >&2
+            sleep $((attempt * 5))
+          done
