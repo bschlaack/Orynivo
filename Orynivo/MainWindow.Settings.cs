@@ -315,6 +315,23 @@ public partial class MainWindow : Window
             crossfeedPlayer.UpdateCrossfeed(_settings.CrossfeedEnabled, _settings.CrossfeedStrength);
     }
 
+    /// <summary>
+    /// Applies the persisted streaming-loudness settings. Normalization runs only
+    /// for radio and podcast streams, never for library tracks or native DSD.
+    /// </summary>
+    /// <param name="player">The active player, or <see langword="null"/> when none is open.</param>
+    /// <param name="isStream">Whether the current item is a radio or podcast stream.</param>
+    private void ApplyLoudnessNormalizationSettings(IAudioPlayer? player, bool isStream)
+    {
+        if (player is not ILoudnessNormalizerAudioPlayer normalizerPlayer)
+            return;
+
+        normalizerPlayer.UpdateLoudnessNormalization(
+            isStream && _settings.StreamingLoudnessNormalizationEnabled,
+            StreamingLoudnessNormalizer.DefaultTargetDbfs,
+            StreamingLoudnessNormalizer.DefaultMaximumGainDb);
+    }
+
     /// <summary>Applies a newly selected profile and refreshes profile-sensitive views.</summary>
     /// <param name="profileId">Stable identifier of the selected profile.</param>
     private async Task OnUserProfileChangedAsync(string profileId)
@@ -796,6 +813,7 @@ public partial class MainWindow : Window
             _settings.LastFmApiKey           = window.SelectedLastFmApiKey;
             _settings.LastFmApiSecret        = window.SelectedLastFmApiSecret;
             _settings.LastFmScrobblingEnabled = window.SelectedLastFmScrobblingEnabled;
+            _settings.StreamingLoudnessNormalizationEnabled = window.SelectedStreamingLoudnessNormalizationEnabled;
             _settings.CrossfeedEnabled       = window.SelectedCrossfeedEnabled;
             _settings.CrossfeedStrength      = window.SelectedCrossfeedStrength;
             _settings.FanartTvApiKey         = window.SelectedFanartTvApiKey;
@@ -849,6 +867,9 @@ public partial class MainWindow : Window
                 _settings.LastFmSessionKey,
                 _settings.LastFmUsername);
             ApplyCrossfeedSettings(_player);
+            ApplyLoudnessNormalizationSettings(
+                _player,
+                _currentRadioStation is not null || _currentPodcastPlayback is not null);
             if (mcpChanged)
             {
                 if (_settings.McpServerEnabled)

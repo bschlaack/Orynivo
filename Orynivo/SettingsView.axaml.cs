@@ -223,6 +223,7 @@ internal partial class SettingsView : UserControl
             LocalizationManager.Current.CrossfeedStrong
         };
         CrossfeedStrengthComboBox.SelectedIndex = Math.Clamp((int)settings.CrossfeedStrength, 0, 2);
+        StreamingLoudnessNormalizationCheckBox.IsChecked = settings.StreamingLoudnessNormalizationEnabled;
         RefreshEqualizerProfileText();
         RebuildEqualizerEditor();
         McpServerEnabledCheckBox.IsChecked        = settings.McpServerEnabled;
@@ -438,6 +439,9 @@ internal partial class SettingsView : UserControl
     public string? SelectedEqualizerProfileName => _equalizerProfile?.Name;
     /// <summary>Gets a value indicating whether headphone crossfeed is enabled.</summary>
     public bool SelectedCrossfeedEnabled => CrossfeedEnabledCheckBox.IsChecked == true;
+    /// <summary>Gets a value indicating whether radio and podcast streams are loudness-normalized.</summary>
+    public bool SelectedStreamingLoudnessNormalizationEnabled =>
+        StreamingLoudnessNormalizationCheckBox.IsChecked == true;
     /// <summary>Gets the selected headphone crossfeed strength.</summary>
     public CrossfeedStrength SelectedCrossfeedStrength => CrossfeedStrengthComboBox.SelectedIndex switch
     {

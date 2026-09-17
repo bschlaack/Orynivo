@@ -240,6 +240,8 @@ public static class LocalizationManager
         resources["L_LastFmScrobblingNotConnected"] = Current.LastFmScrobblingNotConnected;
         resources["L_LastFmScrobblingAuthorizeHint"] = Current.LastFmScrobblingAuthorizeHint;
         resources["L_LastFmScrobblingConnectFailed"] = Current.LastFmScrobblingConnectFailed;
+        resources["L_StreamingLoudnessNormalization"] = Current.StreamingLoudnessNormalization;
+        resources["L_StreamingLoudnessNormalizationEnabled"] = Current.StreamingLoudnessNormalizationEnabled;
         resources["L_Crossfeed"] = Current.Crossfeed;
         resources["L_CrossfeedEnabled"] = Current.CrossfeedEnabled;
         resources["L_CrossfeedStrength"] = Current.CrossfeedStrength;
@@ -583,6 +585,8 @@ public static class LocalizationManager
         "Ein unerwarteter Fehler ist aufgetreten. Der Fehlerbericht konnte nicht gespeichert werden. Orynivo wird beendet.")
     {
         AutoAcceptFanartTvImages = "Fanart.tv-Funde automatisch übernehmen",
+        StreamingLoudnessNormalization = "Lautheit von Streams",
+        StreamingLoudnessNormalizationEnabled = "Radio und Podcasts auf gleiche Lautstärke anpassen",
         Crossfeed = "Kopfhörer-Crossfeed",
         CrossfeedEnabled = "Kopfhörer-Stereobreite reduzieren",
         CrossfeedStrength = "Stärke",
@@ -1323,6 +1327,8 @@ public static class LocalizationManager
         "An unexpected error occurred. The crash report could not be saved. Orynivo will now close.")
     {
         AutoAcceptFanartTvImages = "Automatically accept Fanart.tv results",
+        StreamingLoudnessNormalization = "Stream loudness",
+        StreamingLoudnessNormalizationEnabled = "Match radio and podcast loudness",
         Crossfeed = "Headphone crossfeed",
         CrossfeedEnabled = "Reduce headphone stereo separation",
         CrossfeedStrength = "Strength",
@@ -2046,6 +2052,8 @@ public static class LocalizationManager
         "Une erreur inattendue s’est produite. Le rapport n’a pas pu être enregistré. Orynivo va maintenant se fermer.")
     {
         AutoAcceptFanartTvImages = "Accepter automatiquement les résultats Fanart.tv",
+        StreamingLoudnessNormalization = "Loudness des flux",
+        StreamingLoudnessNormalizationEnabled = "Aligner la loudness de la radio et des podcasts",
         Crossfeed = "Crossfeed pour casque",
         CrossfeedEnabled = "Réduire la séparation stéréo au casque",
         CrossfeedStrength = "Intensité",
@@ -2766,6 +2774,8 @@ public static class LocalizationManager
         "Se produjo un error inesperado. No se pudo guardar el informe. Orynivo se cerrará ahora.")
     {
         AutoAcceptFanartTvImages = "Aceptar automáticamente los resultados de Fanart.tv",
+        StreamingLoudnessNormalization = "Sonoridad de emisiones",
+        StreamingLoudnessNormalizationEnabled = "Igualar el volumen de radio y pódcasts",
         Crossfeed = "Crossfeed para auriculares",
         CrossfeedEnabled = "Reducir la separación estéreo con auriculares",
         CrossfeedStrength = "Intensidad",
@@ -4266,6 +4276,8 @@ private static readonly LocalizedStrings Russian = new(
         AiChatEmptyResponse = "Модель вернула пустой ответ.",
         AiChatToolResultFallback = "После вызова инструмента модель не вернула окончательный ответ. Результат инструмента:",
         AutoAcceptFanartTvImages = "Автоматически принимать результаты Fanart.tv",
+        StreamingLoudnessNormalization = "Громкость потоков",
+        StreamingLoudnessNormalizationEnabled = "Выравнивать громкость радио и подкастов",
         Crossfeed = "Кроссфид для наушников",
         CrossfeedEnabled = "Уменьшить стереоразделение в наушниках",
         CrossfeedStrength = "Интенсивность",
@@ -5141,6 +5153,8 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "模型返回了空响应。",
         AiChatToolResultFallback = "调用工具后，模型未返回最终答复。工具结果：",
         AutoAcceptFanartTvImages = "自动接受 Fanart.tv 的结果",
+        StreamingLoudnessNormalization = "流媒体响度",
+        StreamingLoudnessNormalizationEnabled = "统一广播和播客的响度",
         Crossfeed = "耳机 Crossfeed",
         CrossfeedEnabled = "减小耳机声道的分离度",
         CrossfeedStrength = "强度",
@@ -6015,6 +6029,8 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "मॉडल ने खाली उत्तर दिया।",
         AiChatToolResultFallback = "टूल कॉल के बाद मॉडल ने अंतिम उत्तर नहीं दिया। टूल परिणाम:",
         AutoAcceptFanartTvImages = "Fanart.tv परिणाम स्वतः स्वीकार करें",
+        StreamingLoudnessNormalization = "स्ट्रीम लाउडनेस",
+        StreamingLoudnessNormalizationEnabled = "रेडियो और पॉडकास्ट की लाउडनेस एक समान करें",
         Crossfeed = "हेडफ़ोन क्रॉसफ़ीड",
         CrossfeedEnabled = "हेडफ़ोन स्टीरियो अलगाव कम करें",
         CrossfeedStrength = "तीव्रता",

@@ -70,6 +70,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   All new strings exist in German, English, French, Spanish, Russian, Simplified
   Chinese, and Hindi.
 
+- Added optional loudness normalization for radio and podcast streams: a slow,
+  bounded `StreamingLoudnessNormalizer` in `Orynivo.Core` that evens out their
+  loudness relative to the ReplayGain-normalized library. It runs only for
+  radio/podcast PCM (never library tracks or native DSD), is off by default, and
+  is configured in Settings with localized labels in all seven languages.
 - Added optional headphone crossfeed for PCM playback: a `CrossfeedProcessor` in
   `Orynivo.Core` (Light/Medium/Strong, one-pole blend with a level-preserving
   direct path) applied after ReplayGain and the equalizer in the ASIO and WASAPI

@@ -122,7 +122,8 @@ auto-downloads FFmpeg on Windows; expects system-installed FFmpeg on Linux/macOS
 waveform), `SeekDiagnostics` (sanitized transport seek, FFmpeg decoder, and
 server-side transcode diagnostics under `logs/seek.log`), `EqualizerProfile`,
 `EqualizerFilter`, `EqualizerFilterType`, `CrossfeedProcessor` (optional
-headphone crossfeed) and `CrossfeedStrength`.
+headphone crossfeed) and `CrossfeedStrength`, and `StreamingLoudnessNormalizer`
+(optional loudness matching for radio and podcast streams).
 
 **Orynivo.Core/Web/**: `WebBrowsingService` (SSRF-guarded page fetch + SearXNG
 search), `WebBrowsingOptions` (persisted config), `HtmlContentExtractor`
@@ -564,6 +565,11 @@ fallback or allow client-provided commands/paths to reach the helper.
   through `ICrossfeedAudioPlayer`. It is off by default, must keep correlated
   (mono) content centered, must not change native DSD output, and must reset its
   filter history after a seek
+- `Orynivo.Core/Audio/StreamingLoudnessNormalizer.cs`: optional slow, bounded
+  loudness matching applied last in the ASIO and WASAPI PCM paths, wired through
+  `ILoudnessNormalizerAudioPlayer`. It is off by default, runs **only** for radio
+  and podcast streams (never library tracks, which use ReplayGain, or native
+  DSD), must not pump on short passages, and must reset after a seek
 - `Orynivo/Controls/EqualizerResponseControl.cs`: logarithmic frequency-response
   graph for the editable parametric equalizer profile in Settings, including
   a 20 Hz–20 kHz scale and numbered dashed markers that map filter frequencies

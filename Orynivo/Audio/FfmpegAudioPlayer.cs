@@ -9,7 +9,7 @@ namespace Orynivo.Audio;
 /// device session. The next FFmpeg decoder is started and prefetched while the
 /// current track is playing.
 /// </summary>
-public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlayer, ICrossfeedAudioPlayer
+public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlayer, ICrossfeedAudioPlayer, ILoudnessNormalizerAudioPlayer
 {
     private const int MaximumPrematurePlexEofRetries = 3;
     private static readonly TimeSpan PrematurePlexEofTolerance = TimeSpan.FromSeconds(5);
@@ -25,6 +25,7 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
     private readonly object _stateLock = new();
     private readonly ParametricEqualizer _equalizer;
     private readonly CrossfeedProcessor _crossfeed;
+    private readonly StreamingLoudnessNormalizer _loudnessNormalizer;
     private volatile bool _paused;
     private long _totalFramesWritten;
     private int _audibleTrackIndex;
@@ -37,6 +38,7 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
     private CancellationTokenSource? _seekStartupCts;
     private EqualizerUpdateRequest? _pendingEqualizerUpdate;
     private CrossfeedUpdateRequest? _pendingCrossfeedUpdate;
+    private LoudnessUpdateRequest? _pendingLoudnessUpdate;
     private int _equalizerResetRequested;
     private float _volume = 1.0f;
     private bool _disposed;
@@ -66,6 +68,11 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
             firstInfo.OutputSampleRate,
             enabled: false,
             CrossfeedStrength.Medium);
+        // Loudness normalization starts disabled; the window enables it only for
+        // radio and podcast streams.
+        _loudnessNormalizer = new StreamingLoudnessNormalizer(
+            firstInfo.OutputSampleRate,
+            enabled: false);
         _activeDecoder = firstDecoder;
         _pumpTask = Task.Run(() => PumpAsync(firstDecoder));
     }
@@ -218,6 +225,12 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
         => Interlocked.Exchange(
             ref _pendingCrossfeedUpdate,
             new CrossfeedUpdateRequest(enabled, strength));
+
+    /// <inheritdoc/>
+    public void UpdateLoudnessNormalization(bool enabled, double targetDbfs, double maximumGainDb)
+        => Interlocked.Exchange(
+            ref _pendingLoudnessUpdate,
+            new LoudnessUpdateRequest(enabled, targetDbfs, maximumGainDb));
 
     /// <inheritdoc/>
     public void Pause() => _paused = true;
@@ -597,8 +610,9 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
                 samples[index] * trackReplayGain,
                 samples[index + 1] * trackReplayGain);
             var crossed = _crossfeed.Process(output.Left, output.Right);
-            samples[index] = Math.Clamp(crossed.Left, -1.0f, 1.0f);
-            samples[index + 1] = Math.Clamp(crossed.Right, -1.0f, 1.0f);
+            var normalized = _loudnessNormalizer.Process(crossed.Left, crossed.Right);
+            samples[index] = Math.Clamp(normalized.Left, -1.0f, 1.0f);
+            samples[index + 1] = Math.Clamp(normalized.Right, -1.0f, 1.0f);
         }
     }
 
@@ -608,6 +622,7 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
         {
             _equalizer.Reset();
             _crossfeed.Reset();
+            _loudnessNormalizer.Reset();
         }
         var update = Interlocked.Exchange(ref _pendingEqualizerUpdate, null);
         if (update is not null)
@@ -615,11 +630,19 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
         var crossfeedUpdate = Interlocked.Exchange(ref _pendingCrossfeedUpdate, null);
         if (crossfeedUpdate is not null)
             _crossfeed.Update(crossfeedUpdate.Enabled, crossfeedUpdate.Strength);
+        var loudnessUpdate = Interlocked.Exchange(ref _pendingLoudnessUpdate, null);
+        if (loudnessUpdate is not null)
+            _loudnessNormalizer.Update(
+                loudnessUpdate.Enabled,
+                loudnessUpdate.TargetDbfs,
+                loudnessUpdate.MaximumGainDb);
     }
 
     private sealed record EqualizerUpdateRequest(bool Enabled, EqualizerProfile? Profile);
 
     private sealed record CrossfeedUpdateRequest(bool Enabled, CrossfeedStrength Strength);
+
+    private sealed record LoudnessUpdateRequest(bool Enabled, double TargetDbfs, double MaximumGainDb);
 
     private static async Task DisposePreparedAsync(
         Task<(FfmpegPcmDecoder Decoder, AudioFileInfo Info)> preparedTask)

@@ -84,7 +84,14 @@ Implemented:
 Tests: bypass when disabled, centered mono content, strength monotonicity,
 silence, finite output, filter reset.
 
-## 3. Linux MPRIS and media keys — `Todo`
+## 3. Linux MPRIS and media keys — `Blocked`
+
+Blocked: needs a Linux session bus to build and verify. The Linux target
+compiles locally (`dotnet build Orynivo/Orynivo.csproj -p:OS=Linux`), but the
+`Tmds.DBus.Protocol` 0.92.0 API is low-level and cannot be runtime-tested on
+Windows. Implement and verify on a Linux system before shipping. Note that the
+`Tmds.DBus.Protocol` package is referenced only on Linux, so a local
+compile-check requires temporarily referencing it.
 
 Platform parity with the Windows SMTC integration.
 
@@ -101,21 +108,25 @@ Platform parity with the Windows SMTC integration.
 
 **Commit**: `feat(linux): expose MPRIS media transport and media keys`
 
-## 4. Streaming loudness normalization — `Todo`
+## 4. Streaming loudness normalization — `Done`
 
 Fix the loudness jump between the library (ReplayGain) and radio/podcasts.
 
-**Design**
+Implemented:
 
-- `Orynivo.Core/Audio/StreamingLoudnessNormalizer.cs`: sliding-window RMS/peak
-  gain toward a target, applied to radio/podcast PCM only.
-- Setting: enable + target (e.g. -14/-16/-18 LUFS-equivalent) with a toggle.
-- Never applies to library tracks (which use ReplayGain) or native DSD.
+- `Orynivo.Core/Audio/StreamingLoudnessNormalizer.cs`: slow, bounded automatic
+  gain from a running mean square of the mono sum (3 s level window, 2 s gain
+  window, ±12 dB clamp, silence guard).
+- Applied after ReplayGain, the equalizer, and crossfeed in the ASIO and WASAPI
+  PCM paths via `ILoudnessNormalizerAudioPlayer`; enabled only for radio and
+  podcast playback, never for library tracks or native DSD.
+- `AppSettings.StreamingLoudnessNormalizationEnabled` with a Settings toggle and
+  seven-language localization. The target is fixed at -18 dBFS RMS.
 
-**Tests**: gain converges toward the target, bounded adjustment, disabled
-passthrough.
+Tests: bypass, boost/attenuation convergence, maximum-gain clamp, silence
+safety, reset.
 
-**Commit**: `feat(playback): normalize loudness for radio and podcasts`
+Follow-up: an optional target selector (e.g. -16/-18/-20 dBFS).
 
 ## 5. Remote transcoding with bitrate selection — `Todo`
 

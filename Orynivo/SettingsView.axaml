@@ -559,6 +559,17 @@
 
                     <Separator Margin="0,18,0,14"/>
 
+                    <TextBlock Text="{DynamicResource L_StreamingLoudnessNormalization}"
+                               FontSize="{DynamicResource FontSizeCaption}"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,8"/>
+                    <CheckBox x:Name="StreamingLoudnessNormalizationCheckBox"
+                              Theme="{StaticResource SettingsToggleTheme}"
+                              Content="{DynamicResource L_StreamingLoudnessNormalizationEnabled}"
+                              Margin="0,0,0,8"/>
+
+                    <Separator Margin="0,18,0,14"/>
+
                     <TextBlock Text="{DynamicResource L_Crossfeed}"
                                FontSize="{DynamicResource FontSizeCaption}"
                                FontWeight="SemiBold"

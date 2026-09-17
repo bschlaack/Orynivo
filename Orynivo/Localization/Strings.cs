@@ -1368,6 +1368,10 @@ public sealed record LocalizedStrings(
     public string LastFmScrobblingAuthorizeHint { get; init; } = "";
     /// <summary>Gets the Last.fm connection failure message.</summary>
     public string LastFmScrobblingConnectFailed { get; init; } = "";
+    /// <summary>Gets the streaming-loudness section label.</summary>
+    public string StreamingLoudnessNormalization { get; init; } = "";
+    /// <summary>Gets the label for enabling streaming loudness normalization.</summary>
+    public string StreamingLoudnessNormalizationEnabled { get; init; } = "";
     /// <summary>Gets the headphone crossfeed section label.</summary>
     public string Crossfeed { get; init; } = "";
     /// <summary>Gets the label for enabling headphone crossfeed.</summary>

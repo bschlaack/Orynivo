@@ -280,6 +280,9 @@ public partial class MainWindow : Window
 
         _player        = player;
         ApplyCrossfeedSettings(_player);
+        ApplyLoudnessNormalizationSettings(
+            _player,
+            radioStation is not null || podcastPlayback is not null);
         _audioDeviceExplicitlyReleased = false;
         ClearReleasedOutputResumeState();
         UpdateOutputDeviceLockButton();
