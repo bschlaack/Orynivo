@@ -11,10 +11,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Release asset uploads now retry transient GitHub 5xx responses with bounded
   backoff instead of failing the complete release; the signed update-manifest
   upload retries the same way.
-- Dependabot no longer proposes major NuGet upgrades that cannot build against
-  the pinned .NET 8 SDK and toolchain (Avalonia 12 requires Roslyn 4.14 and has
-  breaking API changes; the Microsoft.Data.Sqlite 10 and Microsoft.NET.Test.Sdk
-  18 lines target newer runtimes). Major upgrades are reviewed manually.
+- Dependabot no longer proposes NuGet upgrades that cannot build against the
+  pinned .NET 8 SDK and toolchain. Avalonia is held on the 11.2 line (11.3
+  deprecates the legacy drag-and-drop API and 12 requires Roslyn 4.14), and major
+  upgrades of Microsoft.Data.Sqlite and Microsoft.NET.Test.Sdk are ignored
+  because those lines target newer runtimes. Upgrades are migrated deliberately.
 - Stabilized `Orynivo.Core.Tests` in CI: the isolated test data root is now set
   from a module initializer before any type caches `AppPaths.DataRoot`, so the
   artist-attribution tests no longer run against the real user data directory

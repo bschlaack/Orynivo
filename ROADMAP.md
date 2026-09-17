@@ -256,3 +256,40 @@ Multi-select rows, then set genre, personal rating, or favorite in one step.
 **Tests**: retention selection (pure).
 
 **Commit**: `feat(backup): add scheduled backups with retention`
+
+---
+
+## 14. Migrate drag-and-drop to Avalonia `IDataTransfer` — `Todo`
+
+Unblocks the Avalonia 11.3+ upgrade. Avalonia 11.3 deprecates the legacy
+drag-and-drop API, and the CI builds with `--warnaserror`, so every Avalonia
+minor bump currently fails. Dependabot is held on the 11.2 line until this is
+done (`.github/dependabot.yml`, see item 14's note in `AGENTS.md`).
+
+**Current usage** (all in `Orynivo/MainWindow.Playlists.DragDrop.cs`):
+
+- `DataObject` (line ~99) → `DataTransfer`
+- `DragDrop.DoDragDrop(pointer, dataObject, effects)` (line ~101) →
+  `DragDrop.DoDragDropAsync(...)`
+- `DragEventArgs.Data` (lines ~108, ~115) → `DragEventArgs.DataTransfer`
+- `IDataObject` in `GetDroppedQueueTokens` (line ~133) → `IDataTransfer` /
+  `IAsyncDataTransfer`
+
+**Steps**
+
+1. Confirm the replacement API surface against the Avalonia version being
+   adopted (11.3+), including the custom `QueueDragFormat` data format and how
+   it is read back from the drop.
+2. Migrate the drag source (pointer press/move), the drop target
+   (`QueueNavItem_OnDragOver`/`OnDrop`), and the token extraction together so
+   the in-memory `orynivo-album:...`/path tokens keep working unchanged.
+3. Bump `Avalonia*` to the 11.3 line, build with `--warnaserror`, and verify the
+   drag-and-drop manually on Windows and Linux (queue append, album and folder
+   drag, remote album reference resolution).
+4. Remove the Avalonia minor ignore from `.github/dependabot.yml` and update
+   `AGENTS.md`/`CHANGELOG.md`.
+
+**Tests**: token cleaning/parsing is already covered; drag/drop itself needs a
+manual check because it depends on the platform drag manager.
+
+**Commit**: `refactor(ui): migrate drag-and-drop to IDataTransfer`

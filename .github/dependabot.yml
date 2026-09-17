@@ -13,8 +13,16 @@ updates:
       # changes, while the desktop app targets net8.0; the Microsoft.* 9/10 and
       # test-SDK 18 lines likewise target newer runtimes. Keep Dependabot on the
       # minor/patch line and review majors by hand.
+      #
+      # Avalonia is pinned to the 11.2 line as well: 11.3 deprecates the legacy
+      # drag-and-drop API (IDataObject/DataObject/DragDrop.DoDragDrop/
+      # DragEventArgs.Data), and the CI builds with --warnaserror. Migrating the
+      # drag-and-drop code to IDataTransfer is a deliberate follow-up; until then
+      # a minor bump would fail every Avalonia PR.
       - dependency-name: "Avalonia*"
-        update-types: ["version-update:semver-major"]
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
       - dependency-name: "Microsoft.Data.Sqlite"
         update-types: ["version-update:semver-major"]
       - dependency-name: "Microsoft.NET.Test.Sdk"
