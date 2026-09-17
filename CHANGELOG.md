@@ -4,6 +4,65 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Added `Orynivo.Library.QueuePathPolicy` in `Orynivo.Core` as the single,
+  unit-tested decision for whether a playback or queue path may be persisted
+  without credentials, plus a desktop-agnostic regression test suite covering
+  local, `cue://`, `orynivo://`, credential-free HTTP, and credential-bearing
+  URL cases.
+- Added the `Orynivo.Tests` unit-test project for pure desktop helpers with a
+  regression suite for the transport accent colour maths. `Orynivo.Core.Tests`
+  additionally covers ReplayGain decibel-to-linear conversion and its
+  track/album fallback. The Windows build workflow now runs all test projects.
+- Added the `Orynivo.Server.Tests` unit-test project covering the API key
+  middleware (health bypass, header/query key acceptance, missing/wrong/empty
+  key rejection, case-sensitive comparison) and the profile-context middleware
+  (profile scoping, standard default, query selection, unknown-profile 403).
+- Added a dedicated CI parity job that runs the MCP tool and localization
+  verification scripts on every push and pull request, Dependabot configuration
+  for NuGet and GitHub Actions updates, and a repository `.editorconfig`.
+- Expanded `Orynivo.Core.Tests` with regression coverage for artist
+  display-name normalization and identity comparison keys, the shared
+  smart-playlist filtering/ordering/limiting logic, CUE sheet parsing and
+  virtual-path detection, and M3U8 import/export including relative-path
+  resolution and credential-URL rejection.
+
+### Changed
+
+- Split the monolithic `Orynivo/MainWindow.xaml.cs` (17,774 lines) into
+  cohesive domain partials without changing behavior; the root file now holds
+  only fields, nested types/records, and the constructor (about 1,200 lines).
+  New domain partials: `MainWindow.Queue.cs` (queue persistence and Up Next),
+  `MainWindow.AlphabetIndex.cs` (A-Z index and scrolling),
+  `MainWindow.Artwork.cs` (artwork loading/hydration),
+  `MainWindow.Podcasts.cs`, `MainWindow.Search.cs` (local/remote search),
+  `MainWindow.TrackFilters.cs` (facet filters and unified smart playlists),
+  `MainWindow.Settings.cs` (settings host, output/equalizer pickers, device
+  lock, PCM volume/ReplayGain), `MainWindow.FolderTree.cs` (local/remote/unified
+  folder trees), `MainWindow.AlbumDetail.cs` (album detail and album-track
+  loading), `MainWindow.ArtistInfo.cs` (artist detail and unified population),
+  `MainWindow.Sidebar.cs`, `MainWindow.Navigation.cs` (navigation stack and
+  back-navigation), `MainWindow.Playback.cs` (playback engine, gapless, shuffle,
+  transport, waveform, lyrics, now-playing, history),
+  `MainWindow.CoverSearch.cs` (cover/artist image search and artwork
+  synchronization), `MainWindow.Favorites.cs`, `MainWindow.Plex.cs`,
+  `MainWindow.RemoteOrynivo.cs` (remote server view and caches),
+  `MainWindow.LibraryViews.cs` (unified row loading/merging/conversion),
+  `MainWindow.TableRendering.cs` (shared column factories and row rendering),
+  `MainWindow.Startup.cs`, `MainWindow.ContentLoading.cs`,
+  `MainWindow.EntityFavorites.cs`, `MainWindow.NavigationLinks.cs`,
+  `MainWindow.OrynivoNavigation.cs`, `MainWindow.ContextMenus.cs`,
+  `MainWindow.Helpers.cs`, `MainWindow.RatingColumns.cs`,
+  `MainWindow.ArtistAlbums.cs`, and `MainWindow.AppShell.cs`. The
+  credential-free queue path check now delegates to the shared, tested
+  `QueuePathPolicy`, and the transport accent colour maths moved to the testable
+  `Orynivo.Controls.ArtworkAccentColor`.
+
+### Fixed
+
 ## [0.41.8] - 2026-09-16
 
 ### Fixed
@@ -11,10 +70,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Assigning local or remote album artwork now preserves the Dashboard's
   recently-added Show all page and scroll position, updating the bound cover
   in place instead of replacing the page with the Dashboard.
-
 - Clarified that the Dashboard's most-listened-albums values are minutes by
   adding the unit to the heading in all seven interface languages.
-
 - Cover searches now progressively display bounded 250-pixel previews with at
   most three concurrent downloads, time budgets, and one transient-error retry.
   Failed candidates no longer discard successful results. Original artwork is

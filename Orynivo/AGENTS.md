@@ -57,8 +57,37 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   server profile authentication must use this context; never duplicate or
   partition shared audio metadata/artwork.
 
-- `MainWindow` remains one partial Avalonia class; use the existing domain-sized
-  partials instead of creating competing window state or navigation models.
+- `MainWindow` remains one partial Avalonia class; use the existing
+  domain-sized partials instead of creating competing window state or navigation
+  models. `MainWindow.xaml.cs` is intentionally reduced to shared state (fields,
+  nested types/records, and the constructor). Domain partials cover dashboard,
+  history, radio, podcasts, playlists, genre cloud, Infinite Mix, similarity,
+  AirPlay, mobile remote, MusicBrainz, metadata repair, artwork
+  synchronization, library view cache, queue/Up Next (`MainWindow.Queue.cs`),
+  the A-Z index (`MainWindow.AlphabetIndex.cs`), artwork
+  (`MainWindow.Artwork.cs`), search (`MainWindow.Search.cs`), track filters and
+  smart playlists (`MainWindow.TrackFilters.cs`), settings/output/EQ and PCM
+  volume/ReplayGain (`MainWindow.Settings.cs`), folder trees
+  (`MainWindow.FolderTree.cs`), album detail (`MainWindow.AlbumDetail.cs`),
+  artist detail (`MainWindow.ArtistInfo.cs`), sidebar (`MainWindow.Sidebar.cs`),
+  navigation (`MainWindow.Navigation.cs`), playback/transport
+  (`MainWindow.Playback.cs`), cover search (`MainWindow.CoverSearch.cs`),
+  favorites, Plex, remote Orynivo Server view/caches, unified library views
+  (`MainWindow.LibraryViews.cs`), table rendering (`MainWindow.TableRendering.cs`),
+  startup, content loading, entity favorites, navigation links, Orynivo
+  navigation, context menus, helpers, rating columns, artist albums, and the app
+  shell. Generic visual helpers (`FindResource`, `ResolveFontSize`,
+  `FindAncestor`, `FindVisualChild`, `FindVisualChildren`) and the shared
+  table-column factories live in their dedicated helper/rendering partials.
+  Credential-free queue path persistence is decided by the
+  shared, tested `Orynivo.Library.QueuePathPolicy` in Core; never duplicate that
+  URL policy in the desktop. Pure, UI-free desktop helpers must be extracted
+  into standalone testable types (for example
+  `Orynivo.Controls.ArtworkAccentColor`, covered by `Orynivo.Tests`) instead of
+  remaining private `MainWindow` members. Extract further domains as new
+  partials rather than letting `MainWindow.xaml.cs` grow again.
+  Build with `dotnet build Orynivo/Orynivo.csproj` and run
+  `dotnet test Orynivo.Tests/Orynivo.Tests.csproj` after client changes.
 - Do not block the UI thread with database access, network requests, FFmpeg,
   device enumeration, player disposal, large cache I/O, or large row composition.
 - AI chat and the embedded MCP server expose one permission-gated tool surface.

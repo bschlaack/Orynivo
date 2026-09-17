@@ -67,6 +67,12 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   desktop and server searches. Date ranges are half-open Unix ranges after the
   client converts inclusive calendar dates. `SmartPlaylistTrackInfo.AlbumId`
   supports bounded album grouping and must remain compact.
+- `QueuePathPolicy.CanPersist` is the single decision for whether a queue or
+  playback path may be persisted without credentials. It keeps local, `cue://`,
+  and `orynivo://` paths persistable and rejects HTTP/HTTPS URLs that embed user
+  information or known credential query parameters (`X-Plex-Token`, `token=`,
+  `key=`). Desktop and server consumers must not duplicate this URL policy; it is
+  covered by `Orynivo.Core.Tests/QueuePathPolicyTests.cs`.
 - Track scans preserve personal ratings, cached MusicBrainz rating/vote data,
   and a client-resolved recording MBID when the media tag has no recording ID.
   `MusicBrainzRatingService` prefers a valid recording MBID and permits fallback

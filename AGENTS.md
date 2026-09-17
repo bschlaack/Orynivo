@@ -177,6 +177,17 @@ limited compatibility types described above for the Linux target.
 .\Orynivo\bin\Debug\net8.0-windows10.0.19041.0\Orynivo.exe
 ```
 
+Run the managed unit tests with
+`dotnet test Orynivo.Core.Tests/Orynivo.Core.Tests.csproj`,
+`dotnet test Orynivo.Tests/Orynivo.Tests.csproj`, and
+`dotnet test Orynivo.Server.Tests/Orynivo.Server.Tests.csproj`.
+`Orynivo.Core.Tests` covers the cross-platform core library; `Orynivo.Tests`
+covers pure desktop helpers that do not require a running Avalonia UI;
+`Orynivo.Server.Tests` covers server middleware without starting the web host.
+Do not move shared behavior into a UI-only class when a `Orynivo.Core` type can
+own it and stay cross-platform testable. The Windows build workflow runs all
+three test projects.
+
 `build.ps1` always builds the vendored MIT-licensed `CwAsioBridge.dll`, then
 builds `AsioBridge.dll` when the Steinberg SDK is available, and finally builds
 the .NET application. It
@@ -195,6 +206,12 @@ publishes the self-contained `linux-x64` desktop artifact. The Windows job
 intentionally excludes only the Steinberg bridge because that SDK is not stored
 in the repository. Its Release artifact therefore contains cwASIO support
 without Steinberg SDK files.
+The same workflow has a dedicated `verify` job that runs
+`scripts/verify-mcp-tool-parity.ps1` and `scripts/verify-localization-parity.ps1`
+on every push and pull request, so MCP tool parity and the seven-language
+desktop/website/mobile localization coverage cannot silently drift. Keep these
+scripts passing; do not remove the job. `.github/dependabot.yml` tracks NuGet and
+GitHub Actions updates weekly.
 All GitHub-hosted CI and release workflows use Node.js 24-compatible action
 generations (`actions/checkout@v6`, `actions/setup-dotnet@v5`, and
 `softprops/action-gh-release@v3` where applicable); do not reintroduce their
@@ -494,10 +511,38 @@ fallback or allow client-provided commands/paths to reach the helper.
   local and remote tracks. For a remote track the now-playing artist button
   navigates within that track's server library (`OpenOrynivoArtistAlbumsAsync`
   using the row's `OrynivoServer` and `ArtistId`), not the local album view.
-- `Orynivo/MainWindow.*.cs`: `MainWindow` remains one Avalonia partial class;
-  domain-sized partials keep dashboard, daily history, internet radio,
-  Orynivo Server navigation, and playlist/context-menu code out of
-  `MainWindow.xaml.cs` without changing ownership or runtime behavior.
+- `Orynivo/MainWindow.*.cs`: `MainWindow` remains one Avalonia partial class,
+  split into domain-sized partials without changing ownership or runtime
+  behavior. `MainWindow.xaml.cs` is intentionally reduced to shared state:
+  fields, nested types/records, and the constructor. Domain partials (all under
+  `Orynivo/`): `MainWindow.Dashboard.cs`, `MainWindow.History.cs`,
+  `MainWindow.Radio.cs`, `MainWindow.Podcasts.cs`, `MainWindow.Playlists.cs`,
+  `MainWindow.GenreCloud.cs`, `MainWindow.InfiniteMix.cs`,
+  `MainWindow.Similarity.cs`, `MainWindow.AirPlay.cs`,
+  `MainWindow.MobileRemote.cs`, `MainWindow.MusicBrainz.cs`,
+  `MainWindow.MetadataRepair.cs`, `MainWindow.ArtworkSynchronization.cs`,
+  `MainWindow.LibraryViewCache.cs`, `MainWindow.Queue.cs`,
+  `MainWindow.AlphabetIndex.cs`, `MainWindow.Artwork.cs`,
+  `MainWindow.Search.cs`, `MainWindow.TrackFilters.cs`,
+  `MainWindow.Settings.cs`, `MainWindow.FolderTree.cs`,
+  `MainWindow.AlbumDetail.cs`, `MainWindow.ArtistInfo.cs`,
+  `MainWindow.Sidebar.cs`, `MainWindow.Navigation.cs`,
+  `MainWindow.Playback.cs`, `MainWindow.CoverSearch.cs`,
+  `MainWindow.Favorites.cs`, `MainWindow.Plex.cs`,
+  `MainWindow.RemoteOrynivo.cs`, `MainWindow.LibraryViews.cs`,
+  `MainWindow.TableRendering.cs`, `MainWindow.Startup.cs`,
+  `MainWindow.ContentLoading.cs`, `MainWindow.EntityFavorites.cs`,
+  `MainWindow.NavigationLinks.cs`, `MainWindow.OrynivoNavigation.cs`,
+  `MainWindow.ContextMenus.cs`, `MainWindow.Helpers.cs`,
+  `MainWindow.RatingColumns.cs`, `MainWindow.ArtistAlbums.cs`, and
+  `MainWindow.AppShell.cs`. Keep generic visual helpers (`FindResource`,
+  `ResolveFontSize`, `FindAncestor`, `FindVisualChild`, `FindVisualChildren`)
+  and the shared table-column factories (`CreateFavoriteColumn`,
+  `CreateSourceBadgeColumn`, `CreateEntityLinkColumn`,
+  `GetContentRowSortMemberPath`) in dedicated helper/rendering partials rather
+  than a single domain. Pure, UI-free logic must live in a standalone testable
+  type instead (for example `Orynivo.Controls.ArtworkAccentColor`), covered by
+  `Orynivo.Tests`.
 - `Orynivo/Audio/WindowsEndpointVolumeSynchronizer.cs`: bidirectional
   synchronization between the transport volume slider and the selected
   Windows render endpoint's master volume

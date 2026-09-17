@@ -1257,6 +1257,22 @@ The default build also compiles and tests the independent Qt-free
 native project for a focused managed/ASIO build; the incomplete bridge is not
 copied into the desktop output.
 
+### Unit tests
+
+The managed unit tests run on any platform:
+
+```bash
+dotnet test Orynivo.Core.Tests/Orynivo.Core.Tests.csproj
+dotnet test Orynivo.Tests/Orynivo.Tests.csproj
+dotnet test Orynivo.Server.Tests/Orynivo.Server.Tests.csproj
+```
+
+`Orynivo.Core.Tests` covers the cross-platform core library, including the
+credential-free `QueuePathPolicy` and ReplayGain conversion. `Orynivo.Tests`
+covers pure desktop helpers such as the transport accent colour maths; it never
+starts the Avalonia UI. `Orynivo.Server.Tests` covers the server's API key and
+profile-context middleware without starting the web host.
+
 ### Orynivo Server
 
 The server has no native dependencies and builds on any platform:
