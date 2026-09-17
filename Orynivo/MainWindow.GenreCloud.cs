@@ -5,6 +5,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Orynivo.Controls;
 using Orynivo.Library;
 using Orynivo.Localization;
 using Orynivo.Streaming;
@@ -584,26 +585,17 @@ public partial class MainWindow
         if (thumbnail is null)
             return false;
 
-        Span<float> luminance = stackalloc float[64];
-        float total = 0;
+        Span<float> luminance = stackalloc float[GenreCloudImageFingerprint.SampleCount];
         for (var y = 0; y < 8; y++)
         {
             for (var x = 0; x < 8; x++)
             {
                 var color = thumbnail.GetPixel(x, y);
-                var value = 0.2126f * color.Red + 0.7152f * color.Green + 0.0722f * color.Blue;
-                luminance[y * 8 + x] = value;
-                total += value;
+                luminance[y * 8 + x] = 0.2126f * color.Red + 0.7152f * color.Green + 0.0722f * color.Blue;
             }
         }
 
-        var average = total / luminance.Length;
-        for (var index = 0; index < luminance.Length; index++)
-        {
-            if (luminance[index] >= average)
-                fingerprint |= 1UL << index;
-        }
-
+        fingerprint = GenreCloudImageFingerprint.Compute(luminance);
         return true;
     }
 
@@ -773,12 +765,12 @@ public partial class MainWindow
         var isFavorite = server is null
             ? candidate.IsFavorite
             : IsOrynivoFavorite(server, "Track", candidate.TrackId);
-        var affinity = listeningWeights
-            .Where(pair => GenreCloudService.IsDescendantOrSelf(candidate.GenreKey, pair.Key) ||
-                           GenreCloudService.IsDescendantOrSelf(pair.Key, candidate.GenreKey))
-            .Sum(pair => pair.Value);
-        var stableVariation = Math.Abs(HashCode.Combine(server?.Id, candidate.TrackId)) % 1000 / 1000d;
-        return Math.Log10(1 + affinity) * 100 + (isFavorite ? 25 : 0) + stableVariation;
+        return GenreRecommendationScore.Compute(
+            server?.Id,
+            candidate.TrackId,
+            candidate.GenreKey,
+            isFavorite,
+            listeningWeights);
     }
 
     /// <summary>Resolves compact candidate identifiers to shared playable table rows.</summary>

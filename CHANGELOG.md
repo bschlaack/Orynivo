@@ -30,6 +30,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   virtual-path detection, and M3U8 import/export including relative-path
   resolution and credential-URL rejection.
 
+- Extracted the credential-free Orynivo Server track/album references into the
+  testable `Orynivo.PlaylistReferences`, the genre-cloud recommendation scoring
+  into `Orynivo.GenreRecommendationScore`, and the MusicBrainz rating-refresh row
+  partitioning into `Orynivo.MusicBrainzRatingGrouping`. `Orynivo.Tests` now
+  covers reference build/parse round-trips, malformed-value rejection, affinity
+  aggregation, favorite weighting, the tie-break variation, and case-insensitive
+  recording-MBID grouping.
+
 ### Changed
 
 - Split the monolithic `Orynivo/MainWindow.xaml.cs` (17,774 lines) into
@@ -60,8 +68,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   credential-free queue path check now delegates to the shared, tested
   `QueuePathPolicy`, and the transport accent colour maths moved to the testable
   `Orynivo.Controls.ArtworkAccentColor`.
+- Split the largest domain partials further without changing behavior:
+  `MainWindow.Dashboard.cs` into dashboard core, recommendations, media, and
+  stats partials; `MainWindow.Playback.cs` into the playback engine,
+  `MainWindow.PlaybackState.cs`, and `MainWindow.Transport.cs`; and
+  `MainWindow.ArtistInfo.cs` into the detail surface plus
+  `MainWindow.ArtistInfo.Rename.cs`, `MainWindow.ArtistInfo.Albums.cs`, and
+  `MainWindow.ArtistInfo.Profile.cs`.
+- Extracted queue drag-and-drop out of `MainWindow.Playlists.cs` into
+  `MainWindow.Playlists.DragDrop.cs` and moved the Dashboard listening-trend
+  chart geometry into the testable `Orynivo.Controls.ListeningTrendGeometry`.
+  The genre-cloud perceptual luminance fingerprint moved to
+  `Orynivo.Controls.GenreCloudImageFingerprint`. `Orynivo.Tests` now covers axis
+  rounding, invariant point formatting, the clamped-control-point smoothing
+  invariant, and the fingerprint's average-threshold bit selection.
 
 ### Fixed
+
+- The genre-cloud recommendation tie-break is now deterministic. It previously
+  used `HashCode.Combine`, which is seeded randomly per process, so equal-score
+  candidates could be ordered differently on every start. It now uses a stable
+  FNV-1a hash over the server and track identifiers.
 
 ## [0.41.8] - 2026-09-16
 

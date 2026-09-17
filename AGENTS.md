@@ -535,14 +535,18 @@ fallback or allow client-provided commands/paths to reach the helper.
   `MainWindow.NavigationLinks.cs`, `MainWindow.OrynivoNavigation.cs`,
   `MainWindow.ContextMenus.cs`, `MainWindow.Helpers.cs`,
   `MainWindow.RatingColumns.cs`, `MainWindow.ArtistAlbums.cs`, and
-  `MainWindow.AppShell.cs`. Keep generic visual helpers (`FindResource`,
-  `ResolveFontSize`, `FindAncestor`, `FindVisualChild`, `FindVisualChildren`)
-  and the shared table-column factories (`CreateFavoriteColumn`,
-  `CreateSourceBadgeColumn`, `CreateEntityLinkColumn`,
+  `MainWindow.AppShell.cs`. The largest domains are themselves split into
+  sub-partials: `MainWindow.Dashboard.{Recommendations,Media,Stats}.cs`,
+  `MainWindow.PlaybackState.cs` and `MainWindow.Transport.cs`,
+  `MainWindow.ArtistInfo.{Rename,Albums,Profile}.cs`, and
+  `MainWindow.Playlists.DragDrop.cs`. Keep generic visual
+  helpers (`FindResource`, `ResolveFontSize`, `FindAncestor`,
+  `FindVisualChild`, `FindVisualChildren`) and the shared table-column factories
+  (`CreateFavoriteColumn`, `CreateSourceBadgeColumn`, `CreateEntityLinkColumn`,
   `GetContentRowSortMemberPath`) in dedicated helper/rendering partials rather
   than a single domain. Pure, UI-free logic must live in a standalone testable
-  type instead (for example `Orynivo.Controls.ArtworkAccentColor`), covered by
-  `Orynivo.Tests`.
+  type instead (for example `Orynivo.Controls.ArtworkAccentColor` or
+  `Orynivo.Controls.ListeningTrendGeometry`), covered by `Orynivo.Tests`.
 - `Orynivo/Audio/WindowsEndpointVolumeSynchronizer.cs`: bidirectional
   synchronization between the transport volume slider and the selected
   Windows render endpoint's master volume

@@ -724,13 +724,12 @@ public partial class MainWindow : Window
         try
         {
             await Task.Yield();
-            var knownGroups = rows
-                .Where(row => Guid.TryParse(row.MusicBrainzTrackId, out _))
-                .GroupBy(row => row.MusicBrainzTrackId!, StringComparer.OrdinalIgnoreCase);
-            foreach (var group in knownGroups)
+            var (knownGroups, ungroupedRows) = MusicBrainzRatingGrouping.Partition(
+                rows,
+                row => row.MusicBrainzTrackId);
+            foreach (var groupRows in knownGroups)
             {
                 cts.Token.ThrowIfCancellationRequested();
-                var groupRows = group.ToList();
                 for (var attempt = 0; attempt < 3; attempt++)
                 {
                     if (await RefreshMusicBrainzTrackRatingGroupAsync(groupRows, cts.Token))
@@ -739,7 +738,7 @@ public partial class MainWindow : Window
                 }
             }
 
-            foreach (var row in rows.Where(row => !Guid.TryParse(row.MusicBrainzTrackId, out _)))
+            foreach (var row in ungroupedRows)
             {
                 cts.Token.ThrowIfCancellationRequested();
                 await RefreshMusicBrainzTrackRatingAsync(row, cts.Token);
