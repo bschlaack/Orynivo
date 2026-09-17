@@ -4,6 +4,15 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.42.1] - 2026-09-17
+
+### Fixed
+
+- Stabilized `Orynivo.Core.Tests` in CI: the isolated test data root is now set
+  from a module initializer before any type caches `AppPaths.DataRoot`, so the
+  artist-attribution tests no longer run against the real user data directory
+  (or share leftover rows) depending on test ordering.
+
 ## [0.42.0] - 2026-09-17
 
 ### Added
