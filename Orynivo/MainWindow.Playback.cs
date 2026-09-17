@@ -279,6 +279,7 @@ public partial class MainWindow : Window
         }
 
         _player        = player;
+        ApplyCrossfeedSettings(_player);
         _audioDeviceExplicitlyReleased = false;
         ClearReleasedOutputResumeState();
         UpdateOutputDeviceLockButton();

@@ -240,6 +240,12 @@ public static class LocalizationManager
         resources["L_LastFmScrobblingNotConnected"] = Current.LastFmScrobblingNotConnected;
         resources["L_LastFmScrobblingAuthorizeHint"] = Current.LastFmScrobblingAuthorizeHint;
         resources["L_LastFmScrobblingConnectFailed"] = Current.LastFmScrobblingConnectFailed;
+        resources["L_Crossfeed"] = Current.Crossfeed;
+        resources["L_CrossfeedEnabled"] = Current.CrossfeedEnabled;
+        resources["L_CrossfeedStrength"] = Current.CrossfeedStrength;
+        resources["L_CrossfeedLight"] = Current.CrossfeedLight;
+        resources["L_CrossfeedMedium"] = Current.CrossfeedMedium;
+        resources["L_CrossfeedStrong"] = Current.CrossfeedStrong;
         resources["L_FanartTvApiKey"] = Current.FanartTvApiKey;
         resources["L_FanartTvApiKeyHint"] = Current.FanartTvApiKeyHint;
         resources["L_DownloadMissingArtistImages"] = Current.DownloadMissingArtistImages;
@@ -577,6 +583,12 @@ public static class LocalizationManager
         "Ein unerwarteter Fehler ist aufgetreten. Der Fehlerbericht konnte nicht gespeichert werden. Orynivo wird beendet.")
     {
         AutoAcceptFanartTvImages = "Fanart.tv-Funde automatisch übernehmen",
+        Crossfeed = "Kopfhörer-Übersprechen",
+        CrossfeedEnabled = "Kopfhörer-Stereobreite reduzieren",
+        CrossfeedStrength = "Stärke",
+        CrossfeedLight = "Leicht",
+        CrossfeedMedium = "Mittel",
+        CrossfeedStrong = "Stark",
         LastFmScrobbling = "Last.fm-Scrobbling",
         LastFmScrobblingEnabled = "Gehörte Titel scrobbeln",
         LastFmApiSecret = "API-Geheimnis",
@@ -1311,6 +1323,12 @@ public static class LocalizationManager
         "An unexpected error occurred. The crash report could not be saved. Orynivo will now close.")
     {
         AutoAcceptFanartTvImages = "Automatically accept Fanart.tv results",
+        Crossfeed = "Headphone crossfeed",
+        CrossfeedEnabled = "Reduce headphone stereo separation",
+        CrossfeedStrength = "Strength",
+        CrossfeedLight = "Light",
+        CrossfeedMedium = "Medium",
+        CrossfeedStrong = "Strong",
         LastFmScrobbling = "Last.fm scrobbling",
         LastFmScrobblingEnabled = "Scrobble played tracks",
         LastFmApiSecret = "API secret",
@@ -2028,6 +2046,12 @@ public static class LocalizationManager
         "Une erreur inattendue s’est produite. Le rapport n’a pas pu être enregistré. Orynivo va maintenant se fermer.")
     {
         AutoAcceptFanartTvImages = "Accepter automatiquement les résultats Fanart.tv",
+        Crossfeed = "Mélange inter-auriculaire",
+        CrossfeedEnabled = "Réduire la séparation stéréo au casque",
+        CrossfeedStrength = "Intensité",
+        CrossfeedLight = "Léger",
+        CrossfeedMedium = "Moyen",
+        CrossfeedStrong = "Fort",
         LastFmScrobbling = "Scrobbling Last.fm",
         LastFmScrobblingEnabled = "Scrobbler les titres écoutés",
         LastFmApiSecret = "Secret de l'API",
@@ -2742,6 +2766,12 @@ public static class LocalizationManager
         "Se produjo un error inesperado. No se pudo guardar el informe. Orynivo se cerrará ahora.")
     {
         AutoAcceptFanartTvImages = "Aceptar automáticamente los resultados de Fanart.tv",
+        Crossfeed = "Mezcla entre canales",
+        CrossfeedEnabled = "Reducir la separación estéreo con auriculares",
+        CrossfeedStrength = "Intensidad",
+        CrossfeedLight = "Suave",
+        CrossfeedMedium = "Media",
+        CrossfeedStrong = "Fuerte",
         LastFmScrobbling = "Scrobbling de Last.fm",
         LastFmScrobblingEnabled = "Scrobble de las pistas escuchadas",
         LastFmApiSecret = "Secreto de la API",
@@ -4236,6 +4266,12 @@ private static readonly LocalizedStrings Russian = new(
         AiChatEmptyResponse = "Модель вернула пустой ответ.",
         AiChatToolResultFallback = "После вызова инструмента модель не вернула окончательный ответ. Результат инструмента:",
         AutoAcceptFanartTvImages = "Автоматически принимать результаты Fanart.tv",
+        Crossfeed = "Перекрёстное смешивание",
+        CrossfeedEnabled = "Уменьшить стереоразделение в наушниках",
+        CrossfeedStrength = "Интенсивность",
+        CrossfeedLight = "Слабое",
+        CrossfeedMedium = "Среднее",
+        CrossfeedStrong = "Сильное",
         LastFmScrobbling = "Скробблинг Last.fm",
         LastFmScrobblingEnabled = "Скробблить прослушанные треки",
         LastFmApiSecret = "Секрет API",
@@ -5105,6 +5141,12 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "模型返回了空响应。",
         AiChatToolResultFallback = "调用工具后，模型未返回最终答复。工具结果：",
         AutoAcceptFanartTvImages = "自动接受 Fanart.tv 的结果",
+        Crossfeed = "耳机串音混合",
+        CrossfeedEnabled = "减小耳机声道的分离度",
+        CrossfeedStrength = "强度",
+        CrossfeedLight = "轻",
+        CrossfeedMedium = "中",
+        CrossfeedStrong = "强",
         LastFmScrobbling = "Last.fm 记录",
         LastFmScrobblingEnabled = "记录已播放的曲目",
         LastFmApiSecret = "API 密钥",
@@ -5973,6 +6015,12 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "मॉडल ने खाली उत्तर दिया।",
         AiChatToolResultFallback = "टूल कॉल के बाद मॉडल ने अंतिम उत्तर नहीं दिया। टूल परिणाम:",
         AutoAcceptFanartTvImages = "Fanart.tv परिणाम स्वतः स्वीकार करें",
+        Crossfeed = "हेडफ़ोन क्रॉसफ़ीड",
+        CrossfeedEnabled = "हेडफ़ोन स्टीरियो अलगाव कम करें",
+        CrossfeedStrength = "तीव्रता",
+        CrossfeedLight = "हल्का",
+        CrossfeedMedium = "मध्यम",
+        CrossfeedStrong = "तेज़",
         LastFmScrobbling = "Last.fm स्क्रोब्लिंग",
         LastFmScrobblingEnabled = "सुने गए ट्रैक स्क्रॉबल करें",
         LastFmApiSecret = "API सीक्रेट",

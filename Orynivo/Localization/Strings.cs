@@ -1368,4 +1368,16 @@ public sealed record LocalizedStrings(
     public string LastFmScrobblingAuthorizeHint { get; init; } = "";
     /// <summary>Gets the Last.fm connection failure message.</summary>
     public string LastFmScrobblingConnectFailed { get; init; } = "";
+    /// <summary>Gets the headphone crossfeed section label.</summary>
+    public string Crossfeed { get; init; } = "";
+    /// <summary>Gets the label for enabling headphone crossfeed.</summary>
+    public string CrossfeedEnabled { get; init; } = "";
+    /// <summary>Gets the crossfeed strength field label.</summary>
+    public string CrossfeedStrength { get; init; } = "";
+    /// <summary>Gets the light crossfeed strength name.</summary>
+    public string CrossfeedLight { get; init; } = "";
+    /// <summary>Gets the medium crossfeed strength name.</summary>
+    public string CrossfeedMedium { get; init; } = "";
+    /// <summary>Gets the strong crossfeed strength name.</summary>
+    public string CrossfeedStrong { get; init; } = "";
 }

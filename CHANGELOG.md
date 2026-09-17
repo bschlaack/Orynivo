@@ -70,6 +70,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   All new strings exist in German, English, French, Spanish, Russian, Simplified
   Chinese, and Hindi.
 
+- Added optional headphone crossfeed for PCM playback: a `CrossfeedProcessor` in
+  `Orynivo.Core` (Light/Medium/Strong, one-pole blend with a level-preserving
+  direct path) applied after ReplayGain and the equalizer in the ASIO and WASAPI
+  PCM paths. It is off by default, leaves native DSD bit-perfect, and is
+  configured in Settings with localized labels in all seven languages.
+
 ### Changed
 
 - Split the monolithic `Orynivo/MainWindow.xaml.cs` (17,774 lines) into

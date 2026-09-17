@@ -215,6 +215,14 @@ internal partial class SettingsView : UserControl
                 StringComparison.OrdinalIgnoreCase));
         EqualizerProfileComboBox.SelectedItem = _equalizerProfile;
         EqualizerEnabledCheckBox.IsChecked = settings.EqualizerEnabled;
+        CrossfeedEnabledCheckBox.IsChecked = settings.CrossfeedEnabled;
+        CrossfeedStrengthComboBox.ItemsSource = new[]
+        {
+            LocalizationManager.Current.CrossfeedLight,
+            LocalizationManager.Current.CrossfeedMedium,
+            LocalizationManager.Current.CrossfeedStrong
+        };
+        CrossfeedStrengthComboBox.SelectedIndex = Math.Clamp((int)settings.CrossfeedStrength, 0, 2);
         RefreshEqualizerProfileText();
         RebuildEqualizerEditor();
         McpServerEnabledCheckBox.IsChecked        = settings.McpServerEnabled;
@@ -428,6 +436,15 @@ internal partial class SettingsView : UserControl
         _equalizerProfiles.Select(static profile => profile.Clone()).ToList().AsReadOnly();
     /// <summary>Gets the selected equalizer profile name.</summary>
     public string? SelectedEqualizerProfileName => _equalizerProfile?.Name;
+    /// <summary>Gets a value indicating whether headphone crossfeed is enabled.</summary>
+    public bool SelectedCrossfeedEnabled => CrossfeedEnabledCheckBox.IsChecked == true;
+    /// <summary>Gets the selected headphone crossfeed strength.</summary>
+    public CrossfeedStrength SelectedCrossfeedStrength => CrossfeedStrengthComboBox.SelectedIndex switch
+    {
+        0 => CrossfeedStrength.Light,
+        2 => CrossfeedStrength.Strong,
+        _ => CrossfeedStrength.Medium
+    };
     public IReadOnlyList<string> SelectedLibraryPaths => _libraryPaths.AsReadOnly();
     public AppTheme SelectedTheme =>
         ThemeComboBox.SelectedItem is SettingChoice<AppTheme> theme ? theme.Value : AppTheme.Dark;

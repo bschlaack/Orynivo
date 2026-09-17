@@ -121,7 +121,8 @@ auto-downloads FFmpeg on Windows; expects system-installed FFmpeg on Linux/macOS
 `WaveformCache` (cached compact FFmpeg-generated peak data for the transport
 waveform), `SeekDiagnostics` (sanitized transport seek, FFmpeg decoder, and
 server-side transcode diagnostics under `logs/seek.log`), `EqualizerProfile`,
-`EqualizerFilter`, `EqualizerFilterType`.
+`EqualizerFilter`, `EqualizerFilterType`, `CrossfeedProcessor` (optional
+headphone crossfeed) and `CrossfeedStrength`.
 
 **Orynivo.Core/Web/**: `WebBrowsingService` (SSRF-guarded page fetch + SearXNG
 search), `WebBrowsingOptions` (persisted config), `HtmlContentExtractor`
@@ -558,6 +559,11 @@ fallback or allow client-provided commands/paths to reach the helper.
 - `Orynivo/Audio/ParametricEqualizer.cs`: stereo biquad PCM equalizer with a
   short crossfade when the active profile changes and filter-state reset after
   seeks
+- `Orynivo.Core/Audio/CrossfeedProcessor.cs`: optional headphone crossfeed applied
+  after ReplayGain and the equalizer in the ASIO and WASAPI PCM paths, wired
+  through `ICrossfeedAudioPlayer`. It is off by default, must keep correlated
+  (mono) content centered, must not change native DSD output, and must reset its
+  filter history after a seek
 - `Orynivo/Controls/EqualizerResponseControl.cs`: logarithmic frequency-response
   graph for the editable parametric equalizer profile in Settings, including
   a 20 Hz–20 kHz scale and numbered dashed markers that map filter frequencies

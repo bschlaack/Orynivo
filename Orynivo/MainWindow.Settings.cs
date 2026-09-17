@@ -307,6 +307,14 @@ public partial class MainWindow : Window
         SettingsViewHost.IsVisible = true;
     }
 
+    /// <summary>Applies the persisted headphone-crossfeed settings to a PCM player.</summary>
+    /// <param name="player">The active player, or <see langword="null"/> when none is open.</param>
+    private void ApplyCrossfeedSettings(IAudioPlayer? player)
+    {
+        if (player is ICrossfeedAudioPlayer crossfeedPlayer)
+            crossfeedPlayer.UpdateCrossfeed(_settings.CrossfeedEnabled, _settings.CrossfeedStrength);
+    }
+
     /// <summary>Applies a newly selected profile and refreshes profile-sensitive views.</summary>
     /// <param name="profileId">Stable identifier of the selected profile.</param>
     private async Task OnUserProfileChangedAsync(string profileId)
@@ -788,6 +796,8 @@ public partial class MainWindow : Window
             _settings.LastFmApiKey           = window.SelectedLastFmApiKey;
             _settings.LastFmApiSecret        = window.SelectedLastFmApiSecret;
             _settings.LastFmScrobblingEnabled = window.SelectedLastFmScrobblingEnabled;
+            _settings.CrossfeedEnabled       = window.SelectedCrossfeedEnabled;
+            _settings.CrossfeedStrength      = window.SelectedCrossfeedStrength;
             _settings.FanartTvApiKey         = window.SelectedFanartTvApiKey;
             _settings.QobuzApplicationId      = window.SelectedQobuzApplicationId;
             _settings.PlexServers             = window.SelectedPlexServers.ToList();
@@ -838,6 +848,7 @@ public partial class MainWindow : Window
                 _settings.LastFmApiSecret,
                 _settings.LastFmSessionKey,
                 _settings.LastFmUsername);
+            ApplyCrossfeedSettings(_player);
             if (mcpChanged)
             {
                 if (_settings.McpServerEnabled)

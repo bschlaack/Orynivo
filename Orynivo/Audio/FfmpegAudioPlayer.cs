@@ -9,7 +9,7 @@ namespace Orynivo.Audio;
 /// device session. The next FFmpeg decoder is started and prefetched while the
 /// current track is playing.
 /// </summary>
-public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlayer
+public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlayer, ICrossfeedAudioPlayer
 {
     private const int MaximumPrematurePlexEofRetries = 3;
     private static readonly TimeSpan PrematurePlexEofTolerance = TimeSpan.FromSeconds(5);
@@ -24,6 +24,7 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
     private readonly Task _pumpTask;
     private readonly object _stateLock = new();
     private readonly ParametricEqualizer _equalizer;
+    private readonly CrossfeedProcessor _crossfeed;
     private volatile bool _paused;
     private long _totalFramesWritten;
     private int _audibleTrackIndex;
@@ -35,6 +36,7 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
     private int _seekRequestGeneration;
     private CancellationTokenSource? _seekStartupCts;
     private EqualizerUpdateRequest? _pendingEqualizerUpdate;
+    private CrossfeedUpdateRequest? _pendingCrossfeedUpdate;
     private int _equalizerResetRequested;
     private float _volume = 1.0f;
     private bool _disposed;
@@ -58,6 +60,12 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
             firstInfo.OutputSampleRate,
             equalizerEnabled,
             equalizerProfile);
+        // Crossfeed starts disabled; the window applies the persisted settings
+        // immediately after the player is created.
+        _crossfeed = new CrossfeedProcessor(
+            firstInfo.OutputSampleRate,
+            enabled: false,
+            CrossfeedStrength.Medium);
         _activeDecoder = firstDecoder;
         _pumpTask = Task.Run(() => PumpAsync(firstDecoder));
     }
@@ -204,6 +212,12 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
         => Interlocked.Exchange(
             ref _pendingEqualizerUpdate,
             new EqualizerUpdateRequest(enabled, profile?.Clone()));
+
+    /// <inheritdoc/>
+    public void UpdateCrossfeed(bool enabled, CrossfeedStrength strength)
+        => Interlocked.Exchange(
+            ref _pendingCrossfeedUpdate,
+            new CrossfeedUpdateRequest(enabled, strength));
 
     /// <inheritdoc/>
     public void Pause() => _paused = true;
@@ -582,21 +596,30 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
             var output = _equalizer.Process(
                 samples[index] * trackReplayGain,
                 samples[index + 1] * trackReplayGain);
-            samples[index] = Math.Clamp(output.Left, -1.0f, 1.0f);
-            samples[index + 1] = Math.Clamp(output.Right, -1.0f, 1.0f);
+            var crossed = _crossfeed.Process(output.Left, output.Right);
+            samples[index] = Math.Clamp(crossed.Left, -1.0f, 1.0f);
+            samples[index + 1] = Math.Clamp(crossed.Right, -1.0f, 1.0f);
         }
     }
 
     private void ApplyPendingEqualizerChanges()
     {
         if (Interlocked.Exchange(ref _equalizerResetRequested, 0) != 0)
+        {
             _equalizer.Reset();
+            _crossfeed.Reset();
+        }
         var update = Interlocked.Exchange(ref _pendingEqualizerUpdate, null);
         if (update is not null)
             _equalizer.Update(update.Enabled, update.Profile);
+        var crossfeedUpdate = Interlocked.Exchange(ref _pendingCrossfeedUpdate, null);
+        if (crossfeedUpdate is not null)
+            _crossfeed.Update(crossfeedUpdate.Enabled, crossfeedUpdate.Strength);
     }
 
     private sealed record EqualizerUpdateRequest(bool Enabled, EqualizerProfile? Profile);
+
+    private sealed record CrossfeedUpdateRequest(bool Enabled, CrossfeedStrength Strength);
 
     private static async Task DisposePreparedAsync(
         Task<(FfmpegPcmDecoder Decoder, AudioFileInfo Info)> preparedTask)

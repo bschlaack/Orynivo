@@ -65,6 +65,10 @@ public sealed class AppSettings
     public bool PcmOutputBoostEnabled { get; set; }
     /// <summary>Gets or sets the fade duration used when advancing non-gapless queues, in seconds.</summary>
     public double NonGaplessCrossfadeSeconds { get; set; }
+    /// <summary>Gets or sets a value indicating whether headphone crossfeed is applied to PCM playback.</summary>
+    public bool CrossfeedEnabled { get; set; }
+    /// <summary>Gets or sets the selected headphone crossfeed strength.</summary>
+    public CrossfeedStrength CrossfeedStrength { get; set; } = CrossfeedStrength.Medium;
     /// <summary>Gets or sets a value indicating whether the imported PCM equalizer profile is active.</summary>
     public bool EqualizerEnabled { get; set; }
     /// <summary>Gets or sets the selected Equalizer APO or AutoEQ profile compatibility snapshot.</summary>

@@ -64,25 +64,25 @@ persistence/ordering.
 
 **Commit**: `feat(scrobbling): add Last.fm scrobbling with offline queue`
 
-## 2. Headphone crossfeed — `Todo`
+## 2. Headphone crossfeed — `Done`
 
 Blend left/right channels to reduce the unnatural separation of headphone
-listening. Runs after ReplayGain, before the output stage; **off by default**.
+listening. Runs after ReplayGain and the equalizer, before the output stage;
+**off by default**.
 
-**Design**
+Implemented:
 
-- `Orynivo.Core/Audio/CrossfeedProcessor.cs`: stereo, BS2B-style one-pole
-  blend with interaural delay; `Update`/`Reset`/`Process` mirroring
-  `ParametricEqualizer`.
-- `Orynivo/CrossfeedSettings` (strength presets: off/light/medium/strong).
-- Wire into `FfmpegAudioPlayer` and `WasapiAudioPlayer` via a new
-  `ICrossfeedAudioPlayer` interface, next to the equalizer.
-- Settings UI toggle + strength selector; localization in seven languages.
+- `Orynivo.Core/Audio/CrossfeedProcessor.cs` and `CrossfeedStrength`
+  (Light/Medium/Strong): one-pole low-pass blend with a level-preserving direct
+  path, `Update`/`Reset`/`Process` mirroring `ParametricEqualizer`.
+- `ICrossfeedAudioPlayer` wired into `FfmpegAudioPlayer` and
+  `WasapiAudioPlayer` (pending-update pattern, filter reset on seek).
+- `AppSettings.CrossfeedEnabled`/`CrossfeedStrength`, applied when a player is
+  created and when settings are saved.
+- Settings toggle + strength selector with seven-language localization.
 
-**Tests**: bypass when disabled, mono-compatibility (correlated input stays
-centered), no NaN/denormal output, strength monotonicity.
-
-**Commit**: `feat(playback): add optional headphone crossfeed`
+Tests: bypass when disabled, centered mono content, strength monotonicity,
+silence, finite output, filter reset.
 
 ## 3. Linux MPRIS and media keys — `Todo`
 
