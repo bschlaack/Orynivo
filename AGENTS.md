@@ -213,7 +213,10 @@ The same workflow has a dedicated `verify` job that runs
 on every push and pull request, so MCP tool parity and the seven-language
 desktop/website/mobile localization coverage cannot silently drift. Keep these
 scripts passing; do not remove the job. `.github/dependabot.yml` tracks NuGet and
-GitHub Actions updates weekly.
+GitHub Actions updates weekly, but ignores major NuGet upgrades that cannot build
+on the pinned .NET 8 toolchain (Avalonia, Microsoft.Data.Sqlite,
+Microsoft.NET.Test.Sdk); migrate those deliberately instead of merging an
+automatic bump.
 All GitHub-hosted CI and release workflows use Node.js 24-compatible action
 generations (`actions/checkout@v6`, `actions/setup-dotnet@v5`, and
 `softprops/action-gh-release@v3` where applicable); do not reintroduce their

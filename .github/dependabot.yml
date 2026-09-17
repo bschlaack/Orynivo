@@ -7,6 +7,18 @@ updates:
     open-pull-requests-limit: 10
     commit-message:
       prefix: "deps(nuget)"
+    ignore:
+      # Major upgrades need a deliberate migration instead of an automatic bump.
+      # Avalonia 12 requires the .NET 9 SDK (Roslyn 4.14) and has breaking API
+      # changes, while the desktop app targets net8.0; the Microsoft.* 9/10 and
+      # test-SDK 18 lines likewise target newer runtimes. Keep Dependabot on the
+      # minor/patch line and review majors by hand.
+      - dependency-name: "Avalonia*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.Data.Sqlite"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "Microsoft.NET.Test.Sdk"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: "/"

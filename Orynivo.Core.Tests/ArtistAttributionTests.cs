@@ -7,20 +7,19 @@ namespace Orynivo.Core.Tests;
 /// <summary>Verifies album-centered artist attribution and stable MusicBrainz identity matching.</summary>
 public sealed class ArtistAttributionTests : IDisposable
 {
-    private static readonly string TestDataRoot =
-        Path.Combine(Path.GetTempPath(), $"orynivo-artist-tests-{Guid.NewGuid():N}");
-
-    static ArtistAttributionTests()
-    {
-        Environment.SetEnvironmentVariable(AppPaths.DataDirEnvironmentVariable, TestDataRoot);
-    }
-
     /// <summary>Initializes a clean isolated library database for one test.</summary>
     public ArtistAttributionTests()
     {
         SqliteConnection.ClearAllPools();
-        if (File.Exists(Path.Combine(TestDataRoot, "library.db")))
-            File.Delete(Path.Combine(TestDataRoot, "library.db"));
+        // The data root is fixed for the whole test run by TestEnvironment's module
+        // initializer; remove the database and its write-ahead log so no rows from
+        // an earlier test survive.
+        foreach (var suffix in new[] { string.Empty, "-wal", "-shm" })
+        {
+            var path = Path.Combine(AppPaths.DataRoot, "library.db" + suffix);
+            if (File.Exists(path))
+                File.Delete(path);
+        }
     }
 
     /// <summary>Verifies that an untagged compilation is represented by one album artist.</summary>
@@ -102,5 +101,5 @@ public sealed class ArtistAttributionTests : IDisposable
         };
 
     private static string TrackPath(string fileName) =>
-        Path.Combine(TestDataRoot, "Music", "Album", fileName);
+        Path.Combine(AppPaths.DataRoot, "Music", "Album", fileName);
 }
