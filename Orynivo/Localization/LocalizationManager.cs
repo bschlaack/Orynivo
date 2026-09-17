@@ -230,7 +230,7 @@ public static class LocalizationManager
         resources["L_ArtistInfoSourceLastFm"] = Current.ArtistInfoSourceLastFm;
         resources["L_ArtistInfoSourceSetting"] = Current.ArtistInfoSourceSetting;
         resources["L_LastFmApiKey"] = Current.LastFmApiKey;
-        resources["L_LastFmApiKeyHint"] = Current.LastFmApiKeyHint;
+        resources["L_LastFmCredentialsHint"] = Current.LastFmCredentialsHint;
         resources["L_LastFmScrobbling"] = Current.LastFmScrobbling;
         resources["L_LastFmScrobblingEnabled"] = Current.LastFmScrobblingEnabled;
         resources["L_LastFmApiSecret"] = Current.LastFmApiSecret;
@@ -553,7 +553,7 @@ public static class LocalizationManager
         "Kein Bild heruntergeladen", "Bilddatei fehlt", "Bild konnte nicht geladen werden",
         "Quelle: Wikipedia", "Quelle: Last.fm",
         "Quelle für Künstlerinfos", "Last.fm API-Schlüssel",
-        "Kostenlosen API-Schlüssel erstellen unter: last.fm/api/account/create",
+        "API-Schlüssel und API-Geheimnis der kostenlosen Last.fm-Anwendung eintragen: last.fm/api/account/create",
         "Fanart.tv API-Schlüssel",
         "Bevorzugt kuratierte Künstlerbilder. Der Schlüssel wird verschlüsselt im benutzergebundenen Zugangsdaten-Tresor gespeichert; alternativ kann FANART_TV_API_KEY gesetzt werden. Für bereits geladene Künstler »Künstlerinfo neu laden« wählen. Schlüssel unter fanart.tv/get-an-api-key/ erstellen.",
         "Fehlende Künstlerbilder herunterladen",
@@ -1287,7 +1287,7 @@ public static class LocalizationManager
         "No image downloaded", "Image file missing", "Failed to load image",
         "Source: Wikipedia", "Source: Last.fm",
         "Artist info source", "Last.fm API key",
-        "Create a free API key at: last.fm/api/account/create",
+        "Enter the API key and API secret of your free Last.fm application: last.fm/api/account/create",
         "Fanart.tv API key",
         "Prefers curated artist images. The key is stored encrypted in the current user's credential vault; alternatively set FANART_TV_API_KEY. Use “Refresh artist information” for existing artists. Create a key at fanart.tv/get-an-api-key/.",
         "Download missing artist images",
@@ -2004,7 +2004,7 @@ public static class LocalizationManager
         "Aucune image téléchargée", "Fichier image introuvable", "Échec du chargement de l’image",
         "Source : Wikipédia", "Source : Last.fm",
         "Source des informations artiste", "Clé API Last.fm",
-        "Créez une clé API gratuite sur : last.fm/api/account/create",
+        "Saisissez la clé API et le secret de l'API de votre application Last.fm gratuite : last.fm/api/account/create",
         "Clé API Fanart.tv",
         "Préfère les images d’artistes sélectionnées. La clé est chiffrée dans le coffre d’identifiants de l’utilisateur actuel ; vous pouvez aussi définir FANART_TV_API_KEY. Utilisez « Actualiser les informations artiste » pour les artistes existants. Créez une clé sur fanart.tv/get-an-api-key/.",
         "Télécharger les images d’artistes manquantes",
@@ -2718,7 +2718,7 @@ public static class LocalizationManager
         "Ninguna imagen descargada", "Archivo de imagen faltante", "Error al cargar la imagen",
         "Fuente: Wikipedia", "Fuente: Last.fm",
         "Fuente de información del artista", "Clave de API de Last.fm",
-        "Crea una clave de API gratuita en: last.fm/api/account/create",
+        "Introduce la clave de API y el secreto de la API de tu aplicación gratuita de Last.fm: last.fm/api/account/create",
         "Clave API de Fanart.tv",
         "Da prioridad a imágenes de artistas seleccionadas. La clave se guarda cifrada en el almacén de credenciales del usuario actual; también puedes definir FANART_TV_API_KEY. Usa «Actualizar información del artista» para artistas existentes. Crea una clave en fanart.tv/get-an-api-key/.",
         "Descargar imágenes de artistas que faltan",
@@ -3513,7 +3513,7 @@ private static readonly LocalizedStrings Russian = new(
         "Источник: Last.fm",
         "Источник информации об исполнителе",
         "API-ключ Last.fm",
-        "Создайте бесплатный API-ключ на last.fm/api/account/create",
+        "Укажите ключ API и секрет API вашего бесплатного приложения Last.fm: last.fm/api/account/create",
         "API-ключ Fanart.tv",
         "Предпочитает отобранные изображения исполнителей. Ключ хранится зашифрованным в хранилище учётных данных текущего пользователя; также можно задать FANART_TV_API_KEY. Для уже загруженных исполнителей используйте «Обновить информацию». Создайте ключ на fanart.tv/get-an-api-key/.",
         "Загрузить отсутствующие изображения исполнителей",
@@ -4382,7 +4382,7 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         "来源：Last.fm",
         "艺术家信息来源",
         "Last.fm API 密钥",
-        "在 last.fm/api/account/create 创建免费的 API 密钥",
+        "请输入免费 Last.fm 应用的 API Key 和 API Secret：last.fm/api/account/create",
         "Fanart.tv API 密钥",
         "优先使用精选艺术家图片。密钥加密保存在当前用户的凭据存储中；也可设置 FANART_TV_API_KEY。对于现有艺术家，请使用“刷新艺术家信息”。在 fanart.tv/get-an-api-key/ 创建密钥。",
         "下载缺失的艺术家图片",
@@ -5251,7 +5251,7 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         "स्रोत: Last.fm",
         "कलाकार की जानकारी का स्रोत",
         "Last.fm API कुंजी",
-        "यहाँ निःशुल्क API कुंजी बनाएँ: last.fm/api/account/create",
+        "अपने निःशुल्क Last.fm एप्लिकेशन की API कुंजी और API सीक्रेट दर्ज करें: last.fm/api/account/create",
         "Fanart.tv API कुंजी",
         "चुने हुए कलाकार चित्रों को प्राथमिकता देता है। कुंजी वर्तमान उपयोगकर्ता के क्रेडेंशियल भंडार में एन्क्रिप्ट की जाती है; वैकल्पिक रूप से FANART_TV_API_KEY सेट करें। मौजूदा कलाकारों के लिए “कलाकार की जानकारी रीफ़्रेश करें” चुनें। fanart.tv/get-an-api-key/ पर कुंजी बनाएँ।",
         "अनुपलब्ध कलाकार चित्र डाउनलोड करें",

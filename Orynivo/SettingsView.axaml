@@ -1051,11 +1051,6 @@
                                  Padding="8,0"
                                  VerticalContentAlignment="Center"
                                  Margin="0,0,0,8"/>
-                        <TextBlock Text="{DynamicResource L_LastFmApiKeyHint}"
-                                   FontSize="{DynamicResource FontSizeMeta}"
-                                   Foreground="{DynamicResource AppMutedTextBrush}"
-                                   TextWrapping="Wrap"/>
-
                         <TextBlock Text="{DynamicResource L_LastFmApiSecret}"
                                    FontSize="{DynamicResource FontSizeCaption}"
                                    FontWeight="SemiBold"
@@ -1066,7 +1061,11 @@
                                  PasswordChar="●"
                                  Padding="8,0"
                                  VerticalContentAlignment="Center"
-                                 Margin="0,0,0,18"/>
+                                 Margin="0,0,0,8"/>
+                        <TextBlock Text="{DynamicResource L_LastFmCredentialsHint}"
+                                   FontSize="{DynamicResource FontSizeMeta}"
+                                   Foreground="{DynamicResource AppMutedTextBrush}"
+                                   TextWrapping="Wrap"/>
 
                         <TextBlock Text="{DynamicResource L_LastFmScrobbling}"
                                    FontSize="{DynamicResource FontSizeBodyStrong}"

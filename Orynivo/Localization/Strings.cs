@@ -139,7 +139,7 @@ public sealed record LocalizedStrings(
     string ArtistInfoSourceLastFm,
     string ArtistInfoSourceSetting,
     string LastFmApiKey,
-    string LastFmApiKeyHint,
+    string LastFmCredentialsHint,
     string FanartTvApiKey,
     string FanartTvApiKeyHint,
     string DownloadMissingArtistImages,
