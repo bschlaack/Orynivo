@@ -321,6 +321,12 @@ internal sealed class ApplicationCredentialSnapshot
     /// <summary>Gets or sets the Last.fm API key.</summary>
     public string LastFmApiKey { get; set; } = string.Empty;
 
+    /// <summary>Gets or sets the Last.fm API secret used to sign scrobbling requests.</summary>
+    public string LastFmApiSecret { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the authorized Last.fm session key.</summary>
+    public string LastFmSessionKey { get; set; } = string.Empty;
+
     /// <summary>Gets or sets the Fanart.tv API key.</summary>
     public string FanartTvApiKey { get; set; } = string.Empty;
 

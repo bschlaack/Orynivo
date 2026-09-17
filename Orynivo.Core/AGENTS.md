@@ -67,6 +67,12 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   desktop and server searches. Date ranges are half-open Unix ranges after the
   client converts inclusive calendar dates. `SmartPlaylistTrackInfo.AlbumId`
   supports bounded album grouping and must remain compact.
+- `QueuePathPolicy.CanPersist` is the single decision for whether a queue or
+  playback path may be persisted without credentials. It keeps local, `cue://`,
+  and `orynivo://` paths persistable and rejects HTTP/HTTPS URLs that embed user
+  information or known credential query parameters (`X-Plex-Token`, `token=`,
+  `key=`). Desktop and server consumers must not duplicate this URL policy; it is
+  covered by `Orynivo.Core.Tests/QueuePathPolicyTests.cs`.
 - Track scans preserve personal ratings, cached MusicBrainz rating/vote data,
   and a client-resolved recording MBID when the media tag has no recording ID.
   `MusicBrainzRatingService` prefers a valid recording MBID and permits fallback
@@ -107,6 +113,13 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   unavailable hash remains “likely,” while differing size or content means an
   alternate-file/edition candidate. No class may trigger automatic deletion or
   metadata merging.
+  `LibraryMetadataRepairService.FindDuplicateGroups` exposes the same evidence as
+  `LibraryDuplicateGroup` records (`Exact`/`Likely`) for a user-confirmed review;
+  it is read-only and must never remove, move, or merge anything. Any removal
+  stays explicit and user-confirmed and goes through
+  `LibraryScanner.RemoveTracksByPaths`, which keeps SQLite, Lucene, and the
+  waveform cache in sync, removes virtual CUE/MKA tracks that share a removed
+  physical source, and only deletes files from disk when the caller asks for it.
   Artist spelling variants use the shared conservative comparison key and are
   guided-review findings only; name similarity must never merge artist records
   automatically.
@@ -193,6 +206,9 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   provider-local `artist-images/<id>.*` cache variants.
 - Web page fetching must retain SSRF protection, connect-time address checks,
   redirect and size limits, text-only responses, timeouts, and audit logging.
+  The loopback/private/link-local/CGNAT/multicast/reserved address classification
+  lives in the tested `Orynivo.Web.PrivateNetworkPolicy`; keep it there rather
+  than inlining the range checks.
 - Streaming URL builders may carry credentials for immediate playback, but such
   URLs must never be persisted, logged, documented, or returned to a model.
 - Shared release-update models verify the ECDSA P-256 signed manifest before an

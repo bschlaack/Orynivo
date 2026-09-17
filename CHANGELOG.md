@@ -4,6 +4,154 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.42.0] - 2026-09-17
+
+### Added
+
+- Added `Orynivo.Library.QueuePathPolicy` in `Orynivo.Core` as the single,
+  unit-tested decision for whether a playback or queue path may be persisted
+  without credentials, plus a desktop-agnostic regression test suite covering
+  local, `cue://`, `orynivo://`, credential-free HTTP, and credential-bearing
+  URL cases.
+- Added the `Orynivo.Tests` unit-test project for pure desktop helpers with a
+  regression suite for the transport accent colour maths. `Orynivo.Core.Tests`
+  additionally covers ReplayGain decibel-to-linear conversion and its
+  track/album fallback. The Windows build workflow now runs all test projects.
+- Added the `Orynivo.Server.Tests` unit-test project covering the API key
+  middleware (health bypass, header/query key acceptance, missing/wrong/empty
+  key rejection, case-sensitive comparison) and the profile-context middleware
+  (profile scoping, standard default, query selection, unknown-profile 403).
+- Added a dedicated CI parity job that runs the MCP tool and localization
+  verification scripts on every push and pull request, Dependabot configuration
+  for NuGet and GitHub Actions updates, and a repository `.editorconfig`.
+- Expanded `Orynivo.Core.Tests` with regression coverage for artist
+  display-name normalization and identity comparison keys, the shared
+  smart-playlist filtering/ordering/limiting logic, CUE sheet parsing and
+  virtual-path detection, and M3U8 import/export including relative-path
+  resolution and credential-URL rejection.
+
+- Extracted the credential-free Orynivo Server track/album references into the
+  testable `Orynivo.PlaylistReferences`, the genre-cloud recommendation scoring
+  into `Orynivo.GenreRecommendationScore`, and the MusicBrainz rating-refresh row
+  partitioning into `Orynivo.MusicBrainzRatingGrouping`. `Orynivo.Tests` now
+  covers reference build/parse round-trips, malformed-value rejection, affinity
+  aggregation, favorite weighting, the tie-break variation, and case-insensitive
+  recording-MBID grouping.
+- Extracted the web-browsing SSRF address classification into the testable
+  `Orynivo.Web.PrivateNetworkPolicy`. `Orynivo.Core.Tests` now covers the IPv4,
+  IPv6, and IPv4-mapped loopback, private, link-local, CGNAT, multicast, and
+  reserved ranges.
+- Extracted the server health and info endpoints into
+  `Orynivo.Server.Endpoints.CoreEndpoints` and added in-memory `TestServer`
+  integration tests that exercise `/api/health` and `/api/info` through the real
+  API key and profile-context middleware pipeline (health bypass, header/query
+  key acceptance, missing key, unknown-profile 403).
+- Added `Orynivo.Core.Tests` coverage for the HTML-to-text/Markdown extractor
+  (script/style removal, entity decoding, headings, links, lists, plain-text
+  passthrough), for `SeekDiagnostics.SanitizeUrl` (secret query-parameter
+  redaction, user-info removal, non-HTTP passthrough), and for the genre
+  taxonomy (multi-parent ancestry queries, name/alias/delimiter normalization,
+  dynamic unmapped keys, and display-name resolution).
+
+- Added the cross-platform Last.fm scrobbling core in `Orynivo.Core`
+  (`LastFmSignature` MD5 request signing, `ScrobbleRules` eligibility, and a
+  `LastFmClient` for token/session authentication, now-playing updates, and
+  scrobble submission) with regression tests for the signature vector and the
+  scrobble thresholds.
+- Wired Last.fm scrobbling into the desktop client: a `LastFmScrobblingService`
+  with authorization, now-playing and eligible scrobble submission, a persisted
+  offline queue (`PendingScrobbleStore`, bounded to 500 entries), new
+  `LastFmScrobblingEnabled`/`LastFmUsername` settings, and API-secret/session-key
+  storage through the encrypted credential container. Playback start and end now
+  feed the scrobbler, and queued scrobbles are flushed at startup.
+- Added the Last.fm scrobbling settings to **Artist information**: an enable
+  toggle, API key and API secret fields, a two-step Connect flow that opens the
+  Last.fm authorization page, Disconnect, and a localized connection status.
+  All new strings exist in German, English, French, Spanish, Russian, Simplified
+  Chinese, and Hindi.
+
+- Added a **Duplicate files** action to Settings > Review metadata: it opens a
+  review dialog listing Library Doctor duplicate groups with the first file of
+  each group kept by default, an explicit confirmation, and an optional
+  "delete the files from disk" step. Nothing is removed without confirmation.
+- Added `LibraryScanner.RemoveTracksByPaths` in `Orynivo.Core`: a confirmed
+  removal deletes the matching rows from SQLite, Lucene, and the waveform cache
+  together, includes virtual CUE/MKA tracks that share a removed physical source,
+  and can optionally delete the files from disk. It is never called implicitly.
+- Added `LibraryMetadataRepairService.FindDuplicateGroups` in `Orynivo.Core`,
+  which reuses the Library Doctor AcoustID/SHA-256 evidence to return duplicate
+  file groups (exact byte-identical files and likely same-size matches). It is
+  read-only: nothing is removed or merged, and alternate recordings are never
+  reported as duplicates.
+- Added optional lossy remote transcoding to the server stream endpoint:
+  `GET /api/stream/{id}?format=opus|aac&bitrate=<64-320>` re-encodes through
+  FFmpeg for bandwidth-limited clients, with per-format defaults, validated
+  ranges, and a 400 for unsupported requests. Clients select a per-server
+  streaming quality (Original / Opus 128 / AAC 192) in the Orynivo Server
+  dialog; the parameters are optional so older clients are unaffected.
+- Added optional loudness normalization for radio and podcast streams: a slow,
+  bounded `StreamingLoudnessNormalizer` in `Orynivo.Core` that evens out their
+  loudness relative to the ReplayGain-normalized library. It runs only for
+  radio/podcast PCM (never library tracks or native DSD), is off by default, and
+  is configured in Settings with localized labels in all seven languages.
+- Added optional headphone crossfeed for PCM playback: a `CrossfeedProcessor` in
+  `Orynivo.Core` (Light/Medium/Strong, one-pole blend with a level-preserving
+  direct path) applied after ReplayGain and the equalizer in the ASIO and WASAPI
+  PCM paths. It is off by default, leaves native DSD bit-perfect, and is
+  configured in Settings with localized labels in all seven languages.
+
+### Changed
+
+- Split the monolithic `Orynivo/MainWindow.xaml.cs` (17,774 lines) into
+  cohesive domain partials without changing behavior; the root file now holds
+  only fields, nested types/records, and the constructor (about 1,200 lines).
+  New domain partials: `MainWindow.Queue.cs` (queue persistence and Up Next),
+  `MainWindow.AlphabetIndex.cs` (A-Z index and scrolling),
+  `MainWindow.Artwork.cs` (artwork loading/hydration),
+  `MainWindow.Podcasts.cs`, `MainWindow.Search.cs` (local/remote search),
+  `MainWindow.TrackFilters.cs` (facet filters and unified smart playlists),
+  `MainWindow.Settings.cs` (settings host, output/equalizer pickers, device
+  lock, PCM volume/ReplayGain), `MainWindow.FolderTree.cs` (local/remote/unified
+  folder trees), `MainWindow.AlbumDetail.cs` (album detail and album-track
+  loading), `MainWindow.ArtistInfo.cs` (artist detail and unified population),
+  `MainWindow.Sidebar.cs`, `MainWindow.Navigation.cs` (navigation stack and
+  back-navigation), `MainWindow.Playback.cs` (playback engine, gapless, shuffle,
+  transport, waveform, lyrics, now-playing, history),
+  `MainWindow.CoverSearch.cs` (cover/artist image search and artwork
+  synchronization), `MainWindow.Favorites.cs`, `MainWindow.Plex.cs`,
+  `MainWindow.RemoteOrynivo.cs` (remote server view and caches),
+  `MainWindow.LibraryViews.cs` (unified row loading/merging/conversion),
+  `MainWindow.TableRendering.cs` (shared column factories and row rendering),
+  `MainWindow.Startup.cs`, `MainWindow.ContentLoading.cs`,
+  `MainWindow.EntityFavorites.cs`, `MainWindow.NavigationLinks.cs`,
+  `MainWindow.OrynivoNavigation.cs`, `MainWindow.ContextMenus.cs`,
+  `MainWindow.Helpers.cs`, `MainWindow.RatingColumns.cs`,
+  `MainWindow.ArtistAlbums.cs`, and `MainWindow.AppShell.cs`. The
+  credential-free queue path check now delegates to the shared, tested
+  `QueuePathPolicy`, and the transport accent colour maths moved to the testable
+  `Orynivo.Controls.ArtworkAccentColor`.
+- Split the largest domain partials further without changing behavior:
+  `MainWindow.Dashboard.cs` into dashboard core, recommendations, media, and
+  stats partials; `MainWindow.Playback.cs` into the playback engine,
+  `MainWindow.PlaybackState.cs`, and `MainWindow.Transport.cs`; and
+  `MainWindow.ArtistInfo.cs` into the detail surface plus
+  `MainWindow.ArtistInfo.Rename.cs`, `MainWindow.ArtistInfo.Albums.cs`, and
+  `MainWindow.ArtistInfo.Profile.cs`.
+- Extracted queue drag-and-drop out of `MainWindow.Playlists.cs` into
+  `MainWindow.Playlists.DragDrop.cs` and moved the Dashboard listening-trend
+  chart geometry into the testable `Orynivo.Controls.ListeningTrendGeometry`.
+  The genre-cloud perceptual luminance fingerprint moved to
+  `Orynivo.Controls.GenreCloudImageFingerprint`. `Orynivo.Tests` now covers axis
+  rounding, invariant point formatting, the clamped-control-point smoothing
+  invariant, and the fingerprint's average-threshold bit selection.
+
+### Fixed
+
+- The genre-cloud recommendation tie-break is now deterministic. It previously
+  used `HashCode.Combine`, which is seeded randomly per process, so equal-score
+  candidates could be ordered differently on every start. It now uses a stable
+  FNV-1a hash over the server and track identifiers.
+
 ## [0.41.8] - 2026-09-16
 
 ### Fixed
@@ -11,10 +159,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Assigning local or remote album artwork now preserves the Dashboard's
   recently-added Show all page and scroll position, updating the bound cover
   in place instead of replacing the page with the Dashboard.
-
 - Clarified that the Dashboard's most-listened-albums values are minutes by
   adding the unit to the heading in all seven interface languages.
-
 - Cover searches now progressively display bounded 250-pixel previews with at
   most three concurrent downloads, time budgets, and one transient-error retry.
   Failed candidates no longer discard successful results. Original artwork is

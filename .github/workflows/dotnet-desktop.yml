@@ -13,6 +13,22 @@ permissions:
   contents: read
 
 jobs:
+  verify:
+    name: Verify parity
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Verify MCP tool parity
+        shell: pwsh
+        run: ./scripts/verify-mcp-tool-parity.ps1
+
+      - name: Verify localization parity
+        shell: pwsh
+        run: ./scripts/verify-localization-parity.ps1
+
   build:
     name: Build ${{ matrix.configuration }}
     runs-on: windows-latest
@@ -64,6 +80,15 @@ jobs:
           /p:IncludeAsioBridge=false
           /p:IncludeCwAsioBridge=true
           /p:IncludeAirPlay2Bridge=true
+
+      - name: Run unit tests
+        run: |
+          dotnet test Orynivo.Core.Tests/Orynivo.Core.Tests.csproj --configuration ${{ matrix.configuration }}
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet test Orynivo.Tests/Orynivo.Tests.csproj --configuration ${{ matrix.configuration }}
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet test Orynivo.Server.Tests/Orynivo.Server.Tests.csproj --configuration ${{ matrix.configuration }}
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Publish Windows build
         if: matrix.configuration == 'Release'

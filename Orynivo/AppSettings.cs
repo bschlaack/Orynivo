@@ -65,6 +65,12 @@ public sealed class AppSettings
     public bool PcmOutputBoostEnabled { get; set; }
     /// <summary>Gets or sets the fade duration used when advancing non-gapless queues, in seconds.</summary>
     public double NonGaplessCrossfadeSeconds { get; set; }
+    /// <summary>Gets or sets a value indicating whether radio and podcast streams are loudness-normalized.</summary>
+    public bool StreamingLoudnessNormalizationEnabled { get; set; }
+    /// <summary>Gets or sets a value indicating whether headphone crossfeed is applied to PCM playback.</summary>
+    public bool CrossfeedEnabled { get; set; }
+    /// <summary>Gets or sets the selected headphone crossfeed strength.</summary>
+    public CrossfeedStrength CrossfeedStrength { get; set; } = CrossfeedStrength.Medium;
     /// <summary>Gets or sets a value indicating whether the imported PCM equalizer profile is active.</summary>
     public bool EqualizerEnabled { get; set; }
     /// <summary>Gets or sets the selected Equalizer APO or AutoEQ profile compatibility snapshot.</summary>
@@ -101,6 +107,16 @@ public sealed class AppSettings
     /// <summary>Gets or sets the Last.fm API key used when <see cref="ArtistInfoSource"/> is <see cref="ArtistInfoSource.LastFm"/>.</summary>
     [JsonIgnore]
     public string LastFmApiKey { get; set; } = string.Empty;
+    /// <summary>Gets or sets a value indicating whether completed tracks are scrobbled to Last.fm.</summary>
+    public bool LastFmScrobblingEnabled { get; set; }
+    /// <summary>Gets or sets the connected Last.fm username shown in Settings.</summary>
+    public string LastFmUsername { get; set; } = string.Empty;
+    /// <summary>Gets or sets the Last.fm API secret overlaid from the encrypted credential store.</summary>
+    [JsonIgnore]
+    public string LastFmApiSecret { get; set; } = string.Empty;
+    /// <summary>Gets or sets the Last.fm session key overlaid from the encrypted credential store.</summary>
+    [JsonIgnore]
+    public string LastFmSessionKey { get; set; } = string.Empty;
     /// <summary>Gets or sets the Fanart.tv API key used for preferred curated artist thumbnails.</summary>
     [JsonIgnore]
     public string FanartTvApiKey { get; set; } = string.Empty;

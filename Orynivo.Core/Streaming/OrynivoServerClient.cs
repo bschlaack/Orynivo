@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Json;
 using System.Net;
 using System.IO.Compression;
@@ -2007,7 +2008,17 @@ public sealed class OrynivoServerClient : IDisposable
     /// <param name="trackId">Database ID of the track to stream.</param>
     /// <returns>Authenticated HTTP URL for the audio stream.</returns>
     public static string GetStreamUrl(OrynivoServerSettings server, long trackId)
-        => $"{server.BaseUrl.TrimEnd('/')}/api/stream/{trackId}?key={Uri.EscapeDataString(server.ApiKey)}";
+    {
+        var url = $"{server.BaseUrl.TrimEnd('/')}/api/stream/{trackId}?key={Uri.EscapeDataString(server.ApiKey)}";
+        if (!string.IsNullOrWhiteSpace(server.StreamingFormat))
+        {
+            url += $"&format={Uri.EscapeDataString(server.StreamingFormat)}";
+            if (server.StreamingBitrateKbps is int bitrate)
+                url += $"&bitrate={bitrate.ToString(CultureInfo.InvariantCulture)}";
+        }
+
+        return url;
+    }
 
     /// <summary>
     /// Returns the URL for an album's artwork thumbnail.

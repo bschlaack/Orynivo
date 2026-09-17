@@ -31,6 +31,10 @@
     </AssemblyAttribute>
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orynivo.Tests" />
+  </ItemGroup>
+
   <PropertyGroup>
     <PlatformTarget Condition="'$(OS)' == 'Windows_NT'">x64</PlatformTarget>
     <IncludeAsioBridge Condition="'$(IncludeAsioBridge)' == '' and '$(OS)' == 'Windows_NT'">true</IncludeAsioBridge>

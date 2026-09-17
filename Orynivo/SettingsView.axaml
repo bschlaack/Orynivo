@@ -559,6 +559,36 @@
 
                     <Separator Margin="0,18,0,14"/>
 
+                    <TextBlock Text="{DynamicResource L_StreamingLoudnessNormalization}"
+                               FontSize="{DynamicResource FontSizeCaption}"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,8"/>
+                    <CheckBox x:Name="StreamingLoudnessNormalizationCheckBox"
+                              Theme="{StaticResource SettingsToggleTheme}"
+                              Content="{DynamicResource L_StreamingLoudnessNormalizationEnabled}"
+                              Margin="0,0,0,8"/>
+
+                    <Separator Margin="0,18,0,14"/>
+
+                    <TextBlock Text="{DynamicResource L_Crossfeed}"
+                               FontSize="{DynamicResource FontSizeCaption}"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,8"/>
+                    <CheckBox x:Name="CrossfeedEnabledCheckBox"
+                              Theme="{StaticResource SettingsToggleTheme}"
+                              Content="{DynamicResource L_CrossfeedEnabled}"
+                              Margin="0,0,0,10"/>
+                    <TextBlock Text="{DynamicResource L_CrossfeedStrength}"
+                               FontSize="{DynamicResource FontSizeCaption}"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,6"/>
+                    <ComboBox x:Name="CrossfeedStrengthComboBox"
+                              Height="30"
+                              HorizontalAlignment="Stretch"
+                              Margin="0,0,0,8"/>
+
+                    <Separator Margin="0,18,0,14"/>
+
                     <TextBlock Text="{DynamicResource L_Equalizer}"
                                FontSize="{DynamicResource FontSizeCaption}"
                                FontWeight="SemiBold"
@@ -886,6 +916,14 @@
                             <TextBlock Text="{DynamicResource L_MetadataQuickHint}" TextWrapping="Wrap"
                                        Foreground="{DynamicResource AppSecondaryTextBrush}"
                                        FontSize="{DynamicResource FontSizeCaption}"/>
+                            <Button x:Name="ResolveDuplicatesButton"
+                                    MinWidth="220"
+                                    Height="30"
+                                    Padding="12,0"
+                                    HorizontalAlignment="Left"
+                                    Theme="{StaticResource SettingsButtonTheme}"
+                                    Content="{DynamicResource L_DuplicateResolutionTitle}"
+                                    Click="ResolveDuplicatesButton_OnClick"/>
                             <StackPanel x:Name="MetadataProgressPanel" IsVisible="False" Spacing="8">
                                 <TextBlock x:Name="MetadataActivityTextBlock" TextWrapping="Wrap"
                                            FontSize="{DynamicResource FontSizeBody}"/>
@@ -1037,11 +1075,9 @@
                     <ComboBox x:Name="ArtistInfoSourceComboBox"
                               Height="30"
                               HorizontalAlignment="Stretch"
-                              Margin="0,0,0,18"
-                              SelectionChanged="ArtistInfoSourceComboBox_OnSelectionChanged"/>
+                              Margin="0,0,0,18"/>
 
-                    <StackPanel x:Name="LastFmPanel"
-                                IsVisible="False">
+                    <StackPanel x:Name="LastFmPanel">
                         <TextBlock Text="{DynamicResource L_LastFmApiKey}"
                                    FontSize="{DynamicResource FontSizeCaption}"
                                    FontWeight="SemiBold"
@@ -1053,7 +1089,47 @@
                                  Padding="8,0"
                                  VerticalContentAlignment="Center"
                                  Margin="0,0,0,8"/>
-                        <TextBlock Text="{DynamicResource L_LastFmApiKeyHint}"
+                        <TextBlock Text="{DynamicResource L_LastFmApiSecret}"
+                                   FontSize="{DynamicResource FontSizeCaption}"
+                                   FontWeight="SemiBold"
+                                   Margin="0,18,0,6"/>
+                        <TextBox x:Name="LastFmApiSecretTextBox"
+                                 Height="30"
+                                 HorizontalAlignment="Stretch"
+                                 PasswordChar="●"
+                                 Padding="8,0"
+                                 VerticalContentAlignment="Center"
+                                 Margin="0,0,0,8"/>
+                        <TextBlock Text="{DynamicResource L_LastFmCredentialsHint}"
+                                   FontSize="{DynamicResource FontSizeMeta}"
+                                   Foreground="{DynamicResource AppMutedTextBrush}"
+                                   TextWrapping="Wrap"/>
+
+                        <TextBlock Text="{DynamicResource L_LastFmScrobbling}"
+                                   FontSize="{DynamicResource FontSizeBodyStrong}"
+                                   FontWeight="SemiBold"
+                                   Margin="0,0,0,12"/>
+                        <CheckBox x:Name="LastFmScrobblingEnabledCheckBox"
+                                  Theme="{StaticResource SettingsToggleTheme}"
+                                  Content="{DynamicResource L_LastFmScrobblingEnabled}"
+                                  Margin="0,0,0,12"/>
+                        <StackPanel Orientation="Horizontal"
+                                    Spacing="8"
+                                    Margin="0,0,0,8">
+                            <Button x:Name="LastFmConnectButton"
+                                    Height="30"
+                                    Padding="12,0"
+                                    Theme="{StaticResource SettingsButtonTheme}"
+                                    Content="{DynamicResource L_LastFmConnect}"
+                                    Click="LastFmConnectButton_OnClick"/>
+                            <Button x:Name="LastFmDisconnectButton"
+                                    Height="30"
+                                    Padding="12,0"
+                                    Theme="{StaticResource SettingsButtonTheme}"
+                                    Content="{DynamicResource L_LastFmDisconnect}"
+                                    Click="LastFmDisconnectButton_OnClick"/>
+                        </StackPanel>
+                        <TextBlock x:Name="LastFmScrobblingStatusTextBlock"
                                    FontSize="{DynamicResource FontSizeMeta}"
                                    Foreground="{DynamicResource AppMutedTextBrush}"
                                    TextWrapping="Wrap"/>

@@ -11,7 +11,7 @@ namespace Orynivo.Audio;
 /// Plays one or more files as continuous PCM through one exclusive WASAPI
 /// session. Upcoming FFmpeg decoders are prefetched before track boundaries.
 /// </summary>
-public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlayer
+public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlayer, ICrossfeedAudioPlayer, ILoudnessNormalizerAudioPlayer
 {
     private const int MaximumPrematurePlexEofRetries = 3;
     private static readonly TimeSpan PrematurePlexEofTolerance = TimeSpan.FromSeconds(5);
@@ -30,6 +30,8 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
     private readonly Task _pumpTask;
     private readonly object _stateLock = new();
     private readonly ParametricEqualizer _equalizer;
+    private readonly CrossfeedProcessor _crossfeed;
+    private readonly StreamingLoudnessNormalizer _loudnessNormalizer;
     private long _totalFramesWritten;
     private int _audibleTrackIndex;
     private int _writeTrackIndex;
@@ -40,6 +42,8 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
     private int _seekRequestGeneration;
     private CancellationTokenSource? _seekStartupCts;
     private EqualizerUpdateRequest? _pendingEqualizerUpdate;
+    private CrossfeedUpdateRequest? _pendingCrossfeedUpdate;
+    private LoudnessUpdateRequest? _pendingLoudnessUpdate;
     private int _equalizerResetRequested;
     private float _volume = 1.0f;
     private bool _disposed;
@@ -71,6 +75,17 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
             selectedFormat.Format.SampleRate,
             equalizerEnabled,
             equalizerProfile);
+        // Crossfeed starts disabled; the window applies the persisted settings
+        // immediately after the player is created.
+        _crossfeed = new CrossfeedProcessor(
+            selectedFormat.Format.SampleRate,
+            enabled: false,
+            CrossfeedStrength.Medium);
+        // Loudness normalization starts disabled; the window enables it only for
+        // radio and podcast streams.
+        _loudnessNormalizer = new StreamingLoudnessNormalizer(
+            selectedFormat.Format.SampleRate,
+            enabled: false);
         _activeDecoder = firstDecoder;
         _pumpTask = Task.Run(() => PumpAsync(firstDecoder));
     }
@@ -204,6 +219,18 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
         => Interlocked.Exchange(
             ref _pendingEqualizerUpdate,
             new EqualizerUpdateRequest(enabled, profile?.Clone()));
+
+    /// <inheritdoc/>
+    public void UpdateCrossfeed(bool enabled, CrossfeedStrength strength)
+        => Interlocked.Exchange(
+            ref _pendingCrossfeedUpdate,
+            new CrossfeedUpdateRequest(enabled, strength));
+
+    /// <inheritdoc/>
+    public void UpdateLoudnessNormalization(bool enabled, double targetDbfs, double maximumGainDb)
+        => Interlocked.Exchange(
+            ref _pendingLoudnessUpdate,
+            new LoudnessUpdateRequest(enabled, targetDbfs, maximumGainDb));
 
     /// <inheritdoc/>
     public void Pause() => _playbackProvider.IsPaused = true;
@@ -578,7 +605,7 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
             var samples = MemoryMarshal.Cast<byte, float>(bytes);
             for (var index = 0; index + 1 < samples.Length; index += 2)
             {
-                var output = _equalizer.Process(
+                var output = ProcessFrame(
                     samples[index] * trackReplayGain,
                     samples[index + 1] * trackReplayGain);
                 samples[index] = Math.Clamp(output.Left, -1.0f, 1.0f);
@@ -590,7 +617,7 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
             var samples = MemoryMarshal.Cast<byte, short>(bytes);
             for (var index = 0; index + 1 < samples.Length; index += 2)
             {
-                var output = _equalizer.Process(
+                var output = ProcessFrame(
                     samples[index] / 32768.0f * trackReplayGain,
                     samples[index + 1] / 32768.0f * trackReplayGain);
                 samples[index] = FloatToInt16(output.Left);
@@ -601,7 +628,7 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
         {
             for (var offset = 0; offset + 5 < bytes.Length; offset += 6)
             {
-                var output = _equalizer.Process(
+                var output = ProcessFrame(
                     ReadInt24(bytes, offset) / 8_388_608.0f * trackReplayGain,
                     ReadInt24(bytes, offset + 3) / 8_388_608.0f * trackReplayGain);
                 WriteInt24(bytes, offset, output.Left);
@@ -613,7 +640,7 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
             var samples = MemoryMarshal.Cast<byte, int>(bytes);
             for (var index = 0; index + 1 < samples.Length; index += 2)
             {
-                var output = _equalizer.Process(
+                var output = ProcessFrame(
                     samples[index] / 2_147_483_648.0f * trackReplayGain,
                     samples[index + 1] / 2_147_483_648.0f * trackReplayGain);
                 samples[index] = FloatToInt32(output.Left);
@@ -622,16 +649,44 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
         }
     }
 
+    /// <summary>Applies the equalizer and headphone crossfeed to one stereo frame.</summary>
+    /// <param name="left">Left input sample.</param>
+    /// <param name="right">Right input sample.</param>
+    /// <returns>The processed stereo frame.</returns>
+    private (float Left, float Right) ProcessFrame(float left, float right)
+    {
+        var output = _equalizer.Process(left, right);
+        var crossed = _crossfeed.Process(output.Left, output.Right);
+        return _loudnessNormalizer.Process(crossed.Left, crossed.Right);
+    }
+
     private void ApplyPendingEqualizerChanges()
     {
         if (Interlocked.Exchange(ref _equalizerResetRequested, 0) != 0)
+        {
             _equalizer.Reset();
+            _crossfeed.Reset();
+            _loudnessNormalizer.Reset();
+        }
         var update = Interlocked.Exchange(ref _pendingEqualizerUpdate, null);
         if (update is not null)
             _equalizer.Update(update.Enabled, update.Profile);
+        var crossfeedUpdate = Interlocked.Exchange(ref _pendingCrossfeedUpdate, null);
+        if (crossfeedUpdate is not null)
+            _crossfeed.Update(crossfeedUpdate.Enabled, crossfeedUpdate.Strength);
+        var loudnessUpdate = Interlocked.Exchange(ref _pendingLoudnessUpdate, null);
+        if (loudnessUpdate is not null)
+            _loudnessNormalizer.Update(
+                loudnessUpdate.Enabled,
+                loudnessUpdate.TargetDbfs,
+                loudnessUpdate.MaximumGainDb);
     }
 
     private sealed record EqualizerUpdateRequest(bool Enabled, EqualizerProfile? Profile);
+
+    private sealed record CrossfeedUpdateRequest(bool Enabled, CrossfeedStrength Strength);
+
+    private sealed record LoudnessUpdateRequest(bool Enabled, double TargetDbfs, double MaximumGainDb);
 
     private static short FloatToInt16(float sample) =>
         (short)Math.Round(Math.Clamp(sample, -1.0f, 1.0f) * (sample < 0 ? 32768.0f : 32767.0f));

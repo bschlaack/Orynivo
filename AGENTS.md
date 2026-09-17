@@ -121,7 +121,9 @@ auto-downloads FFmpeg on Windows; expects system-installed FFmpeg on Linux/macOS
 `WaveformCache` (cached compact FFmpeg-generated peak data for the transport
 waveform), `SeekDiagnostics` (sanitized transport seek, FFmpeg decoder, and
 server-side transcode diagnostics under `logs/seek.log`), `EqualizerProfile`,
-`EqualizerFilter`, `EqualizerFilterType`.
+`EqualizerFilter`, `EqualizerFilterType`, `CrossfeedProcessor` (optional
+headphone crossfeed) and `CrossfeedStrength`, and `StreamingLoudnessNormalizer`
+(optional loudness matching for radio and podcast streams).
 
 **Orynivo.Core/Web/**: `WebBrowsingService` (SSRF-guarded page fetch + SearXNG
 search), `WebBrowsingOptions` (persisted config), `HtmlContentExtractor`
@@ -177,6 +179,17 @@ limited compatibility types described above for the Linux target.
 .\Orynivo\bin\Debug\net8.0-windows10.0.19041.0\Orynivo.exe
 ```
 
+Run the managed unit tests with
+`dotnet test Orynivo.Core.Tests/Orynivo.Core.Tests.csproj`,
+`dotnet test Orynivo.Tests/Orynivo.Tests.csproj`, and
+`dotnet test Orynivo.Server.Tests/Orynivo.Server.Tests.csproj`.
+`Orynivo.Core.Tests` covers the cross-platform core library; `Orynivo.Tests`
+covers pure desktop helpers that do not require a running Avalonia UI;
+`Orynivo.Server.Tests` covers server middleware without starting the web host.
+Do not move shared behavior into a UI-only class when a `Orynivo.Core` type can
+own it and stay cross-platform testable. The Windows build workflow runs all
+three test projects.
+
 `build.ps1` always builds the vendored MIT-licensed `CwAsioBridge.dll`, then
 builds `AsioBridge.dll` when the Steinberg SDK is available, and finally builds
 the .NET application. It
@@ -195,6 +208,12 @@ publishes the self-contained `linux-x64` desktop artifact. The Windows job
 intentionally excludes only the Steinberg bridge because that SDK is not stored
 in the repository. Its Release artifact therefore contains cwASIO support
 without Steinberg SDK files.
+The same workflow has a dedicated `verify` job that runs
+`scripts/verify-mcp-tool-parity.ps1` and `scripts/verify-localization-parity.ps1`
+on every push and pull request, so MCP tool parity and the seven-language
+desktop/website/mobile localization coverage cannot silently drift. Keep these
+scripts passing; do not remove the job. `.github/dependabot.yml` tracks NuGet and
+GitHub Actions updates weekly.
 All GitHub-hosted CI and release workflows use Node.js 24-compatible action
 generations (`actions/checkout@v6`, `actions/setup-dotnet@v5`, and
 `softprops/action-gh-release@v3` where applicable); do not reintroduce their
@@ -310,8 +329,11 @@ runtime dependency.
   virtual tracks; `GET /api/stream/{trackId}?ss=<seconds>` performs a fast
   server-side seek by transcoding the local file from that offset to FLAC (used
   by remote clients so in-track seeking does not binary-search a seektable-less
-  file over HTTP); the transcode/FFmpeg process is stopped when the client
-  disconnects; album, artist, and track artwork endpoints (track artwork is
+  file over HTTP); `?format=opus|aac&bitrate=<64-320>` requests a validated
+  lossy transcode (`StreamTranscodeOptions`) for regular files and virtual
+  segments alike, returning 400 for unsupported requests; the transcode/FFmpeg
+  process is stopped when the client disconnects; album, artist, and track
+  artwork endpoints (track artwork is
   served both by file path via `/api/artwork/track?p=` and by database ID via
   `/api/artwork/track/{id}` with an optional `?size=`); album artwork
   requests fall back to an on-demand embedded-artwork repair for the requested
@@ -494,10 +516,42 @@ fallback or allow client-provided commands/paths to reach the helper.
   local and remote tracks. For a remote track the now-playing artist button
   navigates within that track's server library (`OpenOrynivoArtistAlbumsAsync`
   using the row's `OrynivoServer` and `ArtistId`), not the local album view.
-- `Orynivo/MainWindow.*.cs`: `MainWindow` remains one Avalonia partial class;
-  domain-sized partials keep dashboard, daily history, internet radio,
-  Orynivo Server navigation, and playlist/context-menu code out of
-  `MainWindow.xaml.cs` without changing ownership or runtime behavior.
+- `Orynivo/MainWindow.*.cs`: `MainWindow` remains one Avalonia partial class,
+  split into domain-sized partials without changing ownership or runtime
+  behavior. `MainWindow.xaml.cs` is intentionally reduced to shared state:
+  fields, nested types/records, and the constructor. Domain partials (all under
+  `Orynivo/`): `MainWindow.Dashboard.cs`, `MainWindow.History.cs`,
+  `MainWindow.Radio.cs`, `MainWindow.Podcasts.cs`, `MainWindow.Playlists.cs`,
+  `MainWindow.GenreCloud.cs`, `MainWindow.InfiniteMix.cs`,
+  `MainWindow.Similarity.cs`, `MainWindow.AirPlay.cs`,
+  `MainWindow.MobileRemote.cs`, `MainWindow.MusicBrainz.cs`,
+  `MainWindow.MetadataRepair.cs`, `MainWindow.ArtworkSynchronization.cs`,
+  `MainWindow.LibraryViewCache.cs`, `MainWindow.Queue.cs`,
+  `MainWindow.AlphabetIndex.cs`, `MainWindow.Artwork.cs`,
+  `MainWindow.Search.cs`, `MainWindow.TrackFilters.cs`,
+  `MainWindow.Settings.cs`, `MainWindow.FolderTree.cs`,
+  `MainWindow.AlbumDetail.cs`, `MainWindow.ArtistInfo.cs`,
+  `MainWindow.Sidebar.cs`, `MainWindow.Navigation.cs`,
+  `MainWindow.Playback.cs`, `MainWindow.CoverSearch.cs`,
+  `MainWindow.Favorites.cs`, `MainWindow.Plex.cs`,
+  `MainWindow.RemoteOrynivo.cs`, `MainWindow.LibraryViews.cs`,
+  `MainWindow.TableRendering.cs`, `MainWindow.Startup.cs`,
+  `MainWindow.ContentLoading.cs`, `MainWindow.EntityFavorites.cs`,
+  `MainWindow.NavigationLinks.cs`, `MainWindow.OrynivoNavigation.cs`,
+  `MainWindow.ContextMenus.cs`, `MainWindow.Helpers.cs`,
+  `MainWindow.RatingColumns.cs`, `MainWindow.ArtistAlbums.cs`, and
+  `MainWindow.AppShell.cs`. The largest domains are themselves split into
+  sub-partials: `MainWindow.Dashboard.{Recommendations,Media,Stats}.cs`,
+  `MainWindow.PlaybackState.cs` and `MainWindow.Transport.cs`,
+  `MainWindow.ArtistInfo.{Rename,Albums,Profile}.cs`, and
+  `MainWindow.Playlists.DragDrop.cs`. Keep generic visual
+  helpers (`FindResource`, `ResolveFontSize`, `FindAncestor`,
+  `FindVisualChild`, `FindVisualChildren`) and the shared table-column factories
+  (`CreateFavoriteColumn`, `CreateSourceBadgeColumn`, `CreateEntityLinkColumn`,
+  `GetContentRowSortMemberPath`) in dedicated helper/rendering partials rather
+  than a single domain. Pure, UI-free logic must live in a standalone testable
+  type instead (for example `Orynivo.Controls.ArtworkAccentColor` or
+  `Orynivo.Controls.ListeningTrendGeometry`), covered by `Orynivo.Tests`.
 - `Orynivo/Audio/WindowsEndpointVolumeSynchronizer.cs`: bidirectional
   synchronization between the transport volume slider and the selected
   Windows render endpoint's master volume
@@ -509,6 +563,16 @@ fallback or allow client-provided commands/paths to reach the helper.
 - `Orynivo/Audio/ParametricEqualizer.cs`: stereo biquad PCM equalizer with a
   short crossfade when the active profile changes and filter-state reset after
   seeks
+- `Orynivo.Core/Audio/CrossfeedProcessor.cs`: optional headphone crossfeed applied
+  after ReplayGain and the equalizer in the ASIO and WASAPI PCM paths, wired
+  through `ICrossfeedAudioPlayer`. It is off by default, must keep correlated
+  (mono) content centered, must not change native DSD output, and must reset its
+  filter history after a seek
+- `Orynivo.Core/Audio/StreamingLoudnessNormalizer.cs`: optional slow, bounded
+  loudness matching applied last in the ASIO and WASAPI PCM paths, wired through
+  `ILoudnessNormalizerAudioPlayer`. It is off by default, runs **only** for radio
+  and podcast streams (never library tracks, which use ReplayGain, or native
+  DSD), must not pump on short passages, and must reset after a seek
 - `Orynivo/Controls/EqualizerResponseControl.cs`: logarithmic frequency-response
   graph for the editable parametric equalizer profile in Settings, including
   a 20 Hz–20 kHz scale and numbered dashed markers that map filter frequencies
@@ -743,9 +807,13 @@ fallback or allow client-provided commands/paths to reach the helper.
   `%LOCALAPPDATA%\Orynivo\settings.json`, overlays secrets from
   `ApplicationCredentialStore`, and migrates legacy plaintext JSON credentials
 - `Orynivo/ApplicationCredentialStore.cs`: the single encrypted current-user
-  credential container for Last.fm, Fanart.tv, AI Chat, Orynivo Server, Plex,
-  and generic streaming credentials. Windows uses current-user DPAPI; Linux and
-  macOS use AES-GCM with a separate random key restricted to user read/write.
+  credential container for Last.fm (artist info, API secret, and scrobbling
+  session key), Fanart.tv, AI Chat, Orynivo Server, Plex, and generic streaming
+  credentials. Windows uses current-user DPAPI; Linux and macOS use AES-GCM with
+  a separate random key restricted to user read/write. Last.fm scrobbling lives
+  in `Orynivo/Scrobbling/` (`LastFmScrobblingService`, `PendingScrobbleStore`);
+  it must never block or fail playback, and its settings are configured under
+  **Artist information**.
 - `Orynivo/Streaming/IStreamingCatalog.cs` and `IStreamingPlaybackProvider.cs`:
   provider-neutral contracts for future streaming catalog and playback integrations
 - `Orynivo/Streaming/QobuzStreamingProvider.cs`: inactive Qobuz scaffold; do not
@@ -977,7 +1045,8 @@ fallback or allow client-provided commands/paths to reach the helper.
   `settings.json` and reflected in any visible remote track rows. For local
   tracks it still writes `tracks.is_favorite`.
 - `Orynivo/OrynivoServerDialog.axaml/.cs`: themed dialog for adding or editing a
-  remote Orynivo Server (name, URL, API key, Test Connection); it can load, add,
+  remote Orynivo Server (name, URL, API key, per-server streaming quality, Test
+  Connection); it can load, add,
   remove, and save the remote server's music directories through the server API,
   start a remote scan, and show live scan progress; returned server record is
   stored in `AppSettings.OrynivoServers`

@@ -27,20 +27,31 @@ public static class StreamEndpoints
         /// Streams the audio file for a track by database ID.
         /// Regular files support HTTP byte-range seeking.
         /// CUE virtual tracks are transcoded to FLAC on-the-fly via FFmpeg.
+        /// An optional <c>format=opus|aac</c> with <c>bitrate</c> (kbps) requests a
+        /// lossy transcode instead of the original stream.
         /// </summary>
         api.MapGet("/stream/{trackId:long}", async (
             long trackId,
             HttpContext ctx,
             ILoggerFactory loggerFactory,
-            double? ss) =>
+            double? ss,
+            string? format,
+            int? bitrate) =>
         {
             var logger = loggerFactory.CreateLogger("Orynivo.Server.Stream");
             using var db = AudioDatabase.OpenDefault();
             var track = db.GetTrackById(trackId);
             if (track is null) return Results.NotFound();
 
+            StreamTranscodeOptions? transcode = null;
+            if (!string.IsNullOrWhiteSpace(format) &&
+                !StreamTranscodeOptions.TryParse(format, bitrate, out transcode))
+            {
+                return Results.BadRequest(new { error = "Unsupported transcode format or bitrate." });
+            }
+
             return await BuildStreamResult(track.Path, track.SourcePath,
-                track.SegmentStart, track.SegmentEnd, ctx, logger, ss);
+                track.SegmentStart, track.SegmentEnd, ctx, logger, ss, transcode);
         });
 
         /// <summary>
@@ -188,12 +199,29 @@ public static class StreamEndpoints
         double? segmentEnd,
         HttpContext ctx,
         ILogger logger,
-        double? seekSeconds = null)
+        double? seekSeconds = null,
+        StreamTranscodeOptions? transcode = null)
     {
+        var isVirtual = trackPath.StartsWith("cue://", StringComparison.OrdinalIgnoreCase) ||
+                        trackPath.StartsWith("mka://", StringComparison.OrdinalIgnoreCase);
+
+        // A requested lossy transcode applies to regular files and virtual segments alike.
+        if (transcode is not null)
+        {
+            var transcodeSource = isVirtual && sourcePath is not null ? sourcePath : trackPath;
+            if (!File.Exists(transcodeSource)) return Results.NotFound();
+
+            return await TranscodeCueSegmentAsync(
+                transcodeSource,
+                (isVirtual ? segmentStart ?? 0 : 0) + (seekSeconds ?? 0),
+                isVirtual ? segmentEnd : null,
+                ctx,
+                logger,
+                transcode);
+        }
+
         // Virtual CUE/MKA track: transcode the segment to FLAC via FFmpeg
-        if ((trackPath.StartsWith("cue://", StringComparison.OrdinalIgnoreCase) ||
-             trackPath.StartsWith("mka://", StringComparison.OrdinalIgnoreCase))
-            && sourcePath is not null)
+        if (isVirtual && sourcePath is not null)
         {
             return await TranscodeCueSegmentAsync(
                 sourcePath, (segmentStart ?? 0) + (seekSeconds ?? 0), segmentEnd, ctx, logger);
@@ -258,15 +286,16 @@ public static class StreamEndpoints
         double startSeconds,
         double? endSeconds,
         HttpContext ctx,
-        ILogger logger)
+        ILogger logger,
+        StreamTranscodeOptions? transcode = null)
     {
         if (!File.Exists(sourcePath)) return Results.NotFound();
 
         ctx.Response.StatusCode = 200;
-        ctx.Response.ContentType = "audio/flac";
+        ctx.Response.ContentType = transcode?.ContentType ?? "audio/flac";
         await ctx.Response.StartAsync(ctx.RequestAborted);
 
-        var args = BuildFfmpegArgs(sourcePath, startSeconds, endSeconds);
+        var args = BuildFfmpegArgs(sourcePath, startSeconds, endSeconds, transcode);
         logger.LogDebug("FFmpeg transcode: {Args}", args);
         var stopwatch = Stopwatch.StartNew();
         var logSeekTranscode = startSeconds > 0;
@@ -362,7 +391,11 @@ public static class StreamEndpoints
             : buffer.ToArray();
     }
 
-    private static string BuildFfmpegArgs(string source, double start, double? end)
+    private static string BuildFfmpegArgs(
+        string source,
+        double start,
+        double? end,
+        StreamTranscodeOptions? transcode = null)
     {
         var startArg = start > 0
             ? $"-ss {start.ToString("F6", CultureInfo.InvariantCulture)} "
@@ -375,7 +408,8 @@ public static class StreamEndpoints
             durationArg = $"-t {duration.ToString("F6", CultureInfo.InvariantCulture)} ";
         }
 
-        return $"-nostdin -hide_banner -loglevel error {startArg}-i \"{source}\" {durationArg}-map 0:a:0 -vn -sn -dn -c:a flac -f flac pipe:1";
+        var output = transcode?.FfmpegOutputArguments ?? "-c:a flac -f flac";
+        return $"-nostdin -hide_banner -loglevel error {startArg}-i \"{source}\" {durationArg}-map 0:a:0 -vn -sn -dn {output} pipe:1";
     }
 
     private static async Task<string> TryReadStandardErrorAsync(Process process)

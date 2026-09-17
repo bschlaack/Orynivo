@@ -14,6 +14,16 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
 - Keep the server cross-platform `net8.0` and free of Windows-only dependencies.
 - Every endpoint except `/api/health` requires the configured API key through
   `X-Api-Key` or `?key=`. Do not log or expose the key.
+- `ApiKeyMiddleware` and `ProfileContextMiddleware` must stay independently
+  unit-testable without starting the web host; `Orynivo.Server.Tests` covers
+  the health bypass, header/query key acceptance, missing/wrong/empty key
+  rejection, case-sensitive comparison, profile scoping, the `standard`
+  default, query-based profile selection, and the unknown-profile 403.
+- `/api/health` and `/api/info` are mapped through
+  `Endpoints.CoreEndpoints.MapCoreEndpoints` so they can be exercised with an
+  in-memory `TestServer` through the real middleware pipeline. Keep new
+  dependency-free endpoints in that mapping method rather than inline in
+  `Program.cs`.
 - Personal-state requests may optionally select a configured profile with
   `X-Orynivo-Profile` (or the non-secret `profile` query parameter); unknown
   profile IDs are rejected and the profile context is async-local so concurrent
@@ -25,6 +35,10 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
 - Materialize SQLite-backed endpoint results before disposing their connection.
 - Preserve byte-range streaming and cancellation of FFmpeg/transcode processes
   when clients disconnect.
+- `GET /api/stream/{id}` accepts an optional validated lossy transcode
+  (`?format=opus|aac&bitrate=<64-320>` via `StreamTranscodeOptions`); unsupported
+  requests return 400. The parameters are optional so older clients are
+  unaffected, and the same FFmpeg pipe/cancellation path is reused.
 - `cue://` tracks and `mka://chapter/` tracks are virtual source segments and
   are transcoded from their stored physical source and time boundaries.
 - Normal full scans and watcher updates use

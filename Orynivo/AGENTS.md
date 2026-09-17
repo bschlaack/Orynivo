@@ -57,8 +57,43 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   server profile authentication must use this context; never duplicate or
   partition shared audio metadata/artwork.
 
-- `MainWindow` remains one partial Avalonia class; use the existing domain-sized
-  partials instead of creating competing window state or navigation models.
+- `MainWindow` remains one partial Avalonia class; use the existing
+  domain-sized partials instead of creating competing window state or navigation
+  models. `MainWindow.xaml.cs` is intentionally reduced to shared state (fields,
+  nested types/records, and the constructor). Domain partials cover dashboard,
+  history, radio, podcasts, playlists, genre cloud, Infinite Mix, similarity,
+  AirPlay, mobile remote, MusicBrainz, metadata repair, artwork
+  synchronization, library view cache, queue/Up Next (`MainWindow.Queue.cs`),
+  the A-Z index (`MainWindow.AlphabetIndex.cs`), artwork
+  (`MainWindow.Artwork.cs`), search (`MainWindow.Search.cs`), track filters and
+  smart playlists (`MainWindow.TrackFilters.cs`), settings/output/EQ and PCM
+  volume/ReplayGain (`MainWindow.Settings.cs`), folder trees
+  (`MainWindow.FolderTree.cs`), album detail (`MainWindow.AlbumDetail.cs`),
+  artist detail (`MainWindow.ArtistInfo.cs`), sidebar (`MainWindow.Sidebar.cs`),
+  navigation (`MainWindow.Navigation.cs`), playback/transport
+  (`MainWindow.Playback.cs`), cover search (`MainWindow.CoverSearch.cs`),
+  favorites, Plex, remote Orynivo Server view/caches, unified library views
+  (`MainWindow.LibraryViews.cs`), table rendering (`MainWindow.TableRendering.cs`),
+  startup, content loading, entity favorites, navigation links, Orynivo
+  navigation, context menus, helpers, rating columns, artist albums, and the app
+  shell. The largest domains are split into sub-partials
+  (`MainWindow.Dashboard.{Recommendations,Media,Stats}.cs`,
+  `MainWindow.PlaybackState.cs`/`MainWindow.Transport.cs`,
+  `MainWindow.ArtistInfo.{Rename,Albums,Profile}.cs`, and
+  `MainWindow.Playlists.DragDrop.cs`).
+  Generic visual helpers (`FindResource`, `ResolveFontSize`,
+  `FindAncestor`, `FindVisualChild`, `FindVisualChildren`) and the shared
+  table-column factories live in their dedicated helper/rendering partials.
+  Credential-free queue path persistence is decided by the
+  shared, tested `Orynivo.Library.QueuePathPolicy` in Core; never duplicate that
+  URL policy in the desktop. Pure, UI-free desktop helpers must be extracted
+  into standalone testable types (for example
+  `Orynivo.Controls.ArtworkAccentColor` or
+  `Orynivo.Controls.ListeningTrendGeometry`, covered by `Orynivo.Tests`) instead of
+  remaining private `MainWindow` members. Extract further domains as new
+  partials rather than letting `MainWindow.xaml.cs` grow again.
+  Build with `dotnet build Orynivo/Orynivo.csproj` and run
+  `dotnet test Orynivo.Tests/Orynivo.Tests.csproj` after client changes.
 - Do not block the UI thread with database access, network requests, FFmpeg,
   device enumeration, player disposal, large cache I/O, or large row composition.
 - AI chat and the embedded MCP server expose one permission-gated tool surface.
@@ -237,6 +272,12 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   Repeated searches must clear selection and preview before loading. Analysis,
   dialog and correction use Core `OrderTracks`; never silently zip a partial match.
   Successful corrections invalidate shared library views and refresh analysis.
+  The same section exposes a **Duplicate files** action that opens
+  `DuplicateResolutionDialog` over `LibraryMetadataRepairService.FindDuplicateGroups`
+  and `LibraryScanner.RemoveTracksByPaths`. The first file of each group is kept
+  by default, removal requires explicit confirmation, and deleting files from
+  disk is a separate opt-in. Never remove anything without that confirmation, and
+  invalidate the shared library view cache after a successful removal.
 - The shared Folder structure sidebar item is visible when either local media
   or at least one Orynivo Server is configured. Server-only setups must be able
   to open `ShowUnifiedFolderTreeAsync` without configuring a local directory.
@@ -244,7 +285,11 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   the local snapshot and every configured Orynivo Server concurrently, merges
   counts by stable taxonomy key, applies client-side remote favorites and
   cross-source listening-history affinity, and resolves recommendations to
-  ordinary source-aware `ContentRow` track rows. Its explanatory hero remains
+  ordinary source-aware `ContentRow` track rows. Recommendation scoring lives in
+  the pure, tested `Orynivo.GenreRecommendationScore`; its tie-break variation
+  must stay deterministic (stable hash, never `HashCode.Combine` or
+  `Random`), and the perceptual background fingerprint lives in
+  `Orynivo.Controls.GenreCloudImageFingerprint`. Its explanatory hero remains
   separate from the elliptical cloud surface below it; drill-down transitions
   cross-fade the old level and stagger the new count-scaled nodes. Cloud nodes
   use measured, centered rows with explicit horizontal/vertical gaps and must
@@ -487,7 +532,9 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
 - Persisted Up Next entries from Orynivo Server must use stable
   `orynivo://serverId/track/trackId` references rather than credential-bearing
   stream URLs. Restore those references asynchronously after startup and
-  resolve them only when playback or metadata requires it.
+  resolve them only when playback or metadata requires it. Build and parse these
+  references (and the `orynivo-album:serverId:albumId` drag references) only
+  through the tested `Orynivo.PlaylistReferences`; never inline the format.
 - The single-track **Play more like this** action may combine local and Orynivo
   Server similarity vectors, but it must load them asynchronously, resolve each
   provider-local result through its owning catalog, and keep server URLs and
@@ -605,7 +652,9 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   conservatively and persist every unambiguous identity, then fetch each rating
   through the direct recording lookup; MusicBrainz batch search rating fields
   are not reliable enough to cache. De-duplicate known MBIDs across mirrored
-  local/server album rows before issuing direct lookups.
+  local/server album rows before issuing direct lookups; use the tested
+  `Orynivo.MusicBrainzRatingGrouping.Partition` for that case-insensitive
+  grouping instead of ad-hoc `GroupBy`/`Guid.TryParse` filters.
   The rating cell displays a localized **Load rating** action before its first
   lookup, a loading state while active, and **Try again** after a temporary
   failure. Album-detail foreground refresh retries temporary failures up to

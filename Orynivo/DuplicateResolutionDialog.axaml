@@ -1,0 +1,51 @@
+<Window x:Class="Orynivo.DuplicateResolutionDialog"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Width="900"
+        Height="720"
+        MinWidth="700"
+        MinHeight="480"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppContentBrush}"
+        Foreground="{DynamicResource AppPrimaryTextBrush}">
+    <Grid Margin="24" RowDefinitions="Auto,Auto,*,Auto,Auto">
+        <TextBlock Grid.Row="0"
+                   Text="{DynamicResource L_DuplicateResolutionTitle}"
+                   FontSize="{DynamicResource FontSizeTitle}"
+                   FontWeight="SemiBold"
+                   TextWrapping="Wrap"/>
+        <TextBlock Grid.Row="1"
+                   Text="{DynamicResource L_DuplicateResolutionHint}"
+                   Margin="0,8,0,12"
+                   FontSize="{DynamicResource FontSizeCaption}"
+                   Foreground="{DynamicResource AppSecondaryTextBrush}"
+                   TextWrapping="Wrap"/>
+        <ScrollViewer Grid.Row="2"
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="GroupsPanel" Spacing="14"/>
+        </ScrollViewer>
+        <CheckBox x:Name="DeleteFilesCheckBox"
+                  Grid.Row="3"
+                  Margin="0,12,0,0"
+                  Content="{DynamicResource L_DuplicateResolutionDeleteFiles}"/>
+        <Grid Grid.Row="4" Margin="0,12,0,0" ColumnDefinitions="*,Auto,Auto">
+            <TextBlock x:Name="SummaryTextBlock"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource AppSecondaryTextBrush}"
+                       TextWrapping="Wrap"/>
+            <Button Grid.Column="1"
+                    Margin="0,0,10,0"
+                    MinWidth="100"
+                    Padding="18,9"
+                    Content="{DynamicResource L_Cancel}"
+                    Click="CancelButton_OnClick"/>
+            <Button x:Name="RemoveButton"
+                    Grid.Column="2"
+                    MinWidth="160"
+                    Padding="18,9"
+                    IsEnabled="False"
+                    Content="{DynamicResource L_DuplicateResolutionRemove}"
+                    Click="RemoveButton_OnClick"/>
+        </Grid>
+    </Grid>
+</Window>
