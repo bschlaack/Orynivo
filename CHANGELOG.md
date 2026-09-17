@@ -70,6 +70,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   All new strings exist in German, English, French, Spanish, Russian, Simplified
   Chinese, and Hindi.
 
+- Added `LibraryMetadataRepairService.FindDuplicateGroups` in `Orynivo.Core`,
+  which reuses the Library Doctor AcoustID/SHA-256 evidence to return duplicate
+  file groups (exact byte-identical files and likely same-size matches). It is
+  read-only: nothing is removed or merged, and alternate recordings are never
+  reported as duplicates.
 - Added optional lossy remote transcoding to the server stream endpoint:
   `GET /api/stream/{id}?format=opus|aac&bitrate=<64-320>` re-encodes through
   FFmpeg for bandwidth-limited clients, with per-format defaults, validated

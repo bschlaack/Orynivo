@@ -273,6 +273,77 @@ public static class LibraryMetadataRepairService
             .ToList();
     }
 
+    /// <summary>
+    /// Finds groups of physical files that appear to be duplicates of one another,
+    /// using the same AcoustID fingerprint and SHA-256 evidence as the Library
+    /// Doctor analysis. Byte-identical files form <see cref="LibraryDuplicateKind.Exact"/>
+    /// groups; files that share a fingerprint and size but could not be hashed form
+    /// <see cref="LibraryDuplicateKind.Likely"/> groups. Files with the same
+    /// fingerprint but different content or size are alternate recordings and are
+    /// never reported as duplicates. Nothing is removed automatically.
+    /// </summary>
+    /// <param name="tracks">Tracks to inspect.</param>
+    /// <param name="inspectFiles">Whether physical files may be hashed.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="progress">Optional progress receiver.</param>
+    /// <returns>Duplicate groups ordered by their first path.</returns>
+    public static List<LibraryDuplicateGroup> FindDuplicateGroups(
+        IEnumerable<MetadataRepairTrack> tracks,
+        bool inspectFiles = true,
+        CancellationToken cancellationToken = default,
+        IProgress<MetadataReviewProgress>? progress = null)
+    {
+        ArgumentNullException.ThrowIfNull(tracks);
+        cancellationToken.ThrowIfCancellationRequested();
+        var trackList = tracks.ToList();
+        var fingerprintGroups = trackList
+            .Where(static track => !string.IsNullOrWhiteSpace(track.AcoustIdFingerprint))
+            .GroupBy(static track => track.AcoustIdFingerprint!, StringComparer.Ordinal)
+            .ToDictionary(static group => group.Key, static group => group.ToList(), StringComparer.Ordinal);
+        var contentHashes = inspectFiles
+            ? BuildDuplicateContentHashes(fingerprintGroups, cancellationToken, progress)
+            : new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        var groups = new List<LibraryDuplicateGroup>();
+        foreach (var fingerprintGroup in fingerprintGroups.Values)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var distinct = fingerprintGroup
+                .GroupBy(track => track.SourcePath, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .ToList();
+            if (distinct.Count < 2)
+                continue;
+
+            foreach (var exact in distinct
+                         .Where(track => contentHashes.ContainsKey(track.SourcePath))
+                         .GroupBy(track => contentHashes[track.SourcePath], StringComparer.Ordinal)
+                         .Where(group => group.Count() > 1))
+            {
+                groups.Add(new LibraryDuplicateGroup(
+                    LibraryDuplicateKind.Exact,
+                    exact.Select(ToDuplicateFile).ToList()));
+            }
+
+            foreach (var likely in distinct
+                         .Where(track => !contentHashes.ContainsKey(track.SourcePath) && track.FileSize is > 0)
+                         .GroupBy(track => track.FileSize!.Value)
+                         .Where(group => group.Count() > 1))
+            {
+                groups.Add(new LibraryDuplicateGroup(
+                    LibraryDuplicateKind.Likely,
+                    likely.Select(ToDuplicateFile).ToList()));
+            }
+        }
+
+        return groups
+            .OrderBy(group => group.Files[0].Path, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static LibraryDuplicateFile ToDuplicateFile(MetadataRepairTrack track) =>
+        new(track.SourcePath, track.FileSize);
+
     private static (int ExactDuplicates, int LikelyDuplicates, int AlternateRecordings) AnalyzeDuplicateCandidates(
         IEnumerable<MetadataRepairTrack> folderTracks,
         IReadOnlyDictionary<string, List<MetadataRepairTrack>> fingerprintGroups,

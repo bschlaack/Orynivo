@@ -113,6 +113,10 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   unavailable hash remains “likely,” while differing size or content means an
   alternate-file/edition candidate. No class may trigger automatic deletion or
   metadata merging.
+  `LibraryMetadataRepairService.FindDuplicateGroups` exposes the same evidence as
+  `LibraryDuplicateGroup` records (`Exact`/`Likely`) for a user-confirmed review;
+  it is read-only and must never remove, move, or merge anything. Any removal
+  stays explicit and user-confirmed.
   Artist spelling variants use the shared conservative comparison key and are
   guided-review findings only; name similarity must never merge artist records
   automatically.

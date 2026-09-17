@@ -149,21 +149,24 @@ Implemented:
 Tests: option validation and mapping (`Orynivo.Server.Tests`), stream-URL
 building (`Orynivo.Core.Tests`).
 
-## 6. Library Doctor duplicate resolution — `Todo`
+## 6. Library Doctor duplicate resolution — `In progress`
 
 Turn the existing read-only duplicate findings into a user-confirmed workflow.
 
-**Design**
+Steps:
 
-- `MetadataRepairDialog`/Library Doctor: a review list with per-group
-  "keep this / remove the others" selection, always explicit.
-- Reuse `LibraryScanner`/`AudioDatabase` deletion paths; update SQLite, Lucene,
-  and the waveform cache together.
-- Never automatic; no action without a confirmation.
+- 6a Core duplicate grouping — `Done`: `LibraryMetadataRepairService.FindDuplicateGroups`
+  reuses the Library Doctor fingerprint/SHA-256 evidence and returns
+  `LibraryDuplicateGroup` records (`Exact` for byte-identical files, `Likely` for
+  unhashed same-size matches; alternate recordings are never reported). 6 tests.
+- 6b Core library removal API — `Todo`: remove confirmed paths from SQLite,
+  Lucene, and the waveform cache together (and optionally delete the files from
+  disk), reusing the `LibraryScanner` cleanup pattern.
+- 6c Desktop review UI — `Todo`: a per-group "keep this / remove the others"
+  list in `MetadataRepairDialog` with explicit confirmation and seven-language
+  localization.
 
-**Tests**: grouping/selection logic as pure helpers.
-
-**Commit**: `feat(library): add confirmed duplicate resolution to Library Doctor`
+Never automatic; no action without confirmation.
 
 ## 7. Bulk editing in tables — `Todo`
 
