@@ -171,7 +171,7 @@ Steps:
 
 Never automatic; no action without confirmation.
 
-## 7. Bulk editing in tables — `In progress`
+## 7. Bulk editing in tables — `Done`
 
 Multi-select rows, then set personal rating or favorite in one step.
 
@@ -180,10 +180,11 @@ Steps:
 - 7a Core bulk update API — `Done`: `AudioDatabase.SetTrackFavorites` and
   `SetTrackUserRatings` write several tracks in one transaction (profile-aware,
   de-duplicated identifiers, validated rating). 5 tests.
-- 7b Desktop multi-select UI — `Todo`: enable `SelectionMode="Extended"` on the
-  Tracks table, show a bulk action bar for track selections, apply local updates
-  through 7a and remote updates through the per-track favorite/rating endpoints
-  (bounded), and refresh the visible rows in place. Seven-language localization.
+- 7b Desktop multi-select UI — `Done`: the shared content table uses
+  `SelectionMode="Extended"`, a bulk action bar appears for multi-track
+  selections in local and remote Tracks views, local rows apply through 7a,
+  remote rows update the client-side favorite container and the server rating
+  API, and the visible rows refresh in place. Localized in all seven languages.
 
 Genre editing is deliberately **not** included: it would write media tags, which
 needs a separate, explicit decision (the library never rewrites audio files

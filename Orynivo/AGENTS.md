@@ -437,6 +437,14 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   result is complete, unless a proven virtualized/paged strategy is used.
 - Use shared typography, brushes, vector icons, control themes, loading helpers,
   and context-menu patterns from the existing application resources.
+- The shared content table supports multi-selection for track rows. Selecting
+  more than one local or Orynivo Server track in a Tracks view reveals the bulk
+  action bar (`BulkEditBar`) with **Mark as favorite**, **Remove favorite**, and
+  a personal-rating selector. Local rows use the transactional
+  `AudioDatabase.SetTrackFavorites`/`SetTrackUserRatings`; remote rows update
+  the profile-scoped `OrynivoServerFavorites` container and the server rating
+  API. The bar stays hidden for every other entity type or view and must never
+  persist an authenticated playback URL.
 - Keep the application-level `DataGridSortIconMinWidth` override at zero. The
   Fluent DataGrid theme otherwise reserves 32 px for an absent sort glyph in
   every column header, obscuring labels in compact columns; a visible sort glyph

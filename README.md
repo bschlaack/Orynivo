@@ -29,6 +29,9 @@ the ability to reach that library from any device on the local network.
 - Gapless playback
 - CUE sheet support
 - ReplayGain and parametric EQ
+- Multi-select bulk editing in the shared Tracks table, applying favorite,
+  unfavorite, or a personal rating to every selected local or Orynivo Server
+  track at once
 - Local library, playlists, smart playlists and full-text search
 - Unified artist detail pages with an album-style image-and-biography hero,
   synchronized favorites, image management, refreshable biographies, and

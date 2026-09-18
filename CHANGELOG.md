@@ -12,6 +12,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `AudioDatabase.SetTrackFavorites` and `SetTrackUserRatings` apply a favorite
   state or a personal rating to several tracks in one transaction, with
   de-duplicated identifiers and validated ratings.
+- Added bulk editing for the shared local and Orynivo Server Tracks table:
+  selecting more than one track shows a bulk action bar with **Mark as
+  favorite**, **Remove favorite**, and a personal-rating selector. Local tracks
+  are written through the transactional bulk methods; remote tracks mirror their
+  favorite state into the client-side profile container and update their rating
+  through the server API. All seven interface languages are included.
 
 ### Fixed
 

@@ -1252,6 +1252,10 @@
                     BorderThickness="0,0,0,1" BorderBrush="{DynamicResource AppHeaderBorderBrush}"
                     Padding="28,19">
                 <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
@@ -1513,6 +1517,40 @@
                                              IsCheckedChanged="OrynivoServerViewModeRadioButton_OnChecked"/>
                             </StackPanel>
                         </Border>
+                        <StackPanel x:Name="BulkEditBar"
+                                    Grid.Row="1"
+                                    Grid.ColumnSpan="8"
+                                    Margin="0,14,0,0"
+                                    Orientation="Horizontal"
+                                    Spacing="10"
+                                    VerticalAlignment="Center"
+                                    IsVisible="False">
+                            <TextBlock x:Name="BulkSelectionTextBlock"
+                                       VerticalAlignment="Center"
+                                       FontSize="{DynamicResource FontSizeCaption}"
+                                       Foreground="{DynamicResource AppMutedTextBrush}"/>
+                            <Button x:Name="BulkFavoriteButton"
+                                    Padding="12,5"
+                                    VerticalAlignment="Center"
+                                    Theme="{StaticResource HeaderFilterButtonTheme}"
+                                    Content="{DynamicResource L_BulkFavorite}"
+                                    Click="BulkFavoriteButton_OnClick"/>
+                            <Button x:Name="BulkUnfavoriteButton"
+                                    Padding="12,5"
+                                    VerticalAlignment="Center"
+                                    Theme="{StaticResource HeaderFilterButtonTheme}"
+                                    Content="{DynamicResource L_BulkUnfavorite}"
+                                    Click="BulkUnfavoriteButton_OnClick"/>
+                            <ComboBox x:Name="BulkRatingComboBox"
+                                      Width="190"
+                                      Height="30"
+                                      VerticalAlignment="Center"
+                                      Background="{DynamicResource AppInputBrush}"
+                                      Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                      BorderBrush="{DynamicResource AppHeaderBorderBrush}"
+                                      ToolTip.Tip="{DynamicResource L_BulkRating}"
+                                      SelectionChanged="BulkRatingComboBox_OnSelectionChanged"/>
+                        </StackPanel>
                 </Grid>
             </Border>
 
@@ -2584,9 +2622,10 @@
                           CanUserSortColumns="True"
                           CanUserResizeColumns="True"
                           IsReadOnly="True"
-                          SelectionMode="Single"
+                          SelectionMode="Extended"
                           FontSize="{DynamicResource FontSizeCaption}"
                           LoadingRow="ContentDataGrid_OnLoadingRow"
+                          SelectionChanged="ContentDataGrid_OnSelectionChanged"
                           DoubleTapped="ContentDataGrid_OnMouseDoubleClick"/>
 
                 <ScrollViewer x:Name="AlbumFolderGroupsScrollViewer"

@@ -1350,6 +1350,22 @@ public sealed record LocalizedStrings(
     public string AiChatToolResultFallback { get; init; } = "";
     /// <summary>Gets the option for automatically accepting Fanart.tv artist-image results.</summary>
     public string AutoAcceptFanartTvImages { get; init; } = "";
+    /// <summary>Gets the bulk selection summary format string.</summary>
+    public string BulkSelectedCount { get; init; } = "";
+    /// <summary>Gets the bulk action that marks the selected tracks as favorites.</summary>
+    public string BulkFavorite { get; init; } = "";
+    /// <summary>Gets the bulk action that clears the favorite state of the selected tracks.</summary>
+    public string BulkUnfavorite { get; init; } = "";
+    /// <summary>Gets the label of the bulk personal-rating selector.</summary>
+    public string BulkRating { get; init; } = "";
+    /// <summary>Gets the bulk rating entry that clears the personal rating.</summary>
+    public string BulkRatingNone { get; init; } = "";
+    /// <summary>Gets the bulk favorite confirmation format string.</summary>
+    public string BulkFavoriteUpdated { get; init; } = "";
+    /// <summary>Gets the bulk rating confirmation format string.</summary>
+    public string BulkRatingUpdated { get; init; } = "";
+    /// <summary>Gets the bulk rating failure format string.</summary>
+    public string BulkRatingPartiallyFailed { get; init; } = "";
     /// <summary>Gets the Last.fm scrobbling settings label.</summary>
     public string LastFmScrobbling { get; init; } = "";
     /// <summary>Gets the label for enabling Last.fm scrobbling.</summary>

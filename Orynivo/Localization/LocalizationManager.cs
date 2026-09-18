@@ -271,6 +271,14 @@ public static class LocalizationManager
         resources["L_ArtistImageSuggestionTitle"] = Current.ArtistImageSuggestionTitle;
         resources["L_ArtistImageSuggestionHint"] = Current.ArtistImageSuggestionHint;
         resources["L_AutoAcceptFanartTvImages"] = Current.AutoAcceptFanartTvImages;
+        resources["L_BulkSelectedCount"] = Current.BulkSelectedCount;
+        resources["L_BulkFavorite"] = Current.BulkFavorite;
+        resources["L_BulkUnfavorite"] = Current.BulkUnfavorite;
+        resources["L_BulkRating"] = Current.BulkRating;
+        resources["L_BulkRatingNone"] = Current.BulkRatingNone;
+        resources["L_BulkFavoriteUpdated"] = Current.BulkFavoriteUpdated;
+        resources["L_BulkRatingUpdated"] = Current.BulkRatingUpdated;
+        resources["L_BulkRatingPartiallyFailed"] = Current.BulkRatingPartiallyFailed;
         resources["L_AcceptArtistImage"] = Current.AcceptArtistImage;
         resources["L_RejectArtistImage"] = Current.RejectArtistImage;
         resources["L_ShowAllAlbumTracks"] = Current.ShowAllAlbumTracks;
@@ -601,6 +609,14 @@ public static class LocalizationManager
         "Ein unerwarteter Fehler ist aufgetreten. Der Fehlerbericht konnte nicht gespeichert werden. Orynivo wird beendet.")
     {
         AutoAcceptFanartTvImages = "Fanart.tv-Funde automatisch übernehmen",
+        BulkSelectedCount = "{0} ausgewählt",
+        BulkFavorite = "Als Favorit markieren",
+        BulkUnfavorite = "Favorit entfernen",
+        BulkRating = "Bewertung",
+        BulkRatingNone = "Keine Bewertung",
+        BulkFavoriteUpdated = "Favoritenstatus für {0} Titel aktualisiert",
+        BulkRatingUpdated = "Bewertung für {0} Titel aktualisiert",
+        BulkRatingPartiallyFailed = "Bewertung für {0} Titel fehlgeschlagen",
         DuplicateResolutionTitle = "Doppelte Dateien",
         DuplicateResolutionHint = "Der Library Doctor hat Dateien gefunden, die identisch oder sehr wahrscheinlich doppelt sind. Wähle aus, welche entfernt werden sollen. Standardmäßig bleibt die erste Datei jeder Gruppe erhalten.",
         DuplicateResolutionGroupHeader = "{0} · {1} Dateien",
@@ -1359,6 +1375,14 @@ public static class LocalizationManager
         "An unexpected error occurred. The crash report could not be saved. Orynivo will now close.")
     {
         AutoAcceptFanartTvImages = "Automatically accept Fanart.tv results",
+        BulkSelectedCount = "{0} selected",
+        BulkFavorite = "Mark as favorite",
+        BulkUnfavorite = "Remove favorite",
+        BulkRating = "Rating",
+        BulkRatingNone = "No rating",
+        BulkFavoriteUpdated = "Updated favorite state for {0} tracks",
+        BulkRatingUpdated = "Updated rating for {0} tracks",
+        BulkRatingPartiallyFailed = "Rating update failed for {0} tracks",
         DuplicateResolutionTitle = "Duplicate files",
         DuplicateResolutionHint = "The Library Doctor found files that are identical or very likely duplicates. Choose which ones to remove. The first file of each group is kept by default.",
         DuplicateResolutionGroupHeader = "{0} · {1} files",
@@ -2100,6 +2124,14 @@ public static class LocalizationManager
         "Une erreur inattendue s’est produite. Le rapport n’a pas pu être enregistré. Orynivo va maintenant se fermer.")
     {
         AutoAcceptFanartTvImages = "Accepter automatiquement les résultats Fanart.tv",
+        BulkSelectedCount = "{0} sélectionné(s)",
+        BulkFavorite = "Marquer comme favori",
+        BulkUnfavorite = "Retirer des favoris",
+        BulkRating = "Note",
+        BulkRatingNone = "Aucune note",
+        BulkFavoriteUpdated = "État favori mis à jour pour {0} pistes",
+        BulkRatingUpdated = "Note mise à jour pour {0} pistes",
+        BulkRatingPartiallyFailed = "Échec de la mise à jour de la note pour {0} pistes",
         DuplicateResolutionTitle = "Fichiers en double",
         DuplicateResolutionHint = "Le Library Doctor a trouvé des fichiers identiques ou très probablement en double. Choisissez ceux à supprimer. Le premier fichier de chaque groupe est conservé par défaut.",
         DuplicateResolutionGroupHeader = "{0} · {1} fichiers",
@@ -2838,6 +2870,14 @@ public static class LocalizationManager
         "Se produjo un error inesperado. No se pudo guardar el informe. Orynivo se cerrará ahora.")
     {
         AutoAcceptFanartTvImages = "Aceptar automáticamente los resultados de Fanart.tv",
+        BulkSelectedCount = "{0} seleccionado(s)",
+        BulkFavorite = "Marcar como favorito",
+        BulkUnfavorite = "Quitar de favoritos",
+        BulkRating = "Valoración",
+        BulkRatingNone = "Sin valoración",
+        BulkFavoriteUpdated = "Estado de favorito actualizado para {0} pistas",
+        BulkRatingUpdated = "Valoración actualizada para {0} pistas",
+        BulkRatingPartiallyFailed = "Error al actualizar la valoración de {0} pistas",
         DuplicateResolutionTitle = "Archivos duplicados",
         DuplicateResolutionHint = "El Library Doctor encontró archivos idénticos o muy probablemente duplicados. Elige cuáles eliminar. El primer archivo de cada grupo se conserva de forma predeterminada.",
         DuplicateResolutionGroupHeader = "{0} · {1} archivos",
@@ -4356,6 +4396,14 @@ private static readonly LocalizedStrings Russian = new(
         AiChatEmptyResponse = "Модель вернула пустой ответ.",
         AiChatToolResultFallback = "После вызова инструмента модель не вернула окончательный ответ. Результат инструмента:",
         AutoAcceptFanartTvImages = "Автоматически принимать результаты Fanart.tv",
+        BulkSelectedCount = "Выбрано: {0}",
+        BulkFavorite = "Добавить в избранное",
+        BulkUnfavorite = "Убрать из избранного",
+        BulkRating = "Оценка",
+        BulkRatingNone = "Без оценки",
+        BulkFavoriteUpdated = "Состояние избранного обновлено для {0} треков",
+        BulkRatingUpdated = "Оценка обновлена для {0} треков",
+        BulkRatingPartiallyFailed = "Не удалось обновить оценку для {0} треков",
         DuplicateResolutionTitle = "Дублирующиеся файлы",
         DuplicateResolutionHint = "Library Doctor обнаружил идентичные или вероятно дублирующиеся файлы. Выберите, какие удалить. Первый файл каждой группы сохраняется по умолчанию.",
         DuplicateResolutionGroupHeader = "{0} · {1} файлов",
@@ -5249,6 +5297,14 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "模型返回了空响应。",
         AiChatToolResultFallback = "调用工具后，模型未返回最终答复。工具结果：",
         AutoAcceptFanartTvImages = "自动接受 Fanart.tv 的结果",
+        BulkSelectedCount = "已选择 {0} 项",
+        BulkFavorite = "标记为收藏",
+        BulkUnfavorite = "取消收藏",
+        BulkRating = "评分",
+        BulkRatingNone = "无评分",
+        BulkFavoriteUpdated = "已更新 {0} 首曲目的收藏状态",
+        BulkRatingUpdated = "已更新 {0} 首曲目的评分",
+        BulkRatingPartiallyFailed = "{0} 首曲目的评分更新失败",
         DuplicateResolutionTitle = "重复文件",
         DuplicateResolutionHint = "Library Doctor 发现了一些完全相同或极有可能重复的文件。请选择要移除的文件。每组中的第一个文件默认保留。",
         DuplicateResolutionGroupHeader = "{0} · {1} 个文件",
@@ -6141,6 +6197,14 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "मॉडल ने खाली उत्तर दिया।",
         AiChatToolResultFallback = "टूल कॉल के बाद मॉडल ने अंतिम उत्तर नहीं दिया। टूल परिणाम:",
         AutoAcceptFanartTvImages = "Fanart.tv परिणाम स्वतः स्वीकार करें",
+        BulkSelectedCount = "{0} चयनित",
+        BulkFavorite = "पसंदीदा के रूप में चिह्नित करें",
+        BulkUnfavorite = "पसंदीदा हटाएँ",
+        BulkRating = "रेटिंग",
+        BulkRatingNone = "कोई रेटिंग नहीं",
+        BulkFavoriteUpdated = "{0} ट्रैक का पसंदीदा स्टेटस अपडेट किया",
+        BulkRatingUpdated = "{0} ट्रैक की रेटिंग अपडेट की",
+        BulkRatingPartiallyFailed = "{0} ट्रैक की रेटिंग अपडेट विफल रही",
         DuplicateResolutionTitle = "डुप्लिकेट फ़ाइलें",
         DuplicateResolutionHint = "Library Doctor को ऐसी फ़ाइलें मिलीं जो समान या बहुत संभवतः डुप्लिकेट हैं। चुनें कि कौन-सी हटानी हैं। प्रत्येक समूह की पहली फ़ाइल डिफ़ॉल्ट रूप से रखी जाती है।",
         DuplicateResolutionGroupHeader = "{0} · {1} फ़ाइलें",
