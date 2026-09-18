@@ -1511,31 +1511,60 @@ selects a release and explicitly applies that correction.
 
 ```text
 Orynivo/
-├── Native/AsioBridge/       Native C++ bridge for the Steinberg ASIO SDK
-├── Native/CwAsioBridge/     Native C++ bridge built against cwASIO
+├── Native/                  Native C++ bridges
+│   ├── AirPlay2Bridge/      Standalone AirPlay 2 sender (versioned C ABI, CMake)
+│   ├── AsioBridge/          Steinberg ASIO bridge
+│   └── CwAsioBridge/        cwASIO bridge
 ├── third_party/cwasio/      Vendored cwASIO sources under the MIT License
-├── Orynivo.Core/            Cross-platform library (net8.0, no Windows deps)
-│   ├── Audio/               FFmpeg decoder, equalizer, ReplayGain utilities
-│   ├── Library/             SQLite database, scanner, Lucene search, models
-│   └── Streaming/           Provider-neutral streaming contracts and models
-├── Orynivo/                 Windows/Linux desktop (Avalonia UI)
-│   ├── Audio/               ASIO, WASAPI, PCM, and DSD playback
-│   ├── Controls/            Custom Avalonia controls
+├── Orynivo.Core/            Cross-platform library (net8.0, no platform dependencies)
+│   ├── Audio/               FFmpeg decoder, acoustic analysis, ReplayGain, equalizer, crossfeed
+│   ├── Library/             SQLite database, scanner, watcher, Lucene search, backups, models
+│   ├── Scrobbling/          Last.fm request signing, scrobble rules, and HTTP client
+│   ├── Streaming/           Provider-neutral contracts plus the Plex and Orynivo Server clients
+│   ├── Updates/             Signed release-update verification and asset selection
+│   └── Web/                 SSRF-guarded page fetching and SearXNG search
+├── Orynivo/                 Avalonia desktop client (Windows, Linux, macOS)
+│   ├── AI/                  Embedded AI chat, OpenAI-compatible client, Markdown rendering
+│   ├── Assets/              Logos, application icon, and dashboard artwork
+│   ├── Audio/               ASIO, cwASIO, WASAPI, OpenAL, AirPlay, PCM and DSD playback
+│   ├── Compatibility/       Linux compatibility types (direct ALSA, OpenAL, credential stores)
+│   ├── Controls/            Custom Avalonia controls and reusable table helpers
 │   ├── Localization/        Complete built-in resources for all seven languages
-│   ├── Mcp/                 Embedded MCP server, player bridge, and tools
-│   ├── Streaming/           Windows credential stores and Plex client
-│   └── MainWindow.*         Main user interface and navigation
+│   ├── Mcp/                 Embedded MCP server, player bridge, and the 32 tools
+│   ├── Remote/              Opt-in mobile web remote (service, page, and script)
+│   ├── Scrobbling/          Desktop scrobbling service and pending-scrobble store
+│   ├── Streaming/           Credential-store facades and the inactive Qobuz provider scaffold
+│   └── MainWindow.*.cs      Main window, split into domain-sized partials
 ├── Orynivo.Server/          Cross-platform headless server (net8.0, ASP.NET Core)
-│   ├── Endpoints/           REST and streaming endpoint handlers
-│   ├── Middleware/          API key authentication
-│   ├── Services/            Library scan and file-system watcher service
+│   ├── Endpoints/           Core, library, streaming, configuration, backup, and update routes
+│   ├── Middleware/          API key and user-profile authentication
+│   ├── Services/            Hosted library scan, watcher, and audio-feature maintenance
 │   ├── Program.cs           Server entry point
 │   └── appsettings.json     Default configuration
+├── Orynivo.Core.Tests/      Unit tests for the cross-platform core library
+├── Orynivo.Tests/           Unit tests for pure desktop helpers (no running UI required)
+├── Orynivo.Server.Tests/    Unit tests for server middleware without starting the web host
+├── scripts/                 Verification and smoke-test harnesses
+│   ├── verify-localization-parity.ps1   Seven-language desktop/website/mobile parity
+│   ├── verify-mcp-tool-parity.ps1       MCP, AI tool schema, and Settings checklist parity
+│   └── *Smoke/              Cover search, metadata, remote, and localization harnesses
+├── html/                    Static localized product website (German source plus i18n.js)
+├── Logo/                    Source logo, icon, and background artwork
+├── installer/               Windows Inno Setup script and published installers
+├── licenses/                Third-party license texts (LGPL, MIT, QRCoder)
 ├── .github/
-│   ├── server-release/      systemd unit and package scripts for Linux releases
-│   └── workflows/           CI (dotnet-desktop.yml), Windows release, Server release
-├── build.ps1                Builds native bridges and the Windows .NET application
-└── Orynivo.sln              Visual Studio solution
+│   ├── ISSUE_TEMPLATE/      Structured bug, feature, and security report forms
+│   ├── player-release/      Linux desktop packaging (DEB, RPM, Arch)
+│   ├── player-macos/        macOS PKG, ZIP, and tar packaging
+│   ├── server-release/      systemd unit and Linux server packaging
+│   ├── workflows/           CI, Windows/macOS/Linux and server releases, manifest signing
+│   └── dependabot.yml       Weekly NuGet and GitHub Actions updates
+├── build.ps1                Builds the native bridges and the .NET application
+├── Orynivo.sln              Visual Studio solution
+├── AGENTS.md                Repository-wide contributor and architecture rules
+├── ROADMAP.md               Planned and completed feature work
+├── CHANGELOG.md             Release notes
+└── README.md                This document
 ```
 
 ## Local Data
