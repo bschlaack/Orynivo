@@ -795,6 +795,24 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   credentials in plaintext or claim unavailable WASAPI, ASIO, endpoint-volume,
   or SMTC capabilities.
   Cross-platform behavior shared with the server belongs in `Orynivo.Core`.
+- The Linux target exposes system-media control through MPRIS 2 instead of
+  SMTC. `Orynivo/Compatibility/Linux/MprisMediaTransport.cs` registers
+  `org.mpris.MediaPlayer2.orynivo` on the session bus and is compiled only under
+  the `ORYNIVO_LINUX` define, because `Tmds.DBus.Protocol` is referenced on
+  Linux only. It connects asynchronously and must stay inert (never throw into
+  playback) when the session bus is unavailable. The non-Windows
+  `WindowsMediaTransportService` forwards to it so the shared transport methods
+  remain the single source of playback state. MPRIS volume changes route
+  through the existing `VolumeSlider`/`ApplySystemVolume` path and are echoed
+  back with `SetVolume`. Never publish a credential-bearing artwork URL
+  (`?key=`, Plex token, user info) through `mpris:artUrl`; gate remote artwork
+  URLs through the shared `QueuePathPolicy.CanPersist`. Remote Orynivo Server
+  covers must instead use the locally cached
+  `remote-artworks/track-art-<server>-<track>.img` file, and the now-playing
+  media metadata must be refreshed after the asynchronous artwork download
+  completes so the credential-free local file is published. Keep the
+  `VolumeChangeRequested`/`SetVolume` members on the Windows implementation as
+  no-ops so the shared `MainWindow` code compiles for every target.
 - The Windows installer shortcuts must carry the same
   `Orynivo.AudioPlayer` application user model ID that `App.xaml.cs` assigns to
   the process. Windows uses that identity to attribute the SMTC media session

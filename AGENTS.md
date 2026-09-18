@@ -74,8 +74,10 @@ PCM playback through selectable direct ALSA hardware and OpenAL output devices
 in addition to the
 library and network/UI feature set; it excludes Windows audio, endpoint-volume,
 and SMTC implementations and uses compatibility types under
-`Orynivo/Compatibility/Linux`. Linux credentials use the desktop client's
-AES-GCM current-user credential container and must never persist secrets in plaintext.
+`Orynivo/Compatibility/Linux`. System-media control on Linux is provided by
+MPRIS 2 (`org.mpris.MediaPlayer2.orynivo`) instead of SMTC. Linux credentials
+use the desktop client's AES-GCM current-user credential container and must
+never persist secrets in plaintext.
 
 Linux native DSD does not use either Windows ASIO bridge. Local and
 HTTP-range-streamed stereo DSF and uncompressed stereo DFF/DSDIFF use the
@@ -1793,6 +1795,16 @@ fallback or allow client-provided commands/paths to reach the helper.
   authenticated `GetTrackArtworkUrl` (`?key=`) so Windows fetches it directly.
 - The SMTC timeline is refreshed at most every five seconds during playback and
   immediately after track changes or seeks.
+- Linux exposes the MPRIS 2 media player interface through
+  `Orynivo/Compatibility/Linux/MprisMediaTransport.cs`, compiled only under the
+  `ORYNIVO_LINUX` define because `Tmds.DBus.Protocol` is referenced on Linux
+  only. It dispatches onto the same shared transport methods as the desktop
+  controls, must never throw into playback when the session bus is unavailable,
+  and must not publish credential-bearing artwork URLs through `mpris:artUrl`
+  (gate them through `QueuePathPolicy.CanPersist`). Remote Orynivo Server covers
+  use the locally cached `remote-artworks/track-art-<server>-<track>.img` file
+  instead, and the media metadata is refreshed after the asynchronous artwork
+  download so the cover appears without exposing the `?key=` URL.
 - `SteinbergAsioStream.IsBackendAvailable()` validates each native bridge and
   loads its shared export API dynamically. Settings shows **Steinberg ASIO**
   only when `AsioBridge.dll` exists and **cwASIO** only when

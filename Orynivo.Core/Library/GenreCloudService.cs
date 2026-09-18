@@ -280,7 +280,7 @@ public static class GenreCloudService
         if (string.IsNullOrWhiteSpace(value))
             return [];
         var result = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var token in value.Split([';', ',', '|', '/'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        foreach (var token in value.Split(new[] { ';', ',', '|', '/' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
             var normalized = Normalize(token);
             if (TryResolveDefinition(normalized, out var definition))

@@ -48,6 +48,11 @@ internal sealed class WindowsMediaTransportService : IDisposable
     /// <summary>Raised when Windows requests a new playback position.</summary>
     internal event Action<TimeSpan>? PositionChangeRequested;
 
+#pragma warning disable CS0067
+    /// <summary>Raised when a system surface requests a new output volume.</summary>
+    internal event Action<double>? VolumeChangeRequested;
+#pragma warning restore CS0067
+
     /// <summary>
     /// Creates the Windows media integration when the required operating-system
     /// APIs are available; otherwise returns <see langword="null"/>.
@@ -130,6 +135,12 @@ internal sealed class WindowsMediaTransportService : IDisposable
         {
             // SMTC availability must never affect queue navigation.
         }
+    }
+
+    /// <summary>Publishes the current output volume to the system integration.</summary>
+    /// <param name="volume">Linear volume from zero through one.</param>
+    internal void SetVolume(double volume)
+    {
     }
 
     /// <summary>Updates the playback status displayed by Windows.</summary>
