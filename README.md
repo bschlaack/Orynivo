@@ -1579,6 +1579,12 @@ the file is renamed to `.zip` only after the export completes successfully.
 Imports use the same progress bar while extracting, validating, restoring
 artwork, rebasing paths, and rebuilding the search index.
 
+**Scheduled backups** can create that archive automatically. Choose an enable
+toggle, an interval in days, how many backups to keep, and a backup folder
+(default: a `backups` folder beneath the per-user data directory), or run one
+immediately with **Back up now**. Orynivo writes the archive, removes older ones
+beyond the retention count, and shows the last successful run.
+
 ## Current Limitations
 
 - Linux output profiles include direct ALSA `hw:` endpoints and endpoints

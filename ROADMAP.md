@@ -267,16 +267,20 @@ implicitly).
   `Orynivo.Library.LyricLineSelector` (6 tests).
 - Not included: word-level (enhanced LRC) highlighting and a per-word animation.
 
-## 13. Scheduled auto-backup with retention — `Todo`
+## 13. Scheduled auto-backup with retention — `Done`
 
-**Design**
-
-- Optional scheduled library backup using the existing `LibraryBackupService`,
-  with a retention count and a last-run timestamp in settings.
-
-**Tests**: retention selection (pure).
-
-**Commit**: `feat(backup): add scheduled backups with retention`
+- `AppSettings.ScheduledBackup` persists enable, interval days, retention count,
+  folder, and the last successful run.
+- The pure, tested `Orynivo.Library.BackupRetention` owns the two decisions:
+  `IsDue` (interval elapsed, missing run, clock moved backwards) and
+  `SelectObsolete` (keep the newest N, return the rest oldest first).
+- A low-frequency timer checks on startup and every 30 minutes; the export reuses
+  `LibraryBackupService`, prunes older archives, records the run, and reports it
+  in the status bar. Only one run is in flight at a time.
+- Settings > Library exposes the enable toggle, interval, retention, folder
+  picker, **Back up now**, and the last successful run. 8 tests.
+- Not included: automatic cleanup of the *manual* exports, cloud targets, and a
+  server-side schedule.
 
 ---
 

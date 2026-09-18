@@ -907,6 +907,7 @@ public partial class MainWindow : Window
         if (!_settings.UserProfilesInitialized)
             _ = PromptInitialUserProfileAsync();
         _ = WarmSimilarityFeatureCacheAsync();
+        StartScheduledBackupTimer();
     }
 
     private async Task PromptInitialUserProfileAsync()

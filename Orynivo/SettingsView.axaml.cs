@@ -63,6 +63,8 @@ internal partial class SettingsView : UserControl
     private readonly AppSettings _settings;
     private readonly SettingsStore _settingsStore = new();
     private readonly List<string> _libraryPaths = [];
+    private string _scheduledBackupDirectory = string.Empty;
+    private long _scheduledBackupLastRunUnix;
     private readonly List<PlexServerSettings> _plexServers = [];
     private readonly Dictionary<string, string> _plexTokens = [];
     private readonly List<OrynivoServerSettings> _orynivoServers = [];
@@ -288,6 +290,12 @@ internal partial class SettingsView : UserControl
         QobuzApplicationIdTextBox.Text = settings.QobuzApplicationId ?? string.Empty;
         UpdateLastFmScrobblingStatus();
         _libraryPaths.AddRange(settings.LibraryPaths);
+        _scheduledBackupDirectory = settings.ScheduledBackup.ResolveDirectory();
+        _scheduledBackupLastRunUnix = settings.ScheduledBackup.LastRunAtUnix;
+        ScheduledBackupEnabledCheckBox.IsChecked = settings.ScheduledBackup.Enabled;
+        ScheduledBackupIntervalInput.Value = Math.Clamp(settings.ScheduledBackup.IntervalDays, 1, 365);
+        ScheduledBackupRetentionInput.Value = Math.Clamp(settings.ScheduledBackup.RetentionCount, 1, 50);
+        UpdateScheduledBackupStatus();
         _plexServers.AddRange((settings.PlexServers ?? []).Select(ClonePlexServer));
         _orynivoServers.AddRange((settings.OrynivoServers ?? []).Select(CloneOrynivoServer));
         UserProfileComboBox.ItemsSource = _profileManager.Profiles;
@@ -405,6 +413,81 @@ internal partial class SettingsView : UserControl
             : ReplayGainMode.Off;
     /// <summary>Gets a value indicating whether scans should calculate missing ReplayGain values.</summary>
     public bool CalculateMissingReplayGainDuringScan => CalculateReplayGainDuringScanCheckBox.IsChecked == true;
+
+    /// <summary>Gets whether automatic library backups are enabled.</summary>
+    public bool ScheduledBackupEnabledValue => ScheduledBackupEnabledCheckBox.IsChecked == true;
+
+    /// <summary>Gets the configured minimum number of days between automatic backups.</summary>
+    public int ScheduledBackupIntervalValue =>
+        (int)Math.Clamp(ScheduledBackupIntervalInput.Value ?? 7m, 1m, 365m);
+
+    /// <summary>Gets the configured number of backups kept before older ones are removed.</summary>
+    public int ScheduledBackupRetentionValue =>
+        (int)Math.Clamp(ScheduledBackupRetentionInput.Value ?? 3m, 1m, 50m);
+
+    /// <summary>Gets the configured backup folder.</summary>
+    public string ScheduledBackupDirectoryValue => _scheduledBackupDirectory;
+
+    /// <summary>
+    /// Gets or sets the callback that runs a library backup. The argument forces a
+    /// run regardless of the configured interval.
+    /// </summary>
+    public Func<bool, Task<bool>>? RunScheduledBackup { get; set; }
+
+    /// <summary>Updates the displayed last-run timestamp after an automatic or manual backup.</summary>
+    /// <param name="unixSeconds">Unix timestamp of the completed backup.</param>
+    public void SetScheduledBackupLastRun(long unixSeconds)
+    {
+        _scheduledBackupLastRunUnix = unixSeconds;
+        UpdateScheduledBackupStatus();
+    }
+
+    private void UpdateScheduledBackupStatus()
+    {
+        ScheduledBackupFolderTextBlock.Text = _scheduledBackupDirectory;
+        ScheduledBackupStatusTextBlock.Text = string.Format(
+            CultureInfo.CurrentCulture,
+            LocalizationManager.Current.ScheduledBackupLastRun,
+            _scheduledBackupLastRunUnix > 0
+                ? DateTimeOffset.FromUnixTimeSeconds(_scheduledBackupLastRunUnix)
+                    .ToLocalTime()
+                    .ToString("g", CultureInfo.CurrentCulture)
+                : LocalizationManager.Current.ScheduledBackupNever);
+    }
+
+    private async void ScheduledBackupFolderButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (TopLevel.GetTopLevel(this) is not { } topLevel)
+            return;
+        var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = LocalizationManager.Current.ScheduledBackupFolder,
+            AllowMultiple = false
+        });
+        if (folders.Count == 0 || folders[0].TryGetLocalPath() is not { Length: > 0 } path)
+            return;
+        _scheduledBackupDirectory = path;
+        UpdateScheduledBackupStatus();
+    }
+
+    private async void RunScheduledBackupNowButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (RunScheduledBackup is null)
+            return;
+        RunScheduledBackupNowButton.IsEnabled = false;
+        ScheduledBackupStatusTextBlock.Text = LocalizationManager.Current.ScheduledBackupRunning;
+        try
+        {
+            var completed = await RunScheduledBackup(true);
+            ScheduledBackupStatusTextBlock.Text = completed
+                ? LocalizationManager.Current.ScheduledBackupFinished
+                : LocalizationManager.Current.ScheduledBackupFailed;
+        }
+        finally
+        {
+            RunScheduledBackupNowButton.IsEnabled = true;
+        }
+    }
     /// <summary>Gets a value indicating whether DSF and DFF sources should always be converted to PCM.</summary>
     public bool AlwaysConvertDsdToPcm => AlwaysConvertDsdToPcmCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether DSD should be transported through DoP.</summary>

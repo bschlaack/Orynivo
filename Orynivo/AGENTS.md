@@ -445,6 +445,14 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   the profile-scoped `OrynivoServerFavorites` container and the server rating
   API. The bar stays hidden for every other entity type or view and must never
   persist an authenticated playback URL.
+- Automatic library backups are driven by `AppSettings.ScheduledBackup`
+  (enable, interval days, retention count, folder, last-run timestamp) and the
+  pure, tested `Orynivo.Library.BackupRetention` decisions. The low-frequency
+  timer only checks; the actual export reuses `LibraryBackupService` and prunes
+  archives beyond the retention count. Backups must never include audio files or
+  credentials, only one run may be in flight at a time, and the backup folder is
+  created on demand. Settings exposes the enable toggle, interval, retention,
+  folder picker, **Back up now**, and the last successful run.
 - The lyrics view's **Karaoke** action opens `KaraokeWindow` fullscreen. It shows
   a fixed window of synchronized lines around the active one, emphasizes the
   active line, and animates opacity and font size through `Transitions`; the

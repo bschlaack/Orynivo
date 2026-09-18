@@ -8,6 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Added optional scheduled library backups. Settings > Library gained a
+  **Scheduled backups** section with an enable toggle, an interval in days, a
+  retention count, a backup folder picker, a **Back up now** action, and the last
+  successful run. Orynivo writes the same versioned ZIP as the manual export into
+  the chosen folder (default: a per-user `backups` folder) and removes archives
+  beyond the retention count. The schedule and retention decisions live in the
+  pure, tested `Orynivo.Library.BackupRetention`; audio files and credentials are
+  never included.
 - Added a fullscreen karaoke view for synchronized lyrics. The lyrics view
   gained a **Karaoke** action that opens a fullscreen window with the active line
   centered and emphasized while neighbouring lines fade out, using the now-playing

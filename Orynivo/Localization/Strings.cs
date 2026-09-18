@@ -1350,6 +1350,34 @@ public sealed record LocalizedStrings(
     public string AiChatToolResultFallback { get; init; } = "";
     /// <summary>Gets the option for automatically accepting Fanart.tv artist-image results.</summary>
     public string AutoAcceptFanartTvImages { get; init; } = "";
+    /// <summary>Gets the scheduled-backup settings section label.</summary>
+    public string ScheduledBackup { get; init; } = "";
+    /// <summary>Gets the explanation of the scheduled-backup feature.</summary>
+    public string ScheduledBackupHint { get; init; } = "";
+    /// <summary>Gets the scheduled-backup enable option.</summary>
+    public string ScheduledBackupEnabled { get; init; } = "";
+    /// <summary>Gets the label for the backup interval in days.</summary>
+    public string ScheduledBackupInterval { get; init; } = "";
+    /// <summary>Gets the label for the number of retained backups.</summary>
+    public string ScheduledBackupRetention { get; init; } = "";
+    /// <summary>Gets the label for the backup folder.</summary>
+    public string ScheduledBackupFolder { get; init; } = "";
+    /// <summary>Gets the folder-picker action label.</summary>
+    public string ChooseFolder { get; init; } = "";
+    /// <summary>Gets the immediate-backup action label.</summary>
+    public string RunBackupNow { get; init; } = "";
+    /// <summary>Gets the last-backup format string.</summary>
+    public string ScheduledBackupLastRun { get; init; } = "";
+    /// <summary>Gets the value shown when no backup ran yet.</summary>
+    public string ScheduledBackupNever { get; init; } = "";
+    /// <summary>Gets the message shown while a backup is running.</summary>
+    public string ScheduledBackupRunning { get; init; } = "";
+    /// <summary>Gets the message shown after a backup finished.</summary>
+    public string ScheduledBackupFinished { get; init; } = "";
+    /// <summary>Gets the message shown when a backup fails.</summary>
+    public string ScheduledBackupFailed { get; init; } = "";
+    /// <summary>Gets the status-bar format string after an automatic backup.</summary>
+    public string ScheduledBackupDone { get; init; } = "";
     /// <summary>Gets the fullscreen karaoke feature label.</summary>
     public string Karaoke { get; init; } = "";
     /// <summary>Gets the karaoke action tooltip.</summary>
