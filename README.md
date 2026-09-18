@@ -787,6 +787,10 @@ byte-range streaming without FFmpeg.
   starts. These use explicit mood tags when available and fall back to tempo
   plus preference/familiarity signals; they also start with the selected track
   and continue through Infinite Mix.
+  A **Play activity mix** submenu next to it offers the curated **Focus**,
+  **Workout**, and **Wind down** presets, which rank tracks against cached
+  acoustic descriptors (energy, brightness, dynamics) and tempo and continue
+  through the same Infinite Mix queue.
   Repeated similarity and mood actions reuse a five-minute memory-only vector
   cache. Catalog, favourite, rating, and server-configuration invalidations
   clear it; no vectors or provider credentials are written to disk.
@@ -869,7 +873,9 @@ byte-range streaming without FFmpeg.
 - Smart playlists are created directly from active track filters and can be
   refined later through their sidebar context menu. The editor previews the live
   match count while criteria are changed, including unified local/server counts
-  and server-side counts when the connected Orynivo Server supports them.
+  and server-side counts when the connected Orynivo Server supports them, and it
+  shows every stored criterion — including the reference track of a similarity
+  smart playlist, whose minimum similarity score stays editable.
 - UTF-8 M3U8 import and export for regular playlists, including relative local
   paths, retained missing-file entries, and HTTP/HTTPS streams; credentialed
   Plex URLs are excluded

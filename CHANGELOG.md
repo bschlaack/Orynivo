@@ -12,6 +12,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `AudioDatabase.SetTrackFavorites` and `SetTrackUserRatings` apply a favorite
   state or a personal rating to several tracks in one transaction, with
   de-duplicated identifiers and validated ratings.
+- Added curated mood/activity presets to the track context menu: a new
+  **Play activity mix** submenu offers **Focus**, **Workout**, and **Wind down**
+  next to the existing mood mix. They rank tracks through the new
+  `SimilarityFeatureService.RankPreset` using cached acoustic descriptors
+  (energy, brightness, dynamics) and tempo, fall back to explicit mood tags and
+  preference signals for tracks without descriptors, and reuse the existing
+  Infinite Mix similarity queue, persistence, and navigation path.
 - Added a similarity criterion to smart playlists. `SmartPlaylistCriteria` can
   store a credential-free reference track (provider key plus provider-local track
   id) and an optional inclusive minimum similarity score, and resolves to that
@@ -21,6 +28,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   is stored without any server URL or credential, and remote neighbours are
   resolved through the client's cached similarity vectors. Criteria persisted
   before this change remain valid.
+- The smart-playlist editor now shows the similarity reference a playlist is
+  based on — resolved to the track title and artist for local references, or the
+  server name for remote ones — and lets its minimum similarity score be edited
+  or the reference be removed.
 - Added bulk editing for the shared local and Orynivo Server Tracks table:
   selecting more than one track shows a bulk action bar with **Mark as
   favorite**, **Remove favorite**, and a personal-rating selector. Local tracks
@@ -29,6 +40,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   through the server API. All seven interface languages are included.
 
 ### Fixed
+
+- Editing a similarity smart playlist no longer drops its reference track. The
+  editor rebuilt the criteria from its own input fields and silently lost the
+  reference; it is now carried over explicitly and removed only when the user
+  chooses **Remove reference**.
 
 ## [0.42.0] - 2026-09-17
 

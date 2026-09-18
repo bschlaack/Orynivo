@@ -285,6 +285,48 @@
                     </StackPanel>
                 </Grid>
 
+                <Border x:Name="SimilarityReferencePanel"
+                        IsVisible="False"
+                        Margin="0,14,0,0"
+                        Padding="12,10"
+                        Background="{DynamicResource AppInputBrush}"
+                        BorderBrush="{DynamicResource AppInputBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="10">
+                    <StackPanel Spacing="8">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Grid.Column="0" Spacing="4">
+                                <TextBlock Text="{DynamicResource L_SmartPlaylistSimilarityReference}"
+                                           FontSize="{DynamicResource FontSizeCaption}"
+                                           Foreground="{DynamicResource AppMutedTextBrush}"/>
+                                <TextBlock x:Name="SimilarityReferenceTextBlock"
+                                           TextWrapping="Wrap"
+                                           FontSize="{DynamicResource FontSizeBody}"
+                                           Foreground="{DynamicResource AppPrimaryTextBrush}"/>
+                            </StackPanel>
+                            <Button x:Name="ClearSimilarityReferenceButton"
+                                    Grid.Column="1"
+                                    Margin="12,0,0,0"
+                                    Padding="12,5"
+                                    VerticalAlignment="Center"
+                                    Theme="{StaticResource SmartPlaylistButtonTheme}"
+                                    Content="{DynamicResource L_SmartPlaylistSimilarityClear}"
+                                    Click="ClearSimilarityReferenceButton_OnClick"/>
+                        </Grid>
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="{DynamicResource L_SmartPlaylistSimilarityMinimumScore}"
+                                       FontSize="{DynamicResource FontSizeCaption}"
+                                       Foreground="{DynamicResource AppMutedTextBrush}"/>
+                            <TextBox x:Name="SimilarityMinimumScoreTextBox"
+                                     Width="140"
+                                     HorizontalAlignment="Left"
+                                     Background="{DynamicResource AppInputBrush}"
+                                     Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                     BorderBrush="{DynamicResource AppInputBorderBrush}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
                 <TextBlock x:Name="ValidationTextBlock"
                            IsVisible="False"
                            Foreground="#E05B62"

@@ -205,17 +205,20 @@ implicitly).
   (creation is context-menu driven), and a server-side similarity resolve
   endpoint.
 
-## 9. Mood/activity presets — `Todo`
+## 9. Mood/activity presets — `Done`
 
-**Design**
-
-- Presets (Focus, Workout, Wind down) over the existing acoustic descriptors
-  (energy/brightness/dynamics) and BPM, reusing the Infinite Mix queue path.
-- Shown beside the existing mood selector.
-
-**Tests**: preset ranking determinism.
-
-**Commit**: `feat(infinite-mix): add mood and activity presets`
+- `SimilarityFeatureService.RankPreset` provides deterministic **Focus**,
+  **Workout**, and **Wind down** ordering from cached acoustic descriptors
+  (energy, brightness, dynamics), normalized tempo, explicit mood tags, and
+  preference signals. Missing descriptors use a neutral prior instead of
+  excluding the track.
+- `RankSimilar`, `RankMood`, and `RankPreset` now share one private
+  diversity-limited selection helper (behaviour-preserving refactor).
+- The track context menu gained a **Play activity mix** submenu beside the mood
+  mix, reusing the shared Infinite Mix similarity queue, persistence, and
+  navigation path. 8 tests.
+- Not included: surfacing the presets in `InfiniteMixDialog`; the presets are a
+  context-menu quick start, not persisted profile state.
 
 ## 10. Harmonic mixing (Camelot) — `Todo`
 

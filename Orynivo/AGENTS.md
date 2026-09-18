@@ -445,6 +445,14 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   the profile-scoped `OrynivoServerFavorites` container and the server rating
   API. The bar stays hidden for every other entity type or view and must never
   persist an authenticated playback URL.
+- The smart-playlist editor (`SmartPlaylistDialog`) must show every stored
+  criterion and must never drop a criterion it cannot rebuild from its own input
+  fields. The similarity reference is displayed with a readable track label
+  (track title and artist for local references, server name for remote ones) and
+  is carried across a save through the pure, tested
+  `SmartPlaylistCriteriaEditing.ResolveSimilarityReference`; it is removed only
+  through the explicit **Remove reference** action. The reference label lookup
+  runs off the UI thread.
 - Keep the application-level `DataGridSortIconMinWidth` override at zero. The
   Fluent DataGrid theme otherwise reserves 32 px for an absent sort glyph in
   every column header, obscuring labels in compact columns; a visible sort glyph

@@ -271,6 +271,13 @@ public static class LocalizationManager
         resources["L_ArtistImageSuggestionTitle"] = Current.ArtistImageSuggestionTitle;
         resources["L_ArtistImageSuggestionHint"] = Current.ArtistImageSuggestionHint;
         resources["L_AutoAcceptFanartTvImages"] = Current.AutoAcceptFanartTvImages;
+        resources["L_SmartPlaylistSimilarityReference"] = Current.SmartPlaylistSimilarityReference;
+        resources["L_SmartPlaylistSimilarityClear"] = Current.SmartPlaylistSimilarityClear;
+        resources["L_SmartPlaylistSimilarityMinimumScore"] = Current.SmartPlaylistSimilarityMinimumScore;
+        resources["L_PlayActivityMix"] = Current.PlayActivityMix;
+        resources["L_ActivityMixFocus"] = Current.ActivityMixFocus;
+        resources["L_ActivityMixWorkout"] = Current.ActivityMixWorkout;
+        resources["L_ActivityMixWindDown"] = Current.ActivityMixWindDown;
         resources["L_CreateSimilarSmartPlaylist"] = Current.CreateSimilarSmartPlaylist;
         resources["L_BulkSelectedCount"] = Current.BulkSelectedCount;
         resources["L_BulkFavorite"] = Current.BulkFavorite;
@@ -610,6 +617,13 @@ public static class LocalizationManager
         "Ein unerwarteter Fehler ist aufgetreten. Der Fehlerbericht konnte nicht gespeichert werden. Orynivo wird beendet.")
     {
         AutoAcceptFanartTvImages = "Fanart.tv-Funde automatisch übernehmen",
+        SmartPlaylistSimilarityReference = "Ähnlichkeitsreferenz",
+        SmartPlaylistSimilarityClear = "Referenz entfernen",
+        SmartPlaylistSimilarityMinimumScore = "Mindestähnlichkeit (0–1)",
+        PlayActivityMix = "Aktivitätsmix abspielen",
+        ActivityMixFocus = "Fokus",
+        ActivityMixWorkout = "Training",
+        ActivityMixWindDown = "Entspannen",
         CreateSimilarSmartPlaylist = "Als intelligente Wiedergabeliste speichern: ähnliche Titel",
         BulkSelectedCount = "{0} ausgewählt",
         BulkFavorite = "Als Favorit markieren",
@@ -1377,6 +1391,13 @@ public static class LocalizationManager
         "An unexpected error occurred. The crash report could not be saved. Orynivo will now close.")
     {
         AutoAcceptFanartTvImages = "Automatically accept Fanart.tv results",
+        SmartPlaylistSimilarityReference = "Similarity reference",
+        SmartPlaylistSimilarityClear = "Remove reference",
+        SmartPlaylistSimilarityMinimumScore = "Minimum similarity (0–1)",
+        PlayActivityMix = "Play activity mix",
+        ActivityMixFocus = "Focus",
+        ActivityMixWorkout = "Workout",
+        ActivityMixWindDown = "Wind down",
         CreateSimilarSmartPlaylist = "Save as smart playlist: similar tracks",
         BulkSelectedCount = "{0} selected",
         BulkFavorite = "Mark as favorite",
@@ -2127,6 +2148,13 @@ public static class LocalizationManager
         "Une erreur inattendue s’est produite. Le rapport n’a pas pu être enregistré. Orynivo va maintenant se fermer.")
     {
         AutoAcceptFanartTvImages = "Accepter automatiquement les résultats Fanart.tv",
+        SmartPlaylistSimilarityReference = "Référence de similitude",
+        SmartPlaylistSimilarityClear = "Supprimer la référence",
+        SmartPlaylistSimilarityMinimumScore = "Similitude minimale (0–1)",
+        PlayActivityMix = "Lire un mix d'activité",
+        ActivityMixFocus = "Concentration",
+        ActivityMixWorkout = "Entraînement",
+        ActivityMixWindDown = "Détente",
         CreateSimilarSmartPlaylist = "Enregistrer comme liste intelligente : pistes similaires",
         BulkSelectedCount = "{0} sélectionné(s)",
         BulkFavorite = "Marquer comme favori",
@@ -2874,6 +2902,13 @@ public static class LocalizationManager
         "Se produjo un error inesperado. No se pudo guardar el informe. Orynivo se cerrará ahora.")
     {
         AutoAcceptFanartTvImages = "Aceptar automáticamente los resultados de Fanart.tv",
+        SmartPlaylistSimilarityReference = "Referencia de similitud",
+        SmartPlaylistSimilarityClear = "Quitar referencia",
+        SmartPlaylistSimilarityMinimumScore = "Similitud mínima (0–1)",
+        PlayActivityMix = "Reproducir mezcla de actividad",
+        ActivityMixFocus = "Concentración",
+        ActivityMixWorkout = "Entrenamiento",
+        ActivityMixWindDown = "Relajación",
         CreateSimilarSmartPlaylist = "Guardar como lista inteligente: pistas similares",
         BulkSelectedCount = "{0} seleccionado(s)",
         BulkFavorite = "Marcar como favorito",
@@ -4401,6 +4436,13 @@ private static readonly LocalizedStrings Russian = new(
         AiChatEmptyResponse = "Модель вернула пустой ответ.",
         AiChatToolResultFallback = "После вызова инструмента модель не вернула окончательный ответ. Результат инструмента:",
         AutoAcceptFanartTvImages = "Автоматически принимать результаты Fanart.tv",
+        SmartPlaylistSimilarityReference = "Ссылка на похожий трек",
+        SmartPlaylistSimilarityClear = "Удалить ссылку",
+        SmartPlaylistSimilarityMinimumScore = "Минимальное сходство (0–1)",
+        PlayActivityMix = "Воспроизвести микс активности",
+        ActivityMixFocus = "Сосредоточение",
+        ActivityMixWorkout = "Тренировка",
+        ActivityMixWindDown = "Расслабление",
         CreateSimilarSmartPlaylist = "Сохранить как умный плейлист: похожие треки",
         BulkSelectedCount = "Выбрано: {0}",
         BulkFavorite = "Добавить в избранное",
@@ -5303,6 +5345,13 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "模型返回了空响应。",
         AiChatToolResultFallback = "调用工具后，模型未返回最终答复。工具结果：",
         AutoAcceptFanartTvImages = "自动接受 Fanart.tv 的结果",
+        SmartPlaylistSimilarityReference = "相似度参考曲目",
+        SmartPlaylistSimilarityClear = "移除参考曲目",
+        SmartPlaylistSimilarityMinimumScore = "最低相似度（0–1）",
+        PlayActivityMix = "播放活动混音",
+        ActivityMixFocus = "专注",
+        ActivityMixWorkout = "锻炼",
+        ActivityMixWindDown = "放松",
         CreateSimilarSmartPlaylist = "保存为智能播放列表：相似曲目",
         BulkSelectedCount = "已选择 {0} 项",
         BulkFavorite = "标记为收藏",
@@ -6204,6 +6253,13 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "मॉडल ने खाली उत्तर दिया।",
         AiChatToolResultFallback = "टूल कॉल के बाद मॉडल ने अंतिम उत्तर नहीं दिया। टूल परिणाम:",
         AutoAcceptFanartTvImages = "Fanart.tv परिणाम स्वतः स्वीकार करें",
+        SmartPlaylistSimilarityReference = "समानता संदर्भ",
+        SmartPlaylistSimilarityClear = "संदर्भ हटाएँ",
+        SmartPlaylistSimilarityMinimumScore = "न्यूनतम समानता (0–1)",
+        PlayActivityMix = "गतिविधि मिक्स चलाएँ",
+        ActivityMixFocus = "एकाग्रता",
+        ActivityMixWorkout = "वर्कआउट",
+        ActivityMixWindDown = "आराम",
         CreateSimilarSmartPlaylist = "स्मार्ट प्लेलिस्ट के रूप में सहेजें: समान ट्रैक",
         BulkSelectedCount = "{0} चयनित",
         BulkFavorite = "पसंदीदा के रूप में चिह्नित करें",

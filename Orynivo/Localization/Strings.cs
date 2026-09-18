@@ -1350,6 +1350,20 @@ public sealed record LocalizedStrings(
     public string AiChatToolResultFallback { get; init; } = "";
     /// <summary>Gets the option for automatically accepting Fanart.tv artist-image results.</summary>
     public string AutoAcceptFanartTvImages { get; init; } = "";
+    /// <summary>Gets the smart-playlist editor label for the similarity reference track.</summary>
+    public string SmartPlaylistSimilarityReference { get; init; } = "";
+    /// <summary>Gets the smart-playlist editor action that removes the similarity reference.</summary>
+    public string SmartPlaylistSimilarityClear { get; init; } = "";
+    /// <summary>Gets the smart-playlist editor label for the minimum similarity score.</summary>
+    public string SmartPlaylistSimilarityMinimumScore { get; init; } = "";
+    /// <summary>Gets the track action that starts a curated mood/activity preset mix.</summary>
+    public string PlayActivityMix { get; init; } = "";
+    /// <summary>Gets the focus activity preset label.</summary>
+    public string ActivityMixFocus { get; init; } = "";
+    /// <summary>Gets the workout activity preset label.</summary>
+    public string ActivityMixWorkout { get; init; } = "";
+    /// <summary>Gets the wind-down activity preset label.</summary>
+    public string ActivityMixWindDown { get; init; } = "";
     /// <summary>Gets the track action that saves a similarity smart playlist.</summary>
     public string CreateSimilarSmartPlaylist { get; init; } = "";
     /// <summary>Gets the bulk selection summary format string.</summary>

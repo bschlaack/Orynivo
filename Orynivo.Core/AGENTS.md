@@ -154,6 +154,12 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   `RankMood` provides deterministic calm, balanced, and energetic ordering from
   explicit mood tags, normalized BPM, preferences, community confidence, and
   familiarity, with the same provider-aware diversity constraints.
+  `RankPreset` provides deterministic **Focus**, **Workout**, and **Wind down**
+  ordering from cached acoustic descriptors (energy, brightness, dynamics),
+  normalized tempo, explicit mood tags, and preference signals; missing
+  descriptors use a neutral prior rather than excluding the track. All three
+  rankings share one private diversity-limited selection helper, and results
+  always carry credential-free provider keys.
   Server vectors are paged by stable track ID order, and the desktop client
   must replace the server's placeholder source with `orynivo:{server.Id}`;
   never place a server URL or credential in `SourceKey`.
