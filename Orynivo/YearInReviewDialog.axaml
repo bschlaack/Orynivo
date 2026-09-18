@@ -16,7 +16,8 @@
             <Setter Property="BorderBrush" Value="{DynamicResource AppButtonBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="FontSize" Value="12"/>
-            <Setter Property="Padding" Value="16,6"/>
+            <Setter Property="Padding" Value="24,11"/>
+            <Setter Property="MinHeight" Value="40"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Template">
@@ -27,6 +28,7 @@
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="8">
                         <ContentPresenter Content="{TemplateBinding Content}"
+                                          Padding="{TemplateBinding Padding}"
                                           HorizontalAlignment="Center"
                                           VerticalAlignment="Center"/>
                     </Border>

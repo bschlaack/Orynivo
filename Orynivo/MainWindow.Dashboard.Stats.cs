@@ -117,15 +117,6 @@ public partial class MainWindow : Window
         details.Children.Add(artistsCard);
         DashboardPanel.Children.Add(details);
 
-        var yearInReview = new Button
-        {
-            Content = LocalizationManager.Current.YearInReview,
-            Theme = FindResource<ControlTheme>("EntityLinkButtonTheme"),
-            HorizontalAlignment = HorizontalAlignment.Left,
-            Margin = new Thickness(0, 14, 0, 0)
-        };
-        yearInReview.Click += YearInReviewButton_OnClick;
-        DashboardPanel.Children.Add(yearInReview);
     }
 
     private Border DashboardBuildListeningSummaryCard(
@@ -178,7 +169,24 @@ public partial class MainWindow : Window
             SelectedIndex = (int)_dashboardStatsPeriod
         };
         periodBox.SelectionChanged += DashboardStatsPeriod_OnSelectionChanged;
-        return DashboardWrapOverviewCard(LocalizationManager.Current.ListeningStats, content, periodBox);
+
+        // The year-in-review link sits directly below the period selector so both
+        // belong to the same "listening stats" context.
+        var headerActions = new StackPanel
+        {
+            Spacing = 8,
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        headerActions.Children.Add(periodBox);
+        var yearInReview = new Button
+        {
+            Content = LocalizationManager.Current.YearInReview,
+            Theme = FindResource<ControlTheme>("EntityLinkButtonTheme"),
+            HorizontalAlignment = HorizontalAlignment.Right
+        };
+        yearInReview.Click += YearInReviewButton_OnClick;
+        headerActions.Children.Add(yearInReview);
+        return DashboardWrapOverviewCard(LocalizationManager.Current.ListeningStats, content, headerActions);
     }
 
     private Control DashboardBuildListeningChart(IReadOnlyList<double> listeningTrend)

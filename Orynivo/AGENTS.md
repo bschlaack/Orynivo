@@ -445,7 +445,9 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   the profile-scoped `OrynivoServerFavorites` container and the server rating
   API. The bar stays hidden for every other entity type or view and must never
   persist an authenticated playback URL.
-- The Dashboard **Year in review** action opens `YearInReviewDialog`, which
+- The Dashboard **Year in review** action lives in the Listening stats card
+  directly below its period selector, so both share one context. It opens
+  `YearInReviewDialog`, which
   renders the existing year aggregates from `AudioDatabase.GetYearInReview` and
   exports the visible card through `RenderTargetBitmap`. It must only read
   playback history, must load each year off the UI thread, and must keep the
