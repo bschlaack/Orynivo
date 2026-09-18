@@ -384,6 +384,23 @@ public sealed record TopArtistStat(
     string? ExternalId,
     string? Path);
 
+/// <summary>Aggregated listening statistics for one calendar year.</summary>
+/// <param name="Year">Calendar year the statistics describe.</param>
+/// <param name="TotalListeningSeconds">Total listened seconds inside the year.</param>
+/// <param name="ActiveDays">Number of local calendar days with recorded listening.</param>
+/// <param name="MonthlySeconds">Twelve entries from January through December.</param>
+/// <param name="TopGenres">Leading genres with their listened seconds.</param>
+/// <param name="TopAlbums">Leading albums with their listened seconds.</param>
+/// <param name="TopArtists">Leading artists with their listened seconds.</param>
+public sealed record YearInReviewSummary(
+    int Year,
+    double TotalListeningSeconds,
+    int ActiveDays,
+    IReadOnlyList<double> MonthlySeconds,
+    IReadOnlyList<(string Genre, double Seconds)> TopGenres,
+    IReadOnlyList<TopAlbumStat> TopAlbums,
+    IReadOnlyList<TopArtistStat> TopArtists);
+
 /// <summary>Result returned after an artist-name normalisation run.</summary>
 public sealed record ArtistNormalizationResult(int MergedArtists, int UpdatedTracks);
 
@@ -5119,6 +5136,100 @@ public sealed class AudioDatabase : IDisposable
         return result;
     }
 
+    /// <summary>
+    /// Aggregates the existing listening statistics for one calendar year. No new
+    /// data is collected; every value comes from the playback history.
+    /// </summary>
+    /// <param name="year">Four-digit calendar year.</param>
+    /// <param name="topCount">Maximum entries per leading list.</param>
+    /// <returns>The year summary, or <see langword="null"/> for an unsupported year.</returns>
+    public YearInReviewSummary? GetYearInReview(int year, int topCount = 5)
+    {
+        if (year is < 1900 or > 9999)
+            return null;
+        topCount = Math.Clamp(topCount, 1, 50);
+        var start = new DateTimeOffset(new DateTime(year, 1, 1, 0, 0, 0, DateTimeKind.Local));
+        var end = start.AddYears(1);
+        var startUnix = start.ToUnixTimeSeconds();
+        var endUnix = end.ToUnixTimeSeconds();
+        return new YearInReviewSummary(
+            year,
+            GetTotalListeningSeconds(startUnix, endUnix),
+            GetActiveListeningDays(startUnix, endUnix),
+            GetMonthlyListeningSeconds(startUnix, endUnix),
+            GetTopGenres(topCount, startUnix, endUnix),
+            GetTopAlbums(topCount, startUnix, endUnix),
+            GetTopArtists(topCount, startUnix, endUnix));
+    }
+
+    /// <summary>Returns the local calendar years with recorded playback.</summary>
+    /// <returns>Distinct years that contain listening time, newest first.</returns>
+    public List<int> GetListeningYears()
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT DISTINCT CAST(strftime('%Y', started_at, 'unixepoch', 'localtime') AS INTEGER) AS year
+            FROM play_history
+            WHERE profile_id = $profile AND position_seconds > 0
+            ORDER BY year DESC;
+            """;
+        cmd.Parameters.AddWithValue("$profile", ActiveProfileId);
+        using var reader = cmd.ExecuteReader();
+        var result = new List<int>();
+        while (reader.Read())
+            result.Add(reader.GetInt32(0));
+        return result;
+    }
+
+    /// <summary>Counts local calendar days with recorded listening inside a range.</summary>
+    /// <param name="sinceUnix">Inclusive lower Unix-time bound.</param>
+    /// <param name="untilUnix">Exclusive upper Unix-time bound.</param>
+    /// <returns>The number of distinct local calendar days with listening time.</returns>
+    public int GetActiveListeningDays(long sinceUnix, long untilUnix)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT COUNT(*) FROM (
+                SELECT DISTINCT strftime('%Y-%m-%d', started_at, 'unixepoch', 'localtime') AS day
+                FROM play_history
+                WHERE profile_id = $profile AND position_seconds > 0
+                  AND started_at >= $start AND started_at < $end);
+            """;
+        cmd.Parameters.AddWithValue("$profile", ActiveProfileId);
+        cmd.Parameters.AddWithValue("$start", sinceUnix);
+        cmd.Parameters.AddWithValue("$end", untilUnix);
+        return Convert.ToInt32(cmd.ExecuteScalar() ?? 0, CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>Aggregates listened seconds per local calendar month inside a range.</summary>
+    /// <param name="sinceUnix">Inclusive lower Unix-time bound.</param>
+    /// <param name="untilUnix">Exclusive upper Unix-time bound.</param>
+    /// <returns>Twelve entries from January through December.</returns>
+    public IReadOnlyList<double> GetMonthlyListeningSeconds(long sinceUnix, long untilUnix)
+    {
+        var result = new double[12];
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT CAST(strftime('%m', started_at, 'unixepoch', 'localtime') AS INTEGER) AS month,
+                   SUM(COALESCE(position_seconds, 0)) AS secs
+            FROM play_history
+            WHERE profile_id = $profile AND position_seconds > 0
+              AND started_at >= $start AND started_at < $end
+            GROUP BY month;
+            """;
+        cmd.Parameters.AddWithValue("$profile", ActiveProfileId);
+        cmd.Parameters.AddWithValue("$start", sinceUnix);
+        cmd.Parameters.AddWithValue("$end", untilUnix);
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            var month = reader.GetInt32(0);
+            if (month is >= 1 and <= 12)
+                result[month - 1] = reader.GetDouble(1);
+        }
+        return result;
+    }
+
     /// <summary>Returns the albums whose tracks were added most recently.</summary>
     /// <param name="limit">Maximum number of albums to return.</param>
     /// <returns>Compact recent-album rows ordered by newest track addition.</returns>
@@ -5794,8 +5905,9 @@ public sealed class AudioDatabase : IDisposable
     /// <summary>Aggregates listening time per genre across all playback sources.</summary>
     /// <param name="limit">Maximum number of genres to return.</param>
     /// <param name="sinceUnix">Optional inclusive lower bound on the playback start (Unix seconds); <see langword="null"/> means all time.</param>
+    /// <param name="untilUnix">Optional exclusive upper bound on the playback start (Unix seconds); <see langword="null"/> means no upper bound.</param>
     /// <returns>Genres ordered by total play time descending.</returns>
-    public List<(string Genre, double Seconds)> GetTopGenres(int limit = 10, long? sinceUnix = null)
+    public List<(string Genre, double Seconds)> GetTopGenres(int limit = 10, long? sinceUnix = null, long? untilUnix = null)
     {
         var agg = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
         using var cmd = _conn.CreateCommand();
@@ -5809,12 +5921,14 @@ public sealed class AudioDatabase : IDisposable
             WHERE ph.profile_id = $profile AND ph.position_seconds > 0
               AND COALESCE(t.genre, ph.genre) IS NOT NULL
               AND COALESCE(t.genre, ph.genre) != ''
-              {(sinceUnix.HasValue ? "AND ph.started_at >= $since" : string.Empty)}
+              {(sinceUnix.HasValue ? "AND ph.started_at >= $since" : string.Empty)}{(untilUnix.HasValue ? " AND ph.started_at < $until" : string.Empty)}
             GROUP BY COALESCE(t.genre, ph.genre)
             ORDER BY secs DESC;
             """;
         if (sinceUnix.HasValue)
             cmd.Parameters.AddWithValue("$since", sinceUnix.Value);
+        if (untilUnix.HasValue)
+            cmd.Parameters.AddWithValue("$until", untilUnix.Value);
         cmd.Parameters.AddWithValue("$profile", ActiveProfileId);
         using var r = cmd.ExecuteReader();
         while (r.Read())
@@ -5837,8 +5951,9 @@ public sealed class AudioDatabase : IDisposable
     /// </summary>
     /// <param name="limit">Maximum number of albums to return.</param>
     /// <param name="sinceUnix">Optional inclusive lower bound on the playback start (Unix seconds); <see langword="null"/> means all time.</param>
+    /// <param name="untilUnix">Optional exclusive upper bound on the playback start (Unix seconds); <see langword="null"/> means no upper bound.</param>
     /// <returns>Albums ordered by total play time descending.</returns>
-    public List<TopAlbumStat> GetTopAlbums(int limit = 10, long? sinceUnix = null)
+    public List<TopAlbumStat> GetTopAlbums(int limit = 10, long? sinceUnix = null, long? untilUnix = null)
     {
         var agg = new Dictionary<string, TopAlbumAccumulator>(StringComparer.Ordinal);
         using var cmd = _conn.CreateCommand();
@@ -5859,10 +5974,12 @@ public sealed class AudioDatabase : IDisposable
             WHERE ph.profile_id = $profile AND ph.media_type = 'track'
               AND COALESCE(ph.position_seconds, 0) > 0
               AND TRIM(COALESCE(a.title, t.album, ph.album, '')) != ''
-              {(sinceUnix.HasValue ? "AND ph.started_at >= $since" : string.Empty)};
+              {(sinceUnix.HasValue ? "AND ph.started_at >= $since" : string.Empty)}{(untilUnix.HasValue ? " AND ph.started_at < $until" : string.Empty)};
             """;
         if (sinceUnix.HasValue)
             cmd.Parameters.AddWithValue("$since", sinceUnix.Value);
+        if (untilUnix.HasValue)
+            cmd.Parameters.AddWithValue("$until", untilUnix.Value);
         cmd.Parameters.AddWithValue("$profile", ActiveProfileId);
 
         using var r = cmd.ExecuteReader();
@@ -5910,8 +6027,9 @@ public sealed class AudioDatabase : IDisposable
     /// </summary>
     /// <param name="limit">Maximum number of artists to return.</param>
     /// <param name="sinceUnix">Optional inclusive lower bound on the playback start (Unix seconds); <see langword="null"/> means all time.</param>
+    /// <param name="untilUnix">Optional exclusive upper bound on the playback start (Unix seconds); <see langword="null"/> means no upper bound.</param>
     /// <returns>Artists ordered by total play time descending.</returns>
-    public List<TopArtistStat> GetTopArtists(int limit = 10, long? sinceUnix = null)
+    public List<TopArtistStat> GetTopArtists(int limit = 10, long? sinceUnix = null, long? untilUnix = null)
     {
         var agg = new Dictionary<string, TopArtistAccumulator>(StringComparer.Ordinal);
         using var cmd = _conn.CreateCommand();
@@ -5927,10 +6045,12 @@ public sealed class AudioDatabase : IDisposable
             WHERE ph.profile_id = $profile AND ph.media_type = 'track'
               AND COALESCE(ph.position_seconds, 0) > 0
               AND TRIM(COALESCE(ar.name, t.artist, ph.subtitle, '')) != ''
-              {(sinceUnix.HasValue ? "AND ph.started_at >= $since" : string.Empty)};
+              {(sinceUnix.HasValue ? "AND ph.started_at >= $since" : string.Empty)}{(untilUnix.HasValue ? " AND ph.started_at < $until" : string.Empty)};
             """;
         if (sinceUnix.HasValue)
             cmd.Parameters.AddWithValue("$since", sinceUnix.Value);
+        if (untilUnix.HasValue)
+            cmd.Parameters.AddWithValue("$until", untilUnix.Value);
         cmd.Parameters.AddWithValue("$profile", ActiveProfileId);
 
         using var r = cmd.ExecuteReader();

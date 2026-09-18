@@ -445,6 +445,13 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   the profile-scoped `OrynivoServerFavorites` container and the server rating
   API. The bar stays hidden for every other entity type or view and must never
   persist an authenticated playback URL.
+- The Dashboard **Year in review** action opens `YearInReviewDialog`, which
+  renders the existing year aggregates from `AudioDatabase.GetYearInReview` and
+  exports the visible card through `RenderTargetBitmap`. It must only read
+  playback history, must load each year off the UI thread, and must keep the
+  export bounded to the rendered card. A past year must never include later
+  listening: the shared top-genre, album, and artist queries take an optional
+  exclusive upper time bound for that reason.
 - The estimated musical key travels with the compact track data:
   `TrackListInfo.CamelotKey` feeds `ContentRow.CamelotKey` (local and remote
   providers), the shared track-column set exposes it as the optional `camelotKey`

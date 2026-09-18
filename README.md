@@ -827,6 +827,9 @@ byte-range streaming without FFmpeg.
   in the track tables and in **Show track information**; Settings > Playback
   offers **Analyze audio features** to analyze the complete library and the
   configured Orynivo Servers instead of waiting for the background batches.
+- A Dashboard **Year in review** summary for any year with listening history:
+  listened hours, active days, a monthly breakdown, and the leading genres,
+  albums, and artists, exportable as a shareable PNG image
 - Dashboard with an artwork-backed greeting hero with a lightened-artwork rim, live
   library counters (including local and configured Orynivo Server track
   favorites), random

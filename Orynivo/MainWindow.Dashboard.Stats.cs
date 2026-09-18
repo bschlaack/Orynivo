@@ -116,6 +116,16 @@ public partial class MainWindow : Window
         Grid.SetColumn(artistsCard, 2);
         details.Children.Add(artistsCard);
         DashboardPanel.Children.Add(details);
+
+        var yearInReview = new Button
+        {
+            Content = LocalizationManager.Current.YearInReview,
+            Theme = FindResource<ControlTheme>("EntityLinkButtonTheme"),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Margin = new Thickness(0, 14, 0, 0)
+        };
+        yearInReview.Click += YearInReviewButton_OnClick;
+        DashboardPanel.Children.Add(yearInReview);
     }
 
     private Border DashboardBuildListeningSummaryCard(

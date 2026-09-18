@@ -8,6 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Added a **Year in review** summary, reachable from the Dashboard statistics.
+  It reuses the existing Dashboard aggregates — total listened hours, active
+  days, a monthly breakdown, and the leading genres, albums, and artists — for a
+  chosen calendar year with recorded history, and exports the rendered card as a
+  shareable PNG image. No additional data is collected. The top-genre, album, and
+  artist queries gained an optional exclusive upper time bound so a past year
+  never includes later listening.
 - The estimated musical key is now visible: an optional **Key** column (Camelot
   wheel label) is available for the shared Tracks, Up Next, and playlist tables,
   and **Show track information** lists it for local and Orynivo Server tracks.

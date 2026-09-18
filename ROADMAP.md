@@ -239,17 +239,19 @@ implicitly).
 - Not included: manual key correction, and key-aware harmonic constraints on
   explicit user queues.
 
-## 11. Year-in-review export — `Todo`
+## 11. Year-in-review export — `Done`
 
-**Design**
-
-- Render the existing Dashboard statistics for a chosen year into a shareable
-  image/PDF.
-- No new data collection.
-
-**Tests**: layout/aggregation helpers.
-
-**Commit**: `feat(dashboard): add a year-in-review export`
+- `AudioDatabase.GetYearInReview(year)` aggregates the existing playback history
+  into `YearInReviewSummary` (total seconds, active days, twelve monthly
+  buckets, and the leading genres/albums/artists). `GetListeningYears()` lists
+  the selectable years. No new data is collected.
+- The top-genre, album, and artist queries gained an optional exclusive upper
+  time bound so a past year never includes later listening.
+- The Dashboard statistics section links to `YearInReviewDialog`, which renders
+  the summary for a chosen year, switches years without blocking the UI thread,
+  and exports the visible card as a shareable PNG through `RenderTargetBitmap`.
+- 3 Core tests (year aggregation, cross-year exclusion, unsupported years).
+- Not included: PDF output and a server-side year aggregate.
 
 ## 12. Karaoke fullscreen lyrics — `Todo`
 

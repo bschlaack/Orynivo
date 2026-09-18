@@ -1350,6 +1350,30 @@ public sealed record LocalizedStrings(
     public string AiChatToolResultFallback { get; init; } = "";
     /// <summary>Gets the option for automatically accepting Fanart.tv artist-image results.</summary>
     public string AutoAcceptFanartTvImages { get; init; } = "";
+    /// <summary>Gets the year-in-review feature and window label.</summary>
+    public string YearInReview { get; init; } = "";
+    /// <summary>Gets the year-in-review headline.</summary>
+    public string YearInReviewHeading { get; init; } = "";
+    /// <summary>Gets the label for the total listened hours.</summary>
+    public string YearInReviewHours { get; init; } = "";
+    /// <summary>Gets the label for the number of days with listening.</summary>
+    public string YearInReviewActiveDays { get; init; } = "";
+    /// <summary>Gets the label for the monthly listening breakdown.</summary>
+    public string YearInReviewMonthly { get; init; } = "";
+    /// <summary>Gets the label for the leading genres.</summary>
+    public string YearInReviewTopGenres { get; init; } = "";
+    /// <summary>Gets the label for the leading albums.</summary>
+    public string YearInReviewTopAlbums { get; init; } = "";
+    /// <summary>Gets the label for the leading artists.</summary>
+    public string YearInReviewTopArtists { get; init; } = "";
+    /// <summary>Gets the message shown when a year has no listening history.</summary>
+    public string YearInReviewEmpty { get; init; } = "";
+    /// <summary>Gets the action that exports the current view as an image.</summary>
+    public string SaveAsImage { get; init; } = "";
+    /// <summary>Gets the confirmation format string after exporting the image.</summary>
+    public string YearInReviewImageSaved { get; init; } = "";
+    /// <summary>Gets the message shown when exporting the image fails.</summary>
+    public string YearInReviewImageFailed { get; init; } = "";
     /// <summary>Gets the explanation of what the audio-feature analysis does and what it is used for.</summary>
     public string AnalyzeAudioFeaturesHint { get; init; } = "";
     /// <summary>Gets the action that analyzes acoustic descriptors and musical keys for the complete library.</summary>
