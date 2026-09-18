@@ -222,7 +222,13 @@ the drag-and-drop code now uses `IDataTransfer`/`DataTransfer`/
 `DragDrop.DoDragDropAsync`; note that `Avalonia.Controls.DataGrid` has no release
 beyond 11.3.13, so it stays on that version while the other Avalonia packages may
 move within 11.3.x — that mix builds, but do not raise DataGrid past 11.3.13
-until upstream publishes a newer 11.3 line.
+until upstream publishes a newer 11.3 line. SkiaSharp majors stay ignored as
+well: Avalonia.Skia 11.3 depends on SkiaSharp 2.88.9 and
+SkiaSharp.NativeAssets.Linux 2.88.9, so raising SkiaSharp or
+SkiaSharp.NativeAssets.* in `Orynivo.Core`/`Orynivo.Server` would make Avalonia
+render through an incompatible managed/native Skia (and 3.x/4.x removed
+`SKFilterQuality`). Revisit both pins together when Avalonia ships a
+SkiaSharp 3/4-based release.
 All GitHub-hosted CI and release workflows use Node.js 24-compatible action
 generations (`actions/checkout@v6`, `actions/setup-dotnet@v5`, and
 `softprops/action-gh-release@v3` where applicable); do not reintroduce their

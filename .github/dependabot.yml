@@ -23,6 +23,15 @@ updates:
       - dependency-name: "Avalonia*"
         update-types:
           - "version-update:semver-major"
+      # SkiaSharp is pinned to the 2.88 line because Avalonia.Skia 11.3 depends on
+      # SkiaSharp 2.88.9 and SkiaSharp.NativeAssets.Linux 2.88.9. Raising
+      # SkiaSharp (or SkiaSharp.NativeAssets.*) in Orynivo.Core/Orynivo.Server
+      # would force the desktop app to render through an incompatible
+      # managed/native Skia, and 3.x/4.x also removed APIs such as
+      # SKFilterQuality. Revisit when Avalonia ships a SkiaSharp 3/4-based release.
+      - dependency-name: "SkiaSharp*"
+        update-types:
+          - "version-update:semver-major"
       - dependency-name: "Microsoft.Data.Sqlite"
         update-types: ["version-update:semver-major"]
       - dependency-name: "Microsoft.NET.Test.Sdk"
