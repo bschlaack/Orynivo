@@ -119,7 +119,8 @@ public sealed record TrackListInfo(
     string? MusicBrainzTrackId = null,
     long? MusicBrainzRatingFetchedAt = null,
     string? MusicBrainzGenres = null,
-    string? MusicBrainzTags = null);
+    string? MusicBrainzTags = null,
+    string? CamelotKey = null);
 
 /// <summary>Minimal track row for filter/facet building; carries only classification fields.</summary>
 /// <param name="Id">Track database identifier.</param>
@@ -2126,14 +2127,16 @@ public sealed class AudioDatabase : IDisposable
     public List<TrackListInfo> GetTrackList()
     {
         using var cmd = _conn.CreateCommand();
-        cmd.CommandText = """
+        cmd.CommandText = $"""
             SELECT
                 path, file_name, title, artist, album, album_artist, genre, format, bitrate,
                 duration, sort_title, id, is_favorite, year, track_number, track_total,
                 disc_number, disc_total, sample_rate, bit_depth, channels, composer, bpm,
                 file_size, added_at, replay_gain_track, replay_gain_album, artist_id, album_id,
                 user_rating, musicbrainz_rating, musicbrainz_rating_votes, musicbrainz_track_id,
-                musicbrainz_rating_fetched_at, musicbrainz_genres, musicbrainz_tags
+                musicbrainz_rating_fetched_at, musicbrainz_genres, musicbrainz_tags,
+                (SELECT af.camelot_key FROM track_audio_features af
+                 WHERE af.track_id = tracks.id AND af.version = {AudioFeatureAnalysisService.CurrentVersion})
             FROM tracks
             ORDER BY COALESCE(sort_title, title, file_name) COLLATE NOCASE;
             """;
@@ -2147,14 +2150,16 @@ public sealed class AudioDatabase : IDisposable
     public List<TrackListInfo> GetTrackListByAlbum(long albumId, long? artistId = null)
     {
         using var cmd = _conn.CreateCommand();
-        cmd.CommandText = """
+        cmd.CommandText = $"""
             SELECT
                 path, file_name, title, artist, album, album_artist, genre, format, bitrate,
                 duration, sort_title, id, is_favorite, year, track_number, track_total,
                 disc_number, disc_total, sample_rate, bit_depth, channels, composer, bpm,
                 file_size, added_at, replay_gain_track, replay_gain_album, artist_id, album_id,
                 user_rating, musicbrainz_rating, musicbrainz_rating_votes, musicbrainz_track_id,
-                musicbrainz_rating_fetched_at, musicbrainz_genres, musicbrainz_tags
+                musicbrainz_rating_fetched_at, musicbrainz_genres, musicbrainz_tags,
+                (SELECT af.camelot_key FROM track_audio_features af
+                 WHERE af.track_id = tracks.id AND af.version = {AudioFeatureAnalysisService.CurrentVersion})
             FROM tracks
             WHERE album_id = $album_id
               AND ($artist_id IS NULL OR artist_id = $artist_id)
@@ -2227,7 +2232,9 @@ public sealed class AudioDatabase : IDisposable
                     disc_number, disc_total, sample_rate, bit_depth, channels, composer, bpm,
                     file_size, added_at, replay_gain_track, replay_gain_album, artist_id, album_id,
                     user_rating, musicbrainz_rating, musicbrainz_rating_votes, musicbrainz_track_id,
-                    musicbrainz_rating_fetched_at, musicbrainz_genres, musicbrainz_tags
+                    musicbrainz_rating_fetched_at, musicbrainz_genres, musicbrainz_tags,
+                    (SELECT af.camelot_key FROM track_audio_features af
+                     WHERE af.track_id = tracks.id AND af.version = {AudioFeatureAnalysisService.CurrentVersion})
                 FROM tracks
                 WHERE id IN ({string.Join(", ", parameters)});
                 """;
@@ -2270,7 +2277,9 @@ public sealed class AudioDatabase : IDisposable
                     disc_number, disc_total, sample_rate, bit_depth, channels, composer, bpm,
                     file_size, added_at, replay_gain_track, replay_gain_album, artist_id, album_id,
                     user_rating, musicbrainz_rating, musicbrainz_rating_votes, musicbrainz_track_id,
-                    musicbrainz_rating_fetched_at, musicbrainz_genres, musicbrainz_tags
+                    musicbrainz_rating_fetched_at, musicbrainz_genres, musicbrainz_tags,
+                    (SELECT af.camelot_key FROM track_audio_features af
+                     WHERE af.track_id = tracks.id AND af.version = {AudioFeatureAnalysisService.CurrentVersion})
                 FROM tracks
                 WHERE path IN ({string.Join(", ", parameters)});
                 """;
@@ -2422,7 +2431,8 @@ public sealed class AudioDatabase : IDisposable
         reader.IsDBNull(32) ? null : reader.GetString(32),
         reader.IsDBNull(33) ? null : reader.GetInt64(33),
         reader.IsDBNull(34) ? null : reader.GetString(34),
-        reader.IsDBNull(35) ? null : reader.GetString(35));
+        reader.IsDBNull(35) ? null : reader.GetString(35),
+        reader.IsDBNull(36) ? null : reader.GetString(36));
 
     /// <summary>Loads distinct albums referenced by the specified track identifiers.</summary>
     /// <param name="ids">Track identifiers.</param>
@@ -5162,14 +5172,16 @@ public sealed class AudioDatabase : IDisposable
         ArgumentOutOfRangeException.ThrowIfNegative(page);
         ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
         using var cmd = _conn.CreateCommand();
-        cmd.CommandText = """
+        cmd.CommandText = $"""
             SELECT
                 path, file_name, title, artist, album, album_artist, genre, format, bitrate,
                 duration, sort_title, id, is_favorite, year, track_number, track_total,
                 disc_number, disc_total, sample_rate, bit_depth, channels, composer, bpm,
                 file_size, added_at, replay_gain_track, replay_gain_album, artist_id, album_id,
                 user_rating, musicbrainz_rating, musicbrainz_rating_votes, musicbrainz_track_id,
-                musicbrainz_rating_fetched_at, musicbrainz_genres, musicbrainz_tags
+                musicbrainz_rating_fetched_at, musicbrainz_genres, musicbrainz_tags,
+                (SELECT af.camelot_key FROM track_audio_features af
+                 WHERE af.track_id = tracks.id AND af.version = {AudioFeatureAnalysisService.CurrentVersion})
             FROM tracks
             ORDER BY COALESCE(sort_title, title, file_name) COLLATE NOCASE
             LIMIT $limit OFFSET $offset;

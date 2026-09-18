@@ -108,6 +108,7 @@ internal partial class SettingsView : UserControl
     private bool _metadataDeactivated;
     private CancellationTokenSource? _missingArtistImagesCts;
     private CancellationTokenSource? _replayGainCalculationCts;
+    private CancellationTokenSource? _audioFeatureAnalysisCts;
     private CancellationTokenSource? _aiEndpointProbeCts;
     private string? _aiModelsLoadedForSignature;
 
@@ -1270,6 +1271,7 @@ internal partial class SettingsView : UserControl
         _missingArtistImagesCts?.Cancel();
         _metadataAnalysisCts?.Cancel();
         _replayGainCalculationCts?.Cancel();
+        _audioFeatureAnalysisCts?.Cancel();
         _aiEndpointProbeCts?.Cancel();
         _aiEndpointService.Dispose();
         Interlocked.Increment(ref _equalizerPreviewVersion);
@@ -2944,6 +2946,91 @@ internal partial class SettingsView : UserControl
         return remaining.TotalHours >= 1
             ? remaining.ToString(@"h\:mm\:ss", CultureInfo.InvariantCulture)
             : remaining.ToString(@"m\:ss", CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
+    /// Runs the optional acoustic descriptor and musical-key analysis for the
+    /// complete local library and every configured Orynivo Server. The operation
+    /// is cancellable, never modifies source media, and leaves failed sources on
+    /// their normal retry cooldown.
+    /// </summary>
+    /// <param name="sender">The analyze action.</param>
+    /// <param name="e">Click details.</param>
+    private async void AnalyzeAudioFeaturesButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        _audioFeatureAnalysisCts?.Cancel();
+        _audioFeatureAnalysisCts?.Dispose();
+        var cancellation = new CancellationTokenSource();
+        _audioFeatureAnalysisCts = cancellation;
+        AnalyzeAudioFeaturesButton.IsEnabled = false;
+        var stored = 0;
+        var failed = 0;
+        AudioFeatureAnalysisStatusTextBlock.Text =
+            string.Format(LocalizationManager.Current.AudioFeatureAnalyzing, 0);
+        try
+        {
+            while (true)
+            {
+                cancellation.Token.ThrowIfCancellationRequested();
+                var result = await AudioFeatureMaintenanceService.AnalyzeMissingAsync(
+                    AudioDatabase.OpenDefault,
+                    maximumTracks: 25,
+                    delay: TimeSpan.FromMilliseconds(250),
+                    cancellationToken: cancellation.Token);
+                stored += result.Stored;
+                failed += result.Failed;
+                AudioFeatureAnalysisStatusTextBlock.Text =
+                    string.Format(LocalizationManager.Current.AudioFeatureAnalyzing, stored);
+                if (result.Examined == 0)
+                    break;
+            }
+
+            var unsupportedServers = new List<string>();
+            using var client = new OrynivoServerClient();
+            foreach (var server in _orynivoServers)
+            {
+                cancellation.Token.ThrowIfCancellationRequested();
+                AudioFeatureAnalysisStatusTextBlock.Text =
+                    $"{string.Format(LocalizationManager.Current.AudioFeatureAnalyzing, stored)} – {server.Name}";
+                // The endpoint schedules one bounded batch per request, so repeat
+                // until the server declines (busy, unsupported, or finished).
+                for (var batch = 0; batch < 500; batch++)
+                {
+                    if (!await client.TriggerAudioFeatureAnalysisAsync(server, 10, cancellation.Token))
+                    {
+                        if (batch == 0)
+                            unsupportedServers.Add(server.Name);
+                        break;
+                    }
+
+                    await Task.Delay(750, cancellation.Token);
+                }
+            }
+
+            AudioFeatureAnalysisStatusTextBlock.Text =
+                unsupportedServers.Count == 0
+                    ? string.Format(LocalizationManager.Current.AudioFeatureAnalysisDone, stored, failed)
+                    : $"{string.Format(LocalizationManager.Current.AudioFeatureAnalysisDone, stored, failed)} " +
+                      string.Format(
+                          LocalizationManager.Current.AudioFeatureAnalysisUnsupported,
+                          string.Join(", ", unsupportedServers));
+        }
+        catch (OperationCanceledException)
+        {
+            AudioFeatureAnalysisStatusTextBlock.Text = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            AudioFeatureAnalysisStatusTextBlock.Text =
+                string.Format(LocalizationManager.Current.AudioFeatureAnalysisFailed, ex.Message);
+        }
+        finally
+        {
+            AnalyzeAudioFeaturesButton.IsEnabled = true;
+            if (ReferenceEquals(_audioFeatureAnalysisCts, cancellation))
+                _audioFeatureAnalysisCts = null;
+            cancellation.Dispose();
+        }
     }
 
     private async void CalculateReplayGainButton_OnClick(object? sender, RoutedEventArgs e)

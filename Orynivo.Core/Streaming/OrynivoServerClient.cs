@@ -180,7 +180,9 @@ public sealed record OrynivoTrackRatingUpdate(
     int? MusicBrainzRatingVotes = null,
     long? MusicBrainzRatingFetchedAt = null,
     string? MusicBrainzGenres = null,
-    string? MusicBrainzTags = null);
+    string? MusicBrainzTags = null,
+    string? CamelotKey = null);
+
 
 /// <summary>Lightweight remote track entry used for folder-tree construction.</summary>
 /// <param name="Id">Database ID of the track.</param>

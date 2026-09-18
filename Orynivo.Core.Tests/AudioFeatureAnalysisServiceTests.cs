@@ -83,6 +83,10 @@ public sealed class AudioFeatureAnalysisServiceTests
             Assert.Equal(0.4, profile.Brightness);
             Assert.Equal(0.6, profile.Dynamics);
             Assert.Equal("8A", profile.CamelotKey);
+            // The cached key must also reach the compact track list used by tables
+            // and track information, and the facet rows used by filters and clouds.
+            Assert.Equal("8A", Assert.Single(database.GetTrackList()).CamelotKey);
+            Assert.Equal("8A", Assert.Single(database.GetTrackFacets()).CamelotKey);
 
             database.Upsert(new TrackRecord
             {

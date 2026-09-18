@@ -556,6 +556,20 @@
                                FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppSecondaryTextBrush}"
                                TextWrapping="Wrap"/>
+                    <Button x:Name="AnalyzeAudioFeaturesButton"
+                            MinWidth="230"
+                            Height="30"
+                            Padding="12,0"
+                            HorizontalAlignment="Left"
+                            Margin="0,14,0,0"
+                            Theme="{StaticResource SettingsButtonTheme}"
+                            Content="{DynamicResource L_AnalyzeAudioFeatures}"
+                            Click="AnalyzeAudioFeaturesButton_OnClick"/>
+                    <TextBlock x:Name="AudioFeatureAnalysisStatusTextBlock"
+                               Margin="0,8,0,0"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppSecondaryTextBrush}"
+                               TextWrapping="Wrap"/>
 
                     <Separator Margin="0,18,0,14"/>
 

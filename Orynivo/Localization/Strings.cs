@@ -1350,6 +1350,18 @@ public sealed record LocalizedStrings(
     public string AiChatToolResultFallback { get; init; } = "";
     /// <summary>Gets the option for automatically accepting Fanart.tv artist-image results.</summary>
     public string AutoAcceptFanartTvImages { get; init; } = "";
+    /// <summary>Gets the action that analyzes acoustic descriptors and musical keys for the complete library.</summary>
+    public string AnalyzeAudioFeatures { get; init; } = "";
+    /// <summary>Gets the audio-feature analysis progress format string.</summary>
+    public string AudioFeatureAnalyzing { get; init; } = "";
+    /// <summary>Gets the audio-feature analysis completion format string.</summary>
+    public string AudioFeatureAnalysisDone { get; init; } = "";
+    /// <summary>Gets the audio-feature analysis failure format string.</summary>
+    public string AudioFeatureAnalysisFailed { get; init; } = "";
+    /// <summary>Gets the message naming servers without audio-feature analysis.</summary>
+    public string AudioFeatureAnalysisUnsupported { get; init; } = "";
+    /// <summary>Gets the label for the estimated musical key on the Camelot wheel.</summary>
+    public string MusicalKey { get; init; } = "";
     /// <summary>Gets the smart-playlist editor label for the similarity reference track.</summary>
     public string SmartPlaylistSimilarityReference { get; init; } = "";
     /// <summary>Gets the smart-playlist editor action that removes the similarity reference.</summary>

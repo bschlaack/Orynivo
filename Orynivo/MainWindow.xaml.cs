@@ -428,6 +428,8 @@ public partial class MainWindow : Window
         public int?    ChannelCount { get; init; }
         public string? Composer    { get; init; }
         public string? Bpm         { get; init; }
+        /// <summary>Gets the cached Camelot wheel label of the estimated musical key, when available.</summary>
+        public string? CamelotKey  { get; init; }
         public string? FileName    { get; init; }
         public string? FileSize    { get; init; }
         public string? AddedAt     { get; init; }

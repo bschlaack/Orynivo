@@ -823,7 +823,10 @@ byte-range streaming without FFmpeg.
   harmonically: when a track's key has been estimated from a bounded audio
   analysis, Infinite Mix, similarity, mood, and activity mixes walk the Camelot
   wheel so consecutive tracks mix cleanly. Tracks without an estimated key keep
-  their ranking order.
+  their ranking order. The estimated key appears as an optional **Key** column
+  in the track tables and in **Show track information**; Settings > Playback
+  offers **Analyze audio features** to analyze the complete library and the
+  configured Orynivo Servers instead of waiting for the background batches.
 - Dashboard with an artwork-backed greeting hero with a lightened-artwork rim, live
   library counters (including local and configured Orynivo Server track
   favorites), random

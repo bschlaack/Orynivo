@@ -271,6 +271,12 @@ public static class LocalizationManager
         resources["L_ArtistImageSuggestionTitle"] = Current.ArtistImageSuggestionTitle;
         resources["L_ArtistImageSuggestionHint"] = Current.ArtistImageSuggestionHint;
         resources["L_AutoAcceptFanartTvImages"] = Current.AutoAcceptFanartTvImages;
+        resources["L_AnalyzeAudioFeatures"] = Current.AnalyzeAudioFeatures;
+        resources["L_AudioFeatureAnalyzing"] = Current.AudioFeatureAnalyzing;
+        resources["L_AudioFeatureAnalysisDone"] = Current.AudioFeatureAnalysisDone;
+        resources["L_AudioFeatureAnalysisFailed"] = Current.AudioFeatureAnalysisFailed;
+        resources["L_AudioFeatureAnalysisUnsupported"] = Current.AudioFeatureAnalysisUnsupported;
+        resources["L_MusicalKey"] = Current.MusicalKey;
         resources["L_SmartPlaylistSimilarityReference"] = Current.SmartPlaylistSimilarityReference;
         resources["L_SmartPlaylistSimilarityClear"] = Current.SmartPlaylistSimilarityClear;
         resources["L_SmartPlaylistSimilarityMinimumScore"] = Current.SmartPlaylistSimilarityMinimumScore;
@@ -617,6 +623,12 @@ public static class LocalizationManager
         "Ein unerwarteter Fehler ist aufgetreten. Der Fehlerbericht konnte nicht gespeichert werden. Orynivo wird beendet.")
     {
         AutoAcceptFanartTvImages = "Fanart.tv-Funde automatisch übernehmen",
+        AnalyzeAudioFeatures = "Audioanalyse starten",
+        AudioFeatureAnalyzing = "Audioanalyse… {0} analysiert",
+        AudioFeatureAnalysisDone = "{0} Titel analysiert ({1} fehlgeschlagen).",
+        AudioFeatureAnalysisFailed = "Audioanalyse fehlgeschlagen: {0}",
+        AudioFeatureAnalysisUnsupported = "Server unterstützt die Audioanalyse nicht: {0}",
+        MusicalKey = "Tonart",
         SmartPlaylistSimilarityReference = "Ähnlichkeitsreferenz",
         SmartPlaylistSimilarityClear = "Referenz entfernen",
         SmartPlaylistSimilarityMinimumScore = "Mindestähnlichkeit (0–1)",
@@ -1391,6 +1403,12 @@ public static class LocalizationManager
         "An unexpected error occurred. The crash report could not be saved. Orynivo will now close.")
     {
         AutoAcceptFanartTvImages = "Automatically accept Fanart.tv results",
+        AnalyzeAudioFeatures = "Analyze audio features",
+        AudioFeatureAnalyzing = "Analyzing audio features… {0} analyzed",
+        AudioFeatureAnalysisDone = "Analyzed {0} tracks ({1} failed).",
+        AudioFeatureAnalysisFailed = "Audio-feature analysis failed: {0}",
+        AudioFeatureAnalysisUnsupported = "Server does not support audio-feature analysis: {0}",
+        MusicalKey = "Key",
         SmartPlaylistSimilarityReference = "Similarity reference",
         SmartPlaylistSimilarityClear = "Remove reference",
         SmartPlaylistSimilarityMinimumScore = "Minimum similarity (0–1)",
@@ -2148,6 +2166,12 @@ public static class LocalizationManager
         "Une erreur inattendue s’est produite. Le rapport n’a pas pu être enregistré. Orynivo va maintenant se fermer.")
     {
         AutoAcceptFanartTvImages = "Accepter automatiquement les résultats Fanart.tv",
+        AnalyzeAudioFeatures = "Analyser les caractéristiques audio",
+        AudioFeatureAnalyzing = "Analyse audio… {0} analysées",
+        AudioFeatureAnalysisDone = "{0} pistes analysées ({1} en échec).",
+        AudioFeatureAnalysisFailed = "Échec de l'analyse audio : {0}",
+        AudioFeatureAnalysisUnsupported = "Le serveur ne prend pas en charge l'analyse audio : {0}",
+        MusicalKey = "Tonalité",
         SmartPlaylistSimilarityReference = "Référence de similitude",
         SmartPlaylistSimilarityClear = "Supprimer la référence",
         SmartPlaylistSimilarityMinimumScore = "Similitude minimale (0–1)",
@@ -2902,6 +2926,12 @@ public static class LocalizationManager
         "Se produjo un error inesperado. No se pudo guardar el informe. Orynivo se cerrará ahora.")
     {
         AutoAcceptFanartTvImages = "Aceptar automáticamente los resultados de Fanart.tv",
+        AnalyzeAudioFeatures = "Analizar características de audio",
+        AudioFeatureAnalyzing = "Analizando audio… {0} analizadas",
+        AudioFeatureAnalysisDone = "{0} pistas analizadas ({1} fallidas).",
+        AudioFeatureAnalysisFailed = "Error en el análisis de audio: {0}",
+        AudioFeatureAnalysisUnsupported = "El servidor no admite el análisis de audio: {0}",
+        MusicalKey = "Tonalidad",
         SmartPlaylistSimilarityReference = "Referencia de similitud",
         SmartPlaylistSimilarityClear = "Quitar referencia",
         SmartPlaylistSimilarityMinimumScore = "Similitud mínima (0–1)",
@@ -4436,6 +4466,12 @@ private static readonly LocalizedStrings Russian = new(
         AiChatEmptyResponse = "Модель вернула пустой ответ.",
         AiChatToolResultFallback = "После вызова инструмента модель не вернула окончательный ответ. Результат инструмента:",
         AutoAcceptFanartTvImages = "Автоматически принимать результаты Fanart.tv",
+        AnalyzeAudioFeatures = "Анализировать аудиопризнаки",
+        AudioFeatureAnalyzing = "Анализ аудио… обработано: {0}",
+        AudioFeatureAnalysisDone = "Проанализировано треков: {0} (ошибок: {1}).",
+        AudioFeatureAnalysisFailed = "Не удалось выполнить анализ аудио: {0}",
+        AudioFeatureAnalysisUnsupported = "Сервер не поддерживает анализ аудио: {0}",
+        MusicalKey = "Тональность",
         SmartPlaylistSimilarityReference = "Ссылка на похожий трек",
         SmartPlaylistSimilarityClear = "Удалить ссылку",
         SmartPlaylistSimilarityMinimumScore = "Минимальное сходство (0–1)",
@@ -5345,6 +5381,12 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "模型返回了空响应。",
         AiChatToolResultFallback = "调用工具后，模型未返回最终答复。工具结果：",
         AutoAcceptFanartTvImages = "自动接受 Fanart.tv 的结果",
+        AnalyzeAudioFeatures = "分析音频特征",
+        AudioFeatureAnalyzing = "正在分析音频…已分析 {0} 首",
+        AudioFeatureAnalysisDone = "已分析 {0} 首曲目（{1} 首失败）。",
+        AudioFeatureAnalysisFailed = "音频特征分析失败：{0}",
+        AudioFeatureAnalysisUnsupported = "服务器不支持音频特征分析：{0}",
+        MusicalKey = "调性",
         SmartPlaylistSimilarityReference = "相似度参考曲目",
         SmartPlaylistSimilarityClear = "移除参考曲目",
         SmartPlaylistSimilarityMinimumScore = "最低相似度（0–1）",
@@ -6253,6 +6295,12 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "मॉडल ने खाली उत्तर दिया।",
         AiChatToolResultFallback = "टूल कॉल के बाद मॉडल ने अंतिम उत्तर नहीं दिया। टूल परिणाम:",
         AutoAcceptFanartTvImages = "Fanart.tv परिणाम स्वतः स्वीकार करें",
+        AnalyzeAudioFeatures = "ऑडियो विशेषताओं का विश्लेषण करें",
+        AudioFeatureAnalyzing = "ऑडियो विश्लेषण… {0} विश्लेषित",
+        AudioFeatureAnalysisDone = "{0} ट्रैक विश्लेषित ({1} विफल)।",
+        AudioFeatureAnalysisFailed = "ऑडियो विश्लेषण विफल: {0}",
+        AudioFeatureAnalysisUnsupported = "सर्वर ऑडियो विश्लेषण का समर्थन नहीं करता: {0}",
+        MusicalKey = "संगीत कुंजी",
         SmartPlaylistSimilarityReference = "समानता संदर्भ",
         SmartPlaylistSimilarityClear = "संदर्भ हटाएँ",
         SmartPlaylistSimilarityMinimumScore = "न्यूनतम समानता (0–1)",

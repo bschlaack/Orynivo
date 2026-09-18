@@ -445,6 +445,15 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   the profile-scoped `OrynivoServerFavorites` container and the server rating
   API. The bar stays hidden for every other entity type or view and must never
   persist an authenticated playback URL.
+- The estimated musical key travels with the compact track data:
+  `TrackListInfo.CamelotKey` feeds `ContentRow.CamelotKey` (local and remote
+  providers), the shared track-column set exposes it as the optional `camelotKey`
+  column for Tracks, Up Next, and playlists, and **Show track information** lists
+  it. Never recompute the key in the UI, and never persist a key that did not
+  come from the cached analysis. Settings > Playback owns the explicit
+  **Analyze audio features** action; it runs the local library through
+  `AudioFeatureMaintenanceService` and requests bounded batches from each
+  configured server, stays cancellable, and cancels on Settings deactivation.
 - The smart-playlist editor (`SmartPlaylistDialog`) must show every stored
   criterion and must never drop a criterion it cannot rebuild from its own input
   fields. The similarity reference is displayed with a readable track label

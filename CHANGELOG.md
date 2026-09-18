@@ -8,6 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- The estimated musical key is now visible: an optional **Key** column (Camelot
+  wheel label) is available for the shared Tracks, Up Next, and playlist tables,
+  and **Show track information** lists it for local and Orynivo Server tracks.
+- Settings > Playback gained **Analyze audio features**, which runs the optional
+  acoustic-descriptor and musical-key analysis for the complete local library and
+  requests bounded batches from every configured Orynivo Server. It reports
+  progress, stays cancellable, never modifies source media, and leaves failed
+  sources on their normal seven-day retry cooldown.
 - Added harmonic mixing. The new pure `Orynivo.Library.CamelotKey` type maps
   conventional key names and Camelot labels onto the wheel and exposes wheel
   adjacency, and `AudioFeatureAnalysisService` estimates a musical key from a

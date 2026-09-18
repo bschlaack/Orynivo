@@ -132,6 +132,9 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
   provider-local acoustic analyses and returns immediately. It must decline
   overlapping scans or batches, serialize through the library gate, use the
   Core one-thread/low-priority analyzer, and never return physical paths.
+  Track list DTOs also carry the cached Camelot wheel label (`CamelotKey`) so
+  remote clients can show the estimated musical key; it stays a cached value and
+  the server never derives keys on request.
 - `GET /api/albums/recommendation-candidates` returns compact album-level
   genre/BPM metadata for client-side Dashboard ranking; recommendation policy
   and listening history remain on the client.
