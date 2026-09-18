@@ -8,6 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Migrated queue drag-and-drop to the modern Avalonia data-transfer API
+  (`DataTransfer`, `DataTransferItem`, `IDataTransfer`, `DataFormat<string>`, and
+  `DragDrop.DoDragDropAsync`) and raised Avalonia to the 11.3 line. The queue
+  tokens are carried as a JSON string under the application format
+  `orynivo.queue-paths`, so track, album, and folder drags behave exactly as
+  before. The format lives in `OrynivoDataFormats` with a regression test, because
+  Avalonia only accepts ASCII letters, digits, dots, and hyphens in an application
+  identifier and validates it eagerly. Dependabot may now propose Avalonia 11.3 minor updates; major updates
+  remain ignored because Avalonia 12 needs the .NET 9 SDK. Note that
+  `Avalonia.Controls.DataGrid` has no 11.3 release beyond 11.3.13 and stays
+  pinned there.
 - Added optional scheduled library backups. Settings > Library gained a
   **Scheduled backups** section with an enable toggle, an interval in days, a
   retention count, a backup folder picker, a **Back up now** action, and the last

@@ -689,7 +689,6 @@ public partial class MainWindow : Window
     // Drag & drop into the queue (Tracks / Albums / Folders → Up Next)
     // ------------------------------------------------------------------
 
-    private const string QueueDragFormat = "orynivo/queue-paths";
     private Point _queueDragOrigin;
     private bool _queueDragPending;
 

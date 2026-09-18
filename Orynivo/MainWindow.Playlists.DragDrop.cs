@@ -45,6 +45,13 @@ namespace Orynivo;
 public partial class MainWindow : Window
 {
     /// <summary>
+    /// Application data format carrying the JSON-serialized queue tokens for an
+    /// in-process drag. A single string payload keeps the tokens intact without
+    /// depending on a platform data format.
+    /// </summary>
+    private static DataFormat<string> QueueDragFormat => OrynivoDataFormats.QueueDragTokens;
+
+    /// <summary>
     /// Wires drag-and-drop so track rows, local album rows, and folder nodes can be dragged
     /// onto the always-visible "Up Next" sidebar item to append them to the queue. The queue
     /// view and the source lists are never visible at the same time, so the sidebar item is the
@@ -96,23 +103,23 @@ public partial class MainWindow : Window
             return;
 
         e.Handled = true;
-        var data = new DataObject();
-        data.Set(QueueDragFormat, paths);
-        try { await DragDrop.DoDragDrop(e, data, DragDropEffects.Copy); }
+        var data = new DataTransfer();
+        data.Add(DataTransferItem.Create(QueueDragFormat, JsonSerializer.Serialize(paths)));
+        try { await DragDrop.DoDragDropAsync(e, data, DragDropEffects.Copy); }
         catch { /* A failed drag must never disrupt normal list interaction. */ }
         e.Handled = true;
     }
 
     private void QueueNavItem_OnDragOver(object? sender, DragEventArgs e)
     {
-        e.DragEffects = e.Data.Contains(QueueDragFormat) ? DragDropEffects.Copy : DragDropEffects.None;
+        e.DragEffects = e.DataTransfer.Contains(QueueDragFormat) ? DragDropEffects.Copy : DragDropEffects.None;
         e.Handled = true;
     }
 
     private async void QueueNavItem_OnDrop(object? sender, DragEventArgs e)
     {
         e.Handled = true;
-        var tokens = GetDroppedQueueTokens(e.Data);
+        var tokens = GetDroppedQueueTokens(e.DataTransfer);
         if (tokens.Length == 0)
             return;
 
@@ -130,15 +137,24 @@ public partial class MainWindow : Window
             LocalizationManager.Current.TracksAppendedToQueue, paths.Count);
     }
 
-    private static string[] GetDroppedQueueTokens(IDataObject data)
+    private static string[] GetDroppedQueueTokens(IDataTransfer data)
     {
-        return data.Get(QueueDragFormat) switch
+        if (!data.Contains(QueueDragFormat))
+            return [];
+
+        var payload = data.TryGetValue(QueueDragFormat);
+        if (string.IsNullOrWhiteSpace(payload))
+            return [];
+
+        try
         {
-            string[] items => CleanQueueDragTokens(items),
-            IEnumerable<string> items => CleanQueueDragTokens(items),
-            string item => string.IsNullOrWhiteSpace(item) ? [] : [item],
-            _ => []
-        };
+            return CleanQueueDragTokens(JsonSerializer.Deserialize<string[]>(payload) ?? []);
+        }
+        catch (JsonException)
+        {
+            // An unreadable payload is treated like a drag without our tokens.
+            return [];
+        }
     }
 
     private static string[] CleanQueueDragTokens(IEnumerable<string> items) =>

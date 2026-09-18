@@ -284,37 +284,27 @@ implicitly).
 
 ---
 
-## 14. Migrate drag-and-drop to Avalonia `IDataTransfer` — `Todo`
+## 14. Migrate drag-and-drop to Avalonia `IDataTransfer` — `Done`
 
-Unblocks the Avalonia 11.3+ upgrade. Avalonia 11.3 deprecates the legacy
-drag-and-drop API, and the CI builds with `--warnaserror`, so every Avalonia
-minor bump currently fails. Dependabot is held on the 11.2 line until this is
-done (`.github/dependabot.yml`, see item 14's note in `AGENTS.md`).
-
-**Current usage** (all in `Orynivo/MainWindow.Playlists.DragDrop.cs`):
-
-- `DataObject` (line ~99) → `DataTransfer`
-- `DragDrop.DoDragDrop(pointer, dataObject, effects)` (line ~101) →
-  `DragDrop.DoDragDropAsync(...)`
-- `DragEventArgs.Data` (lines ~108, ~115) → `DragEventArgs.DataTransfer`
-- `IDataObject` in `GetDroppedQueueTokens` (line ~133) → `IDataTransfer` /
-  `IAsyncDataTransfer`
-
-**Steps**
-
-1. Confirm the replacement API surface against the Avalonia version being
-   adopted (11.3+), including the custom `QueueDragFormat` data format and how
-   it is read back from the drop.
-2. Migrate the drag source (pointer press/move), the drop target
-   (`QueueNavItem_OnDragOver`/`OnDrop`), and the token extraction together so
-   the in-memory `orynivo-album:...`/path tokens keep working unchanged.
-3. Bump `Avalonia*` to the 11.3 line, build with `--warnaserror`, and verify the
-   drag-and-drop manually on Windows and Linux (queue append, album and folder
-   drag, remote album reference resolution).
-4. Remove the Avalonia minor ignore from `.github/dependabot.yml` and update
-   `AGENTS.md`/`CHANGELOG.md`.
-
-**Tests**: token cleaning/parsing is already covered; drag/drop itself needs a
-manual check because it depends on the platform drag manager.
-
-**Commit**: `refactor(ui): migrate drag-and-drop to IDataTransfer`
+- The drag source uses `new DataTransfer()` + `DataTransferItem.Create`, the drop
+  target reads `DragEventArgs.DataTransfer`, and the drag runs through
+  `DragDrop.DoDragDropAsync`. `IDataObject`/`DataObject`/`DragEventArgs.Data` are
+  gone, so the 11.3 deprecations no longer fail the `--warnaserror` build.
+- `QueueDragFormat` is now a `DataFormat<string>` created with
+  `DataFormat.CreateStringApplicationFormat("orynivo.queue-paths")`. The token
+  list travels as a JSON string, so the in-memory path and
+  `orynivo-album:serverId:albumId` tokens are unchanged; an unreadable payload is
+  treated like a foreign drag. Avalonia only accepts ASCII letters, digits, dots,
+  and hyphens here and validates eagerly — a slash identifier crashed the window's
+  static initializer at startup — so the format lives in `OrynivoDataFormats` with
+  a regression test in `Orynivo.Tests`.
+- Avalonia was raised to **11.3.13**, the highest version where every referenced
+  package exists: `Avalonia.Controls.DataGrid` has no release beyond 11.3.13,
+  while the core packages already offer 11.3.22. The mixed set (core 11.3.22 +
+  DataGrid 11.3.13) was verified to build with `--warnaserror`, so future
+  Dependabot minor bumps are safe.
+- `.github/dependabot.yml` no longer ignores Avalonia **minor** updates; major
+  updates stay ignored because Avalonia 12 needs the .NET 9 SDK.
+- **Manual verification still required**: queue append, local album drag, folder
+  drag, and remote-album reference resolution on Windows and Linux. The platform
+  drag manager cannot be exercised by the test suite.
