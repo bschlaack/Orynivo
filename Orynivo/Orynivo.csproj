@@ -22,6 +22,7 @@
     <UpdatePublicKeyBase64 Condition="'$(UpdatePublicKeyBase64)' == ''"></UpdatePublicKeyBase64>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <DefineConstants Condition="$([MSBuild]::IsOSPlatform('OSX'))">$(DefineConstants);ORYNIVO_MACOS</DefineConstants>
+    <DefineConstants Condition="$([MSBuild]::IsOSPlatform('Linux'))">$(DefineConstants);ORYNIVO_LINUX</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

@@ -100,8 +100,9 @@ ReplayGain, PCM boost, and the parametric equalizer. The macOS desktop provides
 the same library, streaming, playlist, radio, podcast, AI Chat, MCP, and PCM
 processing features through the system OpenAL output path on Intel and Apple
 Silicon. Native DSD output remains available only through Windows ASIO/cwASIO
-or Linux direct ALSA, and Windows System Media Transport Controls remain
-Windows-specific.
+or Linux direct ALSA. Windows System Media Transport Controls remain
+Windows-specific, while the Linux desktop exposes the MPRIS 2 media player
+interface so desktop media keys, panels, and applets can control playback.
 
 AirPlay output profiles discover local `_raop._tcp` receivers on every desktop
 platform. On Windows, the bundled native `AirPlay2Bridge` is preferred and
@@ -192,9 +193,9 @@ The desktop project selects its target from the build host:
 - Windows builds target `net8.0-windows10.0.19041.0` and include the existing
   WASAPI/ASIO integrations.
 - Linux builds target `net8.0`; PCM audio is rendered through direct ALSA or
-  OpenAL, while
-  Windows endpoint-volume and system-media integrations are replaced by
-  compatibility services.
+  OpenAL. The Windows endpoint-volume integration is replaced by a
+  compatibility service, and system-media integration is provided by MPRIS 2
+  (`org.mpris.MediaPlayer2.orynivo`) for desktop media keys and panels.
 - macOS builds target `net8.0`; PCM audio is rendered through Apple's system
   OpenAL framework. Windows audio, endpoint-volume, and SMTC integrations are
   replaced by compatibility services, and native DSD output is not currently
@@ -703,6 +704,10 @@ byte-range streaming without FFmpeg.
 - Windows System Media Transport Controls integration with global media keys,
   play/pause/previous/next/stop and seek requests, system-overlay and lock-screen
   metadata, album art, playback state, and timeline synchronization
+- Linux MPRIS 2 media player integration (`org.mpris.MediaPlayer2.orynivo`) for
+  desktop media keys, panels, and applets, with the same transport commands,
+  metadata, position, playback status, and volume; credential-bearing remote
+  artwork URLs are never published to the session bus
 - Optional ReplayGain volume adjustment for PCM playback, using track or album
   gain metadata with fallback to the other available value; native DSD output
   remains bit-perfect. A small transport badge appears when ReplayGain is active
@@ -1562,7 +1567,6 @@ Orynivo/
 ├── build.ps1                Builds the native bridges and the .NET application
 ├── Orynivo.sln              Visual Studio solution
 ├── AGENTS.md                Repository-wide contributor and architecture rules
-├── ROADMAP.md               Planned and completed feature work
 ├── CHANGELOG.md             Release notes
 └── README.md                This document
 ```

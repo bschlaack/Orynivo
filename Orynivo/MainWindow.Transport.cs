@@ -479,6 +479,7 @@ public partial class MainWindow : Window
                 NowPlayingArtworkImage.Source = CreateArtworkImage(thumbnailPath, 96);
             if (largePath is not null || provider is LocalNowPlayingMetadataProvider)
                 LyricsBackgroundImage.Source = CreateArtworkImage(largePath, 900);
+            RefreshWindowsMediaMetadata();
         }
         catch (OperationCanceledException)
         {

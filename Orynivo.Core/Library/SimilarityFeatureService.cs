@@ -388,7 +388,7 @@ public static class SimilarityFeatureService
 
     private static IReadOnlyList<string> SplitKeys(string? value) =>
         (value ?? string.Empty)
-        .Split([';', ',', '/', '|'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Split(new[] { ';', ',', '/', '|' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
         .Select(ArtistNameNormalizer.CreateComparisonKey)
         .Where(static key => key.Length > 0)
         .Distinct(StringComparer.Ordinal)

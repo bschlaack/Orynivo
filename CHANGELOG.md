@@ -4,6 +4,34 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.43.1] - 2026-09-18
+
+### Added
+
+- Linux desktop builds now expose the full MPRIS 2 media player interface
+  (`org.mpris.MediaPlayer2.orynivo`) on the session bus, giving desktop media
+  keys, panels, and applets parity with the Windows System Media Transport
+  Controls integration. It supports Play/Pause/PlayPause/Stop/Next/Previous/
+  Seek/SetPosition, reports metadata, position, playback status, volume, and
+  navigation capabilities, and emits `PropertiesChanged` and `Seeked` signals.
+  Remote artwork URLs that carry credentials (Orynivo Server `?key=`, Plex
+  tokens) are never exposed; only local files and credential-free URLs are
+  published. macOS remains unaffected.
+
+### Fixed
+
+- Fixed a .NET 8 build break in `GenreCloudService` and
+  `SimilarityFeatureService`: collection-expression `string.Split([';', …], …)`
+  calls are ambiguous with the latest .NET 8 reference assemblies, which add
+  `Split(string?, StringSplitOptions)`. Both now use explicitly typed `char[]`
+  arguments.
+- Remote Orynivo Server tracks now show their cover art in the desktop media
+  integration. The now-playing metadata prefers the locally cached
+  `remote-artworks/track-art-<server>-<track>.img` file instead of the
+  credential-bearing server URL, so MPRIS and the Windows media overlay can
+  display the cover without the `?key=` API key ever reaching them, and the
+  media metadata is refreshed once an asynchronous artwork download completes.
+
 ## [0.43.0] - 2026-09-18
 
 ### Added
@@ -15,7 +43,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `orynivo.queue-paths`, so track, album, and folder drags behave exactly as
   before. The format lives in `OrynivoDataFormats` with a regression test, because
   Avalonia only accepts ASCII letters, digits, dots, and hyphens in an application
-  identifier and validates it eagerly. Dependabot may now propose Avalonia 11.3 minor updates; major updates
+  identifier and validates it eagerly. Dependabot may now propose Avalonia 11.3
+  minor updates; major updates
   remain ignored because Avalonia 12 needs the .NET 9 SDK. Note that
   `Avalonia.Controls.DataGrid` has no 11.3 release beyond 11.3.13 and stays
   pinned there.
@@ -812,8 +841,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Infinite Mix no longer stalls after exhausting its first two 20-track
   batches. Refills rotate through the stable genre candidate order in local and
-  remote libraries, and active playback performs a throttled lightweight refill check
-  continuously instead of relying only on queue-navigation updates.
+  remote libraries, and active playback performs a throttled lightweight refill
+  check continuously instead of relying only on queue-navigation updates.
 
 ## [0.36.4] - 2026-08-12
 
