@@ -132,6 +132,7 @@ public sealed record TrackListInfo(
 /// <param name="UserRating">Personal zero-to-five-star rating.</param>
 /// <param name="MusicBrainzRating">MusicBrainz community rating on a zero-to-five scale.</param>
 /// <param name="MusicBrainzRatingVotes">Number of contributing MusicBrainz votes.</param>
+/// <param name="CamelotKey">Cached Camelot wheel label such as <c>8A</c>, when a key was estimated.</param>
 public sealed record TrackFacetInfo(
     long Id,
     bool IsFavorite,
@@ -142,7 +143,8 @@ public sealed record TrackFacetInfo(
     long? AlbumId = null,
     int UserRating = 0,
     double? MusicBrainzRating = null,
-    int? MusicBrainzRatingVotes = null);
+    int? MusicBrainzRatingVotes = null,
+    string? CamelotKey = null);
 
 /// <summary>Personal and cached MusicBrainz rating metadata for one track.</summary>
 /// <param name="TrackId">Database track identifier.</param>
@@ -2292,10 +2294,13 @@ public sealed class AudioDatabase : IDisposable
                    genre, format, bitrate, album_id,
                    COALESCE((SELECT ps.user_rating FROM profile_track_state ps
                              WHERE ps.profile_id = $profile AND ps.track_id = tracks.id), user_rating),
-                   musicbrainz_rating, musicbrainz_rating_votes, musicbrainz_genres, musicbrainz_tags
+                   musicbrainz_rating, musicbrainz_rating_votes, musicbrainz_genres, musicbrainz_tags,
+                   (SELECT af.camelot_key FROM track_audio_features af
+                    WHERE af.track_id = tracks.id AND af.version = $audioFeatureVersion)
             FROM tracks;
             """;
         Add(cmd, "$profile", ActiveProfileId);
+        Add(cmd, "$audioFeatureVersion", AudioFeatureAnalysisService.CurrentVersion);
         using var reader = cmd.ExecuteReader();
         var result = new List<TrackFacetInfo>();
         while (reader.Read())
@@ -2311,7 +2316,8 @@ public sealed class AudioDatabase : IDisposable
                 AlbumId: reader.IsDBNull(5) ? null : reader.GetInt64(5),
                 UserRating: reader.GetInt32(6),
                 MusicBrainzRating: reader.IsDBNull(7) ? null : reader.GetDouble(7),
-                MusicBrainzRatingVotes: reader.IsDBNull(8) ? null : reader.GetInt32(8)));
+                MusicBrainzRatingVotes: reader.IsDBNull(8) ? null : reader.GetInt32(8),
+                CamelotKey: reader.IsDBNull(11) ? null : reader.GetString(11)));
         return result;
     }
 
@@ -3338,6 +3344,7 @@ public sealed class AudioDatabase : IDisposable
                 analyzed_at INTEGER NOT NULL
             );
             """);
+            EnsureColumn("track_audio_features", "camelot_key", "TEXT");
         }
 
         using (Orynivo.StartupDiagnostics.Time("AudioDatabase.EnsureSchema: MusicBrainz rating lookup repair"))
@@ -5435,7 +5442,7 @@ public sealed class AudioDatabase : IDisposable
                    t.is_favorite, t.user_rating, t.musicbrainz_rating,
                    t.musicbrainz_rating_votes, t.musicbrainz_genres,
                    t.musicbrainz_tags, COALESCE(ph.play_count, 0), ph.last_played_at,
-                   af.energy, af.brightness, af.dynamics
+                   af.energy, af.brightness, af.dynamics, af.camelot_key
             FROM tracks t
             LEFT JOIN (
                 SELECT track_id, COUNT(*) AS play_count, MAX(started_at) AS last_played_at
@@ -5475,7 +5482,8 @@ public sealed class AudioDatabase : IDisposable
                 reader.IsDBNull(13) ? null : reader.GetInt64(13),
                 reader.IsDBNull(14) ? null : reader.GetDouble(14),
                 reader.IsDBNull(15) ? null : reader.GetDouble(15),
-                reader.IsDBNull(16) ? null : reader.GetDouble(16)));
+                reader.IsDBNull(16) ? null : reader.GetDouble(16),
+                reader.IsDBNull(17) ? null : reader.GetString(17)));
         }
         return result;
     }
@@ -5523,14 +5531,15 @@ public sealed class AudioDatabase : IDisposable
         ArgumentNullException.ThrowIfNull(descriptor);
         using var command = _conn.CreateCommand();
         command.CommandText = """
-            INSERT INTO track_audio_features(track_id, version, energy, brightness, dynamics, analyzed_at)
-            VALUES ($trackId, $version, $energy, $brightness, $dynamics, $analyzedAt)
+            INSERT INTO track_audio_features(track_id, version, energy, brightness, dynamics, analyzed_at, camelot_key)
+            VALUES ($trackId, $version, $energy, $brightness, $dynamics, $analyzedAt, $camelotKey)
             ON CONFLICT(track_id) DO UPDATE SET
                 version = excluded.version,
                 energy = excluded.energy,
                 brightness = excluded.brightness,
                 dynamics = excluded.dynamics,
-                analyzed_at = excluded.analyzed_at;
+                analyzed_at = excluded.analyzed_at,
+                camelot_key = excluded.camelot_key;
             """;
         command.Parameters.AddWithValue("$trackId", trackId);
         command.Parameters.AddWithValue("$version", descriptor.Version);
@@ -5538,6 +5547,9 @@ public sealed class AudioDatabase : IDisposable
         command.Parameters.AddWithValue("$brightness", Math.Clamp(descriptor.Brightness, 0d, 1d));
         command.Parameters.AddWithValue("$dynamics", Math.Clamp(descriptor.Dynamics, 0d, 1d));
         command.Parameters.AddWithValue("$analyzedAt", descriptor.AnalyzedAt);
+        command.Parameters.AddWithValue(
+            "$camelotKey",
+            descriptor.Key is { } key ? key.Label : DBNull.Value);
         command.ExecuteNonQuery();
     }
 
@@ -5547,14 +5559,15 @@ public sealed class AudioDatabase : IDisposable
     {
         using var command = _conn.CreateCommand();
         command.CommandText = """
-            INSERT INTO track_audio_features(track_id, version, energy, brightness, dynamics, analyzed_at)
-            VALUES ($trackId, $version, NULL, NULL, NULL, $analyzedAt)
+            INSERT INTO track_audio_features(track_id, version, energy, brightness, dynamics, analyzed_at, camelot_key)
+            VALUES ($trackId, $version, NULL, NULL, NULL, $analyzedAt, NULL)
             ON CONFLICT(track_id) DO UPDATE SET
                 version = excluded.version,
                 energy = NULL,
                 brightness = NULL,
                 dynamics = NULL,
-                analyzed_at = excluded.analyzed_at;
+                analyzed_at = excluded.analyzed_at,
+                camelot_key = NULL;
             """;
         command.Parameters.AddWithValue("$trackId", trackId);
         command.Parameters.AddWithValue("$version", AudioFeatureAnalysisService.CurrentVersion);

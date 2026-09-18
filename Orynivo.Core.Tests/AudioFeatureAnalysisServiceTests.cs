@@ -67,13 +67,22 @@ public sealed class AudioFeatureAnalysisServiceTests
                 Album = "Album"
             });
             var candidate = Assert.Single(database.GetTracksMissingAudioFeatures());
-            database.SetTrackAudioFeatures(candidate.TrackId, new AudioFeatureDescriptor(1, 0.2, 0.4, 0.6, 123));
+            database.SetTrackAudioFeatures(
+                candidate.TrackId,
+                new AudioFeatureDescriptor(
+                    AudioFeatureAnalysisService.CurrentVersion,
+                    0.2,
+                    0.4,
+                    0.6,
+                    123,
+                    new CamelotKey(8, true)));
 
             Assert.Empty(database.GetTracksMissingAudioFeatures());
             var profile = Assert.Single(database.GetSimilarityTrackProfiles());
             Assert.Equal(0.2, profile.Energy);
             Assert.Equal(0.4, profile.Brightness);
             Assert.Equal(0.6, profile.Dynamics);
+            Assert.Equal("8A", profile.CamelotKey);
 
             database.Upsert(new TrackRecord
             {

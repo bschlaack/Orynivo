@@ -17,6 +17,7 @@ namespace Orynivo.Library;
 /// <param name="Energy">Optional cached audio energy from zero through one.</param>
 /// <param name="Brightness">Optional cached high-frequency/transient proxy from zero through one.</param>
 /// <param name="Dynamics">Optional cached dynamic-range proxy from zero through one.</param>
+/// <param name="CamelotKey">Optional cached musical key as a Camelot wheel label such as <c>8A</c>.</param>
 public sealed record SimilarityTrackProfile(
     long TrackId,
     string SourceKey,
@@ -33,7 +34,8 @@ public sealed record SimilarityTrackProfile(
     long? LastPlayedAt,
     double? Energy = null,
     double? Brightness = null,
-    double? Dynamics = null);
+    double? Dynamics = null,
+    string? CamelotKey = null);
 
 /// <summary>Versioned provider-neutral feature vector used by similarity and mood ranking.</summary>
 /// <param name="Version">Feature schema version.</param>
@@ -51,6 +53,7 @@ public sealed record SimilarityTrackProfile(
 /// <param name="Energy">Optional cached audio energy from zero through one.</param>
 /// <param name="Brightness">Optional cached high-frequency/transient proxy from zero through one.</param>
 /// <param name="Dynamics">Optional cached dynamic-range proxy from zero through one.</param>
+/// <param name="CamelotKey">Optional canonical Camelot wheel label such as <c>8A</c>, used for harmonic ordering.</param>
 public sealed record SimilarityFeatureVector(
     int Version,
     string SourceKey,
@@ -66,7 +69,8 @@ public sealed record SimilarityFeatureVector(
     long? LastPlayedAt,
     double? Energy = null,
     double? Brightness = null,
-    double? Dynamics = null);
+    double? Dynamics = null,
+    string? CamelotKey = null);
 
 /// <summary>One ranked similarity candidate.</summary>
 /// <param name="Vector">Candidate vector.</param>
@@ -139,7 +143,8 @@ public static class SimilarityFeatureService
             profile.LastPlayedAt,
             NormalizeOptional(profile.Energy),
             NormalizeOptional(profile.Brightness),
-            NormalizeOptional(profile.Dynamics));
+            NormalizeOptional(profile.Dynamics),
+            CamelotKey.TryParse(profile.CamelotKey, out var camelot) ? camelot.Label : null);
     }
 
     /// <summary>Ranks nearest metadata neighbours with artist and album diversity limits.</summary>

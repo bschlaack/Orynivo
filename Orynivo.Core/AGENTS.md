@@ -176,8 +176,20 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   `track_audio_features` table and survive metadata scans. Version changes must
   trigger bounded reanalysis. `AudioFeatureAnalysisService` decodes at most 90
   seconds as 8-kHz mono, restricts FFmpeg to one thread and best-effort reduced
-  priority, and produces only normalized energy, brightness, and dynamics.
-  Maintenance is sequential and failed sources have a seven-day retry cooldown.
+  priority, and produces only normalized energy, brightness, and dynamics plus an
+  optional estimated key. Maintenance is sequential and failed sources have a
+  seven-day retry cooldown.
+- `CamelotKey` is the single Camelot-wheel mapping: it parses conventional key
+  names and wheel labels, exposes wheel distance (identical `0`, relative or
+  neighbouring `1`), and never guesses an unsupported spelling. Key estimation
+  uses a bounded Goertzel chromagram correlated against Krumhansl-Schmuckler
+  profiles and must stay conservative — a flat or ambiguous chroma returns no
+  key rather than a guess — and the canonical wheel label is what gets cached in
+  `track_audio_features.camelot_key` and carried on facet, similarity, and genre
+  cloud payloads. `HarmonicOrdering.Order` is the single greedy wheel walk used
+  by playback batches: it is deterministic, keeps keyless items in their original
+  relative order after the chain, and returns its input unchanged when fewer than
+  two items carry a key.
 - `GenreCloudService` owns the stable hierarchical genre taxonomy, tag
   normalization, count aggregation, breadcrumbs, and bounded provider-local
   candidate selection. Candidate offsets rotate and wrap the stable order for

@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Added harmonic mixing. The new pure `Orynivo.Library.CamelotKey` type maps
+  conventional key names and Camelot labels onto the wheel and exposes wheel
+  adjacency, and `AudioFeatureAnalysisService` estimates a musical key from a
+  bounded Goertzel chromagram correlated against Krumhansl-Schmuckler profiles.
+  The estimate is cached with the other acoustic descriptors (descriptor version
+  2, `track_audio_features.camelot_key`) and stays conservative: an ambiguous
+  chroma yields no key. Infinite Mix batches and similarity, mood, and activity
+  mixes are ordered with the new deterministic `HarmonicOrdering` greedy wheel
+  walk so consecutive tracks mix cleanly; tracks without an estimated key keep
+  their ranking order at the end of the batch.
 - Added transactional bulk updates in `Orynivo.Core`:
   `AudioDatabase.SetTrackFavorites` and `SetTrackUserRatings` apply a favorite
   state or a personal rating to several tracks in one transaction, with

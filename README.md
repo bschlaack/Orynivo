@@ -819,7 +819,11 @@ byte-range streaming without FFmpeg.
   Servers. It balances discovery with genre affinity and suppresses immediate
   track, album, and artist repetition. Initial preparation is surfaced through
   a progress overlay; later refills rotate through the complete matching genre
-  population and happen automatically in the background.
+  population and happen automatically in the background. Batches are ordered
+  harmonically: when a track's key has been estimated from a bounded audio
+  analysis, Infinite Mix, similarity, mood, and activity mixes walk the Camelot
+  wheel so consecutive tracks mix cleanly. Tracks without an estimated key keep
+  their ranking order.
 - Dashboard with an artwork-backed greeting hero with a lightened-artwork rim, live
   library counters (including local and configured Orynivo Server track
   favorites), random

@@ -325,7 +325,11 @@ public partial class MainWindow
         while (_similarityMixCursor < _similarityMixCandidates.Count && added < batchSize)
         {
             var take = Math.Min(batchSize, _similarityMixCandidates.Count - _similarityMixCursor);
-            var vectors = _similarityMixCandidates.Skip(_similarityMixCursor).Take(take).ToList();
+            // Harmonic mixing: order each appended batch along the Camelot wheel.
+            var vectors = HarmonicOrdering.Order(
+                    _similarityMixCandidates.Skip(_similarityMixCursor).Take(take).ToList(),
+                    vector => CamelotKey.TryParse(vector.CamelotKey, out var camelot) ? camelot : null)
+                .ToList();
             _similarityMixCursor += take;
             var rows = await ResolveSimilarityRowsAsync(vectors);
             foreach (var row in rows)

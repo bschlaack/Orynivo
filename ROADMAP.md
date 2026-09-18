@@ -220,17 +220,24 @@ implicitly).
 - Not included: surfacing the presets in `InfiniteMixDialog`; the presets are a
   context-menu quick start, not persisted profile state.
 
-## 10. Harmonic mixing (Camelot) — `Todo`
+## 10. Harmonic mixing (Camelot) — `Done`
 
-**Design**
-
-- Add musical-key detection to `AudioFeatureAnalysisService` (bounded, cached
-  like the other descriptors).
-- Order Infinite Mix batches by Camelot-wheel adjacency.
-
-**Tests**: Camelot mapping and adjacency.
-
-**Commit**: `feat(infinite-mix): add harmonic mixing on the Camelot wheel`
+- `Orynivo.Library.CamelotKey` owns the wheel mapping: it parses conventional
+  key names (`A minor`, `Am`, `A moll`, `C dur`, `F# minor`) and wheel labels
+  (`8A`), exposes `Distance`/`IsCompatible`/`ToKeyName`, and never guesses an
+  unsupported spelling.
+- `AudioFeatureAnalysisService` estimates the key from a bounded Goertzel
+  chromagram correlated against Krumhansl-Schmuckler profiles. It stays
+  conservative (ambiguous chroma → no key), and descriptor version 2 caches the
+  canonical label in `track_audio_features.camelot_key`, exposed through
+  `TrackFacetInfo`, `SimilarityTrackProfile`, `SimilarityFeatureVector`, and
+  `GenreCloudTrackCandidate`.
+- `HarmonicOrdering.Order` is the deterministic greedy wheel walk used for
+  Infinite Mix batches and for similarity, mood, and activity mix batches.
+  Keyless tracks keep their ranking order. 49 tests (Camelot parsing, adjacency,
+  scale recognition, ordering).
+- Not included: manual key correction, and key-aware harmonic constraints on
+  explicit user queues.
 
 ## 11. Year-in-review export — `Todo`
 
