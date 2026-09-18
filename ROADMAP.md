@@ -171,20 +171,23 @@ Steps:
 
 Never automatic; no action without confirmation.
 
-## 7. Bulk editing in tables — `Todo`
+## 7. Bulk editing in tables — `In progress`
 
-Multi-select rows, then set genre, personal rating, or favorite in one step.
+Multi-select rows, then set personal rating or favorite in one step.
 
-**Design**
+Steps:
 
-- `DataGrid.SelectionMode="Extended"` for the track tables; a bulk action bar.
-- Local: transactional `AudioDatabase` updates; remote: batched rating/favorite
-  API calls.
-- Preserve the existing single-row behavior and column masks.
+- 7a Core bulk update API — `Done`: `AudioDatabase.SetTrackFavorites` and
+  `SetTrackUserRatings` write several tracks in one transaction (profile-aware,
+  de-duplicated identifiers, validated rating). 5 tests.
+- 7b Desktop multi-select UI — `Todo`: enable `SelectionMode="Extended"` on the
+  Tracks table, show a bulk action bar for track selections, apply local updates
+  through 7a and remote updates through the per-track favorite/rating endpoints
+  (bounded), and refresh the visible rows in place. Seven-language localization.
 
-**Tests**: batch-building logic, mixed local/remote selection handling.
-
-**Commit**: `feat(library): add bulk genre, rating and favorite editing`
+Genre editing is deliberately **not** included: it would write media tags, which
+needs a separate, explicit decision (the library never rewrites audio files
+implicitly).
 
 ## 8. Smart playlist "similar to track" — `Todo`
 

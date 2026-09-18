@@ -2616,6 +2616,104 @@ public sealed class AudioDatabase : IDisposable
         profile.ExecuteNonQuery();
     }
 
+    /// <summary>Stores a personal favorite state for several tracks in one transaction.</summary>
+    /// <param name="trackIds">Database track identifiers.</param>
+    /// <param name="value">Requested favorite state.</param>
+    /// <returns>The number of distinct track identifiers processed.</returns>
+    public int SetTrackFavorites(IReadOnlyCollection<long> trackIds, bool value)
+    {
+        ArgumentNullException.ThrowIfNull(trackIds);
+        var ids = trackIds.Distinct().ToList();
+        if (ids.Count == 0)
+            return 0;
+
+        using var transaction = _conn.BeginTransaction();
+        using (var command = _conn.CreateCommand())
+        {
+            command.Transaction = transaction;
+            command.CommandText = """
+                INSERT INTO profile_track_state(profile_id, track_id, is_favorite)
+                VALUES ($profile, $id, $value)
+                ON CONFLICT(profile_id, track_id) DO UPDATE SET is_favorite = excluded.is_favorite;
+                """;
+            Add(command, "$profile", ActiveProfileId);
+            Add(command, "$value", value ? 1 : 0);
+            var idParameter = command.Parameters.AddWithValue("$id", 0L);
+            foreach (var trackId in ids)
+            {
+                idParameter.Value = trackId;
+                command.ExecuteNonQuery();
+            }
+        }
+
+        if (string.Equals(ActiveProfileId, "standard", StringComparison.Ordinal))
+        {
+            using var tracks = _conn.CreateCommand();
+            tracks.Transaction = transaction;
+            tracks.CommandText = "UPDATE tracks SET is_favorite = $value WHERE id = $id;";
+            Add(tracks, "$value", value ? 1 : 0);
+            var idParameter = tracks.Parameters.AddWithValue("$id", 0L);
+            foreach (var trackId in ids)
+            {
+                idParameter.Value = trackId;
+                tracks.ExecuteNonQuery();
+            }
+        }
+
+        transaction.Commit();
+        return ids.Count;
+    }
+
+    /// <summary>Stores a personal zero-to-five-star rating for several tracks in one transaction.</summary>
+    /// <param name="trackIds">Database track identifiers.</param>
+    /// <param name="rating">Rating from zero (unrated) through five.</param>
+    /// <returns>The number of distinct track identifiers processed.</returns>
+    public int SetTrackUserRatings(IReadOnlyCollection<long> trackIds, int rating)
+    {
+        ArgumentNullException.ThrowIfNull(trackIds);
+        ArgumentOutOfRangeException.ThrowIfLessThan(rating, 0);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(rating, 5);
+        var ids = trackIds.Distinct().ToList();
+        if (ids.Count == 0)
+            return 0;
+
+        using var transaction = _conn.BeginTransaction();
+        using (var command = _conn.CreateCommand())
+        {
+            command.Transaction = transaction;
+            command.CommandText = """
+                INSERT INTO profile_track_state(profile_id, track_id, user_rating)
+                VALUES ($profile, $id, $rating)
+                ON CONFLICT(profile_id, track_id) DO UPDATE SET user_rating = excluded.user_rating;
+                """;
+            Add(command, "$profile", ActiveProfileId);
+            Add(command, "$rating", rating);
+            var idParameter = command.Parameters.AddWithValue("$id", 0L);
+            foreach (var trackId in ids)
+            {
+                idParameter.Value = trackId;
+                command.ExecuteNonQuery();
+            }
+        }
+
+        if (string.Equals(ActiveProfileId, "standard", StringComparison.Ordinal))
+        {
+            using var tracks = _conn.CreateCommand();
+            tracks.Transaction = transaction;
+            tracks.CommandText = "UPDATE tracks SET user_rating = $rating WHERE id = $id;";
+            Add(tracks, "$rating", rating);
+            var idParameter = tracks.Parameters.AddWithValue("$id", 0L);
+            foreach (var trackId in ids)
+            {
+                idParameter.Value = trackId;
+                tracks.ExecuteNonQuery();
+            }
+        }
+
+        transaction.Commit();
+        return ids.Count;
+    }
+
     /// <summary>Gets personal and cached community rating data for a track.</summary>
     /// <param name="trackId">Database track identifier.</param>
     /// <returns>The stored rating data, or <see langword="null"/> when the track does not exist.</returns>

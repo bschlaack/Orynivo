@@ -4,6 +4,17 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Added transactional bulk updates in `Orynivo.Core`:
+  `AudioDatabase.SetTrackFavorites` and `SetTrackUserRatings` apply a favorite
+  state or a personal rating to several tracks in one transaction, with
+  de-duplicated identifiers and validated ratings.
+
+### Fixed
+
 ## [0.42.0] - 2026-09-17
 
 ### Added
