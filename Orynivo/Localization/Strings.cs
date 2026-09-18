@@ -1350,6 +1350,8 @@ public sealed record LocalizedStrings(
     public string AiChatToolResultFallback { get; init; } = "";
     /// <summary>Gets the option for automatically accepting Fanart.tv artist-image results.</summary>
     public string AutoAcceptFanartTvImages { get; init; } = "";
+    /// <summary>Gets the explanation of what the audio-feature analysis does and what it is used for.</summary>
+    public string AnalyzeAudioFeaturesHint { get; init; } = "";
     /// <summary>Gets the action that analyzes acoustic descriptors and musical keys for the complete library.</summary>
     public string AnalyzeAudioFeatures { get; init; } = "";
     /// <summary>Gets the audio-feature analysis progress format string.</summary>

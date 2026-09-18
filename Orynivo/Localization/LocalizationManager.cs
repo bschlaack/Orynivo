@@ -271,6 +271,7 @@ public static class LocalizationManager
         resources["L_ArtistImageSuggestionTitle"] = Current.ArtistImageSuggestionTitle;
         resources["L_ArtistImageSuggestionHint"] = Current.ArtistImageSuggestionHint;
         resources["L_AutoAcceptFanartTvImages"] = Current.AutoAcceptFanartTvImages;
+        resources["L_AnalyzeAudioFeaturesHint"] = Current.AnalyzeAudioFeaturesHint;
         resources["L_AnalyzeAudioFeatures"] = Current.AnalyzeAudioFeatures;
         resources["L_AudioFeatureAnalyzing"] = Current.AudioFeatureAnalyzing;
         resources["L_AudioFeatureAnalysisDone"] = Current.AudioFeatureAnalysisDone;
@@ -623,6 +624,7 @@ public static class LocalizationManager
         "Ein unerwarteter Fehler ist aufgetreten. Der Fehlerbericht konnte nicht gespeichert werden. Orynivo wird beendet.")
     {
         AutoAcceptFanartTvImages = "Fanart.tv-Funde automatisch übernehmen",
+        AnalyzeAudioFeaturesHint = "Analysiert Energie, Helligkeit, Dynamik und die Tonart jedes Titels über FFmpeg. Die Tonart wird für harmonisches Mischen auf dem Camelot-Rad in Infinite Mix und den Mix-Aktionen verwendet; deine Dateien werden nie verändert.",
         AnalyzeAudioFeatures = "Audioanalyse starten",
         AudioFeatureAnalyzing = "Audioanalyse… {0} analysiert",
         AudioFeatureAnalysisDone = "{0} Titel analysiert ({1} fehlgeschlagen).",
@@ -1403,6 +1405,7 @@ public static class LocalizationManager
         "An unexpected error occurred. The crash report could not be saved. Orynivo will now close.")
     {
         AutoAcceptFanartTvImages = "Automatically accept Fanart.tv results",
+        AnalyzeAudioFeaturesHint = "Analyzes energy, brightness, dynamics, and the musical key of every track with FFmpeg. The key is used for harmonic mixing on the Camelot wheel in Infinite Mix and the mix actions; your files are never changed.",
         AnalyzeAudioFeatures = "Analyze audio features",
         AudioFeatureAnalyzing = "Analyzing audio features… {0} analyzed",
         AudioFeatureAnalysisDone = "Analyzed {0} tracks ({1} failed).",
@@ -2166,6 +2169,7 @@ public static class LocalizationManager
         "Une erreur inattendue s’est produite. Le rapport n’a pas pu être enregistré. Orynivo va maintenant se fermer.")
     {
         AutoAcceptFanartTvImages = "Accepter automatiquement les résultats Fanart.tv",
+        AnalyzeAudioFeaturesHint = "Analyse l'énergie, la luminosité, la dynamique et la tonalité de chaque piste avec FFmpeg. La tonalité sert au mixage harmonique sur la roue Camelot dans Infinite Mix et les actions de mixage ; vos fichiers ne sont jamais modifiés.",
         AnalyzeAudioFeatures = "Analyser les caractéristiques audio",
         AudioFeatureAnalyzing = "Analyse audio… {0} analysées",
         AudioFeatureAnalysisDone = "{0} pistes analysées ({1} en échec).",
@@ -2926,6 +2930,7 @@ public static class LocalizationManager
         "Se produjo un error inesperado. No se pudo guardar el informe. Orynivo se cerrará ahora.")
     {
         AutoAcceptFanartTvImages = "Aceptar automáticamente los resultados de Fanart.tv",
+        AnalyzeAudioFeaturesHint = "Analiza la energía, el brillo, la dinámica y la tonalidad de cada pista con FFmpeg. La tonalidad se usa para la mezcla armónica en la rueda Camelot en Infinite Mix y las acciones de mezcla; tus archivos nunca se modifican.",
         AnalyzeAudioFeatures = "Analizar características de audio",
         AudioFeatureAnalyzing = "Analizando audio… {0} analizadas",
         AudioFeatureAnalysisDone = "{0} pistas analizadas ({1} fallidas).",
@@ -4466,6 +4471,7 @@ private static readonly LocalizedStrings Russian = new(
         AiChatEmptyResponse = "Модель вернула пустой ответ.",
         AiChatToolResultFallback = "После вызова инструмента модель не вернула окончательный ответ. Результат инструмента:",
         AutoAcceptFanartTvImages = "Автоматически принимать результаты Fanart.tv",
+        AnalyzeAudioFeaturesHint = "Анализирует энергию, яркость, динамику и тональность каждого трека через FFmpeg. Тональность используется для гармонического сведения по колесу Camelot в Infinite Mix и действиях микса; ваши файлы никогда не изменяются.",
         AnalyzeAudioFeatures = "Анализировать аудиопризнаки",
         AudioFeatureAnalyzing = "Анализ аудио… обработано: {0}",
         AudioFeatureAnalysisDone = "Проанализировано треков: {0} (ошибок: {1}).",
@@ -5381,6 +5387,7 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "模型返回了空响应。",
         AiChatToolResultFallback = "调用工具后，模型未返回最终答复。工具结果：",
         AutoAcceptFanartTvImages = "自动接受 Fanart.tv 的结果",
+        AnalyzeAudioFeaturesHint = "使用 FFmpeg 分析每个曲目的能量、亮度、动态和调性。调性用于 Infinite Mix 和混音操作中基于 Camelot 轮的和谐混音；您的文件绝不会被修改。",
         AnalyzeAudioFeatures = "分析音频特征",
         AudioFeatureAnalyzing = "正在分析音频…已分析 {0} 首",
         AudioFeatureAnalysisDone = "已分析 {0} 首曲目（{1} 首失败）。",
@@ -6295,6 +6302,7 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "मॉडल ने खाली उत्तर दिया।",
         AiChatToolResultFallback = "टूल कॉल के बाद मॉडल ने अंतिम उत्तर नहीं दिया। टूल परिणाम:",
         AutoAcceptFanartTvImages = "Fanart.tv परिणाम स्वतः स्वीकार करें",
+        AnalyzeAudioFeaturesHint = "FFmpeg के माध्यम से प्रत्येक ट्रैक की ऊर्जा, चमक, गतिशीलता और संगीत कुंजी का विश्लेषण करता है। कुंजी का उपयोग Infinite Mix और मिक्स क्रियाओं में Camelot व्हील पर हार्मोनिक मिक्सिंग के लिए होता है; आपकी फ़ाइलें कभी नहीं बदली जातीं।",
         AnalyzeAudioFeatures = "ऑडियो विशेषताओं का विश्लेषण करें",
         AudioFeatureAnalyzing = "ऑडियो विश्लेषण… {0} विश्लेषित",
         AudioFeatureAnalysisDone = "{0} ट्रैक विश्लेषित ({1} विफल)।",
