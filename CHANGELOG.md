@@ -12,6 +12,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `AudioDatabase.SetTrackFavorites` and `SetTrackUserRatings` apply a favorite
   state or a personal rating to several tracks in one transaction, with
   de-duplicated identifiers and validated ratings.
+- Added a similarity criterion to smart playlists. `SmartPlaylistCriteria` can
+  store a credential-free reference track (provider key plus provider-local track
+  id) and an optional inclusive minimum similarity score, and resolves to that
+  track's nearest neighbours through `SimilarityFeatureService`, still applying
+  every other criterion. The Tracks context menu offers **Save as smart
+  playlist: similar tracks** for local and Orynivo Server tracks; the reference
+  is stored without any server URL or credential, and remote neighbours are
+  resolved through the client's cached similarity vectors. Criteria persisted
+  before this change remain valid.
 - Added bulk editing for the shared local and Orynivo Server Tracks table:
   selecting more than one track shows a bulk action bar with **Mark as
   favorite**, **Remove favorite**, and a personal-rating selector. Local tracks

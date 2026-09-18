@@ -271,6 +271,7 @@ public static class LocalizationManager
         resources["L_ArtistImageSuggestionTitle"] = Current.ArtistImageSuggestionTitle;
         resources["L_ArtistImageSuggestionHint"] = Current.ArtistImageSuggestionHint;
         resources["L_AutoAcceptFanartTvImages"] = Current.AutoAcceptFanartTvImages;
+        resources["L_CreateSimilarSmartPlaylist"] = Current.CreateSimilarSmartPlaylist;
         resources["L_BulkSelectedCount"] = Current.BulkSelectedCount;
         resources["L_BulkFavorite"] = Current.BulkFavorite;
         resources["L_BulkUnfavorite"] = Current.BulkUnfavorite;
@@ -609,6 +610,7 @@ public static class LocalizationManager
         "Ein unerwarteter Fehler ist aufgetreten. Der Fehlerbericht konnte nicht gespeichert werden. Orynivo wird beendet.")
     {
         AutoAcceptFanartTvImages = "Fanart.tv-Funde automatisch übernehmen",
+        CreateSimilarSmartPlaylist = "Als intelligente Wiedergabeliste speichern: ähnliche Titel",
         BulkSelectedCount = "{0} ausgewählt",
         BulkFavorite = "Als Favorit markieren",
         BulkUnfavorite = "Favorit entfernen",
@@ -1375,6 +1377,7 @@ public static class LocalizationManager
         "An unexpected error occurred. The crash report could not be saved. Orynivo will now close.")
     {
         AutoAcceptFanartTvImages = "Automatically accept Fanart.tv results",
+        CreateSimilarSmartPlaylist = "Save as smart playlist: similar tracks",
         BulkSelectedCount = "{0} selected",
         BulkFavorite = "Mark as favorite",
         BulkUnfavorite = "Remove favorite",
@@ -2124,6 +2127,7 @@ public static class LocalizationManager
         "Une erreur inattendue s’est produite. Le rapport n’a pas pu être enregistré. Orynivo va maintenant se fermer.")
     {
         AutoAcceptFanartTvImages = "Accepter automatiquement les résultats Fanart.tv",
+        CreateSimilarSmartPlaylist = "Enregistrer comme liste intelligente : pistes similaires",
         BulkSelectedCount = "{0} sélectionné(s)",
         BulkFavorite = "Marquer comme favori",
         BulkUnfavorite = "Retirer des favoris",
@@ -2870,6 +2874,7 @@ public static class LocalizationManager
         "Se produjo un error inesperado. No se pudo guardar el informe. Orynivo se cerrará ahora.")
     {
         AutoAcceptFanartTvImages = "Aceptar automáticamente los resultados de Fanart.tv",
+        CreateSimilarSmartPlaylist = "Guardar como lista inteligente: pistas similares",
         BulkSelectedCount = "{0} seleccionado(s)",
         BulkFavorite = "Marcar como favorito",
         BulkUnfavorite = "Quitar de favoritos",
@@ -4396,6 +4401,7 @@ private static readonly LocalizedStrings Russian = new(
         AiChatEmptyResponse = "Модель вернула пустой ответ.",
         AiChatToolResultFallback = "После вызова инструмента модель не вернула окончательный ответ. Результат инструмента:",
         AutoAcceptFanartTvImages = "Автоматически принимать результаты Fanart.tv",
+        CreateSimilarSmartPlaylist = "Сохранить как умный плейлист: похожие треки",
         BulkSelectedCount = "Выбрано: {0}",
         BulkFavorite = "Добавить в избранное",
         BulkUnfavorite = "Убрать из избранного",
@@ -5297,6 +5303,7 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "模型返回了空响应。",
         AiChatToolResultFallback = "调用工具后，模型未返回最终答复。工具结果：",
         AutoAcceptFanartTvImages = "自动接受 Fanart.tv 的结果",
+        CreateSimilarSmartPlaylist = "保存为智能播放列表：相似曲目",
         BulkSelectedCount = "已选择 {0} 项",
         BulkFavorite = "标记为收藏",
         BulkUnfavorite = "取消收藏",
@@ -6197,6 +6204,7 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "मॉडल ने खाली उत्तर दिया।",
         AiChatToolResultFallback = "टूल कॉल के बाद मॉडल ने अंतिम उत्तर नहीं दिया। टूल परिणाम:",
         AutoAcceptFanartTvImages = "Fanart.tv परिणाम स्वतः स्वीकार करें",
+        CreateSimilarSmartPlaylist = "स्मार्ट प्लेलिस्ट के रूप में सहेजें: समान ट्रैक",
         BulkSelectedCount = "{0} चयनित",
         BulkFavorite = "पसंदीदा के रूप में चिह्नित करें",
         BulkUnfavorite = "पसंदीदा हटाएँ",

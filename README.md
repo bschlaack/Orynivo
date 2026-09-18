@@ -863,7 +863,9 @@ byte-range streaming without FFmpeg.
 - Lucene.NET full-text search with partial-word and German umlaut variants
 - Favorites for tracks, albums, and artists
 - Regular playlists and live smart playlists with metadata, library-age,
-  playback-history, ordering, and result-limit criteria
+  playback-history, similarity, ordering, and result-limit criteria. A track's
+  context menu offers **Save as smart playlist: similar tracks**, which keeps the
+  nearest local and Orynivo Server neighbours of that reference track
 - Smart playlists are created directly from active track filters and can be
   refined later through their sidebar context menu. The editor previews the live
   match count while criteria are changed, including unified local/server counts

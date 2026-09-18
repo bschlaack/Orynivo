@@ -157,6 +157,15 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   Server vectors are paged by stable track ID order, and the desktop client
   must replace the server's placeholder source with `orynivo:{server.Id}`;
   never place a server URL or credential in `SourceKey`.
+  `SmartPlaylistCriteria.Resolve(candidates, similarityFeatures)` uses
+  `RankSimilar` whenever `SimilaritySourceKey` and `SimilarityTrackId` are set:
+  the reference is matched by provider key plus provider-local track id, results
+  are ordered by descending score, `SimilarityMinimumScore` removes weak
+  neighbours, an unresolvable reference returns an empty list rather than an
+  unrelated set, and every other criterion still applies. The desktop re-keys
+  remote vectors onto the smart-playlist candidate provider key and pseudo-IDs
+  before resolving, and the stored reference must never contain a server URL or
+  credential.
 - Optional acoustic descriptors live in the provider-local
   `track_audio_features` table and survive metadata scans. Version changes must
   trigger bounded reanalysis. `AudioFeatureAnalysisService` decodes at most 90

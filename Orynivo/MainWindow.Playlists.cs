@@ -212,6 +212,11 @@ public partial class MainWindow : Window
             similarItem.Click += PlayMoreLikeThisMenuItem_OnClick;
             items.Add(similarItem);
 
+            var similarPlaylistItem = CreateFlyoutMenuItem(LocalizationManager.Current.CreateSimilarSmartPlaylist);
+            similarPlaylistItem.Tag = paths[0];
+            similarPlaylistItem.Click += CreateSimilarSmartPlaylistMenuItem_OnClick;
+            items.Add(similarPlaylistItem);
+
             var moodItem = CreateFlyoutMenuItem(LocalizationManager.Current.PlayMoodMix);
             foreach (var (label, mood) in new[]
                      {

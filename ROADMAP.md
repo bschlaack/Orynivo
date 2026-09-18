@@ -190,18 +190,20 @@ Genre editing is deliberately **not** included: it would write media tags, which
 needs a separate, explicit decision (the library never rewrites audio files
 implicitly).
 
-## 8. Smart playlist "similar to track" — `Todo`
+## 8. Smart playlist "similar to track" — `Done`
 
-**Design**
-
-- Extend `SmartPlaylistCriteria` with a similarity reference (provider-local
-  source key + track id) and a strength.
-- Resolve through the existing `SimilarityFeatureService` in `Orynivo.Core` so
-  both desktop and server resolve identically.
-
-**Tests**: criteria serialization compatibility, resolver behavior.
-
-**Commit**: `feat(playlists): add a similarity criterion to smart playlists`
+- `SmartPlaylistCriteria` gained `SimilaritySourceKey`, `SimilarityTrackId`, and
+  `SimilarityMinimumScore`. `Resolve(candidates, similarityFeatures)` orders
+  neighbours through `SimilarityFeatureService.RankSimilar`, filters by the
+  minimum score, returns empty for an unresolvable reference, and still applies
+  every other criterion. Criteria persisted before the change remain valid.
+- The Tracks context menu offers **Save as smart playlist: similar tracks** for
+  local and Orynivo Server references. The desktop re-keys remote vectors onto
+  the smart-playlist candidate provider key and pseudo-IDs; the reference never
+  contains a server URL or credential. 9 tests.
+- Not included: a similarity reference picker inside `SmartPlaylistDialog`
+  (creation is context-menu driven), and a server-side similarity resolve
+  endpoint.
 
 ## 9. Mood/activity presets — `Todo`
 

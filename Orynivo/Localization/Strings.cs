@@ -1350,6 +1350,8 @@ public sealed record LocalizedStrings(
     public string AiChatToolResultFallback { get; init; } = "";
     /// <summary>Gets the option for automatically accepting Fanart.tv artist-image results.</summary>
     public string AutoAcceptFanartTvImages { get; init; } = "";
+    /// <summary>Gets the track action that saves a similarity smart playlist.</summary>
+    public string CreateSimilarSmartPlaylist { get; init; } = "";
     /// <summary>Gets the bulk selection summary format string.</summary>
     public string BulkSelectedCount { get; init; } = "";
     /// <summary>Gets the bulk action that marks the selected tracks as favorites.</summary>

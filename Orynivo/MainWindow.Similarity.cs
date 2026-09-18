@@ -333,6 +333,107 @@ public partial class MainWindow
         });
     }
 
+    /// <summary>
+    /// Creates a smart playlist that keeps the tracks most similar to the
+    /// clicked local or Orynivo Server reference track.
+    /// </summary>
+    private async void CreateSimilarSmartPlaylistMenuItem_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is not Avalonia.Controls.MenuItem { Tag: string path })
+            return;
+
+        var seedIdentity = await ResolveSimilaritySeedAsync(path).ConfigureAwait(true);
+        if (seedIdentity is null)
+        {
+            StatusTextBlock.Text = LocalizationManager.Current.SimilarTracksUnavailable;
+            return;
+        }
+
+        var dialog = new NewPlaylistDialog();
+        if (await dialog.ShowDialog<bool>(this) == false || string.IsNullOrWhiteSpace(dialog.PlaylistName))
+            return;
+
+        // Smart-playlist criteria use the same provider convention as the source
+        // facet, so a remote reference is stored as its server source key.
+        var sourceKey = seedIdentity.Value.SourceKey;
+        if (sourceKey.StartsWith("orynivo:", StringComparison.Ordinal))
+            sourceKey = GetServerSourceKey(sourceKey["orynivo:".Length..]);
+
+        var criteria = new SmartPlaylistCriteria
+        {
+            SimilaritySourceKey = sourceKey,
+            SimilarityTrackId = seedIdentity.Value.TrackId
+        };
+        var name = dialog.PlaylistName.Trim();
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            db.CreateSmartPlaylist(name, System.Text.Json.JsonSerializer.Serialize(criteria));
+        }
+        catch
+        {
+            return;
+        }
+
+        LoadNavPlaylists();
+        StatusTextBlock.Text = string.Format(LocalizationManager.Current.SmartPlaylistSaved, name);
+    }
+
+    /// <summary>
+    /// Loads the similarity vectors used to resolve a similarity smart playlist.
+    /// Remote vectors are re-keyed onto the smart-playlist candidate provider key
+    /// and pseudo-IDs so the shared Core resolver can match them; unavailable
+    /// servers are skipped. Blocks on the cached feature load, so it must run off
+    /// the UI thread.
+    /// </summary>
+    /// <param name="criteria">Criteria being resolved; vectors load only for a configured reference.</param>
+    /// <param name="remoteTracks">Pseudo-ID to (server, track) map produced by the candidate build.</param>
+    /// <returns>The translated vectors, or <see langword="null"/> when none are available.</returns>
+    private IReadOnlyList<SimilarityFeatureVector>? BuildSmartPlaylistSimilarityFeatures(
+        SmartPlaylistCriteria criteria,
+        Dictionary<long, (Orynivo.Streaming.OrynivoServerSettings Server, LibraryCatalogTrack Track)> remoteTracks)
+    {
+        if (string.IsNullOrWhiteSpace(criteria.SimilaritySourceKey) || criteria.SimilarityTrackId is null)
+            return null;
+
+        try
+        {
+            var vectors = LoadAvailableSimilarityFeaturesAsync().GetAwaiter().GetResult();
+            if (vectors.Count == 0)
+                return null;
+
+            var pseudoIdByRealTrack = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (pseudoId, entry) in remoteTracks)
+                pseudoIdByRealTrack[$"{entry.Server.Id}\u001f{entry.Track.Id}"] = pseudoId;
+
+            var translated = new List<SimilarityFeatureVector>(vectors.Count);
+            foreach (var vector in vectors)
+            {
+                if (!vector.SourceKey.StartsWith("orynivo:", StringComparison.Ordinal))
+                {
+                    translated.Add(vector);
+                    continue;
+                }
+
+                var serverId = vector.SourceKey["orynivo:".Length..];
+                if (!pseudoIdByRealTrack.TryGetValue($"{serverId}\u001f{vector.TrackId}", out var pseudoId))
+                    continue;
+                translated.Add(vector with
+                {
+                    SourceKey = GetServerSourceKey(serverId),
+                    TrackId = pseudoId
+                });
+            }
+
+            return translated.Count > 0 ? translated : null;
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine($"Smart playlist similarity features failed: {exception.GetType().Name}");
+            return null;
+        }
+    }
+
     private async Task<List<SimilarityFeatureVector>> LoadAllSimilarityFeaturesAsync(Orynivo.Streaming.OrynivoServerSettings server)
     {
         var result = new List<SimilarityFeatureVector>();
