@@ -309,14 +309,14 @@ public partial class MainWindow : Window
         CancellationToken cancellationToken)
         => Task.Run<int?>(() =>
         {
-            var candidates = BuildUnifiedSmartPlaylistCandidates(out _);
-            return criteria.Resolve(candidates).Count;
+            var candidates = BuildUnifiedSmartPlaylistCandidates(out var remoteTracks);
+            return criteria.Resolve(candidates, BuildSmartPlaylistSimilarityFeatures(criteria, remoteTracks)).Count;
         }, cancellationToken);
 
     private List<ContentRow> ResolveUnifiedSmartPlaylistRows(SmartPlaylistCriteria criteria, bool registerRemoteMetadata = true)
     {
         var candidates = BuildUnifiedSmartPlaylistCandidates(out var remoteTracks);
-        var resolved = criteria.Resolve(candidates);
+        var resolved = criteria.Resolve(candidates, BuildSmartPlaylistSimilarityFeatures(criteria, remoteTracks));
         var localIds = resolved
             .Where(candidate => candidate.Id > 0)
             .Select(candidate => candidate.Id)

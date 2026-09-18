@@ -29,6 +29,9 @@ the ability to reach that library from any device on the local network.
 - Gapless playback
 - CUE sheet support
 - ReplayGain and parametric EQ
+- Multi-select bulk editing in the shared Tracks table, applying favorite,
+  unfavorite, or a personal rating to every selected local or Orynivo Server
+  track at once
 - Local library, playlists, smart playlists and full-text search
 - Unified artist detail pages with an album-style image-and-biography hero,
   synchronized favorites, image management, refreshable biographies, and
@@ -784,6 +787,10 @@ byte-range streaming without FFmpeg.
   starts. These use explicit mood tags when available and fall back to tempo
   plus preference/familiarity signals; they also start with the selected track
   and continue through Infinite Mix.
+  A **Play activity mix** submenu next to it offers the curated **Focus**,
+  **Workout**, and **Wind down** presets, which rank tracks against cached
+  acoustic descriptors (energy, brightness, dynamics) and tempo and continue
+  through the same Infinite Mix queue.
   Repeated similarity and mood actions reuse a five-minute memory-only vector
   cache. Catalog, favourite, rating, and server-configuration invalidations
   clear it; no vectors or provider credentials are written to disk.
@@ -812,7 +819,17 @@ byte-range streaming without FFmpeg.
   Servers. It balances discovery with genre affinity and suppresses immediate
   track, album, and artist repetition. Initial preparation is surfaced through
   a progress overlay; later refills rotate through the complete matching genre
-  population and happen automatically in the background.
+  population and happen automatically in the background. Batches are ordered
+  harmonically: when a track's key has been estimated from a bounded audio
+  analysis, Infinite Mix, similarity, mood, and activity mixes walk the Camelot
+  wheel so consecutive tracks mix cleanly. Tracks without an estimated key keep
+  their ranking order. The estimated key appears as an optional **Key** column
+  in the track tables and in **Show track information**; Settings > Playback
+  offers **Analyze audio features** to analyze the complete library and the
+  configured Orynivo Servers instead of waiting for the background batches.
+- A Dashboard **Year in review** summary for any year with listening history:
+  listened hours, active days, a monthly breakdown, and the leading genres,
+  albums, and artists, exportable as a shareable PNG image
 - Dashboard with an artwork-backed greeting hero with a lightened-artwork rim, live
   library counters (including local and configured Orynivo Server track
   favorites), random
@@ -860,11 +877,15 @@ byte-range streaming without FFmpeg.
 - Lucene.NET full-text search with partial-word and German umlaut variants
 - Favorites for tracks, albums, and artists
 - Regular playlists and live smart playlists with metadata, library-age,
-  playback-history, ordering, and result-limit criteria
+  playback-history, similarity, ordering, and result-limit criteria. A track's
+  context menu offers **Save as smart playlist: similar tracks**, which keeps the
+  nearest local and Orynivo Server neighbours of that reference track
 - Smart playlists are created directly from active track filters and can be
   refined later through their sidebar context menu. The editor previews the live
   match count while criteria are changed, including unified local/server counts
-  and server-side counts when the connected Orynivo Server supports them.
+  and server-side counts when the connected Orynivo Server supports them, and it
+  shows every stored criterion — including the reference track of a similarity
+  smart playlist, whose minimum similarity score stays editable.
 - UTF-8 M3U8 import and export for regular playlists, including relative local
   paths, retained missing-file entries, and HTTP/HTTPS streams; credentialed
   Plex URLs are excluded
@@ -1533,7 +1554,11 @@ first uses cached synchronized lyrics, then downloaded or embedded plain lyrics
 as a fallback. Missing lyrics can be requested from the public LRCLIB API and
 are stored in `library.db`; synchronized LRC lines are highlighted and kept in
 view using the current playback position. The refresh button performs a new
-lookup, and a missing result is shown directly in the lyrics view.
+lookup, and a missing result is shown directly in the lyrics view. The
+**Karaoke** action opens a fullscreen view of the synchronized lyrics with the
+active line centered and emphasized while neighbouring lines fade out, using the
+current cover as a dimmed backdrop; it exits with Esc or a click and explains
+when a track only has plain lyrics.
 For WASAPI, buffered but not yet audible frames are excluded from the playback
 position so synchronized lyrics follow the actual output timing.
 
@@ -1553,6 +1578,12 @@ Exports show file-level progress and write to a temporary `.tmp` archive first;
 the file is renamed to `.zip` only after the export completes successfully.
 Imports use the same progress bar while extracting, validating, restoring
 artwork, rebasing paths, and rebuilding the search index.
+
+**Scheduled backups** can create that archive automatically. Choose an enable
+toggle, an interval in days, how many backups to keep, and a backup folder
+(default: a `backups` folder beneath the per-user data directory), or run one
+immediately with **Back up now**. Orynivo writes the archive, removes older ones
+beyond the retention count, and shows the last successful run.
 
 ## Current Limitations
 

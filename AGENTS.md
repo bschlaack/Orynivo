@@ -214,12 +214,15 @@ on every push and pull request, so MCP tool parity and the seven-language
 desktop/website/mobile localization coverage cannot silently drift. Keep these
 scripts passing; do not remove the job. `.github/dependabot.yml` tracks NuGet and
 GitHub Actions updates weekly, but ignores NuGet upgrades that cannot build on
-the pinned toolchain: Avalonia major and minor updates (11.3 deprecates the
-legacy drag-and-drop API that the CI's `--warnaserror` turns into an error, and
-12 requires the .NET 9 SDK) plus major upgrades of Microsoft.Data.Sqlite and
+the pinned toolchain: Avalonia **major** updates (12 requires the .NET 9 SDK and
+has breaking API changes) plus major upgrades of Microsoft.Data.Sqlite and
 Microsoft.NET.Test.Sdk. Migrate those deliberately instead of merging an
-automatic bump; when the Avalonia drag-and-drop code moves to `IDataTransfer`,
-the Avalonia minor pin can be relaxed.
+automatic bump. Avalonia **minor** updates within 11.3 are allowed again because
+the drag-and-drop code now uses `IDataTransfer`/`DataTransfer`/
+`DragDrop.DoDragDropAsync`; note that `Avalonia.Controls.DataGrid` has no release
+beyond 11.3.13, so it stays on that version while the other Avalonia packages may
+move within 11.3.x — that mix builds, but do not raise DataGrid past 11.3.13
+until upstream publishes a newer 11.3 line.
 All GitHub-hosted CI and release workflows use Node.js 24-compatible action
 generations (`actions/checkout@v6`, `actions/setup-dotnet@v5`, and
 `softprops/action-gh-release@v3` where applicable); do not reintroduce their
@@ -2136,7 +2139,7 @@ asynchronous file I/O from the UI thread
   `MenuFlyout` column chooser at the pointer position. It uses
   `StaysOpenOnClick` so several columns can be changed in one session. Do not
   replace this with a dynamically attached and programmatically opened
-  Avalonia `ContextMenu`; Avalonia 11.2 retains internal ownership in that
+  Avalonia `ContextMenu`; Avalonia 11.2/11.3 retains internal ownership in that
   sequence and can throw during placement.
   Track contexts additionally expose file name, album artist, year, track/disc
   numbers, genre, bitrate, sample rate, bit depth, channels, composer, BPM,

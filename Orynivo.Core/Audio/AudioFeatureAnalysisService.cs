@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Globalization;
+using Orynivo.Library;
 
 namespace Orynivo.Audio;
 
@@ -10,12 +11,14 @@ namespace Orynivo.Audio;
 /// <param name="Brightness">Normalized zero-crossing/transient proxy.</param>
 /// <param name="Dynamics">Normalized variation between short-time energy windows.</param>
 /// <param name="AnalyzedAt">Unix timestamp at which analysis completed.</param>
+/// <param name="Key">Estimated musical key on the Camelot wheel, or <see langword="null"/> when it is ambiguous.</param>
 public sealed record AudioFeatureDescriptor(
     int Version,
     double Energy,
     double Brightness,
     double Dynamics,
-    long AnalyzedAt);
+    long AnalyzedAt,
+    CamelotKey? Key = null);
 
 /// <summary>One provider-local source selected for optional acoustic analysis.</summary>
 /// <param name="TrackId">Provider-local track identifier.</param>
@@ -32,9 +35,20 @@ public sealed record AudioFeatureAnalysisCandidate(
 public static class AudioFeatureAnalysisService
 {
     /// <summary>Current cached acoustic-descriptor version.</summary>
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
     private const int SampleRate = 8000;
     private const int MaximumSeconds = 90;
+    private const int ChromaFrameSize = 2048;
+    private const int ChromaHopSize = 4096;
+    private const int LowestChromaOctave = 3;
+    private const int ChromaOctaveCount = 5;
+    private const double MinimumKeyCorrelation = 0.15d;
+
+    /// <summary>Krumhansl-Schmuckler major-key profile, indexed from the tonic.</summary>
+    private static readonly double[] MajorProfile = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
+
+    /// <summary>Krumhansl-Schmuckler minor-key profile, indexed from the tonic.</summary>
+    private static readonly double[] MinorProfile = [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
 
     /// <summary>Analyzes at most ninety seconds of a local physical source using one FFmpeg thread.</summary>
     /// <param name="sourcePath">Physical audio source path.</param>
@@ -179,7 +193,141 @@ public static class AudioFeatureAnalysisService
             Math.Clamp(rms * 3d, 0d, 1d),
             Math.Clamp(crossings / (double)Math.Max(1, samples.Count - 1) / 0.35d, 0d, 1d),
             Math.Clamp(dynamicDb / 30d, 0d, 1d),
-            DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+            DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+            EstimateKey(samples, sampleRate));
+    }
+
+    /// <summary>
+    /// Estimates the musical key with a bounded Goertzel chromagram and
+    /// Krumhansl-Schmuckler profile correlation. The estimate stays deliberately
+    /// conservative: a flat or ambiguous chroma returns <see langword="null"/>
+    /// instead of a guess, so harmonic ordering simply skips that track.
+    /// </summary>
+    /// <param name="samples">Normalized mono floating-point samples.</param>
+    /// <param name="sampleRate">Sample rate in hertz.</param>
+    /// <returns>The estimated Camelot key, or <see langword="null"/> when the chroma is too flat to decide.</returns>
+    internal static CamelotKey? EstimateKey(IReadOnlyList<float> samples, int sampleRate)
+    {
+        if (sampleRate <= 0 || samples.Count < ChromaFrameSize)
+            return null;
+
+        var chroma = new double[12];
+        var frame = new double[ChromaFrameSize];
+        var frameCount = 0;
+        for (var start = 0; start + ChromaFrameSize <= samples.Count; start += ChromaHopSize)
+        {
+            var energy = 0d;
+            for (var index = 0; index < ChromaFrameSize; index++)
+            {
+                var window = 0.5d - 0.5d * Math.Cos(2d * Math.PI * index / (ChromaFrameSize - 1));
+                var value = Math.Clamp(samples[start + index], -1f, 1f) * window;
+                frame[index] = value;
+                energy += value * value;
+            }
+
+            if (energy < 1e-6d)
+                continue;
+
+            frameCount++;
+            for (var pitchClass = 0; pitchClass < 12; pitchClass++)
+            {
+                var magnitude = 0d;
+                for (var octave = LowestChromaOctave; octave < LowestChromaOctave + ChromaOctaveCount; octave++)
+                {
+                    var frequency = 440d * Math.Pow(2d, (12 * (octave + 1) + pitchClass - 69) / 12d);
+                    if (frequency >= sampleRate / 2d)
+                        continue;
+                    magnitude += GoertzelMagnitude(frame, frequency, sampleRate);
+                }
+
+                chroma[pitchClass] += magnitude;
+            }
+        }
+
+        if (frameCount == 0)
+            return null;
+
+        var mean = chroma.Average();
+        var deviation = Math.Sqrt(chroma.Select(value => (value - mean) * (value - mean)).Average());
+        if (deviation <= 1e-9d)
+            return null;
+
+        var bestScore = double.MinValue;
+        var bestPitchClass = 0;
+        var bestIsMinor = false;
+        for (var rotation = 0; rotation < 12; rotation++)
+        {
+            var majorScore = Correlate(chroma, MajorProfile, rotation);
+            if (majorScore > bestScore)
+            {
+                bestScore = majorScore;
+                bestPitchClass = rotation;
+                bestIsMinor = false;
+            }
+
+            var minorScore = Correlate(chroma, MinorProfile, rotation);
+            if (minorScore > bestScore)
+            {
+                bestScore = minorScore;
+                bestPitchClass = rotation;
+                bestIsMinor = true;
+            }
+        }
+
+        return bestScore < MinimumKeyCorrelation
+            ? null
+            : CamelotKey.FromPitchClass(bestPitchClass, bestIsMinor);
+    }
+
+    private static double GoertzelMagnitude(ReadOnlySpan<double> frame, double frequency, int sampleRate)
+    {
+        var coefficient = 2d * Math.Cos(2d * Math.PI * frequency / sampleRate);
+        var previous = 0d;
+        var previousPrevious = 0d;
+        foreach (var sample in frame)
+        {
+            var current = sample + coefficient * previous - previousPrevious;
+            previousPrevious = previous;
+            previous = current;
+        }
+
+        var power = previous * previous + previousPrevious * previousPrevious -
+                    coefficient * previous * previousPrevious;
+        return Math.Sqrt(Math.Max(0d, power));
+    }
+
+    /// <summary>Correlates a chroma vector with a rotated key profile using Pearson correlation.</summary>
+    /// <param name="chroma">Twelve-element chroma vector indexed by pitch class.</param>
+    /// <param name="profile">Key profile indexed from the tonic.</param>
+    /// <param name="rotation">Tonic pitch class the profile is rotated to.</param>
+    /// <returns>The correlation from minus one through one.</returns>
+    private static double Correlate(double[] chroma, double[] profile, int rotation)
+    {
+        var chromaMean = 0d;
+        var profileMean = 0d;
+        for (var index = 0; index < 12; index++)
+        {
+            chromaMean += chroma[(rotation + index) % 12];
+            profileMean += profile[index];
+        }
+
+        chromaMean /= 12d;
+        profileMean /= 12d;
+
+        var covariance = 0d;
+        var chromaVariance = 0d;
+        var profileVariance = 0d;
+        for (var index = 0; index < 12; index++)
+        {
+            var chromaValue = chroma[(rotation + index) % 12] - chromaMean;
+            var profileValue = profile[index] - profileMean;
+            covariance += chromaValue * profileValue;
+            chromaVariance += chromaValue * chromaValue;
+            profileVariance += profileValue * profileValue;
+        }
+
+        var denominator = Math.Sqrt(chromaVariance * profileVariance);
+        return denominator <= 1e-12d ? 0d : covariance / denominator;
     }
 
     private static float ReadSingle(ReadOnlySpan<byte> bytes) =>

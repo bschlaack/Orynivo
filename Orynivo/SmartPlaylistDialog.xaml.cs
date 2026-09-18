@@ -15,6 +15,8 @@ namespace Orynivo;
 public partial class SmartPlaylistDialog : Window
 {
     private readonly SmartPlaylistCriteria _initialCriteria;
+    private readonly string? _similarityReferenceLabel;
+    private bool _similarityReferenceCleared;
     private DispatcherTimer? _previewTimer;
     private CancellationTokenSource? _previewCts;
 
@@ -45,9 +47,17 @@ public partial class SmartPlaylistDialog : Window
     /// </summary>
     /// <param name="initialCriteria">Criteria used to prepopulate the dialog.</param>
     /// <param name="playlistName">Current smart-playlist display name.</param>
-    public SmartPlaylistDialog(SmartPlaylistCriteria initialCriteria, string playlistName)
+    /// <param name="similarityReferenceLabel">
+    /// Readable label for the configured similarity reference track, or
+    /// <see langword="null"/> when the criteria has no reference.
+    /// </param>
+    public SmartPlaylistDialog(
+        SmartPlaylistCriteria initialCriteria,
+        string playlistName,
+        string? similarityReferenceLabel = null)
     {
         _initialCriteria = initialCriteria;
+        _similarityReferenceLabel = similarityReferenceLabel;
         InitializeComponent();
         NameTextBox.Text = playlistName;
         CreateButton.IsEnabled = !string.IsNullOrWhiteSpace(playlistName);
@@ -96,6 +106,26 @@ public partial class SmartPlaylistDialog : Window
         };
         SortOrderComboBox.SelectedItem = ((IEnumerable<SortOrderOption>)SortOrderComboBox.ItemsSource)
             .First(option => option.Value == _initialCriteria.SortOrder);
+
+        var hasReference = !string.IsNullOrWhiteSpace(_initialCriteria.SimilaritySourceKey) &&
+                           _initialCriteria.SimilarityTrackId.HasValue;
+        SimilarityReferencePanel.IsVisible = hasReference;
+        if (hasReference)
+        {
+            SimilarityReferenceTextBlock.Text = _similarityReferenceLabel
+                ?? $"{_initialCriteria.SimilaritySourceKey} · {_initialCriteria.SimilarityTrackId}";
+            SimilarityMinimumScoreTextBox.Text = FormatNumber(_initialCriteria.SimilarityMinimumScore);
+        }
+    }
+
+    /// <summary>Removes the similarity reference from the criteria being edited.</summary>
+    /// <param name="sender">The clear action.</param>
+    /// <param name="e">Click details.</param>
+    private void ClearSimilarityReferenceButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        _similarityReferenceCleared = true;
+        SimilarityReferencePanel.IsVisible = false;
+        SchedulePreview();
     }
 
     private void NameTextBox_OnTextChanged(object? sender, TextChangedEventArgs e)
@@ -138,6 +168,8 @@ public partial class SmartPlaylistDialog : Window
             !TryOptionalInt(MinimumPlayCountTextBox.Text, out var minimumPlayCount) ||
             !TryOptionalInt(MaximumPlayCountTextBox.Text, out var maximumPlayCount) ||
             !TryOptionalInt(ResultLimitTextBox.Text, out var resultLimit) ||
+            !TryOptionalDouble(SimilarityMinimumScoreTextBox.Text, out var similarityMinimumScore) ||
+            !IsSimilarityScoreValid(similarityMinimumScore) ||
             !TryIntegerList(BitratesTextBox.Text, out var bitrates) ||
             !IsPositive(minimumYear) ||
             !IsPositive(maximumYear) ||
@@ -157,6 +189,12 @@ public partial class SmartPlaylistDialog : Window
             return false;
         }
 
+        // The similarity reference cannot be rebuilt from the editor fields, so it
+        // must be carried over explicitly instead of being silently dropped.
+        var similarity = SmartPlaylistCriteriaEditing.ResolveSimilarityReference(
+            _initialCriteria,
+            _similarityReferenceCleared,
+            similarityMinimumScore);
         criteria = new SmartPlaylistCriteria
         {
             FavoritesOnly = FavoritesOnlyCheckBox.IsChecked == true,
@@ -182,7 +220,10 @@ public partial class SmartPlaylistDialog : Window
             MaximumPlayCount = maximumPlayCount,
             SortOrder = (SortOrderComboBox.SelectedItem as SortOrderOption)?.Value
                         ?? SmartPlaylistSortOrder.Title,
-            ResultLimit = resultLimit
+            ResultLimit = resultLimit,
+            SimilaritySourceKey = similarity.SourceKey,
+            SimilarityTrackId = similarity.TrackId,
+            SimilarityMinimumScore = similarity.MinimumScore
         };
         return true;
     }
@@ -195,7 +236,8 @@ public partial class SmartPlaylistDialog : Window
             SearchTextTextBox, GenresTextBox, FormatsTextBox, BitratesTextBox, SourcesTextBox,
             MinimumYearTextBox, MaximumYearTextBox, ArtistTextBox, AlbumTextBox,
             MinimumDurationTextBox, MaximumDurationTextBox, AddedWithinDaysTextBox,
-            PlayedWithinDaysTextBox, MinimumPlayCountTextBox, MaximumPlayCountTextBox, ResultLimitTextBox
+            PlayedWithinDaysTextBox, MinimumPlayCountTextBox, MaximumPlayCountTextBox, ResultLimitTextBox,
+            SimilarityMinimumScoreTextBox
         ];
         foreach (var box in textBoxes)
             box.TextChanged += (_, _) => SchedulePreview();
@@ -313,6 +355,9 @@ public partial class SmartPlaylistDialog : Window
     private static bool IsNonNegative(double? value) => !value.HasValue || value.Value >= 0;
 
     private static bool IsPositive(int? value) => !value.HasValue || value.Value > 0;
+
+    private static bool IsSimilarityScoreValid(double? value) =>
+        !value.HasValue || (value.Value >= 0d && value.Value <= 1d);
 
     private static string? NullIfWhiteSpace(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();

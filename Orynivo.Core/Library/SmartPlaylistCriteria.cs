@@ -69,12 +69,47 @@ public sealed class SmartPlaylistCriteria
     public int? ResultLimit { get; init; }
 
     /// <summary>
+    /// Gets the credential-free provider key of the reference track whose nearest
+    /// neighbours are selected, or <see langword="null"/> when no similarity
+    /// reference is configured. Uses the same provider key convention as
+    /// <see cref="SourceKeys"/> and never carries a server URL or credential.
+    /// </summary>
+    public string? SimilaritySourceKey { get; init; }
+
+    /// <summary>
+    /// Gets the provider-local track identifier of the similarity reference
+    /// track, or <see langword="null"/> when no similarity reference is
+    /// configured.
+    /// </summary>
+    public long? SimilarityTrackId { get; init; }
+
+    /// <summary>
+    /// Gets the inclusive minimum similarity score from zero through one for
+    /// similarity references, or <see langword="null"/> when the default of
+    /// <c>0</c> applies.
+    /// </summary>
+    public double? SimilarityMinimumScore { get; init; }
+
+    /// <summary>Gets whether a complete similarity reference is configured.</summary>
+    private bool HasSimilarityReference =>
+        !string.IsNullOrWhiteSpace(SimilaritySourceKey) && SimilarityTrackId.HasValue;
+
+    /// <summary>
     /// Filters and orders <paramref name="candidates"/> against this criteria and returns the matching tracks.
+    /// A configured similarity reference cannot be honoured without feature
+    /// vectors, so this overload returns an empty list instead of an unrelated
+    /// full-library result; use
+    /// <see cref="Resolve(List{SmartPlaylistTrackInfo}, IReadOnlyList{SimilarityFeatureVector})"/>
+    /// to resolve similarity criteria.
     /// </summary>
     /// <param name="candidates">Full set of compact track metadata returned by <see cref="AudioDatabase.GetSmartPlaylistTracks"/>.</param>
     /// <returns>Ordered, optionally limited list of matching <see cref="SmartPlaylistTrackInfo"/> records.</returns>
     public List<SmartPlaylistTrackInfo> Resolve(List<SmartPlaylistTrackInfo> candidates)
     {
+        ArgumentNullException.ThrowIfNull(candidates);
+        if (HasSimilarityReference)
+            return [];
+
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         IEnumerable<SmartPlaylistTrackInfo> filtered = candidates.Where(f => Matches(f, now));
         IEnumerable<SmartPlaylistTrackInfo> ordered = SortOrder switch
@@ -91,6 +126,67 @@ public sealed class SmartPlaylistCriteria
         var result = ResultLimit.HasValue ? ordered.Take(ResultLimit.Value).ToList() : ordered.ToList();
         return result;
     }
+
+    /// <summary>
+    /// Filters and orders <paramref name="candidates"/> against this criteria.
+    /// When a similarity reference is configured, the closest neighbours of the
+    /// reference track replace the configured ordering and are returned in
+    /// descending similarity score order.
+    /// </summary>
+    /// <param name="candidates">Full set of compact track metadata returned by <see cref="AudioDatabase.GetSmartPlaylistTracks"/>.</param>
+    /// <param name="similarityFeatures">
+    /// Provider-neutral feature vectors covering the reference and every
+    /// candidate, or <see langword="null"/> when similarity data is unavailable.
+    /// </param>
+    /// <returns>Ordered, optionally limited list of matching <see cref="SmartPlaylistTrackInfo"/> records.</returns>
+    public List<SmartPlaylistTrackInfo> Resolve(
+        List<SmartPlaylistTrackInfo> candidates,
+        IReadOnlyList<SimilarityFeatureVector>? similarityFeatures)
+    {
+        ArgumentNullException.ThrowIfNull(candidates);
+        if (!HasSimilarityReference || similarityFeatures is not { Count: > 0 })
+            return Resolve(candidates);
+
+        var seed = similarityFeatures.FirstOrDefault(vector =>
+            string.Equals(vector.SourceKey, SimilaritySourceKey, StringComparison.OrdinalIgnoreCase) &&
+            vector.TrackId == SimilarityTrackId!.Value);
+        if (seed is null)
+            return [];
+
+        if (ResultLimit is <= 0)
+            return [];
+
+        var byIdentity = new Dictionary<string, SmartPlaylistTrackInfo>(StringComparer.OrdinalIgnoreCase);
+        foreach (var candidate in candidates)
+            byIdentity[BuildIdentityKey(candidate.SourceKey, candidate.Id)] = candidate;
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var minimumScore = Math.Clamp(SimilarityMinimumScore ?? 0d, 0d, 1d);
+        var result = new List<SmartPlaylistTrackInfo>();
+        foreach (var match in SimilarityFeatureService.RankSimilar(
+                     seed,
+                     similarityFeatures,
+                     maximumResults: 500,
+                     maximumPerArtist: 10,
+                     maximumPerAlbum: 5))
+        {
+            if (match.Score < minimumScore)
+                break;
+            if (!byIdentity.TryGetValue(
+                    BuildIdentityKey(match.Vector.SourceKey, match.Vector.TrackId),
+                    out var info))
+                continue;
+            if (!Matches(info, now))
+                continue;
+            result.Add(info);
+            if (ResultLimit.HasValue && result.Count >= ResultLimit.Value)
+                break;
+        }
+        return result;
+    }
+
+    private static string BuildIdentityKey(string? sourceKey, long trackId) =>
+        $"{sourceKey ?? string.Empty}\u001f{trackId}";
 
     private bool Matches(SmartPlaylistTrackInfo facet, long nowUnixSeconds)
     {

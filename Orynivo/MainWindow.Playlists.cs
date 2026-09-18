@@ -212,6 +212,11 @@ public partial class MainWindow : Window
             similarItem.Click += PlayMoreLikeThisMenuItem_OnClick;
             items.Add(similarItem);
 
+            var similarPlaylistItem = CreateFlyoutMenuItem(LocalizationManager.Current.CreateSimilarSmartPlaylist);
+            similarPlaylistItem.Tag = paths[0];
+            similarPlaylistItem.Click += CreateSimilarSmartPlaylistMenuItem_OnClick;
+            items.Add(similarPlaylistItem);
+
             var moodItem = CreateFlyoutMenuItem(LocalizationManager.Current.PlayMoodMix);
             foreach (var (label, mood) in new[]
                      {
@@ -226,6 +231,21 @@ public partial class MainWindow : Window
                 moodItem.Items.Add(child);
             }
             items.Add(moodItem);
+
+            var presetItem = CreateFlyoutMenuItem(LocalizationManager.Current.PlayActivityMix);
+            foreach (var (label, preset) in new[]
+                     {
+                         (LocalizationManager.Current.ActivityMixFocus, SimilarityPreset.Focus),
+                         (LocalizationManager.Current.ActivityMixWorkout, SimilarityPreset.Workout),
+                         (LocalizationManager.Current.ActivityMixWindDown, SimilarityPreset.WindDown)
+                     })
+            {
+                var child = CreateFlyoutMenuItem(label);
+                child.Tag = new PresetMixActionTag(paths[0], preset);
+                child.Click += PlayPresetMixMenuItem_OnClick;
+                presetItem.Items.Add(child);
+            }
+            items.Add(presetItem);
         }
         return items;
     }
@@ -606,7 +626,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        var dialog = new SmartPlaylistDialog(criteria, playlist.Name)
+        var dialog = new SmartPlaylistDialog(
+            criteria,
+            playlist.Name,
+            await DescribeSmartPlaylistSimilarityReferenceAsync(criteria).ConfigureAwait(true))
         {
             CountResolver = (candidate, ct) => _orynivoClient.ResolveSmartPlaylistCountAsync(
                 server, JsonSerializer.Serialize(candidate), GetOrynivoFavoriteTrackIds(server), ct)
@@ -666,7 +689,6 @@ public partial class MainWindow : Window
     // Drag & drop into the queue (Tracks / Albums / Folders → Up Next)
     // ------------------------------------------------------------------
 
-    private const string QueueDragFormat = "orynivo/queue-paths";
     private Point _queueDragOrigin;
     private bool _queueDragPending;
 
@@ -801,6 +823,53 @@ public partial class MainWindow : Window
         return sanitized.Length == 0 ? "playlist" : sanitized;
     }
 
+    /// <summary>
+    /// Builds a readable label for a smart playlist's similarity reference so the
+    /// editor can show which track the playlist is based on. The local lookup runs
+    /// off the UI thread.
+    /// </summary>
+    /// <param name="criteria">Criteria holding the optional similarity reference.</param>
+    /// <returns>A readable reference label, or <see langword="null"/> when no reference is configured.</returns>
+    private async Task<string?> DescribeSmartPlaylistSimilarityReferenceAsync(SmartPlaylistCriteria criteria)
+    {
+        if (string.IsNullOrWhiteSpace(criteria.SimilaritySourceKey) || criteria.SimilarityTrackId is not long trackId)
+            return null;
+
+        var sourceKey = criteria.SimilaritySourceKey!;
+        if (string.Equals(sourceKey, "local", StringComparison.OrdinalIgnoreCase))
+        {
+            var track = await Task.Run(() =>
+            {
+                try
+                {
+                    using var db = AudioDatabase.OpenDefault();
+                    return db.GetTrackListByIds([trackId]).FirstOrDefault();
+                }
+                catch
+                {
+                    return null;
+                }
+            }).ConfigureAwait(true);
+            if (track is not null)
+            {
+                var title = string.IsNullOrWhiteSpace(track.Title) ? track.FileName : track.Title;
+                return string.IsNullOrWhiteSpace(track.Artist) ? title : $"{title} — {track.Artist}";
+            }
+            return $"local · {trackId}";
+        }
+
+        if (sourceKey.StartsWith("server:", StringComparison.OrdinalIgnoreCase))
+        {
+            var serverId = sourceKey["server:".Length..];
+            var server = (_settings.OrynivoServers ?? [])
+                .FirstOrDefault(candidate => string.Equals(candidate.Id, serverId, StringComparison.OrdinalIgnoreCase));
+            if (server is not null)
+                return $"{server.Name} · {trackId}";
+        }
+
+        return $"{sourceKey} · {trackId}";
+    }
+
     private async void EditSmartPlaylistMenuItem_OnClick(object? sender, RoutedEventArgs e)
     {
         if (sender is not MenuItem { Tag: long playlistId })
@@ -823,7 +892,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        var dialog = new SmartPlaylistDialog(criteria, playlist.Name)
+        var dialog = new SmartPlaylistDialog(
+            criteria,
+            playlist.Name,
+            await DescribeSmartPlaylistSimilarityReferenceAsync(criteria).ConfigureAwait(true))
         {
             CountResolver = ResolveUnifiedSmartPlaylistCountAsync
         };

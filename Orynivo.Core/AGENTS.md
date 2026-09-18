@@ -154,15 +154,42 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   `RankMood` provides deterministic calm, balanced, and energetic ordering from
   explicit mood tags, normalized BPM, preferences, community confidence, and
   familiarity, with the same provider-aware diversity constraints.
+  `RankPreset` provides deterministic **Focus**, **Workout**, and **Wind down**
+  ordering from cached acoustic descriptors (energy, brightness, dynamics),
+  normalized tempo, explicit mood tags, and preference signals; missing
+  descriptors use a neutral prior rather than excluding the track. All three
+  rankings share one private diversity-limited selection helper, and results
+  always carry credential-free provider keys.
   Server vectors are paged by stable track ID order, and the desktop client
   must replace the server's placeholder source with `orynivo:{server.Id}`;
   never place a server URL or credential in `SourceKey`.
+  `SmartPlaylistCriteria.Resolve(candidates, similarityFeatures)` uses
+  `RankSimilar` whenever `SimilaritySourceKey` and `SimilarityTrackId` are set:
+  the reference is matched by provider key plus provider-local track id, results
+  are ordered by descending score, `SimilarityMinimumScore` removes weak
+  neighbours, an unresolvable reference returns an empty list rather than an
+  unrelated set, and every other criterion still applies. The desktop re-keys
+  remote vectors onto the smart-playlist candidate provider key and pseudo-IDs
+  before resolving, and the stored reference must never contain a server URL or
+  credential.
 - Optional acoustic descriptors live in the provider-local
   `track_audio_features` table and survive metadata scans. Version changes must
   trigger bounded reanalysis. `AudioFeatureAnalysisService` decodes at most 90
   seconds as 8-kHz mono, restricts FFmpeg to one thread and best-effort reduced
-  priority, and produces only normalized energy, brightness, and dynamics.
-  Maintenance is sequential and failed sources have a seven-day retry cooldown.
+  priority, and produces only normalized energy, brightness, and dynamics plus an
+  optional estimated key. Maintenance is sequential and failed sources have a
+  seven-day retry cooldown.
+- `CamelotKey` is the single Camelot-wheel mapping: it parses conventional key
+  names and wheel labels, exposes wheel distance (identical `0`, relative or
+  neighbouring `1`), and never guesses an unsupported spelling. Key estimation
+  uses a bounded Goertzel chromagram correlated against Krumhansl-Schmuckler
+  profiles and must stay conservative — a flat or ambiguous chroma returns no
+  key rather than a guess — and the canonical wheel label is what gets cached in
+  `track_audio_features.camelot_key` and carried on facet, similarity, and genre
+  cloud payloads. `HarmonicOrdering.Order` is the single greedy wheel walk used
+  by playback batches: it is deterministic, keeps keyless items in their original
+  relative order after the chain, and returns its input unchanged when fewer than
+  two items carry a key.
 - `GenreCloudService` owns the stable hierarchical genre taxonomy, tag
   normalization, count aggregation, breadcrumbs, and bounded provider-local
   candidate selection. Candidate offsets rotate and wrap the stable order for

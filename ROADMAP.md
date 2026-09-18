@@ -171,125 +171,140 @@ Steps:
 
 Never automatic; no action without confirmation.
 
-## 7. Bulk editing in tables — `Todo`
+## 7. Bulk editing in tables — `Done`
 
-Multi-select rows, then set genre, personal rating, or favorite in one step.
+Multi-select rows, then set personal rating or favorite in one step.
 
-**Design**
+Steps:
 
-- `DataGrid.SelectionMode="Extended"` for the track tables; a bulk action bar.
-- Local: transactional `AudioDatabase` updates; remote: batched rating/favorite
-  API calls.
-- Preserve the existing single-row behavior and column masks.
+- 7a Core bulk update API — `Done`: `AudioDatabase.SetTrackFavorites` and
+  `SetTrackUserRatings` write several tracks in one transaction (profile-aware,
+  de-duplicated identifiers, validated rating). 5 tests.
+- 7b Desktop multi-select UI — `Done`: the shared content table uses
+  `SelectionMode="Extended"`, a bulk action bar appears for multi-track
+  selections in local and remote Tracks views, local rows apply through 7a,
+  remote rows update the client-side favorite container and the server rating
+  API, and the visible rows refresh in place. Localized in all seven languages.
 
-**Tests**: batch-building logic, mixed local/remote selection handling.
+Genre editing is deliberately **not** included: it would write media tags, which
+needs a separate, explicit decision (the library never rewrites audio files
+implicitly).
 
-**Commit**: `feat(library): add bulk genre, rating and favorite editing`
+## 8. Smart playlist "similar to track" — `Done`
 
-## 8. Smart playlist "similar to track" — `Todo`
+- `SmartPlaylistCriteria` gained `SimilaritySourceKey`, `SimilarityTrackId`, and
+  `SimilarityMinimumScore`. `Resolve(candidates, similarityFeatures)` orders
+  neighbours through `SimilarityFeatureService.RankSimilar`, filters by the
+  minimum score, returns empty for an unresolvable reference, and still applies
+  every other criterion. Criteria persisted before the change remain valid.
+- The Tracks context menu offers **Save as smart playlist: similar tracks** for
+  local and Orynivo Server references. The desktop re-keys remote vectors onto
+  the smart-playlist candidate provider key and pseudo-IDs; the reference never
+  contains a server URL or credential. 9 tests.
+- Not included: a similarity reference picker inside `SmartPlaylistDialog`
+  (creation is context-menu driven), and a server-side similarity resolve
+  endpoint.
 
-**Design**
+## 9. Mood/activity presets — `Done`
 
-- Extend `SmartPlaylistCriteria` with a similarity reference (provider-local
-  source key + track id) and a strength.
-- Resolve through the existing `SimilarityFeatureService` in `Orynivo.Core` so
-  both desktop and server resolve identically.
+- `SimilarityFeatureService.RankPreset` provides deterministic **Focus**,
+  **Workout**, and **Wind down** ordering from cached acoustic descriptors
+  (energy, brightness, dynamics), normalized tempo, explicit mood tags, and
+  preference signals. Missing descriptors use a neutral prior instead of
+  excluding the track.
+- `RankSimilar`, `RankMood`, and `RankPreset` now share one private
+  diversity-limited selection helper (behaviour-preserving refactor).
+- The track context menu gained a **Play activity mix** submenu beside the mood
+  mix, reusing the shared Infinite Mix similarity queue, persistence, and
+  navigation path. 8 tests.
+- Not included: surfacing the presets in `InfiniteMixDialog`; the presets are a
+  context-menu quick start, not persisted profile state.
 
-**Tests**: criteria serialization compatibility, resolver behavior.
+## 10. Harmonic mixing (Camelot) — `Done`
 
-**Commit**: `feat(playlists): add a similarity criterion to smart playlists`
+- `Orynivo.Library.CamelotKey` owns the wheel mapping: it parses conventional
+  key names (`A minor`, `Am`, `A moll`, `C dur`, `F# minor`) and wheel labels
+  (`8A`), exposes `Distance`/`IsCompatible`/`ToKeyName`, and never guesses an
+  unsupported spelling.
+- `AudioFeatureAnalysisService` estimates the key from a bounded Goertzel
+  chromagram correlated against Krumhansl-Schmuckler profiles. It stays
+  conservative (ambiguous chroma → no key), and descriptor version 2 caches the
+  canonical label in `track_audio_features.camelot_key`, exposed through
+  `TrackFacetInfo`, `SimilarityTrackProfile`, `SimilarityFeatureVector`, and
+  `GenreCloudTrackCandidate`.
+- `HarmonicOrdering.Order` is the deterministic greedy wheel walk used for
+  Infinite Mix batches and for similarity, mood, and activity mix batches.
+  Keyless tracks keep their ranking order. 49 tests (Camelot parsing, adjacency,
+  scale recognition, ordering).
+- Not included: manual key correction, and key-aware harmonic constraints on
+  explicit user queues.
 
-## 9. Mood/activity presets — `Todo`
+## 11. Year-in-review export — `Done`
 
-**Design**
+- `AudioDatabase.GetYearInReview(year)` aggregates the existing playback history
+  into `YearInReviewSummary` (total seconds, active days, twelve monthly
+  buckets, and the leading genres/albums/artists). `GetListeningYears()` lists
+  the selectable years. No new data is collected.
+- The top-genre, album, and artist queries gained an optional exclusive upper
+  time bound so a past year never includes later listening.
+- The Dashboard statistics section links to `YearInReviewDialog`, which renders
+  the summary for a chosen year, switches years without blocking the UI thread,
+  and exports the visible card as a shareable PNG through `RenderTargetBitmap`.
+- 3 Core tests (year aggregation, cross-year exclusion, unsupported years).
+- Not included: PDF output and a server-side year aggregate.
 
-- Presets (Focus, Workout, Wind down) over the existing acoustic descriptors
-  (energy/brightness/dynamics) and BPM, reusing the Infinite Mix queue path.
-- Shown beside the existing mood selector.
+## 12. Karaoke fullscreen lyrics — `Done`
 
-**Tests**: preset ranking determinism.
+- The lyrics view gained a **Karaoke** action that opens `KaraokeWindow`
+  fullscreen: a fixed window of synchronized lines around the active one, with
+  the active line centered and emphasized and neighbours fading out, over the
+  now-playing cover as a dimmed backdrop.
+- Positions are pushed by the existing transport timer; opacity and font size
+  animate through `Transitions`. Esc, a click, or clearing the lyrics closes it,
+  and a track with only plain lyrics explains that karaoke needs synchronized
+  lyrics.
+- The active-line lookup was extracted into the pure, tested
+  `Orynivo.Library.LyricLineSelector` (6 tests).
+- Not included: word-level (enhanced LRC) highlighting and a per-word animation.
 
-**Commit**: `feat(infinite-mix): add mood and activity presets`
+## 13. Scheduled auto-backup with retention — `Done`
 
-## 10. Harmonic mixing (Camelot) — `Todo`
-
-**Design**
-
-- Add musical-key detection to `AudioFeatureAnalysisService` (bounded, cached
-  like the other descriptors).
-- Order Infinite Mix batches by Camelot-wheel adjacency.
-
-**Tests**: Camelot mapping and adjacency.
-
-**Commit**: `feat(infinite-mix): add harmonic mixing on the Camelot wheel`
-
-## 11. Year-in-review export — `Todo`
-
-**Design**
-
-- Render the existing Dashboard statistics for a chosen year into a shareable
-  image/PDF.
-- No new data collection.
-
-**Tests**: layout/aggregation helpers.
-
-**Commit**: `feat(dashboard): add a year-in-review export`
-
-## 12. Karaoke fullscreen lyrics — `Todo`
-
-**Design**
-
-- A fullscreen mode for the existing synced-lyrics view with large,
-  centered, animated lines.
-
-**Tests**: lyric-line selection timing (pure).
-
-**Commit**: `feat(lyrics): add a fullscreen karaoke view`
-
-## 13. Scheduled auto-backup with retention — `Todo`
-
-**Design**
-
-- Optional scheduled library backup using the existing `LibraryBackupService`,
-  with a retention count and a last-run timestamp in settings.
-
-**Tests**: retention selection (pure).
-
-**Commit**: `feat(backup): add scheduled backups with retention`
+- `AppSettings.ScheduledBackup` persists enable, interval days, retention count,
+  folder, and the last successful run.
+- The pure, tested `Orynivo.Library.BackupRetention` owns the two decisions:
+  `IsDue` (interval elapsed, missing run, clock moved backwards) and
+  `SelectObsolete` (keep the newest N, return the rest oldest first).
+- A low-frequency timer checks on startup and every 30 minutes; the export reuses
+  `LibraryBackupService`, prunes older archives, records the run, and reports it
+  in the status bar. Only one run is in flight at a time.
+- Settings > Library exposes the enable toggle, interval, retention, folder
+  picker, **Back up now**, and the last successful run. 8 tests.
+- Not included: automatic cleanup of the *manual* exports, cloud targets, and a
+  server-side schedule.
 
 ---
 
-## 14. Migrate drag-and-drop to Avalonia `IDataTransfer` — `Todo`
+## 14. Migrate drag-and-drop to Avalonia `IDataTransfer` — `Done`
 
-Unblocks the Avalonia 11.3+ upgrade. Avalonia 11.3 deprecates the legacy
-drag-and-drop API, and the CI builds with `--warnaserror`, so every Avalonia
-minor bump currently fails. Dependabot is held on the 11.2 line until this is
-done (`.github/dependabot.yml`, see item 14's note in `AGENTS.md`).
-
-**Current usage** (all in `Orynivo/MainWindow.Playlists.DragDrop.cs`):
-
-- `DataObject` (line ~99) → `DataTransfer`
-- `DragDrop.DoDragDrop(pointer, dataObject, effects)` (line ~101) →
-  `DragDrop.DoDragDropAsync(...)`
-- `DragEventArgs.Data` (lines ~108, ~115) → `DragEventArgs.DataTransfer`
-- `IDataObject` in `GetDroppedQueueTokens` (line ~133) → `IDataTransfer` /
-  `IAsyncDataTransfer`
-
-**Steps**
-
-1. Confirm the replacement API surface against the Avalonia version being
-   adopted (11.3+), including the custom `QueueDragFormat` data format and how
-   it is read back from the drop.
-2. Migrate the drag source (pointer press/move), the drop target
-   (`QueueNavItem_OnDragOver`/`OnDrop`), and the token extraction together so
-   the in-memory `orynivo-album:...`/path tokens keep working unchanged.
-3. Bump `Avalonia*` to the 11.3 line, build with `--warnaserror`, and verify the
-   drag-and-drop manually on Windows and Linux (queue append, album and folder
-   drag, remote album reference resolution).
-4. Remove the Avalonia minor ignore from `.github/dependabot.yml` and update
-   `AGENTS.md`/`CHANGELOG.md`.
-
-**Tests**: token cleaning/parsing is already covered; drag/drop itself needs a
-manual check because it depends on the platform drag manager.
-
-**Commit**: `refactor(ui): migrate drag-and-drop to IDataTransfer`
+- The drag source uses `new DataTransfer()` + `DataTransferItem.Create`, the drop
+  target reads `DragEventArgs.DataTransfer`, and the drag runs through
+  `DragDrop.DoDragDropAsync`. `IDataObject`/`DataObject`/`DragEventArgs.Data` are
+  gone, so the 11.3 deprecations no longer fail the `--warnaserror` build.
+- `QueueDragFormat` is now a `DataFormat<string>` created with
+  `DataFormat.CreateStringApplicationFormat("orynivo.queue-paths")`. The token
+  list travels as a JSON string, so the in-memory path and
+  `orynivo-album:serverId:albumId` tokens are unchanged; an unreadable payload is
+  treated like a foreign drag. Avalonia only accepts ASCII letters, digits, dots,
+  and hyphens here and validates eagerly — a slash identifier crashed the window's
+  static initializer at startup — so the format lives in `OrynivoDataFormats` with
+  a regression test in `Orynivo.Tests`.
+- Avalonia was raised to **11.3.13**, the highest version where every referenced
+  package exists: `Avalonia.Controls.DataGrid` has no release beyond 11.3.13,
+  while the core packages already offer 11.3.22. The mixed set (core 11.3.22 +
+  DataGrid 11.3.13) was verified to build with `--warnaserror`, so future
+  Dependabot minor bumps are safe.
+- `.github/dependabot.yml` no longer ignores Avalonia **minor** updates; major
+  updates stay ignored because Avalonia 12 needs the .NET 9 SDK.
+- **Manual verification still required**: queue append, local album drag, folder
+  drag, and remote-album reference resolution on Windows and Linux. The platform
+  drag manager cannot be exercised by the test suite.

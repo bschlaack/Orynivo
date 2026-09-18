@@ -146,6 +146,7 @@ public partial class MainWindow : Window
             SavePodcastProgress(completed: false);
         }
         UpdateActiveLyric(_player.Position);
+        _karaokeWindow?.UpdatePosition(_player.Position);
         EnsureInfiniteMixQueue();
         MaybeStartNonGaplessFadeTransition(visiblePosition);
     }
@@ -591,26 +592,13 @@ public partial class MainWindow : Window
 
     private void UpdateActiveLyric(TimeSpan position)
     {
-        if (_lyricLines.Count == 0 || _lyricLines[0].Time is null)
+        if (_lyricLines.Count == 0)
             return;
 
-        var nextIndex = -1;
-        var low = 0;
-        var high = _lyricLines.Count - 1;
-        while (low <= high)
-        {
-            var middle = low + (high - low) / 2;
-            if (_lyricLines[middle].Time <= position)
-            {
-                nextIndex = middle;
-                low = middle + 1;
-            }
-            else
-            {
-                high = middle - 1;
-            }
-        }
-
+        var nextIndex = LyricLineSelector.FindActiveIndex(
+            _lyricLines,
+            line => line.Time,
+            position);
         if (nextIndex == _activeLyricIndex)
             return;
         if (_activeLyricIndex >= 0 && _activeLyricIndex < _lyricLines.Count)
@@ -629,6 +617,34 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>Opens or closes the fullscreen karaoke view for synchronized lyrics.</summary>
+    /// <param name="sender">The karaoke action.</param>
+    /// <param name="e">Click details.</param>
+    private void KaraokeButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (_karaokeWindow is { } open)
+        {
+            open.Close();
+            return;
+        }
+
+        if (_lyricLines.Count == 0 || _lyricLines.All(line => line.Time is null))
+        {
+            ShowLyricsStatus(LocalizationManager.Current.KaraokeRequiresSyncedLyrics);
+            return;
+        }
+
+        var window = new KaraokeWindow(
+            [.. _lyricLines.Select(line => new KaraokeWindow.KaraokeLine(line.Text, line.Time))],
+            LyricsBackgroundImage.Source);
+        window.SetTrack(NowPlayingTitleBlock.Text, NowPlayingArtistBlock.Text);
+        window.Closed += (_, _) => _karaokeWindow = null;
+        _karaokeWindow = window;
+        if (_player is not null)
+            window.UpdatePosition(_player.Position);
+        window.Show(this);
+    }
+
     private void ShowLyricsStatus(string text)
     {
         LyricsStatusTextBlock.Text = text;
@@ -637,6 +653,8 @@ public partial class MainWindow : Window
 
     private void ClearLyrics()
     {
+        _karaokeWindow?.Close();
+        _karaokeWindow = null;
         LyricsListBox.SelectedItem = null;
         _lyricLines.Clear();
         _activeLyricIndex = -1;

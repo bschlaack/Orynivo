@@ -201,6 +201,34 @@ public sealed class AppSettings
     public AiChatSettings AiChat { get; set; } = new();
     /// <summary>Gets or sets the web-browsing tool configuration (SearXNG endpoint and fetch safety limits).</summary>
     public WebBrowsingOptions WebBrowsing { get; set; } = new();
+    /// <summary>Gets or sets the automatic library-backup schedule.</summary>
+    public ScheduledBackupSettings ScheduledBackup { get; set; } = new();
+}
+
+/// <summary>Persisted configuration for automatic library backups.</summary>
+public sealed class ScheduledBackupSettings
+{
+    /// <summary>Gets or sets a value indicating whether Orynivo backs up the library automatically.</summary>
+    public bool Enabled { get; set; }
+
+    /// <summary>Gets or sets the minimum number of days between automatic backups.</summary>
+    public int IntervalDays { get; set; } = 7;
+
+    /// <summary>Gets or sets how many automatic backups are kept before older ones are removed.</summary>
+    public int RetentionCount { get; set; } = 3;
+
+    /// <summary>Gets or sets the backup folder; an empty value uses the per-user default folder.</summary>
+    public string Directory { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the Unix timestamp of the last successful automatic backup.</summary>
+    public long LastRunAtUnix { get; set; }
+
+    /// <summary>Resolves the configured backup folder, falling back to the per-user default.</summary>
+    /// <returns>The absolute backup folder path.</returns>
+    public string ResolveDirectory() =>
+        string.IsNullOrWhiteSpace(Directory)
+            ? Path.Combine(AppPaths.DataRoot, "backups")
+            : Directory.Trim();
 }
 
 /// <summary>Application colour theme.</summary>

@@ -14,15 +14,15 @@ updates:
       # test-SDK 18 lines likewise target newer runtimes. Keep Dependabot on the
       # minor/patch line and review majors by hand.
       #
-      # Avalonia is pinned to the 11.2 line as well: 11.3 deprecates the legacy
-      # drag-and-drop API (IDataObject/DataObject/DragDrop.DoDragDrop/
-      # DragEventArgs.Data), and the CI builds with --warnaserror. Migrating the
-      # drag-and-drop code to IDataTransfer is a deliberate follow-up; until then
-      # a minor bump would fail every Avalonia PR.
+      # Avalonia minor updates within 11.3 are allowed: the drag-and-drop code
+      # uses IDataTransfer/DataTransfer/DragDrop.DoDragDropAsync, so the 11.3
+      # deprecations no longer fail the --warnaserror build. Note that
+      # Avalonia.Controls.DataGrid has no release beyond 11.3.13, so it stays on
+      # that version while the other Avalonia packages may move within 11.3.x;
+      # that mix builds, but do not raise DataGrid past 11.3.13.
       - dependency-name: "Avalonia*"
         update-types:
           - "version-update:semver-major"
-          - "version-update:semver-minor"
       - dependency-name: "Microsoft.Data.Sqlite"
         update-types: ["version-update:semver-major"]
       - dependency-name: "Microsoft.NET.Test.Sdk"

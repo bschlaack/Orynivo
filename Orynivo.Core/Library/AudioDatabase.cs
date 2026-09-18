@@ -119,7 +119,8 @@ public sealed record TrackListInfo(
     string? MusicBrainzTrackId = null,
     long? MusicBrainzRatingFetchedAt = null,
     string? MusicBrainzGenres = null,
-    string? MusicBrainzTags = null);
+    string? MusicBrainzTags = null,
+    string? CamelotKey = null);
 
 /// <summary>Minimal track row for filter/facet building; carries only classification fields.</summary>
 /// <param name="Id">Track database identifier.</param>
@@ -132,6 +133,7 @@ public sealed record TrackListInfo(
 /// <param name="UserRating">Personal zero-to-five-star rating.</param>
 /// <param name="MusicBrainzRating">MusicBrainz community rating on a zero-to-five scale.</param>
 /// <param name="MusicBrainzRatingVotes">Number of contributing MusicBrainz votes.</param>
+/// <param name="CamelotKey">Cached Camelot wheel label such as <c>8A</c>, when a key was estimated.</param>
 public sealed record TrackFacetInfo(
     long Id,
     bool IsFavorite,
@@ -142,7 +144,8 @@ public sealed record TrackFacetInfo(
     long? AlbumId = null,
     int UserRating = 0,
     double? MusicBrainzRating = null,
-    int? MusicBrainzRatingVotes = null);
+    int? MusicBrainzRatingVotes = null,
+    string? CamelotKey = null);
 
 /// <summary>Personal and cached MusicBrainz rating metadata for one track.</summary>
 /// <param name="TrackId">Database track identifier.</param>
@@ -380,6 +383,23 @@ public sealed record TopArtistStat(
     long? LocalArtistId,
     string? ExternalId,
     string? Path);
+
+/// <summary>Aggregated listening statistics for one calendar year.</summary>
+/// <param name="Year">Calendar year the statistics describe.</param>
+/// <param name="TotalListeningSeconds">Total listened seconds inside the year.</param>
+/// <param name="ActiveDays">Number of local calendar days with recorded listening.</param>
+/// <param name="MonthlySeconds">Twelve entries from January through December.</param>
+/// <param name="TopGenres">Leading genres with their listened seconds.</param>
+/// <param name="TopAlbums">Leading albums with their listened seconds.</param>
+/// <param name="TopArtists">Leading artists with their listened seconds.</param>
+public sealed record YearInReviewSummary(
+    int Year,
+    double TotalListeningSeconds,
+    int ActiveDays,
+    IReadOnlyList<double> MonthlySeconds,
+    IReadOnlyList<(string Genre, double Seconds)> TopGenres,
+    IReadOnlyList<TopAlbumStat> TopAlbums,
+    IReadOnlyList<TopArtistStat> TopArtists);
 
 /// <summary>Result returned after an artist-name normalisation run.</summary>
 public sealed record ArtistNormalizationResult(int MergedArtists, int UpdatedTracks);
@@ -2124,14 +2144,16 @@ public sealed class AudioDatabase : IDisposable
     public List<TrackListInfo> GetTrackList()
     {
         using var cmd = _conn.CreateCommand();
-        cmd.CommandText = """
+        cmd.CommandText = $"""
             SELECT
                 path, file_name, title, artist, album, album_artist, genre, format, bitrate,
                 duration, sort_title, id, is_favorite, year, track_number, track_total,
                 disc_number, disc_total, sample_rate, bit_depth, channels, composer, bpm,
                 file_size, added_at, replay_gain_track, replay_gain_album, artist_id, album_id,
                 user_rating, musicbrainz_rating, musicbrainz_rating_votes, musicbrainz_track_id,
-                musicbrainz_rating_fetched_at, musicbrainz_genres, musicbrainz_tags
+                musicbrainz_rating_fetched_at, musicbrainz_genres, musicbrainz_tags,
+                (SELECT af.camelot_key FROM track_audio_features af
+                 WHERE af.track_id = tracks.id AND af.version = {AudioFeatureAnalysisService.CurrentVersion})
             FROM tracks
             ORDER BY COALESCE(sort_title, title, file_name) COLLATE NOCASE;
             """;
@@ -2145,14 +2167,16 @@ public sealed class AudioDatabase : IDisposable
     public List<TrackListInfo> GetTrackListByAlbum(long albumId, long? artistId = null)
     {
         using var cmd = _conn.CreateCommand();
-        cmd.CommandText = """
+        cmd.CommandText = $"""
             SELECT
                 path, file_name, title, artist, album, album_artist, genre, format, bitrate,
                 duration, sort_title, id, is_favorite, year, track_number, track_total,
                 disc_number, disc_total, sample_rate, bit_depth, channels, composer, bpm,
                 file_size, added_at, replay_gain_track, replay_gain_album, artist_id, album_id,
                 user_rating, musicbrainz_rating, musicbrainz_rating_votes, musicbrainz_track_id,
-                musicbrainz_rating_fetched_at, musicbrainz_genres, musicbrainz_tags
+                musicbrainz_rating_fetched_at, musicbrainz_genres, musicbrainz_tags,
+                (SELECT af.camelot_key FROM track_audio_features af
+                 WHERE af.track_id = tracks.id AND af.version = {AudioFeatureAnalysisService.CurrentVersion})
             FROM tracks
             WHERE album_id = $album_id
               AND ($artist_id IS NULL OR artist_id = $artist_id)
@@ -2225,7 +2249,9 @@ public sealed class AudioDatabase : IDisposable
                     disc_number, disc_total, sample_rate, bit_depth, channels, composer, bpm,
                     file_size, added_at, replay_gain_track, replay_gain_album, artist_id, album_id,
                     user_rating, musicbrainz_rating, musicbrainz_rating_votes, musicbrainz_track_id,
-                    musicbrainz_rating_fetched_at, musicbrainz_genres, musicbrainz_tags
+                    musicbrainz_rating_fetched_at, musicbrainz_genres, musicbrainz_tags,
+                    (SELECT af.camelot_key FROM track_audio_features af
+                     WHERE af.track_id = tracks.id AND af.version = {AudioFeatureAnalysisService.CurrentVersion})
                 FROM tracks
                 WHERE id IN ({string.Join(", ", parameters)});
                 """;
@@ -2268,7 +2294,9 @@ public sealed class AudioDatabase : IDisposable
                     disc_number, disc_total, sample_rate, bit_depth, channels, composer, bpm,
                     file_size, added_at, replay_gain_track, replay_gain_album, artist_id, album_id,
                     user_rating, musicbrainz_rating, musicbrainz_rating_votes, musicbrainz_track_id,
-                    musicbrainz_rating_fetched_at, musicbrainz_genres, musicbrainz_tags
+                    musicbrainz_rating_fetched_at, musicbrainz_genres, musicbrainz_tags,
+                    (SELECT af.camelot_key FROM track_audio_features af
+                     WHERE af.track_id = tracks.id AND af.version = {AudioFeatureAnalysisService.CurrentVersion})
                 FROM tracks
                 WHERE path IN ({string.Join(", ", parameters)});
                 """;
@@ -2292,10 +2320,13 @@ public sealed class AudioDatabase : IDisposable
                    genre, format, bitrate, album_id,
                    COALESCE((SELECT ps.user_rating FROM profile_track_state ps
                              WHERE ps.profile_id = $profile AND ps.track_id = tracks.id), user_rating),
-                   musicbrainz_rating, musicbrainz_rating_votes, musicbrainz_genres, musicbrainz_tags
+                   musicbrainz_rating, musicbrainz_rating_votes, musicbrainz_genres, musicbrainz_tags,
+                   (SELECT af.camelot_key FROM track_audio_features af
+                    WHERE af.track_id = tracks.id AND af.version = $audioFeatureVersion)
             FROM tracks;
             """;
         Add(cmd, "$profile", ActiveProfileId);
+        Add(cmd, "$audioFeatureVersion", AudioFeatureAnalysisService.CurrentVersion);
         using var reader = cmd.ExecuteReader();
         var result = new List<TrackFacetInfo>();
         while (reader.Read())
@@ -2311,7 +2342,8 @@ public sealed class AudioDatabase : IDisposable
                 AlbumId: reader.IsDBNull(5) ? null : reader.GetInt64(5),
                 UserRating: reader.GetInt32(6),
                 MusicBrainzRating: reader.IsDBNull(7) ? null : reader.GetDouble(7),
-                MusicBrainzRatingVotes: reader.IsDBNull(8) ? null : reader.GetInt32(8)));
+                MusicBrainzRatingVotes: reader.IsDBNull(8) ? null : reader.GetInt32(8),
+                CamelotKey: reader.IsDBNull(11) ? null : reader.GetString(11)));
         return result;
     }
 
@@ -2416,7 +2448,8 @@ public sealed class AudioDatabase : IDisposable
         reader.IsDBNull(32) ? null : reader.GetString(32),
         reader.IsDBNull(33) ? null : reader.GetInt64(33),
         reader.IsDBNull(34) ? null : reader.GetString(34),
-        reader.IsDBNull(35) ? null : reader.GetString(35));
+        reader.IsDBNull(35) ? null : reader.GetString(35),
+        reader.IsDBNull(36) ? null : reader.GetString(36));
 
     /// <summary>Loads distinct albums referenced by the specified track identifiers.</summary>
     /// <param name="ids">Track identifiers.</param>
@@ -2614,6 +2647,104 @@ public sealed class AudioDatabase : IDisposable
         Add(profile, "$id", trackId);
         Add(profile, "$rating", rating);
         profile.ExecuteNonQuery();
+    }
+
+    /// <summary>Stores a personal favorite state for several tracks in one transaction.</summary>
+    /// <param name="trackIds">Database track identifiers.</param>
+    /// <param name="value">Requested favorite state.</param>
+    /// <returns>The number of distinct track identifiers processed.</returns>
+    public int SetTrackFavorites(IReadOnlyCollection<long> trackIds, bool value)
+    {
+        ArgumentNullException.ThrowIfNull(trackIds);
+        var ids = trackIds.Distinct().ToList();
+        if (ids.Count == 0)
+            return 0;
+
+        using var transaction = _conn.BeginTransaction();
+        using (var command = _conn.CreateCommand())
+        {
+            command.Transaction = transaction;
+            command.CommandText = """
+                INSERT INTO profile_track_state(profile_id, track_id, is_favorite)
+                VALUES ($profile, $id, $value)
+                ON CONFLICT(profile_id, track_id) DO UPDATE SET is_favorite = excluded.is_favorite;
+                """;
+            Add(command, "$profile", ActiveProfileId);
+            Add(command, "$value", value ? 1 : 0);
+            var idParameter = command.Parameters.AddWithValue("$id", 0L);
+            foreach (var trackId in ids)
+            {
+                idParameter.Value = trackId;
+                command.ExecuteNonQuery();
+            }
+        }
+
+        if (string.Equals(ActiveProfileId, "standard", StringComparison.Ordinal))
+        {
+            using var tracks = _conn.CreateCommand();
+            tracks.Transaction = transaction;
+            tracks.CommandText = "UPDATE tracks SET is_favorite = $value WHERE id = $id;";
+            Add(tracks, "$value", value ? 1 : 0);
+            var idParameter = tracks.Parameters.AddWithValue("$id", 0L);
+            foreach (var trackId in ids)
+            {
+                idParameter.Value = trackId;
+                tracks.ExecuteNonQuery();
+            }
+        }
+
+        transaction.Commit();
+        return ids.Count;
+    }
+
+    /// <summary>Stores a personal zero-to-five-star rating for several tracks in one transaction.</summary>
+    /// <param name="trackIds">Database track identifiers.</param>
+    /// <param name="rating">Rating from zero (unrated) through five.</param>
+    /// <returns>The number of distinct track identifiers processed.</returns>
+    public int SetTrackUserRatings(IReadOnlyCollection<long> trackIds, int rating)
+    {
+        ArgumentNullException.ThrowIfNull(trackIds);
+        ArgumentOutOfRangeException.ThrowIfLessThan(rating, 0);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(rating, 5);
+        var ids = trackIds.Distinct().ToList();
+        if (ids.Count == 0)
+            return 0;
+
+        using var transaction = _conn.BeginTransaction();
+        using (var command = _conn.CreateCommand())
+        {
+            command.Transaction = transaction;
+            command.CommandText = """
+                INSERT INTO profile_track_state(profile_id, track_id, user_rating)
+                VALUES ($profile, $id, $rating)
+                ON CONFLICT(profile_id, track_id) DO UPDATE SET user_rating = excluded.user_rating;
+                """;
+            Add(command, "$profile", ActiveProfileId);
+            Add(command, "$rating", rating);
+            var idParameter = command.Parameters.AddWithValue("$id", 0L);
+            foreach (var trackId in ids)
+            {
+                idParameter.Value = trackId;
+                command.ExecuteNonQuery();
+            }
+        }
+
+        if (string.Equals(ActiveProfileId, "standard", StringComparison.Ordinal))
+        {
+            using var tracks = _conn.CreateCommand();
+            tracks.Transaction = transaction;
+            tracks.CommandText = "UPDATE tracks SET user_rating = $rating WHERE id = $id;";
+            Add(tracks, "$rating", rating);
+            var idParameter = tracks.Parameters.AddWithValue("$id", 0L);
+            foreach (var trackId in ids)
+            {
+                idParameter.Value = trackId;
+                tracks.ExecuteNonQuery();
+            }
+        }
+
+        transaction.Commit();
+        return ids.Count;
     }
 
     /// <summary>Gets personal and cached community rating data for a track.</summary>
@@ -3240,6 +3371,7 @@ public sealed class AudioDatabase : IDisposable
                 analyzed_at INTEGER NOT NULL
             );
             """);
+            EnsureColumn("track_audio_features", "camelot_key", "TEXT");
         }
 
         using (Orynivo.StartupDiagnostics.Time("AudioDatabase.EnsureSchema: MusicBrainz rating lookup repair"))
@@ -5004,6 +5136,100 @@ public sealed class AudioDatabase : IDisposable
         return result;
     }
 
+    /// <summary>
+    /// Aggregates the existing listening statistics for one calendar year. No new
+    /// data is collected; every value comes from the playback history.
+    /// </summary>
+    /// <param name="year">Four-digit calendar year.</param>
+    /// <param name="topCount">Maximum entries per leading list.</param>
+    /// <returns>The year summary, or <see langword="null"/> for an unsupported year.</returns>
+    public YearInReviewSummary? GetYearInReview(int year, int topCount = 5)
+    {
+        if (year is < 1900 or > 9999)
+            return null;
+        topCount = Math.Clamp(topCount, 1, 50);
+        var start = new DateTimeOffset(new DateTime(year, 1, 1, 0, 0, 0, DateTimeKind.Local));
+        var end = start.AddYears(1);
+        var startUnix = start.ToUnixTimeSeconds();
+        var endUnix = end.ToUnixTimeSeconds();
+        return new YearInReviewSummary(
+            year,
+            GetTotalListeningSeconds(startUnix, endUnix),
+            GetActiveListeningDays(startUnix, endUnix),
+            GetMonthlyListeningSeconds(startUnix, endUnix),
+            GetTopGenres(topCount, startUnix, endUnix),
+            GetTopAlbums(topCount, startUnix, endUnix),
+            GetTopArtists(topCount, startUnix, endUnix));
+    }
+
+    /// <summary>Returns the local calendar years with recorded playback.</summary>
+    /// <returns>Distinct years that contain listening time, newest first.</returns>
+    public List<int> GetListeningYears()
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT DISTINCT CAST(strftime('%Y', started_at, 'unixepoch', 'localtime') AS INTEGER) AS year
+            FROM play_history
+            WHERE profile_id = $profile AND position_seconds > 0
+            ORDER BY year DESC;
+            """;
+        cmd.Parameters.AddWithValue("$profile", ActiveProfileId);
+        using var reader = cmd.ExecuteReader();
+        var result = new List<int>();
+        while (reader.Read())
+            result.Add(reader.GetInt32(0));
+        return result;
+    }
+
+    /// <summary>Counts local calendar days with recorded listening inside a range.</summary>
+    /// <param name="sinceUnix">Inclusive lower Unix-time bound.</param>
+    /// <param name="untilUnix">Exclusive upper Unix-time bound.</param>
+    /// <returns>The number of distinct local calendar days with listening time.</returns>
+    public int GetActiveListeningDays(long sinceUnix, long untilUnix)
+    {
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT COUNT(*) FROM (
+                SELECT DISTINCT strftime('%Y-%m-%d', started_at, 'unixepoch', 'localtime') AS day
+                FROM play_history
+                WHERE profile_id = $profile AND position_seconds > 0
+                  AND started_at >= $start AND started_at < $end);
+            """;
+        cmd.Parameters.AddWithValue("$profile", ActiveProfileId);
+        cmd.Parameters.AddWithValue("$start", sinceUnix);
+        cmd.Parameters.AddWithValue("$end", untilUnix);
+        return Convert.ToInt32(cmd.ExecuteScalar() ?? 0, CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>Aggregates listened seconds per local calendar month inside a range.</summary>
+    /// <param name="sinceUnix">Inclusive lower Unix-time bound.</param>
+    /// <param name="untilUnix">Exclusive upper Unix-time bound.</param>
+    /// <returns>Twelve entries from January through December.</returns>
+    public IReadOnlyList<double> GetMonthlyListeningSeconds(long sinceUnix, long untilUnix)
+    {
+        var result = new double[12];
+        using var cmd = _conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT CAST(strftime('%m', started_at, 'unixepoch', 'localtime') AS INTEGER) AS month,
+                   SUM(COALESCE(position_seconds, 0)) AS secs
+            FROM play_history
+            WHERE profile_id = $profile AND position_seconds > 0
+              AND started_at >= $start AND started_at < $end
+            GROUP BY month;
+            """;
+        cmd.Parameters.AddWithValue("$profile", ActiveProfileId);
+        cmd.Parameters.AddWithValue("$start", sinceUnix);
+        cmd.Parameters.AddWithValue("$end", untilUnix);
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            var month = reader.GetInt32(0);
+            if (month is >= 1 and <= 12)
+                result[month - 1] = reader.GetDouble(1);
+        }
+        return result;
+    }
+
     /// <summary>Returns the albums whose tracks were added most recently.</summary>
     /// <param name="limit">Maximum number of albums to return.</param>
     /// <returns>Compact recent-album rows ordered by newest track addition.</returns>
@@ -5057,14 +5283,16 @@ public sealed class AudioDatabase : IDisposable
         ArgumentOutOfRangeException.ThrowIfNegative(page);
         ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
         using var cmd = _conn.CreateCommand();
-        cmd.CommandText = """
+        cmd.CommandText = $"""
             SELECT
                 path, file_name, title, artist, album, album_artist, genre, format, bitrate,
                 duration, sort_title, id, is_favorite, year, track_number, track_total,
                 disc_number, disc_total, sample_rate, bit_depth, channels, composer, bpm,
                 file_size, added_at, replay_gain_track, replay_gain_album, artist_id, album_id,
                 user_rating, musicbrainz_rating, musicbrainz_rating_votes, musicbrainz_track_id,
-                musicbrainz_rating_fetched_at, musicbrainz_genres, musicbrainz_tags
+                musicbrainz_rating_fetched_at, musicbrainz_genres, musicbrainz_tags,
+                (SELECT af.camelot_key FROM track_audio_features af
+                 WHERE af.track_id = tracks.id AND af.version = {AudioFeatureAnalysisService.CurrentVersion})
             FROM tracks
             ORDER BY COALESCE(sort_title, title, file_name) COLLATE NOCASE
             LIMIT $limit OFFSET $offset;
@@ -5337,7 +5565,7 @@ public sealed class AudioDatabase : IDisposable
                    t.is_favorite, t.user_rating, t.musicbrainz_rating,
                    t.musicbrainz_rating_votes, t.musicbrainz_genres,
                    t.musicbrainz_tags, COALESCE(ph.play_count, 0), ph.last_played_at,
-                   af.energy, af.brightness, af.dynamics
+                   af.energy, af.brightness, af.dynamics, af.camelot_key
             FROM tracks t
             LEFT JOIN (
                 SELECT track_id, COUNT(*) AS play_count, MAX(started_at) AS last_played_at
@@ -5377,7 +5605,8 @@ public sealed class AudioDatabase : IDisposable
                 reader.IsDBNull(13) ? null : reader.GetInt64(13),
                 reader.IsDBNull(14) ? null : reader.GetDouble(14),
                 reader.IsDBNull(15) ? null : reader.GetDouble(15),
-                reader.IsDBNull(16) ? null : reader.GetDouble(16)));
+                reader.IsDBNull(16) ? null : reader.GetDouble(16),
+                reader.IsDBNull(17) ? null : reader.GetString(17)));
         }
         return result;
     }
@@ -5425,14 +5654,15 @@ public sealed class AudioDatabase : IDisposable
         ArgumentNullException.ThrowIfNull(descriptor);
         using var command = _conn.CreateCommand();
         command.CommandText = """
-            INSERT INTO track_audio_features(track_id, version, energy, brightness, dynamics, analyzed_at)
-            VALUES ($trackId, $version, $energy, $brightness, $dynamics, $analyzedAt)
+            INSERT INTO track_audio_features(track_id, version, energy, brightness, dynamics, analyzed_at, camelot_key)
+            VALUES ($trackId, $version, $energy, $brightness, $dynamics, $analyzedAt, $camelotKey)
             ON CONFLICT(track_id) DO UPDATE SET
                 version = excluded.version,
                 energy = excluded.energy,
                 brightness = excluded.brightness,
                 dynamics = excluded.dynamics,
-                analyzed_at = excluded.analyzed_at;
+                analyzed_at = excluded.analyzed_at,
+                camelot_key = excluded.camelot_key;
             """;
         command.Parameters.AddWithValue("$trackId", trackId);
         command.Parameters.AddWithValue("$version", descriptor.Version);
@@ -5440,6 +5670,9 @@ public sealed class AudioDatabase : IDisposable
         command.Parameters.AddWithValue("$brightness", Math.Clamp(descriptor.Brightness, 0d, 1d));
         command.Parameters.AddWithValue("$dynamics", Math.Clamp(descriptor.Dynamics, 0d, 1d));
         command.Parameters.AddWithValue("$analyzedAt", descriptor.AnalyzedAt);
+        command.Parameters.AddWithValue(
+            "$camelotKey",
+            descriptor.Key is { } key ? key.Label : DBNull.Value);
         command.ExecuteNonQuery();
     }
 
@@ -5449,14 +5682,15 @@ public sealed class AudioDatabase : IDisposable
     {
         using var command = _conn.CreateCommand();
         command.CommandText = """
-            INSERT INTO track_audio_features(track_id, version, energy, brightness, dynamics, analyzed_at)
-            VALUES ($trackId, $version, NULL, NULL, NULL, $analyzedAt)
+            INSERT INTO track_audio_features(track_id, version, energy, brightness, dynamics, analyzed_at, camelot_key)
+            VALUES ($trackId, $version, NULL, NULL, NULL, $analyzedAt, NULL)
             ON CONFLICT(track_id) DO UPDATE SET
                 version = excluded.version,
                 energy = NULL,
                 brightness = NULL,
                 dynamics = NULL,
-                analyzed_at = excluded.analyzed_at;
+                analyzed_at = excluded.analyzed_at,
+                camelot_key = NULL;
             """;
         command.Parameters.AddWithValue("$trackId", trackId);
         command.Parameters.AddWithValue("$version", AudioFeatureAnalysisService.CurrentVersion);
@@ -5671,8 +5905,9 @@ public sealed class AudioDatabase : IDisposable
     /// <summary>Aggregates listening time per genre across all playback sources.</summary>
     /// <param name="limit">Maximum number of genres to return.</param>
     /// <param name="sinceUnix">Optional inclusive lower bound on the playback start (Unix seconds); <see langword="null"/> means all time.</param>
+    /// <param name="untilUnix">Optional exclusive upper bound on the playback start (Unix seconds); <see langword="null"/> means no upper bound.</param>
     /// <returns>Genres ordered by total play time descending.</returns>
-    public List<(string Genre, double Seconds)> GetTopGenres(int limit = 10, long? sinceUnix = null)
+    public List<(string Genre, double Seconds)> GetTopGenres(int limit = 10, long? sinceUnix = null, long? untilUnix = null)
     {
         var agg = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
         using var cmd = _conn.CreateCommand();
@@ -5686,12 +5921,14 @@ public sealed class AudioDatabase : IDisposable
             WHERE ph.profile_id = $profile AND ph.position_seconds > 0
               AND COALESCE(t.genre, ph.genre) IS NOT NULL
               AND COALESCE(t.genre, ph.genre) != ''
-              {(sinceUnix.HasValue ? "AND ph.started_at >= $since" : string.Empty)}
+              {(sinceUnix.HasValue ? "AND ph.started_at >= $since" : string.Empty)}{(untilUnix.HasValue ? " AND ph.started_at < $until" : string.Empty)}
             GROUP BY COALESCE(t.genre, ph.genre)
             ORDER BY secs DESC;
             """;
         if (sinceUnix.HasValue)
             cmd.Parameters.AddWithValue("$since", sinceUnix.Value);
+        if (untilUnix.HasValue)
+            cmd.Parameters.AddWithValue("$until", untilUnix.Value);
         cmd.Parameters.AddWithValue("$profile", ActiveProfileId);
         using var r = cmd.ExecuteReader();
         while (r.Read())
@@ -5714,8 +5951,9 @@ public sealed class AudioDatabase : IDisposable
     /// </summary>
     /// <param name="limit">Maximum number of albums to return.</param>
     /// <param name="sinceUnix">Optional inclusive lower bound on the playback start (Unix seconds); <see langword="null"/> means all time.</param>
+    /// <param name="untilUnix">Optional exclusive upper bound on the playback start (Unix seconds); <see langword="null"/> means no upper bound.</param>
     /// <returns>Albums ordered by total play time descending.</returns>
-    public List<TopAlbumStat> GetTopAlbums(int limit = 10, long? sinceUnix = null)
+    public List<TopAlbumStat> GetTopAlbums(int limit = 10, long? sinceUnix = null, long? untilUnix = null)
     {
         var agg = new Dictionary<string, TopAlbumAccumulator>(StringComparer.Ordinal);
         using var cmd = _conn.CreateCommand();
@@ -5736,10 +5974,12 @@ public sealed class AudioDatabase : IDisposable
             WHERE ph.profile_id = $profile AND ph.media_type = 'track'
               AND COALESCE(ph.position_seconds, 0) > 0
               AND TRIM(COALESCE(a.title, t.album, ph.album, '')) != ''
-              {(sinceUnix.HasValue ? "AND ph.started_at >= $since" : string.Empty)};
+              {(sinceUnix.HasValue ? "AND ph.started_at >= $since" : string.Empty)}{(untilUnix.HasValue ? " AND ph.started_at < $until" : string.Empty)};
             """;
         if (sinceUnix.HasValue)
             cmd.Parameters.AddWithValue("$since", sinceUnix.Value);
+        if (untilUnix.HasValue)
+            cmd.Parameters.AddWithValue("$until", untilUnix.Value);
         cmd.Parameters.AddWithValue("$profile", ActiveProfileId);
 
         using var r = cmd.ExecuteReader();
@@ -5787,8 +6027,9 @@ public sealed class AudioDatabase : IDisposable
     /// </summary>
     /// <param name="limit">Maximum number of artists to return.</param>
     /// <param name="sinceUnix">Optional inclusive lower bound on the playback start (Unix seconds); <see langword="null"/> means all time.</param>
+    /// <param name="untilUnix">Optional exclusive upper bound on the playback start (Unix seconds); <see langword="null"/> means no upper bound.</param>
     /// <returns>Artists ordered by total play time descending.</returns>
-    public List<TopArtistStat> GetTopArtists(int limit = 10, long? sinceUnix = null)
+    public List<TopArtistStat> GetTopArtists(int limit = 10, long? sinceUnix = null, long? untilUnix = null)
     {
         var agg = new Dictionary<string, TopArtistAccumulator>(StringComparer.Ordinal);
         using var cmd = _conn.CreateCommand();
@@ -5804,10 +6045,12 @@ public sealed class AudioDatabase : IDisposable
             WHERE ph.profile_id = $profile AND ph.media_type = 'track'
               AND COALESCE(ph.position_seconds, 0) > 0
               AND TRIM(COALESCE(ar.name, t.artist, ph.subtitle, '')) != ''
-              {(sinceUnix.HasValue ? "AND ph.started_at >= $since" : string.Empty)};
+              {(sinceUnix.HasValue ? "AND ph.started_at >= $since" : string.Empty)}{(untilUnix.HasValue ? " AND ph.started_at < $until" : string.Empty)};
             """;
         if (sinceUnix.HasValue)
             cmd.Parameters.AddWithValue("$since", sinceUnix.Value);
+        if (untilUnix.HasValue)
+            cmd.Parameters.AddWithValue("$until", untilUnix.Value);
         cmd.Parameters.AddWithValue("$profile", ActiveProfileId);
 
         using var r = cmd.ExecuteReader();
