@@ -458,7 +458,7 @@ works directly in FFmpeg and browser URLs.
 | `DELETE /api/playlist-tracks/{id}` | Remove one entry from a server playlist |
 | `GET /api/search?q=` | Full-text search — returns matching tracks |
 | `GET /api/search/full?q=` | Category search — returns tracks, albums, and artists |
-| `GET /api/stream/{trackId}` | Byte-range HTTP streaming for regular files; FLAC transcode for CUE virtual tracks |
+| `GET /api/stream/{trackId}` | Byte-range HTTP streaming for regular files; FLAC transcode for CUE virtual tracks; `?ss=` seeks server-side; `?format=opus\|aac&bitrate=<64-320>` requests a validated lossy transcode (unsupported values return 400) |
 | `GET /api/stream/path?p=` | Stream by absolute file path |
 | `GET /api/artwork/album/{id}?size=` | Album artwork (`size=96` or `size=320` for thumbnails) |
 | `GET /api/artwork/track?p=` | Track artwork by file path |
@@ -542,6 +542,12 @@ The Windows client probes server compatibility in Settings, reports missing
 newer endpoints explicitly, shows the last successful connection time when a
 server is unreachable, and can clear cached remote artwork, track lists, and
 folder trees per server or globally.
+Each Orynivo Server connection stores its own streaming quality: **Original**,
+or a lossy transcode at a chosen bitrate (`Opus` or `AAC`, 64–320 kbps). Lossy
+requests are validated server-side and rejected with HTTP 400 when the format or
+bitrate is unsupported, so the setting is safe to leave on a server that cannot
+transcode. Seeking uses the server-side seek parameter and works for both
+original and transcoded streams.
 
 ### Running the server
 
@@ -687,6 +693,13 @@ byte-range streaming without FFmpeg.
   client. Last.fm or Wikipedia requests run on the client; the server receives
   only the resulting biography, source URL, language, and optional image bytes
   to cache.
+- Optional Last.fm scrobbling of played tracks, configured under
+  **Settings → Artist information** with an API key, secret, and a two-step
+  browser authorization. Scrobbles are queued and flushed in the background, so
+  playback and artist-information lookups are never blocked; the session key and
+  the API secret are stored only in the encrypted per-user credential container.
+  Scrobbling applies to local and Orynivo Server library tracks, and both the
+  scrobble threshold and the pending queue survive restarts.
 - Windows System Media Transport Controls integration with global media keys,
   play/pause/previous/next/stop and seek requests, system-overlay and lock-screen
   metadata, album art, playback state, and timeline synchronization
@@ -702,6 +715,14 @@ byte-range streaming without FFmpeg.
   low/high shelf, low/high pass, and `GraphicEQ` profiles are supported;
   changes are crossfaded during playback and native DSD output remains
   bit-perfect
+- Optional headphone crossfeed with light, medium, and strong strength, applied
+  after ReplayGain and the equalizer in the ASIO and WASAPI PCM paths. It is off
+  by default, keeps correlated (mono) content centered, resets its filter
+  history after a seek, and never affects native DSD output
+- Optional loudness matching for internet radio and podcast streams, with a slow
+  bounded gain that avoids pumping on short passages. It applies only to those
+  streams, never to library tracks (which use ReplayGain) or native DSD, and
+  resets after a seek
 - SQLite music library with multiple monitored directories
 - CUE-sheet support for large FLAC/WAV images: indexed CUE entries appear as
   independent virtual tracks in library, folder, search, queue, playlist, and
