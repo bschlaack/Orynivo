@@ -271,6 +271,10 @@ public static class LocalizationManager
         resources["L_ArtistImageSuggestionTitle"] = Current.ArtistImageSuggestionTitle;
         resources["L_ArtistImageSuggestionHint"] = Current.ArtistImageSuggestionHint;
         resources["L_AutoAcceptFanartTvImages"] = Current.AutoAcceptFanartTvImages;
+        resources["L_Karaoke"] = Current.Karaoke;
+        resources["L_KaraokeTooltip"] = Current.KaraokeTooltip;
+        resources["L_KaraokeExitHint"] = Current.KaraokeExitHint;
+        resources["L_KaraokeRequiresSyncedLyrics"] = Current.KaraokeRequiresSyncedLyrics;
         resources["L_YearInReview"] = Current.YearInReview;
         resources["L_YearInReviewHeading"] = Current.YearInReviewHeading;
         resources["L_YearInReviewHours"] = Current.YearInReviewHours;
@@ -636,6 +640,10 @@ public static class LocalizationManager
         "Ein unerwarteter Fehler ist aufgetreten. Der Fehlerbericht konnte nicht gespeichert werden. Orynivo wird beendet.")
     {
         AutoAcceptFanartTvImages = "Fanart.tv-Funde automatisch übernehmen",
+        Karaoke = "Karaoke",
+        KaraokeTooltip = "Vollbild-Karaoke mit synchronisierten Liedtexten",
+        KaraokeExitHint = "Zum Beenden Esc drücken oder klicken",
+        KaraokeRequiresSyncedLyrics = "Karaoke benötigt synchronisierte Liedtexte.",
         YearInReview = "Jahresrückblick",
         YearInReviewHeading = "Dein Hörjahr",
         YearInReviewHours = "Gehörte Stunden",
@@ -1429,6 +1437,10 @@ public static class LocalizationManager
         "An unexpected error occurred. The crash report could not be saved. Orynivo will now close.")
     {
         AutoAcceptFanartTvImages = "Automatically accept Fanart.tv results",
+        Karaoke = "Karaoke",
+        KaraokeTooltip = "Fullscreen karaoke with synchronized lyrics",
+        KaraokeExitHint = "Press Esc or click to exit",
+        KaraokeRequiresSyncedLyrics = "Karaoke needs synchronized lyrics.",
         YearInReview = "Year in review",
         YearInReviewHeading = "Your listening year",
         YearInReviewHours = "Hours listened",
@@ -2205,6 +2217,10 @@ public static class LocalizationManager
         "Une erreur inattendue s’est produite. Le rapport n’a pas pu être enregistré. Orynivo va maintenant se fermer.")
     {
         AutoAcceptFanartTvImages = "Accepter automatiquement les résultats Fanart.tv",
+        Karaoke = "Karaoké",
+        KaraokeTooltip = "Karaoké plein écran avec paroles synchronisées",
+        KaraokeExitHint = "Appuyez sur Échap ou cliquez pour quitter",
+        KaraokeRequiresSyncedLyrics = "Le karaoké nécessite des paroles synchronisées.",
         YearInReview = "Rétrospective de l'année",
         YearInReviewHeading = "Votre année d'écoute",
         YearInReviewHours = "Heures écoutées",
@@ -2978,6 +2994,10 @@ public static class LocalizationManager
         "Se produjo un error inesperado. No se pudo guardar el informe. Orynivo se cerrará ahora.")
     {
         AutoAcceptFanartTvImages = "Aceptar automáticamente los resultados de Fanart.tv",
+        Karaoke = "Karaoke",
+        KaraokeTooltip = "Karaoke a pantalla completa con letras sincronizadas",
+        KaraokeExitHint = "Pulsa Esc o haz clic para salir",
+        KaraokeRequiresSyncedLyrics = "El karaoke necesita letras sincronizadas.",
         YearInReview = "Resumen del año",
         YearInReviewHeading = "Tu año de escucha",
         YearInReviewHours = "Horas escuchadas",
@@ -4531,6 +4551,10 @@ private static readonly LocalizedStrings Russian = new(
         AiChatEmptyResponse = "Модель вернула пустой ответ.",
         AiChatToolResultFallback = "После вызова инструмента модель не вернула окончательный ответ. Результат инструмента:",
         AutoAcceptFanartTvImages = "Автоматически принимать результаты Fanart.tv",
+        Karaoke = "Караоке",
+        KaraokeTooltip = "Полноэкранное караоке с синхронизированным текстом",
+        KaraokeExitHint = "Нажмите Esc или щёлкните, чтобы выйти",
+        KaraokeRequiresSyncedLyrics = "Для караоке нужен синхронизированный текст.",
         YearInReview = "Итоги года",
         YearInReviewHeading = "Ваш год прослушивания",
         YearInReviewHours = "Часов прослушано",
@@ -5459,6 +5483,10 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "模型返回了空响应。",
         AiChatToolResultFallback = "调用工具后，模型未返回最终答复。工具结果：",
         AutoAcceptFanartTvImages = "自动接受 Fanart.tv 的结果",
+        Karaoke = "卡拉OK",
+        KaraokeTooltip = "带同步歌词的全屏卡拉OK",
+        KaraokeExitHint = "按 Esc 或单击退出",
+        KaraokeRequiresSyncedLyrics = "卡拉OK需要同步歌词。",
         YearInReview = "年度回顾",
         YearInReviewHeading = "你的聆听之年",
         YearInReviewHours = "收听小时数",
@@ -6386,6 +6414,10 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "मॉडल ने खाली उत्तर दिया।",
         AiChatToolResultFallback = "टूल कॉल के बाद मॉडल ने अंतिम उत्तर नहीं दिया। टूल परिणाम:",
         AutoAcceptFanartTvImages = "Fanart.tv परिणाम स्वतः स्वीकार करें",
+        Karaoke = "कराओके",
+        KaraokeTooltip = "सिंक किए गए बोल के साथ फ़ुलस्क्रीन कराओके",
+        KaraokeExitHint = "बाहर निकलने के लिए Esc दबाएँ या क्लिक करें",
+        KaraokeRequiresSyncedLyrics = "कराओके के लिए सिंक किए गए बोल आवश्यक हैं।",
         YearInReview = "वर्ष की समीक्षा",
         YearInReviewHeading = "आपका सुनने का वर्ष",
         YearInReviewHours = "सुने गए घंटे",

@@ -8,6 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Added a fullscreen karaoke view for synchronized lyrics. The lyrics view
+  gained a **Karaoke** action that opens a fullscreen window with the active line
+  centered and emphasized while neighbouring lines fade out, using the now-playing
+  cover as a dimmed backdrop. It follows the transport position through the
+  existing timer, exits with Esc or a click, and reports when a track only has
+  plain lyrics. Lyric-line selection now lives in the pure, tested
+  `Orynivo.Library.LyricLineSelector`.
 - Added a **Year in review** summary, reachable from the Dashboard statistics.
   It reuses the existing Dashboard aggregates — total listened hours, active
   days, a monthly breakdown, and the leading genres, albums, and artists — for a

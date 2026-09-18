@@ -1350,6 +1350,14 @@ public sealed record LocalizedStrings(
     public string AiChatToolResultFallback { get; init; } = "";
     /// <summary>Gets the option for automatically accepting Fanart.tv artist-image results.</summary>
     public string AutoAcceptFanartTvImages { get; init; } = "";
+    /// <summary>Gets the fullscreen karaoke feature label.</summary>
+    public string Karaoke { get; init; } = "";
+    /// <summary>Gets the karaoke action tooltip.</summary>
+    public string KaraokeTooltip { get; init; } = "";
+    /// <summary>Gets the karaoke exit hint.</summary>
+    public string KaraokeExitHint { get; init; } = "";
+    /// <summary>Gets the message shown when karaoke has no synchronized lyrics.</summary>
+    public string KaraokeRequiresSyncedLyrics { get; init; } = "";
     /// <summary>Gets the year-in-review feature and window label.</summary>
     public string YearInReview { get; init; } = "";
     /// <summary>Gets the year-in-review headline.</summary>

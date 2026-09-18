@@ -253,16 +253,19 @@ implicitly).
 - 3 Core tests (year aggregation, cross-year exclusion, unsupported years).
 - Not included: PDF output and a server-side year aggregate.
 
-## 12. Karaoke fullscreen lyrics — `Todo`
+## 12. Karaoke fullscreen lyrics — `Done`
 
-**Design**
-
-- A fullscreen mode for the existing synced-lyrics view with large,
-  centered, animated lines.
-
-**Tests**: lyric-line selection timing (pure).
-
-**Commit**: `feat(lyrics): add a fullscreen karaoke view`
+- The lyrics view gained a **Karaoke** action that opens `KaraokeWindow`
+  fullscreen: a fixed window of synchronized lines around the active one, with
+  the active line centered and emphasized and neighbours fading out, over the
+  now-playing cover as a dimmed backdrop.
+- Positions are pushed by the existing transport timer; opacity and font size
+  animate through `Transitions`. Esc, a click, or clearing the lyrics closes it,
+  and a track with only plain lyrics explains that karaoke needs synchronized
+  lyrics.
+- The active-line lookup was extracted into the pure, tested
+  `Orynivo.Library.LyricLineSelector` (6 tests).
+- Not included: word-level (enhanced LRC) highlighting and a per-word animation.
 
 ## 13. Scheduled auto-backup with retention — `Todo`
 

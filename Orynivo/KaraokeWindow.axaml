@@ -1,0 +1,36 @@
+<Window x:Class="Orynivo.KaraokeWindow"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{DynamicResource L_Karaoke}"
+        Icon="avares://Orynivo/Assets/Orynivo.ico"
+        WindowState="FullScreen"
+        Background="#FF0B0C16">
+    <Grid>
+        <Image x:Name="BackgroundImage"
+               Stretch="UniformToFill"
+               Opacity="0.18"/>
+        <Border Background="#B018192E"/>
+        <Grid RowDefinitions="*,Auto">
+            <StackPanel x:Name="LinesPanel"
+                        Grid.Row="0"
+                        VerticalAlignment="Center"
+                        HorizontalAlignment="Stretch"
+                        Spacing="8"
+                        Margin="90,0"/>
+            <StackPanel Grid.Row="1"
+                        Margin="0,0,0,30"
+                        HorizontalAlignment="Center"
+                        Spacing="6">
+                <TextBlock x:Name="TrackTextBlock"
+                           HorizontalAlignment="Center"
+                           TextAlignment="Center"
+                           FontSize="{DynamicResource FontSizeBodyStrong}"
+                           Foreground="#EDEDF7"/>
+                <TextBlock x:Name="HintTextBlock"
+                           HorizontalAlignment="Center"
+                           FontSize="{DynamicResource FontSizeMeta}"
+                           Foreground="#8A8AA8"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

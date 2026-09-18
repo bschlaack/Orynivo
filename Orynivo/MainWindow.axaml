@@ -3046,6 +3046,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="{DynamicResource L_Lyrics}"
                                    VerticalAlignment="Center"
@@ -3056,17 +3057,24 @@
                                 Padding="12,6"
                                 Margin="0,0,8,0"
                                 Theme="{StaticResource HeaderFilterButtonTheme}"
+                                ToolTip.Tip="{DynamicResource L_KaraokeTooltip}"
+                                Content="{DynamicResource L_Karaoke}"
+                                Click="KaraokeButton_OnClick"/>
+                        <Button Grid.Column="2"
+                                Padding="12,6"
+                                Margin="0,0,8,0"
+                                Theme="{StaticResource HeaderFilterButtonTheme}"
                                 Content="{DynamicResource L_SearchLyrics}"
                                 Click="SearchLyricsButton_OnClick"/>
                         <Button x:Name="RefreshLyricsButton"
-                                Grid.Column="2"
+                                Grid.Column="3"
                                 Theme="{StaticResource TransportBtnTheme}"
                                 Margin="0,0,8,0"
                                 ToolTip.Tip="{DynamicResource L_RefreshLyrics}"
                                 Click="RefreshLyricsButton_OnClick">
                             <TextBlock Text="↻" FontSize="{DynamicResource FontSizeTitle}"/>
                         </Button>
-                        <Button Grid.Column="3"
+                        <Button Grid.Column="4"
                                 Theme="{StaticResource TransportBtnTheme}"
                                 ToolTip.Tip="{DynamicResource L_CloseLyrics}"
                                 Click="CloseLyricsButton_OnClick">

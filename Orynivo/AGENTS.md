@@ -445,6 +445,13 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   the profile-scoped `OrynivoServerFavorites` container and the server rating
   API. The bar stays hidden for every other entity type or view and must never
   persist an authenticated playback URL.
+- The lyrics view's **Karaoke** action opens `KaraokeWindow` fullscreen. It shows
+  a fixed window of synchronized lines around the active one, emphasizes the
+  active line, and animates opacity and font size through `Transitions`; the
+  main window pushes positions from its existing transport timer and never adds a
+  second polling loop. Karaoke requires synchronized lines, closes on Esc, a
+  click, or whenever the lyrics are cleared, and the active-line lookup must stay
+  in the pure, tested `Orynivo.Library.LyricLineSelector`.
 - The Dashboard **Year in review** action lives in the Listening stats card
   directly below its period selector, so both share one context. It opens
   `YearInReviewDialog`, which

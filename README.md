@@ -1554,7 +1554,11 @@ first uses cached synchronized lyrics, then downloaded or embedded plain lyrics
 as a fallback. Missing lyrics can be requested from the public LRCLIB API and
 are stored in `library.db`; synchronized LRC lines are highlighted and kept in
 view using the current playback position. The refresh button performs a new
-lookup, and a missing result is shown directly in the lyrics view.
+lookup, and a missing result is shown directly in the lyrics view. The
+**Karaoke** action opens a fullscreen view of the synchronized lyrics with the
+active line centered and emphasized while neighbouring lines fade out, using the
+current cover as a dimmed backdrop; it exits with Esc or a click and explains
+when a track only has plain lyrics.
 For WASAPI, buffered but not yet audible frames are excluded from the playback
 position so synchronized lyrics follow the actual output timing.
 
