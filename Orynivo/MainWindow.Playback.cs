@@ -67,6 +67,9 @@ public partial class MainWindow : Window
             Dispatcher.UIThread.Post(StopPlayback);
         _windowsMediaTransport.PositionChangeRequested += position =>
             Dispatcher.UIThread.Post(async () => await SeekFromSystemAsync(position));
+        _windowsMediaTransport.VolumeChangeRequested += volume =>
+            Dispatcher.UIThread.Post(() => ApplySystemVolume((float)volume));
+        _windowsMediaTransport.SetVolume(VolumeSlider.Value);
         RefreshQueueNavigationButtons();
     }
 
@@ -1162,13 +1165,22 @@ public partial class MainWindow : Window
         {
             album = orynivoTrack.Album ?? string.Empty;
             if (orynivoTrack.OrynivoServer is { } server &&
-                orynivoTrack.Id is long trackId &&
-                Uri.TryCreate(
+                orynivoTrack.Id is long trackId)
+            {
+                var cachedArtwork = AppPaths.GetDataPath(
+                    "remote-artworks",
+                    $"track-art-{server.Id}-{trackId}.img");
+                if (File.Exists(cachedArtwork))
+                {
+                    artworkPath = cachedArtwork;
+                }
+                else if (Uri.TryCreate(
                     OrynivoServerClient.GetTrackArtworkUrl(server, trackId, 320),
                     UriKind.Absolute,
                     out var orynivoArtworkUri))
-            {
-                artworkUri = orynivoArtworkUri;
+                {
+                    artworkUri = orynivoArtworkUri;
+                }
             }
         }
         else

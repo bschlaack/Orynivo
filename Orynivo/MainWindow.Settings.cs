@@ -61,6 +61,8 @@ public partial class MainWindow : Window
             _player.Volume = (float)VolumeSlider.Value;
         }
         _settings.Volume = VolumeSlider.Value;
+        if (!_updatingVolumeFromSystem)
+            _windowsMediaTransport?.SetVolume(VolumeSlider.Value);
     }
 
     private async Task ConfigureEndpointVolumeSynchronizationAsync()
