@@ -143,7 +143,7 @@ jobs:
           --output artifacts/Orynivo-linux-x64
 
       - name: Upload Linux desktop
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: Orynivo-linux-x64
           path: artifacts/Orynivo-linux-x64
@@ -190,7 +190,7 @@ jobs:
           --output artifacts/Orynivo-${{ matrix.rid }}
 
       - name: Upload macOS desktop
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: Orynivo-${{ matrix.rid }}
           path: artifacts/Orynivo-${{ matrix.rid }}
