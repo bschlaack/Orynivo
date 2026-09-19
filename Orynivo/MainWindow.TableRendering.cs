@@ -385,6 +385,7 @@ public partial class MainWindow : Window
             new(LocalizationManager.Current.Channels, DisplayTrackInfoValue(row.Channels)),
             new(LocalizationManager.Current.Composer, DisplayTrackInfoValue(row.Composer)),
             new(LocalizationManager.Current.Bpm, DisplayTrackInfoValue(row.Bpm)),
+            new(LocalizationManager.Current.MusicalKey, DisplayTrackInfoValue(row.CamelotKey)),
             new(LocalizationManager.Current.FileName, DisplayTrackInfoValue(row.FileName)),
             new(LocalizationManager.Current.FileSize, DisplayTrackInfoValue(row.FileSize)),
             new(LocalizationManager.Current.AddedAt, DisplayTrackInfoValue(row.AddedAt)),
@@ -659,6 +660,7 @@ public partial class MainWindow : Window
             Add(LocalizationManager.Current.Channels, nameof(ContentRow.Channels), 80, "channels", right: true, defaultVisible: false);
             Add(LocalizationManager.Current.Composer, nameof(ContentRow.Composer), 180, "composer", defaultVisible: false);
             Add(LocalizationManager.Current.Bpm, nameof(ContentRow.Bpm), 70, "bpm", right: true, defaultVisible: false);
+            Add(LocalizationManager.Current.MusicalKey, nameof(ContentRow.CamelotKey), 70, "camelotKey", right: true, defaultVisible: false);
             Add(LocalizationManager.Current.FileName, nameof(ContentRow.FileName), 220, "fileName", defaultVisible: false);
             Add(LocalizationManager.Current.FileSize, nameof(ContentRow.FileSize), 100, "fileSize", right: true, defaultVisible: false);
             Add(LocalizationManager.Current.AddedAt, nameof(ContentRow.AddedAt), 110, "addedAt", defaultVisible: false);

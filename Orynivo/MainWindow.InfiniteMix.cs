@@ -291,6 +291,30 @@ public partial class MainWindow
                 TrySelect(row, requireNewAlbum: true, avoidRecentArtist: false);
             foreach (var row in rows)
                 TrySelect(row, requireNewAlbum: false, avoidRecentArtist: false);
+
+            // Harmonic mixing: walk the batch along the Camelot wheel so
+            // consecutive tracks mix cleanly. Rows without an estimated key keep
+            // their ranking order at the end of the batch.
+            var camelotByTrackKey = new Dictionary<string, CamelotKey>(StringComparer.OrdinalIgnoreCase);
+            foreach (var candidate in ranked)
+            {
+                if (CamelotKey.TryParse(candidate.Track.CamelotKey, out var camelot))
+                    camelotByTrackKey[BuildInfiniteMixTrackKey(candidate.Server, candidate.Track.TrackId)] = camelot;
+            }
+
+            if (camelotByTrackKey.Count > 1)
+            {
+                selected = HarmonicOrdering.Order(
+                        selected,
+                        row => row.Id is long rowId &&
+                               camelotByTrackKey.TryGetValue(
+                                   BuildInfiniteMixTrackKey(row.OrynivoServer, rowId),
+                                   out var camelot)
+                            ? camelot
+                            : null)
+                    .ToList();
+            }
+
             foreach (var row in selected)
             {
                 _queue.Add(ToPlaylistItem(row));

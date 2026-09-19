@@ -584,6 +584,7 @@ public partial class MainWindow : Window
         Channels = t.Channels?.ToString(CultureInfo.CurrentCulture),
         Composer = t.Composer,
         Bpm = t.Bpm?.ToString(CultureInfo.CurrentCulture),
+        CamelotKey = t.CamelotKey,
         FileName = t.FileName,
         FileSize = FormatFileSize(t.FileSize),
         AddedAt = DateTimeOffset.FromUnixTimeSeconds(t.AddedAt)
@@ -630,6 +631,7 @@ public partial class MainWindow : Window
             ChannelCount = track.Channels,
             Composer = track.Composer,
             Bpm = track.Bpm?.ToString(CultureInfo.CurrentCulture),
+            CamelotKey = track.CamelotKey,
             FileName = track.FileName,
             FileSize = FormatFileSize(track.FileSize),
             AddedAt = track.AddedAt.HasValue

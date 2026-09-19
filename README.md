@@ -29,6 +29,9 @@ the ability to reach that library from any device on the local network.
 - Gapless playback
 - CUE sheet support
 - ReplayGain and parametric EQ
+- Multi-select bulk editing in the shared Tracks table, applying favorite,
+  unfavorite, or a personal rating to every selected local or Orynivo Server
+  track at once
 - Local library, playlists, smart playlists and full-text search
 - Unified artist detail pages with an album-style image-and-biography hero,
   synchronized favorites, image management, refreshable biographies, and
@@ -97,8 +100,9 @@ ReplayGain, PCM boost, and the parametric equalizer. The macOS desktop provides
 the same library, streaming, playlist, radio, podcast, AI Chat, MCP, and PCM
 processing features through the system OpenAL output path on Intel and Apple
 Silicon. Native DSD output remains available only through Windows ASIO/cwASIO
-or Linux direct ALSA, and Windows System Media Transport Controls remain
-Windows-specific.
+or Linux direct ALSA. Windows System Media Transport Controls remain
+Windows-specific, while the Linux desktop exposes the MPRIS 2 media player
+interface so desktop media keys, panels, and applets can control playback.
 
 AirPlay output profiles discover local `_raop._tcp` receivers on every desktop
 platform. On Windows, the bundled native `AirPlay2Bridge` is preferred and
@@ -189,9 +193,9 @@ The desktop project selects its target from the build host:
 - Windows builds target `net8.0-windows10.0.19041.0` and include the existing
   WASAPI/ASIO integrations.
 - Linux builds target `net8.0`; PCM audio is rendered through direct ALSA or
-  OpenAL, while
-  Windows endpoint-volume and system-media integrations are replaced by
-  compatibility services.
+  OpenAL. The Windows endpoint-volume integration is replaced by a
+  compatibility service, and system-media integration is provided by MPRIS 2
+  (`org.mpris.MediaPlayer2.orynivo`) for desktop media keys and panels.
 - macOS builds target `net8.0`; PCM audio is rendered through Apple's system
   OpenAL framework. Windows audio, endpoint-volume, and SMTC integrations are
   replaced by compatibility services, and native DSD output is not currently
@@ -455,7 +459,7 @@ works directly in FFmpeg and browser URLs.
 | `DELETE /api/playlist-tracks/{id}` | Remove one entry from a server playlist |
 | `GET /api/search?q=` | Full-text search — returns matching tracks |
 | `GET /api/search/full?q=` | Category search — returns tracks, albums, and artists |
-| `GET /api/stream/{trackId}` | Byte-range HTTP streaming for regular files; FLAC transcode for CUE virtual tracks |
+| `GET /api/stream/{trackId}` | Byte-range HTTP streaming for regular files; FLAC transcode for CUE virtual tracks; `?ss=` seeks server-side; `?format=opus\|aac&bitrate=<64-320>` requests a validated lossy transcode (unsupported values return 400) |
 | `GET /api/stream/path?p=` | Stream by absolute file path |
 | `GET /api/artwork/album/{id}?size=` | Album artwork (`size=96` or `size=320` for thumbnails) |
 | `GET /api/artwork/track?p=` | Track artwork by file path |
@@ -539,6 +543,12 @@ The Windows client probes server compatibility in Settings, reports missing
 newer endpoints explicitly, shows the last successful connection time when a
 server is unreachable, and can clear cached remote artwork, track lists, and
 folder trees per server or globally.
+Each Orynivo Server connection stores its own streaming quality: **Original**,
+or a lossy transcode at a chosen bitrate (`Opus` or `AAC`, 64–320 kbps). Lossy
+requests are validated server-side and rejected with HTTP 400 when the format or
+bitrate is unsupported, so the setting is safe to leave on a server that cannot
+transcode. Seeking uses the server-side seek parameter and works for both
+original and transcoded streams.
 
 ### Running the server
 
@@ -684,9 +694,20 @@ byte-range streaming without FFmpeg.
   client. Last.fm or Wikipedia requests run on the client; the server receives
   only the resulting biography, source URL, language, and optional image bytes
   to cache.
+- Optional Last.fm scrobbling of played tracks, configured under
+  **Settings → Artist information** with an API key, secret, and a two-step
+  browser authorization. Scrobbles are queued and flushed in the background, so
+  playback and artist-information lookups are never blocked; the session key and
+  the API secret are stored only in the encrypted per-user credential container.
+  Scrobbling applies to local and Orynivo Server library tracks, and both the
+  scrobble threshold and the pending queue survive restarts.
 - Windows System Media Transport Controls integration with global media keys,
   play/pause/previous/next/stop and seek requests, system-overlay and lock-screen
   metadata, album art, playback state, and timeline synchronization
+- Linux MPRIS 2 media player integration (`org.mpris.MediaPlayer2.orynivo`) for
+  desktop media keys, panels, and applets, with the same transport commands,
+  metadata, position, playback status, and volume; credential-bearing remote
+  artwork URLs are never published to the session bus
 - Optional ReplayGain volume adjustment for PCM playback, using track or album
   gain metadata with fallback to the other available value; native DSD output
   remains bit-perfect. A small transport badge appears when ReplayGain is active
@@ -699,6 +720,14 @@ byte-range streaming without FFmpeg.
   low/high shelf, low/high pass, and `GraphicEQ` profiles are supported;
   changes are crossfaded during playback and native DSD output remains
   bit-perfect
+- Optional headphone crossfeed with light, medium, and strong strength, applied
+  after ReplayGain and the equalizer in the ASIO and WASAPI PCM paths. It is off
+  by default, keeps correlated (mono) content centered, resets its filter
+  history after a seek, and never affects native DSD output
+- Optional loudness matching for internet radio and podcast streams, with a slow
+  bounded gain that avoids pumping on short passages. It applies only to those
+  streams, never to library tracks (which use ReplayGain) or native DSD, and
+  resets after a seek
 - SQLite music library with multiple monitored directories
 - CUE-sheet support for large FLAC/WAV images: indexed CUE entries appear as
   independent virtual tracks in library, folder, search, queue, playlist, and
@@ -784,6 +813,10 @@ byte-range streaming without FFmpeg.
   starts. These use explicit mood tags when available and fall back to tempo
   plus preference/familiarity signals; they also start with the selected track
   and continue through Infinite Mix.
+  A **Play activity mix** submenu next to it offers the curated **Focus**,
+  **Workout**, and **Wind down** presets, which rank tracks against cached
+  acoustic descriptors (energy, brightness, dynamics) and tempo and continue
+  through the same Infinite Mix queue.
   Repeated similarity and mood actions reuse a five-minute memory-only vector
   cache. Catalog, favourite, rating, and server-configuration invalidations
   clear it; no vectors or provider credentials are written to disk.
@@ -812,7 +845,17 @@ byte-range streaming without FFmpeg.
   Servers. It balances discovery with genre affinity and suppresses immediate
   track, album, and artist repetition. Initial preparation is surfaced through
   a progress overlay; later refills rotate through the complete matching genre
-  population and happen automatically in the background.
+  population and happen automatically in the background. Batches are ordered
+  harmonically: when a track's key has been estimated from a bounded audio
+  analysis, Infinite Mix, similarity, mood, and activity mixes walk the Camelot
+  wheel so consecutive tracks mix cleanly. Tracks without an estimated key keep
+  their ranking order. The estimated key appears as an optional **Key** column
+  in the track tables and in **Show track information**; Settings > Playback
+  offers **Analyze audio features** to analyze the complete library and the
+  configured Orynivo Servers instead of waiting for the background batches.
+- A Dashboard **Year in review** summary for any year with listening history:
+  listened hours, active days, a monthly breakdown, and the leading genres,
+  albums, and artists, exportable as a shareable PNG image
 - Dashboard with an artwork-backed greeting hero with a lightened-artwork rim, live
   library counters (including local and configured Orynivo Server track
   favorites), random
@@ -860,11 +903,15 @@ byte-range streaming without FFmpeg.
 - Lucene.NET full-text search with partial-word and German umlaut variants
 - Favorites for tracks, albums, and artists
 - Regular playlists and live smart playlists with metadata, library-age,
-  playback-history, ordering, and result-limit criteria
+  playback-history, similarity, ordering, and result-limit criteria. A track's
+  context menu offers **Save as smart playlist: similar tracks**, which keeps the
+  nearest local and Orynivo Server neighbours of that reference track
 - Smart playlists are created directly from active track filters and can be
   refined later through their sidebar context menu. The editor previews the live
   match count while criteria are changed, including unified local/server counts
-  and server-side counts when the connected Orynivo Server supports them.
+  and server-side counts when the connected Orynivo Server supports them, and it
+  shows every stored criterion — including the reference track of a similarity
+  smart playlist, whose minimum similarity score stays editable.
 - UTF-8 M3U8 import and export for regular playlists, including relative local
   paths, retained missing-file entries, and HTTP/HTTPS streams; credentialed
   Plex URLs are excluded
@@ -1469,31 +1516,59 @@ selects a release and explicitly applies that correction.
 
 ```text
 Orynivo/
-├── Native/AsioBridge/       Native C++ bridge for the Steinberg ASIO SDK
-├── Native/CwAsioBridge/     Native C++ bridge built against cwASIO
+├── Native/                  Native C++ bridges
+│   ├── AirPlay2Bridge/      Standalone AirPlay 2 sender (versioned C ABI, CMake)
+│   ├── AsioBridge/          Steinberg ASIO bridge
+│   └── CwAsioBridge/        cwASIO bridge
 ├── third_party/cwasio/      Vendored cwASIO sources under the MIT License
-├── Orynivo.Core/            Cross-platform library (net8.0, no Windows deps)
-│   ├── Audio/               FFmpeg decoder, equalizer, ReplayGain utilities
-│   ├── Library/             SQLite database, scanner, Lucene search, models
-│   └── Streaming/           Provider-neutral streaming contracts and models
-├── Orynivo/                 Windows/Linux desktop (Avalonia UI)
-│   ├── Audio/               ASIO, WASAPI, PCM, and DSD playback
-│   ├── Controls/            Custom Avalonia controls
+├── Orynivo.Core/            Cross-platform library (net8.0, no platform dependencies)
+│   ├── Audio/               FFmpeg decoder, acoustic analysis, ReplayGain, equalizer, crossfeed
+│   ├── Library/             SQLite database, scanner, watcher, Lucene search, backups, models
+│   ├── Scrobbling/          Last.fm request signing, scrobble rules, and HTTP client
+│   ├── Streaming/           Provider-neutral contracts plus the Plex and Orynivo Server clients
+│   ├── Updates/             Signed release-update verification and asset selection
+│   └── Web/                 SSRF-guarded page fetching and SearXNG search
+├── Orynivo/                 Avalonia desktop client (Windows, Linux, macOS)
+│   ├── AI/                  Embedded AI chat, OpenAI-compatible client, Markdown rendering
+│   ├── Assets/              Logos, application icon, and dashboard artwork
+│   ├── Audio/               ASIO, cwASIO, WASAPI, OpenAL, AirPlay, PCM and DSD playback
+│   ├── Compatibility/       Linux compatibility types (direct ALSA, OpenAL, credential stores)
+│   ├── Controls/            Custom Avalonia controls and reusable table helpers
 │   ├── Localization/        Complete built-in resources for all seven languages
-│   ├── Mcp/                 Embedded MCP server, player bridge, and tools
-│   ├── Streaming/           Windows credential stores and Plex client
-│   └── MainWindow.*         Main user interface and navigation
+│   ├── Mcp/                 Embedded MCP server, player bridge, and the 32 tools
+│   ├── Remote/              Opt-in mobile web remote (service, page, and script)
+│   ├── Scrobbling/          Desktop scrobbling service and pending-scrobble store
+│   ├── Streaming/           Credential-store facades and the inactive Qobuz provider scaffold
+│   └── MainWindow.*.cs      Main window, split into domain-sized partials
 ├── Orynivo.Server/          Cross-platform headless server (net8.0, ASP.NET Core)
-│   ├── Endpoints/           REST and streaming endpoint handlers
-│   ├── Middleware/          API key authentication
-│   ├── Services/            Library scan and file-system watcher service
+│   ├── Endpoints/           Core, library, streaming, configuration, backup, and update routes
+│   ├── Middleware/          API key and user-profile authentication
+│   ├── Services/            Hosted library scan, watcher, and audio-feature maintenance
 │   ├── Program.cs           Server entry point
 │   └── appsettings.json     Default configuration
+├── Orynivo.Core.Tests/      Unit tests for the cross-platform core library
+├── Orynivo.Tests/           Unit tests for pure desktop helpers (no running UI required)
+├── Orynivo.Server.Tests/    Unit tests for server middleware without starting the web host
+├── scripts/                 Verification and smoke-test harnesses
+│   ├── verify-localization-parity.ps1   Seven-language desktop/website/mobile parity
+│   ├── verify-mcp-tool-parity.ps1       MCP, AI tool schema, and Settings checklist parity
+│   └── *Smoke/              Cover search, metadata, remote, and localization harnesses
+├── html/                    Static localized product website (German source plus i18n.js)
+├── Logo/                    Source logo, icon, and background artwork
+├── installer/               Windows Inno Setup script and published installers
+├── licenses/                Third-party license texts (LGPL, MIT, QRCoder)
 ├── .github/
-│   ├── server-release/      systemd unit and package scripts for Linux releases
-│   └── workflows/           CI (dotnet-desktop.yml), Windows release, Server release
-├── build.ps1                Builds native bridges and the Windows .NET application
-└── Orynivo.sln              Visual Studio solution
+│   ├── ISSUE_TEMPLATE/      Structured bug, feature, and security report forms
+│   ├── player-release/      Linux desktop packaging (DEB, RPM, Arch)
+│   ├── player-macos/        macOS PKG, ZIP, and tar packaging
+│   ├── server-release/      systemd unit and Linux server packaging
+│   ├── workflows/           CI, Windows/macOS/Linux and server releases, manifest signing
+│   └── dependabot.yml       Weekly NuGet and GitHub Actions updates
+├── build.ps1                Builds the native bridges and the .NET application
+├── Orynivo.sln              Visual Studio solution
+├── AGENTS.md                Repository-wide contributor and architecture rules
+├── CHANGELOG.md             Release notes
+└── README.md                This document
 ```
 
 ## Local Data
@@ -1533,7 +1608,11 @@ first uses cached synchronized lyrics, then downloaded or embedded plain lyrics
 as a fallback. Missing lyrics can be requested from the public LRCLIB API and
 are stored in `library.db`; synchronized LRC lines are highlighted and kept in
 view using the current playback position. The refresh button performs a new
-lookup, and a missing result is shown directly in the lyrics view.
+lookup, and a missing result is shown directly in the lyrics view. The
+**Karaoke** action opens a fullscreen view of the synchronized lyrics with the
+active line centered and emphasized while neighbouring lines fade out, using the
+current cover as a dimmed backdrop; it exits with Esc or a click and explains
+when a track only has plain lyrics.
 For WASAPI, buffered but not yet audible frames are excluded from the playback
 position so synchronized lyrics follow the actual output timing.
 
@@ -1553,6 +1632,12 @@ Exports show file-level progress and write to a temporary `.tmp` archive first;
 the file is renamed to `.zip` only after the export completes successfully.
 Imports use the same progress bar while extracting, validating, restoring
 artwork, rebasing paths, and rebuilding the search index.
+
+**Scheduled backups** can create that archive automatically. Choose an enable
+toggle, an interval in days, how many backups to keep, and a backup folder
+(default: a `backups` folder beneath the per-user data directory), or run one
+immediately with **Back up now**. Orynivo writes the archive, removes older ones
+beyond the retention count, and shows the last successful run.
 
 ## Current Limitations
 

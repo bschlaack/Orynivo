@@ -4,21 +4,128 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.42.1] - 2026-09-17
+## [0.43.1] - 2026-09-18
+
+### Added
+
+- Linux desktop builds now expose the full MPRIS 2 media player interface
+  (`org.mpris.MediaPlayer2.orynivo`) on the session bus, giving desktop media
+  keys, panels, and applets parity with the Windows System Media Transport
+  Controls integration. It supports Play/Pause/PlayPause/Stop/Next/Previous/
+  Seek/SetPosition, reports metadata, position, playback status, volume, and
+  navigation capabilities, and emits `PropertiesChanged` and `Seeked` signals.
+  Remote artwork URLs that carry credentials (Orynivo Server `?key=`, Plex
+  tokens) are never exposed; only local files and credential-free URLs are
+  published. macOS remains unaffected.
 
 ### Fixed
 
-- Release asset uploads now retry transient GitHub 5xx responses with bounded
-  backoff instead of failing the complete release; the signed update-manifest
-  upload retries the same way.
-- Dependabot no longer proposes major NuGet upgrades that cannot build against
-  the pinned .NET 8 SDK and toolchain (Avalonia 12 requires Roslyn 4.14 and has
-  breaking API changes; the Microsoft.Data.Sqlite 10 and Microsoft.NET.Test.Sdk
-  18 lines target newer runtimes). Major upgrades are reviewed manually.
-- Stabilized `Orynivo.Core.Tests` in CI: the isolated test data root is now set
-  from a module initializer before any type caches `AppPaths.DataRoot`, so the
-  artist-attribution tests no longer run against the real user data directory
-  (or share leftover rows) depending on test ordering.
+- Fixed a .NET 8 build break in `GenreCloudService` and
+  `SimilarityFeatureService`: collection-expression `string.Split([';', …], …)`
+  calls are ambiguous with the latest .NET 8 reference assemblies, which add
+  `Split(string?, StringSplitOptions)`. Both now use explicitly typed `char[]`
+  arguments.
+- Remote Orynivo Server tracks now show their cover art in the desktop media
+  integration. The now-playing metadata prefers the locally cached
+  `remote-artworks/track-art-<server>-<track>.img` file instead of the
+  credential-bearing server URL, so MPRIS and the Windows media overlay can
+  display the cover without the `?key=` API key ever reaching them, and the
+  media metadata is refreshed once an asynchronous artwork download completes.
+
+## [0.43.0] - 2026-09-18
+
+### Added
+
+- Migrated queue drag-and-drop to the modern Avalonia data-transfer API
+  (`DataTransfer`, `DataTransferItem`, `IDataTransfer`, `DataFormat<string>`, and
+  `DragDrop.DoDragDropAsync`) and raised Avalonia to the 11.3 line. The queue
+  tokens are carried as a JSON string under the application format
+  `orynivo.queue-paths`, so track, album, and folder drags behave exactly as
+  before. The format lives in `OrynivoDataFormats` with a regression test, because
+  Avalonia only accepts ASCII letters, digits, dots, and hyphens in an application
+  identifier and validates it eagerly. Dependabot may now propose Avalonia 11.3
+  minor updates; major updates
+  remain ignored because Avalonia 12 needs the .NET 9 SDK. Note that
+  `Avalonia.Controls.DataGrid` has no 11.3 release beyond 11.3.13 and stays
+  pinned there.
+- Added optional scheduled library backups. Settings > Library gained a
+  **Scheduled backups** section with an enable toggle, an interval in days, a
+  retention count, a backup folder picker, a **Back up now** action, and the last
+  successful run. Orynivo writes the same versioned ZIP as the manual export into
+  the chosen folder (default: a per-user `backups` folder) and removes archives
+  beyond the retention count. The schedule and retention decisions live in the
+  pure, tested `Orynivo.Library.BackupRetention`; audio files and credentials are
+  never included.
+- Added a fullscreen karaoke view for synchronized lyrics. The lyrics view
+  gained a **Karaoke** action that opens a fullscreen window with the active line
+  centered and emphasized while neighbouring lines fade out, using the now-playing
+  cover as a dimmed backdrop. It follows the transport position through the
+  existing timer, exits with Esc or a click, and reports when a track only has
+  plain lyrics. Lyric-line selection now lives in the pure, tested
+  `Orynivo.Library.LyricLineSelector`.
+- Added a **Year in review** summary, reachable from the Dashboard statistics.
+  It reuses the existing Dashboard aggregates — total listened hours, active
+  days, a monthly breakdown, and the leading genres, albums, and artists — for a
+  chosen calendar year with recorded history, and exports the rendered card as a
+  shareable PNG image. No additional data is collected. The top-genre, album, and
+  artist queries gained an optional exclusive upper time bound so a past year
+  never includes later listening.
+- The estimated musical key is now visible: an optional **Key** column (Camelot
+  wheel label) is available for the shared Tracks, Up Next, and playlist tables,
+  and **Show track information** lists it for local and Orynivo Server tracks.
+- Settings > Playback gained **Analyze audio features**, which runs the optional
+  acoustic-descriptor and musical-key analysis for the complete local library and
+  requests bounded batches from every configured Orynivo Server. The section
+  explains what the analysis produces and what it is used for, reports progress,
+  stays cancellable, never modifies source media, and leaves failed sources on
+  their normal seven-day retry cooldown.
+- Added harmonic mixing. The new pure `Orynivo.Library.CamelotKey` type maps
+  conventional key names and Camelot labels onto the wheel and exposes wheel
+  adjacency, and `AudioFeatureAnalysisService` estimates a musical key from a
+  bounded Goertzel chromagram correlated against Krumhansl-Schmuckler profiles.
+  The estimate is cached with the other acoustic descriptors (descriptor version
+  2, `track_audio_features.camelot_key`) and stays conservative: an ambiguous
+  chroma yields no key. Infinite Mix batches and similarity, mood, and activity
+  mixes are ordered with the new deterministic `HarmonicOrdering` greedy wheel
+  walk so consecutive tracks mix cleanly; tracks without an estimated key keep
+  their ranking order at the end of the batch.
+- Added transactional bulk updates in `Orynivo.Core`:
+  `AudioDatabase.SetTrackFavorites` and `SetTrackUserRatings` apply a favorite
+  state or a personal rating to several tracks in one transaction, with
+  de-duplicated identifiers and validated ratings.
+- Added curated mood/activity presets to the track context menu: a new
+  **Play activity mix** submenu offers **Focus**, **Workout**, and **Wind down**
+  next to the existing mood mix. They rank tracks through the new
+  `SimilarityFeatureService.RankPreset` using cached acoustic descriptors
+  (energy, brightness, dynamics) and tempo, fall back to explicit mood tags and
+  preference signals for tracks without descriptors, and reuse the existing
+  Infinite Mix similarity queue, persistence, and navigation path.
+- Added a similarity criterion to smart playlists. `SmartPlaylistCriteria` can
+  store a credential-free reference track (provider key plus provider-local track
+  id) and an optional inclusive minimum similarity score, and resolves to that
+  track's nearest neighbours through `SimilarityFeatureService`, still applying
+  every other criterion. The Tracks context menu offers **Save as smart
+  playlist: similar tracks** for local and Orynivo Server tracks; the reference
+  is stored without any server URL or credential, and remote neighbours are
+  resolved through the client's cached similarity vectors. Criteria persisted
+  before this change remain valid.
+- The smart-playlist editor now shows the similarity reference a playlist is
+  based on — resolved to the track title and artist for local references, or the
+  server name for remote ones — and lets its minimum similarity score be edited
+  or the reference be removed.
+- Added bulk editing for the shared local and Orynivo Server Tracks table:
+  selecting more than one track shows a bulk action bar with **Mark as
+  favorite**, **Remove favorite**, and a personal-rating selector. Local tracks
+  are written through the transactional bulk methods; remote tracks mirror their
+  favorite state into the client-side profile container and update their rating
+  through the server API. All seven interface languages are included.
+
+### Fixed
+
+- Editing a similarity smart playlist no longer drops its reference track. The
+  editor rebuilt the criteria from its own input fields and silently lost the
+  reference; it is now carried over explicitly and removed only when the user
+  chooses **Remove reference**.
 
 ## [0.42.0] - 2026-09-17
 
@@ -167,6 +274,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   used `HashCode.Combine`, which is seeded randomly per process, so equal-score
   candidates could be ordered differently on every start. It now uses a stable
   FNV-1a hash over the server and track identifiers.
+- Release asset uploads now retry transient GitHub 5xx responses with bounded
+  backoff instead of failing the complete release; the signed update-manifest
+  upload retries the same way.
+- Dependabot no longer proposes NuGet upgrades that cannot build against the
+  pinned .NET 8 SDK and toolchain. Avalonia is held on the 11.2 line (11.3
+  deprecates the legacy drag-and-drop API and 12 requires Roslyn 4.14), and major
+  upgrades of Microsoft.Data.Sqlite and Microsoft.NET.Test.Sdk are ignored
+  because those lines target newer runtimes. Upgrades are migrated deliberately.
+- Stabilized `Orynivo.Core.Tests` in CI: the isolated test data root is now set
+  from a module initializer before any type caches `AppPaths.DataRoot`, so the
+  artist-attribution tests no longer run against the real user data directory
+  (or share leftover rows) depending on test ordering.
 
 ## [0.41.8] - 2026-09-16
 
@@ -722,8 +841,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - Infinite Mix no longer stalls after exhausting its first two 20-track
   batches. Refills rotate through the stable genre candidate order in local and
-  remote libraries, and active playback performs a throttled lightweight refill check
-  continuously instead of relying only on queue-navigation updates.
+  remote libraries, and active playback performs a throttled lightweight refill
+  check continuously instead of relying only on queue-navigation updates.
 
 ## [0.36.4] - 2026-08-12
 

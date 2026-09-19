@@ -134,7 +134,8 @@ internal sealed record LibraryCatalogTrack(
     double? MusicBrainzRating = null,
     int? MusicBrainzRatingVotes = null,
     string? MusicBrainzTrackId = null,
-    long? MusicBrainzRatingFetchedAt = null);
+    long? MusicBrainzRatingFetchedAt = null,
+    string? CamelotKey = null);
 
 /// <summary>Common catalog surface for local and remote music libraries.</summary>
 internal interface ILibraryCatalogProvider
@@ -393,7 +394,8 @@ internal sealed class LocalLibraryCatalogProvider : ILibraryCatalogProvider
         track.MusicBrainzRating,
         track.MusicBrainzRatingVotes,
         track.MusicBrainzTrackId,
-        track.MusicBrainzRatingFetchedAt);
+        track.MusicBrainzRatingFetchedAt,
+        track.CamelotKey);
 }
 
 /// <summary>Remote Orynivo Server-backed catalog provider.</summary>

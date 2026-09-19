@@ -63,6 +63,8 @@ internal partial class SettingsView : UserControl
     private readonly AppSettings _settings;
     private readonly SettingsStore _settingsStore = new();
     private readonly List<string> _libraryPaths = [];
+    private string _scheduledBackupDirectory = string.Empty;
+    private long _scheduledBackupLastRunUnix;
     private readonly List<PlexServerSettings> _plexServers = [];
     private readonly Dictionary<string, string> _plexTokens = [];
     private readonly List<OrynivoServerSettings> _orynivoServers = [];
@@ -108,6 +110,7 @@ internal partial class SettingsView : UserControl
     private bool _metadataDeactivated;
     private CancellationTokenSource? _missingArtistImagesCts;
     private CancellationTokenSource? _replayGainCalculationCts;
+    private CancellationTokenSource? _audioFeatureAnalysisCts;
     private CancellationTokenSource? _aiEndpointProbeCts;
     private string? _aiModelsLoadedForSignature;
 
@@ -287,6 +290,12 @@ internal partial class SettingsView : UserControl
         QobuzApplicationIdTextBox.Text = settings.QobuzApplicationId ?? string.Empty;
         UpdateLastFmScrobblingStatus();
         _libraryPaths.AddRange(settings.LibraryPaths);
+        _scheduledBackupDirectory = settings.ScheduledBackup.ResolveDirectory();
+        _scheduledBackupLastRunUnix = settings.ScheduledBackup.LastRunAtUnix;
+        ScheduledBackupEnabledCheckBox.IsChecked = settings.ScheduledBackup.Enabled;
+        ScheduledBackupIntervalInput.Value = Math.Clamp(settings.ScheduledBackup.IntervalDays, 1, 365);
+        ScheduledBackupRetentionInput.Value = Math.Clamp(settings.ScheduledBackup.RetentionCount, 1, 50);
+        UpdateScheduledBackupStatus();
         _plexServers.AddRange((settings.PlexServers ?? []).Select(ClonePlexServer));
         _orynivoServers.AddRange((settings.OrynivoServers ?? []).Select(CloneOrynivoServer));
         UserProfileComboBox.ItemsSource = _profileManager.Profiles;
@@ -404,6 +413,81 @@ internal partial class SettingsView : UserControl
             : ReplayGainMode.Off;
     /// <summary>Gets a value indicating whether scans should calculate missing ReplayGain values.</summary>
     public bool CalculateMissingReplayGainDuringScan => CalculateReplayGainDuringScanCheckBox.IsChecked == true;
+
+    /// <summary>Gets whether automatic library backups are enabled.</summary>
+    public bool ScheduledBackupEnabledValue => ScheduledBackupEnabledCheckBox.IsChecked == true;
+
+    /// <summary>Gets the configured minimum number of days between automatic backups.</summary>
+    public int ScheduledBackupIntervalValue =>
+        (int)Math.Clamp(ScheduledBackupIntervalInput.Value ?? 7m, 1m, 365m);
+
+    /// <summary>Gets the configured number of backups kept before older ones are removed.</summary>
+    public int ScheduledBackupRetentionValue =>
+        (int)Math.Clamp(ScheduledBackupRetentionInput.Value ?? 3m, 1m, 50m);
+
+    /// <summary>Gets the configured backup folder.</summary>
+    public string ScheduledBackupDirectoryValue => _scheduledBackupDirectory;
+
+    /// <summary>
+    /// Gets or sets the callback that runs a library backup. The argument forces a
+    /// run regardless of the configured interval.
+    /// </summary>
+    public Func<bool, Task<bool>>? RunScheduledBackup { get; set; }
+
+    /// <summary>Updates the displayed last-run timestamp after an automatic or manual backup.</summary>
+    /// <param name="unixSeconds">Unix timestamp of the completed backup.</param>
+    public void SetScheduledBackupLastRun(long unixSeconds)
+    {
+        _scheduledBackupLastRunUnix = unixSeconds;
+        UpdateScheduledBackupStatus();
+    }
+
+    private void UpdateScheduledBackupStatus()
+    {
+        ScheduledBackupFolderTextBlock.Text = _scheduledBackupDirectory;
+        ScheduledBackupStatusTextBlock.Text = string.Format(
+            CultureInfo.CurrentCulture,
+            LocalizationManager.Current.ScheduledBackupLastRun,
+            _scheduledBackupLastRunUnix > 0
+                ? DateTimeOffset.FromUnixTimeSeconds(_scheduledBackupLastRunUnix)
+                    .ToLocalTime()
+                    .ToString("g", CultureInfo.CurrentCulture)
+                : LocalizationManager.Current.ScheduledBackupNever);
+    }
+
+    private async void ScheduledBackupFolderButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (TopLevel.GetTopLevel(this) is not { } topLevel)
+            return;
+        var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = LocalizationManager.Current.ScheduledBackupFolder,
+            AllowMultiple = false
+        });
+        if (folders.Count == 0 || folders[0].TryGetLocalPath() is not { Length: > 0 } path)
+            return;
+        _scheduledBackupDirectory = path;
+        UpdateScheduledBackupStatus();
+    }
+
+    private async void RunScheduledBackupNowButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (RunScheduledBackup is null)
+            return;
+        RunScheduledBackupNowButton.IsEnabled = false;
+        ScheduledBackupStatusTextBlock.Text = LocalizationManager.Current.ScheduledBackupRunning;
+        try
+        {
+            var completed = await RunScheduledBackup(true);
+            ScheduledBackupStatusTextBlock.Text = completed
+                ? LocalizationManager.Current.ScheduledBackupFinished
+                : LocalizationManager.Current.ScheduledBackupFailed;
+        }
+        finally
+        {
+            RunScheduledBackupNowButton.IsEnabled = true;
+        }
+    }
     /// <summary>Gets a value indicating whether DSF and DFF sources should always be converted to PCM.</summary>
     public bool AlwaysConvertDsdToPcm => AlwaysConvertDsdToPcmCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether DSD should be transported through DoP.</summary>
@@ -1270,6 +1354,7 @@ internal partial class SettingsView : UserControl
         _missingArtistImagesCts?.Cancel();
         _metadataAnalysisCts?.Cancel();
         _replayGainCalculationCts?.Cancel();
+        _audioFeatureAnalysisCts?.Cancel();
         _aiEndpointProbeCts?.Cancel();
         _aiEndpointService.Dispose();
         Interlocked.Increment(ref _equalizerPreviewVersion);
@@ -2944,6 +3029,91 @@ internal partial class SettingsView : UserControl
         return remaining.TotalHours >= 1
             ? remaining.ToString(@"h\:mm\:ss", CultureInfo.InvariantCulture)
             : remaining.ToString(@"m\:ss", CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
+    /// Runs the optional acoustic descriptor and musical-key analysis for the
+    /// complete local library and every configured Orynivo Server. The operation
+    /// is cancellable, never modifies source media, and leaves failed sources on
+    /// their normal retry cooldown.
+    /// </summary>
+    /// <param name="sender">The analyze action.</param>
+    /// <param name="e">Click details.</param>
+    private async void AnalyzeAudioFeaturesButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        _audioFeatureAnalysisCts?.Cancel();
+        _audioFeatureAnalysisCts?.Dispose();
+        var cancellation = new CancellationTokenSource();
+        _audioFeatureAnalysisCts = cancellation;
+        AnalyzeAudioFeaturesButton.IsEnabled = false;
+        var stored = 0;
+        var failed = 0;
+        AudioFeatureAnalysisStatusTextBlock.Text =
+            string.Format(LocalizationManager.Current.AudioFeatureAnalyzing, 0);
+        try
+        {
+            while (true)
+            {
+                cancellation.Token.ThrowIfCancellationRequested();
+                var result = await AudioFeatureMaintenanceService.AnalyzeMissingAsync(
+                    AudioDatabase.OpenDefault,
+                    maximumTracks: 25,
+                    delay: TimeSpan.FromMilliseconds(250),
+                    cancellationToken: cancellation.Token);
+                stored += result.Stored;
+                failed += result.Failed;
+                AudioFeatureAnalysisStatusTextBlock.Text =
+                    string.Format(LocalizationManager.Current.AudioFeatureAnalyzing, stored);
+                if (result.Examined == 0)
+                    break;
+            }
+
+            var unsupportedServers = new List<string>();
+            using var client = new OrynivoServerClient();
+            foreach (var server in _orynivoServers)
+            {
+                cancellation.Token.ThrowIfCancellationRequested();
+                AudioFeatureAnalysisStatusTextBlock.Text =
+                    $"{string.Format(LocalizationManager.Current.AudioFeatureAnalyzing, stored)} – {server.Name}";
+                // The endpoint schedules one bounded batch per request, so repeat
+                // until the server declines (busy, unsupported, or finished).
+                for (var batch = 0; batch < 500; batch++)
+                {
+                    if (!await client.TriggerAudioFeatureAnalysisAsync(server, 10, cancellation.Token))
+                    {
+                        if (batch == 0)
+                            unsupportedServers.Add(server.Name);
+                        break;
+                    }
+
+                    await Task.Delay(750, cancellation.Token);
+                }
+            }
+
+            AudioFeatureAnalysisStatusTextBlock.Text =
+                unsupportedServers.Count == 0
+                    ? string.Format(LocalizationManager.Current.AudioFeatureAnalysisDone, stored, failed)
+                    : $"{string.Format(LocalizationManager.Current.AudioFeatureAnalysisDone, stored, failed)} " +
+                      string.Format(
+                          LocalizationManager.Current.AudioFeatureAnalysisUnsupported,
+                          string.Join(", ", unsupportedServers));
+        }
+        catch (OperationCanceledException)
+        {
+            AudioFeatureAnalysisStatusTextBlock.Text = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            AudioFeatureAnalysisStatusTextBlock.Text =
+                string.Format(LocalizationManager.Current.AudioFeatureAnalysisFailed, ex.Message);
+        }
+        finally
+        {
+            AnalyzeAudioFeaturesButton.IsEnabled = true;
+            if (ReferenceEquals(_audioFeatureAnalysisCts, cancellation))
+                _audioFeatureAnalysisCts = null;
+            cancellation.Dispose();
+        }
     }
 
     private async void CalculateReplayGainButton_OnClick(object? sender, RoutedEventArgs e)

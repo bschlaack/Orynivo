@@ -17,6 +17,7 @@ namespace Orynivo.Library;
 /// <param name="Energy">Optional cached audio energy from zero through one.</param>
 /// <param name="Brightness">Optional cached high-frequency/transient proxy from zero through one.</param>
 /// <param name="Dynamics">Optional cached dynamic-range proxy from zero through one.</param>
+/// <param name="CamelotKey">Optional cached musical key as a Camelot wheel label such as <c>8A</c>.</param>
 public sealed record SimilarityTrackProfile(
     long TrackId,
     string SourceKey,
@@ -33,7 +34,8 @@ public sealed record SimilarityTrackProfile(
     long? LastPlayedAt,
     double? Energy = null,
     double? Brightness = null,
-    double? Dynamics = null);
+    double? Dynamics = null,
+    string? CamelotKey = null);
 
 /// <summary>Versioned provider-neutral feature vector used by similarity and mood ranking.</summary>
 /// <param name="Version">Feature schema version.</param>
@@ -51,6 +53,7 @@ public sealed record SimilarityTrackProfile(
 /// <param name="Energy">Optional cached audio energy from zero through one.</param>
 /// <param name="Brightness">Optional cached high-frequency/transient proxy from zero through one.</param>
 /// <param name="Dynamics">Optional cached dynamic-range proxy from zero through one.</param>
+/// <param name="CamelotKey">Optional canonical Camelot wheel label such as <c>8A</c>, used for harmonic ordering.</param>
 public sealed record SimilarityFeatureVector(
     int Version,
     string SourceKey,
@@ -66,7 +69,8 @@ public sealed record SimilarityFeatureVector(
     long? LastPlayedAt,
     double? Energy = null,
     double? Brightness = null,
-    double? Dynamics = null);
+    double? Dynamics = null,
+    string? CamelotKey = null);
 
 /// <summary>One ranked similarity candidate.</summary>
 /// <param name="Vector">Candidate vector.</param>
@@ -82,6 +86,19 @@ public enum SimilarityMood
     Balanced,
     /// <summary>Favours faster and explicitly energetic tracks.</summary>
     Energetic
+}
+
+/// <summary>Curated mood/activity presets ranked from cached acoustic descriptors and tempo.</summary>
+public enum SimilarityPreset
+{
+    /// <summary>Favours steady, low-distraction tracks with subdued energy and brightness.</summary>
+    Focus,
+
+    /// <summary>Favours fast, loud and bright tracks for training.</summary>
+    Workout,
+
+    /// <summary>Favours slow, soft and calm tracks for winding down.</summary>
+    WindDown
 }
 
 /// <summary>Creates deterministic current-version similarity vectors from metadata and optional cached audio descriptors.</summary>
@@ -126,7 +143,8 @@ public static class SimilarityFeatureService
             profile.LastPlayedAt,
             NormalizeOptional(profile.Energy),
             NormalizeOptional(profile.Brightness),
-            NormalizeOptional(profile.Dynamics));
+            NormalizeOptional(profile.Dynamics),
+            CamelotKey.TryParse(profile.CamelotKey, out var camelot) ? camelot.Label : null);
     }
 
     /// <summary>Ranks nearest metadata neighbours with artist and album diversity limits.</summary>
@@ -148,35 +166,18 @@ public static class SimilarityFeatureService
         maximumResults = Math.Clamp(maximumResults, 1, 500);
         maximumPerArtist = Math.Clamp(maximumPerArtist, 1, maximumResults);
         maximumPerAlbum = Math.Clamp(maximumPerAlbum, 1, maximumResults);
-        var artistCounts = new Dictionary<string, int>(StringComparer.Ordinal);
-        var albumCounts = new Dictionary<string, int>(StringComparer.Ordinal);
-        var result = new List<SimilarityFeatureMatch>();
-        foreach (var match in candidates
-                     .Where(candidate => candidate.Version == seed.Version &&
-                         (candidate.SourceKey != seed.SourceKey || candidate.TrackId != seed.TrackId))
-                     .Select(candidate => new SimilarityFeatureMatch(candidate, CalculateSimilarity(seed, candidate)))
-                     .Where(static match => match.Score > 0)
-                     .OrderByDescending(static match => match.Score)
-                     .ThenBy(static match => match.Vector.SourceKey, StringComparer.Ordinal)
-                     .ThenBy(static match => match.Vector.TrackId))
-        {
-            var artistKey = match.Vector.ArtistKey;
-            if (artistKey.Length > 0 && artistCounts.GetValueOrDefault(artistKey) >= maximumPerArtist)
-                continue;
-            var albumKey = match.Vector.AlbumId.HasValue
-                ? $"{match.Vector.SourceKey}\u001f{match.Vector.AlbumId.Value}"
-                : string.Empty;
-            if (albumKey.Length > 0 && albumCounts.GetValueOrDefault(albumKey) >= maximumPerAlbum)
-                continue;
-            result.Add(match);
-            if (artistKey.Length > 0)
-                artistCounts[artistKey] = artistCounts.GetValueOrDefault(artistKey) + 1;
-            if (albumKey.Length > 0)
-                albumCounts[albumKey] = albumCounts.GetValueOrDefault(albumKey) + 1;
-            if (result.Count == maximumResults)
-                break;
-        }
-        return result;
+        return SelectDiverse(
+            candidates
+                .Where(candidate => candidate.Version == seed.Version &&
+                    (candidate.SourceKey != seed.SourceKey || candidate.TrackId != seed.TrackId))
+                .Select(candidate => new SimilarityFeatureMatch(candidate, CalculateSimilarity(seed, candidate)))
+                .Where(static match => match.Score > 0)
+                .OrderByDescending(static match => match.Score)
+                .ThenBy(static match => match.Vector.SourceKey, StringComparer.Ordinal)
+                .ThenBy(static match => match.Vector.TrackId),
+            maximumResults,
+            maximumPerArtist,
+            maximumPerAlbum);
     }
 
     /// <summary>Ranks tracks for a coarse mood using explicit mood tags, tempo, and preference signals.</summary>
@@ -209,35 +210,111 @@ public static class SimilarityFeatureService
             SimilarityMood.Energetic => new[] { "energetic", "upbeat", "party", "powerful", "dance", "energiegeladen" },
             _ => Array.Empty<string>()
         };
+        return SelectDiverse(
+            candidates
+                .Where(candidate => candidate.Version == CurrentVersion)
+                .Select(candidate =>
+                {
+                    var tempoScore = candidate.Tempo.HasValue
+                        ? 1d - Math.Abs(candidate.Tempo.Value - targetTempo)
+                        : 0.35d;
+                    var explicitMood = desiredMoodKeys.Length == 0
+                        ? 0.5d
+                        : candidate.MoodKeys.Any(key => desiredMoodKeys.Contains(key, StringComparer.Ordinal)) ? 1d : 0d;
+                    var acousticSignals = new[] { candidate.Energy, candidate.Brightness }
+                        .Where(static value => value.HasValue)
+                        .Select(value => 1d - Math.Abs(value!.Value - targetTempo))
+                        .ToList();
+                    var acousticScore = acousticSignals.Count > 0 ? acousticSignals.Average() : 0.35d;
+                    var score = tempoScore * 0.4d + explicitMood * 0.2d + acousticScore * 0.15d +
+                                candidate.PersonalAffinity * 0.15d + candidate.CommunityAffinity * 0.05d +
+                                candidate.Familiarity * 0.05d;
+                    return new SimilarityFeatureMatch(candidate, Math.Clamp(score, 0d, 1d));
+                })
+                .OrderByDescending(static match => match.Score)
+                .ThenBy(static match => match.Vector.SourceKey, StringComparer.Ordinal)
+                .ThenBy(static match => match.Vector.TrackId),
+            maximumResults,
+            maximumPerArtist,
+            maximumPerAlbum);
+    }
+
+    /// <summary>
+    /// Ranks tracks for a curated mood/activity preset using cached acoustic
+    /// descriptors and tempo. Tracks without cached descriptors still rank
+    /// through tempo, explicit mood, and preference signals.
+    /// </summary>
+    /// <param name="preset">Requested mood/activity preset.</param>
+    /// <param name="candidates">Candidate vectors from any provider.</param>
+    /// <param name="maximumResults">Maximum returned matches.</param>
+    /// <param name="maximumPerArtist">Maximum matches sharing one non-empty artist key.</param>
+    /// <param name="maximumPerAlbum">Maximum matches sharing one provider-local album identity.</param>
+    /// <returns>Deterministically ordered preset matches with artist and album diversity.</returns>
+    public static IReadOnlyList<SimilarityFeatureMatch> RankPreset(
+        SimilarityPreset preset,
+        IEnumerable<SimilarityFeatureVector> candidates,
+        int maximumResults = 500,
+        int maximumPerArtist = 10,
+        int maximumPerAlbum = 5)
+    {
+        ArgumentNullException.ThrowIfNull(candidates);
+        maximumResults = Math.Clamp(maximumResults, 1, 500);
+        maximumPerArtist = Math.Clamp(maximumPerArtist, 1, maximumResults);
+        maximumPerAlbum = Math.Clamp(maximumPerAlbum, 1, maximumResults);
+        var (targetTempo, targetEnergy, targetBrightness, targetDynamics, desiredMoodKeys) = preset switch
+        {
+            SimilarityPreset.Focus => (0.42d, 0.35d, 0.38d, 0.32d, FocusMoodKeys),
+            SimilarityPreset.Workout => (0.80d, 0.82d, 0.74d, 0.62d, WorkoutMoodKeys),
+            _ => (0.22d, 0.24d, 0.30d, 0.30d, WindDownMoodKeys)
+        };
+        return SelectDiverse(
+            candidates
+                .Where(candidate => candidate.Version == CurrentVersion)
+                .Select(candidate =>
+                {
+                    var explicitMood = desiredMoodKeys.Length == 0
+                        ? 0.5d
+                        : candidate.MoodKeys.Any(key => desiredMoodKeys.Contains(key, StringComparer.Ordinal)) ? 1d : 0d;
+                    var score = ProximityOrNeutral(candidate.Tempo, targetTempo) * 0.30d +
+                                ProximityOrNeutral(candidate.Energy, targetEnergy) * 0.20d +
+                                ProximityOrNeutral(candidate.Brightness, targetBrightness) * 0.12d +
+                                ProximityOrNeutral(candidate.Dynamics, targetDynamics) * 0.08d +
+                                explicitMood * 0.15d +
+                                candidate.PersonalAffinity * 0.10d +
+                                candidate.CommunityAffinity * 0.03d +
+                                candidate.Familiarity * 0.02d;
+                    return new SimilarityFeatureMatch(candidate, Math.Clamp(score, 0d, 1d));
+                })
+                .OrderByDescending(static match => match.Score)
+                .ThenBy(static match => match.Vector.SourceKey, StringComparer.Ordinal)
+                .ThenBy(static match => match.Vector.TrackId),
+            maximumResults,
+            maximumPerArtist,
+            maximumPerAlbum);
+    }
+
+    /// <summary>
+    /// Applies the shared artist and album diversity limits to an already ordered
+    /// match sequence.
+    /// </summary>
+    /// <param name="orderedMatches">Matches ordered by descending score with a deterministic tie-break.</param>
+    /// <param name="maximumResults">Maximum returned matches.</param>
+    /// <param name="maximumPerArtist">Maximum matches sharing one non-empty artist key.</param>
+    /// <param name="maximumPerAlbum">Maximum matches sharing one provider-local album identity.</param>
+    /// <returns>The diversity-limited match list.</returns>
+    private static IReadOnlyList<SimilarityFeatureMatch> SelectDiverse(
+        IEnumerable<SimilarityFeatureMatch> orderedMatches,
+        int maximumResults,
+        int maximumPerArtist,
+        int maximumPerAlbum)
+    {
         var artistCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var albumCounts = new Dictionary<string, int>(StringComparer.Ordinal);
         var result = new List<SimilarityFeatureMatch>();
-        foreach (var match in candidates
-                     .Where(candidate => candidate.Version == CurrentVersion)
-                     .Select(candidate =>
-                     {
-                         var tempoScore = candidate.Tempo.HasValue
-                             ? 1d - Math.Abs(candidate.Tempo.Value - targetTempo)
-                             : 0.35d;
-                         var explicitMood = desiredMoodKeys.Length == 0
-                             ? 0.5d
-                             : candidate.MoodKeys.Any(key => desiredMoodKeys.Contains(key, StringComparer.Ordinal)) ? 1d : 0d;
-                         var acousticSignals = new[] { candidate.Energy, candidate.Brightness }
-                             .Where(static value => value.HasValue)
-                             .Select(value => 1d - Math.Abs(value!.Value - targetTempo))
-                             .ToList();
-                         var acousticScore = acousticSignals.Count > 0 ? acousticSignals.Average() : 0.35d;
-                         var score = tempoScore * 0.4d + explicitMood * 0.2d + acousticScore * 0.15d +
-                                     candidate.PersonalAffinity * 0.15d + candidate.CommunityAffinity * 0.05d +
-                                     candidate.Familiarity * 0.05d;
-                         return new SimilarityFeatureMatch(candidate, Math.Clamp(score, 0d, 1d));
-                     })
-                     .OrderByDescending(static match => match.Score)
-                     .ThenBy(static match => match.Vector.SourceKey, StringComparer.Ordinal)
-                     .ThenBy(static match => match.Vector.TrackId))
+        foreach (var match in orderedMatches)
         {
-            if (match.Vector.ArtistKey.Length > 0 &&
-                artistCounts.GetValueOrDefault(match.Vector.ArtistKey) >= maximumPerArtist)
+            var artistKey = match.Vector.ArtistKey;
+            if (artistKey.Length > 0 && artistCounts.GetValueOrDefault(artistKey) >= maximumPerArtist)
                 continue;
             var albumKey = match.Vector.AlbumId.HasValue
                 ? $"{match.Vector.SourceKey}\u001f{match.Vector.AlbumId.Value}"
@@ -245,8 +322,8 @@ public static class SimilarityFeatureService
             if (albumKey.Length > 0 && albumCounts.GetValueOrDefault(albumKey) >= maximumPerAlbum)
                 continue;
             result.Add(match);
-            if (match.Vector.ArtistKey.Length > 0)
-                artistCounts[match.Vector.ArtistKey] = artistCounts.GetValueOrDefault(match.Vector.ArtistKey) + 1;
+            if (artistKey.Length > 0)
+                artistCounts[artistKey] = artistCounts.GetValueOrDefault(artistKey) + 1;
             if (albumKey.Length > 0)
                 albumCounts[albumKey] = albumCounts.GetValueOrDefault(albumKey) + 1;
             if (result.Count == maximumResults)
@@ -254,6 +331,15 @@ public static class SimilarityFeatureService
         }
         return result;
     }
+
+    private static readonly string[] FocusMoodKeys =
+        ["focus", "concentration", "study", "ambient", "instrumental", "konzentration"];
+
+    private static readonly string[] WorkoutMoodKeys =
+        ["workout", "training", "sport", "energetic", "upbeat", "party", "powerful", "dance"];
+
+    private static readonly string[] WindDownMoodKeys =
+        ["calm", "chill", "relaxed", "ambient", "peaceful", "sleep", "ruhig", "entspannung"];
 
     private static double CalculateSimilarity(SimilarityFeatureVector seed, SimilarityFeatureVector candidate)
     {
@@ -284,6 +370,9 @@ public static class SimilarityFeatureService
     private static double Proximity(double? left, double? right) =>
         left.HasValue && right.HasValue ? 1d - Math.Abs(left.Value - right.Value) : 0d;
 
+    private static double ProximityOrNeutral(double? value, double target) =>
+        value.HasValue ? 1d - Math.Abs(value.Value - target) : 0.35d;
+
     private static double? NormalizeOptional(double? value) =>
         value.HasValue ? Math.Clamp(value.Value, 0d, 1d) : null;
 
@@ -299,7 +388,7 @@ public static class SimilarityFeatureService
 
     private static IReadOnlyList<string> SplitKeys(string? value) =>
         (value ?? string.Empty)
-        .Split([';', ',', '/', '|'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Split(new[] { ';', ',', '/', '|' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
         .Select(ArtistNameNormalizer.CreateComparisonKey)
         .Where(static key => key.Length > 0)
         .Distinct(StringComparer.Ordinal)

@@ -437,6 +437,55 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   result is complete, unless a proven virtualized/paged strategy is used.
 - Use shared typography, brushes, vector icons, control themes, loading helpers,
   and context-menu patterns from the existing application resources.
+- The shared content table supports multi-selection for track rows. Selecting
+  more than one local or Orynivo Server track in a Tracks view reveals the bulk
+  action bar (`BulkEditBar`) with **Mark as favorite**, **Remove favorite**, and
+  a personal-rating selector. Local rows use the transactional
+  `AudioDatabase.SetTrackFavorites`/`SetTrackUserRatings`; remote rows update
+  the profile-scoped `OrynivoServerFavorites` container and the server rating
+  API. The bar stays hidden for every other entity type or view and must never
+  persist an authenticated playback URL.
+- Automatic library backups are driven by `AppSettings.ScheduledBackup`
+  (enable, interval days, retention count, folder, last-run timestamp) and the
+  pure, tested `Orynivo.Library.BackupRetention` decisions. The low-frequency
+  timer only checks; the actual export reuses `LibraryBackupService` and prunes
+  archives beyond the retention count. Backups must never include audio files or
+  credentials, only one run may be in flight at a time, and the backup folder is
+  created on demand. Settings exposes the enable toggle, interval, retention,
+  folder picker, **Back up now**, and the last successful run.
+- The lyrics view's **Karaoke** action opens `KaraokeWindow` fullscreen. It shows
+  a fixed window of synchronized lines around the active one, emphasizes the
+  active line, and animates opacity and font size through `Transitions`; the
+  main window pushes positions from its existing transport timer and never adds a
+  second polling loop. Karaoke requires synchronized lines, closes on Esc, a
+  click, or whenever the lyrics are cleared, and the active-line lookup must stay
+  in the pure, tested `Orynivo.Library.LyricLineSelector`.
+- The Dashboard **Year in review** action lives in the Listening stats card
+  directly below its period selector, so both share one context. It opens
+  `YearInReviewDialog`, which
+  renders the existing year aggregates from `AudioDatabase.GetYearInReview` and
+  exports the visible card through `RenderTargetBitmap`. It must only read
+  playback history, must load each year off the UI thread, and must keep the
+  export bounded to the rendered card. A past year must never include later
+  listening: the shared top-genre, album, and artist queries take an optional
+  exclusive upper time bound for that reason.
+- The estimated musical key travels with the compact track data:
+  `TrackListInfo.CamelotKey` feeds `ContentRow.CamelotKey` (local and remote
+  providers), the shared track-column set exposes it as the optional `camelotKey`
+  column for Tracks, Up Next, and playlists, and **Show track information** lists
+  it. Never recompute the key in the UI, and never persist a key that did not
+  come from the cached analysis. Settings > Playback owns the explicit
+  **Analyze audio features** action; it runs the local library through
+  `AudioFeatureMaintenanceService` and requests bounded batches from each
+  configured server, stays cancellable, and cancels on Settings deactivation.
+- The smart-playlist editor (`SmartPlaylistDialog`) must show every stored
+  criterion and must never drop a criterion it cannot rebuild from its own input
+  fields. The similarity reference is displayed with a readable track label
+  (track title and artist for local references, server name for remote ones) and
+  is carried across a save through the pure, tested
+  `SmartPlaylistCriteriaEditing.ResolveSimilarityReference`; it is removed only
+  through the explicit **Remove reference** action. The reference label lookup
+  runs off the UI thread.
 - Keep the application-level `DataGridSortIconMinWidth` override at zero. The
   Fluent DataGrid theme otherwise reserves 32 px for an absent sort glyph in
   every column header, obscuring labels in compact columns; a visible sort glyph
@@ -746,6 +795,24 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   credentials in plaintext or claim unavailable WASAPI, ASIO, endpoint-volume,
   or SMTC capabilities.
   Cross-platform behavior shared with the server belongs in `Orynivo.Core`.
+- The Linux target exposes system-media control through MPRIS 2 instead of
+  SMTC. `Orynivo/Compatibility/Linux/MprisMediaTransport.cs` registers
+  `org.mpris.MediaPlayer2.orynivo` on the session bus and is compiled only under
+  the `ORYNIVO_LINUX` define, because `Tmds.DBus.Protocol` is referenced on
+  Linux only. It connects asynchronously and must stay inert (never throw into
+  playback) when the session bus is unavailable. The non-Windows
+  `WindowsMediaTransportService` forwards to it so the shared transport methods
+  remain the single source of playback state. MPRIS volume changes route
+  through the existing `VolumeSlider`/`ApplySystemVolume` path and are echoed
+  back with `SetVolume`. Never publish a credential-bearing artwork URL
+  (`?key=`, Plex token, user info) through `mpris:artUrl`; gate remote artwork
+  URLs through the shared `QueuePathPolicy.CanPersist`. Remote Orynivo Server
+  covers must instead use the locally cached
+  `remote-artworks/track-art-<server>-<track>.img` file, and the now-playing
+  media metadata must be refreshed after the asynchronous artwork download
+  completes so the credential-free local file is published. Keep the
+  `VolumeChangeRequested`/`SetVolume` members on the Windows implementation as
+  no-ops so the shared `MainWindow` code compiles for every target.
 - The Windows installer shortcuts must carry the same
   `Orynivo.AudioPlayer` application user model ID that `App.xaml.cs` assigns to
   the process. Windows uses that identity to attribute the SMTC media session

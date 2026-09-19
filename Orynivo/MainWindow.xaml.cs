@@ -220,6 +220,7 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<PlaylistItem> _queue = [];
     private readonly ObservableCollection<ContentRow> _queueRows = [];
     private readonly ObservableCollection<LyricLineViewModel> _lyricLines = [];
+    private KaraokeWindow? _karaokeWindow;
     private int _queueIndex = -1;
     private bool _shuffleEnabled;
     private readonly HashSet<string> _playedQueuePaths = new(StringComparer.OrdinalIgnoreCase);
@@ -428,6 +429,8 @@ public partial class MainWindow : Window
         public int?    ChannelCount { get; init; }
         public string? Composer    { get; init; }
         public string? Bpm         { get; init; }
+        /// <summary>Gets the cached Camelot wheel label of the estimated musical key, when available.</summary>
+        public string? CamelotKey  { get; init; }
         public string? FileName    { get; init; }
         public string? FileSize    { get; init; }
         public string? AddedAt     { get; init; }
@@ -904,6 +907,7 @@ public partial class MainWindow : Window
         if (!_settings.UserProfilesInitialized)
             _ = PromptInitialUserProfileAsync();
         _ = WarmSimilarityFeatureCacheAsync();
+        StartScheduledBackupTimer();
     }
 
     private async Task PromptInitialUserProfileAsync()

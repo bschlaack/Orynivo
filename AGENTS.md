@@ -74,8 +74,10 @@ PCM playback through selectable direct ALSA hardware and OpenAL output devices
 in addition to the
 library and network/UI feature set; it excludes Windows audio, endpoint-volume,
 and SMTC implementations and uses compatibility types under
-`Orynivo/Compatibility/Linux`. Linux credentials use the desktop client's
-AES-GCM current-user credential container and must never persist secrets in plaintext.
+`Orynivo/Compatibility/Linux`. System-media control on Linux is provided by
+MPRIS 2 (`org.mpris.MediaPlayer2.orynivo`) instead of SMTC. Linux credentials
+use the desktop client's AES-GCM current-user credential container and must
+never persist secrets in plaintext.
 
 Linux native DSD does not use either Windows ASIO bridge. Local and
 HTTP-range-streamed stereo DSF and uncompressed stereo DFF/DSDIFF use the
@@ -213,10 +215,22 @@ The same workflow has a dedicated `verify` job that runs
 on every push and pull request, so MCP tool parity and the seven-language
 desktop/website/mobile localization coverage cannot silently drift. Keep these
 scripts passing; do not remove the job. `.github/dependabot.yml` tracks NuGet and
-GitHub Actions updates weekly, but ignores major NuGet upgrades that cannot build
-on the pinned .NET 8 toolchain (Avalonia, Microsoft.Data.Sqlite,
-Microsoft.NET.Test.Sdk); migrate those deliberately instead of merging an
-automatic bump.
+GitHub Actions updates weekly, but ignores NuGet upgrades that cannot build on
+the pinned toolchain: Avalonia **major** updates (12 requires the .NET 9 SDK and
+has breaking API changes) plus major upgrades of Microsoft.Data.Sqlite and
+Microsoft.NET.Test.Sdk. Migrate those deliberately instead of merging an
+automatic bump. Avalonia **minor** updates within 11.3 are allowed again because
+the drag-and-drop code now uses `IDataTransfer`/`DataTransfer`/
+`DragDrop.DoDragDropAsync`; note that `Avalonia.Controls.DataGrid` has no release
+beyond 11.3.13, so it stays on that version while the other Avalonia packages may
+move within 11.3.x — that mix builds, but do not raise DataGrid past 11.3.13
+until upstream publishes a newer 11.3 line. SkiaSharp majors stay ignored as
+well: Avalonia.Skia 11.3 depends on SkiaSharp 2.88.9 and
+SkiaSharp.NativeAssets.Linux 2.88.9, so raising SkiaSharp or
+SkiaSharp.NativeAssets.* in `Orynivo.Core`/`Orynivo.Server` would make Avalonia
+render through an incompatible managed/native Skia (and 3.x/4.x removed
+`SKFilterQuality`). Revisit both pins together when Avalonia ships a
+SkiaSharp 3/4-based release.
 All GitHub-hosted CI and release workflows use Node.js 24-compatible action
 generations (`actions/checkout@v6`, `actions/setup-dotnet@v5`, and
 `softprops/action-gh-release@v3` where applicable); do not reintroduce their
@@ -1781,6 +1795,16 @@ fallback or allow client-provided commands/paths to reach the helper.
   authenticated `GetTrackArtworkUrl` (`?key=`) so Windows fetches it directly.
 - The SMTC timeline is refreshed at most every five seconds during playback and
   immediately after track changes or seeks.
+- Linux exposes the MPRIS 2 media player interface through
+  `Orynivo/Compatibility/Linux/MprisMediaTransport.cs`, compiled only under the
+  `ORYNIVO_LINUX` define because `Tmds.DBus.Protocol` is referenced on Linux
+  only. It dispatches onto the same shared transport methods as the desktop
+  controls, must never throw into playback when the session bus is unavailable,
+  and must not publish credential-bearing artwork URLs through `mpris:artUrl`
+  (gate them through `QueuePathPolicy.CanPersist`). Remote Orynivo Server covers
+  use the locally cached `remote-artworks/track-art-<server>-<track>.img` file
+  instead, and the media metadata is refreshed after the asynchronous artwork
+  download so the cover appears without exposing the `?key=` URL.
 - `SteinbergAsioStream.IsBackendAvailable()` validates each native bridge and
   loads its shared export API dynamically. Settings shows **Steinberg ASIO**
   only when `AsioBridge.dll` exists and **cwASIO** only when
@@ -2133,7 +2157,7 @@ asynchronous file I/O from the UI thread
   `MenuFlyout` column chooser at the pointer position. It uses
   `StaysOpenOnClick` so several columns can be changed in one session. Do not
   replace this with a dynamically attached and programmatically opened
-  Avalonia `ContextMenu`; Avalonia 11.2 retains internal ownership in that
+  Avalonia `ContextMenu`; Avalonia 11.2/11.3 retains internal ownership in that
   sequence and can throw during placement.
   Track contexts additionally expose file name, album artist, year, track/disc
   numbers, genre, bitrate, sample rate, bit depth, channels, composer, BPM,

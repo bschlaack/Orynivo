@@ -1350,6 +1350,112 @@ public sealed record LocalizedStrings(
     public string AiChatToolResultFallback { get; init; } = "";
     /// <summary>Gets the option for automatically accepting Fanart.tv artist-image results.</summary>
     public string AutoAcceptFanartTvImages { get; init; } = "";
+    /// <summary>Gets the scheduled-backup settings section label.</summary>
+    public string ScheduledBackup { get; init; } = "";
+    /// <summary>Gets the explanation of the scheduled-backup feature.</summary>
+    public string ScheduledBackupHint { get; init; } = "";
+    /// <summary>Gets the scheduled-backup enable option.</summary>
+    public string ScheduledBackupEnabled { get; init; } = "";
+    /// <summary>Gets the label for the backup interval in days.</summary>
+    public string ScheduledBackupInterval { get; init; } = "";
+    /// <summary>Gets the label for the number of retained backups.</summary>
+    public string ScheduledBackupRetention { get; init; } = "";
+    /// <summary>Gets the label for the backup folder.</summary>
+    public string ScheduledBackupFolder { get; init; } = "";
+    /// <summary>Gets the folder-picker action label.</summary>
+    public string ChooseFolder { get; init; } = "";
+    /// <summary>Gets the immediate-backup action label.</summary>
+    public string RunBackupNow { get; init; } = "";
+    /// <summary>Gets the last-backup format string.</summary>
+    public string ScheduledBackupLastRun { get; init; } = "";
+    /// <summary>Gets the value shown when no backup ran yet.</summary>
+    public string ScheduledBackupNever { get; init; } = "";
+    /// <summary>Gets the message shown while a backup is running.</summary>
+    public string ScheduledBackupRunning { get; init; } = "";
+    /// <summary>Gets the message shown after a backup finished.</summary>
+    public string ScheduledBackupFinished { get; init; } = "";
+    /// <summary>Gets the message shown when a backup fails.</summary>
+    public string ScheduledBackupFailed { get; init; } = "";
+    /// <summary>Gets the status-bar format string after an automatic backup.</summary>
+    public string ScheduledBackupDone { get; init; } = "";
+    /// <summary>Gets the fullscreen karaoke feature label.</summary>
+    public string Karaoke { get; init; } = "";
+    /// <summary>Gets the karaoke action tooltip.</summary>
+    public string KaraokeTooltip { get; init; } = "";
+    /// <summary>Gets the karaoke exit hint.</summary>
+    public string KaraokeExitHint { get; init; } = "";
+    /// <summary>Gets the message shown when karaoke has no synchronized lyrics.</summary>
+    public string KaraokeRequiresSyncedLyrics { get; init; } = "";
+    /// <summary>Gets the year-in-review feature and window label.</summary>
+    public string YearInReview { get; init; } = "";
+    /// <summary>Gets the year-in-review headline.</summary>
+    public string YearInReviewHeading { get; init; } = "";
+    /// <summary>Gets the label for the total listened hours.</summary>
+    public string YearInReviewHours { get; init; } = "";
+    /// <summary>Gets the label for the number of days with listening.</summary>
+    public string YearInReviewActiveDays { get; init; } = "";
+    /// <summary>Gets the label for the monthly listening breakdown.</summary>
+    public string YearInReviewMonthly { get; init; } = "";
+    /// <summary>Gets the label for the leading genres.</summary>
+    public string YearInReviewTopGenres { get; init; } = "";
+    /// <summary>Gets the label for the leading albums.</summary>
+    public string YearInReviewTopAlbums { get; init; } = "";
+    /// <summary>Gets the label for the leading artists.</summary>
+    public string YearInReviewTopArtists { get; init; } = "";
+    /// <summary>Gets the message shown when a year has no listening history.</summary>
+    public string YearInReviewEmpty { get; init; } = "";
+    /// <summary>Gets the action that exports the current view as an image.</summary>
+    public string SaveAsImage { get; init; } = "";
+    /// <summary>Gets the confirmation format string after exporting the image.</summary>
+    public string YearInReviewImageSaved { get; init; } = "";
+    /// <summary>Gets the message shown when exporting the image fails.</summary>
+    public string YearInReviewImageFailed { get; init; } = "";
+    /// <summary>Gets the explanation of what the audio-feature analysis does and what it is used for.</summary>
+    public string AnalyzeAudioFeaturesHint { get; init; } = "";
+    /// <summary>Gets the action that analyzes acoustic descriptors and musical keys for the complete library.</summary>
+    public string AnalyzeAudioFeatures { get; init; } = "";
+    /// <summary>Gets the audio-feature analysis progress format string.</summary>
+    public string AudioFeatureAnalyzing { get; init; } = "";
+    /// <summary>Gets the audio-feature analysis completion format string.</summary>
+    public string AudioFeatureAnalysisDone { get; init; } = "";
+    /// <summary>Gets the audio-feature analysis failure format string.</summary>
+    public string AudioFeatureAnalysisFailed { get; init; } = "";
+    /// <summary>Gets the message naming servers without audio-feature analysis.</summary>
+    public string AudioFeatureAnalysisUnsupported { get; init; } = "";
+    /// <summary>Gets the label for the estimated musical key on the Camelot wheel.</summary>
+    public string MusicalKey { get; init; } = "";
+    /// <summary>Gets the smart-playlist editor label for the similarity reference track.</summary>
+    public string SmartPlaylistSimilarityReference { get; init; } = "";
+    /// <summary>Gets the smart-playlist editor action that removes the similarity reference.</summary>
+    public string SmartPlaylistSimilarityClear { get; init; } = "";
+    /// <summary>Gets the smart-playlist editor label for the minimum similarity score.</summary>
+    public string SmartPlaylistSimilarityMinimumScore { get; init; } = "";
+    /// <summary>Gets the track action that starts a curated mood/activity preset mix.</summary>
+    public string PlayActivityMix { get; init; } = "";
+    /// <summary>Gets the focus activity preset label.</summary>
+    public string ActivityMixFocus { get; init; } = "";
+    /// <summary>Gets the workout activity preset label.</summary>
+    public string ActivityMixWorkout { get; init; } = "";
+    /// <summary>Gets the wind-down activity preset label.</summary>
+    public string ActivityMixWindDown { get; init; } = "";
+    /// <summary>Gets the track action that saves a similarity smart playlist.</summary>
+    public string CreateSimilarSmartPlaylist { get; init; } = "";
+    /// <summary>Gets the bulk selection summary format string.</summary>
+    public string BulkSelectedCount { get; init; } = "";
+    /// <summary>Gets the bulk action that marks the selected tracks as favorites.</summary>
+    public string BulkFavorite { get; init; } = "";
+    /// <summary>Gets the bulk action that clears the favorite state of the selected tracks.</summary>
+    public string BulkUnfavorite { get; init; } = "";
+    /// <summary>Gets the label of the bulk personal-rating selector.</summary>
+    public string BulkRating { get; init; } = "";
+    /// <summary>Gets the bulk rating entry that clears the personal rating.</summary>
+    public string BulkRatingNone { get; init; } = "";
+    /// <summary>Gets the bulk favorite confirmation format string.</summary>
+    public string BulkFavoriteUpdated { get; init; } = "";
+    /// <summary>Gets the bulk rating confirmation format string.</summary>
+    public string BulkRatingUpdated { get; init; } = "";
+    /// <summary>Gets the bulk rating failure format string.</summary>
+    public string BulkRatingPartiallyFailed { get; init; } = "";
     /// <summary>Gets the Last.fm scrobbling settings label.</summary>
     public string LastFmScrobbling { get; init; } = "";
     /// <summary>Gets the label for enabling Last.fm scrobbling.</summary>

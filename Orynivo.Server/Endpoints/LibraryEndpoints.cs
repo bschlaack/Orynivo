@@ -703,6 +703,7 @@ public static class LibraryEndpoints
         t.MusicBrainzRatingFetchedAt,
         t.MusicBrainzGenres,
         t.MusicBrainzTags,
+        t.CamelotKey,
         IsCueTrack = IsVirtualSegmentPath(t.Path)
     };
 

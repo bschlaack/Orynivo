@@ -18,7 +18,8 @@ public sealed record GenreCloudTrackCandidate(
     bool IsFavorite,
     int UserRating = 0,
     double? MusicBrainzRating = null,
-    int? MusicBrainzRatingVotes = null);
+    int? MusicBrainzRatingVotes = null,
+    string? CamelotKey = null);
 
 /// <summary>Represents one visible child in an interactive genre cloud.</summary>
 /// <param name="Key">Stable language-independent taxonomy key.</param>
@@ -157,7 +158,8 @@ public static class GenreCloudService
                 item.Track.IsFavorite,
                 item.Track.UserRating,
                 item.Track.MusicBrainzRating,
-                item.Track.MusicBrainzRatingVotes))
+                item.Track.MusicBrainzRatingVotes,
+                item.Track.CamelotKey))
             .ToList();
 
         return new GenreCloudSnapshot(selected, BuildBreadcrumb(selected), nodes, candidates);
@@ -278,7 +280,7 @@ public static class GenreCloudService
         if (string.IsNullOrWhiteSpace(value))
             return [];
         var result = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var token in value.Split([';', ',', '|', '/'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        foreach (var token in value.Split(new[] { ';', ',', '|', '/' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
             var normalized = Normalize(token);
             if (TryResolveDefinition(normalized, out var definition))

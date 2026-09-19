@@ -18,6 +18,7 @@ public partial class MainWindow
     private int _audioFeatureWarmupRunning;
     private readonly CancellationTokenSource _audioFeatureWarmupCts = new();
     private sealed record MoodMixActionTag(string Path, SimilarityMood Mood);
+    private sealed record PresetMixActionTag(string Path, SimilarityPreset Preset);
 
     /// <summary>Gets whether Infinite Mix is currently continuing a similarity-based queue.</summary>
     private bool HasActiveSimilarityMix => _similarityMixCandidates.Count > 0;
@@ -129,14 +130,44 @@ public partial class MainWindow
     {
         if (sender is not Avalonia.Controls.MenuItem { Tag: MoodMixActionTag action })
             return;
+        await StartRankedSimilarityMixAsync(
+            action.Path,
+            vectors => SimilarityFeatureService.RankMood(action.Mood, vectors),
+            "Play mood mix").ConfigureAwait(true);
+    }
+
+    /// <summary>Builds and starts a curated mood/activity preset mix from one selected track.</summary>
+    private async void PlayPresetMixMenuItem_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is not Avalonia.Controls.MenuItem { Tag: PresetMixActionTag action })
+            return;
+        await StartRankedSimilarityMixAsync(
+            action.Path,
+            vectors => SimilarityFeatureService.RankPreset(action.Preset, vectors),
+            "Play activity mix").ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// Starts a similarity continuation queue from a pre-ranked vector list,
+    /// reusing the shared Infinite Mix queue, persistence, and navigation path.
+    /// </summary>
+    /// <param name="path">Reference track path whose playback context is preserved.</param>
+    /// <param name="rank">Deterministic ranking applied to the loaded feature vectors.</param>
+    /// <param name="logContext">Sanitized crash-log context label.</param>
+    /// <returns>A task representing queue construction and optional playback start.</returns>
+    private async Task StartRankedSimilarityMixAsync(
+        string path,
+        Func<IReadOnlyList<SimilarityFeatureVector>, IReadOnlyList<SimilarityFeatureMatch>> rank,
+        string logContext)
+    {
         StatusTextBlock.Text = LocalizationManager.Current.SimilarTracksLoading;
         try
         {
             var vectors = await LoadAvailableSimilarityFeaturesAsync().ConfigureAwait(true);
-            var ranked = (await Task.Run(() => SimilarityFeatureService.RankMood(action.Mood, vectors)))
+            var ranked = (await Task.Run(() => rank(vectors)))
                 .Select(match => match.Vector)
                 .ToList();
-            var seedIdentity = await ResolveSimilaritySeedAsync(action.Path).ConfigureAwait(true);
+            var seedIdentity = await ResolveSimilaritySeedAsync(path).ConfigureAwait(true);
             if (seedIdentity is { } identity)
                 ranked.RemoveAll(vector => vector.SourceKey == identity.SourceKey && vector.TrackId == identity.TrackId);
             var initialVectors = ranked.Take(SimilarityQueueSize).ToList();
@@ -159,9 +190,9 @@ public partial class MainWindow
             _queue.Clear();
             if (!string.IsNullOrWhiteSpace(activePlaybackPath))
                 _queue.Add(CreatePlaylistItem(activePlaybackPath));
-            if (!string.Equals(activePlaybackPath, action.Path, StringComparison.OrdinalIgnoreCase))
-                _queue.Add(CreatePlaylistItem(action.Path));
-            foreach (var row in rows.Where(row => !string.Equals(row.FilePath, action.Path, StringComparison.OrdinalIgnoreCase)))
+            if (!string.Equals(activePlaybackPath, path, StringComparison.OrdinalIgnoreCase))
+                _queue.Add(CreatePlaylistItem(path));
+            foreach (var row in rows.Where(row => !string.Equals(row.FilePath, path, StringComparison.OrdinalIgnoreCase)))
                 _queue.Add(ToPlaylistItem(row));
             _queueIndex = _queue.Count > 0 ? 0 : -1;
             ResetQueuePlaybackState();
@@ -170,13 +201,13 @@ public partial class MainWindow
             RefreshQueueNavigationButtons();
             UpdateInfiniteMixUi();
             if (!keepCurrentPlayback && _queue.Count > 0)
-                await StartPlaybackAsync(action.Path);
+                await StartPlaybackAsync(path);
             await ShowTopLevelViewAsync("Queue");
             StatusTextBlock.Text = string.Format(LocalizationManager.Current.SimilarTracksQueued, _queue.Count - 1);
         }
         catch (Exception exception)
         {
-            CrashLogger.Log(exception, "Play mood mix");
+            CrashLogger.Log(exception, logContext);
             StatusTextBlock.Text = LocalizationManager.Current.SimilarTracksUnavailable;
         }
     }
@@ -294,7 +325,11 @@ public partial class MainWindow
         while (_similarityMixCursor < _similarityMixCandidates.Count && added < batchSize)
         {
             var take = Math.Min(batchSize, _similarityMixCandidates.Count - _similarityMixCursor);
-            var vectors = _similarityMixCandidates.Skip(_similarityMixCursor).Take(take).ToList();
+            // Harmonic mixing: order each appended batch along the Camelot wheel.
+            var vectors = HarmonicOrdering.Order(
+                    _similarityMixCandidates.Skip(_similarityMixCursor).Take(take).ToList(),
+                    vector => CamelotKey.TryParse(vector.CamelotKey, out var camelot) ? camelot : null)
+                .ToList();
             _similarityMixCursor += take;
             var rows = await ResolveSimilarityRowsAsync(vectors);
             foreach (var row in rows)
@@ -331,6 +366,107 @@ public partial class MainWindow
             using var db = AudioDatabase.OpenDefault();
             return db.GetTrackIdByPath(path) is long id ? ("local", id) : null;
         });
+    }
+
+    /// <summary>
+    /// Creates a smart playlist that keeps the tracks most similar to the
+    /// clicked local or Orynivo Server reference track.
+    /// </summary>
+    private async void CreateSimilarSmartPlaylistMenuItem_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is not Avalonia.Controls.MenuItem { Tag: string path })
+            return;
+
+        var seedIdentity = await ResolveSimilaritySeedAsync(path).ConfigureAwait(true);
+        if (seedIdentity is null)
+        {
+            StatusTextBlock.Text = LocalizationManager.Current.SimilarTracksUnavailable;
+            return;
+        }
+
+        var dialog = new NewPlaylistDialog();
+        if (await dialog.ShowDialog<bool>(this) == false || string.IsNullOrWhiteSpace(dialog.PlaylistName))
+            return;
+
+        // Smart-playlist criteria use the same provider convention as the source
+        // facet, so a remote reference is stored as its server source key.
+        var sourceKey = seedIdentity.Value.SourceKey;
+        if (sourceKey.StartsWith("orynivo:", StringComparison.Ordinal))
+            sourceKey = GetServerSourceKey(sourceKey["orynivo:".Length..]);
+
+        var criteria = new SmartPlaylistCriteria
+        {
+            SimilaritySourceKey = sourceKey,
+            SimilarityTrackId = seedIdentity.Value.TrackId
+        };
+        var name = dialog.PlaylistName.Trim();
+        try
+        {
+            using var db = AudioDatabase.OpenDefault();
+            db.CreateSmartPlaylist(name, System.Text.Json.JsonSerializer.Serialize(criteria));
+        }
+        catch
+        {
+            return;
+        }
+
+        LoadNavPlaylists();
+        StatusTextBlock.Text = string.Format(LocalizationManager.Current.SmartPlaylistSaved, name);
+    }
+
+    /// <summary>
+    /// Loads the similarity vectors used to resolve a similarity smart playlist.
+    /// Remote vectors are re-keyed onto the smart-playlist candidate provider key
+    /// and pseudo-IDs so the shared Core resolver can match them; unavailable
+    /// servers are skipped. Blocks on the cached feature load, so it must run off
+    /// the UI thread.
+    /// </summary>
+    /// <param name="criteria">Criteria being resolved; vectors load only for a configured reference.</param>
+    /// <param name="remoteTracks">Pseudo-ID to (server, track) map produced by the candidate build.</param>
+    /// <returns>The translated vectors, or <see langword="null"/> when none are available.</returns>
+    private IReadOnlyList<SimilarityFeatureVector>? BuildSmartPlaylistSimilarityFeatures(
+        SmartPlaylistCriteria criteria,
+        Dictionary<long, (Orynivo.Streaming.OrynivoServerSettings Server, LibraryCatalogTrack Track)> remoteTracks)
+    {
+        if (string.IsNullOrWhiteSpace(criteria.SimilaritySourceKey) || criteria.SimilarityTrackId is null)
+            return null;
+
+        try
+        {
+            var vectors = LoadAvailableSimilarityFeaturesAsync().GetAwaiter().GetResult();
+            if (vectors.Count == 0)
+                return null;
+
+            var pseudoIdByRealTrack = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (pseudoId, entry) in remoteTracks)
+                pseudoIdByRealTrack[$"{entry.Server.Id}\u001f{entry.Track.Id}"] = pseudoId;
+
+            var translated = new List<SimilarityFeatureVector>(vectors.Count);
+            foreach (var vector in vectors)
+            {
+                if (!vector.SourceKey.StartsWith("orynivo:", StringComparison.Ordinal))
+                {
+                    translated.Add(vector);
+                    continue;
+                }
+
+                var serverId = vector.SourceKey["orynivo:".Length..];
+                if (!pseudoIdByRealTrack.TryGetValue($"{serverId}\u001f{vector.TrackId}", out var pseudoId))
+                    continue;
+                translated.Add(vector with
+                {
+                    SourceKey = GetServerSourceKey(serverId),
+                    TrackId = pseudoId
+                });
+            }
+
+            return translated.Count > 0 ? translated : null;
+        }
+        catch (Exception exception)
+        {
+            Debug.WriteLine($"Smart playlist similarity features failed: {exception.GetType().Name}");
+            return null;
+        }
     }
 
     private async Task<List<SimilarityFeatureVector>> LoadAllSimilarityFeaturesAsync(Orynivo.Streaming.OrynivoServerSettings server)

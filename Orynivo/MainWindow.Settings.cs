@@ -61,6 +61,8 @@ public partial class MainWindow : Window
             _player.Volume = (float)VolumeSlider.Value;
         }
         _settings.Volume = VolumeSlider.Value;
+        if (!_updatingVolumeFromSystem)
+            _windowsMediaTransport?.SetVolume(VolumeSlider.Value);
     }
 
     private async Task ConfigureEndpointVolumeSynchronizationAsync()
@@ -284,6 +286,13 @@ public partial class MainWindow : Window
             _settings.LastFmUsername = string.Empty;
         });
         var completionHandled = false;
+        view.RunScheduledBackup = async force =>
+        {
+            var completed = await RunScheduledBackupIfDueAsync(force);
+            if (completed)
+                view.SetScheduledBackupLastRun(_settings.ScheduledBackup.LastRunAtUnix);
+            return completed;
+        };
         view.LocalLibraryChanged += OnWatchedLibraryChanged;
         view.ProfileChanged += profileId => _ = OnUserProfileChangedAsync(profileId);
         view.DuplicateResolutionRequested += () => _ = OpenDuplicateResolutionAsync();
@@ -837,6 +846,10 @@ public partial class MainWindow : Window
             _settings.WebBrowsing             = window.WebBrowsingValue;
             if (_webBrowsing is not null)
                 _webBrowsing.Options          = _settings.WebBrowsing;
+            _settings.ScheduledBackup.Enabled        = window.ScheduledBackupEnabledValue;
+            _settings.ScheduledBackup.IntervalDays   = window.ScheduledBackupIntervalValue;
+            _settings.ScheduledBackup.RetentionCount = window.ScheduledBackupRetentionValue;
+            _settings.ScheduledBackup.Directory      = window.ScheduledBackupDirectoryValue;
             _settings.ShowInternetRadioItem   = window.ShowInternetRadioItem;
             _settings.ShowPodcastsItem        = window.ShowPodcastsItem;
             _settings.ShowQueueItem           = window.ShowQueueItem;
