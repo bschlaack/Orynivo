@@ -1,0 +1,238 @@
+# Orynivo Roadmap
+
+Items 1–14 are complete and listed for reference only. Items 15+ are open work.
+
+Each item is one commit and must follow the completion checklist in
+`AGENTS.md`: build every affected project, run the three test projects, update
+`CHANGELOG.md` (and `README.md`/nested `AGENTS.md` when behaviour changes), add
+English XML docs, add every new visible string to all seven languages, and run
+`scripts/verify-localization-parity.ps1` (plus
+`scripts/verify-mcp-tool-parity.ps1` for MCP/AI changes).
+
+Status values: `Todo`, `In progress`, `Blocked`, `Done`. Items marked ★ are the
+recommended next steps.
+
+## Completed (1–14)
+
+| # | Item | Notes |
+|---|------|-------|
+| 1 | Last.fm scrobbling | Core signing/rules/client plus the desktop queue; Settings under **Artist information** |
+| 2 | Headphone crossfeed | `CrossfeedProcessor`, off by default, ASIO/WASAPI PCM only |
+| 3 | Linux MPRIS and media keys | `MprisMediaTransport`, verified on CachyOS/KDE Plasma; remote covers come from the local `remote-artworks` cache |
+| 4 | Streaming loudness normalization | Radio and podcast streams only |
+| 5 | Remote transcoding with bitrate selection | `?format=opus\|aac&bitrate=` plus per-server streaming quality |
+| 6 | Library Doctor duplicate resolution | `FindDuplicateGroups`, explicit confirmation before removal |
+| 7 | Bulk editing in tables | Favourite/rating bulk API and the shared table action bar |
+| 8 | Smart playlist "similar to track" | `SmartPlaylistCriteria` similarity reference |
+| 9 | Mood/activity presets | `SimilarityFeatureService.RankPreset` and the activity mix menu |
+| 10 | Harmonic mixing (Camelot) | `CamelotKey`, key estimation, `HarmonicOrdering` |
+| 11 | Year-in-review export | `GetYearInReview`, PNG export |
+| 12 | Karaoke fullscreen lyrics | `KaraokeWindow`, `LyricLineSelector` |
+| 13 | Scheduled auto-backup with retention | `BackupRetention`, Settings > Library |
+| 14 | Migrate drag-and-drop to `IDataTransfer` | Unblocked the Avalonia 11.3 line |
+
+## 15. ★ Isolate the Core test data root — `Todo`
+
+`ArtistAttributionTests` is the only class that still uses the real
+`AppPaths.DataRoot` and deletes `library.db` per test. That leaked rows between
+tests, produced intermittent Core failures, and made four Dependabot pull
+requests fail before `72afb66`.
+
+**Design**
+
+- Give every database test its own temporary directory and
+  `new AudioDatabase(path)` (the pattern the newer tests already use), or a
+  shared fixture that hands out unique paths.
+- Keep the `TestEnvironment` module initializer as the safety net so no test can
+  reach the real per-user data root.
+- Audit the remaining test files for `OpenDefault()`/`AppPaths.DataRoot` usage.
+
+**Tests**: the suite must pass repeatedly (ten consecutive runs) without data
+leaking between classes.
+
+**Commit**: `test(core): give every database test its own data root`
+
+## 16. ★ Add `scripts/verify-all.ps1` — `Todo`
+
+A single local command that mirrors CI exactly.
+
+**Design**
+
+- Build `Orynivo.Core`, `Orynivo.Server`, and `Orynivo` with `--warnaserror`.
+- Run all three test projects and both parity scripts.
+- Fail fast, print a compact summary, and exit non-zero on the first failure.
+- Do not wire it into the workflows; CI already runs these steps separately.
+
+**Tests**: the script itself is the verification.
+
+**Commit**: `chore(scripts): add a local CI parity verification script`
+
+## 17. ★ Expose the new features to MCP and AI Chat — `Todo`
+
+None of the 32 tools knows the year-in-review summary, the estimated musical
+key, bulk favourite/rating updates, or similarity smart playlists.
+
+**Design**
+
+- Add tools for the year summary, a track's Camelot key, bulk favourite/rating
+  updates, and creating a similarity smart playlist.
+- Keep `McpTools`, `AiToolDefinitions`, `AiToolExecutor`, and the Settings tool
+  checklist in exact parity and extend `scripts/verify-mcp-tool-parity.ps1`.
+- Keep the existing redaction rules: no `key=` URLs, no credentials.
+- Update the tool count everywhere it is stated (`AGENTS.md`, `README.md`,
+  Settings `UniformGrid` rows, wiki `MCP-Tool-Reference.md`).
+
+**Tests**: the parity script plus Core/pure helpers for any new aggregation.
+
+**Commit**: `feat(mcp): expose year in review, musical key, and bulk edits`
+
+## 18. Pick the similarity reference in the smart-playlist editor — `Todo`
+
+The reference can currently only be set from the track context menu.
+
+**Design**
+
+- Add a track picker (search box plus result list) to `SmartPlaylistDialog` that
+  sets or replaces `SimilaritySourceKey`/`SimilarityTrackId` through the
+  existing catalog providers, keeping the readable label and **Remove
+  reference**.
+- Keep the criteria-building logic in `SmartPlaylistCriteriaEditing`.
+- Add the server-side resolve endpoint so similarity smart playlists also work
+  when they live on an Orynivo Server.
+
+**Tests**: criteria building and the picker's selection mapping (pure).
+
+**Commit**: `feat(playlists): pick the similarity reference in the editor`
+
+## 19. Offer activity presets in the Infinite Mix profile — `Todo`
+
+Focus/Workout/Wind down are currently only a context-menu quick start.
+
+**Design**
+
+- Add the three presets to `InfiniteMixDialog` next to the mood selector and map
+  them onto the persisted profile fields.
+- Reuse `SimilarityFeatureService.RankPreset` and the shared queue path.
+
+**Tests**: the preset-to-profile mapping as a pure helper.
+
+**Commit**: `feat(infinite-mix): offer activity presets in the profile dialog`
+
+## 20. Report "now playing" and love tracks on Last.fm — `Todo`
+
+**Design**
+
+- Extend `LastFmScrobblingService` with `track.updateNowPlaying` when playback
+  starts and a love/unlove action bound to the track favourite toggle.
+- Never block or fail playback; keep the session key in
+  `ApplicationCredentialStore` only.
+
+**Tests**: request signing and the scrobble/love rules in Core.
+
+**Commit**: `feat(scrobbling): report now playing and love tracks`
+
+## 21. Export the year in review as PDF — `Todo`
+
+**Design**
+
+- Render the existing `YearInReviewSummary` through `SKDocument.CreatePdf` in
+  addition to the PNG export, reusing the same layout helper.
+- Keep the export bounded and offline; no new data collection.
+
+**Tests**: the layout helper.
+
+**Commit**: `feat(dashboard): export the year in review as PDF`
+
+## 22. Word-level karaoke highlighting — `Todo`
+
+**Design**
+
+- Parse enhanced LRC word timestamps (`<mm:ss.xx>`) in `LyricsService` and
+  highlight the active word in `KaraokeWindow`.
+- Keep `LyricLineSelector` as the line-level fallback for plain synchronized
+  lyrics.
+
+**Tests**: enhanced-LRC parsing and word selection (pure).
+
+**Commit**: `feat(lyrics): highlight words in the karaoke view`
+
+## 23. Bulk genre editing — `Todo`
+
+Deliberately excluded from item 7 because it may write media tags.
+
+**Design**
+
+- Decide explicitly between library-only overrides (like
+  `track_title_overrides`) and rewriting media tags.
+- If tags are written, require an explicit confirmation, create a backup first,
+  and report per-file failures; never write implicitly during a scan.
+- Reuse the transactional bulk-update plumbing from item 7.
+
+**Tests**: the chosen storage path, including a mixed local/remote selection.
+
+**Commit**: `feat(library): add bulk genre editing`
+
+## 24. Download podcast episodes for offline playback — `Todo`
+
+**Design**
+
+- Download episodes into a bounded per-user cache with a configurable size
+  limit, play from the local file when present, and show the downloaded state in
+  the episode list.
+- Clean up downloads that are no longer pinned; never delete while playing.
+
+**Tests**: cache and eviction selection (pure).
+
+**Commit**: `feat(podcasts): download episodes for offline playback`
+
+## 25. Cloud backup targets and a server-side schedule — `Todo`
+
+**Design**
+
+- Add WebDAV/S3 targets to `LibraryBackupService` and retention for the manual
+  exports, reusing `BackupRetention`.
+- Add an optional server-side schedule that reuses the desktop's due/retention
+  decisions; never store cloud credentials in `appsettings.json`.
+
+**Tests**: target URL building and retention selection (pure).
+
+**Commit**: `feat(backup): add cloud targets and a server schedule`
+
+## 26. Reduce motion and keyboard navigation — `Todo`
+
+**Design**
+
+- Add an `AppSettings.ReduceMotion` toggle that disables the Genre Cloud,
+  Dashboard stage, and karaoke animations.
+- Add keyboard navigation and accessible names for the artwork grids and
+  transport controls.
+
+**Tests**: the animation decision as a pure helper.
+
+**Commit**: `feat(a11y): add reduce motion and keyboard navigation`
+
+## 27. Resume a track across devices — `Todo`
+
+**Design**
+
+- Store the last position per track on the server (profile-scoped) and offer
+  **Resume on this device** when a track starts elsewhere.
+- Reuse the existing profile and playback-history infrastructure; never persist
+  authenticated stream URLs.
+
+**Tests**: the resume decision (pure).
+
+**Commit**: `feat(playback): resume a track across devices`
+
+## 28. Record the dependency migration plan — `Todo`
+
+**Design**
+
+- Document when and how to move to Avalonia 12/.NET 9, what would unblock
+  `Avalonia.Controls.DataGrid` beyond 11.3.13, and how the SkiaSharp 2.88.9 pin
+  (Avalonia.Skia) is revisited.
+- Keep it as a decision record next to the Dependabot rules in `AGENTS.md`.
+
+**Tests**: none; documentation only.
+
+**Commit**: `docs: record the dependency migration plan`
