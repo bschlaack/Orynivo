@@ -48,6 +48,36 @@ public sealed class ServerSettings
 
     /// <summary>Gets or sets the profiles allowed to store personal server state.</summary>
     public List<ServerProfile> Profiles { get; set; } = [new ServerProfile()];
+
+    /// <summary>
+    /// Gets or sets the optional automatic server-side library backup schedule.
+    /// It holds no credentials and defaults to disabled.
+    /// </summary>
+    public BackupScheduleSettings BackupSchedule { get; set; } = new();
+}
+
+/// <summary>
+/// Optional automatic server-side library backup configuration. The schedule and
+/// retention decisions come from the shared <c>BackupRetention</c> helper, and the
+/// last run is derived from the newest archive in the target folder, so no extra
+/// state has to be persisted.
+/// </summary>
+public sealed class BackupScheduleSettings
+{
+    /// <summary>Gets or sets a value indicating whether the server creates backups automatically.</summary>
+    public bool Enabled { get; set; }
+
+    /// <summary>Gets or sets the minimum number of days between automatic backups.</summary>
+    public int IntervalDays { get; set; } = 7;
+
+    /// <summary>Gets or sets how many automatic backups are kept before older ones are removed.</summary>
+    public int RetentionCount { get; set; } = 3;
+
+    /// <summary>
+    /// Gets or sets the backup folder; an empty value uses a <c>backups</c> folder
+    /// below the server data directory.
+    /// </summary>
+    public string Directory { get; set; } = string.Empty;
 }
 
 /// <summary>Stable server-side profile identity shared with a desktop client.</summary>

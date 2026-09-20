@@ -97,6 +97,12 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
   runtime dependency.
 - Linux service data belongs under `ORYNIVO_DATA_DIR=/var/lib/orynivo-server`.
   Do not fall back to the service user's non-writable home directory.
+- `BackupScheduleService` is the optional automatic server-side library backup. It
+  must reuse the shared `Orynivo.Library.BackupRetention` decisions, derive its last
+  run from the newest archive in the target folder (never persist extra state),
+  write through `LibraryBackupService.ExportAsync` with the server data root, prune
+  only names that match `BackupNaming`, and hold no credentials. It is disabled by
+  default and never blocks scans or requests.
 - Authenticated `GET`/`PUT /api/library/backup` transfer the Core versioned
   library ZIP. Transfers are bounded to 2 GiB, serialized against server scans,
   staged beneath the data root, exclude credentials/audio files, and restore

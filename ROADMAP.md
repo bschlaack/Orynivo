@@ -199,18 +199,24 @@ Steps:
 - Not included: pinning individual episodes so eviction can never remove them, and
   background prefetch of new episodes.
 
-## 25. Cloud backup targets and a server-side schedule — `Todo`
+## 25. Cloud backup targets and a server-side schedule — `In progress`
 
-**Design**
+Steps:
 
-- Add WebDAV/S3 targets to `LibraryBackupService` and retention for the manual
-  exports, reusing `BackupRetention`.
-- Add an optional server-side schedule that reuses the desktop's due/retention
-  decisions; never store cloud credentials in `appsettings.json`.
-
-**Tests**: target URL building and retention selection (pure).
-
-**Commit**: `feat(backup): add cloud targets and a server schedule`
+- 25a Server-side schedule and shared naming — `Done`:
+  `Orynivo.Server.Services.BackupScheduleService` writes a versioned ZIP at most
+  once per `IntervalDays` into `Orynivo:BackupSchedule:Directory` (default: a
+  `backups` folder below the server data directory) and prunes through
+  `BackupRetention.SelectObsolete`. The last run comes from the newest archive, so
+  no extra state is persisted, and the section holds no credentials. Automatic
+  archive naming moved into the shared `Orynivo.Library.BackupNaming`, which the
+  desktop now uses as well. 8 `Orynivo.Core.Tests` cases cover the naming.
+- 25b Cloud targets — `Todo`: a WebDAV (and later S3) upload target for manual and
+  scheduled backups, with pure URL building and remote retention selection, plus
+  the credential plumbing. It needs the encrypted
+  `ApplicationCredentialSnapshot` extended with the target password, so it is a
+  deliberate follow-up; credentials must never reach `settings.json` or
+  `appsettings.json`.
 
 ## 26. Reduce motion and keyboard navigation — `Todo`
 

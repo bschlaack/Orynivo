@@ -481,7 +481,13 @@ Edit `appsettings.json` before first use:
     "CalculateMissingReplayGainDuringScan": false,
     "ReplayGainFfmpegThreads": 1,
     "ReplayGainDelayMilliseconds": 250,
-    "AllowRemoteUpdates": false
+    "AllowRemoteUpdates": false,
+    "BackupSchedule": {
+      "Enabled": false,
+      "IntervalDays": 7,
+      "RetentionCount": 3,
+      "Directory": ""
+    }
   }
 }
 ```
@@ -499,6 +505,14 @@ usual `Orynivo__...` environment-variable names.
 ReplayGain maintenance keeps only compact album identifiers between its track
 and album phases and refreshes the search index in bounded batches, so memory
 usage remains proportional to a small work set rather than the complete library.
+
+`BackupSchedule` is disabled by default. When enabled, the server writes a
+versioned library ZIP into its target folder (default: a `backups` folder below the
+server data directory) at most once per `IntervalDays` and removes archives beyond
+`RetentionCount`. The due check and the retention selection come from the same
+shared helper the desktop uses, the last run is derived from the newest archive so
+no extra state is stored, and the section holds no credentials. Audio files are
+never included.
 
 `AllowRemoteUpdates` is disabled by default. When enabled on a packaged Linux
 server, an authenticated Orynivo desktop client can download the matching signed

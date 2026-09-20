@@ -12,7 +12,6 @@ namespace Orynivo;
 /// </summary>
 public partial class MainWindow
 {
-    private const string ScheduledBackupFilePrefix = "orynivo-backup-";
     private DispatcherTimer? _scheduledBackupTimer;
     private int _scheduledBackupRunning;
 
@@ -55,9 +54,7 @@ public partial class MainWindow
 
             var directory = schedule.ResolveDirectory();
             Directory.CreateDirectory(directory);
-            var target = Path.Combine(
-                directory,
-                $"{ScheduledBackupFilePrefix}{now:yyyyMMdd-HHmmss}.zip");
+            var target = Path.Combine(directory, BackupNaming.BuildFileName(now));
             var libraryPaths = (_settings.LibraryPaths ?? []).ToList();
             await LibraryBackupService.ExportAsync(target, libraryPaths).ConfigureAwait(true);
             PruneScheduledBackups(directory, schedule.RetentionCount);
@@ -87,7 +84,7 @@ public partial class MainWindow
     private static void PruneScheduledBackups(string directory, int retentionCount)
     {
         var existing = Directory
-            .EnumerateFiles(directory, $"{ScheduledBackupFilePrefix}*.zip")
+            .EnumerateFiles(directory, $"{BackupNaming.FilePrefix}*.zip")
             .Select(path => (
                 Path: path,
                 CreatedAt: new DateTimeOffset(File.GetLastWriteTimeUtc(path), TimeSpan.Zero)))
