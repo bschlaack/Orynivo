@@ -1413,7 +1413,7 @@
                                  Foreground="{DynamicResource AppPrimaryTextBrush}"
                                  BorderBrush="{DynamicResource AppHeaderBorderBrush}"
                                  CornerRadius="18"
-                                 Watermark="{DynamicResource L_Search}"
+                                 PlaceholderText="{DynamicResource L_Search}"
                                  ToolTip.Tip="{DynamicResource L_Search}"
                                  TextChanged="SearchTextBox_OnTextChanged"/>
                         <Border x:Name="AlbumViewModeBorder"
@@ -1558,7 +1558,7 @@
                                      Background="{DynamicResource AppInputBrush}"
                                      Foreground="{DynamicResource AppPrimaryTextBrush}"
                                      BorderBrush="{DynamicResource AppHeaderBorderBrush}"
-                                     Watermark="{DynamicResource L_BulkGenre}"
+                                     PlaceholderText="{DynamicResource L_BulkGenre}"
                                      ToolTip.Tip="{DynamicResource L_BulkGenreTooltip}"/>
                             <Button x:Name="BulkGenreApplyButton"
                                     Padding="12,5"

@@ -150,7 +150,7 @@
                          MaxHeight="120"
                          FontSize="{DynamicResource FontSizeBody}"
                          VerticalContentAlignment="Center"
-                         Watermark="{DynamicResource L_AiChatInputPlaceholder}"
+                         PlaceholderText="{DynamicResource L_AiChatInputPlaceholder}"
                          KeyDown="ChatInputBox_OnKeyDown"/>
 
                 <Button x:Name="SendButton"

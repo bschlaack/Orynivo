@@ -58,7 +58,11 @@ public static class ArtworkCache
             if (scale > 1) scale = 1;
             var newW = Math.Max(1, (int)Math.Round(bitmap.Width * scale));
             var newH = Math.Max(1, (int)Math.Round(bitmap.Height * scale));
-            using var scaled = bitmap.Resize(new SKImageInfo(newW, newH), SKFilterQuality.High);
+            // SkiaSharp 3 removed SKFilterQuality; the Mitchell cubic resampler is the
+            // equivalent high-quality sampling option.
+            using var scaled = bitmap.Resize(
+                new SKImageInfo(newW, newH),
+                new SKSamplingOptions(SKCubicResampler.Mitchell));
             using var encoded = scaled.Encode(SKEncodedImageFormat.Jpeg, 88);
             using var output = File.Create(path);
             encoded.SaveTo(output);

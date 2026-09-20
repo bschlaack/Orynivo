@@ -9,29 +9,23 @@ updates:
       prefix: "deps(nuget)"
     ignore:
       # Major upgrades need a deliberate migration instead of an automatic bump.
-      # Avalonia 12 has breaking API changes; the Microsoft.Data.Sqlite and
-      # test-SDK major lines also need review. The projects target .NET 10 LTS
-      # (not .NET 9, which is already in security-only maintenance). Keep
-      # Dependabot on the minor/patch line and review majors by hand. The
-      # triggers, steps, and required checks live in DEPENDENCY-MIGRATION.md.
+      # Avalonia is on 12.1.2 and a future 13 line will have breaking API changes;
+      # the Microsoft.Data.Sqlite and test-SDK major lines also need review. The
+      # projects target .NET 10 LTS (not .NET 9, which is already in security-only
+      # maintenance). Keep Dependabot on the minor/patch line and review majors by
+      # hand. The triggers, steps, and required checks live in
+      # DEPENDENCY-MIGRATION.md.
       #
-      # Avalonia minor updates within 11.3 are allowed: the drag-and-drop code
-      # uses IDataTransfer/DataTransfer/DragDrop.DoDragDropAsync, so the 11.3
-      # deprecations no longer fail the --warnaserror build. Note that
-      # Avalonia.Controls.DataGrid is in upstream maintenance mode and has no
-      # release beyond 11.3.13, so it stays on that version while the other
-      # Avalonia packages may move within 11.3.x; that mix builds, but do not
-      # raise DataGrid past 11.3.13. A successor control has to be evaluated
-      # deliberately instead of waiting for a DataGrid release.
+      # All Avalonia packages, including Avalonia.Controls.DataGrid, move together
+      # on the 12.1 line; DataGrid has a 12.1.2 release after all, so the earlier
+      # "no release beyond 11.3.13" note was wrong.
       - dependency-name: "Avalonia*"
         update-types:
           - "version-update:semver-major"
-      # SkiaSharp is pinned to the 2.88 line because Avalonia.Skia 11.3 depends on
-      # SkiaSharp 2.88.9 and SkiaSharp.NativeAssets.Linux 2.88.9. Raising
-      # SkiaSharp (or SkiaSharp.NativeAssets.*) in Orynivo.Core/Orynivo.Server
-      # would force the desktop app to render through an incompatible
-      # managed/native Skia, and 3.x/4.x also removed APIs such as
-      # SKFilterQuality. Revisit when Avalonia ships a SkiaSharp 3/4-based release.
+      # SkiaSharp is pinned to the 3.119 line because Avalonia.Skia 12.1.2 depends
+      # on SkiaSharp 3.119.4 and SkiaSharp.NativeAssets.Linux 3.119.4. Raising it
+      # independently in Orynivo.Core/Orynivo.Server would force the desktop app to
+      # render through an incompatible managed/native Skia pair.
       - dependency-name: "SkiaSharp*"
         update-types:
           - "version-update:semver-major"

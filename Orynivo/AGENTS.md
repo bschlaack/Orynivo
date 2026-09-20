@@ -468,6 +468,15 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   or an error message (`Orynivo.Library.BackupUploader`). The scheduled and
   **Back up now** paths share `MainWindow.TryUploadBackupAsync`; the explicit
   **Export library** action still writes only the user-chosen local ZIP.
+- The desktop runs on Avalonia 12.1.2 with
+  `AvaloniaUseCompiledBindingsByDefault=false`, so `{Binding}` stays a reflection
+  binding. Avalonia 12 compiles bindings by default and then requires an explicit
+  `x:DataType` on every template and root; the existing views do not carry one yet.
+  Adopt compiled bindings per XAML file (adding the correct `x:DataType`, then
+  removing the switch) as separate, verified changes, and never flip the switch
+  back to `true` before every file has been converted. SkiaSharp moves with
+  Avalonia: use `SKSamplingOptions`/`SKFont` instead of the removed 2.88 text and
+  sampling APIs on `SKPaint`.
 - Cross-device resume for remote Orynivo Server tracks lives in
   `MainWindow.CrossDeviceResume.cs`. The last audible position is published at
   most every 20 seconds and only through the authenticated, profile-scoped

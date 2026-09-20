@@ -7,6 +7,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Migrated the desktop from Avalonia 11.3 to **Avalonia 12.1.2** and SkiaSharp
+  2.88.9 to **3.119.4** (`Avalonia.Skia` 12.1.2 depends on that line).
+  `Avalonia.Controls.DataGrid` moved with the other packages - the earlier "no
+  release beyond 11.3.13" note was wrong, DataGrid ships 12.1.2 again. The
+  unused Debug-only `Avalonia.Diagnostics` reference was dropped (it has no 12.x
+  release and the app never called `AttachDevTools`); its official successor is
+  `AvaloniaUI.DiagnosticsSupport`. SkiaSharp 3 moved the text and sampling APIs
+  off `SKPaint` onto `SKFont`/`SKSamplingOptions`, and the Avalonia 12
+  deprecations that fail the `--warnaserror` build were fixed:
+  `TextBox.Watermark` became `PlaceholderText` (8 sites), `Window.SystemDecorations`
+  became `WindowDecorations`, `IClipboard.SetTextAsync` became
+  `SetDataAsync(DataTransfer)`, and `DragDrop.DoDragDropAsync` now needs the
+  originating press event. Bindings deliberately stay on the reflection mode
+  (`AvaloniaUseCompiledBindingsByDefault=false`) until each view is converted to
+  compiled bindings with an explicit `x:DataType`; that conversion is recorded
+  in `DEPENDENCY-MIGRATION.md`.
+
 
 - Added an optional automatic server-side library backup schedule. The
   `Orynivo:BackupSchedule` configuration section (disabled by default) writes a

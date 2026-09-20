@@ -581,7 +581,7 @@ public partial class MainWindow
             return false;
         using var thumbnail = source.Resize(
             new SKImageInfo(8, 8, SKColorType.Bgra8888, SKAlphaType.Premul),
-            SKFilterQuality.Medium);
+            new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
         if (thumbnail is null)
             return false;
 
@@ -632,7 +632,6 @@ public partial class MainWindow
             using var paint = new SKPaint
             {
                 IsAntialias = true,
-                FilterQuality = SKFilterQuality.Medium,
                 ColorFilter = SKColorFilter.CreateColorMatrix(
                 [
                     0.2126f, 0.7152f, 0.0722f, 0, 0,
@@ -669,10 +668,14 @@ public partial class MainWindow
                     destination.MidX + fittedWidth / 2f,
                     destination.MidY + fittedHeight / 2f);
 
-                canvas.DrawBitmap(
-                    bitmap,
+                // SkiaSharp 3 moved the sampling quality from SKPaint to the draw
+                // call, which for a scaled bitmap is DrawImage with SKSamplingOptions.
+                using var tileImage = SKImage.FromBitmap(bitmap);
+                canvas.DrawImage(
+                    tileImage,
                     new SKRect(0, 0, bitmap.Width, bitmap.Height),
                     fittedDestination,
+                    new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear),
                     paint);
             }
 

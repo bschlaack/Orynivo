@@ -1,6 +1,6 @@
 # Orynivo Roadmap
 
-Items 1-30 are complete and listed for reference only.
+Items 1-31 are complete and listed for reference only.
 
 Each item is one commit and must follow the completion checklist in
 `AGENTS.md`: build every affected project, run the three test projects, update
@@ -295,3 +295,25 @@ Steps:
 `net10.0`; `scripts/verify-all.ps1` is green in Debug and Release.
 
 **Commit**: `chore(dotnet): migrate the solution to .NET 10 LTS`
+
+## 31. Migrate the desktop to Avalonia 12 - `Done`
+
+**Design**
+
+- Avalonia 11.3.22 to 12.1.2 in one commit, including
+  `Avalonia.Controls.DataGrid` (which does ship 12.1.2; the earlier "no release
+  beyond 11.3.13" note was wrong) and SkiaSharp 2.88.9 to 3.119.4.
+- The unused Debug-only `Avalonia.Diagnostics` reference was dropped; it has no
+  12.x release and the app never called `AttachDevTools`.
+- SkiaSharp 3 text and sampling APIs moved to `SKFont`/`SKSamplingOptions`; the
+  Avalonia 12 deprecations that fail `--warnaserror` were fixed
+  (`Watermark`/`SystemDecorations`/clipboard/drag-drop).
+- Bindings stay on reflection mode for now; converting each view to compiled
+  bindings with an explicit `x:DataType` is recorded in
+  `DEPENDENCY-MIGRATION.md` with its measured scope.
+
+**Tests**: 570 tests green; clean Debug and Release builds with `--warnaserror`
+report 0 errors and 0 warnings. A runtime pass is still outstanding and listed in
+`DEPENDENCY-MIGRATION.md`.
+
+**Commit**: `chore(avalonia): migrate the desktop to Avalonia 12`

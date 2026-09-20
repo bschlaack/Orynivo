@@ -692,6 +692,7 @@ public partial class MainWindow : Window
 
     private Point _queueDragOrigin;
     private bool _queueDragPending;
+    private PointerPressedEventArgs? _queueDragPress;
 
     private MenuFlyout BuildPlaylistsHeaderContextFlyout()
     {

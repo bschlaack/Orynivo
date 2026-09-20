@@ -34,9 +34,9 @@ table is a snapshot, not a permanent fact.
 | Dependency | Current | Pinned because | Blocked by |
 | --- | --- | --- | --- |
 | .NET runtime and SDK | `net10.0` / `net10.0-windows10.0.19041.0` (SDK 10.0.401) | LTS with support until 14 November 2028 | None |
-| Avalonia | `11.3.22` | Avalonia 12 has breaking API changes | The Avalonia 12 migration (see below) |
-| `Avalonia.Themes.Fluent`, `Avalonia.Controls.DataGrid`, `Avalonia.Diagnostics` | `11.3.13` | `Avalonia.Controls.DataGrid` is in upstream maintenance mode and has no release beyond 11.3.13 | No upstream release is planned; evaluate the successor controls |
-| SkiaSharp | `2.88.9` (`Orynivo.Core`, plus `SkiaSharp.NativeAssets.Linux.NoDependencies` in `Orynivo.Server`) | `Avalonia.Skia` 11.3 depends on SkiaSharp `2.88.9` | An Avalonia release on a SkiaSharp 3/4 line |
+| Avalonia | `12.1.2` (incl. `Avalonia.Controls.DataGrid`) | Matches the .NET 10 toolchain | None (a future major needs review) |
+| `AvaloniaUI.DiagnosticsSupport` | not referenced | The Debug-only DevTools bridge; the app never called `AttachDevTools` | Add it deliberately if DevTools are wanted again |
+| SkiaSharp | `3.119.4` (`Orynivo.Core`, plus `SkiaSharp.NativeAssets.Linux.NoDependencies` in `Orynivo.Server`) | `Avalonia.Skia` 12.1.2 depends on SkiaSharp `3.119.4` | None (major upgrades still need review) |
 | `Microsoft.Data.Sqlite` | `10.0.12` | Matches the .NET 10 toolchain | None (major upgrades still need review) |
 | `Microsoft.NET.Test.Sdk` | `18.10.1` | Matches the .NET 10 toolchain | None (major upgrades still need review) |
 | `Tmds.DBus.Protocol` | `0.95.1` | Linux-only; `0.92.0` is the documented floor | None (minor/patch updates are welcome) |
@@ -68,89 +68,99 @@ Verification: `scripts/verify-all.ps1` green in Debug and Release with
 `--warnaserror`, and 570 tests passing on `net10.0`
 (`Orynivo.Core.Tests` 427, `Orynivo.Tests` 105, `Orynivo.Server.Tests` 38).
 
-## Moving to Avalonia 12
+## Completed: the Avalonia 12 migration
 
-**Trigger:** an Avalonia 12 release whose breaking changes are documented. The SDK
-prerequisite is already satisfied by the .NET 10 migration. Confirm the exact
-minimum .NET version Avalonia 12 requires in its release notes before starting.
+Avalonia moved from 11.3.22 to **12.1.2** in one commit, together with SkiaSharp
+2.88.9 to **3.119.4** (Avalonia.Skia 12.1.2 depends on that line). What changed:
+
+1. Every Avalonia package moved together, including
+   `Avalonia.Controls.DataGrid`. The earlier note that DataGrid "has no release
+   beyond 11.3.13" was wrong: DataGrid ships 12.1.2 again and is not abandoned.
+2. `Avalonia.Diagnostics` was dropped. It has no 12.x release, the app never
+   called `AttachDevTools`, and the Debug-only reference was therefore unused. The
+   official successor for a future DevTools bridge is
+   `AvaloniaUI.DiagnosticsSupport`.
+3. SkiaSharp 3 removed the 2.88 text and sampling APIs. `SKPaint` no longer
+   carries `TextSize`, `Typeface`, `FakeBoldText`, `FilterQuality`, or
+   `MeasureText`; text uses `SKFont` (`Embolden`, `MeasureText`) and drawing takes
+   `SKSamplingOptions`. `SKCanvas.DrawText` now needs the font, and a scaled bitmap
+   is drawn with `DrawImage(..., SKSamplingOptions, paint)`. `SKFilterQuality.High`
+   became `new SKSamplingOptions(SKCubicResampler.Mitchell)`.
+4. Avalonia 12 deprecations that fail the `--warnaserror` build were fixed:
+   `TextBox.Watermark` became `PlaceholderText` (8 sites) and
+   `Window.SystemDecorations` became `WindowDecorations`.
+5. `IClipboard.SetTextAsync` was replaced by the data-transfer model
+   (`clipboard.SetDataAsync(DataTransfer)`), and `DragDrop.DoDragDropAsync` now
+   requires the originating `PointerPressedEventArgs` rather than the move event.
+6. **Bindings stay on the reflection mode for now.**
+   `AvaloniaUseCompiledBindingsByDefault=false` keeps `{Binding}` working;
+   Avalonia 12 otherwise compiles bindings and requires an explicit `x:DataType` on
+   every template and root, which the existing views do not carry (232 compiler
+   diagnostics across 8 files). Adopting compiled bindings is the recorded
+   follow-up below.
+
+Verification: clean Debug and Release builds with `--warnaserror` (0 errors,
+0 warnings) and `scripts/verify-all.ps1` green, with 570 tests passing.
+
+**Still to verify manually.** The migration is proven by build and test only. A
+runtime pass is outstanding for: startup and window/title-bar decorations,
+playback and the transport, the shared Tracks/Albums/Artists tables (theming,
+column chooser, column reordering, A-Z index), drag and drop into Up Next, the
+Dashboard and its stage animation, the Genre Cloud background mosaic, the AI chat
+clipboard copy, every dialog, and macOS rendering. Avalonia 12 changes the
+EGL/OpenGL handling on Linux and macOS, so the documented
+OpenGL-first/software-second macOS workaround must be re-checked rather than
+assumed to still apply.
+
+## Adopting compiled bindings
+
+**Trigger:** a dedicated change per XAML file, with that file's bindings verified.
 
 **Steps:**
 
-1. Bump every Avalonia package in one commit, including
-   `Avalonia.Controls.DataGrid` (see below), and keep them on one version.
-2. Check which SkiaSharp line Avalonia 12 pulls in. If it moved to 3.x/4.x, fold
-   the SkiaSharp migration into the same commit (see below).
-3. Work through the Avalonia 12 breaking changes. The areas that historically
-   needed work here are drag and drop (`IDataTransfer`/`DataTransfer`), the
-   `DataGrid` theming and `ControlTheme` templates, `Popup`/`Flyout` placement,
-   `Transitions` and `RenderTransform` animation APIs, and the Skia render
-   interface.
-4. Re-check the `App.axaml` control themes, the transport and table styles, the
-   `VirtualizingWrapPanel`, and the macOS `AvaloniaNativePlatformOptions`
-   rendering mode. Avalonia 12 changes the EGL/OpenGL handling on Linux and macOS,
-   so the documented OpenGL-first/software-second macOS workaround must be
-   re-evaluated rather than carried over blindly.
-5. Update `AGENTS.md`, `README.md`, `CHANGELOG.md`, and this file.
+1. Add the correct `x:DataType` to each `DataTemplate` and to the root element
+   (`ContentRow` for the shared cards and table templates, the code-behind class
+   for windows and views).
+2. Give a type that XAML can reference to any template whose item type is a
+   private nested class; a private nested view model cannot be named in
+   `x:DataType`.
+3. Remove `AvaloniaUseCompiledBindingsByDefault=false` only after every file has
+   been converted.
+4. Re-check the templates that bind through `RelativeSource` to `ListBoxItem`
+   ancestors, and the templates whose item type has to be confirmed against the
+   owning grid's `ItemsSource`.
 
-**Checks before merging:** `scripts/verify-all.ps1` green; a manual pass over
-playback, the library tables, drag and drop into Up Next, the Dashboard, the
-Genre Cloud, and the artwork grids on Windows and Linux.
-
-## `Avalonia.Controls.DataGrid` on 11.3.13 and the successor question
-
-`Avalonia.Controls.DataGrid` is in upstream **maintenance mode** and has no
-release beyond 11.3.13, so waiting for a newer DataGrid is not a plan. This
-repository uses DataGrid heavily (shared Tracks/Albums/Artists tables, playlist
-and queue tables, nested album-detail grids) with custom `ControlTheme`
-templates, the column chooser, column reordering, and direct
-`PART_VerticalScrollbar` handling, so a replacement is a real project rather than
-a package bump.
-
-**Trigger:** either a DataGrid release on the same line as the other Avalonia
-packages, or a decision to evaluate a successor control.
-
-**Steps:**
-
-1. If a matching DataGrid release appears, bump it together with
-   `Avalonia.Themes.Fluent` and the Debug-only `Avalonia.Diagnostics`, then verify
-   the mixed set still builds with `--warnaserror`.
-2. Otherwise evaluate the successors against the shared table requirements:
-   `TableView` (free, read-only columns, row and cell recycling, resizable
-   columns) and `TreeDataGrid` (Avalonia Pro). Decide whether one of them can own
-   the shared table surfaces before writing a migration.
-3. Confirm the `DataGridSortIconMinWidth` override, the per-view column width and
-   order stores, the column chooser flyout, and the pixel-based scroll handling
-   have an equivalent in the chosen control.
-4. Migrate one surface first (the shared Tracks table is the best candidate) and
-   keep the DataGrid path until every table has moved.
+The measured scope is 232 diagnostics across eight files: `MainWindow.axaml`
+(124), `DailyHistoryDialog.axaml` (42), `MetadataRepairDialog.axaml` (26),
+`SettingsView.axaml` (10), `TrackInfoDialog.axaml` (10),
+`ArtistImageSearchWindow.axaml` (8), `CoverSearchWindow.axaml` (6), and
+`LyricsSearchWindow.axaml` (6).
 
 **Checks before merging:** `scripts/verify-all.ps1` green plus a manual pass over
-the shared Tracks/Albums/Artists tables, the column chooser, column reordering,
-row selection and double-click playback, and the A-Z index.
+every converted view: the shared Tracks/Albums/Artists tables, the Dashboard, the
+Genre Cloud, the transport, the AI chat, and each converted dialog.
+## `Avalonia.Controls.DataGrid`
 
-## Revisiting the SkiaSharp 2.88.9 pin
+`Avalonia.Controls.DataGrid` ships with the Avalonia 12 line (12.1.2) and is
+therefore no longer a pin. An earlier revision of this record claimed it was in
+maintenance mode with no release beyond 11.3.13 and proposed evaluating
+`TableView` or `TreeDataGrid` as a replacement; that was wrong. The shared tables
+keep using `DataGrid`, including the custom `ControlTheme` templates, the column
+chooser, the column order and width stores, the `DataGridSortIconMinWidth`
+override, and the pixel-based `PART_VerticalScrollbar` handling. Re-evaluate the
+successor controls only if a future Avalonia line changes or removes `DataGrid`.
+## SkiaSharp line
 
-**Trigger:** an Avalonia release that depends on a SkiaSharp 3.x or 4.x line.
-
-**Steps:**
-
-1. Bump `SkiaSharp` in `Orynivo.Core` and
-   `SkiaSharp.NativeAssets.Linux.NoDependencies` in `Orynivo.Server` in the same
-   commit as the Avalonia packages, so the desktop never renders through an
-   incompatible managed/native Skia pair.
-2. Replace the removed 2.88-era APIs. `SKFilterQuality` was dropped in 3.x; the
-   remaining uses are in the artwork thumbnail generation and the year-in-review
-   PDF export.
-3. Keep the desktop free of a separate `SkiaSharp` package reference: it must
-   consume Skia only through `Avalonia.Skia`, as `YearInReviewPdfExporter` does.
-4. Verify the Linux packages still ship the native Skia library through
-   `SkiaSharp.NativeAssets.Linux.NoDependencies`; do not replace it with an
-   external ImageMagick/convert runtime dependency.
+SkiaSharp is on `3.119.4`, matching `Avalonia.Skia` 12.1.2. A future Avalonia
+release that moves to SkiaSharp 4.x repeats the same procedure: bump `SkiaSharp`
+in `Orynivo.Core` and `SkiaSharp.NativeAssets.Linux.NoDependencies` in
+`Orynivo.Server` in the same commit as the Avalonia packages, replace the APIs the
+new line removed, keep the desktop free of a separate SkiaSharp reference, and
+verify the Linux packages still ship the native library.
 
 **Checks before merging:** `scripts/verify-all.ps1` green; a manual pass over
 album/artist artwork generation, thumbnails, and the year-in-review PNG and PDF
 export on Windows and Linux.
-
 ## `Microsoft.Data.Sqlite` and the test SDK
 
 **Trigger:** a deliberate decision to move the toolchain forward. Both lines

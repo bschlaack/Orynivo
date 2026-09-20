@@ -1513,7 +1513,7 @@
                     <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,12">
                         <TextBox x:Name="McpAccessTokenTextBox"
                                  PasswordChar="●"
-                                 Watermark="{DynamicResource L_McpAccessTokenWatermark}"/>
+                                 PlaceholderText="{DynamicResource L_McpAccessTokenWatermark}"/>
                         <Button Grid.Column="1"
                                 Content="{DynamicResource L_McpGenerateToken}"
                                 Click="GenerateMcpAccessToken_Click"
@@ -1753,7 +1753,7 @@
                     <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,12">
                         <TextBox x:Name="MobileRemoteAccessTokenTextBox"
                                  PasswordChar="●"
-                                 Watermark="{DynamicResource L_McpAccessTokenWatermark}"/>
+                                 PlaceholderText="{DynamicResource L_McpAccessTokenWatermark}"/>
                         <Button Grid.Column="1"
                                 Content="{DynamicResource L_McpGenerateToken}"
                                 Click="GenerateMobileRemoteAccessToken_Click"

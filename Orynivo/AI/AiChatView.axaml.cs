@@ -255,8 +255,13 @@ internal partial class AiChatView : UserControl
         if (sender is not Control { DataContext: AiChatMessageVm vm })
             return;
         var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
-        if (clipboard is not null)
-            await clipboard.SetTextAsync(vm.Content ?? string.Empty);
+        if (clipboard is null)
+            return;
+
+        // Avalonia 12 replaced IClipboard.SetTextAsync with the data-transfer model.
+        var data = new DataTransfer();
+        data.Add(DataTransferItem.Create(DataFormat.Text, vm.Content ?? string.Empty));
+        await clipboard.SetDataAsync(data);
     }
 
     private void SetBusy(bool busy)

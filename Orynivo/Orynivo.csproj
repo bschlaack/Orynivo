@@ -9,6 +9,13 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!--
+      Avalonia 12 compiles bindings by default and then requires an explicit
+      x:DataType on every template and root. The existing views still use
+      reflection bindings, so keep that mode for now and adopt compiled bindings
+      per file as a separate, verified change; see DEPENDENCY-MIGRATION.md.
+    -->
+    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
     <AssemblyName>Orynivo</AssemblyName>
     <RootNamespace>Orynivo</RootNamespace>
     <Product>Orynivo</Product>
@@ -100,17 +107,16 @@
     <None Include="..\licenses\**\*" Link="licenses\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="..\third_party\cwasio\LICENSE" Link="licenses\cwASIO-MIT.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="$(NuGetPackageRoot)lucene.net\4.8.0-beta00018\NOTICE.txt" Link="licenses\Lucene.NET-NOTICE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('$(NuGetPackageRoot)lucene.net\4.8.0-beta00018\NOTICE.txt')" />
-    <None Include="$(NuGetPackageRoot)skiasharp\2.88.9\THIRD-PARTY-NOTICES.txt" Link="licenses\SkiaSharp-THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('$(NuGetPackageRoot)skiasharp\2.88.9\THIRD-PARTY-NOTICES.txt')" />
+    <None Include="$(NuGetPackageRoot)skiasharp\3.119.4\THIRD-PARTY-NOTICES.txt" Link="licenses\SkiaSharp-THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('$(NuGetPackageRoot)skiasharp\3.119.4\THIRD-PARTY-NOTICES.txt')" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="11.3.22" />
+    <PackageReference Include="Avalonia" Version="12.1.2" />
     <PackageReference Include="QRCoder" Version="1.8.0" />
-    <PackageReference Include="Avalonia.Desktop" Version="11.3.22" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.22" />
-    <PackageReference Include="Avalonia.Controls.DataGrid" Version="11.3.13" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.22" />
-    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.22" Condition="'$(Configuration)' == 'Debug'" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.2" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.2" />
+    <PackageReference Include="Avalonia.Controls.DataGrid" Version="12.1.2" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.2" />
     <PackageReference Include="Tmds.DBus.Protocol" Version="0.95.1" Condition="$([MSBuild]::IsOSPlatform('Linux'))" />
     <PackageReference Include="ModelContextProtocol" Version="2.2.0" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.2.0" />

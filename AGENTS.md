@@ -229,26 +229,18 @@ on every push and pull request, so MCP tool parity and the seven-language
 desktop/website/mobile localization coverage cannot silently drift. Keep these
 scripts passing; do not remove the job. `.github/dependabot.yml` tracks NuGet and
 GitHub Actions updates weekly, but ignores NuGet upgrades that cannot build on
-the pinned toolchain: Avalonia **major** updates (Avalonia 12 has breaking API
-changes) plus major upgrades of Microsoft.Data.Sqlite and Microsoft.NET.Test.Sdk.
-Migrate those deliberately instead of merging an automatic bump. The projects
-target **.NET 10 LTS**; do not move to .NET 9, which is already in security-only
-maintenance and reaches end of support on 10 November 2026, the same day as .NET 8.
-Avalonia **minor** updates within
-11.3 are allowed again because the drag-and-drop code now uses
-`IDataTransfer`/`DataTransfer`/`DragDrop.DoDragDropAsync`; note that
-`Avalonia.Controls.DataGrid` is in upstream maintenance mode and has no release
-beyond 11.3.13, so it stays on that version while the other Avalonia packages may
-move within 11.3.x — that mix builds, but do not raise DataGrid past 11.3.13.
-A successor control has to be evaluated deliberately; do not wait for a DataGrid
-release that upstream does not plan. SkiaSharp majors stay ignored as
-well: Avalonia.Skia 11.3 depends on SkiaSharp 2.88.9 and
-SkiaSharp.NativeAssets.Linux 2.88.9, so raising SkiaSharp or
-SkiaSharp.NativeAssets.* in `Orynivo.Core`/`Orynivo.Server` would make Avalonia
-render through an incompatible managed/native Skia (and 3.x/4.x removed
-`SKFilterQuality`). Revisit both pins together when Avalonia ships a
-SkiaSharp 3/4-based release. The deliberate migration triggers, steps, and
-required checks for every held-back line are recorded in
+the pinned toolchain: Avalonia **major** updates plus major upgrades of
+Microsoft.Data.Sqlite and Microsoft.NET.Test.Sdk. Migrate those deliberately
+instead of merging an automatic bump. The projects target **.NET 10 LTS** and
+Avalonia **12.1.2**; do not move to .NET 9, which is already in security-only
+maintenance and reaches end of support on 10 November 2026, the same day as
+.NET 8. `Avalonia.Controls.DataGrid` is part of the Avalonia 12 line again, so
+it moves with the other Avalonia packages; the earlier "no release beyond
+11.3.13" note was wrong and is corrected here. SkiaSharp moves with Avalonia
+too: `Avalonia.Skia` 12.1.2 depends on SkiaSharp 3.119.4, so `Orynivo.Core` and
+`Orynivo.Server` use that line and must not be raised independently. The
+deliberate migration triggers, steps, and required checks for every held-back
+line are recorded in
 [`DEPENDENCY-MIGRATION.md`](DEPENDENCY-MIGRATION.md); keep that record and the
 Dependabot `ignore` list in agreement, and never merge an ignored major upgrade
 without following the recorded plan.
