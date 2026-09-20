@@ -191,6 +191,15 @@ covers pure desktop helpers that do not require a running Avalonia UI;
 Do not move shared behavior into a UI-only class when a `Orynivo.Core` type can
 own it and stay cross-platform testable. The Windows build workflow runs all
 three test projects.
+Every test that opens a library database must use
+`Orynivo.Core.Tests.CoreTestDatabase`, which owns a unique temporary directory
+per test and clears only that database's SQLite pool on disposal. Never call
+`AudioDatabase.OpenDefault()`, reference `AppPaths.DataRoot`, delete a shared
+database file, or call `SqliteConnection.ClearAllPools()` from a test: xUnit runs
+test classes in parallel, so shared paths and process-wide pool clearing leak
+rows between tests and produce intermittent failures. `TestEnvironment`'s module
+initializer remains the safety net that keeps the whole run away from the real
+per-user data directory.
 
 `build.ps1` always builds the vendored MIT-licensed `CwAsioBridge.dll`, then
 builds `AsioBridge.dll` when the Steinberg SDK is available, and finally builds

@@ -10,6 +10,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Hardened the Core test suite against intermittent failures. Every database test
+  now creates its own temporary library through `CoreTestDatabase` and clears only
+  that database's SQLite pool, instead of sharing one library file and calling the
+  process-wide `SqliteConnection.ClearAllPools()`. `ArtistAttributionTests` no
+  longer deletes a shared database between tests, so no test can observe another
+  test's rows while xUnit runs classes in parallel.
+
 ## [0.43.1] - 2026-09-18
 
 ### Added

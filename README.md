@@ -1318,7 +1318,9 @@ dotnet test Orynivo.Server.Tests/Orynivo.Server.Tests.csproj
 credential-free `QueuePathPolicy` and ReplayGain conversion. `Orynivo.Tests`
 covers pure desktop helpers such as the transport accent colour maths; it never
 starts the Avalonia UI. `Orynivo.Server.Tests` covers the server's API key and
-profile-context middleware without starting the web host.
+profile-context middleware without starting the web host. Every database test
+creates its own temporary library, so the suite is safe to run in parallel and
+never touches your real library data.
 
 ### Orynivo Server
 

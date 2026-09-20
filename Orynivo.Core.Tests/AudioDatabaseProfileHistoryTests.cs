@@ -1,4 +1,3 @@
-using Microsoft.Data.Sqlite;
 using Orynivo.Library;
 using Xunit;
 
@@ -34,7 +33,7 @@ public sealed class AudioDatabaseProfileHistoryTests
         finally
         {
             AudioDatabase.SetActiveProfile("standard");
-            SqliteConnection.ClearAllPools();
+            CoreTestDatabase.ClearPool(databasePath);
             Directory.Delete(root, recursive: true);
         }
     }

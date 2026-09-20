@@ -37,7 +37,7 @@ public sealed class AudioDatabaseAlbumVisibilityTests
         }
         finally
         {
-            SqliteConnection.ClearAllPools();
+            CoreTestDatabase.ClearPool(databasePath);
             Directory.Delete(root, recursive: true);
         }
     }
@@ -105,7 +105,7 @@ public sealed class AudioDatabaseAlbumVisibilityTests
         }
         finally
         {
-            SqliteConnection.ClearAllPools();
+            CoreTestDatabase.ClearPool(databasePath);
             Directory.Delete(root, recursive: true);
         }
     }
@@ -154,7 +154,7 @@ public sealed class AudioDatabaseAlbumVisibilityTests
         }
         finally
         {
-            SqliteConnection.ClearAllPools();
+            CoreTestDatabase.ClearPool(databasePath);
             Directory.Delete(root, recursive: true);
         }
     }

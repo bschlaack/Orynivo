@@ -132,7 +132,7 @@ public sealed class YearInReviewTests
         }
         finally
         {
-            SqliteConnection.ClearAllPools();
+            CoreTestDatabase.ClearPool(databasePath);
             Directory.Delete(root, recursive: true);
         }
     }

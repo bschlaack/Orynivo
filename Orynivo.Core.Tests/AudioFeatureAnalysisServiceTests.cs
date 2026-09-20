@@ -1,6 +1,5 @@
 using Orynivo.Audio;
 using Orynivo.Library;
-using Microsoft.Data.Sqlite;
 using Xunit;
 
 namespace Orynivo.Core.Tests;
@@ -106,7 +105,7 @@ public sealed class AudioFeatureAnalysisServiceTests
         }
         finally
         {
-            SqliteConnection.ClearAllPools();
+            CoreTestDatabase.ClearPool(Path.Combine(root, "library.db"));
             Directory.Delete(root, recursive: true);
         }
     }

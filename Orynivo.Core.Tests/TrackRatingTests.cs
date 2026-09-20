@@ -1,4 +1,3 @@
-using Microsoft.Data.Sqlite;
 using Orynivo.Library;
 using System.Net;
 using System.Text;
@@ -106,7 +105,7 @@ public sealed class TrackRatingTests
         }
         finally
         {
-            SqliteConnection.ClearAllPools();
+            CoreTestDatabase.ClearPool(databasePath);
             Directory.Delete(root, recursive: true);
         }
     }
@@ -136,7 +135,7 @@ public sealed class TrackRatingTests
         }
         finally
         {
-            SqliteConnection.ClearAllPools();
+            CoreTestDatabase.ClearPool(databasePath);
             Directory.Delete(root, recursive: true);
         }
     }

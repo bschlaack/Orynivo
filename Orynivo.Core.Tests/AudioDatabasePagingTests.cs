@@ -1,4 +1,3 @@
-using Microsoft.Data.Sqlite;
 using Orynivo.Library;
 using Xunit;
 
@@ -39,7 +38,7 @@ public sealed class AudioDatabasePagingTests
         }
         finally
         {
-            SqliteConnection.ClearAllPools();
+            CoreTestDatabase.ClearPool(Path.Combine(root, "library.db"));
             Directory.Delete(root, recursive: true);
         }
     }

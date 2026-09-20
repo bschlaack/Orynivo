@@ -31,26 +31,19 @@ recommended next steps.
 | 13 | Scheduled auto-backup with retention | `BackupRetention`, Settings > Library |
 | 14 | Migrate drag-and-drop to `IDataTransfer` | Unblocked the Avalonia 11.3 line |
 
-## 15. ★ Isolate the Core test data root — `Todo`
+## 15. ★ Isolate the Core test data root — `Done`
 
-`ArtistAttributionTests` is the only class that still uses the real
-`AppPaths.DataRoot` and deletes `library.db` per test. That leaked rows between
-tests, produced intermittent Core failures, and made four Dependabot pull
-requests fail before `72afb66`.
-
-**Design**
-
-- Give every database test its own temporary directory and
-  `new AudioDatabase(path)` (the pattern the newer tests already use), or a
-  shared fixture that hands out unique paths.
-- Keep the `TestEnvironment` module initializer as the safety net so no test can
-  reach the real per-user data root.
-- Audit the remaining test files for `OpenDefault()`/`AppPaths.DataRoot` usage.
-
-**Tests**: the suite must pass repeatedly (ten consecutive runs) without data
-leaking between classes.
-
-**Commit**: `test(core): give every database test its own data root`
+- `Orynivo.Core.Tests/CoreTestDatabase` owns a unique temporary directory per
+  test, opens the library database, builds paths inside the directory, and clears
+  only that database's SQLite pool on disposal.
+- `ArtistAttributionTests` no longer shares one library file or deletes it between
+  tests; it was the only class still using `AudioDatabase.OpenDefault()` and
+  `AppPaths.DataRoot`.
+- The remaining database tests keep their own directories but no longer call the
+  process-wide `SqliteConnection.ClearAllPools()`, which could close pooled
+  connections of tests running in parallel.
+- `TestEnvironment`'s module initializer remains the safety net for the whole run.
+- Verified with ten consecutive green suite runs (337 tests).
 
 ## 16. ★ Add `scripts/verify-all.ps1` — `Todo`
 
