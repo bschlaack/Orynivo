@@ -1348,7 +1348,7 @@ creates its own temporary library, so the suite is safe to run in parallel and
 never touches your real library data.
 
 `scripts/verify-all.ps1` runs the same checks as CI in one command: the managed
-builds with `--warnaserror`, all three test projects, and both parity scripts. It
+builds with `--warnaserror`, all three test projects, and all three parity scripts. It
 stops at the first failure and prints a compact summary.
 
 ```bash
@@ -1586,7 +1586,8 @@ Orynivo/
 ├── Orynivo.Server.Tests/    Unit tests for server middleware without starting the web host
 ├── scripts/                 Verification and smoke-test harnesses
 │   ├── verify-localization-parity.ps1   Seven-language desktop/website/mobile parity
-│   ├── verify-mcp-tool-parity.ps1       MCP, AI tool schema, and Settings checklist parity
+│   ├──     verify-mcp-tool-parity.ps1       MCP, AI tool schema, and Settings checklist parity
+    verify-github-actions-pins.ps1   One consistent action version across all workflows
 │   └── *Smoke/              Cover search, metadata, remote, and localization harnesses
 ├── html/                    Static localized product website (German source plus i18n.js)
 ├── Logo/                    Source logo, icon, and background artwork

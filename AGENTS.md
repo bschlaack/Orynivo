@@ -253,9 +253,15 @@ required checks for every held-back line are recorded in
 Dependabot `ignore` list in agreement, and never merge an ignored major upgrade
 without following the recorded plan.
 All GitHub-hosted CI and release workflows use Node.js 24-compatible action
-generations (`actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-`softprops/action-gh-release@v3` where applicable); do not reintroduce their
-Node.js 20 predecessors.
+generations (`actions/checkout@v7`, `actions/setup-dotnet@v6`,
+`actions/upload-artifact@v7`, and `softprops/action-gh-release@v3` where
+applicable); do not reintroduce their Node.js 20 predecessors. Every action must
+be referenced with **one** version across every workflow: Dependabot's
+github_actions updater fails with `Error processing <action> (RuntimeError)` /
+`No files changed!` when the same action is pinned to different majors in
+different files, and mixed majors still run fine in CI, so nothing else catches
+the drift. `scripts/verify-github-actions-pins.ps1` enforces this and runs in both
+`scripts/verify-all.ps1` and the CI verify job.
 The Windows `.github/workflows/release.yml` workflow is the sole creator of the
 canonical `Orynivo <version>` draft release. Linux, macOS, and server matrix
 jobs must locate that exact draft through its numeric release ID and upload

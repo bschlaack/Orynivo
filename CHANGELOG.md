@@ -114,6 +114,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Similarity smart playlists now resolve on an Orynivo Server instead of
@@ -217,6 +226,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -388,6 +406,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -606,6 +633,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - The genre-cloud recommendation tie-break is now deterministic. It previously
@@ -695,6 +731,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -792,6 +837,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Unified all six desktop languages as complete built-in resources (853 keys
@@ -880,6 +934,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -979,6 +1042,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - The **Up Next** table now offers the same selectable track columns as
@@ -1065,6 +1137,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Similar-title and mood-mix actions now navigate directly to **Up Next**
@@ -1141,6 +1222,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -1226,6 +1316,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -1341,6 +1440,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Dashboard album artwork now refreshes immediately after a cover search or
@@ -1423,6 +1531,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Opening metadata review uses a fast index-only analysis instead of opening
@@ -1504,6 +1621,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -1611,6 +1737,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -1775,6 +1910,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Fixed a Library Doctor database-column typo that closed Orynivo when metadata
@@ -1879,6 +2023,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Fixed combined artist-and-title library searches so terms can match across
@@ -1966,6 +2119,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -2057,6 +2219,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -2224,6 +2395,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Artist and album artwork changes now invalidate the unified library view
@@ -2335,6 +2515,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Restarting Orynivo now restores every selectable sidebar content view rather
@@ -2416,6 +2605,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -2510,6 +2708,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Orynivo Server ReplayGain maintenance now runs FFmpeg with one worker thread,
@@ -2599,6 +2806,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -2701,6 +2917,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -2807,6 +3032,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Distinguished a completed MusicBrainz lookup with no community votes from a
@@ -2894,6 +3128,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Removed the Fluent DataGrid header's permanent empty sort-icon reservation,
@@ -2980,6 +3223,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Fixed unified artist details clearing their already rendered albums when the
@@ -3059,6 +3311,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -3178,6 +3439,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Fixed Windows identifying Orynivo as an unknown application in the system
@@ -3259,6 +3529,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -3353,6 +3632,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Preserved an album's downloaded artwork and favorite flag when a full
@@ -3430,6 +3718,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -3521,6 +3818,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -3632,6 +3938,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -3746,6 +4061,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Fixed Genre Cloud drill-downs reverting to all root genres when a connected
@@ -3859,6 +4183,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Fixed SEO image dimensions stretching the product screenshots and brand
@@ -3955,6 +4288,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -4064,6 +4406,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -4176,6 +4527,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Linux server release builds now normalize and validate packaged maintainer
@@ -4251,6 +4611,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -4350,6 +4719,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Opening a local or Orynivo Server album from a unified artist view once again
@@ -4426,6 +4804,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -4523,6 +4910,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Hidden the Steinberg ASIO and cwASIO subsystem badges on macOS and Linux,
@@ -4617,6 +5013,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -4746,6 +5151,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Linux now detects the extensionless `ffmpeg` and `ffprobe` executables for
@@ -4848,6 +5262,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Improved the startup update dialog's primary action contrast, spacing, and
@@ -4929,6 +5352,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -5018,6 +5450,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Placed Settings on/off switches immediately before their labels and aligned
@@ -5102,6 +5543,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Removed the standalone cyan scan-activity dot from the sidebar while retaining
@@ -5183,6 +5633,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -5272,6 +5731,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Prevented publication of incomplete signed update manifests by waiting for
@@ -5354,6 +5822,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -5533,6 +6010,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Fixed the listening chart's Y-axis rendering: the filled path now includes an
@@ -5700,6 +6186,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Fixed dragging albums onto the "Up Next" sidebar item restarting the current
@@ -5798,6 +6293,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Reduced local and Orynivo Server artist rename work by updating only the
@@ -5885,6 +6389,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -5974,6 +6487,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -6096,6 +6618,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -6262,6 +6793,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -6472,6 +7012,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Fixed waveform transport seeking so pointer release is captured reliably, the
@@ -6642,6 +7191,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Fixed checkbox borders appearing near-black on the dark background: the app
@@ -6734,6 +7292,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -6864,6 +7431,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - The Dashboard genre statistics (Top genres and the per-day calendar genres) now
@@ -6954,6 +7530,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - The Linux Orynivo Server now reads and writes its editable configuration at
@@ -7034,6 +7619,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -7130,6 +7724,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -7240,6 +7843,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Windows FFmpeg auto-download now resolves the current BtbN release asset via
@@ -7322,6 +7934,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - FFmpeg and FFprobe child processes now always receive a valid working
@@ -7399,6 +8020,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -7591,6 +8221,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -7803,6 +8442,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - The Orynivo Server settings and remote directory browser dialogs now use
@@ -7956,6 +8604,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Fixed numbered circle labels on the equalizer frequency-response graph being
@@ -8063,6 +8720,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -8205,6 +8871,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Enabled the A–Z index in the Plex folder view. Available letters now come
@@ -8343,6 +9018,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 ## [0.8.0] - 2026-06-21
@@ -8434,6 +9118,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -8552,6 +9245,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Fixed the application failing during startup because the lyrics
@@ -8645,6 +9347,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -8786,6 +9497,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Added a theme-aware background highlight for the currently audible item in
@@ -8904,6 +9624,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
 
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
+
 ### Fixed
 
 - Fixed the table-header column chooser not opening on right-click and then
@@ -9014,6 +9743,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
@@ -9173,6 +9911,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
   pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
   instead of waiting for an upstream release.
+
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ### Fixed
 
