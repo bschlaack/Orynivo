@@ -101,6 +101,33 @@ public sealed class LastFmClient
         return Succeeded(response);
     }
 
+    /// <summary>Marks a track as loved or removes its loved state on Last.fm.</summary>
+    /// <param name="track">Track metadata; artist and title must be present.</param>
+    /// <param name="loved"><see langword="true"/> to love the track, <see langword="false"/> to unlove it.</param>
+    /// <param name="sessionKey">The authenticated session key.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when Last.fm accepted the request.</returns>
+    public async Task<bool> SetTrackLovedAsync(
+        LastFmTrack track,
+        bool loved,
+        string sessionKey,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(track);
+        if (string.IsNullOrWhiteSpace(track.Artist) || string.IsNullOrWhiteSpace(track.Title))
+            return false;
+
+        // track.love and track.unlove accept only artist and track.
+        var parameters = new Dictionary<string, string>
+        {
+            ["method"] = loved ? "track.love" : "track.unlove",
+            ["artist"] = track.Artist,
+            ["track"] = track.Title
+        };
+        var response = await PostAsync(parameters, sessionKey, cancellationToken).ConfigureAwait(false);
+        return Succeeded(response);
+    }
+
     private static bool Succeeded(JsonElement? response) =>
         response is not null && !response.Value.TryGetProperty("error", out _);
 

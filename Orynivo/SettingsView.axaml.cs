@@ -275,6 +275,7 @@ internal partial class SettingsView : UserControl
         ShowPodcastsItemCheckBox.IsChecked      = settings.ShowPodcastsItem;
         ShowQueueItemCheckBox.IsChecked         = settings.ShowQueueItem;
         ShowAiChatItemCheckBox.IsChecked        = settings.ShowAiChatItem;
+        ReduceMotionCheckBox.IsChecked          = settings.ReduceMotion;
         CheckForUpdatesOnStartupCheckBox.IsChecked = settings.CheckForUpdatesOnStartup;
         StartMaximizedCheckBox.IsChecked             = settings.StartMaximized;
         ShowLocalLibrarySectionCheckBox.IsChecked = settings.ShowLocalLibrarySection;
@@ -295,6 +296,13 @@ internal partial class SettingsView : UserControl
         ScheduledBackupEnabledCheckBox.IsChecked = settings.ScheduledBackup.Enabled;
         ScheduledBackupIntervalInput.Value = Math.Clamp(settings.ScheduledBackup.IntervalDays, 1, 365);
         ScheduledBackupRetentionInput.Value = Math.Clamp(settings.ScheduledBackup.RetentionCount, 1, 50);
+        settings.BackupTarget ??= new BackupTargetSettings();
+        BackupTargetEnabledCheckBox.IsChecked = settings.BackupTarget.Enabled;
+        BackupTargetUrlInput.Text = settings.BackupTarget.UploadUrl ?? string.Empty;
+        BackupTargetDirectoryInput.Text = settings.BackupTarget.RemoteDirectory ?? string.Empty;
+        BackupTargetUserNameInput.Text = settings.BackupTarget.UserName ?? string.Empty;
+        BackupTargetPasswordInput.Text = settings.BackupTarget.Password ?? string.Empty;
+        PodcastDownloadLimitInput.Value = Math.Clamp(settings.PodcastDownloadLimitMb, 0, 102400);
         UpdateScheduledBackupStatus();
         _plexServers.AddRange((settings.PlexServers ?? []).Select(ClonePlexServer));
         _orynivoServers.AddRange((settings.OrynivoServers ?? []).Select(CloneOrynivoServer));
@@ -424,6 +432,25 @@ internal partial class SettingsView : UserControl
     /// <summary>Gets the configured number of backups kept before older ones are removed.</summary>
     public int ScheduledBackupRetentionValue =>
         (int)Math.Clamp(ScheduledBackupRetentionInput.Value ?? 3m, 1m, 50m);
+
+    /// <summary>Gets a value indicating whether completed backups are uploaded to the cloud target.</summary>
+    public bool BackupTargetEnabledValue => BackupTargetEnabledCheckBox.IsChecked == true;
+
+    /// <summary>Gets the configured WebDAV collection base URL.</summary>
+    public string BackupTargetUrlValue => BackupTargetUrlInput.Text?.Trim() ?? string.Empty;
+
+    /// <summary>Gets the configured sub-directory inside the WebDAV collection.</summary>
+    public string BackupTargetDirectoryValue => BackupTargetDirectoryInput.Text?.Trim() ?? string.Empty;
+
+    /// <summary>Gets the configured WebDAV user name.</summary>
+    public string BackupTargetUserNameValue => BackupTargetUserNameInput.Text?.Trim() ?? string.Empty;
+
+    /// <summary>Gets the configured WebDAV password.</summary>
+    public string BackupTargetPasswordValue => BackupTargetPasswordInput.Text ?? string.Empty;
+
+    /// <summary>Gets the configured maximum podcast download cache size in megabytes.</summary>
+    public int PodcastDownloadLimitMbValue =>
+        (int)Math.Clamp(PodcastDownloadLimitInput.Value ?? 2048m, 0m, 102400m);
 
     /// <summary>Gets the configured backup folder.</summary>
     public string ScheduledBackupDirectoryValue => _scheduledBackupDirectory;
@@ -638,6 +665,9 @@ internal partial class SettingsView : UserControl
     public bool ShowQueueItem => ShowQueueItemCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether the AI Chat sidebar item should be visible.</summary>
     public bool ShowAiChatItem => ShowAiChatItemCheckBox.IsChecked == true;
+
+    /// <summary>Gets a value indicating whether optional UI motion is disabled.</summary>
+    public bool ReduceMotionValue => ReduceMotionCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether signed updates should be checked at application startup.</summary>
     public bool CheckForUpdatesOnStartup => CheckForUpdatesOnStartupCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether the main window should start maximized.</summary>
@@ -3391,6 +3421,11 @@ internal partial class SettingsView : UserControl
         ("get_current_lyrics", nameof(McpToolGetCurrentLyrics)),
         ("list_orynivo_servers", nameof(McpToolListOrynivoServers)),
         ("scan_orynivo_server", nameof(McpToolScanOrynivoServer)),
+        ("get_year_in_review",    nameof(McpToolGetYearInReview)),
+        ("get_track_key",         nameof(McpToolGetTrackKey)),
+        ("set_tracks_favorite",   nameof(McpToolSetTracksFavorite)),
+        ("set_tracks_rating",     nameof(McpToolSetTracksRating)),
+        ("create_similar_playlist", nameof(McpToolCreateSimilarPlaylist)),
     ];
 
     /// <summary>Initialises each tool checkbox from the persisted disabled-tool set.</summary>
@@ -3429,6 +3464,11 @@ internal partial class SettingsView : UserControl
         McpToolGetCurrentLyrics.IsChecked    = !disabled.Contains("get_current_lyrics");
         McpToolListOrynivoServers.IsChecked  = !disabled.Contains("list_orynivo_servers");
         McpToolScanOrynivoServer.IsChecked   = !disabled.Contains("scan_orynivo_server");
+        McpToolGetYearInReview.IsChecked     = !disabled.Contains("get_year_in_review");
+        McpToolGetTrackKey.IsChecked         = !disabled.Contains("get_track_key");
+        McpToolSetTracksFavorite.IsChecked   = !disabled.Contains("set_tracks_favorite");
+        McpToolSetTracksRating.IsChecked     = !disabled.Contains("set_tracks_rating");
+        McpToolCreateSimilarPlaylist.IsChecked = !disabled.Contains("create_similar_playlist");
     }
 
     /// <summary>Reads the checkbox states and returns the set of tool names that are disabled.</summary>
@@ -3468,6 +3508,11 @@ internal partial class SettingsView : UserControl
         if (McpToolGetCurrentLyrics.IsChecked    != true) disabled.Add("get_current_lyrics");
         if (McpToolListOrynivoServers.IsChecked  != true) disabled.Add("list_orynivo_servers");
         if (McpToolScanOrynivoServer.IsChecked   != true) disabled.Add("scan_orynivo_server");
+        if (McpToolGetYearInReview.IsChecked     != true) disabled.Add("get_year_in_review");
+        if (McpToolGetTrackKey.IsChecked         != true) disabled.Add("get_track_key");
+        if (McpToolSetTracksFavorite.IsChecked   != true) disabled.Add("set_tracks_favorite");
+        if (McpToolSetTracksRating.IsChecked     != true) disabled.Add("set_tracks_rating");
+        if (McpToolCreateSimilarPlaylist.IsChecked != true) disabled.Add("create_similar_playlist");
         return disabled;
     }
 }

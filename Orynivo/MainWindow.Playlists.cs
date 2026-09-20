@@ -632,7 +632,8 @@ public partial class MainWindow : Window
             await DescribeSmartPlaylistSimilarityReferenceAsync(criteria).ConfigureAwait(true))
         {
             CountResolver = (candidate, ct) => _orynivoClient.ResolveSmartPlaylistCountAsync(
-                server, JsonSerializer.Serialize(candidate), GetOrynivoFavoriteTrackIds(server), ct)
+                server, JsonSerializer.Serialize(candidate), GetOrynivoFavoriteTrackIds(server), ct),
+            ReferenceTrackPicker = PickReferenceTrackAsync
         };
         if (await dialog.ShowDialog<bool>(this) == false ||
             string.IsNullOrWhiteSpace(dialog.PlaylistName) ||
@@ -824,6 +825,100 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
+    /// Opens the reference-track picker for the smart-playlist editor and returns
+    /// the chosen track, or <see langword="null"/> when the user cancels.
+    /// </summary>
+    /// <returns>The chosen reference candidate, or <see langword="null"/>.</returns>
+    private async Task<ReferenceTrackPickerDialog.Candidate?> PickReferenceTrackAsync()
+    {
+        var dialog = new ReferenceTrackPickerDialog { Search = SearchReferenceTracksAsync };
+        return await dialog.ShowDialog<bool>(this) ? dialog.Selected : null;
+    }
+
+    /// <summary>
+    /// Searches the local library and every configured Orynivo Server for
+    /// similarity reference candidates. Blocks on the database and server calls, so
+    /// the picker invokes it from a background continuation.
+    /// </summary>
+    /// <param name="query">Free-text artist, album, or title query.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Compact candidates ordered local first.</returns>
+    internal async Task<IReadOnlyList<ReferenceTrackPickerDialog.Candidate>> SearchReferenceTracksAsync(
+        string query,
+        CancellationToken ct)
+    {
+        const int limit = 25;
+        var results = new List<ReferenceTrackPickerDialog.Candidate>();
+
+        try
+        {
+            var ids = await Task.Run(() => TrackSearchIndex.SearchByCategory(query, limit), ct);
+            var localIds = ids.Tracks.Ids.Take(limit).ToList();
+            if (localIds.Count > 0)
+            {
+                var tracks = await Task.Run(() =>
+                {
+                    using var db = AudioDatabase.OpenDefault();
+                    return db.GetTrackListByIds(localIds);
+                }, ct);
+                results.AddRange(tracks.Select(track => new ReferenceTrackPickerDialog.Candidate(
+                    FormatReferenceTrackLabel(track.Title ?? track.FileName, track.Artist),
+                    "local",
+                    track.Id)));
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            // An unreadable local index must not prevent remote results.
+        }
+
+        foreach (var server in _settings.OrynivoServers ?? [])
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                using var client = new OrynivoServerClient();
+                var found = await client.SearchStructuredAsync(
+                    server,
+                    query,
+                    "tracks",
+                    minimumYear: null,
+                    maximumYear: null,
+                    addedFrom: null,
+                    addedBefore: null,
+                    sort: "relevance",
+                    limit,
+                    ct);
+                results.AddRange(found.Tracks.Take(limit).Select(track => new ReferenceTrackPickerDialog.Candidate(
+                    FormatReferenceTrackLabel(track.Title ?? track.FileName, track.Artist),
+                    GetServerSourceKey(server.Id),
+                    track.Id)));
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch
+            {
+                // An unreachable server must not prevent the remaining results.
+            }
+        }
+
+        return results;
+    }
+
+    /// <summary>Builds the display label of a reference-track candidate.</summary>
+    /// <param name="title">Track title or file name.</param>
+    /// <param name="artist">Artist name, or <see langword="null"/>.</param>
+    /// <returns>The combined label.</returns>
+    private static string FormatReferenceTrackLabel(string? title, string? artist) =>
+        string.IsNullOrWhiteSpace(artist) ? title ?? string.Empty : $"{title} — {artist}";
+
+    /// <summary>
     /// Builds a readable label for a smart playlist's similarity reference so the
     /// editor can show which track the playlist is based on. The local lookup runs
     /// off the UI thread.
@@ -897,7 +992,8 @@ public partial class MainWindow : Window
             playlist.Name,
             await DescribeSmartPlaylistSimilarityReferenceAsync(criteria).ConfigureAwait(true))
         {
-            CountResolver = ResolveUnifiedSmartPlaylistCountAsync
+            CountResolver = ResolveUnifiedSmartPlaylistCountAsync,
+            ReferenceTrackPicker = PickReferenceTrackAsync
         };
         if (await dialog.ShowDialog<bool>(this) == false ||
             string.IsNullOrWhiteSpace(dialog.PlaylistName) ||

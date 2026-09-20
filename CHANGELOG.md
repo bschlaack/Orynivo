@@ -4,6 +4,137 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.44.0] - 2026-09-20
+
+### Added
+
+- The year-in-review summary can now also be exported as a single-page A4 PDF.
+  The on-screen card and the PDF share the new pure
+  `Orynivo.Controls.YearInReviewLayout` content model, so the two cannot drift
+  apart; the PDF is drawn offline through SkiaSharp and the export stays bounded
+  to one page. The dialog gained **Save as PDF** next to **Save as image**.-
+  Last.fm scrobbling now also mirrors the transport favourite button: toggling a
+  track as favourite loves or unloves it on Last.fm through
+  `LastFmClient.SetTrackLovedAsync`. The call is best effort, never blocks
+  playback, and is skipped for items without an artist and title. The existing
+  "now playing" notification now also skips untagged items instead of sending a
+  request Last.fm would reject.- The Infinite Mix profile editor now offers 
+  **Focus**, **Workout**, and
+  **Wind down** presets next to the mood selector. They pre-fill the mood,
+  discovery level, history period, and weighting through the pure, tested
+  `InfiniteMixPresets` mapping, which preserves the server selection, genre
+  filters, feedback, and exclusions, and never modifies the profile it is based
+  on.- The smart-playlist editor can now replace the similarity reference track.
+  **Choose reference track** opens a small search dialog over the local library
+  and every configured Orynivo Server and applies the selection together with the
+  minimum similarity score; the readable label and **Remove reference** stay.
+  Criteria building keeps using the pure `SmartPlaylistCriteriaEditing` helper,
+  which gained a picked-reference override.- Added five MCP and AI Chat tools.
+  Read-only: `get_year_in_review` returns the
+  listening statistics for one calendar year (listened hours, active days, the
+  monthly breakdown, and the leading genres, albums, and artists), and
+  `get_track_key` returns a track's estimated musical key as a Camelot wheel
+  label. Acting on search results: `set_tracks_favorite` and `set_tracks_rating`
+  update several tracks in one step, and `create_similar_playlist` builds a
+  similarity smart playlist from a reference track. Every entry accepts a local
+  absolute path or an opaque `orynivo://` reference, so no credential ever
+  reaches the model, and all five respect the per-tool Settings toggles. The tool
+  count is now 37.
+- Added `scripts/verify-all.ps1`, which runs the same checks as CI on a local
+  checkout in one command: the managed builds with `--warnaserror`, all three
+  test projects, and both parity scripts. It stops at the first failure, prints
+  a compact summary, and supports `-Configuration`, `-SkipBuild`, and `-SkipTests`.
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker
+  in the status column, playback prefers the cached file, and Settings > Library
+  sets the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
+### Fixed
+
+- Similarity smart playlists now resolve on an Orynivo Server instead of
+  returning an empty list. `/api/playlists/{id}/resolve` and
+  `/api/playlists/resolve-count` go through the new
+  `Services/SmartPlaylistResolver`, which supplies the server's cached similarity
+  feature vectors whenever the criteria carries a reference. A reference that
+  points at another library (`server:<id>`) intentionally still resolves to
+  nothing, because vectors are provider-local.
+- Remote Orynivo Server tracks now really carry their estimated musical key.
+  `CamelotKey` had been added to the rating-mutation DTO instead of
+  `OrynivoTrackInfo`, so the remote catalog mapping never received it and the
+  Key column stayed empty for server rows. The track DTO now carries the field,
+  the catalog mapping forwards it, and a Core test guards the deserialization.
+- Hardened the Core test suite against intermittent failures. Every database test
+  now creates its own temporary library through `CoreTestDatabase` and clears only
+  that database's SQLite pool, instead of sharing one library file and calling the
+  process-wide `SqliteConnection.ClearAllPools()`. `ArtistAttributionTests` no
+  longer deletes a shared database between tests, so no test can observe another
+  test's rows while xUnit runs classes in parallel.
+
 ## [0.43.1] - 2026-09-18
 
 ### Added
@@ -17,6 +148,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Remote artwork URLs that carry credentials (Orynivo Server `?key=`, Plex
   tokens) are never exposed; only local files and credential-free URLs are
   published. macOS remains unaffected.
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -119,6 +319,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   are written through the transactional bulk methods; remote tracks mirror their
   favorite state into the client-side profile container and update their rating
   through the server API. All seven interface languages are included.
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -268,6 +537,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   rounding, invariant point formatting, the clamped-control-point smoothing
   invariant, and the fingerprint's average-threshold bit selection.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - The genre-cloud recommendation tie-break is now deterministic. It previously
@@ -288,6 +626,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (or share leftover rows) depending on test ordering.
 
 ## [0.41.8] - 2026-09-16
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -316,6 +723,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.41.6] - 2026-09-10
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Unified all six desktop languages as complete built-in resources (853 keys
@@ -335,6 +811,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Added translator-maintained JSON override files for Russian and Simplified
   Chinese under `Orynivo/Localization/Overrides`; missing entries continue to
   use the reviewed built-in fallback.
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -365,6 +910,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Next**. The modal lists the physical file path first, followed by all
   metadata represented by the selectable track columns.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - The **Up Next** table now offers the same selectable track columns as
@@ -382,6 +996,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.41.3] - 2026-09-05
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Similar-title and mood-mix actions now navigate directly to **Up Next**
@@ -389,6 +1072,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   visible while the current title continues playing.
 
 ## [0.41.2] - 2026-09-05
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -405,6 +1157,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the current song.
 
 ## [0.41.1] - 2026-09-05
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -451,6 +1272,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   server profile and merged back on other clients, keeping profile-based
   recommendations consistent across devices.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Dashboard album artwork now refreshes immediately after a cover search or
@@ -464,6 +1354,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   read-only server reports from local corrections, and shows phase progress,
   elapsed time and measured phase-local remaining-time estimates.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Opening metadata review uses a fast index-only analysis instead of opening
@@ -476,6 +1435,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   selection as server results arrive, and invalidates library views after repairs.
 
 ## [0.40.1] - 2026-09-05
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -514,6 +1542,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   library browser now navigates artists, their albums, and album tracks across
   the local catalog and configured servers; tracks retain the same safe
   play-now, play-next, and append actions.
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -609,6 +1706,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Conservatively matched artist-name spelling
   variants are now included as guided-review findings without automatic merges.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Fixed a Library Doctor database-column typo that closed Orynivo when metadata
@@ -644,6 +1810,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Orynivo Server discovery and library scans. A build-time parity check now
   keeps the MCP surface, AI schema, dispatcher, and Settings checklist aligned.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Fixed combined artist-and-title library searches so terms can match across
@@ -662,6 +1897,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   structured GitHub forms for bug reports and feature requests. The issue
   chooser routes setup questions to Discussions and security reports to private
   security advisories.
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -684,6 +1988,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   option for later AAC integration rather than being mislabelled as ALAC.
   Native `shk` and payload encryption now use the first 32 bytes of the
   transient pairing secret, independently from the event-channel HKDF keys.
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -782,6 +2155,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   images are copied only to sources without artwork, and manually protected
   artist images are never overwritten.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Artist and album artwork changes now invalidate the unified library view
@@ -824,6 +2266,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   remote server library versions invalidate it immediately, while listening
   statistics and recently played rows remain freshly queried.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Restarting Orynivo now restores every selectable sidebar content view rather
@@ -836,6 +2347,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   hang that Windows could terminate as `AppHangB1` on large libraries.
 
 ## [0.36.5] - 2026-08-12
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -861,6 +2441,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   table now also exposes the complete shared track-column chooser from its
   header context menu and persists its own visibility, order, and widths.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Orynivo Server ReplayGain maintenance now runs FFmpeg with one worker thread,
@@ -881,6 +2530,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   genre spans only a few albums.
 
 ## [0.36.3] - 2026-08-11
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -914,6 +2632,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   device for other applications, preserves the current source and position,
   and can reacquire the device and resume from that position without restarting
   Orynivo.
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -951,6 +2738,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and take priority. Unresolved metadata matches are retried after 90 days
   instead of being requested repeatedly.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Distinguished a completed MusicBrainz lookup with no community votes from a
@@ -969,6 +2825,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   search action when artwork is missing, plus the same favorite control and
   local/Orynivo Server source badge as the main Albums artwork view.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Removed the Fluent DataGrid header's permanent empty sort-icon reservation,
@@ -986,6 +2911,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.35.2] - 2026-08-03
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Fixed unified artist details clearing their already rendered albums when the
@@ -996,6 +2990,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `es` instead of silently falling back to English.
 
 ## [0.35.1] - 2026-08-03
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -1046,6 +3109,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   The Appearance section now keeps the cache-clear action beside the background
   selector and persists a 0–100% tile-visibility slider, defaulting to 50%.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Fixed Windows identifying Orynivo as an unknown application in the system
@@ -1058,6 +3190,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   count that file as failed instead of updated.
 
 ## [0.34.1] - 2026-08-02
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -1083,6 +3284,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   servers reject the unsupported operation instead of silently running a
   normal scan.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Preserved an album's downloaded artwork and favorite flag when a full
@@ -1091,6 +3361,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   continues to take precedence.
 
 ## [0.33.2] - 2026-08-02
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -1113,6 +3452,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   from remaining visible after the fix.
 
 ## [0.33.1] - 2026-08-01
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -1155,6 +3563,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Expanded the main README, multilingual product website, and GitHub Wiki with
   current Genre Cloud and Infinite Mix behavior, usage, server integration, and
   local cache/data-location documentation.
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -1200,6 +3677,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   remain readable. Genre recommendations can now switch between the playable
   track table and a source-aware album artwork grid.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Fixed Genre Cloud drill-downs reverting to all root genres when a connected
@@ -1244,6 +3790,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   canonical and hreflang metadata, an XML sitemap, complete social metadata,
   SoftwareApplication structured data, and optimized screenshot assets.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Fixed SEO image dimensions stretching the product screenshots and brand
@@ -1271,6 +3886,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Extended manual artist-image search with an editable artist query and the
   same provider order as batch discovery: Fanart.tv first when a key is
   configured, then Wikimedia Commons when Fanart.tv has no usable result.
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -1311,6 +3995,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Orynivo stores the selected titles, artists, album,
   numbering, and MusicBrainz IDs as library-only overrides that survive scans
   without modifying audio-file tags.
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -1354,12 +4107,150 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
   `softprops/action-gh-release@v3`.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Linux server release builds now normalize and validate packaged maintainer
   scripts before upload, preventing CRLF shebang failures during DEB upgrades.
 
 ## [0.29.3] - 2026-07-28
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -1390,6 +4281,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Existing libraries receive a one-time attribution metadata refresh during
   their next scan.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Opening a local or Orynivo Server album from a unified artist view once again
@@ -1397,6 +4357,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   tracks on the album.
 
 ## [0.29.1] - 2026-07-26
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -1425,6 +4454,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   verify the manifest signature and package SHA-256 digest, and open the
   verified package in the macOS Installer.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Hidden the Steinberg ASIO and cwASIO subsystem badges on macOS and Linux,
@@ -1450,6 +4548,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   complete server scan indefinitely.
 
 ## [0.28.1] - 2026-07-25
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -1510,6 +4677,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   streaming secrets remain process-local instead of being written without
   Windows DPAPI protection.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Linux now detects the extensionless `ffmpeg` and `ffprobe` executables for
@@ -1543,6 +4779,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and boundaries. Library-only chapter-title corrections persist across scans
   without modifying the MKA file.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Improved the startup update dialog's primary action contrast, spacing, and
@@ -1555,6 +4860,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Added the authenticated Orynivo Server `/api/library/summary` endpoint and
   client method for compact aggregate Dashboard counts without transferring
   complete track or album rows.
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -1575,6 +4949,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   startup update notification to launch the existing verified update flow
   directly.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Placed Settings on/off switches immediately before their labels and aligned
@@ -1590,6 +5033,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   embedded ReplayGain tags are still imported and manual calculation remains
   available.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Removed the standalone cyan scan-activity dot from the sidebar while retaining
@@ -1602,6 +5114,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Desktop updates now relay the same signed release to every reachable,
   update-enabled Orynivo Server before launching the Windows installer; failed
   servers are named and the user can explicitly continue the desktop update.
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -1622,6 +5203,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   manifest in the background at application startup and notifies the user when
   a newer Windows version is available.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Prevented publication of incomplete signed update manifests by waiting for
@@ -1635,6 +5285,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Replaced the Dashboard hero summary glyphs with the same album, track, artist,
   and favorite vector icons used by navigation, while retaining each tile's
   colored circular badge.
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -1745,6 +5464,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Tightened the four hero counter tiles to compact fixed-width cards and aligned
   their icon badges to the left like the reference layout.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Fixed the listening chart's Y-axis rendering: the filled path now includes an
@@ -1843,6 +5631,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Updated the README to reflect current queue, smart-playlist, dashboard, MCP,
   remote Orynivo Server, and cwASIO/native-DSD capabilities.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Fixed dragging albums onto the "Up Next" sidebar item restarting the current
@@ -1872,6 +5729,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Restyled the favorite heart with a warmer Orynivo-specific color and adjusted
   glyph across tables, artwork cards, album headers, and the transport bar.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Reduced local and Orynivo Server artist rename work by updating only the
@@ -1890,6 +5816,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the selected navigation item without firing an unintended navigation change.
 
 ## [0.23.2] - 2026-07-05
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -1910,6 +5905,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   played cards/full view.
 
 ## [0.23.1] - 2026-07-05
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -1963,6 +6027,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Playlist tables now expose the favorite heart as the first column and the
   source column directly beside it. Source tooltips use theme-aware foreground
   and background colors.
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -2060,6 +6193,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   to every PCM playback path, including local files, remote/Plex streams,
   radio, podcasts, and DSD sources when they are converted to PCM; native DSD
   output remains bit-perfect and unchanged.
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -2201,6 +6403,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   chat and to external MCP clients, and has its own enable/disable toggle in
   Settings → Integration → MCP Server (bringing the tool count to 20).
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Fixed waveform transport seeking so pointer release is captured reliably, the
@@ -2302,6 +6573,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Settings, and pending checks are cancelled when the list is rebuilt or Settings
   is closed.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Fixed checkbox borders appearing near-black on the dark background: the app
@@ -2325,6 +6665,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   fields, and cleaner DataGrid spacing without visible grid lines.
 - Album and artist artwork cards now use theme-aware placeholder backgrounds,
   subtle borders, clipped covers, and a calmer asymmetric card shape.
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -2386,6 +6795,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   accent-bordered card style (`#6C63FF`, `CornerRadius="0,24,0,24"`) as the
   library headline/intro card, for both local and remote search results.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - The Dashboard genre statistics (Top genres and the per-day calendar genres) now
@@ -2407,6 +6885,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.20.2] - 2026-06-29
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - The Linux Orynivo Server now reads and writes its editable configuration at
@@ -2418,6 +6965,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   upgrades.
 
 ## [0.20.1] - 2026-06-29
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -2445,6 +7061,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   no longer re-downloads the whole library. The cache key includes the API key
   (cached playback URLs embed it) and client-side favourites are re-applied after
   loading so toggling a favourite is never masked by stale cached flags.
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -2486,6 +7171,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.19.0] - 2026-06-28
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Windows FFmpeg auto-download now resolves the current BtbN release asset via
@@ -2499,6 +7253,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   libraries so track/album/folder context menus use the same playlist actions
   while persisting entries to the correct local database or remote server.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - FFmpeg and FFprobe child processes now always receive a valid working
@@ -2507,6 +7330,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `%LOCALAPPDATA%\Programs\Orynivo` path.
 
 ## [0.17.0] - 2026-06-28
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -2630,6 +7522,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Orynivo Server connection settings now live under their own Settings >
   Library > Orynivo Server entry instead of Settings > Streaming services or
   the local directories page.
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -2773,6 +7734,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Appearance.  API keys are stored in `settings.json` (the same policy as
   the embedded AI chat key).
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - The Orynivo Server settings and remote directory browser dialogs now use
@@ -2857,6 +7887,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the AI assistant knows the capability is unavailable; the active set is
   persisted in `AppSettings.DisabledMcpTools`.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Fixed numbered circle labels on the equalizer frequency-response graph being
@@ -2895,6 +7994,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   is automatically migrated to a profile named "Standard" on first launch.
   (`OutputProfile`, `OutputProfileDialog`, `AppSettings.OutputProfiles`,
   `AppSettings.SelectedOutputProfileName`, `SettingsStore.NormalizeOutputProfiles`)
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -2968,6 +8136,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   per-profile import and editing, and confirmed deletion. Existing single-EQ
   settings migrate automatically into the profile list.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Enabled the A–Z index in the Plex folder view. Available letters now come
@@ -3037,6 +8274,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   ASIO PCM and exclusive WASAPI playback seek into the shared source file and
   stop at each track's CUE boundary without creating split files.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 ## [0.8.0] - 2026-06-21
@@ -3059,6 +8365,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   create a new playlist, respecting the current album-track scope. The album
   card now spans the available content width, with the favorite action directly
   before the album title and the cover/playlist actions aligned side by side.
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -3108,6 +8483,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.7.2] - 2026-06-21
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Fixed the application failing during startup because the lyrics
@@ -3132,6 +8576,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   window receives the primary theme text color as a global fallback.
 
 ## [0.7.1] - 2026-06-21
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -3204,6 +8717,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Matched the album detail header to the shared radio, podcast, and library
   card design with the accent-colored border and asymmetric rounded corners.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Added a theme-aware background highlight for the currently audible item in
@@ -3253,6 +8835,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   French, and Spanish when DSD is being converted to PCM, including the active
   PCM output sample rate.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Fixed the table-header column chooser not opening on right-click and then
@@ -3294,6 +8945,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   current process session. A localised progress indicator is shown in the startup
   screen. If the download fails, a warning dialog is displayed and the application
   starts without audio playback capability.
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -3384,6 +9104,75 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   immediately due to CPU cache visibility.
 
 ## [0.4.0] - 2026-06-15
+
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
+- Added bulk genre editing for the shared Tracks table. The bulk action bar gained
+  a genre field that stores the value for every selected **local** track through
+  `AudioDatabase.SetTrackGenres`, which writes the library-only
+  `track_genre_overrides` table in one transaction and reapplies it on every later
+  scan. Source media files are never modified, and an empty value removes the
+  override so the next scan restores the embedded genre. Selected Orynivo Server
+  tracks are updated on their owning server through the new authenticated
+  `PUT /api/tracks/{id}/genre`, which records the same library-only override.
+- Podcast episodes can be downloaded for offline playback. Episode rows gained a
+  **Download episode** / **Delete download** context menu and a download marker in
+  the status column, playback prefers the cached file, and Settings > Library sets
+  the cache size limit in megabytes. Eviction removes the least recently used
+  downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
+  the most recently used episode is always kept.
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 

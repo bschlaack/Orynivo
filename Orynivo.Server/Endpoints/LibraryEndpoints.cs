@@ -288,6 +288,31 @@ public static class LibraryEndpoints
             return updated ? Results.Ok() : Results.NotFound();
         });
 
+        // Cross-device resume: the last playback position of a track, scoped to the
+        // authenticated profile so another device can continue where this one stopped.
+        api.MapGet("/tracks/{trackId:long}/position", (long trackId) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            if (db.GetTrackById(trackId) is null)
+                return Results.NotFound();
+            return Results.Ok(new TrackPositionDto(db.GetProfileTrackPosition(trackId)));
+        });
+
+        api.MapPut("/tracks/{trackId:long}/position", (long trackId, TrackPositionUpdateRequest request) =>
+        {
+            if (request.PositionSeconds is double position &&
+                (double.IsNaN(position) || double.IsInfinity(position) || position < 0))
+            {
+                return Results.BadRequest();
+            }
+
+            using var db = AudioDatabase.OpenDefault();
+            if (db.GetTrackById(trackId) is null)
+                return Results.NotFound();
+            db.SaveProfileTrackPosition(trackId, request.PositionSeconds ?? 0);
+            return Results.Ok();
+        });
+
         api.MapPut("/tracks/{trackId:long}/rating", (long trackId, TrackRatingUpdateRequest request) =>
         {
             using var db = AudioDatabase.OpenDefault();
@@ -327,6 +352,18 @@ public static class LibraryEndpoints
                 return Results.NotFound();
             db.SetTrackFavorite(trackId, request.IsFavorite);
             return Results.Ok(new { trackId, request.IsFavorite });
+        });
+
+        api.MapPut("/tracks/{trackId:long}/genre", (long trackId, TrackGenreUpdateRequest request) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            if (db.GetTrackById(trackId) is null)
+                return Results.NotFound();
+            // Library-only override: the server never rewrites the media file.
+            db.SetTrackGenres([trackId], request.Genre);
+            if (db.GetTrackById(trackId) is { } updatedTrack)
+                TrackSearchIndex.UpdateMany([updatedTrack]);
+            return Results.Ok(new { trackId, request.Genre });
         });
 
         api.MapGet("/history/sync", (int limit = 500) =>
@@ -456,7 +493,7 @@ public static class LibraryEndpoints
             var candidates = db.GetSmartPlaylistTracks()
                 .Select(t => t with { IsFavorite = favoriteOverride.Contains(t.Id) })
                 .ToList();
-            return Results.Ok(new { Count = criteria.Resolve(candidates).Count });
+            return Results.Ok(new { Count = SmartPlaylistResolver.Resolve(db, criteria, candidates).Count });
         });
 
         api.MapPost("/playlists", (PlaylistCreateRequest request) =>
@@ -881,7 +918,7 @@ public static class LibraryEndpoints
             : db.GetSmartPlaylistTracks()
                 .Select(t => t with { IsFavorite = favoriteOverride.Contains(t.Id) })
                 .ToList();
-        var resolved = criteria.Resolve(candidates);
+        var resolved = SmartPlaylistResolver.Resolve(db, criteria, candidates);
         var ids = resolved.Select(t => t.Id).ToList();
         var tracks = db.GetTrackListByIds(ids);
         return Results.Ok(tracks.Select((track, index) => new
@@ -948,6 +985,19 @@ public sealed record TrackLyricsUpdateRequest(
     string? PlainLyrics,
     string? SyncedLyrics);
 
+/// <summary>Response body for the profile-scoped cross-device playback position.</summary>
+/// <param name="PositionSeconds">
+/// Stored position in seconds, or <see langword="null"/> when the track was never
+/// played on another device.
+/// </param>
+public sealed record TrackPositionDto(double? PositionSeconds);
+
+/// <summary>Request body for storing a profile-scoped cross-device playback position.</summary>
+/// <param name="PositionSeconds">
+/// Position in seconds; zero or negative clears the stored entry.
+/// </param>
+public sealed record TrackPositionUpdateRequest(double? PositionSeconds);
+
 /// <summary>Request body for personal and cached MusicBrainz track ratings.</summary>
 /// <param name="UserRating">Optional personal zero-to-five-star rating.</param>
 /// <param name="MusicBrainzTrackId">Optional resolved MusicBrainz recording identifier.</param>
@@ -967,6 +1017,13 @@ public sealed record TrackRatingUpdateRequest(
 
 /// <summary>Request body for a profile-scoped server track favorite.</summary>
 public sealed record FavoriteUpdateRequest(bool IsFavorite);
+
+/// <summary>Library-only genre update sent by an authenticated client.</summary>
+/// <param name="Genre">
+/// Replacement genre, or <see langword="null"/>/empty to clear the override so the
+/// next scan restores the embedded value.
+/// </param>
+public sealed record TrackGenreUpdateRequest(string? Genre);
 
 /// <summary>Request body for creating a regular server playlist.</summary>
 /// <param name="Name">Playlist display name.</param>

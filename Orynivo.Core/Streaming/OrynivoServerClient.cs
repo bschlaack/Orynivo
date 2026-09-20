@@ -163,7 +163,8 @@ public sealed record OrynivoTrackInfo(
     string? MusicBrainzTrackId = null,
     long? MusicBrainzRatingFetchedAt = null,
     string? MusicBrainzGenres = null,
-    string? MusicBrainzTags = null);
+    string? MusicBrainzTags = null,
+    string? CamelotKey = null);
 
 /// <summary>Rating mutation sent to an Orynivo Server.</summary>
 /// <param name="UserRating">Optional personal zero-to-five-star rating.</param>
@@ -180,8 +181,7 @@ public sealed record OrynivoTrackRatingUpdate(
     int? MusicBrainzRatingVotes = null,
     long? MusicBrainzRatingFetchedAt = null,
     string? MusicBrainzGenres = null,
-    string? MusicBrainzTags = null,
-    string? CamelotKey = null);
+    string? MusicBrainzTags = null);
 
 
 /// <summary>Lightweight remote track entry used for folder-tree construction.</summary>
@@ -235,6 +235,16 @@ public sealed record OrynivoFullSearchResult(
 /// <param name="SyncedLyrics">LRC-formatted synchronised lyrics, or <see langword="null"/>.</param>
 /// <param name="FetchedAt">Unix-seconds timestamp of the last lyrics lookup, or <see langword="null"/>.</param>
 public sealed record OrynivoLyrics(string? PlainLyrics, string? SyncedLyrics, long? FetchedAt = null);
+
+/// <summary>
+/// Profile-scoped last playback position of a remote track, used to resume it on
+/// another device.
+/// </summary>
+/// <param name="PositionSeconds">
+/// Stored position in seconds, or <see langword="null"/> when the track was never
+/// played on another device.
+/// </param>
+public sealed record TrackPositionDto(double? PositionSeconds);
 
 /// <summary>Compact waveform peak data returned by a remote Orynivo Server.</summary>
 /// <param name="Version">Cache format version.</param>
@@ -455,6 +465,14 @@ public sealed class OrynivoServerClient : IDisposable
     {
         _http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
         _maintenanceHttp = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+    }
+
+    /// <summary>Initialises a client over a supplied HTTP client, used by tests.</summary>
+    /// <param name="http">HTTP client used for catalog and streaming requests.</param>
+    internal OrynivoServerClient(HttpClient http)
+    {
+        _http = http;
+        _maintenanceHttp = http;
     }
 
     // ------------------------------------------------------------------
@@ -1413,6 +1431,65 @@ public sealed class OrynivoServerClient : IDisposable
         }
     }
 
+    /// <summary>
+    /// Reads the profile-scoped last playback position another device stored for a
+    /// remote track.
+    /// </summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="trackId">Server-side track identifier.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The stored position in seconds, or <see langword="null"/> when none exists.</returns>
+    public async Task<double?> GetTrackPositionAsync(
+        OrynivoServerSettings server,
+        long trackId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var dto = await GetJsonAsync<TrackPositionDto>(
+                server, $"/api/tracks/{trackId}/position", cancellationToken).ConfigureAwait(false);
+            var position = dto?.PositionSeconds;
+            return position is double value && !double.IsNaN(value) && value > 0 ? value : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Stores the profile-scoped last playback position for a remote track.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="trackId">Server-side track identifier.</param>
+    /// <param name="positionSeconds">Position in seconds; zero clears the stored entry.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when the update was accepted.</returns>
+    public async Task<bool> SaveTrackPositionAsync(
+        OrynivoServerSettings server,
+        long trackId,
+        double positionSeconds,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(
+                HttpMethod.Put,
+                BuildUrl(server, $"/api/tracks/{trackId}/position"))
+            {
+                Content = JsonContent.Create(
+                    new { positionSeconds = Math.Max(0, positionSeconds) },
+                    options: JsonOptions)
+            };
+            request.Headers.Add("X-Api-Key", server.ApiKey);
+            AddProfileHeader(request, server);
+            using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     /// <summary>Stores the active profile's favorite state for a remote track.</summary>
     public async Task<bool> UpdateTrackFavoriteAsync(
         OrynivoServerSettings server,
@@ -1427,6 +1504,39 @@ public sealed class OrynivoServerClient : IDisposable
                 BuildUrl(server, $"/api/tracks/{trackId}/favorite"))
             {
                 Content = JsonContent.Create(new { isFavorite }, options: JsonOptions)
+            };
+            request.Headers.Add("X-Api-Key", server.ApiKey);
+            AddProfileHeader(request, server);
+            using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// Stores the library-only genre of a server track. The server records it as an
+    /// override and never rewrites the media file.
+    /// </summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="trackId">Server-side track identifier.</param>
+    /// <param name="genre">Replacement genre, or <see langword="null"/> to clear it.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when the server accepted the update.</returns>
+    public async Task<bool> UpdateTrackGenreAsync(
+        OrynivoServerSettings server,
+        long trackId,
+        string? genre,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(
+                HttpMethod.Put,
+                BuildUrl(server, $"/api/tracks/{trackId}/genre"))
+            {
+                // Send an explicit empty value so clearing never depends on the
+                // serializer's null handling; the server trims it to a clear.
+                Content = JsonContent.Create(new { genre = genre ?? string.Empty }, options: JsonOptions)
             };
             request.Headers.Add("X-Api-Key", server.ApiKey);
             AddProfileHeader(request, server);

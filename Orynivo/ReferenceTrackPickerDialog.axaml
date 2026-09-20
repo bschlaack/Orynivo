@@ -1,0 +1,107 @@
+<Window x:Class="Orynivo.ReferenceTrackPickerDialog"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{DynamicResource L_ChooseReferenceTrack}"
+        Icon="avares://Orynivo/Assets/Orynivo.ico"
+        Width="520"
+        Height="480"
+        MinWidth="420"
+        MinHeight="360"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource AppSurfaceBrush}">
+    <Window.Resources>
+        <ControlTheme x:Key="PickerButtonTheme" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource AppButtonBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource AppButtonTextBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AppButtonBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <ControlTemplate>
+                    <Border x:Name="ButtonBorder"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="5">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          TextBlock.Foreground="{TemplateBinding Foreground}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter>
+            <Style Selector="^:pointerover /template/ Border#ButtonBorder">
+                <Setter Property="Background" Value="{DynamicResource AppButtonHoverBrush}"/>
+            </Style>
+            <Style Selector="^:pressed /template/ Border#ButtonBorder">
+                <Setter Property="Background" Value="{DynamicResource AppButtonPressedBrush}"/>
+            </Style>
+        </ControlTheme>
+        <ControlTheme x:Key="PickerPrimaryButtonTheme"
+                      TargetType="Button"
+                      BasedOn="{StaticResource PickerButtonTheme}">
+            <Setter Property="Background" Value="{DynamicResource AppTransportPlayBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Style Selector="^:pointerover /template/ Border#ButtonBorder">
+                <Setter Property="Background" Value="{DynamicResource AppTransportPlayHoverBrush}"/>
+            </Style>
+            <Style Selector="^:pressed /template/ Border#ButtonBorder">
+                <Setter Property="Background" Value="{DynamicResource AppTransportPlayBrush}"/>
+            </Style>
+        </ControlTheme>
+    </Window.Resources>
+
+    <Grid Margin="24,20,24,24" RowDefinitions="Auto,Auto,*,Auto">
+        <TextBlock Grid.Row="0"
+                   Text="{DynamicResource L_ReferenceTrackSearchLabel}"
+                   FontSize="{DynamicResource FontSizeCaption}"
+                   Foreground="{DynamicResource AppMutedTextBrush}"
+                   Margin="0,0,0,6"/>
+
+        <TextBox x:Name="SearchTextBox"
+                 Grid.Row="1"
+                 Height="34"
+                 Padding="10,0"
+                 VerticalContentAlignment="Center"
+                 FontSize="{DynamicResource FontSizeBody}"
+                 Background="{DynamicResource AppInputBrush}"
+                 Foreground="{DynamicResource AppPrimaryTextBrush}"
+                 BorderBrush="{DynamicResource AppInputBorderBrush}"
+                 Watermark="{DynamicResource L_ReferenceTrackSearchWatermark}"
+                 Margin="0,0,0,10"
+                 TextChanged="SearchTextBox_OnTextChanged"/>
+
+        <Grid Grid.Row="2">
+            <ListBox x:Name="ResultsListBox"
+                     Background="{DynamicResource AppContentBrush}"
+                     BorderBrush="{DynamicResource AppInputBorderBrush}"
+                     BorderThickness="1"
+                     DoubleTapped="ResultsListBox_OnDoubleTapped"
+                     SelectionChanged="ResultsListBox_OnSelectionChanged"/>
+            <TextBlock x:Name="StatusTextBlock"
+                       IsVisible="False"
+                       Margin="12"
+                       TextWrapping="Wrap"
+                       VerticalAlignment="Top"
+                       FontSize="{DynamicResource FontSizeCaption}"
+                       Foreground="{DynamicResource AppMutedTextBrush}"/>
+        </Grid>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Content="{DynamicResource L_Cancel}"
+                    Width="96" Height="34"
+                    Margin="0,0,8,0"
+                    Theme="{StaticResource PickerButtonTheme}"
+                    Click="CancelButton_OnClick"/>
+            <Button x:Name="UseButton"
+                    Content="{DynamicResource L_UseReferenceTrack}"
+                    MinWidth="140" Height="34"
+                    IsEnabled="False"
+                    Theme="{StaticResource PickerPrimaryButtonTheme}"
+                    Click="UseButton_OnClick"/>
+        </StackPanel>
+    </Grid>
+</Window>

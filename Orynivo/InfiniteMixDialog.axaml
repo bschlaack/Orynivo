@@ -15,6 +15,20 @@
       <StackPanel Margin="0,0,28,0" Spacing="14">
         <TextBlock Text="{DynamicResource L_InfiniteMixSettingsHint}" TextWrapping="Wrap"
                    FontSize="{DynamicResource FontSizeBody}" Foreground="{DynamicResource AppMutedTextBrush}"/>
+        <TextBlock Text="{DynamicResource L_InfiniteMixPresets}" FontWeight="SemiBold"/>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button Padding="12,5" Tag="Focus"
+                  Content="{DynamicResource L_InfiniteMixPresetFocus}"
+                  Click="PresetButton_OnClick"/>
+          <Button Padding="12,5" Tag="Workout"
+                  Content="{DynamicResource L_InfiniteMixPresetWorkout}"
+                  Click="PresetButton_OnClick"/>
+          <Button Padding="12,5" Tag="WindDown"
+                  Content="{DynamicResource L_InfiniteMixPresetWindDown}"
+                  Click="PresetButton_OnClick"/>
+        </StackPanel>
+        <TextBlock Text="{DynamicResource L_InfiniteMixPresetsHint}" TextWrapping="Wrap"
+                   FontSize="{DynamicResource FontSizeMeta}" Foreground="{DynamicResource AppMutedTextBrush}"/>
         <TextBlock Text="{DynamicResource L_InfiniteMixMood}" FontWeight="SemiBold"/>
         <ComboBox x:Name="MoodComboBox" HorizontalAlignment="Stretch"/>
         <TextBlock Text="{DynamicResource L_InfiniteMixDiscovery}" FontWeight="SemiBold"/>

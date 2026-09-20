@@ -147,6 +147,28 @@ public partial class InfiniteMixDialog : Window
     private void DiscoverySlider_OnValueChanged(object? sender, Avalonia.Controls.Primitives.RangeBaseValueChangedEventArgs e)
         => DiscoveryValueText.Text = $"{e.NewValue:0} %";
 
+    /// <summary>
+    /// Applies a curated preset to the editable profile controls. The preset only
+    /// pre-fills the profile; the user can adjust every field afterwards.
+    /// </summary>
+    /// <param name="sender">The preset button.</param>
+    /// <param name="e">Click details.</param>
+    private void PresetButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string tag } ||
+            !Enum.TryParse<InfiniteMixPreset>(tag, out var preset))
+        {
+            return;
+        }
+
+        var applied = InfiniteMixPresets.Apply(preset, _settings);
+        MoodComboBox.SelectedIndex = (int)applied.Mood;
+        DiscoverySlider.Value = applied.DiscoveryLevel;
+        PeriodComboBox.SelectedItem = applied.HistoryDays;
+        WeightFavoritesCheckBox.IsChecked = applied.WeightFavorites;
+        PreferRareCheckBox.IsChecked = applied.PreferRareTracks;
+    }
+
     private void CancelButton_OnClick(object? sender, RoutedEventArgs e) => Close(false);
 
     private void SaveButton_OnClick(object? sender, RoutedEventArgs e)

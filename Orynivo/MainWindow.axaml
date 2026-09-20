@@ -45,6 +45,7 @@
              support the same cover-change and favorite actions. -->
         <DataTemplate x:Key="AlbumArtworkCardTemplate">
             <Border Classes="motionCard"
+                    AutomationProperties.Name="{Binding Title}"
                     Width="180"
                     MinHeight="276"
                     Margin="8"
@@ -1550,6 +1551,21 @@
                                       BorderBrush="{DynamicResource AppHeaderBorderBrush}"
                                       ToolTip.Tip="{DynamicResource L_BulkRating}"
                                       SelectionChanged="BulkRatingComboBox_OnSelectionChanged"/>
+                            <TextBox x:Name="BulkGenreTextBox"
+                                     Width="170"
+                                     Height="30"
+                                     VerticalAlignment="Center"
+                                     Background="{DynamicResource AppInputBrush}"
+                                     Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                     BorderBrush="{DynamicResource AppHeaderBorderBrush}"
+                                     Watermark="{DynamicResource L_BulkGenre}"
+                                     ToolTip.Tip="{DynamicResource L_BulkGenreTooltip}"/>
+                            <Button x:Name="BulkGenreApplyButton"
+                                    Padding="12,5"
+                                    VerticalAlignment="Center"
+                                    Theme="{StaticResource HeaderFilterButtonTheme}"
+                                    Content="{DynamicResource L_BulkGenreApply}"
+                                    Click="BulkGenreApplyButton_OnClick"/>
                         </StackPanel>
                 </Grid>
             </Border>
@@ -2389,12 +2405,12 @@
                                   IsReadOnly="True"
                                   SelectionMode="Single"
                                   LoadingRow="TrackDataGrid_OnLoadingRow"
-                                  DoubleTapped="PodcastEpisodesDataGrid_OnMouseDoubleClick">
+                            DoubleTapped="PodcastEpisodesDataGrid_OnMouseDoubleClick">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="{DynamicResource L_PodcastStatus}"
                                                     Binding="{Binding Status}"
                                                     Tag="status"
-                                                    Width="90"/>
+                                                    Width="150"/>
                                 <DataGridTextColumn Header="{DynamicResource L_Title}"
                                                     Binding="{Binding Title}"
                                                     Tag="title"
@@ -2767,6 +2783,7 @@
                      Background="{DynamicResource AppContentBrush}"
                      BorderThickness="0"
                      ItemTemplate="{StaticResource AlbumArtworkCardTemplate}"
+                     KeyDown="AlbumArtworkListBox_OnKeyDown"
                      DoubleTapped="AlbumArtworkListBox_OnMouseDoubleClick">
                 <ListBox.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -2794,6 +2811,7 @@
                      IsVisible="False"
                      Background="{DynamicResource AppContentBrush}"
                      BorderThickness="0"
+                     KeyDown="ArtistArtworkListBox_OnKeyDown"
                      DoubleTapped="ArtistArtworkListBox_OnMouseDoubleClick">
                 <ListBox.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -2815,6 +2833,7 @@
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <Border Classes="motionCard"
+                                AutomationProperties.Name="{Binding Title}"
                                 Width="200"
                                 Height="256"
                                 Margin="8"
@@ -3539,6 +3558,7 @@
                                 <TranslateTransform/>
                             </StackPanel.RenderTransform>
                             <Button x:Name="PreviousButton"
+                                    AutomationProperties.Name="{DynamicResource L_TransportPrevious}"
                                     Theme="{StaticResource TransportBtnTheme}"
                                     Margin="0,0,6,0" IsEnabled="False"
                                     Click="PreviousButton_OnClick">
@@ -3557,6 +3577,7 @@
                                 </Grid>
                             </Button>
                             <Button x:Name="PlayButton"
+                                    AutomationProperties.Name="{DynamicResource L_TransportPlayPause}"
                                     Theme="{StaticResource PlayBtnTheme}"
                                     Margin="6,0"
                                     Click="PlayButton_OnClick">
@@ -3570,6 +3591,7 @@
                                 </Canvas>
                             </Button>
                             <Button x:Name="NextButton"
+                                    AutomationProperties.Name="{DynamicResource L_TransportNext}"
                                     Theme="{StaticResource TransportBtnTheme}"
                                     Margin="6,0,0,0" IsEnabled="False"
                                     Click="NextButton_OnClick">
@@ -3592,6 +3614,7 @@
                                     Orientation="Horizontal"
                                     HorizontalAlignment="Left">
                             <Button x:Name="ArtistInfoButton"
+                                    AutomationProperties.Name="{DynamicResource L_ShowArtistInfo}"
                                     Theme="{StaticResource TransportBtnTheme}"
                                     Margin="6,0,0,0"
                                     IsEnabled="False"
@@ -3602,6 +3625,7 @@
                                       Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                             </Button>
                             <Button x:Name="LyricsButton"
+                                    AutomationProperties.Name="{DynamicResource L_ShowLyrics}"
                                     Theme="{StaticResource TransportBtnTheme}"
                                     Margin="6,0,0,0"
                                     IsEnabled="False"
@@ -3612,6 +3636,7 @@
                                       Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                             </Button>
                             <Button x:Name="NowPlayingFavoriteButton"
+                                    AutomationProperties.Name="{DynamicResource L_MarkAsFavorite}"
                                     Theme="{StaticResource TransportBtnTheme}"
                                     Margin="6,0,0,0"
                                     IsEnabled="False"
@@ -3626,6 +3651,7 @@
                                            FontSize="15"/>
                             </Button>
                             <Button x:Name="ShuffleButton"
+                                    AutomationProperties.Name="{DynamicResource L_Shuffle}"
                                     Theme="{StaticResource TransportBtnTheme}"
                                     Margin="6,0,0,0"
                                     ToolTip.Tip="{DynamicResource L_Shuffle}"
@@ -3644,6 +3670,17 @@
                                               Data="M 14 1 L 18 4 L 14 7 Z M 14 11 L 18 14 L 14 17 Z"/>
                                     </Canvas>
                                 </Viewbox>
+                            </Button>
+                            <Button x:Name="ResumePositionButton"
+                                    Theme="{StaticResource TransportBtnTheme}"
+                                    Margin="6,0,0,0"
+                                    IsVisible="False"
+                                    AutomationProperties.Name="{DynamicResource L_ResumeOnThisDevice}"
+                                    ToolTip.Tip="{DynamicResource L_ResumeOnThisDevice}"
+                                    Click="ResumePositionButton_OnClick">
+                                <Path Width="15" Height="15" Stretch="Uniform"
+                                      Data="{StaticResource IconPlay}"
+                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                             </Button>
                         </StackPanel>
                     </Grid>
@@ -3762,6 +3799,7 @@
                               VerticalAlignment="Center"
                               Margin="0,0,10,0"/>
                         <Slider x:Name="VolumeSlider"
+                                AutomationProperties.Name="{DynamicResource L_TransportVolume}"
                                 Theme="{StaticResource DarkSliderTheme}"
                                 Width="100" Minimum="0" Maximum="1" Value="1"
                                 VerticalAlignment="Center"
@@ -3775,6 +3813,7 @@
                                 HorizontalAlignment="Center"
                                 Margin="0,6,0,0">
                         <Button x:Name="EqPickerButton"
+                                AutomationProperties.Name="{DynamicResource L_Equalizer}"
                                 Theme="{StaticResource TransportBtnTheme}"
                                 ToolTip.Tip="{DynamicResource L_Equalizer}"
                                 Click="EqPickerButton_OnClick">
@@ -3788,6 +3827,7 @@
                             </Viewbox>
                         </Button>
                         <Button x:Name="OutputPickerButton"
+                                AutomationProperties.Name="{DynamicResource L_OutputDevice}"
                                 Theme="{StaticResource TransportBtnTheme}"
                                 Margin="4,0,0,0"
                                 ToolTip.Tip="{DynamicResource L_OutputDevice}"
@@ -3805,6 +3845,7 @@
                             </Viewbox>
                         </Button>
                         <Button x:Name="OutputDeviceLockButton"
+                                AutomationProperties.Name="{DynamicResource L_ReleaseOutputDevice}"
                                 Theme="{StaticResource TransportBtnTheme}"
                                 Margin="4,0,0,0"
                                 ToolTip.Tip="{DynamicResource L_ReleaseOutputDevice}"
@@ -3827,4 +3868,5 @@
 
     </Grid>
 </Window>
+
 

@@ -377,16 +377,38 @@ public partial class MainWindow
         if (sender is not Avalonia.Controls.MenuItem { Tag: string path })
             return;
 
-        var seedIdentity = await ResolveSimilaritySeedAsync(path).ConfigureAwait(true);
-        if (seedIdentity is null)
+        var dialog = new NewPlaylistDialog();
+        if (await dialog.ShowDialog<bool>(this) == false || string.IsNullOrWhiteSpace(dialog.PlaylistName))
+            return;
+
+        var name = dialog.PlaylistName.Trim();
+        if (await CreateSimilarPlaylistByPathAsync(name, path, minimumScore: null).ConfigureAwait(true) is null)
         {
             StatusTextBlock.Text = LocalizationManager.Current.SimilarTracksUnavailable;
             return;
         }
 
-        var dialog = new NewPlaylistDialog();
-        if (await dialog.ShowDialog<bool>(this) == false || string.IsNullOrWhiteSpace(dialog.PlaylistName))
-            return;
+        LoadNavPlaylists();
+        StatusTextBlock.Text = string.Format(LocalizationManager.Current.SmartPlaylistSaved, name);
+    }
+
+    /// <summary>
+    /// Creates a similarity smart playlist from a reference track. Shared by the
+    /// track context menu and the MCP/AI Chat tool. Must be called on the UI
+    /// thread because the reference lookup uses UI-owned track registrations.
+    /// </summary>
+    /// <param name="name">Playlist name.</param>
+    /// <param name="path">Local path or opaque remote reference of the reference track.</param>
+    /// <param name="minimumScore">Optional inclusive minimum similarity score.</param>
+    /// <returns>The new playlist ID, or <see langword="null"/> when the reference cannot be resolved.</returns>
+    internal async Task<long?> CreateSimilarPlaylistByPathAsync(string name, string path, double? minimumScore)
+    {
+        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(path))
+            return null;
+
+        var seedIdentity = await ResolveSimilaritySeedAsync(path).ConfigureAwait(true);
+        if (seedIdentity is null)
+            return null;
 
         // Smart-playlist criteria use the same provider convention as the source
         // facet, so a remote reference is stored as its server source key.
@@ -397,21 +419,25 @@ public partial class MainWindow
         var criteria = new SmartPlaylistCriteria
         {
             SimilaritySourceKey = sourceKey,
-            SimilarityTrackId = seedIdentity.Value.TrackId
+            SimilarityTrackId = seedIdentity.Value.TrackId,
+            SimilarityMinimumScore = minimumScore
         };
-        var name = dialog.PlaylistName.Trim();
-        try
-        {
-            using var db = AudioDatabase.OpenDefault();
-            db.CreateSmartPlaylist(name, System.Text.Json.JsonSerializer.Serialize(criteria));
-        }
-        catch
-        {
-            return;
-        }
+        var trimmed = name.Trim();
 
-        LoadNavPlaylists();
-        StatusTextBlock.Text = string.Format(LocalizationManager.Current.SmartPlaylistSaved, name);
+        return await Task.Run(() =>
+        {
+            try
+            {
+                using var db = AudioDatabase.OpenDefault();
+                return (long?)db.CreateSmartPlaylist(
+                    trimmed,
+                    System.Text.Json.JsonSerializer.Serialize(criteria));
+            }
+            catch
+            {
+                return null;
+            }
+        }).ConfigureAwait(true);
     }
 
     /// <summary>

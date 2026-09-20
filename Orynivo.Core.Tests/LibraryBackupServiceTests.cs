@@ -1,4 +1,3 @@
-using Microsoft.Data.Sqlite;
 using Orynivo.Library;
 using Xunit;
 
@@ -54,7 +53,8 @@ public sealed class LibraryBackupServiceTests
         }
         finally
         {
-            SqliteConnection.ClearAllPools();
+            CoreTestDatabase.ClearPool(Path.Combine(sourceRoot, "library.db"));
+            CoreTestDatabase.ClearPool(Path.Combine(targetRoot, "library.db"));
             if (Directory.Exists(root))
                 Directory.Delete(root, recursive: true);
         }

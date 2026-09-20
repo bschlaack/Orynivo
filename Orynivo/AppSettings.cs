@@ -201,8 +201,47 @@ public sealed class AppSettings
     public AiChatSettings AiChat { get; set; } = new();
     /// <summary>Gets or sets the web-browsing tool configuration (SearXNG endpoint and fetch safety limits).</summary>
     public WebBrowsingOptions WebBrowsing { get; set; } = new();
+    /// <summary>
+    /// Gets or sets the maximum size of the local podcast download cache in
+    /// megabytes; zero or less keeps every downloaded episode.
+    /// </summary>
+    public int PodcastDownloadLimitMb { get; set; } = 2048;
+    /// <summary>
+    /// Gets or sets a value indicating whether optional UI motion (Genre Cloud,
+    /// Dashboard cover stage, and karaoke transitions) is disabled.
+    /// </summary>
+    public bool ReduceMotion { get; set; }
+
     /// <summary>Gets or sets the automatic library-backup schedule.</summary>
     public ScheduledBackupSettings ScheduledBackup { get; set; } = new();
+    /// <summary>Gets or sets the optional cloud upload target for completed backups.</summary>
+    public BackupTargetSettings BackupTarget { get; set; } = new();
+}
+
+/// <summary>
+/// Persisted configuration for uploading completed backup archives to a WebDAV
+/// collection. The password is persisted only by the encrypted credential store.
+/// </summary>
+public sealed class BackupTargetSettings
+{
+    /// <summary>Gets or sets a value indicating whether completed backups are uploaded.</summary>
+    public bool Enabled { get; set; }
+
+    /// <summary>Gets or sets the WebDAV collection base URL.</summary>
+    public string UploadUrl { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets an optional sub-directory inside the collection.</summary>
+    public string RemoteDirectory { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the optional user name for Basic authentication.</summary>
+    public string UserName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the optional password for Basic authentication. It is overlaid
+    /// from the encrypted credential store and never written to JSON settings.
+    /// </summary>
+    [JsonIgnore]
+    public string Password { get; set; } = string.Empty;
 }
 
 /// <summary>Persisted configuration for automatic library backups.</summary>

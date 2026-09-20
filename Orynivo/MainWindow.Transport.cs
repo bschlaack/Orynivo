@@ -147,6 +147,7 @@ public partial class MainWindow : Window
         }
         UpdateActiveLyric(_player.Position);
         _karaokeWindow?.UpdatePosition(_player.Position);
+        PublishRemoteTrackPosition(_player.Position);
         EnsureInfiniteMixQueue();
         MaybeStartNonGaplessFadeTransition(visiblePosition);
     }
@@ -576,7 +577,7 @@ public partial class MainWindow : Window
         if (timedLines.Count > 0)
         {
             foreach (var line in timedLines)
-                _lyricLines.Add(new LyricLineViewModel(line.Text, line.Time));
+                _lyricLines.Add(new LyricLineViewModel(line.Text, line.Time, line.Words));
         }
         else if (!string.IsNullOrWhiteSpace(plainLyrics))
         {
@@ -636,8 +637,11 @@ public partial class MainWindow : Window
         }
 
         var window = new KaraokeWindow(
-            [.. _lyricLines.Select(line => new KaraokeWindow.KaraokeLine(line.Text, line.Time))],
-            LyricsBackgroundImage.Source);
+            [.. _lyricLines.Select(line => new KaraokeWindow.KaraokeLine(line.Text, line.Time) { Words = line.Words })],
+            LyricsBackgroundImage.Source)
+        {
+            ReduceMotion = _settings.ReduceMotion
+        };
         window.SetTrack(NowPlayingTitleBlock.Text, NowPlayingArtistBlock.Text);
         window.Closed += (_, _) => _karaokeWindow = null;
         _karaokeWindow = window;

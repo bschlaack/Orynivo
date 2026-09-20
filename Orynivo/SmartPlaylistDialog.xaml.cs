@@ -15,8 +15,9 @@ namespace Orynivo;
 public partial class SmartPlaylistDialog : Window
 {
     private readonly SmartPlaylistCriteria _initialCriteria;
-    private readonly string? _similarityReferenceLabel;
+    private string? _similarityReferenceLabel;
     private bool _similarityReferenceCleared;
+    private (string SourceKey, long TrackId)? _similarityReferenceOverride;
     private DispatcherTimer? _previewTimer;
     private CancellationTokenSource? _previewCts;
 
@@ -33,6 +34,12 @@ public partial class SmartPlaylistDialog : Window
     /// before the dialog is shown.
     /// </summary>
     public Func<SmartPlaylistCriteria, CancellationToken, Task<int?>>? CountResolver { get; set; }
+
+    /// <summary>
+    /// Gets or sets a callback that lets the user choose a replacement reference
+    /// track for a similarity smart playlist.
+    /// </summary>
+    public Func<Task<ReferenceTrackPickerDialog.Candidate?>>? ReferenceTrackPicker { get; set; }
 
     /// <summary>
     /// Initializes a runtime-loader instance with empty criteria.
@@ -118,6 +125,25 @@ public partial class SmartPlaylistDialog : Window
         }
     }
 
+    /// <summary>Lets the user replace the similarity reference track through the picker.</summary>
+    /// <param name="sender">The choose action.</param>
+    /// <param name="e">Click details.</param>
+    private async void ChooseSimilarityReferenceButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (ReferenceTrackPicker is null)
+            return;
+        var candidate = await ReferenceTrackPicker();
+        if (candidate is null)
+            return;
+
+        _similarityReferenceOverride = (candidate.SourceKey, candidate.TrackId);
+        _similarityReferenceCleared = false;
+        _similarityReferenceLabel = candidate.Label;
+        SimilarityReferenceTextBlock.Text = candidate.Label;
+        SimilarityReferencePanel.IsVisible = true;
+        SchedulePreview();
+    }
+
     /// <summary>Removes the similarity reference from the criteria being edited.</summary>
     /// <param name="sender">The clear action.</param>
     /// <param name="e">Click details.</param>
@@ -194,7 +220,8 @@ public partial class SmartPlaylistDialog : Window
         var similarity = SmartPlaylistCriteriaEditing.ResolveSimilarityReference(
             _initialCriteria,
             _similarityReferenceCleared,
-            similarityMinimumScore);
+            similarityMinimumScore,
+            _similarityReferenceOverride);
         criteria = new SmartPlaylistCriteria
         {
             FavoritesOnly = FavoritesOnlyCheckBox.IsChecked == true,

@@ -31,7 +31,8 @@ the ability to reach that library from any device on the local network.
 - ReplayGain and parametric EQ
 - Multi-select bulk editing in the shared Tracks table, applying favorite,
   unfavorite, or a personal rating to every selected local or Orynivo Server
-  track at once
+  track at once, plus a genre field that stores a library-only override for the
+  selected local tracks (media files are never modified)
 - Local library, playlists, smart playlists and full-text search
 - Unified artist detail pages with an album-style image-and-biography hero,
   synchronized favorites, image management, refreshable biographies, and
@@ -293,13 +294,13 @@ configuration.
 | State | `get_now_playing`, `get_queue`, `get_current_time` |
 | Playback | `play`, `pause_resume`, `next_track`, `previous_track`, `stop`, `seek`, `set_volume` |
 | Queue | `queue_append`, `queue_play_next`, `clear_queue`, `replace_queue` |
-| Library | `search_library` |
-| Favorites and discovery | `set_current_favorite`, `control_infinite_mix` |
+| Library | `search_library`, `get_track_key` |
+| Favorites, ratings, and discovery | `set_current_favorite`, `set_tracks_favorite`, `set_tracks_rating`, `control_infinite_mix` |
 | Audio configuration | `list_output_profiles`, `select_output_profile`, `list_equalizer_profiles`, `configure_equalizer` |
 | Lyrics | `get_current_lyrics` |
 | Orynivo Server | `list_orynivo_servers`, `scan_orynivo_server` |
-| Playlists | `list_playlists`, `get_playlist_tracks`, `create_playlist`, `create_smart_playlist` |
-| History | `get_play_history` |
+| Playlists | `list_playlists`, `get_playlist_tracks`, `create_playlist`, `create_smart_playlist`, `create_similar_playlist` |
+| History | `get_play_history`, `get_year_in_review` |
 | Web | `search_web`, `fetch_page`, `fetch_page_as_markdown` |
 
 `search_library` accepts an optional free-text query plus a result category
@@ -379,7 +380,7 @@ mock server and headless Edge; it never controls the actual player.
 
 ### MCP Server
 
-The same 32 tools are available as an embedded **Model Context Protocol (MCP)**
+The same 37 tools are available as an embedded **Model Context Protocol (MCP)**
 HTTP/SSE server for external AI assistants such as
 [Claude Desktop](https://claude.ai/download). Enable it under
 **Settings → Integration → MCP Server**, choose a port (default **49200**),
@@ -388,7 +389,7 @@ and point your assistant at `http://localhost:49200/mcp`. It binds to
 opt-in setting that binds MCP to all interfaces and requires a generated bearer
 token in `Authorization: Bearer <token>` on every MCP request. Use HTTPS through
 a trusted reverse proxy or a VPN when the network is not fully trusted, because
-plain HTTP does not protect the token in transit. Each of the 32 tools has an individual enable/disable toggle
+plain HTTP does not protect the token in transit. Each of the 37 tools has an individual enable/disable toggle
 in Settings so you can limit what an external assistant is allowed to do. The
 web tools (`search_web`, `fetch_page`, `fetch_page_as_markdown`) route through
 the MCP server, not the model directly: searches use a configurable SearXNG
@@ -420,6 +421,8 @@ works directly in FFmpeg and browser URLs.
 | `POST /api/scan` | Trigger a full library scan |
 | `POST /api/scan/metadata` | Re-read metadata from every supported file, including timestamp-unchanged files |
 | `GET /api/library/backup` | Download a versioned ZIP backup of the server library and artwork caches |
+| `GET /api/tracks/{id}/position` | Read the profile-scoped cross-device resume position of a track |
+| `PUT /api/tracks/{id}/position` | Store the profile-scoped cross-device resume position of a track |
 | `PUT /api/library/backup` | Validate and restore a server library backup (maximum 2 GiB) |
 | `GET /api/scan` | Scan status with current root, processed/total counts, current file, last result, errors, and `LibraryChangedAt` for client cache invalidation |
 | `GET /api/artists` | All artists (id, name, favorite, biography/image flags) |
@@ -442,6 +445,7 @@ works directly in FFmpeg and browser URLs.
 | `GET /api/library/summary` | Aggregate album, track, artist, and favorite counts without materializing library rows |
 | `GET /api/library/doctor` | Compact read-only Library Doctor folder findings; `inspectFiles=false` skips physical file reads/hashing (omitting it retains full checks) |
 | `POST /api/tracks/by-ids` | Track rows for a list of track IDs (facet-filtered results) |
+| `PUT /api/tracks/{id}/genre` | Store the library-only genre override for one track; an empty value clears it. Media files are never rewritten |
 | `GET /api/folders/tracks` | Lightweight track rows plus playback metadata for building a server library folder tree |
 | `GET /api/artwork/album/{id}?size=96` | Album artwork thumbnail or original image |
 | `PUT /api/artwork/album/{id}` | Store raw client-selected album artwork bytes on the server |
@@ -449,8 +453,8 @@ works directly in FFmpeg and browser URLs.
 | `PUT /api/artwork/artist/{id}` | Store raw client-selected artist image bytes on the server |
 | `GET /api/playlists` | All playlists (regular and smart) |
 | `GET /api/playlists/{id}/tracks` | Resolved track list (smart playlists are evaluated live) |
-| `POST /api/playlists/{id}/resolve` | Resolve a smart playlist while applying client-side favorite track IDs |
-| `POST /api/playlists/resolve-count` | Return the match count for ad-hoc smart-playlist criteria |
+| `POST /api/playlists/{id}/resolve` | Resolve a smart playlist while applying client-side favorite track IDs; similarity references are resolved from the server's cached feature vectors |
+| `POST /api/playlists/resolve-count` | Return the match count for ad-hoc smart-playlist criteria, including similarity references |
 | `POST /api/playlists` | Create a regular playlist from server-side track IDs |
 | `POST /api/playlists/smart` | Create a smart playlist from criteria |
 | `PUT /api/playlists/{id}/smart` | Update a smart playlist name and criteria |
@@ -479,7 +483,13 @@ Edit `appsettings.json` before first use:
     "CalculateMissingReplayGainDuringScan": false,
     "ReplayGainFfmpegThreads": 1,
     "ReplayGainDelayMilliseconds": 250,
-    "AllowRemoteUpdates": false
+    "AllowRemoteUpdates": false,
+    "BackupSchedule": {
+      "Enabled": false,
+      "IntervalDays": 7,
+      "RetentionCount": 3,
+      "Directory": ""
+    }
   }
 }
 ```
@@ -497,6 +507,14 @@ usual `Orynivo__...` environment-variable names.
 ReplayGain maintenance keeps only compact album identifiers between its track
 and album phases and refreshes the search index in bounded batches, so memory
 usage remains proportional to a small work set rather than the complete library.
+
+`BackupSchedule` is disabled by default. When enabled, the server writes a
+versioned library ZIP into its target folder (default: a `backups` folder below the
+server data directory) at most once per `IntervalDays` and removes archives beyond
+`RetentionCount`. The due check and the retention selection come from the same
+shared helper the desktop uses, the last run is derived from the newest archive so
+no extra state is stored, and the section holds no credentials. Audio files are
+never included.
 
 `AllowRemoteUpdates` is disabled by default. When enabled on a packaged Linux
 server, an authenticated Orynivo desktop client can download the matching signed
@@ -700,7 +718,9 @@ byte-range streaming without FFmpeg.
   playback and artist-information lookups are never blocked; the session key and
   the API secret are stored only in the encrypted per-user credential container.
   Scrobbling applies to local and Orynivo Server library tracks, and both the
-  scrobble threshold and the pending queue survive restarts.
+  scrobble threshold and the pending queue survive restarts. The favourite button
+  also mirrors the current track as loved or unloved on Last.fm, which is best
+  effort and never blocks playback.
 - Windows System Media Transport Controls integration with global media keys,
   play/pause/previous/next/stop and seek requests, system-overlay and lock-screen
   metadata, album art, playback state, and timeline synchronization
@@ -855,7 +875,7 @@ byte-range streaming without FFmpeg.
   configured Orynivo Servers instead of waiting for the background batches.
 - A Dashboard **Year in review** summary for any year with listening history:
   listened hours, active days, a monthly breakdown, and the leading genres,
-  albums, and artists, exportable as a shareable PNG image
+  albums, and artists, exportable as a shareable PNG image or a single-page PDF
 - Dashboard with an artwork-backed greeting hero with a lightened-artwork rim, live
   library counters (including local and configured Orynivo Server track
   favorites), random
@@ -891,6 +911,7 @@ byte-range streaming without FFmpeg.
   server-side station query
 - Podcast search through the public Apple Podcasts catalog, complete RSS/Atom
   episode lists sorted newest first, persistent pinned podcasts in the sidebar,
+  downloadable episodes for offline playback with a size-limited local cache,
   category and feed-language filters, played/in-progress state, and automatic
   resume from the saved position
 - Podcast detail cards with large artwork, feed description and metadata, and
@@ -911,7 +932,9 @@ byte-range streaming without FFmpeg.
   match count while criteria are changed, including unified local/server counts
   and server-side counts when the connected Orynivo Server supports them, and it
   shows every stored criterion — including the reference track of a similarity
-  smart playlist, whose minimum similarity score stays editable.
+  smart playlist, whose minimum similarity score stays editable. The reference can
+  be replaced with **Choose reference track**, which searches the local library and
+  every configured Orynivo Server, or removed entirely.
 - UTF-8 M3U8 import and export for regular playlists, including relative local
   paths, retained missing-file entries, and HTTP/HTTPS streams; credentialed
   Plex URLs are excluded
@@ -1075,7 +1098,9 @@ Genre Cloud level. Before
 starting, its compact profile editor selects a calm, balanced, or energetic
 mood; familiar-to-adventurous discovery level; 3, 7, 30, or 90-day history
 period; local and individual Orynivo Server sources; favorite and rarely-played
-weighting; and optional included or excluded genres. Initial creation shows a
+weighting; and optional included or excluded genres. **Focus**, **Workout**, and
+**Wind down** presets pre-fill those fields as a starting point and can be
+adjusted afterwards. Initial creation shows a
 blocking progress overlay so the start action cannot be mistaken for an
 unresponsive button. The first 20 tracks are added to Up next; another batch is
 prepared automatically in the background when five tracks remain. Existing
@@ -1318,7 +1343,17 @@ dotnet test Orynivo.Server.Tests/Orynivo.Server.Tests.csproj
 credential-free `QueuePathPolicy` and ReplayGain conversion. `Orynivo.Tests`
 covers pure desktop helpers such as the transport accent colour maths; it never
 starts the Avalonia UI. `Orynivo.Server.Tests` covers the server's API key and
-profile-context middleware without starting the web host.
+profile-context middleware without starting the web host. Every database test
+creates its own temporary library, so the suite is safe to run in parallel and
+never touches your real library data.
+
+`scripts/verify-all.ps1` runs the same checks as CI in one command: the managed
+builds with `--warnaserror`, all three test projects, and both parity scripts. It
+stops at the first failure and prints a compact summary.
+
+```bash
+pwsh -NoProfile -File scripts/verify-all.ps1
+```
 
 ### Orynivo Server
 
@@ -1535,7 +1570,7 @@ Orynivo/
 │   ├── Compatibility/       Linux compatibility types (direct ALSA, OpenAL, credential stores)
 │   ├── Controls/            Custom Avalonia controls and reusable table helpers
 │   ├── Localization/        Complete built-in resources for all seven languages
-│   ├── Mcp/                 Embedded MCP server, player bridge, and the 32 tools
+│   ├── Mcp/                 Embedded MCP server, player bridge, and the 37 tools
 │   ├── Remote/              Opt-in mobile web remote (service, page, and script)
 │   ├── Scrobbling/          Desktop scrobbling service and pending-scrobble store
 │   ├── Streaming/           Credential-store facades and the inactive Qobuz provider scaffold
@@ -1611,8 +1646,10 @@ view using the current playback position. The refresh button performs a new
 lookup, and a missing result is shown directly in the lyrics view. The
 **Karaoke** action opens a fullscreen view of the synchronized lyrics with the
 active line centered and emphasized while neighbouring lines fade out, using the
-current cover as a dimmed backdrop; it exits with Esc or a click and explains
-when a track only has plain lyrics.
+current cover as a dimmed backdrop. Enhanced LRC files that carry word timestamps
+additionally highlight the active word and keep already-sung words in the accent
+colour. It exits with Esc or a click and explains when a track only has plain
+lyrics.
 For WASAPI, buffered but not yet audible frames are excluded from the playback
 position so synchronized lyrics follow the actual output timing.
 
@@ -1638,6 +1675,35 @@ toggle, an interval in days, how many backups to keep, and a backup folder
 (default: a `backups` folder beneath the per-user data directory), or run one
 immediately with **Back up now**. Orynivo writes the archive, removes older ones
 beyond the retention count, and shows the last successful run.
+
+**Cloud backup target** additionally uploads every completed archive to a WebDAV
+collection. Only plain `http`/`https` URLs without embedded credentials are
+accepted, the optional password is stored in the encrypted per-user credential
+store and never written to `settings.json`, and a failed upload leaves the local
+archive in place.
+
+## Cross-device resume
+
+Remote Orynivo Server tracks remember where you stopped. The client publishes the
+audible position at most every 20 seconds to the authenticated, profile-scoped
+`/api/tracks/{id}/position` endpoint, and starting that track on another device
+offers a **Resume** transport action when the stored position is meaningfully
+ahead. Only a position and timestamp are stored, never a stream URL or API key.
+
+## Accessibility
+
+- **Reduce motion** under Appearance disables the optional Genre Cloud,
+  Dashboard cover-stage, and karaoke animations.
+- The album and artist artwork grids open the selected card with Enter or Space,
+  and the transport controls (previous, play/pause, next, volume, artist info,
+  lyrics, favorite, shuffle, equalizer, and output) expose accessible names.
+
+## Dependency migration
+
+`.github/dependabot.yml` deliberately ignores major upgrades that need a reviewed
+migration instead of an automatic bump. The triggers, steps, and required checks
+for each held-back line are recorded in
+[`DEPENDENCY-MIGRATION.md`](DEPENDENCY-MIGRATION.md).
 
 ## Current Limitations
 

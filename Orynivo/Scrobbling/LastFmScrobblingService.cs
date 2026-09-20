@@ -135,6 +135,23 @@ internal sealed class LastFmScrobblingService
         });
     }
 
+    /// <summary>
+    /// Mirrors a track favourite change to Last.fm as love or unlove. The call is
+    /// best effort and never blocks or fails playback, so an offline change is not
+    /// queued.
+    /// </summary>
+    /// <param name="track">Track metadata.</param>
+    /// <param name="loved">Requested loved state.</param>
+    internal void SetTrackLoved(LastFmTrack track, bool loved)
+    {
+        if (!_enabled || !IsConnected || _client is not { } client)
+            return;
+        if (string.IsNullOrWhiteSpace(track.Artist) || string.IsNullOrWhiteSpace(track.Title))
+            return;
+
+        _ = SafeAsync(async () => { await client.SetTrackLovedAsync(track, loved, _sessionKey).ConfigureAwait(false); });
+    }
+
     /// <summary>Attempts to submit every queued scrobble.</summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A task representing the flush.</returns>

@@ -213,4 +213,181 @@ public partial class MainWindow
             _suppressBulkRatingChange = false;
         }
     }
+
+    /// <summary>Applies the entered genre to every selected local track.</summary>
+    /// <param name="sender">The genre apply action.</param>
+    /// <param name="e">Click details.</param>
+    private async void BulkGenreApplyButton_OnClick(object? sender, RoutedEventArgs e)
+        => await ApplyBulkGenreAsync();
+
+    /// <summary>
+    /// Stores the entered genre as a library-only override for every selected local
+    /// track. Source media files are never modified, and remote tracks are reported
+    /// because only the owning server could persist their genre.
+    /// </summary>
+    /// <returns>A task representing the local update.</returns>
+    private async Task ApplyBulkGenreAsync()
+    {
+        var rows = GetSelectedTrackRows();
+        if (rows.Count == 0)
+            return;
+
+        var localRows = rows.Where(row => row.OrynivoServer is null).ToList();
+        var remoteRows = rows.Where(row => row.OrynivoServer is not null).ToList();
+        var applied = string.IsNullOrWhiteSpace(BulkGenreTextBox.Text)
+            ? null
+            : BulkGenreTextBox.Text!.Trim();
+        var changed = 0;
+        var failed = 0;
+
+        if (localRows.Count > 0)
+        {
+            var localIds = localRows.Select(row => row.Id!.Value).ToList();
+            changed = await Task.Run(() =>
+            {
+                using var db = AudioDatabase.OpenDefault();
+                return db.SetTrackGenres(localIds, applied);
+            }).ConfigureAwait(true);
+
+            foreach (var row in localRows)
+                row.Genre = applied;
+            InvalidateUnifiedLibraryViewCache();
+        }
+
+        // A server track stores its genre on the owning server, which records the
+        // same library-only override and never rewrites the media file.
+        foreach (var row in remoteRows)
+        {
+            if (await _orynivoClient.UpdateTrackGenreAsync(row.OrynivoServer!, row.Id!.Value, applied)
+                    .ConfigureAwait(true))
+            {
+                changed++;
+                row.Genre = applied;
+            }
+            else
+            {
+                failed++;
+            }
+        }
+
+        StatusTextBlock.Text = failed == 0
+            ? string.Format(
+                CultureInfo.CurrentCulture,
+                LocalizationManager.Current.BulkGenreUpdated,
+                changed)
+            : string.Format(
+                CultureInfo.CurrentCulture,
+                LocalizationManager.Current.BulkGenrePartiallyFailed,
+                changed,
+                failed);
+    }
+
+    /// <summary>
+    /// Applies a favorite state to library tracks addressed by playback path or
+    /// opaque <c>orynivo://</c> reference. Used by the MCP and AI Chat tools so a
+    /// model can act on search results without ever seeing a credential.
+    /// </summary>
+    /// <param name="paths">Local file paths and/or opaque remote references.</param>
+    /// <param name="favorite">Requested favorite state.</param>
+    /// <returns>The number of tracks that were updated.</returns>
+    internal async Task<int> SetTracksFavoriteByPathsAsync(IReadOnlyList<string> paths, bool favorite)
+    {
+        var (localPaths, remoteTargets) = SplitTrackTargets(paths);
+        var changed = 0;
+
+        if (localPaths.Count > 0)
+        {
+            changed += await Task.Run(() =>
+            {
+                using var db = AudioDatabase.OpenDefault();
+                var ids = db.GetTrackListByPaths(localPaths).Select(track => track.Id).ToList();
+                return ids.Count == 0 ? 0 : db.SetTrackFavorites(ids, favorite);
+            }).ConfigureAwait(true);
+        }
+
+        if (remoteTargets.Count > 0)
+        {
+            foreach (var (server, trackId) in remoteTargets)
+            {
+                var key = GetOrynivoFavoriteKey(server.Id, "Track", trackId);
+                if (favorite)
+                    ActiveUserProfile.OrynivoServerFavorites.Add(key);
+                else
+                    ActiveUserProfile.OrynivoServerFavorites.Remove(key);
+            }
+
+            await Task.Run(() => _settingsStore.Save(_settings)).ConfigureAwait(true);
+            foreach (var (server, trackId) in remoteTargets)
+            {
+                if (await _orynivoClient.UpdateTrackFavoriteAsync(server, trackId, favorite).ConfigureAwait(true))
+                    changed++;
+                RefreshOrynivoFavoriteRows(server, trackId, favorite);
+            }
+        }
+
+        if (changed > 0)
+            InvalidateUnifiedLibraryViewCache();
+        return changed;
+    }
+
+    /// <summary>
+    /// Applies a personal rating to library tracks addressed by playback path or
+    /// opaque <c>orynivo://</c> reference. Used by the MCP and AI Chat tools.
+    /// </summary>
+    /// <param name="paths">Local file paths and/or opaque remote references.</param>
+    /// <param name="rating">New zero-to-five-star rating.</param>
+    /// <returns>The number of tracks that were updated.</returns>
+    internal async Task<int> SetTracksRatingByPathsAsync(IReadOnlyList<string> paths, int rating)
+    {
+        var (localPaths, remoteTargets) = SplitTrackTargets(paths);
+        var changed = 0;
+
+        if (localPaths.Count > 0)
+        {
+            changed += await Task.Run(() =>
+            {
+                using var db = AudioDatabase.OpenDefault();
+                var ids = db.GetTrackListByPaths(localPaths).Select(track => track.Id).ToList();
+                return ids.Count == 0 ? 0 : db.SetTrackUserRatings(ids, rating);
+            }).ConfigureAwait(true);
+        }
+
+        foreach (var (server, trackId) in remoteTargets)
+        {
+            var saved = await _orynivoClient.UpdateTrackRatingAsync(
+                server,
+                trackId,
+                new OrynivoTrackRatingUpdate(UserRating: rating)).ConfigureAwait(true);
+            if (saved)
+                changed++;
+        }
+
+        return changed;
+    }
+
+    /// <summary>Splits playback paths into local paths and resolvable remote track targets.</summary>
+    /// <param name="paths">Local file paths and/or opaque remote references.</param>
+    /// <returns>The local paths and the remote server/track pairs.</returns>
+    private (List<string> LocalPaths, List<(OrynivoServerSettings Server, long TrackId)> RemoteTargets)
+        SplitTrackTargets(IReadOnlyList<string> paths)
+    {
+        var localPaths = new List<string>();
+        var remoteTargets = new List<(OrynivoServerSettings Server, long TrackId)>();
+        foreach (var path in paths)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                continue;
+            if (!PlaylistReferences.TryParseTrack(path, out var serverId, out var trackId))
+            {
+                localPaths.Add(path);
+                continue;
+            }
+
+            var server = (_settings.OrynivoServers ?? [])
+                .FirstOrDefault(candidate => candidate.Id == serverId);
+            if (server is not null)
+                remoteTargets.Add((server, trackId));
+        }
+        return (localPaths, remoteTargets);
+    }
 }

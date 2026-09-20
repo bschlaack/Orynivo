@@ -1027,9 +1027,218 @@ public sealed class McpTools(McpPlayerBridge bridge)
         return sb.ToString().TrimEnd();
     }
 
+    /// <summary>Returns the aggregated listening statistics for one calendar year.</summary>
+    /// <param name="year">Four-digit calendar year, or <see langword="null"/> for the current year.</param>
+    /// <param name="topCount">Maximum entries per leading list.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A formatted Markdown summary, or an explanation when the year has no history.</returns>
+    [McpServerTool(Name = "get_year_in_review", ReadOnly = true, Idempotent = true)]
+    [Description("Returns the listening statistics for one calendar year: total listened time, active days, the monthly breakdown, and the leading genres, albums, and artists. Uses only the existing playback history.")]
+    public async Task<string> GetYearInReviewAsync(
+        [Description("Four-digit calendar year. Omit for the current year.")] int? year = null,
+        [Description("Maximum entries per leading list (1-10, default 5).")] int topCount = 5,
+        CancellationToken ct = default)
+    {
+        if (!bridge.IsToolEnabled("get_year_in_review")) return "Tool is disabled.";
+        topCount = Math.Clamp(topCount, 1, 10);
+        var targetYear = year ?? DateTime.Now.Year;
+
+        YearInReviewSummary? summary;
+        try
+        {
+            summary = await Task.Run(() =>
+            {
+                using var db = AudioDatabase.OpenDefault();
+                return db.GetYearInReview(targetYear, topCount);
+            }, ct);
+        }
+        catch
+        {
+            return $"Could not read the {targetYear} listening statistics.";
+        }
+
+        if (summary is null)
+            return "Use a four-digit year between 1900 and 9999.";
+        if (summary.TotalListeningSeconds <= 0)
+            return $"No listening history was recorded for {targetYear}.";
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine(CultureInfo.InvariantCulture, $"# {targetYear} in review");
+        sb.AppendLine(CultureInfo.InvariantCulture,
+            $"- Listened: {summary.TotalListeningSeconds / 3600d:0.0} hours across {summary.ActiveDays} active days");
+
+        var monthly = summary.MonthlySeconds
+            .Select((seconds, index) => (Month: index + 1, Seconds: seconds))
+            .Where(entry => entry.Seconds > 0)
+            .Select(entry => string.Create(
+                CultureInfo.InvariantCulture,
+                $"{CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedMonthName(entry.Month)} {entry.Seconds / 3600d:0.0}h"))
+            .ToList();
+        if (monthly.Count > 0)
+            sb.AppendLine(CultureInfo.InvariantCulture, $"- Monthly: {string.Join(", ", monthly)}");
+
+        AppendYearInReviewList(sb, "Top genres", summary.TopGenres.Select(entry => (entry.Genre, entry.Seconds)));
+        AppendYearInReviewList(
+            sb,
+            "Top albums",
+            summary.TopAlbums.Select(entry => ($"{entry.Title} — {entry.Artist}", entry.Seconds)));
+        AppendYearInReviewList(sb, "Top artists", summary.TopArtists.Select(entry => (entry.Name, entry.Seconds)));
+        return sb.ToString().TrimEnd();
+    }
+
+    /// <summary>Returns the estimated musical key of a local or Orynivo Server track.</summary>
+    /// <param name="path">Local file path or opaque <c>orynivo://</c> track reference.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The Camelot wheel label, or an explanation when no key was estimated.</returns>
+    [McpServerTool(Name = "get_track_key", ReadOnly = true, Idempotent = true)]
+    [Description("Returns the estimated musical key of a track as a Camelot wheel label such as 8A. Requires that the optional audio analysis already estimated a key; a flat or ambiguous track has none.")]
+    public async Task<string> GetTrackKeyAsync(
+        [Description("Local file path or opaque orynivo:// track reference from search_library.")] string path,
+        CancellationToken ct = default)
+    {
+        if (!bridge.IsToolEnabled("get_track_key")) return "Tool is disabled.";
+        if (string.IsNullOrWhiteSpace(path))
+            return "Provide a track path or reference.";
+
+        try
+        {
+            if (PlaylistReferences.TryParseTrack(path, out var serverId, out var trackId))
+            {
+                var server = (bridge.GetOrynivoServersFunc?.Invoke() ?? [])
+                    .FirstOrDefault(candidate => candidate.Id == serverId);
+                if (server is null)
+                    return "That server is not configured.";
+                using var client = new OrynivoServerClient();
+                var tracks = await client.GetTracksByIdsAsync(server, [trackId], ct);
+                var remote = tracks.FirstOrDefault();
+                if (remote is null)
+                    return "Track not found on that server.";
+                var remoteTitle = string.IsNullOrWhiteSpace(remote.Title) ? remote.FileName : remote.Title;
+                return string.IsNullOrWhiteSpace(remote.CamelotKey)
+                    ? $"{remoteTitle}: no key was estimated."
+                    : $"{remoteTitle}: {remote.CamelotKey}";
+            }
+
+            var local = await Task.Run(() =>
+            {
+                using var db = AudioDatabase.OpenDefault();
+                return db.GetTrackListByPaths([path]).FirstOrDefault();
+            }, ct);
+            if (local is null)
+                return "Track not found in the local library.";
+            var title = string.IsNullOrWhiteSpace(local.Title) ? local.FileName : local.Title;
+            return string.IsNullOrWhiteSpace(local.CamelotKey)
+                ? $"{title}: no key was estimated."
+                : $"{title}: {local.CamelotKey}";
+        }
+        catch
+        {
+            return "Could not read the track key.";
+        }
+    }
+
+    /// <summary>Applies a favorite state to library tracks addressed by path or reference.</summary>
+    /// <param name="paths">Local file paths and/or opaque remote references.</param>
+    /// <param name="favorite">Requested favorite state.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A confirmation naming how many tracks were updated.</returns>
+    [McpServerTool(Name = "set_tracks_favorite")]
+    [Description("Marks or unmarks several library tracks as favorites in one step. Each entry may be a local absolute file path or an orynivo:// remote reference from search_library.")]
+    public async Task<string> SetTracksFavoriteAsync(
+        [Description("Local absolute file paths and/or orynivo:// remote references to update.")] string[] paths,
+        [Description("True to mark the tracks as favorites; false to remove them.")] bool favorite,
+        CancellationToken ct = default)
+    {
+        if (!bridge.IsToolEnabled("set_tracks_favorite")) return "Tool is disabled.";
+        if (bridge.SetTracksFavoriteFunc is null) return "Favorites are unavailable.";
+        if (paths.Length == 0) return "Provide at least one track path or reference.";
+
+        var changed = await bridge.OnUiAsync(
+            async () => await bridge.SetTracksFavoriteFunc(paths, favorite),
+            ct);
+        return changed == 0
+            ? "No library track matched the supplied paths."
+            : $"Updated the favorite state of {changed} track(s).";
+    }
+
+    /// <summary>Applies a personal rating to library tracks addressed by path or reference.</summary>
+    /// <param name="paths">Local file paths and/or opaque remote references.</param>
+    /// <param name="rating">New zero-to-five-star rating.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A confirmation naming how many tracks were updated.</returns>
+    [McpServerTool(Name = "set_tracks_rating")]
+    [Description("Sets the personal zero-to-five-star rating of several library tracks in one step. Each entry may be a local absolute file path or an orynivo:// remote reference from search_library.")]
+    public async Task<string> SetTracksRatingAsync(
+        [Description("Local absolute file paths and/or orynivo:// remote references to update.")] string[] paths,
+        [Description("Personal rating from 0 (no rating) through 5.")] int rating,
+        CancellationToken ct = default)
+    {
+        if (!bridge.IsToolEnabled("set_tracks_rating")) return "Tool is disabled.";
+        if (bridge.SetTracksRatingFunc is null) return "Ratings are unavailable.";
+        if (paths.Length == 0) return "Provide at least one track path or reference.";
+        if (rating is < 0 or > 5) return "Use a rating from 0 through 5.";
+
+        var changed = await bridge.OnUiAsync(
+            async () => await bridge.SetTracksRatingFunc(paths, rating),
+            ct);
+        return changed == 0
+            ? "No library track matched the supplied paths."
+            : $"Updated the rating of {changed} track(s).";
+    }
+
+    /// <summary>Creates a similarity smart playlist from a reference track.</summary>
+    /// <param name="name">Playlist name.</param>
+    /// <param name="path">Local path or opaque remote reference of the reference track.</param>
+    /// <param name="minimumScore">Optional inclusive minimum similarity score.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A confirmation naming the new playlist, or an explanation when the reference cannot be resolved.</returns>
+    [McpServerTool(Name = "create_similar_playlist")]
+    [Description("Creates a smart playlist that keeps the tracks most similar to a reference track. The reference may be a local absolute file path or an orynivo:// remote reference from search_library.")]
+    public async Task<string> CreateSimilarPlaylistAsync(
+        [Description("Name for the new smart playlist.")] string name,
+        [Description("Local absolute file path or orynivo:// remote reference of the reference track.")] string path,
+        [Description("Optional inclusive minimum similarity score from 0 through 1.")] double? minimumScore = null,
+        CancellationToken ct = default)
+    {
+        if (!bridge.IsToolEnabled("create_similar_playlist")) return "Tool is disabled.";
+        if (bridge.CreateSimilarPlaylistFunc is null) return "Similar playlists are unavailable.";
+        if (string.IsNullOrWhiteSpace(name)) return "Provide a playlist name.";
+        if (string.IsNullOrWhiteSpace(path)) return "Provide a reference track path or reference.";
+        if (minimumScore is < 0d or > 1d) return "Use a minimum score from 0 through 1.";
+
+        var id = await bridge.OnUiAsync(
+            async () => await bridge.CreateSimilarPlaylistFunc(name, path, minimumScore),
+            ct);
+        return id is null
+            ? "Could not resolve the reference track."
+            : $"Created the similar-tracks smart playlist '{name.Trim()}' (ID {id}).";
+    }
+
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
+
+    /// <summary>Appends one leading list of the year-in-review summary as Markdown bullets.</summary>
+    /// <param name="sb">Output builder.</param>
+    /// <param name="title">Section title.</param>
+    /// <param name="entries">Label and listened seconds pairs.</param>
+    private static void AppendYearInReviewList(
+        System.Text.StringBuilder sb,
+        string title,
+        IEnumerable<(string Label, double Seconds)> entries)
+    {
+        var items = entries
+            .Where(entry => !string.IsNullOrWhiteSpace(entry.Label))
+            .Select(entry => string.Create(
+                CultureInfo.InvariantCulture,
+                $"- {entry.Label}: {entry.Seconds / 3600d:0.0} hours"))
+            .ToList();
+        if (items.Count == 0)
+            return;
+        sb.AppendLine(CultureInfo.InvariantCulture, $"## {title}");
+        foreach (var item in items)
+            sb.AppendLine(item);
+    }
 
     private static string FormatState(PlayerState s)
     {

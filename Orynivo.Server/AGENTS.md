@@ -88,10 +88,25 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
   The authenticated `/api/history/sync` GET/POST routes exchange bounded,
   deduplicated playback-history rows for the active profile only. They must
   never expose API keys, credentials, or unrestricted filesystem data.
+- `PUT /api/tracks/{id}/genre` stores a library-only genre override through
+  `AudioDatabase.SetTrackGenres` and refreshes that track's Lucene document. An
+  empty or missing value clears the override so the next scan restores the
+  embedded genre. The endpoint must never rewrite the media file, and older
+  clients that do not call it are unaffected.
 - Keep `SkiaSharp.NativeAssets.Linux.NoDependencies`; do not add an ImageMagick
   runtime dependency.
 - Linux service data belongs under `ORYNIVO_DATA_DIR=/var/lib/orynivo-server`.
   Do not fall back to the service user's non-writable home directory.
+- `GET`/`PUT /api/tracks/{id}/position` store the cross-device resume position of a
+  track. They are profile-scoped through `AudioDatabase.ActiveProfileId` (set by
+  `ProfileContextMiddleware`), reject invalid positions with 400, and store only a
+  position and timestamp - never a stream URL, API key, or any other credential.
+- `BackupScheduleService` is the optional automatic server-side library backup. It
+  must reuse the shared `Orynivo.Library.BackupRetention` decisions, derive its last
+  run from the newest archive in the target folder (never persist extra state),
+  write through `LibraryBackupService.ExportAsync` with the server data root, prune
+  only names that match `BackupNaming`, and hold no credentials. It is disabled by
+  default and never blocks scans or requests.
 - Authenticated `GET`/`PUT /api/library/backup` transfer the Core versioned
   library ZIP. Transfers are bounded to 2 GiB, serialized against server scans,
   staged beneath the data root, exclude credentials/audio files, and restore
@@ -135,6 +150,14 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
   Track list DTOs also carry the cached Camelot wheel label (`CamelotKey`) so
   remote clients can show the estimated musical key; it stays a cached value and
   the server never derives keys on request.
+- Smart-playlist resolution goes through
+  `Services/SmartPlaylistResolver.Resolve`, which supplies the cached similarity
+  feature vectors whenever the criteria carries a similarity reference. Calling
+  `SmartPlaylistCriteria.Resolve` directly returns an empty list for such
+  criteria, so `/api/playlists/{id}/resolve` and `/api/playlists/resolve-count`
+  must always use the helper. Vectors are built from
+  `GetSimilarityTrackProfiles`, so they are provider-local: a reference that
+  points at another library (`server:<id>`) intentionally resolves to nothing.
 - `GET /api/albums/recommendation-candidates` returns compact album-level
   genre/BPM metadata for client-side Dashboard ranking; recommendation policy
   and listening history remain on the client.

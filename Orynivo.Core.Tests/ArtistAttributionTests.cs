@@ -1,34 +1,19 @@
 using Orynivo.Library;
-using Microsoft.Data.Sqlite;
 using Xunit;
 
 namespace Orynivo.Core.Tests;
 
 /// <summary>Verifies album-centered artist attribution and stable MusicBrainz identity matching.</summary>
-public sealed class ArtistAttributionTests : IDisposable
+public sealed class ArtistAttributionTests
 {
-    /// <summary>Initializes a clean isolated library database for one test.</summary>
-    public ArtistAttributionTests()
-    {
-        SqliteConnection.ClearAllPools();
-        // The data root is fixed for the whole test run by TestEnvironment's module
-        // initializer; remove the database and its write-ahead log so no rows from
-        // an earlier test survive.
-        foreach (var suffix in new[] { string.Empty, "-wal", "-shm" })
-        {
-            var path = Path.Combine(AppPaths.DataRoot, "library.db" + suffix);
-            if (File.Exists(path))
-                File.Delete(path);
-        }
-    }
-
     /// <summary>Verifies that an untagged compilation is represented by one album artist.</summary>
     [Fact]
     public void ReconcileAlbumArtists_GroupsUntaggedCompilationUnderVariousArtists()
     {
-        using var database = AudioDatabase.OpenDefault();
-        database.Upsert(CreateTrack("one.flac", "Guest One", albumArtist: null, compilation: true));
-        database.Upsert(CreateTrack("two.flac", "Guest Two", albumArtist: null, compilation: true));
+        using var test = CoreTestDatabase.Create("orynivo-artist-attribution");
+        using var database = test.Open();
+        database.Upsert(CreateTrack(test, "one.flac", "Guest One", albumArtist: null, compilation: true));
+        database.Upsert(CreateTrack(test, "two.flac", "Guest Two", albumArtist: null, compilation: true));
 
         database.ReconcileAlbumArtists();
 
@@ -36,20 +21,21 @@ public sealed class ArtistAttributionTests : IDisposable
         Assert.Contains(artists, artist => artist.Artist == "Various Artists");
         Assert.DoesNotContain(artists, artist => artist.Artist == "Guest One");
         Assert.DoesNotContain(artists, artist => artist.Artist == "Guest Two");
-        Assert.Equal("Guest One", database.GetByPath(TrackPath("one.flac"))!.Artist);
-        Assert.Equal("Various Artists", database.GetByPath(TrackPath("one.flac"))!.AlbumArtist);
+        Assert.Equal("Guest One", database.GetByPath(test.PathOf("Music", "Album", "one.flac"))!.Artist);
+        Assert.Equal("Various Artists", database.GetByPath(test.PathOf("Music", "Album", "one.flac"))!.AlbumArtist);
     }
 
     /// <summary>Verifies that explicit album artists win over featured track credits.</summary>
     [Fact]
     public void ReconcileAlbumArtists_PreservesExplicitAlbumArtistAndRemovesFeaturedSuffix()
     {
-        using var database = AudioDatabase.OpenDefault();
-        database.Upsert(CreateTrack("feature.flac", "Main Artist feat. Guest", "Main Artist"));
+        using var test = CoreTestDatabase.Create("orynivo-artist-attribution");
+        using var database = test.Open();
+        database.Upsert(CreateTrack(test, "feature.flac", "Main Artist feat. Guest", "Main Artist"));
 
         database.ReconcileAlbumArtists();
 
-        var track = database.GetByPath(TrackPath("feature.flac"));
+        var track = database.GetByPath(test.PathOf("Music", "Album", "feature.flac"));
         Assert.Equal("Main Artist", track!.Artist);
         Assert.Equal("Main Artist", track.AlbumArtist);
         Assert.Single(database.GetArtistsLite(), artist => artist.Artist == "Main Artist");
@@ -60,24 +46,23 @@ public sealed class ArtistAttributionTests : IDisposable
     public void Upsert_UsesMusicBrainzArtistIdAcrossNameVariants()
     {
         const string artistId = "11111111-2222-3333-4444-555555555555";
-        using var database = AudioDatabase.OpenDefault();
-        database.Upsert(CreateTrack("first.flac", "Canonical Name", "Canonical Name", artistId));
-        database.Upsert(CreateTrack("second.flac", "Alternate Spelling", "Alternate Spelling", artistId, "Other Album"));
+        using var test = CoreTestDatabase.Create("orynivo-artist-attribution");
+        using var database = test.Open();
+        database.Upsert(CreateTrack(test, "first.flac", "Canonical Name", "Canonical Name", artistId));
+        database.Upsert(CreateTrack(test, "second.flac", "Alternate Spelling", "Alternate Spelling", artistId, "Other Album"));
 
         database.ReconcileAlbumArtists();
 
         var artists = database.GetArtistsLite();
         Assert.Single(artists);
         Assert.Equal("Canonical Name", artists[0].Artist);
-        Assert.Equal("Canonical Name", database.GetByPath(TrackPath("second.flac"))!.Artist);
-    }
-
-    /// <summary>Completes the test fixture lifetime.</summary>
-    public void Dispose()
-    {
+        Assert.Equal(
+            "Canonical Name",
+            database.GetByPath(test.PathOf("Music", "Album", "second.flac"))!.Artist);
     }
 
     private static TrackRecord CreateTrack(
+        CoreTestDatabase test,
         string fileName,
         string artist,
         string? albumArtist,
@@ -86,8 +71,8 @@ public sealed class ArtistAttributionTests : IDisposable
         bool compilation = false) =>
         new()
         {
-            Path = TrackPath(fileName),
-            SourcePath = TrackPath(fileName),
+            Path = test.PathOf("Music", "Album", fileName),
+            SourcePath = test.PathOf("Music", "Album", fileName),
             FileName = fileName,
             ModifiedAt = 1,
             AddedAt = 1,
@@ -99,7 +84,4 @@ public sealed class ArtistAttributionTests : IDisposable
             Compilation = compilation,
             MusicBrainzArtistId = musicBrainzArtistId
         };
-
-    private static string TrackPath(string fileName) =>
-        Path.Combine(AppPaths.DataRoot, "Music", "Album", fileName);
 }

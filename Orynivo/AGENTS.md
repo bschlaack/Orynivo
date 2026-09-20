@@ -437,6 +437,11 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   result is complete, unless a proven virtualized/paged strategy is used.
 - Use shared typography, brushes, vector icons, control themes, loading helpers,
   and context-menu patterns from the existing application resources.
+- The bulk action bar also offers a genre field. Local rows go through
+  `AudioDatabase.SetTrackGenres`; Orynivo Server rows go through
+  `OrynivoServerClient.UpdateTrackGenreAsync` to that server's
+  `PUT /api/tracks/{id}/genre`. Both are library-only overrides that never rewrite
+  media files, and failures are reported per selection.
 - The shared content table supports multi-selection for track rows. Selecting
   more than one local or Orynivo Server track in a Tracks view reveals the bulk
   action bar (`BulkEditBar`) with **Mark as favorite**, **Remove favorite**, and
@@ -453,6 +458,39 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   credentials, only one run may be in flight at a time, and the backup folder is
   created on demand. Settings exposes the enable toggle, interval, retention,
   folder picker, **Back up now**, and the last successful run.
+- Completed backup archives can additionally be uploaded to a WebDAV
+  collection. `AppSettings.BackupTarget` holds the enable flag, URL, optional
+  sub-folder, and user name; the password is overlaid from
+  `ApplicationCredentialStore` and stays `[JsonIgnore]`. Only plain
+  `http`/`https` URLs without embedded credentials are accepted
+  (`Orynivo.Library.BackupTargets`), the upload itself is best effort and never
+  removes the local archive, and credentials must never appear in a URL, a log,
+  or an error message (`Orynivo.Library.BackupUploader`). The scheduled and
+  **Back up now** paths share `MainWindow.TryUploadBackupAsync`; the explicit
+  **Export library** action still writes only the user-chosen local ZIP.
+- Cross-device resume for remote Orynivo Server tracks lives in
+  `MainWindow.CrossDeviceResume.cs`. The last audible position is published at
+  most every 20 seconds and only through the authenticated, profile-scoped
+  `SaveTrackPositionAsync`, and the **Resume** transport action appears only when
+  the pure, tested `Orynivo.Library.CrossDeviceResume.ShouldOffer` accepts the
+  stored position. Never persist a credential-bearing stream URL for this, never
+  block playback on a publish or fetch failure, and clear the prompt when the
+  now-playing remote row changes.
+- Optional UI motion is governed by `AppSettings.ReduceMotion` through the pure,
+  tested `Orynivo.Controls.MotionPreferences` helper. The Genre Cloud, the
+  Dashboard cover stage, and `KaraokeWindow` must ask that helper instead of
+  building transitions or frame loops directly, and `KaraokeWindow.ReduceMotion`
+  is assigned from the saved setting when the window opens. The album and artist
+  artwork grids open the selected card on Enter or Space through
+  `ActivateArtworkCardAsync`, and transport controls keep an
+  `AutomationProperties.Name` that matches their localized tooltip.
+- Enhanced-LRC word timestamps (`<mm:ss.xx>`) are parsed by
+  `LyricsService.ParseLrc` into `TimedLyricLine.Words`, which also strips the
+  markers from the line text. `KaraokeWindow` renders such a line as one `Run` per
+  word and repaints only the active slot when the word changes, so the surrounding
+  opacity/font-size transitions keep animating. Plain synchronized lines keep the
+  line-level highlight through `LyricLineSelector`, which is also the word-level
+  selector.
 - The lyrics view's **Karaoke** action opens `KaraokeWindow` fullscreen. It shows
   a fixed window of synchronized lines around the active one, emphasizes the
   active line, and animates opacity and font size through `Transitions`; the
@@ -478,7 +516,38 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   **Analyze audio features** action; it runs the local library through
   `AudioFeatureMaintenanceService` and requests bounded batches from each
   configured server, stays cancellable, and cancels on Settings deactivation.
-- The smart-playlist editor (`SmartPlaylistDialog`) must show every stored
+- Last.fm scrobbling mirrors the transport favourite button through
+  `LastFmScrobblingService.SetTrackLoved` and `LastFmClient.SetTrackLovedAsync`
+  (`track.love`/`track.unlove`, artist and track only). The call is best effort:
+  it never blocks playback, is skipped for items without an artist and title, and
+  is not queued while offline. `BuildLastFmTrack` is the single place that builds
+  the metadata for both now-playing and love, so an untagged item never produces
+  a request Last.fm rejects.- The year-in-review export shares one pure content model,
+  `Orynivo.Controls.YearInReviewLayout` (title, headline, monthly bar ratios, and
+  the leading sections). The Avalonia dialog renders it as controls; the PDF
+  export draws it through SkiaSharp in `YearInReviewPdfExporter`, which must stay
+  bounded to one A4 page, offline, and free of new data collection. SkiaSharp is
+  used through Avalonia.Skia's pinned 2.88.9 reference, so do not add a separate
+  SkiaSharp package reference to the desktop project.- The Infinite Mix profile editor offers Focus/Workout/Wind down presets through
+  the pure `Orynivo.InfiniteMixPresets.Apply`, which only pre-fills the mood,
+  discovery level, history period, and weighting and must preserve the server
+  selection, genre filters, feedback, and exclusions. Descriptor-based preset
+  scoring stays in the context-menu activity mix (`SimilarityFeatureService.RankPreset`);
+  the Infinite Mix profile itself remains metadata-based because the genre-cloud
+  candidate payload carries no acoustic descriptors.- Podcast downloads live in `PodcastDownloadService` beneath the per-user
+  `podcast-downloads` cache. `PodcastDownloadCache.BuildCacheFileName` derives a
+  stable hashed name per podcast and episode key, playback prefers the cached file
+  and marks it used, and `EnforceLimit` evicts through the pure
+  `PodcastDownloadCache.SelectForEviction` (least recently used first, newest
+  always kept). The limit is `AppSettings.PodcastDownloadLimitMb`. Episode rows
+  carry a download marker and their own context flyout, attached from
+  `TrackDataGrid_OnLoadingRow` when the row data context is an episode.
+- `ReferenceTrackPickerDialog` is the shared search dialog for picking a similarity
+  reference track. It never touches the database or the network itself: the caller
+  supplies the search through `Search` (the editor receives it via
+  `ReferenceTrackPicker`), and `MainWindow.SearchReferenceTracksAsync` queries the
+  local index plus every configured Orynivo Server, returning only credential-free
+  `local`/`server:<id>` identities.- The smart-playlist editor (`SmartPlaylistDialog`) must show every stored
   criterion and must never drop a criterion it cannot rebuild from its own input
   fields. The similarity reference is displayed with a readable track label
   (track title and artist for local references, server name for remote ones) and

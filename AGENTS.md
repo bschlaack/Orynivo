@@ -191,6 +191,19 @@ covers pure desktop helpers that do not require a running Avalonia UI;
 Do not move shared behavior into a UI-only class when a `Orynivo.Core` type can
 own it and stay cross-platform testable. The Windows build workflow runs all
 three test projects.
+`scripts/verify-all.ps1` runs the same checks locally in one command (managed
+builds with `--warnaserror`, all three test projects, and both parity scripts)
+and stops at the first failure; CI still runs these steps itself. Use it before
+declaring work complete.
+Every test that opens a library database must use
+`Orynivo.Core.Tests.CoreTestDatabase`, which owns a unique temporary directory
+per test and clears only that database's SQLite pool on disposal. Never call
+`AudioDatabase.OpenDefault()`, reference `AppPaths.DataRoot`, delete a shared
+database file, or call `SqliteConnection.ClearAllPools()` from a test: xUnit runs
+test classes in parallel, so shared paths and process-wide pool clearing leak
+rows between tests and produce intermittent failures. `TestEnvironment`'s module
+initializer remains the safety net that keeps the whole run away from the real
+per-user data directory.
 
 `build.ps1` always builds the vendored MIT-licensed `CwAsioBridge.dll`, then
 builds `AsioBridge.dll` when the Steinberg SDK is available, and finally builds
@@ -216,21 +229,29 @@ on every push and pull request, so MCP tool parity and the seven-language
 desktop/website/mobile localization coverage cannot silently drift. Keep these
 scripts passing; do not remove the job. `.github/dependabot.yml` tracks NuGet and
 GitHub Actions updates weekly, but ignores NuGet upgrades that cannot build on
-the pinned toolchain: Avalonia **major** updates (12 requires the .NET 9 SDK and
-has breaking API changes) plus major upgrades of Microsoft.Data.Sqlite and
-Microsoft.NET.Test.Sdk. Migrate those deliberately instead of merging an
-automatic bump. Avalonia **minor** updates within 11.3 are allowed again because
-the drag-and-drop code now uses `IDataTransfer`/`DataTransfer`/
-`DragDrop.DoDragDropAsync`; note that `Avalonia.Controls.DataGrid` has no release
+the pinned toolchain: Avalonia **major** updates (12 requires a newer SDK than the
+`net8.0` the desktop targets and has breaking API changes) plus major upgrades of
+Microsoft.Data.Sqlite and Microsoft.NET.Test.Sdk. Migrate those deliberately
+instead of merging an automatic bump, and migrate to **.NET 10 LTS** rather than
+.NET 9: .NET 9 is already in security-only maintenance and reaches end of support
+on the same day as .NET 8 (10 November 2026). Avalonia **minor** updates within
+11.3 are allowed again because the drag-and-drop code now uses
+`IDataTransfer`/`DataTransfer`/`DragDrop.DoDragDropAsync`; note that
+`Avalonia.Controls.DataGrid` is in upstream maintenance mode and has no release
 beyond 11.3.13, so it stays on that version while the other Avalonia packages may
-move within 11.3.x — that mix builds, but do not raise DataGrid past 11.3.13
-until upstream publishes a newer 11.3 line. SkiaSharp majors stay ignored as
+move within 11.3.x — that mix builds, but do not raise DataGrid past 11.3.13.
+A successor control has to be evaluated deliberately; do not wait for a DataGrid
+release that upstream does not plan. SkiaSharp majors stay ignored as
 well: Avalonia.Skia 11.3 depends on SkiaSharp 2.88.9 and
 SkiaSharp.NativeAssets.Linux 2.88.9, so raising SkiaSharp or
 SkiaSharp.NativeAssets.* in `Orynivo.Core`/`Orynivo.Server` would make Avalonia
 render through an incompatible managed/native Skia (and 3.x/4.x removed
 `SKFilterQuality`). Revisit both pins together when Avalonia ships a
-SkiaSharp 3/4-based release.
+SkiaSharp 3/4-based release. The deliberate migration triggers, steps, and
+required checks for every held-back line are recorded in
+[`DEPENDENCY-MIGRATION.md`](DEPENDENCY-MIGRATION.md); keep that record and the
+Dependabot `ignore` list in agreement, and never merge an ignored major upgrade
+without following the recorded plan.
 All GitHub-hosted CI and release workflows use Node.js 24-compatible action
 generations (`actions/checkout@v6`, `actions/setup-dotnet@v5`, and
 `softprops/action-gh-release@v3` where applicable); do not reintroduce their
@@ -658,9 +679,9 @@ fallback or allow client-provided commands/paths to reach the helper.
   the transport quick-pick buttons to jump directly into a settings section;
   the **Integration** navigation group contains the **MCP SERVER** section
   (`Tag="Mcp"`) with an enable checkbox, configurable port field, and per-tool
-  enable/disable checkboxes for all 32 tools (stored in
+  enable/disable checkboxes for all 37 tools (stored in
   `AppSettings.DisabledMcpTools`); `NavigateToSection("Mcp")` jumps there;
-  the tool `UniformGrid` has `Rows="16"` for 32 tools (2 columns). The MCP
+  the tool `UniformGrid` has `Rows="19"` for 37 tools (2 columns). The MCP
   section also holds the **Web browsing** configuration (enable toggle, SearXNG
   URL, block-private-networks toggle, and timeout/response-size/result limits)
   edited via `WebBrowsingValue`
@@ -693,7 +714,7 @@ fallback or allow client-provided commands/paths to reach the helper.
   `%LOCALAPPDATA%\Orynivo\logs\web-browsing.log`. Configured through
   `AppSettings.WebBrowsing` (`WebBrowsingOptions`); `MainWindow` creates the
   service, wires the logger, and updates `Options` on settings save.
-- `Orynivo/Mcp/McpTools.cs`: 32 MCP tools annotated with `[McpServerToolType]`
+- `Orynivo/Mcp/McpTools.cs`: 37 MCP tools annotated with `[McpServerToolType]`
   and `[McpServerTool]`; read-only tools are marked `ReadOnly = true,
   Idempotent = true`; every tool guards with `bridge.IsToolEnabled(name)` and
   returns `"Tool is disabled."` when off; `get_current_time` returns the current
@@ -748,7 +769,7 @@ fallback or allow client-provided commands/paths to reach the helper.
   independent of the transient list so compatibility endpoints without a model
   catalog remain usable.
 - `Orynivo/AI/AiToolDefinitions.cs`: builds the OpenAI function-calling schema
-  (`JsonObject` list) for all 32 Orynivo tools; definitions match the method
+  (`JsonObject` list) for all 37 Orynivo tools; definitions match the method
   signatures in `McpTools.cs`
 - `Orynivo/AI/AiToolExecutor.cs`: dispatches tool calls received from the LLM
   to `McpTools` methods by name; parses JSON arguments from the model; no MCP
@@ -2595,7 +2616,7 @@ and move those entries into a dated version section when preparing a release.
 - Genuine on/off options use the pill toggle `SettingsToggleTheme` (still a
   `CheckBox`, so code that reads `IsChecked` is unchanged): DSD-to-PCM, equalizer
   enable, MCP server enable, AI chat enable, and the Appearance sidebar-visibility
-  options. The toggle track is placed immediately before its label. The 19 MCP
+  options. The toggle track is placed immediately before its label. The 24 MCP
   per-tool entries stay on `SettingsCheckBoxTheme` because
   they form a permission checklist, not a single on/off switch.
 - Interactive settings inputs (TextBox, ComboBox, NumericUpDown, buttons) share

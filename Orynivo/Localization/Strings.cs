@@ -1350,6 +1350,62 @@ public sealed record LocalizedStrings(
     public string AiChatToolResultFallback { get; init; } = "";
     /// <summary>Gets the option for automatically accepting Fanart.tv artist-image results.</summary>
     public string AutoAcceptFanartTvImages { get; init; } = "";
+    /// <summary>Gets the action that downloads a podcast episode for offline playback.</summary>
+    public string PodcastDownload { get; init; } = "";
+    /// <summary>Gets the action that removes a downloaded podcast episode.</summary>
+    public string PodcastDeleteDownload { get; init; } = "";
+    /// <summary>Gets the label marking a downloaded episode.</summary>
+    public string PodcastDownloaded { get; init; } = "";
+    /// <summary>Gets the message shown after removing a download.</summary>
+    public string PodcastDownloadRemoved { get; init; } = "";
+    /// <summary>Gets the message shown while an episode downloads.</summary>
+    public string PodcastDownloading { get; init; } = "";
+    /// <summary>Gets the message shown when a download fails.</summary>
+    public string PodcastDownloadFailed { get; init; } = "";
+    /// <summary>Gets the label of the podcast download cache size limit.</summary>
+    public string PodcastDownloadLimit { get; init; } = "";
+    /// <summary>Gets the explanation of the podcast download cache size limit.</summary>
+    public string PodcastDownloadLimitHint { get; init; } = "";
+    /// <summary>Gets the bulk genre input watermark.</summary>
+    public string BulkGenre { get; init; } = "";
+    /// <summary>Gets the bulk genre input tooltip.</summary>
+    public string BulkGenreTooltip { get; init; } = "";
+    /// <summary>Gets the bulk genre apply action.</summary>
+    public string BulkGenreApply { get; init; } = "";
+    /// <summary>Gets the bulk genre confirmation format string.</summary>
+    public string BulkGenreUpdated { get; init; } = "";
+    /// <summary>Gets the bulk genre partial-failure format string.</summary>
+    public string BulkGenrePartiallyFailed { get; init; } = "";
+    /// <summary>Gets the action that exports the current view as a PDF document.</summary>
+    public string SaveAsPdf { get; init; } = "";
+    /// <summary>Gets the confirmation format string after exporting the PDF.</summary>
+    public string YearInReviewPdfSaved { get; init; } = "";
+    /// <summary>Gets the message shown when exporting the PDF fails.</summary>
+    public string YearInReviewPdfFailed { get; init; } = "";
+    /// <summary>Gets the label of the Infinite Mix preset row.</summary>
+    public string InfiniteMixPresets { get; init; } = "";
+    /// <summary>Gets the focus preset label.</summary>
+    public string InfiniteMixPresetFocus { get; init; } = "";
+    /// <summary>Gets the workout preset label.</summary>
+    public string InfiniteMixPresetWorkout { get; init; } = "";
+    /// <summary>Gets the wind-down preset label.</summary>
+    public string InfiniteMixPresetWindDown { get; init; } = "";
+    /// <summary>Gets the explanation of what the presets change.</summary>
+    public string InfiniteMixPresetsHint { get; init; } = "";
+    /// <summary>Gets the smart-playlist editor action that opens the reference-track picker.</summary>
+    public string ChooseReferenceTrack { get; init; } = "";
+    /// <summary>Gets the reference-track picker search label.</summary>
+    public string ReferenceTrackSearchLabel { get; init; } = "";
+    /// <summary>Gets the reference-track picker search watermark.</summary>
+    public string ReferenceTrackSearchWatermark { get; init; } = "";
+    /// <summary>Gets the reference-track picker minimum-query hint.</summary>
+    public string ReferenceTrackSearchHint { get; init; } = "";
+    /// <summary>Gets the reference-track picker search-in-progress message.</summary>
+    public string ReferenceTrackSearching { get; init; } = "";
+    /// <summary>Gets the reference-track picker empty-result message.</summary>
+    public string ReferenceTrackNotFound { get; init; } = "";
+    /// <summary>Gets the reference-track picker confirmation action.</summary>
+    public string UseReferenceTrack { get; init; } = "";
     /// <summary>Gets the scheduled-backup settings section label.</summary>
     public string ScheduledBackup { get; init; } = "";
     /// <summary>Gets the explanation of the scheduled-backup feature.</summary>
@@ -1378,6 +1434,25 @@ public sealed record LocalizedStrings(
     public string ScheduledBackupFailed { get; init; } = "";
     /// <summary>Gets the status-bar format string after an automatic backup.</summary>
     public string ScheduledBackupDone { get; init; } = "";
+    public string ResumeOnThisDevice { get; init; } = "";
+    public string ResumeOnThisDeviceTooltip { get; init; } = "";
+    public string ResumeOnThisDeviceHint { get; init; } = "";
+    public string TransportPrevious { get; init; } = "";
+    public string TransportPlayPause { get; init; } = "";
+    public string TransportNext { get; init; } = "";
+    public string TransportVolume { get; init; } = "";
+    public string ReduceMotion { get; init; } = "";
+    public string ReduceMotionHint { get; init; } = "";
+    public string ReduceMotionEnabled { get; init; } = "";
+    public string BackupTarget { get; init; } = "";
+    public string BackupTargetHint { get; init; } = "";
+    public string BackupTargetEnabled { get; init; } = "";
+    public string BackupTargetUrl { get; init; } = "";
+    public string BackupTargetDirectory { get; init; } = "";
+    public string BackupTargetUserName { get; init; } = "";
+    public string BackupTargetPassword { get; init; } = "";
+    public string BackupUploadDone { get; init; } = "";
+    public string BackupUploadFailed { get; init; } = "";
     /// <summary>Gets the fullscreen karaoke feature label.</summary>
     public string Karaoke { get; init; } = "";
     /// <summary>Gets the karaoke action tooltip.</summary>

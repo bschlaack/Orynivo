@@ -176,15 +176,30 @@ public partial class MainWindow : Window
             _currentPlayHistoryId = null;
         }
 
-        _lastFmScrobbler.SetNowPlaying(
-            new Scrobbling.LastFmTrack(
-                NowPlayingArtistBlock.Text ?? string.Empty,
-                NowPlayingTitleBlock.Text ?? string.Empty,
-                _currentAlbumTitle,
-                _currentPlaybackDuration > TimeSpan.Zero
-                    ? (int)_currentPlaybackDuration.TotalSeconds
-                    : null),
-            DateTimeOffset.Now);
+        if (BuildLastFmTrack() is { } lastFmTrack)
+            _lastFmScrobbler.SetNowPlaying(lastFmTrack, DateTimeOffset.Now);
+    }
+
+    /// <summary>
+    /// Builds the Last.fm metadata for the audible item. Last.fm requires a
+    /// non-empty artist and title, so an untagged item yields
+    /// <see langword="null"/> instead of a rejected request.
+    /// </summary>
+    /// <returns>The track metadata, or <see langword="null"/> without a title and artist.</returns>
+    private Scrobbling.LastFmTrack? BuildLastFmTrack()
+    {
+        var title = NowPlayingTitleBlock.Text;
+        var artist = NowPlayingArtistBlock.Text;
+        if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(artist))
+            return null;
+
+        return new Scrobbling.LastFmTrack(
+            artist,
+            title,
+            _currentAlbumTitle,
+            _currentPlaybackDuration > TimeSpan.Zero
+                ? (int)_currentPlaybackDuration.TotalSeconds
+                : null);
     }
 
     private async void PreviousButton_OnClick(object? sender, RoutedEventArgs e) =>
@@ -386,14 +401,19 @@ public partial class MainWindow : Window
         double? durationSeconds,
         bool completed)
     {
-        if (PodcastEpisodesDataGrid.ItemsSource is not IEnumerable<PodcastEpisodeViewModel> rows)
+        if (PodcastEpisodesDataGrid.ItemsSource is not IEnumerable<PodcastEpisodeViewModel> rows ||
+            _activePodcast is not { } podcast)
+        {
             return;
+        }
+
         var row = rows.FirstOrDefault(item =>
             string.Equals(item.Episode.EpisodeKey, episodeKey, StringComparison.Ordinal));
         if (row is null)
             return;
 
         var replacement = CreatePodcastEpisodeRow(
+            podcast,
             row.Episode,
             new Dictionary<string, PodcastEpisodeProgress>(StringComparer.Ordinal)
             {

@@ -223,8 +223,62 @@ internal static class AiToolDefinitions
             new JsonObject
             {
                 ["date"]  = Str("Optional date in yyyy-MM-dd format (e.g. 2025-06-01). Omit to get recent history."),
-                ["limit"] = Int("Maximum number of entries when no date is provided (1–100, default 20).")
-            })
+                ["limit"] = Int("Maximum number of entries when no date is provided (1-100, default 20).")
+            }),
+
+        Make("get_year_in_review",
+            "Returns the listening statistics for one calendar year: total listened time, active days, the monthly breakdown, and the leading genres, albums, and artists.",
+            new JsonObject
+            {
+                ["year"]     = Int("Four-digit calendar year. Omit for the current year."),
+                ["topCount"] = Int("Maximum entries per leading list (1-10, default 5).")
+            }),
+
+        Make("get_track_key",
+            "Returns the estimated musical key of a track as a Camelot wheel label such as 8A. Tracks whose key is unknown report that instead.",
+            new JsonObject
+            {
+                ["path"] = Str("Local file path or opaque orynivo:// track reference from search_library.")
+            },
+            ["path"]),
+
+        Make("set_tracks_favorite",
+            "Marks or unmarks several library tracks as favorites in one step. Each entry may be a local absolute file path or an orynivo:// remote reference from search_library.",
+            new JsonObject
+            {
+                ["paths"] = new JsonObject
+                {
+                    ["type"] = "array",
+                    ["items"] = new JsonObject { ["type"] = "string" },
+                    ["description"] = "Local absolute file paths and/or orynivo:// remote references to update."
+                },
+                ["favorite"] = Bool("True to mark the tracks as favorites; false to remove them.")
+            },
+            ["paths", "favorite"]),
+
+        Make("set_tracks_rating",
+            "Sets the personal zero-to-five-star rating of several library tracks in one step. Each entry may be a local absolute file path or an orynivo:// remote reference from search_library.",
+            new JsonObject
+            {
+                ["paths"] = new JsonObject
+                {
+                    ["type"] = "array",
+                    ["items"] = new JsonObject { ["type"] = "string" },
+                    ["description"] = "Local absolute file paths and/or orynivo:// remote references to update."
+                },
+                ["rating"] = Int("Personal rating from 0 (no rating) through 5.")
+            },
+            ["paths", "rating"]),
+
+        Make("create_similar_playlist",
+            "Creates a smart playlist that keeps the tracks most similar to a reference track. The reference may be a local absolute file path or an orynivo:// remote reference from search_library.",
+            new JsonObject
+            {
+                ["name"]         = Str("Name for the new smart playlist."),
+                ["path"]         = Str("Local absolute file path or orynivo:// remote reference of the reference track."),
+                ["minimumScore"] = Num("Optional inclusive minimum similarity score from 0 through 1.")
+            },
+            ["name", "path"])
     ];
 
     private static JsonObject Str(string description) =>

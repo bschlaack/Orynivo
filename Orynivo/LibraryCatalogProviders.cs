@@ -593,6 +593,7 @@ internal sealed class OrynivoServerLibraryCatalogProvider : ILibraryCatalogProvi
             track.MusicBrainzRating,
             track.MusicBrainzRatingVotes,
             track.MusicBrainzTrackId,
-            track.MusicBrainzRatingFetchedAt);
+            track.MusicBrainzRatingFetchedAt,
+            track.CamelotKey);
     }
 }

@@ -72,6 +72,7 @@ builder.Services.AddSingleton(static services =>
             .CalculateMissingReplayGainDuringScan));
 
 builder.Services.AddSingleton<LibraryService>();
+builder.Services.AddHostedService<BackupScheduleService>();
 builder.Services.AddHostedService(static services => services.GetRequiredService<LibraryService>());
 
 // ---- ASP.NET Core infrastructure ------------------------------------------

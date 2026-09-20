@@ -739,6 +739,7 @@ public partial class MainWindow : Window
                 _settings.ShowOwnRadiosSection != window.ShowOwnRadiosSection ||
                 _settings.ShowMyPodcastsSection != window.ShowMyPodcastsSection ||
                 _settings.ShowPlexSection != window.ShowPlexSection;
+            var motionChanged = _settings.ReduceMotion != window.ReduceMotionValue;
             var mcpChanged =
                 _settings.McpServerEnabled != window.McpServerEnabled ||
                 _settings.McpServerPort    != window.McpServerPort ||
@@ -850,10 +851,18 @@ public partial class MainWindow : Window
             _settings.ScheduledBackup.IntervalDays   = window.ScheduledBackupIntervalValue;
             _settings.ScheduledBackup.RetentionCount = window.ScheduledBackupRetentionValue;
             _settings.ScheduledBackup.Directory      = window.ScheduledBackupDirectoryValue;
+        _settings.BackupTarget ??= new BackupTargetSettings();
+        _settings.BackupTarget.Enabled         = window.BackupTargetEnabledValue;
+        _settings.BackupTarget.UploadUrl       = window.BackupTargetUrlValue;
+        _settings.BackupTarget.RemoteDirectory = window.BackupTargetDirectoryValue;
+        _settings.BackupTarget.UserName        = window.BackupTargetUserNameValue;
+        _settings.BackupTarget.Password        = window.BackupTargetPasswordValue;
+            _settings.PodcastDownloadLimitMb  = window.PodcastDownloadLimitMbValue;
             _settings.ShowInternetRadioItem   = window.ShowInternetRadioItem;
             _settings.ShowPodcastsItem        = window.ShowPodcastsItem;
             _settings.ShowQueueItem           = window.ShowQueueItem;
             _settings.ShowAiChatItem          = window.ShowAiChatItem;
+            _settings.ReduceMotion             = window.ReduceMotionValue;
             _settings.CheckForUpdatesOnStartup = window.CheckForUpdatesOnStartup;
             _settings.StartMaximized           = window.StartMaximized;
             _settings.ShowLocalLibrarySection = window.ShowLocalLibrarySection;
@@ -925,6 +934,11 @@ public partial class MainWindow : Window
                 GenreCloudBackgroundImage.Source = null;
                 GenreCloudBackgroundImage.Opacity = 0;
                 GenreCloudBackgroundShade.Opacity = 0;
+            }
+            if (motionChanged &&
+                string.Equals(_currentTopLevelTag, "Dashboard", StringComparison.Ordinal))
+            {
+                await BuildDashboardAsync();
             }
             if (artistInfoChanged)
                 ApplyArtistInfoSettings();

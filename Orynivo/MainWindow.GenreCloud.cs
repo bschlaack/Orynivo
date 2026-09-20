@@ -968,16 +968,20 @@ public partial class MainWindow
                 HorizontalContentAlignment = HorizontalAlignment.Center
             };
             button.Opacity = 0;
-            button.Transitions = new Transitions
-            {
-                new DoubleTransition { Property = Visual.OpacityProperty, Duration = TimeSpan.FromMilliseconds(220) }
-            };
+            button.Transitions = MotionPreferences.ResolveTransitions(
+                _settings.ReduceMotion,
+                new Transitions
+                {
+                    new DoubleTransition { Property = Visual.OpacityProperty, Duration = TimeSpan.FromMilliseconds(220) }
+                });
             var scaleTransform = new ScaleTransform(0.82, 0.82);
-            scaleTransform.Transitions = new Transitions
-            {
-                new DoubleTransition { Property = ScaleTransform.ScaleXProperty, Duration = TimeSpan.FromMilliseconds(260) },
-                new DoubleTransition { Property = ScaleTransform.ScaleYProperty, Duration = TimeSpan.FromMilliseconds(260) }
-            };
+            scaleTransform.Transitions = MotionPreferences.ResolveTransitions(
+                _settings.ReduceMotion,
+                new Transitions
+                {
+                    new DoubleTransition { Property = ScaleTransform.ScaleXProperty, Duration = TimeSpan.FromMilliseconds(260) },
+                    new DoubleTransition { Property = ScaleTransform.ScaleYProperty, Duration = TimeSpan.FromMilliseconds(260) }
+                });
             button.RenderTransform = scaleTransform;
             button.RenderTransformOrigin = RelativePoint.Center;
             button.Click += GenreCloudButton_OnClick;
