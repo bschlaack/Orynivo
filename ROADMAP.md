@@ -535,9 +535,13 @@ written here. No third-party visualizer code or preset bundle is linked.
   frames; the motion-vector grid is derived from the real motion field; and the video echo
   blends a scaled, optionally flipped copy with its zoom, alpha, and orientation keys. Numeric
   preset keys now seed the per-frame variables, so key-only presets work. Covered by 11 tests.
-- 38c Textures and `tex_` blocks - `Pending`: generated `noise_lq`/`noise_mq`/`noise_hq` and
-  `rand00`-`rand15` textures, the `sampler_main`, `sampler_pc_main`, and `sampler_fc_main`
-  sources, `GetBlur1`-`GetBlur3` and `GetPixel`, and the `tex_N_*` block parsing.
+- 38c Textures and `tex_` blocks - `Done`: `VisualizerTextureBank` generates the `noise_lq`
+  (32 x 32), `noise_mq` (256 x 256), and `noise_hq` (512 x 512) textures and the sixteen
+  `rand00`-`rand15` (32 x 32) textures deterministically from fixed seeds, samples them
+  bilinearly, and supports repeat, clamp, and mirror wrap. Correcting the original note: the
+  Milkdrop format has no per-preset texture block, so `tex_*` keys stay ignored, and the
+  sampler constructs (`sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`,
+  `GetPixel`) are HLSL and belong to 38d. Covered by 10 tests.
 - 38d HLSL `warp_*`/`comp_*` runtime - `Pending`: a CPU interpreter for the `ps_2_0` subset
   (scalar and `float2`/`float3`/`float4` math, swizzles, `tex2D`, `lerp`, `saturate`, `frac`,
   `dot`, `mul`, `if`/`for` blocks, and the sampler bindings), the `warp_N_*`/`comp_N_*`

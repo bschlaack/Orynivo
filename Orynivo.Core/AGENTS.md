@@ -37,6 +37,12 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   settings; never drop that step or key-only presets lose their wave, border, and echo
   parameters. The default wave mode is the single line (3), not the circular mode (0), because
   every built-in preset and the legacy `per_point` contract assume a line.
+  `VisualizerTextureBank` generates the Milkdrop noise and random textures from fixed seeds
+  instead of bundling third party images: keep generation deterministic and lazy, and keep the
+  sizes (32, 256, 512) so shader sampling stays comparable. The `sampler_main`,
+  `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, and `GetPixel` constructs are
+  HLSL shader features and belong to the shader runtime in phase 38d, not to the texture bank.
+  The Milkdrop format has no per-preset texture block, so unknown `tex_*` keys stay ignored.
 - Keep the project cross-platform `net10.0`; do not introduce Avalonia, Windows,
   DPAPI, WASAPI, ASIO, or other platform-specific dependencies.
 - Put shared library scanning, SQLite persistence, search, streaming models and
