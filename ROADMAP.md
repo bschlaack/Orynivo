@@ -1,6 +1,6 @@
 # Orynivo Roadmap
 
-Items 1-28 are complete and listed for reference only.
+Items 1-29 are complete and listed for reference only.
 
 Each item is one commit and must follow the completion checklist in
 `AGENTS.md`: build every affected project, run the three test projects, update
@@ -250,7 +250,7 @@ Steps:
 
 **Design**
 
-- Document when and how to move to Avalonia 12/.NET 9, what would unblock
+- Document when and how to move to Avalonia 12/.NET 10 LTS, what would unblock
   `Avalonia.Controls.DataGrid` beyond 11.3.13, and how the SkiaSharp 2.88.9 pin
   (Avalonia.Skia) is revisited.
 - Keep it as a decision record next to the Dependabot rules in `AGENTS.md`.
@@ -258,3 +258,21 @@ Steps:
 **Tests**: none; documentation only.
 
 **Commit**: `docs: record the dependency migration plan`
+
+## 29. Correct the toolchain target to .NET 10 LTS - `Done`
+
+**Design**
+
+- .NET 9 is in security-only maintenance and reaches end of support on
+  10 November 2026, the same day as the currently used .NET 8, so the record's
+  original ".NET 9" destination was a dead end. The target is **.NET 10 LTS**
+  (supported until 14 November 2028).
+- `Avalonia.Controls.DataGrid` is in upstream maintenance mode and has no release
+  beyond 11.3.13, so the DataGrid pin cannot be resolved by waiting. The record
+  now points at evaluating a successor control (`TableView`/`TreeDataGrid`).
+- Added the toolchain support-window table and the SkiaSharp fold-in step to the
+  .NET 10/Avalonia 12 migration.
+
+**Tests**: none; documentation only.
+
+**Commit**: `docs: correct the dependency migration target to .NET 10 LTS`

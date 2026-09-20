@@ -4,7 +4,7 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.44.0] - 2026-09-20
 
 ### Added
 
@@ -12,12 +12,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   The on-screen card and the PDF share the new pure
   `Orynivo.Controls.YearInReviewLayout` content model, so the two cannot drift
   apart; the PDF is drawn offline through SkiaSharp and the export stays bounded
-  to one page. The dialog gained **Save as PDF** next to **Save as image**.- Last.fm scrobbling now also mirrors the transport favourite button: toggling a
+  to one page. The dialog gained **Save as PDF** next to **Save as image**.-
+  Last.fm scrobbling now also mirrors the transport favourite button: toggling a
   track as favourite loves or unloves it on Last.fm through
   `LastFmClient.SetTrackLovedAsync`. The call is best effort, never blocks
   playback, and is skipped for items without an artist and title. The existing
   "now playing" notification now also skips untagged items instead of sending a
-  request Last.fm would reject.- The Infinite Mix profile editor now offers **Focus**, **Workout**, and
+  request Last.fm would reject.- The Infinite Mix profile editor now offers 
+  **Focus**, **Workout**, and
   **Wind down** presets next to the mood selector. They pre-fill the mood,
   discovery level, history period, and weighting through the pure, tested
   `InfiniteMixPresets` mapping, which preserves the server selection, genre
@@ -27,7 +29,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and every configured Orynivo Server and applies the selection together with the
   minimum similarity score; the readable label and **Remove reference** stay.
   Criteria building keeps using the pure `SmartPlaylistCriteriaEditing` helper,
-  which gained a picked-reference override.- Added five MCP and AI Chat tools. Read-only: `get_year_in_review` returns the
+  which gained a picked-reference override.- Added five MCP and AI Chat tools.
+  Read-only: `get_year_in_review` returns the
   listening statistics for one calendar year (listened hours, active days, the
   monthly breakdown, and the leading genres, albums, and artists), and
   `get_track_key` returns a track's estimated musical key as a Camelot wheel
@@ -39,8 +42,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   count is now 37.
 - Added `scripts/verify-all.ps1`, which runs the same checks as CI on a local
   checkout in one command: the managed builds with `--warnaserror`, all three
-  test projects, and both parity scripts. It stops at the first failure, prints a
-  compact summary, and supports `-Configuration`, `-SkipBuild`, and `-SkipTests`.
+  test projects, and both parity scripts. It stops at the first failure, prints
+  a compact summary, and supports `-Configuration`, `-SkipBuild`, and `-SkipTests`.
 
 - The karaoke view now highlights the active word of enhanced-LRC lyrics.
   `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
@@ -59,9 +62,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   tracks are updated on their owning server through the new authenticated
   `PUT /api/tracks/{id}/genre`, which records the same library-only override.
 - Podcast episodes can be downloaded for offline playback. Episode rows gained a
-  **Download episode** / **Delete download** context menu and a download marker in
-  the status column, playback prefers the cached file, and Settings > Library sets
-  the cache size limit in megabytes. Eviction removes the least recently used
+  **Download episode** / **Delete download** context menu and a download marker
+  in the status column, playback prefers the cached file, and Settings > Library
+  sets the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
 - Added an optional automatic server-side library backup schedule. The
@@ -101,6 +104,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -196,6 +208,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -358,6 +379,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -567,6 +597,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - The genre-cloud recommendation tie-break is now deterministic. It previously
@@ -647,6 +686,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -735,6 +783,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Unified all six desktop languages as complete built-in resources (853 keys
@@ -814,6 +871,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -904,6 +970,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - The **Up Next** table now offers the same selectable track columns as
@@ -981,6 +1056,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Similar-title and mood-mix actions now navigate directly to **Up Next**
@@ -1048,6 +1132,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -1124,6 +1217,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -1230,6 +1332,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Dashboard album artwork now refreshes immediately after a cover search or
@@ -1303,6 +1414,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Opening metadata review uses a fast index-only analysis instead of opening
@@ -1375,6 +1495,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -1473,6 +1602,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -1628,6 +1766,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Fixed a Library Doctor database-column typo that closed Orynivo when metadata
@@ -1723,6 +1870,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Fixed combined artist-and-title library searches so terms can match across
@@ -1801,6 +1957,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -1883,6 +2048,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -2041,6 +2215,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Artist and album artwork changes now invalidate the unified library view
@@ -2143,6 +2326,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Restarting Orynivo now restores every selectable sidebar content view rather
@@ -2215,6 +2407,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -2300,6 +2501,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Orynivo Server ReplayGain maintenance now runs FFmpeg with one worker thread,
@@ -2380,6 +2590,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -2473,6 +2692,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -2570,6 +2798,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Distinguished a completed MusicBrainz lookup with no community votes from a
@@ -2648,6 +2885,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Removed the Fluent DataGrid header's permanent empty sort-icon reservation,
@@ -2725,6 +2971,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Fixed unified artist details clearing their already rendered albums when the
@@ -2795,6 +3050,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -2905,6 +3169,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Fixed Windows identifying Orynivo as an unknown application in the system
@@ -2977,6 +3250,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -3062,6 +3344,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Preserved an album's downloaded artwork and favorite flag when a full
@@ -3130,6 +3421,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -3212,6 +3512,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -3314,6 +3623,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -3419,6 +3737,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Fixed Genre Cloud drill-downs reverting to all root genres when a connected
@@ -3523,6 +3850,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Fixed SEO image dimensions stretching the product screenshots and brand
@@ -3610,6 +3946,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -3710,6 +4055,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -3813,6 +4167,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Linux server release builds now normalize and validate packaged maintainer
@@ -3879,6 +4242,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -3969,6 +4341,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Opening a local or Orynivo Server album from a unified artist view once again
@@ -4036,6 +4417,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -4124,6 +4514,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Hidden the Steinberg ASIO and cwASIO subsystem badges on macOS and Linux,
@@ -4209,6 +4608,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -4329,6 +4737,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Linux now detects the extensionless `ffmpeg` and `ffprobe` executables for
@@ -4422,6 +4839,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Improved the startup update dialog's primary action contrast, spacing, and
@@ -4494,6 +4920,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -4574,6 +5009,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Placed Settings on/off switches immediately before their labels and aligned
@@ -4649,6 +5093,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Removed the standalone cyan scan-activity dot from the sidebar while retaining
@@ -4721,6 +5174,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -4801,6 +5263,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Prevented publication of incomplete signed update manifests by waiting for
@@ -4874,6 +5345,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -5044,6 +5524,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Fixed the listening chart's Y-axis rendering: the filled path now includes an
@@ -5202,6 +5691,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Fixed dragging albums onto the "Up Next" sidebar item restarting the current
@@ -5291,6 +5789,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Reduced local and Orynivo Server artist rename work by updating only the
@@ -5369,6 +5876,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -5449,6 +5965,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -5562,6 +6087,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -5719,6 +6253,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -5920,6 +6463,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Fixed waveform transport seeking so pointer release is captured reliably, the
@@ -6081,6 +6633,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Fixed checkbox borders appearing near-black on the dark background: the app
@@ -6164,6 +6725,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -6285,6 +6855,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - The Dashboard genre statistics (Top genres and the per-day calendar genres) now
@@ -6366,6 +6945,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - The Linux Orynivo Server now reads and writes its editable configuration at
@@ -6437,6 +7025,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -6524,6 +7121,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -6625,6 +7231,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Windows FFmpeg auto-download now resolves the current BtbN release asset via
@@ -6698,6 +7313,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - FFmpeg and FFprobe child processes now always receive a valid working
@@ -6766,6 +7390,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -6949,6 +7582,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -7152,6 +7794,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - The Orynivo Server settings and remote directory browser dialogs now use
@@ -7296,6 +7947,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Fixed numbered circle labels on the equalizer frequency-response graph being
@@ -7394,6 +8054,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -7527,6 +8196,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Enabled the A–Z index in the Plex folder view. Available letters now come
@@ -7656,6 +8334,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 ## [0.8.0] - 2026-06-21
@@ -7738,6 +8425,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -7847,6 +8543,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Fixed the application failing during startup because the lyrics
@@ -7931,6 +8636,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -8063,6 +8777,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Added a theme-aware background highlight for the currently audible item in
@@ -8172,6 +8895,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
 
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
+
 ### Fixed
 
 - Fixed the table-header column chooser not opening on right-click and then
@@ -8273,6 +9005,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 
@@ -8423,6 +9164,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
   is referenced from `AGENTS.md` next to the Dependabot rules.
+
+- Corrected the dependency migration plan: the target is **.NET 10 LTS**, not
+  .NET 9. .NET 9 is already in security-only maintenance and reaches end of
+  support on 10 November 2026, the same day as the currently used .NET 8, so
+  moving to it would be a dead end. The record now carries the support-window
+  table, the .NET 10 migration steps, and the note that
+  `Avalonia.Controls.DataGrid` is in upstream maintenance mode, so the DataGrid
+  pin is resolved by evaluating a successor control (`TableView`/`TreeDataGrid`)
+  instead of waiting for an upstream release.
 
 ### Fixed
 

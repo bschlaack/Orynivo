@@ -229,15 +229,19 @@ on every push and pull request, so MCP tool parity and the seven-language
 desktop/website/mobile localization coverage cannot silently drift. Keep these
 scripts passing; do not remove the job. `.github/dependabot.yml` tracks NuGet and
 GitHub Actions updates weekly, but ignores NuGet upgrades that cannot build on
-the pinned toolchain: Avalonia **major** updates (12 requires the .NET 9 SDK and
-has breaking API changes) plus major upgrades of Microsoft.Data.Sqlite and
-Microsoft.NET.Test.Sdk. Migrate those deliberately instead of merging an
-automatic bump. Avalonia **minor** updates within 11.3 are allowed again because
-the drag-and-drop code now uses `IDataTransfer`/`DataTransfer`/
-`DragDrop.DoDragDropAsync`; note that `Avalonia.Controls.DataGrid` has no release
+the pinned toolchain: Avalonia **major** updates (12 requires a newer SDK than the
+`net8.0` the desktop targets and has breaking API changes) plus major upgrades of
+Microsoft.Data.Sqlite and Microsoft.NET.Test.Sdk. Migrate those deliberately
+instead of merging an automatic bump, and migrate to **.NET 10 LTS** rather than
+.NET 9: .NET 9 is already in security-only maintenance and reaches end of support
+on the same day as .NET 8 (10 November 2026). Avalonia **minor** updates within
+11.3 are allowed again because the drag-and-drop code now uses
+`IDataTransfer`/`DataTransfer`/`DragDrop.DoDragDropAsync`; note that
+`Avalonia.Controls.DataGrid` is in upstream maintenance mode and has no release
 beyond 11.3.13, so it stays on that version while the other Avalonia packages may
-move within 11.3.x — that mix builds, but do not raise DataGrid past 11.3.13
-until upstream publishes a newer 11.3 line. SkiaSharp majors stay ignored as
+move within 11.3.x — that mix builds, but do not raise DataGrid past 11.3.13.
+A successor control has to be evaluated deliberately; do not wait for a DataGrid
+release that upstream does not plan. SkiaSharp majors stay ignored as
 well: Avalonia.Skia 11.3 depends on SkiaSharp 2.88.9 and
 SkiaSharp.NativeAssets.Linux 2.88.9, so raising SkiaSharp or
 SkiaSharp.NativeAssets.* in `Orynivo.Core`/`Orynivo.Server` would make Avalonia
