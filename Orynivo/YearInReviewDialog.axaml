@@ -71,6 +71,10 @@
                         Classes="dialogAction"
                         Content="{DynamicResource L_SaveAsImage}"
                         Click="SaveImageButton_OnClick"/>
+                <Button x:Name="SavePdfButton"
+                        Classes="dialogAction"
+                        Content="{DynamicResource L_SaveAsPdf}"
+                        Click="SavePdfButton_OnClick"/>
                 <Button Classes="dialogAction"
                         Content="{DynamicResource L_Close}"
                         Click="CloseButton_OnClick"/>

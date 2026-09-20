@@ -8,7 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Last.fm scrobbling now also mirrors the transport favourite button: toggling a
+- The year-in-review summary can now also be exported as a single-page A4 PDF.
+  The on-screen card and the PDF share the new pure
+  `Orynivo.Controls.YearInReviewLayout` content model, so the two cannot drift
+  apart; the PDF is drawn offline through SkiaSharp and the export stays bounded
+  to one page. The dialog gained **Save as PDF** next to **Save as image**.- Last.fm scrobbling now also mirrors the transport favourite button: toggling a
   track as favourite loves or unloves it on Last.fm through
   `LastFmClient.SetTrackLovedAsync`. The call is best effort, never blocks
   playback, and is skipped for items without an artist and title. The existing

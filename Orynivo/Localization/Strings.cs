@@ -1350,6 +1350,12 @@ public sealed record LocalizedStrings(
     public string AiChatToolResultFallback { get; init; } = "";
     /// <summary>Gets the option for automatically accepting Fanart.tv artist-image results.</summary>
     public string AutoAcceptFanartTvImages { get; init; } = "";
+    /// <summary>Gets the action that exports the current view as a PDF document.</summary>
+    public string SaveAsPdf { get; init; } = "";
+    /// <summary>Gets the confirmation format string after exporting the PDF.</summary>
+    public string YearInReviewPdfSaved { get; init; } = "";
+    /// <summary>Gets the message shown when exporting the PDF fails.</summary>
+    public string YearInReviewPdfFailed { get; init; } = "";
     /// <summary>Gets the label of the Infinite Mix preset row.</summary>
     public string InfiniteMixPresets { get; init; } = "";
     /// <summary>Gets the focus preset label.</summary>

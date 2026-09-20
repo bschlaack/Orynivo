@@ -484,7 +484,13 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   it never blocks playback, is skipped for items without an artist and title, and
   is not queued while offline. `BuildLastFmTrack` is the single place that builds
   the metadata for both now-playing and love, so an untagged item never produces
-  a request Last.fm rejects.- The Infinite Mix profile editor offers Focus/Workout/Wind down presets through
+  a request Last.fm rejects.- The year-in-review export shares one pure content model,
+  `Orynivo.Controls.YearInReviewLayout` (title, headline, monthly bar ratios, and
+  the leading sections). The Avalonia dialog renders it as controls; the PDF
+  export draws it through SkiaSharp in `YearInReviewPdfExporter`, which must stay
+  bounded to one A4 page, offline, and free of new data collection. SkiaSharp is
+  used through Avalonia.Skia's pinned 2.88.9 reference, so do not add a separate
+  SkiaSharp package reference to the desktop project.- The Infinite Mix profile editor offers Focus/Workout/Wind down presets through
   the pure `Orynivo.InfiniteMixPresets.Apply`, which only pre-fills the mood,
   discovery level, history period, and weighting and must preserve the server
   selection, genre filters, feedback, and exclusions. Descriptor-based preset

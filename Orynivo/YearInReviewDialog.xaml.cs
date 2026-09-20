@@ -96,6 +96,36 @@ public partial class YearInReviewDialog : Window
         }
     }
 
+    /// <summary>Renders the current year summary into a PDF file chosen by the user.</summary>
+    /// <param name="sender">The export action.</param>
+    /// <param name="e">Click details.</param>
+    private async void SavePdfButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (_summary is null)
+            return;
+
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = LocalizationManager.Current.SaveAsPdf,
+            FileTypeChoices = [new FilePickerFileType("PDF") { Patterns = ["*.pdf"] }],
+            DefaultExtension = "pdf",
+            SuggestedFileName = $"orynivo-{_summary.Year}.pdf"
+        });
+        if (file?.TryGetLocalPath() is not { Length: > 0 } filePath)
+            return;
+
+        if (YearInReviewPdfExporter.TryWrite(_summary, filePath))
+        {
+            StatusTextBlock.Text = string.Format(
+                CultureInfo.CurrentCulture,
+                LocalizationManager.Current.YearInReviewPdfSaved,
+                filePath);
+            return;
+        }
+
+        StatusTextBlock.Text = LocalizationManager.Current.YearInReviewPdfFailed;
+    }
+
     private void CloseButton_OnClick(object? sender, RoutedEventArgs e) => Close();
 
     private void YearComboBox_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -121,10 +151,12 @@ public partial class YearInReviewDialog : Window
                 Foreground = Brush("AppMutedTextBrush")
             });
             SaveImageButton.IsEnabled = false;
+            SavePdfButton.IsEnabled = false;
             return;
         }
 
         SaveImageButton.IsEnabled = true;
+        SavePdfButton.IsEnabled = true;
         _content.Children.Add(BuildHeadlineNumbers());
         _content.Children.Add(BuildSection(LocalizationManager.Current.YearInReviewMonthly, BuildMonthBars()));
         AddTopList(

@@ -857,7 +857,7 @@ byte-range streaming without FFmpeg.
   configured Orynivo Servers instead of waiting for the background batches.
 - A Dashboard **Year in review** summary for any year with listening history:
   listened hours, active days, a monthly breakdown, and the leading genres,
-  albums, and artists, exportable as a shareable PNG image
+  albums, and artists, exportable as a shareable PNG image or a single-page PDF
 - Dashboard with an artwork-backed greeting hero with a lightened-artwork rim, live
   library counters (including local and configured Orynivo Server track
   favorites), random

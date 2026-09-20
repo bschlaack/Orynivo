@@ -135,17 +135,17 @@ Steps:
 - 6 `Orynivo.Core.Tests` cases verify the signed love/unlove request, the error
   response, and that an untagged item sends nothing.
 
-## 21. Export the year in review as PDF — `Todo`
+## 21. Export the year in review as PDF — `Done`
 
-**Design**
-
-- Render the existing `YearInReviewSummary` through `SKDocument.CreatePdf` in
-  addition to the PNG export, reusing the same layout helper.
-- Keep the export bounded and offline; no new data collection.
-
-**Tests**: the layout helper.
-
-**Commit**: `feat(dashboard): export the year in review as PDF`
+- Added the pure `Orynivo.Controls.YearInReviewLayout` content model (title,
+  headline, monthly bar ratios, leading sections, album labels), consumed by the
+  PDF export so the on-screen card and the PDF cannot drift apart.
+- Added `YearInReviewPdfExporter`, which draws that model into a bounded
+  single-page A4 PDF through `SKDocument.CreatePdf`; SkiaSharp comes from
+  Avalonia.Skia's pinned 2.88.9 reference, so the desktop project deliberately has
+  no separate SkiaSharp package reference. The dialog gained **Save as PDF**.
+- 6 `Orynivo.Tests` cases cover the layout model and 2 more verify that a real
+  PDF document is written, including the empty-summary case.
 
 ## 22. Word-level karaoke highlighting — `Todo`
 

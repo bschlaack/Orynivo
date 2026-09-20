@@ -271,6 +271,9 @@ public static class LocalizationManager
         resources["L_ArtistImageSuggestionTitle"] = Current.ArtistImageSuggestionTitle;
         resources["L_ArtistImageSuggestionHint"] = Current.ArtistImageSuggestionHint;
         resources["L_AutoAcceptFanartTvImages"] = Current.AutoAcceptFanartTvImages;
+        resources["L_SaveAsPdf"] = Current.SaveAsPdf;
+        resources["L_YearInReviewPdfSaved"] = Current.YearInReviewPdfSaved;
+        resources["L_YearInReviewPdfFailed"] = Current.YearInReviewPdfFailed;
         resources["L_InfiniteMixPresets"] = Current.InfiniteMixPresets;
         resources["L_InfiniteMixPresetFocus"] = Current.InfiniteMixPresetFocus;
         resources["L_InfiniteMixPresetWorkout"] = Current.InfiniteMixPresetWorkout;
@@ -666,6 +669,9 @@ public static class LocalizationManager
         "Ein unerwarteter Fehler ist aufgetreten. Der Fehlerbericht konnte nicht gespeichert werden. Orynivo wird beendet.")
     {
         AutoAcceptFanartTvImages = "Fanart.tv-Funde automatisch übernehmen",
+        SaveAsPdf = "Als PDF speichern…",
+        YearInReviewPdfSaved = "PDF gespeichert: {0}",
+        YearInReviewPdfFailed = "Das PDF konnte nicht gespeichert werden.",
         InfiniteMixPresets = "Vorlagen",
         InfiniteMixPresetFocus = "Fokus",
         InfiniteMixPresetWorkout = "Training",
@@ -1489,6 +1495,9 @@ public static class LocalizationManager
         "An unexpected error occurred. The crash report could not be saved. Orynivo will now close.")
     {
         AutoAcceptFanartTvImages = "Automatically accept Fanart.tv results",
+        SaveAsPdf = "Save as PDF…",
+        YearInReviewPdfSaved = "PDF saved: {0}",
+        YearInReviewPdfFailed = "Could not save the PDF.",
         InfiniteMixPresets = "Presets",
         InfiniteMixPresetFocus = "Focus",
         InfiniteMixPresetWorkout = "Workout",
@@ -2295,6 +2304,9 @@ public static class LocalizationManager
         "Une erreur inattendue s’est produite. Le rapport n’a pas pu être enregistré. Orynivo va maintenant se fermer.")
     {
         AutoAcceptFanartTvImages = "Accepter automatiquement les résultats Fanart.tv",
+        SaveAsPdf = "Enregistrer au format PDF…",
+        YearInReviewPdfSaved = "PDF enregistré : {0}",
+        YearInReviewPdfFailed = "Impossible d'enregistrer le PDF.",
         InfiniteMixPresets = "Préréglages",
         InfiniteMixPresetFocus = "Concentration",
         InfiniteMixPresetWorkout = "Entraînement",
@@ -3098,6 +3110,9 @@ public static class LocalizationManager
         "Se produjo un error inesperado. No se pudo guardar el informe. Orynivo se cerrará ahora.")
     {
         AutoAcceptFanartTvImages = "Aceptar automáticamente los resultados de Fanart.tv",
+        SaveAsPdf = "Guardar como PDF…",
+        YearInReviewPdfSaved = "PDF guardado: {0}",
+        YearInReviewPdfFailed = "No se pudo guardar el PDF.",
         InfiniteMixPresets = "Ajustes predefinidos",
         InfiniteMixPresetFocus = "Concentración",
         InfiniteMixPresetWorkout = "Entrenamiento",
@@ -4681,6 +4696,9 @@ private static readonly LocalizedStrings Russian = new(
         AiChatEmptyResponse = "Модель вернула пустой ответ.",
         AiChatToolResultFallback = "После вызова инструмента модель не вернула окончательный ответ. Результат инструмента:",
         AutoAcceptFanartTvImages = "Автоматически принимать результаты Fanart.tv",
+        SaveAsPdf = "Сохранить как PDF…",
+        YearInReviewPdfSaved = "PDF сохранён: {0}",
+        YearInReviewPdfFailed = "Не удалось сохранить PDF.",
         InfiniteMixPresets = "Пресеты",
         InfiniteMixPresetFocus = "Сосредоточение",
         InfiniteMixPresetWorkout = "Тренировка",
@@ -5639,6 +5657,9 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "模型返回了空响应。",
         AiChatToolResultFallback = "调用工具后，模型未返回最终答复。工具结果：",
         AutoAcceptFanartTvImages = "自动接受 Fanart.tv 的结果",
+        SaveAsPdf = "保存为 PDF…",
+        YearInReviewPdfSaved = "PDF 已保存：{0}",
+        YearInReviewPdfFailed = "无法保存 PDF。",
         InfiniteMixPresets = "预设",
         InfiniteMixPresetFocus = "专注",
         InfiniteMixPresetWorkout = "锻炼",
@@ -6596,6 +6617,9 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "मॉडल ने खाली उत्तर दिया।",
         AiChatToolResultFallback = "टूल कॉल के बाद मॉडल ने अंतिम उत्तर नहीं दिया। टूल परिणाम:",
         AutoAcceptFanartTvImages = "Fanart.tv परिणाम स्वतः स्वीकार करें",
+        SaveAsPdf = "PDF के रूप में सहेजें…",
+        YearInReviewPdfSaved = "PDF सहेजा गया: {0}",
+        YearInReviewPdfFailed = "PDF सहेजा नहीं जा सका।",
         InfiniteMixPresets = "प्रीसेट",
         InfiniteMixPresetFocus = "एकाग्रता",
         InfiniteMixPresetWorkout = "वर्कआउट",
