@@ -201,6 +201,11 @@ public sealed class AppSettings
     public AiChatSettings AiChat { get; set; } = new();
     /// <summary>Gets or sets the web-browsing tool configuration (SearXNG endpoint and fetch safety limits).</summary>
     public WebBrowsingOptions WebBrowsing { get; set; } = new();
+    /// <summary>
+    /// Gets or sets the maximum size of the local podcast download cache in
+    /// megabytes; zero or less keeps every downloaded episode.
+    /// </summary>
+    public int PodcastDownloadLimitMb { get; set; } = 2048;
     /// <summary>Gets or sets the automatic library-backup schedule.</summary>
     public ScheduledBackupSettings ScheduledBackup { get; set; } = new();
 }

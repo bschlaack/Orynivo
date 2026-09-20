@@ -401,14 +401,19 @@ public partial class MainWindow : Window
         double? durationSeconds,
         bool completed)
     {
-        if (PodcastEpisodesDataGrid.ItemsSource is not IEnumerable<PodcastEpisodeViewModel> rows)
+        if (PodcastEpisodesDataGrid.ItemsSource is not IEnumerable<PodcastEpisodeViewModel> rows ||
+            _activePodcast is not { } podcast)
+        {
             return;
+        }
+
         var row = rows.FirstOrDefault(item =>
             string.Equals(item.Episode.EpisodeKey, episodeKey, StringComparison.Ordinal));
         if (row is null)
             return;
 
         var replacement = CreatePodcastEpisodeRow(
+            podcast,
             row.Episode,
             new Dictionary<string, PodcastEpisodeProgress>(StringComparer.Ordinal)
             {

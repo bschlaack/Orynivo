@@ -508,7 +508,15 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   selection, genre filters, feedback, and exclusions. Descriptor-based preset
   scoring stays in the context-menu activity mix (`SimilarityFeatureService.RankPreset`);
   the Infinite Mix profile itself remains metadata-based because the genre-cloud
-  candidate payload carries no acoustic descriptors.- `ReferenceTrackPickerDialog` is the shared search dialog for picking a similarity
+  candidate payload carries no acoustic descriptors.- Podcast downloads live in `PodcastDownloadService` beneath the per-user
+  `podcast-downloads` cache. `PodcastDownloadCache.BuildCacheFileName` derives a
+  stable hashed name per podcast and episode key, playback prefers the cached file
+  and marks it used, and `EnforceLimit` evicts through the pure
+  `PodcastDownloadCache.SelectForEviction` (least recently used first, newest
+  always kept). The limit is `AppSettings.PodcastDownloadLimitMb`. Episode rows
+  carry a download marker and their own context flyout, attached from
+  `TrackDataGrid_OnLoadingRow` when the row data context is an episode.
+- `ReferenceTrackPickerDialog` is the shared search dialog for picking a similarity
   reference track. It never touches the database or the network itself: the caller
   supplies the search through `Search` (the editor receives it via
   `ReferenceTrackPicker`), and `MainWindow.SearchReferenceTracksAsync` queries the

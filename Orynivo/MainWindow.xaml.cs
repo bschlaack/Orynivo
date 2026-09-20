@@ -390,17 +390,61 @@ public partial class MainWindow : Window
             new(id, CollectionId, Name, Author, FeedUrl, ArtworkUrl, Genre);
     }
 
-    private sealed class PodcastEpisodeViewModel
+    private sealed class PodcastEpisodeViewModel : INotifyPropertyChanged
     {
+        private bool _downloaded;
+        private string _status = string.Empty;
+
         public required PodcastEpisode Episode { get; init; }
         public required string Title { get; init; }
         public required string Published { get; init; }
         public required string Duration { get; init; }
         public required string Progress { get; init; }
-        public required string Status { get; init; }
+
+        /// <summary>Gets the localized play-state text without the download marker.</summary>
+        public required string BaseStatus { get; init; }
+
+        /// <summary>Gets the displayed status text including the download marker.</summary>
+        public string Status
+        {
+            get => _status;
+            private set
+            {
+                if (string.Equals(_status, value, StringComparison.Ordinal))
+                    return;
+                _status = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Status)));
+            }
+        }
+
+        /// <summary>Gets whether the episode is cached for offline playback.</summary>
+        public bool Downloaded
+        {
+            get => _downloaded;
+            private set
+            {
+                if (_downloaded == value)
+                    return;
+                _downloaded = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Downloaded)));
+            }
+        }
+
         public DateTimeOffset PublishedSort => Episode.PublishedAt ?? DateTimeOffset.MaxValue;
         public TimeSpan DurationSort { get; init; }
         public TimeSpan ProgressSort { get; init; }
+
+        /// <summary>Applies the download state to the row without reloading the feed.</summary>
+        /// <param name="downloaded">Whether the episode is cached.</param>
+        /// <param name="downloadedLabel">Localized download marker.</param>
+        public void ApplyDownloadState(bool downloaded, string downloadedLabel)
+        {
+            Downloaded = downloaded;
+            Status = downloaded ? $"{BaseStatus} · {downloadedLabel}" : BaseStatus;
+        }
+
+        /// <inheritdoc/>
+        public event PropertyChangedEventHandler? PropertyChanged;
     }
 
     private sealed class ContentRow : INotifyPropertyChanged

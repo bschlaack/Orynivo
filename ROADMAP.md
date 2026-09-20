@@ -185,18 +185,19 @@ Steps:
   `Orynivo.Core.Tests` cases cover the request path, the clear value, and a
   rejected response.
 
-## 24. Download podcast episodes for offline playback — `Todo`
+## 24. Download podcast episodes for offline playback — `Done`
 
-**Design**
-
-- Download episodes into a bounded per-user cache with a configurable size
-  limit, play from the local file when present, and show the downloaded state in
-  the episode list.
-- Clean up downloads that are no longer pinned; never delete while playing.
-
-**Tests**: cache and eviction selection (pure).
-
-**Commit**: `feat(podcasts): download episodes for offline playback`
+- `PodcastDownloadCache` owns the pure decisions: a stable hashed cache file name
+  per podcast and episode key, and least-recently-used eviction that always keeps
+  the newest download.
+- `PodcastDownloadService` downloads into the per-user `podcast-downloads` cache,
+  deletes single episodes, marks a played download as used, and enforces the limit.
+- Episode rows gained a **Download episode** / **Delete download** context menu and
+  a download marker in the status column; playback prefers the cached file;
+  Settings > Library sets `AppSettings.PodcastDownloadLimitMb`.
+- 12 `Orynivo.Core.Tests` cases cover the file naming and the eviction selection.
+- Not included: pinning individual episodes so eviction can never remove them, and
+  background prefetch of new episodes.
 
 ## 25. Cloud backup targets and a server-side schedule — `Todo`
 

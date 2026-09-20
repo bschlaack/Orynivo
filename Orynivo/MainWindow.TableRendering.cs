@@ -268,7 +268,10 @@ public partial class MainWindow : Window
     private void TrackDataGrid_OnLoadingRow(object? sender, DataGridRowEventArgs e)
     {
         ApplyNowPlayingClass(e.Row);
-        SetPlaylistContextFlyout(e.Row);
+        if (e.Row.DataContext is PodcastEpisodeViewModel)
+            SetPodcastEpisodeContextFlyout(e.Row);
+        else
+            SetPlaylistContextFlyout(e.Row);
     }
 
     private void PlaylistDataGrid_OnLoadingRow(object? sender, DataGridRowEventArgs e) =>

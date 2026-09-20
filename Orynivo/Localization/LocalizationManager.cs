@@ -271,6 +271,14 @@ public static class LocalizationManager
         resources["L_ArtistImageSuggestionTitle"] = Current.ArtistImageSuggestionTitle;
         resources["L_ArtistImageSuggestionHint"] = Current.ArtistImageSuggestionHint;
         resources["L_AutoAcceptFanartTvImages"] = Current.AutoAcceptFanartTvImages;
+        resources["L_PodcastDownload"] = Current.PodcastDownload;
+        resources["L_PodcastDeleteDownload"] = Current.PodcastDeleteDownload;
+        resources["L_PodcastDownloaded"] = Current.PodcastDownloaded;
+        resources["L_PodcastDownloadRemoved"] = Current.PodcastDownloadRemoved;
+        resources["L_PodcastDownloading"] = Current.PodcastDownloading;
+        resources["L_PodcastDownloadFailed"] = Current.PodcastDownloadFailed;
+        resources["L_PodcastDownloadLimit"] = Current.PodcastDownloadLimit;
+        resources["L_PodcastDownloadLimitHint"] = Current.PodcastDownloadLimitHint;
         resources["L_BulkGenre"] = Current.BulkGenre;
         resources["L_BulkGenreTooltip"] = Current.BulkGenreTooltip;
         resources["L_BulkGenreApply"] = Current.BulkGenreApply;
@@ -674,6 +682,14 @@ public static class LocalizationManager
         "Ein unerwarteter Fehler ist aufgetreten. Der Fehlerbericht konnte nicht gespeichert werden. Orynivo wird beendet.")
     {
         AutoAcceptFanartTvImages = "Fanart.tv-Funde automatisch übernehmen",
+        PodcastDownload = "Episode herunterladen",
+        PodcastDeleteDownload = "Download löschen",
+        PodcastDownloaded = "Heruntergeladen",
+        PodcastDownloadRemoved = "Download entfernt.",
+        PodcastDownloading = "Episode wird heruntergeladen…",
+        PodcastDownloadFailed = "Download fehlgeschlagen.",
+        PodcastDownloadLimit = "Podcast-Downloads (MB)",
+        PodcastDownloadLimitHint = "Heruntergeladene Episoden werden offline abgespielt. Bei Überschreitung werden die zuletzt selten genutzten zuerst entfernt; 0 behält alle.",
         BulkGenre = "Genre",
         BulkGenreTooltip = "Genre für die ausgewählten lokalen Titel setzen (nur Bibliothek, Dateien bleiben unverändert)",
         BulkGenreApply = "Genre anwenden",
@@ -1505,6 +1521,14 @@ public static class LocalizationManager
         "An unexpected error occurred. The crash report could not be saved. Orynivo will now close.")
     {
         AutoAcceptFanartTvImages = "Automatically accept Fanart.tv results",
+        PodcastDownload = "Download episode",
+        PodcastDeleteDownload = "Delete download",
+        PodcastDownloaded = "Downloaded",
+        PodcastDownloadRemoved = "Download removed.",
+        PodcastDownloading = "Downloading episode…",
+        PodcastDownloadFailed = "Download failed.",
+        PodcastDownloadLimit = "Podcast downloads (MB)",
+        PodcastDownloadLimitHint = "Downloaded episodes play offline. When the limit is exceeded the least recently used downloads are removed first; 0 keeps everything.",
         BulkGenre = "Genre",
         BulkGenreTooltip = "Set the genre for the selected local tracks (library only, files stay unchanged)",
         BulkGenreApply = "Apply genre",
@@ -2319,6 +2343,14 @@ public static class LocalizationManager
         "Une erreur inattendue s’est produite. Le rapport n’a pas pu être enregistré. Orynivo va maintenant se fermer.")
     {
         AutoAcceptFanartTvImages = "Accepter automatiquement les résultats Fanart.tv",
+        PodcastDownload = "Télécharger l'épisode",
+        PodcastDeleteDownload = "Supprimer le téléchargement",
+        PodcastDownloaded = "Téléchargé",
+        PodcastDownloadRemoved = "Téléchargement supprimé.",
+        PodcastDownloading = "Téléchargement de l'épisode…",
+        PodcastDownloadFailed = "Échec du téléchargement.",
+        PodcastDownloadLimit = "Téléchargements de podcasts (Mo)",
+        PodcastDownloadLimitHint = "Les épisodes téléchargés sont lus hors ligne. Au dépassement, les téléchargements les moins récents sont supprimés en premier ; 0 conserve tout.",
         BulkGenre = "Genre",
         BulkGenreTooltip = "Définir le genre des pistes locales sélectionnées (bibliothèque uniquement, fichiers inchangés)",
         BulkGenreApply = "Appliquer le genre",
@@ -3130,6 +3162,14 @@ public static class LocalizationManager
         "Se produjo un error inesperado. No se pudo guardar el informe. Orynivo se cerrará ahora.")
     {
         AutoAcceptFanartTvImages = "Aceptar automáticamente los resultados de Fanart.tv",
+        PodcastDownload = "Descargar episodio",
+        PodcastDeleteDownload = "Eliminar descarga",
+        PodcastDownloaded = "Descargado",
+        PodcastDownloadRemoved = "Descarga eliminada.",
+        PodcastDownloading = "Descargando episodio…",
+        PodcastDownloadFailed = "Error en la descarga.",
+        PodcastDownloadLimit = "Descargas de podcasts (MB)",
+        PodcastDownloadLimitHint = "Los episodios descargados se reproducen sin conexión. Al superar el límite se eliminan primero los usados menos recientemente; 0 conserva todo.",
         BulkGenre = "Género",
         BulkGenreTooltip = "Define el género de las pistas locales seleccionadas (solo biblioteca, los archivos no cambian)",
         BulkGenreApply = "Aplicar género",
@@ -4721,6 +4761,14 @@ private static readonly LocalizedStrings Russian = new(
         AiChatEmptyResponse = "Модель вернула пустой ответ.",
         AiChatToolResultFallback = "После вызова инструмента модель не вернула окончательный ответ. Результат инструмента:",
         AutoAcceptFanartTvImages = "Автоматически принимать результаты Fanart.tv",
+        PodcastDownload = "Скачать эпизод",
+        PodcastDeleteDownload = "Удалить загрузку",
+        PodcastDownloaded = "Скачано",
+        PodcastDownloadRemoved = "Загрузка удалена.",
+        PodcastDownloading = "Загрузка эпизода…",
+        PodcastDownloadFailed = "Не удалось скачать.",
+        PodcastDownloadLimit = "Загрузки подкастов (МБ)",
+        PodcastDownloadLimitHint = "Скачанные эпизоды воспроизводятся офлайн. При превышении лимита первыми удаляются давно не использованные; 0 сохраняет всё.",
         BulkGenre = "Жанр",
         BulkGenreTooltip = "Задать жанр для выбранных локальных треков (только библиотека, файлы не изменяются)",
         BulkGenreApply = "Применить жанр",
@@ -5687,6 +5735,14 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "模型返回了空响应。",
         AiChatToolResultFallback = "调用工具后，模型未返回最终答复。工具结果：",
         AutoAcceptFanartTvImages = "自动接受 Fanart.tv 的结果",
+        PodcastDownload = "下载剧集",
+        PodcastDeleteDownload = "删除下载",
+        PodcastDownloaded = "已下载",
+        PodcastDownloadRemoved = "已删除下载。",
+        PodcastDownloading = "正在下载剧集…",
+        PodcastDownloadFailed = "下载失败。",
+        PodcastDownloadLimit = "播客下载（MB）",
+        PodcastDownloadLimitHint = "已下载的剧集可离线播放。超出上限时优先删除最久未使用的下载；0 表示全部保留。",
         BulkGenre = "流派",
         BulkGenreTooltip = "为所选本地曲目设置流派（仅资料库，文件不变）",
         BulkGenreApply = "应用流派",
@@ -6652,6 +6708,14 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "मॉडल ने खाली उत्तर दिया।",
         AiChatToolResultFallback = "टूल कॉल के बाद मॉडल ने अंतिम उत्तर नहीं दिया। टूल परिणाम:",
         AutoAcceptFanartTvImages = "Fanart.tv परिणाम स्वतः स्वीकार करें",
+        PodcastDownload = "एपिसोड डाउनलोड करें",
+        PodcastDeleteDownload = "डाउनलोड हटाएँ",
+        PodcastDownloaded = "डाउनलोड किया",
+        PodcastDownloadRemoved = "डाउनलोड हटाया गया।",
+        PodcastDownloading = "एपिसोड डाउनलोड हो रहा है…",
+        PodcastDownloadFailed = "डाउनलोड विफल रहा।",
+        PodcastDownloadLimit = "पॉडकास्ट डाउनलोड (MB)",
+        PodcastDownloadLimitHint = "डाउनलोड किए गए एपिसोड ऑफ़लाइन चलते हैं। सीमा पार होने पर सबसे कम हाल में उपयोग किए गए पहले हटाए जाते हैं; 0 सब कुछ रखता है।",
         BulkGenre = "शैली",
         BulkGenreTooltip = "चयनित स्थानीय ट्रैक के लिए शैली सेट करें (केवल लाइब्रेरी, फ़ाइलें अपरिवर्तित)",
         BulkGenreApply = "शैली लागू करें",

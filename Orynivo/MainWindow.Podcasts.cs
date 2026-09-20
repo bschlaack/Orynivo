@@ -527,7 +527,7 @@ public partial class MainWindow : Window
                     return db.GetPodcastEpisodeProgress(podcast.Id);
                 }, cancellationToken)
                 : new Dictionary<string, PodcastEpisodeProgress>(StringComparer.Ordinal);
-            var rows = feed.Episodes.Select(episode => CreatePodcastEpisodeRow(episode, progress))
+            var rows = feed.Episodes.Select(episode => CreatePodcastEpisodeRow(podcast, episode, progress))
                 .ToList();
             PodcastEpisodesDataGrid.ItemsSource = rows;
             PodcastEpisodesStatusTextBlock.Text = rows.Count == 0
@@ -593,6 +593,7 @@ public partial class MainWindow : Window
     }
 
     private PodcastEpisodeViewModel CreatePodcastEpisodeRow(
+        PodcastRecord podcast,
         PodcastEpisode episode,
         IReadOnlyDictionary<string, PodcastEpisodeProgress> progressByEpisode)
     {
@@ -603,12 +604,13 @@ public partial class MainWindow : Window
         var position = progress?.PositionSeconds is > 0
             ? TimeSpan.FromSeconds(progress.PositionSeconds)
             : TimeSpan.Zero;
+        var downloaded = PodcastDownloadService.GetDownloadedPath(podcast, episode) is not null;
         var status = progress?.IsCompleted == true
             ? LocalizationManager.Current.PodcastPlayed
             : position > TimeSpan.Zero
                 ? LocalizationManager.Current.PodcastInProgress
                 : LocalizationManager.Current.PodcastUnplayed;
-        return new PodcastEpisodeViewModel
+        var row = new PodcastEpisodeViewModel
         {
             Episode = episode,
             Title = episode.Title,
@@ -619,10 +621,12 @@ public partial class MainWindow : Window
                 : duration is null
                     ? FormatTime(position)
                     : $"{FormatTime(position)} / {FormatTime(duration.Value)}",
-            Status = status,
+            BaseStatus = status,
             DurationSort = duration ?? TimeSpan.MaxValue,
             ProgressSort = position
         };
+        row.ApplyDownloadState(downloaded, LocalizationManager.Current.PodcastDownloaded);
+        return row;
     }
 
     private async void PodcastEpisodesDataGrid_OnMouseDoubleClick(object? sender, Avalonia.Input.TappedEventArgs e)
@@ -648,8 +652,14 @@ public partial class MainWindow : Window
         RefreshQueueNavigationButtons();
         try
         {
+            // Play the local copy when the episode was downloaded for offline use and
+            // record the use so eviction keeps the newest episodes.
+            var downloaded = PodcastDownloadService.GetDownloadedPath(podcast, episode);
+            if (downloaded is not null)
+                PodcastDownloadService.MarkUsed(podcast, episode);
+
             await StartPlaybackAsync(
-                episode.AudioUrl,
+                downloaded ?? episode.AudioUrl,
                 podcastPlayback: new PodcastPlayback(podcast, episode));
         }
         catch (OperationCanceledException)
@@ -662,6 +672,97 @@ public partial class MainWindow : Window
             PodcastEpisodesStatusTextBlock.IsVisible = true;
             PodcastEpisodesStatusTextBlock.Text = LocalizationManager.Current.PodcastFeedFailed;
         }
+    }
+
+    /// <summary>Attaches the per-row episode context menu when a row is realized.</summary>
+    /// <param name="row">Realized episode row.</param>
+    private void SetPodcastEpisodeContextFlyout(DataGridRow row)
+    {
+        row.ContextFlyout = BuildPodcastEpisodeContextFlyout();
+        row.AddHandler(
+            PointerPressedEvent,
+            PodcastEpisodeRow_OnPreviewMouseRightButtonDown,
+            RoutingStrategies.Tunnel,
+            handledEventsToo: true);
+    }
+
+    private void PodcastEpisodeRow_OnPreviewMouseRightButtonDown(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not DataGridRow row || !e.GetCurrentPoint(row).Properties.IsRightButtonPressed)
+            return;
+        if (row.ContextFlyout is not PopupFlyoutBase flyout)
+            return;
+        if (FindAncestor<DataGrid>(row) is { } grid)
+            grid.SelectedItem = row.DataContext;
+        e.Handled = true;
+        flyout.ShowAt(row, showAtPointer: true);
+    }
+
+    private MenuFlyout BuildPodcastEpisodeContextFlyout()
+    {
+        var menu = CreateSidebarMenuFlyout();
+        var download = CreateFlyoutMenuItem(LocalizationManager.Current.PodcastDownload);
+        download.Click += PodcastDownloadMenuItem_OnClick;
+        menu.Items.Add(download);
+        var remove = CreateFlyoutMenuItem(LocalizationManager.Current.PodcastDeleteDownload);
+        remove.Click += PodcastDeleteDownloadMenuItem_OnClick;
+        menu.Items.Add(remove);
+        return menu;
+    }
+
+    /// <summary>Downloads the clicked episode into the local offline cache.</summary>
+    /// <param name="sender">The download action.</param>
+    /// <param name="e">Click details.</param>
+    private async void PodcastDownloadMenuItem_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { DataContext: PodcastEpisodeViewModel row } ||
+            _activePodcast is not { } podcast)
+        {
+            return;
+        }
+
+        PodcastEpisodesStatusTextBlock.IsVisible = true;
+        PodcastEpisodesStatusTextBlock.Text = LocalizationManager.Current.PodcastDownloading;
+        var progress = new Progress<double>(value => PodcastEpisodesStatusTextBlock.Text =
+            $"{LocalizationManager.Current.PodcastDownloading} {value:P0}");
+        try
+        {
+            var path = await PodcastDownloadService.DownloadAsync(
+                podcast,
+                row.Episode,
+                progress,
+                CancellationToken.None);
+            if (path is null)
+            {
+                PodcastEpisodesStatusTextBlock.Text = LocalizationManager.Current.PodcastDownloadFailed;
+                return;
+            }
+
+            PodcastDownloadService.EnforceLimit(_settings.PodcastDownloadLimitMb * 1024L * 1024L);
+            row.ApplyDownloadState(true, LocalizationManager.Current.PodcastDownloaded);
+            PodcastEpisodesStatusTextBlock.Text = LocalizationManager.Current.PodcastDownloaded;
+        }
+        catch (OperationCanceledException)
+        {
+            PodcastEpisodesStatusTextBlock.Text = string.Empty;
+        }
+    }
+
+    /// <summary>Removes the clicked episode from the local offline cache.</summary>
+    /// <param name="sender">The delete action.</param>
+    /// <param name="e">Click details.</param>
+    private void PodcastDeleteDownloadMenuItem_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { DataContext: PodcastEpisodeViewModel row } ||
+            _activePodcast is not { } podcast)
+        {
+            return;
+        }
+
+        PodcastDownloadService.Delete(podcast, row.Episode);
+        row.ApplyDownloadState(false, LocalizationManager.Current.PodcastDownloaded);
+        PodcastEpisodesStatusTextBlock.IsVisible = true;
+        PodcastEpisodesStatusTextBlock.Text = LocalizationManager.Current.PodcastDownloadRemoved;
     }
 
     private async Task LoadPodcastArtworkAsync(string? artworkUrl, CancellationToken cancellationToken)

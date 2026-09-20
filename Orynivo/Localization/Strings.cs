@@ -1350,6 +1350,22 @@ public sealed record LocalizedStrings(
     public string AiChatToolResultFallback { get; init; } = "";
     /// <summary>Gets the option for automatically accepting Fanart.tv artist-image results.</summary>
     public string AutoAcceptFanartTvImages { get; init; } = "";
+    /// <summary>Gets the action that downloads a podcast episode for offline playback.</summary>
+    public string PodcastDownload { get; init; } = "";
+    /// <summary>Gets the action that removes a downloaded podcast episode.</summary>
+    public string PodcastDeleteDownload { get; init; } = "";
+    /// <summary>Gets the label marking a downloaded episode.</summary>
+    public string PodcastDownloaded { get; init; } = "";
+    /// <summary>Gets the message shown after removing a download.</summary>
+    public string PodcastDownloadRemoved { get; init; } = "";
+    /// <summary>Gets the message shown while an episode downloads.</summary>
+    public string PodcastDownloading { get; init; } = "";
+    /// <summary>Gets the message shown when a download fails.</summary>
+    public string PodcastDownloadFailed { get; init; } = "";
+    /// <summary>Gets the label of the podcast download cache size limit.</summary>
+    public string PodcastDownloadLimit { get; init; } = "";
+    /// <summary>Gets the explanation of the podcast download cache size limit.</summary>
+    public string PodcastDownloadLimitHint { get; init; } = "";
     /// <summary>Gets the bulk genre input watermark.</summary>
     public string BulkGenre { get; init; } = "";
     /// <summary>Gets the bulk genre input tooltip.</summary>

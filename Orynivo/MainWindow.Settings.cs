@@ -850,6 +850,7 @@ public partial class MainWindow : Window
             _settings.ScheduledBackup.IntervalDays   = window.ScheduledBackupIntervalValue;
             _settings.ScheduledBackup.RetentionCount = window.ScheduledBackupRetentionValue;
             _settings.ScheduledBackup.Directory      = window.ScheduledBackupDirectoryValue;
+            _settings.PodcastDownloadLimitMb  = window.PodcastDownloadLimitMbValue;
             _settings.ShowInternetRadioItem   = window.ShowInternetRadioItem;
             _settings.ShowPodcastsItem        = window.ShowPodcastsItem;
             _settings.ShowQueueItem           = window.ShowQueueItem;

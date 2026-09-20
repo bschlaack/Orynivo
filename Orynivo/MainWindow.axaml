@@ -2404,12 +2404,12 @@
                                   IsReadOnly="True"
                                   SelectionMode="Single"
                                   LoadingRow="TrackDataGrid_OnLoadingRow"
-                                  DoubleTapped="PodcastEpisodesDataGrid_OnMouseDoubleClick">
+                            DoubleTapped="PodcastEpisodesDataGrid_OnMouseDoubleClick">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="{DynamicResource L_PodcastStatus}"
                                                     Binding="{Binding Status}"
                                                     Tag="status"
-                                                    Width="90"/>
+                                                    Width="150"/>
                                 <DataGridTextColumn Header="{DynamicResource L_Title}"
                                                     Binding="{Binding Title}"
                                                     Tag="title"

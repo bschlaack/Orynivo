@@ -895,6 +895,7 @@ byte-range streaming without FFmpeg.
   server-side station query
 - Podcast search through the public Apple Podcasts catalog, complete RSS/Atom
   episode lists sorted newest first, persistent pinned podcasts in the sidebar,
+  downloadable episodes for offline playback with a size-limited local cache,
   category and feed-language filters, played/in-progress state, and automatic
   resume from the saved position
 - Podcast detail cards with large artwork, feed description and metadata, and

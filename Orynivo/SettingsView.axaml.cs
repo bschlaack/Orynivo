@@ -295,6 +295,7 @@ internal partial class SettingsView : UserControl
         ScheduledBackupEnabledCheckBox.IsChecked = settings.ScheduledBackup.Enabled;
         ScheduledBackupIntervalInput.Value = Math.Clamp(settings.ScheduledBackup.IntervalDays, 1, 365);
         ScheduledBackupRetentionInput.Value = Math.Clamp(settings.ScheduledBackup.RetentionCount, 1, 50);
+        PodcastDownloadLimitInput.Value = Math.Clamp(settings.PodcastDownloadLimitMb, 0, 102400);
         UpdateScheduledBackupStatus();
         _plexServers.AddRange((settings.PlexServers ?? []).Select(ClonePlexServer));
         _orynivoServers.AddRange((settings.OrynivoServers ?? []).Select(CloneOrynivoServer));
@@ -424,6 +425,10 @@ internal partial class SettingsView : UserControl
     /// <summary>Gets the configured number of backups kept before older ones are removed.</summary>
     public int ScheduledBackupRetentionValue =>
         (int)Math.Clamp(ScheduledBackupRetentionInput.Value ?? 3m, 1m, 50m);
+
+    /// <summary>Gets the configured maximum podcast download cache size in megabytes.</summary>
+    public int PodcastDownloadLimitMbValue =>
+        (int)Math.Clamp(PodcastDownloadLimitInput.Value ?? 2048m, 0m, 102400m);
 
     /// <summary>Gets the configured backup folder.</summary>
     public string ScheduledBackupDirectoryValue => _scheduledBackupDirectory;

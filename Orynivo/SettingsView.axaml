@@ -866,6 +866,24 @@
                                Foreground="{DynamicResource AppSecondaryTextBrush}"
                                TextWrapping="Wrap"/>
 
+                    <TextBlock Text="{DynamicResource L_PodcastDownloadLimit}"
+                               FontSize="{DynamicResource FontSizeCaption}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               Margin="0,16,0,4"/>
+                    <NumericUpDown x:Name="PodcastDownloadLimitInput"
+                                   Width="160"
+                                   Height="30"
+                                   HorizontalAlignment="Left"
+                                   Minimum="0"
+                                   Maximum="102400"
+                                   Increment="256"
+                                   FormatString="0"/>
+                    <TextBlock Text="{DynamicResource L_PodcastDownloadLimitHint}"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,4,0,0"/>
+
                     <Separator Margin="0,18,0,14"/>
 
                     <TextBlock Text="{DynamicResource L_DatabaseMaintenance}"
