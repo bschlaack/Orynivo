@@ -44,8 +44,12 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   HLSL shader features and belong to the shader runtime in phase 38d, not to the texture bank.
   The Milkdrop format has no per-preset texture block, so unknown `tex_*` keys stay ignored.
   The shader runtime is built in three steps: `ShaderLexer` is the tokenizer and stays a pure,
-  allocation-bounded function over the source, the parser and the `ps_2_0` interpreter follow,
-  and the `warp_N_*`/`comp_N_*` bindings with the per-frame cost budget come last. Keep the
+  allocation-bounded function over the source, `ShaderParser` builds the tagged-union
+  `ShaderNode` tree from it, and `ShaderInterpreter` evaluates that tree,
+  and the `warp_N_*`/`comp_N_*` bindings with the per-frame cost budget come last.
+  `ShaderInterpreter` keeps its variables in a plain dictionary the caller seeds and reads back,
+  samples only through `IShaderSampler`, and guards itself with a loop budget and a call depth
+  limit; keep both, because a runaway shader must never stall a frame. Keep the
   interpreter off the audio thread and bound its per-frame cost so a heavy shader degrades the
   render resolution instead of stalling playback.
 - Keep the project cross-platform `net10.0`; do not introduce Avalonia, Windows,

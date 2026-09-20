@@ -7,6 +7,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -117,6 +132,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.45.0] - 2026-09-20
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -238,6 +268,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.44.0] - 2026-09-20
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -431,6 +476,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.43.1] - 2026-09-18
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -518,6 +578,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.43.0] - 2026-09-18
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -672,6 +747,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.42.0] - 2026-09-17
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -929,6 +1019,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.41.7] - 2026-09-11
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -1010,6 +1115,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.41.5] - 2026-09-09
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -1096,6 +1216,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.41.4] - 2026-09-08
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -1281,6 +1416,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.41.0] - 2026-09-05
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -1384,6 +1534,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.40.2] - 2026-09-05
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -1493,6 +1658,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.40.0] - 2026-09-05
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -1608,6 +1788,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.39.0] - 2026-09-04
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -1683,6 +1878,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   ## [0.38.0] - 2026-09-04
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -1779,6 +1989,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.37.4] - 2026-09-04
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -1828,6 +2053,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.37.3] - 2026-09-02
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -1873,6 +2113,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.37.2] - 2026-08-27
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -1949,6 +2204,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.37.1] - 2026-08-27
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -2116,6 +2386,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and are not exposed by the current classic RAOP backend.
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -2188,6 +2473,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.7] - 2026-08-25
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -2262,6 +2562,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.6] - 2026-08-25
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -2399,6 +2714,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.4] - 2026-08-12
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -2524,6 +2854,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.2] - 2026-08-10
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -2578,6 +2923,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.1] - 2026-08-10
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -2653,6 +3013,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.0] - 2026-08-10
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -2748,6 +3123,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.35.4] - 2026-08-10
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -2915,6 +3305,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.35.0] - 2026-08-03
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -3039,6 +3444,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.34.0] - 2026-08-02
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -3203,6 +3623,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.33.0] - 2026-08-01
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -3309,6 +3744,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.32.0] - 2026-08-01
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -3420,6 +3870,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.31.0] - 2026-08-01
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -3517,6 +3982,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.30.3] - 2026-07-30
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -3591,6 +4071,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.30.2] - 2026-07-29
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -3646,6 +4141,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.30.1] - 2026-07-28
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -3741,6 +4251,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.30.0] - 2026-07-28
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -3858,6 +4383,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.29.2] - 2026-07-27
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -3983,6 +4523,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.29.0] - 2026-07-26
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -4110,6 +4665,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.28.0] - 2026-07-25
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -4245,6 +4815,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.27.0] - 2026-07-15
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -4319,6 +4904,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.6] - 2026-07-15
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -4395,6 +4995,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.5] - 2026-07-15
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -4470,6 +5085,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.4] - 2026-07-15
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -4543,6 +5173,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.3] - 2026-07-15
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -4621,6 +5266,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.2] - 2026-07-15
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -4735,6 +5395,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.0] - 2026-07-15
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -4798,6 +5473,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.25.0] - 2026-07-15
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -4952,6 +5642,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.24.0] - 2026-07-08
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -5105,6 +5810,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.23.3] - 2026-07-05
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -5269,6 +5989,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.23.0] - 2026-07-05
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -5436,6 +6171,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.22.0] - 2026-07-04
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -5628,6 +6378,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.21.0] - 2026-07-04
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -5782,6 +6547,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.20.5] - 2026-07-01
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -5968,6 +6748,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.20.3] - 2026-06-30
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -6142,6 +6937,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.20.0] - 2026-06-29
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -6279,6 +7089,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.18.0] - 2026-06-28
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -6387,6 +7212,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.16.0] - 2026-06-28
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -6629,6 +7469,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.15.0] - 2026-06-27
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -6781,6 +7636,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.14.0] - 2026-06-26
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -6831,6 +7701,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.13.0] - 2026-06-26
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -6893,6 +7778,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.12.0] - 2026-06-26
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -6989,6 +7889,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.11.0] - 2026-06-25
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -7122,6 +8037,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.10.0] - 2026-06-22
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -7265,6 +8195,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.9.0] - 2026-06-21
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -7336,6 +8281,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.8.0] - 2026-06-21
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -7550,6 +8510,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.7.0] - 2026-06-21
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -7695,6 +8670,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.6.0] - 2026-06-19
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -7801,6 +8791,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   New NuGet packages: `Avalonia.Fonts.Inter`, `SkiaSharp`.
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,
@@ -8008,6 +9013,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   automatically.
 
 ### Added
+- Added the HLSL interpreter for the shader runtime: `ShaderInterpreter` evaluates the parsed
+  `ps_2_0` tree with scalar and `float2`/`float3`/`float4` values (`ShaderValue`), covering
+  arithmetic with the C precedence, variables and the assignment operators, swizzles read and
+  written, vector constructors with concatenation and broadcast, the ternary operator,
+  `if`/`else`, `for`, and the usual intrinsics (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`,
+  `floor`, `frac`, `length`, `lerp`, `log`, `max`, `min`, `mul`, `normalize`, `pow`, `saturate`,
+  `sign`, `sin`, `smoothstep`, `sqrt`, `step`, `tan`). Sampling goes through the
+  `IShaderSampler` contract, so the interpreter carries no render state, and division by zero
+  yields zero instead of an infinity. A loop budget of 4096 iterations and a call depth limit of
+  32 keep a runaway shader from stalling a frame. Covered by 14 tests.
+- Added the HLSL parser and its syntax tree: `ShaderParser` and `ShaderNode` turn the
+  `ps_2_0` subset into a tagged-union tree covering declarations, expression statements,
+  `if`/`else`, `for`, `return`, swizzles, calls, the ternary operator, and the C operator
+  precedence. Function signatures and bare statement bodies are both accepted, and a sampler
+  declaration without a type is tolerated. Covered by 10 tests.
 - Added the HLSL front end for the upcoming shader runtime: `ShaderLexer` tokenizes the
   `ps_2_0` subset Milkdrop shaders use, covering identifiers and keywords, numbers with their
   `f`/`h` suffixes, single- and multi-character operators, swizzles, line and block comments,

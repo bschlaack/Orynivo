@@ -547,15 +547,29 @@ written here. No third-party visualizer code or preset bundle is linked.
   single- and multi-character operators, swizzles, line and block comments, and exact source
   positions are covered, and an unexpected character reports its offset through
   `PresetExpressionException`. Covered by 10 tests.
-- 38e HLSL parser and interpreter - `Pending`: the recursive-descent parser and the AST for
-  declarations, statements, `if`/`else`, `for`, and `return`, then the `ps_2_0` interpreter
-  with scalar and `float2`/`float3`/`float4` math, swizzles, and the intrinsics (`tex2D`,
-  `lerp`, `saturate`, `frac`, `dot`, `mul`, `pow`, `abs`, `min`, `max`, and friends).
-- 38f Shader bindings and cost budget - `Pending`: the `warp_N_*` and `comp_N_*` preset keys
+- 38e HLSL parser - `Done`: `ShaderNode` and `ShaderParser` build a tagged-union tree for the
+  subset: declarations, expression statements, `if`/`else`, `for`, `return`, swizzles, calls,
+  the ternary operator, and the C operator precedence. Function signatures and bare statement
+  bodies both parse, and a sampler declaration without a type is tolerated. Covered by
+  10 tests.
+- 38f HLSL interpreter - `Done`: `ShaderInterpreter` and `ShaderValue` evaluate the parsed tree
+  with scalar and `float2`/`float3`/`float4` values: arithmetic with the C precedence, variables
+  and the assignment operators, swizzles read and written, vector constructors with
+  concatenation and broadcast, the ternary operator, `if`/`else`, `for`, and the intrinsics
+  (`abs`, `ceil`, `clamp`, `cos`, `dot`, `exp`, `floor`, `frac`, `length`, `lerp`, `log`, `max`,
+  `min`, `mul`, `normalize`, `pow`, `saturate`, `sign`, `sin`, `smoothstep`, `sqrt`, `step`,
+  `tan`). Sampling is bound through `IShaderSampler` so the interpreter carries no render state,
+  division by zero yields zero, and a loop budget of 4096 iterations plus a call depth limit of
+  32 bound a runaway shader. Covered by 14 tests.
+- 38g Shader bindings and cost budget - `Pending`: the `warp_N_*` and `comp_N_*` preset keys
   (enabled flag, per-frame and per-pixel blocks, and the shader source), the sampler bindings
   (`sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, `GetPixel`,
   and the texture bank), and a bounded per-frame cost budget that lowers the render resolution
   instead of stalling playback.- 38e `.milk` compatibility and validation - `Pending`: `[presetNN]` sections, version and
+  `nWaveMode` handling, tolerance for the remaining legacy keys, a corpus of real presets as
+  regression fixtures, and the per-preset skip diagnostics.
+
+- 38h `.milk` compatibility and validation - `Pending`: `[presetNN]` sections, version and
   `nWaveMode` handling, tolerance for the remaining legacy keys, a corpus of real presets as
   regression fixtures, and the per-preset skip diagnostics.
 
