@@ -449,8 +449,8 @@ works directly in FFmpeg and browser URLs.
 | `PUT /api/artwork/artist/{id}` | Store raw client-selected artist image bytes on the server |
 | `GET /api/playlists` | All playlists (regular and smart) |
 | `GET /api/playlists/{id}/tracks` | Resolved track list (smart playlists are evaluated live) |
-| `POST /api/playlists/{id}/resolve` | Resolve a smart playlist while applying client-side favorite track IDs |
-| `POST /api/playlists/resolve-count` | Return the match count for ad-hoc smart-playlist criteria |
+| `POST /api/playlists/{id}/resolve` | Resolve a smart playlist while applying client-side favorite track IDs; similarity references are resolved from the server's cached feature vectors |
+| `POST /api/playlists/resolve-count` | Return the match count for ad-hoc smart-playlist criteria, including similarity references |
 | `POST /api/playlists` | Create a regular playlist from server-side track IDs |
 | `POST /api/playlists/smart` | Create a smart playlist from criteria |
 | `PUT /api/playlists/{id}/smart` | Update a smart playlist name and criteria |

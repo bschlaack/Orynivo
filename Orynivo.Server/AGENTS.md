@@ -135,6 +135,14 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
   Track list DTOs also carry the cached Camelot wheel label (`CamelotKey`) so
   remote clients can show the estimated musical key; it stays a cached value and
   the server never derives keys on request.
+- Smart-playlist resolution goes through
+  `Services/SmartPlaylistResolver.Resolve`, which supplies the cached similarity
+  feature vectors whenever the criteria carries a similarity reference. Calling
+  `SmartPlaylistCriteria.Resolve` directly returns an empty list for such
+  criteria, so `/api/playlists/{id}/resolve` and `/api/playlists/resolve-count`
+  must always use the helper. Vectors are built from
+  `GetSimilarityTrackProfiles`, so they are provider-local: a reference that
+  points at another library (`server:<id>`) intentionally resolves to nothing.
 - `GET /api/albums/recommendation-candidates` returns compact album-level
   genre/BPM metadata for client-side Dashboard ranking; recommendation policy
   and listening history remain on the client.

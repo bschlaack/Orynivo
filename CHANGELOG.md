@@ -25,6 +25,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Similarity smart playlists now resolve on an Orynivo Server instead of
+  returning an empty list. `/api/playlists/{id}/resolve` and
+  `/api/playlists/resolve-count` go through the new
+  `Services/SmartPlaylistResolver`, which supplies the server's cached similarity
+  feature vectors whenever the criteria carries a reference. A reference that
+  points at another library (`server:<id>`) intentionally still resolves to
+  nothing, because vectors are provider-local.
 - Remote Orynivo Server tracks now really carry their estimated musical key.
   `CamelotKey` had been added to the rating-mutation DTO instead of
   `OrynivoTrackInfo`, so the remote catalog mapping never received it and the

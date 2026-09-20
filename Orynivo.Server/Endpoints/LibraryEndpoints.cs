@@ -456,7 +456,7 @@ public static class LibraryEndpoints
             var candidates = db.GetSmartPlaylistTracks()
                 .Select(t => t with { IsFavorite = favoriteOverride.Contains(t.Id) })
                 .ToList();
-            return Results.Ok(new { Count = criteria.Resolve(candidates).Count });
+            return Results.Ok(new { Count = SmartPlaylistResolver.Resolve(db, criteria, candidates).Count });
         });
 
         api.MapPost("/playlists", (PlaylistCreateRequest request) =>
@@ -881,7 +881,7 @@ public static class LibraryEndpoints
             : db.GetSmartPlaylistTracks()
                 .Select(t => t with { IsFavorite = favoriteOverride.Contains(t.Id) })
                 .ToList();
-        var resolved = criteria.Resolve(candidates);
+        var resolved = SmartPlaylistResolver.Resolve(db, criteria, candidates);
         var ids = resolved.Select(t => t.Id).ToList();
         var tracks = db.GetTrackListByIds(ids);
         return Results.Ok(tracks.Select((track, index) => new

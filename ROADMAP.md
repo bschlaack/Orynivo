@@ -84,23 +84,27 @@ Steps:
   The tool count is 37, and two `Orynivo.Tests` cases validate every AI tool
   schema (types, descriptions, and required names).
 
-## 18. Pick the similarity reference in the smart-playlist editor — `Todo`
+## 18. Pick the similarity reference in the smart-playlist editor — `In progress`
 
 The reference can currently only be set from the track context menu.
 
-### Design
+Steps:
 
-- Add a track picker (search box plus result list) to `SmartPlaylistDialog` that
-  sets or replaces `SimilaritySourceKey`/`SimilarityTrackId` through the
-  existing catalog providers, keeping the readable label and **Remove
-  reference**.
-- Keep the criteria-building logic in `SmartPlaylistCriteriaEditing`.
-- Add the server-side resolve endpoint so similarity smart playlists also work
-  when they live on an Orynivo Server.
-
-**Tests**: criteria building and the picker's selection mapping (pure).
-
-**Commit**: `feat(playlists): pick the similarity reference in the editor`
+- 18a Server-side similarity resolve — `Done`: `/api/playlists/{id}/resolve` and
+  `/api/playlists/resolve-count` now go through the new public
+  `Orynivo.Server.Services.SmartPlaylistResolver`, which supplies the cached
+  similarity feature vectors whenever the criteria carries a reference. Before
+  this a similarity playlist stored on a server resolved to an empty list. A
+  reference pointing at another library (`server:<id>`) intentionally still
+  resolves to nothing, because vectors are provider-local. Three
+  `Orynivo.Server.Tests` cases cover the helper, the empty plain-resolve result,
+  and criteria without a reference.
+- 18b Reference picker in the editor — `Todo`: add a **Choose reference track**
+  action to the similarity panel in `SmartPlaylistDialog` that opens a small
+  search dialog (local library plus configured Orynivo Servers) and replaces
+  `SimilaritySourceKey`/`SimilarityTrackId`, keeping the readable label and
+  **Remove reference**. Criteria building stays in
+  `SmartPlaylistCriteriaEditing`.
 
 ## 19. Offer activity presets in the Infinite Mix profile — `Todo`
 
