@@ -1137,6 +1137,83 @@ public sealed class McpTools(McpPlayerBridge bridge)
         }
     }
 
+    /// <summary>Applies a favorite state to library tracks addressed by path or reference.</summary>
+    /// <param name="paths">Local file paths and/or opaque remote references.</param>
+    /// <param name="favorite">Requested favorite state.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A confirmation naming how many tracks were updated.</returns>
+    [McpServerTool(Name = "set_tracks_favorite")]
+    [Description("Marks or unmarks several library tracks as favorites in one step. Each entry may be a local absolute file path or an orynivo:// remote reference from search_library.")]
+    public async Task<string> SetTracksFavoriteAsync(
+        [Description("Local absolute file paths and/or orynivo:// remote references to update.")] string[] paths,
+        [Description("True to mark the tracks as favorites; false to remove them.")] bool favorite,
+        CancellationToken ct = default)
+    {
+        if (!bridge.IsToolEnabled("set_tracks_favorite")) return "Tool is disabled.";
+        if (bridge.SetTracksFavoriteFunc is null) return "Favorites are unavailable.";
+        if (paths.Length == 0) return "Provide at least one track path or reference.";
+
+        var changed = await bridge.OnUiAsync(
+            async () => await bridge.SetTracksFavoriteFunc(paths, favorite),
+            ct);
+        return changed == 0
+            ? "No library track matched the supplied paths."
+            : $"Updated the favorite state of {changed} track(s).";
+    }
+
+    /// <summary>Applies a personal rating to library tracks addressed by path or reference.</summary>
+    /// <param name="paths">Local file paths and/or opaque remote references.</param>
+    /// <param name="rating">New zero-to-five-star rating.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A confirmation naming how many tracks were updated.</returns>
+    [McpServerTool(Name = "set_tracks_rating")]
+    [Description("Sets the personal zero-to-five-star rating of several library tracks in one step. Each entry may be a local absolute file path or an orynivo:// remote reference from search_library.")]
+    public async Task<string> SetTracksRatingAsync(
+        [Description("Local absolute file paths and/or orynivo:// remote references to update.")] string[] paths,
+        [Description("Personal rating from 0 (no rating) through 5.")] int rating,
+        CancellationToken ct = default)
+    {
+        if (!bridge.IsToolEnabled("set_tracks_rating")) return "Tool is disabled.";
+        if (bridge.SetTracksRatingFunc is null) return "Ratings are unavailable.";
+        if (paths.Length == 0) return "Provide at least one track path or reference.";
+        if (rating is < 0 or > 5) return "Use a rating from 0 through 5.";
+
+        var changed = await bridge.OnUiAsync(
+            async () => await bridge.SetTracksRatingFunc(paths, rating),
+            ct);
+        return changed == 0
+            ? "No library track matched the supplied paths."
+            : $"Updated the rating of {changed} track(s).";
+    }
+
+    /// <summary>Creates a similarity smart playlist from a reference track.</summary>
+    /// <param name="name">Playlist name.</param>
+    /// <param name="path">Local path or opaque remote reference of the reference track.</param>
+    /// <param name="minimumScore">Optional inclusive minimum similarity score.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A confirmation naming the new playlist, or an explanation when the reference cannot be resolved.</returns>
+    [McpServerTool(Name = "create_similar_playlist")]
+    [Description("Creates a smart playlist that keeps the tracks most similar to a reference track. The reference may be a local absolute file path or an orynivo:// remote reference from search_library.")]
+    public async Task<string> CreateSimilarPlaylistAsync(
+        [Description("Name for the new smart playlist.")] string name,
+        [Description("Local absolute file path or orynivo:// remote reference of the reference track.")] string path,
+        [Description("Optional inclusive minimum similarity score from 0 through 1.")] double? minimumScore = null,
+        CancellationToken ct = default)
+    {
+        if (!bridge.IsToolEnabled("create_similar_playlist")) return "Tool is disabled.";
+        if (bridge.CreateSimilarPlaylistFunc is null) return "Similar playlists are unavailable.";
+        if (string.IsNullOrWhiteSpace(name)) return "Provide a playlist name.";
+        if (string.IsNullOrWhiteSpace(path)) return "Provide a reference track path or reference.";
+        if (minimumScore is < 0d or > 1d) return "Use a minimum score from 0 through 1.";
+
+        var id = await bridge.OnUiAsync(
+            async () => await bridge.CreateSimilarPlaylistFunc(name, path, minimumScore),
+            ct);
+        return id is null
+            ? "Could not resolve the reference track."
+            : $"Created the similar-tracks smart playlist '{name.Trim()}' (ID {id}).";
+    }
+
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------

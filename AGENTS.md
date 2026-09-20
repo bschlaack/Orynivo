@@ -671,9 +671,9 @@ fallback or allow client-provided commands/paths to reach the helper.
   the transport quick-pick buttons to jump directly into a settings section;
   the **Integration** navigation group contains the **MCP SERVER** section
   (`Tag="Mcp"`) with an enable checkbox, configurable port field, and per-tool
-  enable/disable checkboxes for all 34 tools (stored in
+  enable/disable checkboxes for all 37 tools (stored in
   `AppSettings.DisabledMcpTools`); `NavigateToSection("Mcp")` jumps there;
-  the tool `UniformGrid` has `Rows="17"` for 34 tools (2 columns). The MCP
+  the tool `UniformGrid` has `Rows="19"` for 37 tools (2 columns). The MCP
   section also holds the **Web browsing** configuration (enable toggle, SearXNG
   URL, block-private-networks toggle, and timeout/response-size/result limits)
   edited via `WebBrowsingValue`
@@ -706,7 +706,7 @@ fallback or allow client-provided commands/paths to reach the helper.
   `%LOCALAPPDATA%\Orynivo\logs\web-browsing.log`. Configured through
   `AppSettings.WebBrowsing` (`WebBrowsingOptions`); `MainWindow` creates the
   service, wires the logger, and updates `Options` on settings save.
-- `Orynivo/Mcp/McpTools.cs`: 34 MCP tools annotated with `[McpServerToolType]`
+- `Orynivo/Mcp/McpTools.cs`: 37 MCP tools annotated with `[McpServerToolType]`
   and `[McpServerTool]`; read-only tools are marked `ReadOnly = true,
   Idempotent = true`; every tool guards with `bridge.IsToolEnabled(name)` and
   returns `"Tool is disabled."` when off; `get_current_time` returns the current
@@ -761,7 +761,7 @@ fallback or allow client-provided commands/paths to reach the helper.
   independent of the transient list so compatibility endpoints without a model
   catalog remain usable.
 - `Orynivo/AI/AiToolDefinitions.cs`: builds the OpenAI function-calling schema
-  (`JsonObject` list) for all 34 Orynivo tools; definitions match the method
+  (`JsonObject` list) for all 37 Orynivo tools; definitions match the method
   signatures in `McpTools.cs`
 - `Orynivo/AI/AiToolExecutor.cs`: dispatches tool calls received from the LLM
   to `McpTools` methods by name; parses JSON arguments from the model; no MCP
@@ -2608,7 +2608,7 @@ and move those entries into a dated version section when preparing a release.
 - Genuine on/off options use the pill toggle `SettingsToggleTheme` (still a
   `CheckBox`, so code that reads `IsChecked` is unchanged): DSD-to-PCM, equalizer
   enable, MCP server enable, AI chat enable, and the Appearance sidebar-visibility
-  options. The toggle track is placed immediately before its label. The 21 MCP
+  options. The toggle track is placed immediately before its label. The 24 MCP
   per-tool entries stay on `SettingsCheckBoxTheme` because
   they form a permission checklist, not a single on/off switch.
 - Interactive settings inputs (TextBox, ComboBox, NumericUpDown, buttons) share

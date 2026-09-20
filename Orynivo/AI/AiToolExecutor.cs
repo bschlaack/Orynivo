@@ -87,6 +87,13 @@ internal sealed class AiToolExecutor(McpTools tools)
             "get_play_history"      => tools.GetPlayHistoryAsync(Str(args, "date"), Int(args, "limit", 20), ct),
             "get_year_in_review"    => tools.GetYearInReviewAsync(OptInt(args, "year"), Int(args, "topCount", 5), ct),
             "get_track_key"         => tools.GetTrackKeyAsync(Str(args, "path") ?? "", ct),
+            "set_tracks_favorite"   => tools.SetTracksFavoriteAsync(StrArray(args, "paths"), Bool(args, "favorite", true), ct),
+            "set_tracks_rating"     => tools.SetTracksRatingAsync(StrArray(args, "paths"), Int(args, "rating", 0), ct),
+            "create_similar_playlist" => tools.CreateSimilarPlaylistAsync(
+                                           Str(args, "name") ?? "",
+                                           Str(args, "path") ?? "",
+                                           OptNum(args, "minimumScore"),
+                                           ct),
             _                       => Task.FromResult($"Unknown tool: {name}")
         };
     }
@@ -112,4 +119,19 @@ internal sealed class AiToolExecutor(McpTools tools)
 
     private static int? OptInt(JsonElement e, string key) =>
         e.TryGetProperty(key, out var v) && v.TryGetInt32(out var i) ? i : null;
+
+    private static double? OptNum(JsonElement e, string key) =>
+        e.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetDouble() : null;
+
+    private static string[] StrArray(JsonElement e, string key)
+    {
+        if (!e.TryGetProperty(key, out var v) || v.ValueKind != JsonValueKind.Array)
+            return [];
+        return v.EnumerateArray()
+            .Where(item => item.ValueKind == JsonValueKind.String)
+            .Select(item => item.GetString())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!)
+            .ToArray();
+    }
 }

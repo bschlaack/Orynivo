@@ -154,6 +154,27 @@ public sealed class McpPlayerBridge
     /// <summary>Gets or sets a function that applies the requested favorite state to the current track.</summary>
     public Func<bool, bool>? SetCurrentFavoriteFunc { get; set; }
 
+    /// <summary>
+    /// Gets or sets a function that applies a favorite state to library tracks
+    /// addressed by local path or opaque <c>orynivo://</c> reference and returns
+    /// how many tracks were updated.
+    /// </summary>
+    public Func<IReadOnlyList<string>, bool, Task<int>>? SetTracksFavoriteFunc { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that applies a personal rating to library tracks
+    /// addressed by local path or opaque <c>orynivo://</c> reference and returns
+    /// how many tracks were updated.
+    /// </summary>
+    public Func<IReadOnlyList<string>, int, Task<int>>? SetTracksRatingFunc { get; set; }
+
+    /// <summary>
+    /// Gets or sets a function that creates a similarity smart playlist from a
+    /// reference track path and returns its new playlist ID, or
+    /// <see langword="null"/> when the reference cannot be resolved.
+    /// </summary>
+    public Func<string, string, double?, Task<long?>>? CreateSimilarPlaylistFunc { get; set; }
+
     /// <summary>Gets or sets a function that controls Infinite Mix and returns its resulting state.</summary>
     public Func<string, Task<string>>? ControlInfiniteMixFunc { get; set; }
 

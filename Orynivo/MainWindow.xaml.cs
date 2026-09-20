@@ -1032,6 +1032,9 @@ public partial class MainWindow : Window
         _mcpBridge.GetOrynivoServersFunc = () => _settings.OrynivoServers ?? [];
         _mcpBridge.ResolveRemoteTrackFunc = ResolveRemoteMcpTrackAsync;
         _mcpBridge.SetCurrentFavoriteFunc = SetCurrentTrackFavorite;
+        _mcpBridge.SetTracksFavoriteFunc = SetTracksFavoriteByPathsAsync;
+        _mcpBridge.SetTracksRatingFunc = SetTracksRatingByPathsAsync;
+        _mcpBridge.CreateSimilarPlaylistFunc = CreateSimilarPlaylistByPathAsync;
         _mcpBridge.ControlInfiniteMixFunc = ControlInfiniteMixAsync;
         _mcpBridge.GetOutputProfilesFunc = () => (_settings.OutputProfiles ?? [])
             .Select(profile => string.Equals(profile.Name, _settings.SelectedOutputProfileName, StringComparison.OrdinalIgnoreCase)

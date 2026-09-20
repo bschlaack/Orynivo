@@ -57,7 +57,7 @@ recommended next steps.
 - Not wired into the workflows; CI runs these steps itself. Both the success and
   the failure path were verified.
 
-## 17. ★ Expose the new features to MCP and AI Chat — `In progress`
+## 17. ★ Expose the new features to MCP and AI Chat — `Done`
 
 None of the 32 tools knew the year-in-review summary, the estimated musical key,
 bulk favourite/rating updates, or similarity smart playlists. Keep `McpTools`,
@@ -75,17 +75,20 @@ Steps:
   34. This also uncovered and fixed a real defect: `CamelotKey` had landed on the
   rating-mutation DTO instead of `OrynivoTrackInfo`, so remote rows never showed
   the key. Two Core tests guard the DTO.
-- 17b Mutating tools — `Todo`: `set_tracks_favorite`, `set_tracks_rating`, and
-  `create_similar_playlist`. They need new `McpPlayerBridge` delegates plus
-  path-based implementations that reuse the bulk-update and similarity-seed
-  logic, so the model can act on `search_library` results (local paths and
-  opaque `orynivo://` references) without ever seeing a credential.
+- 17b Mutating tools — `Done`: `set_tracks_favorite`, `set_tracks_rating`, and
+  `create_similar_playlist`, backed by three new `McpPlayerBridge` delegates and
+  path-based implementations. `SetTracksFavoriteByPathsAsync`/
+  `SetTracksRatingByPathsAsync` split local paths from `orynivo://` references and
+  reuse the transactional bulk update and the per-track server API;
+  `CreateSimilarPlaylistByPathAsync` is now shared with the track context menu.
+  The tool count is 37, and two `Orynivo.Tests` cases validate every AI tool
+  schema (types, descriptions, and required names).
 
 ## 18. Pick the similarity reference in the smart-playlist editor — `Todo`
 
 The reference can currently only be set from the track context menu.
 
-**Design**
+### Design
 
 - Add a track picker (search box plus result list) to `SmartPlaylistDialog` that
   sets or replaces `SimilaritySourceKey`/`SimilarityTrackId` through the

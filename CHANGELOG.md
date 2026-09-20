@@ -8,12 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Added two MCP and AI Chat tools: `get_year_in_review` returns the listening
-  statistics for one calendar year (listened hours, active days, the monthly
-  breakdown, and the leading genres, albums, and artists), and `get_track_key`
-  returns a track's estimated musical key as a Camelot wheel label. Both are
-  read-only, use only existing data, and respect the per-tool Settings toggles;
-  the tool count is now 34.
+- Added five MCP and AI Chat tools. Read-only: `get_year_in_review` returns the
+  listening statistics for one calendar year (listened hours, active days, the
+  monthly breakdown, and the leading genres, albums, and artists), and
+  `get_track_key` returns a track's estimated musical key as a Camelot wheel
+  label. Acting on search results: `set_tracks_favorite` and `set_tracks_rating`
+  update several tracks in one step, and `create_similar_playlist` builds a
+  similarity smart playlist from a reference track. Every entry accepts a local
+  absolute path or an opaque `orynivo://` reference, so no credential ever
+  reaches the model, and all five respect the per-tool Settings toggles. The tool
+  count is now 37.
 - Added `scripts/verify-all.ps1`, which runs the same checks as CI on a local
   checkout in one command: the managed builds with `--warnaserror`, all three
   test projects, and both parity scripts. It stops at the first failure, prints a
