@@ -4,6 +4,8 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using Orynivo.Localization;
 
+using Orynivo.Visualization;
+
 namespace Orynivo.Audio;
 
 /// <summary>
@@ -611,6 +613,8 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
 
     private void ProcessPcm16(Span<byte> bytes, float trackReplayGain)
     {
+        // The visualizer only sees audio while its window is open.
+        VisualizerAudioHub.Shared.PushPcm(bytes, "s16le", _sampleRate);
         var update = Interlocked.Exchange(ref _pendingEqualizerUpdate, null);
         if (update is not null)
             _equalizer.Update(update.Enabled, update.Profile);
@@ -627,6 +631,8 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
 
     private void ProcessPcm32(Span<byte> bytes, float trackReplayGain, float volume)
     {
+        // The visualizer only sees audio while its window is open.
+        VisualizerAudioHub.Shared.PushPcm(bytes, "s32le", _sampleRate);
         var update = Interlocked.Exchange(ref _pendingEqualizerUpdate, null);
         if (update is not null)
             _equalizer.Update(update.Enabled, update.Profile);

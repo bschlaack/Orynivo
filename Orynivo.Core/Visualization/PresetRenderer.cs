@@ -120,6 +120,24 @@ public sealed class PresetRenderer : IVisualizerAudioSource
         _frame++;
     }
 
+    /// <summary>
+    /// Draws only the waveform and spectrum overlay, without the feedback warp. This is the
+    /// reduce-motion path: the picture still shows the music but nothing moves.
+    /// </summary>
+    /// <param name="audio">Audio values to draw.</param>
+    public void RenderOverlayOnly(IVisualizerAudioSource audio)
+    {
+        ArgumentNullException.ThrowIfNull(audio);
+        _audio = audio;
+        Bass = audio.Bass;
+        Mid = audio.Mid;
+        Treble = audio.Treble;
+        Volume = audio.Volume;
+        DrawOverlay();
+        _previous.CopyFrom(_fresh);
+        _frame++;
+    }
+
     /// <summary>Clears every buffer and restarts the preset on the next frame.</summary>
     public void Reset()
     {

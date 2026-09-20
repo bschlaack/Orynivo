@@ -1,0 +1,32 @@
+<Window x:Class="Orynivo.VisualizerWindow"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="{DynamicResource L_Visualizer}"
+        Icon="avares://Orynivo/Assets/Orynivo.ico"
+        Width="960"
+        Height="540"
+        WindowState="FullScreen"
+        Background="Black"
+        Foreground="White">
+    <Grid>
+        <Image x:Name="VisualizerImage"
+               Stretch="Fill"
+               RenderOptions.BitmapInterpolationMode="HighQuality"/>
+        <Border x:Name="PresetBadge"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Top"
+                Margin="24"
+                Padding="12,6"
+                CornerRadius="10"
+                Background="#66000000">
+            <TextBlock x:Name="PresetTextBlock"
+                       FontSize="{DynamicResource FontSizeBody}"/>
+        </Border>
+        <TextBlock x:Name="HintTextBlock"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Bottom"
+                   Margin="0,0,0,28"
+                   Opacity="0.65"
+                   FontSize="{DynamicResource FontSizeMeta}"/>
+    </Grid>
+</Window>

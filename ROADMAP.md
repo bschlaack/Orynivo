@@ -456,9 +456,13 @@ overlays, and a composite stage.
   composite). Covered by 18 pixel-buffer and renderer tests plus 7 preset-parsing tests; the
   warp and the per-frame decay override are asserted through deterministic frame statistics.
   Custom shapes and a per-point waveform program remain for 37e.
-- 37d `VisualizerWindow` and wiring - `Todo`: fullscreen window, sidebar entry, preset
-  switching, frame-rate cap, reduce-motion handling, the player taps, and localization for
-  all seven languages.
+- 37d `VisualizerWindow` and wiring - `Done`: the fullscreen window (Escape closes, click
+  and Space/arrow keys switch presets, R resets) rendering into a `WriteableBitmap` at
+  480 x 270 that the image control scales up, the sidebar **Visualisierung** entry, the
+  reduce-motion path that draws a static spectrum at one frame per second, the audio taps in
+  the Windows WASAPI, ASIO, and Linux/macOS compatibility players through
+  `VisualizerAudioHub` (inactive and therefore free while no window is open), five built-in
+  presets, and three new strings in all seven languages.
 - 37e Presets and documentation - `Todo`: a handful of shipped presets, the preset folder
   and settings, README, AGENTS, wiki, and CHANGELOG coverage.
 

@@ -1,3 +1,5 @@
+using Orynivo.Visualization;
+
 namespace Orynivo.Audio;
 
 /// <summary>
@@ -6,7 +8,7 @@ namespace Orynivo.Audio;
 /// grouping, and the attack/decay smoothing, so a preset only ever sees stable values in
 /// the range zero to one.
 /// </summary>
-public sealed class AudioSpectrumAnalyzer
+public sealed class AudioSpectrumAnalyzer : IVisualizerAudioSource
 {
     /// <summary>Number of logarithmic bands produced for every analyzed frame.</summary>
     public const int BandCount = 64;

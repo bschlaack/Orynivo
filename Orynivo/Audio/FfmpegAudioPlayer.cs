@@ -2,6 +2,8 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 
+using Orynivo.Visualization;
+
 namespace Orynivo.Audio;
 
 /// <summary>
@@ -607,6 +609,8 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
 
     private void ProcessPcm(Span<float> samples, float trackReplayGain)
     {
+        // The visualizer only sees audio while its window is open.
+        VisualizerAudioHub.Shared.PushFloats(samples, CurrentInfo.OutputSampleRate);
         ApplyPendingEqualizerChanges();
         for (var index = 0; index + 1 < samples.Length; index += 2)
         {

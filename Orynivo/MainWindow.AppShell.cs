@@ -83,7 +83,18 @@ public partial class MainWindow : Window
         _searchTimer.Stop();
         _libraryWatcher?.Dispose();
         _libraryWatcher = null;
+        _visualizerWindow?.Close();
+        _visualizerWindow = null;
         StopPlayback();
+    }
+
+    private void VisualizerButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        // Non-modal like the karaoke window: playback keeps running behind it.
+        var window = new VisualizerWindow(presetIndex: 0, reduceMotion: _settings.ReduceMotion);
+        window.Closed += (_, _) => _visualizerWindow = null;
+        _visualizerWindow = window;
+        window.Show(this);
     }
 
     private async void AboutButton_OnClick(object? sender, RoutedEventArgs e)

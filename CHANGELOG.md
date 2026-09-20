@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Added the music visualizer window. The sidebar entry **Visualisierung** opens a
+  fullscreen window that renders the playing audio through the preset engine at 480 x 270
+  and scales the frame up; Escape closes it, a click or Space switches the preset, the
+  arrow keys step through them, and R resets the picture. The **Reduce motion** preference
+  draws a static spectrum instead of animating. Five presets ship with it, and the audio
+  players publish their prepared PCM through the lock-free `VisualizerAudioHub`, which
+  costs nothing while the window is closed.
+
 - Added the visualizer render pipeline: `PixelBuffer` (float RGBA with bilinear sampling,
   box blur, and a BGRA export), `VisualizerPreset` (INI parsing where every expression
   block shares one variable layout, so `q1` carries from the per-frame into the per-pixel

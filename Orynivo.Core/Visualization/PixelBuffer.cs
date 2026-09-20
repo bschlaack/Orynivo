@@ -166,5 +166,27 @@ public sealed class PixelBuffer
         }
     }
 
+    /// <summary>Writes one row as BGRA bytes, for presenters whose row stride is padded.</summary>
+    /// <param name="y">Row index.</param>
+    /// <param name="destination">Destination of at least <c>width * 4</c> bytes.</param>
+    public void WriteRowBgra(int y, Span<byte> destination)
+    {
+        var needed = Width * 4;
+        if (destination.Length < needed)
+            throw new ArgumentException("The destination is too small for one row.", nameof(destination));
+        if (y < 0 || y >= Height)
+            return;
+
+        for (var x = 0; x < Width; x++)
+        {
+            var source = (((y * Width) + x) * 4);
+            var target = x * 4;
+            destination[target] = ToByte(_pixels[source + 2]);
+            destination[target + 1] = ToByte(_pixels[source + 1]);
+            destination[target + 2] = ToByte(_pixels[source]);
+            destination[target + 3] = ToByte(Math.Max(_pixels[source + 3], 1f));
+        }
+    }
+
     private static byte ToByte(float value) => (byte)Math.Clamp(value * 255f + 0.5f, 0f, 255f);
 }

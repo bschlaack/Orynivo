@@ -482,6 +482,12 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   queries: the same AE-5 reported 192 kHz and 384 kHz as supported in one run and neither
   in another, under .NET 8 and .NET 10 alike. Never make the DSD conversion depend on that
   answer alone.
+- The visualizer renders through `PresetRenderer` into a low-resolution `PixelBuffer` and
+  presents it through a `WriteableBitmap` that the image control scales up. `VisualizerWindow`
+  owns `VisualizerAudioHub.IsActive`: while it is false the players skip the tap entirely, so
+  a closed visualizer costs nothing. Never render, analyse, or evaluate preset expressions on
+  the audio thread, and keep the window's `ReduceMotion` path on
+  `PresetRenderer.RenderOverlayOnly` so the reduce-motion preference is honoured.
 - The desktop runs on Avalonia 12.1.2 with **compiled bindings enabled by default**;
   do not add `AvaloniaUseCompiledBindingsByDefault=false` back. Every `DataTemplate`
   and every item-binding scope needs an explicit `x:DataType`:

@@ -955,6 +955,7 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <!-- App title -->
@@ -1209,8 +1210,26 @@
                            TextWrapping="Wrap"/>
             </StackPanel>
 
-            <!-- About -->
+            <!-- Visualizer -->
             <Button Grid.Row="3"
+                    HorizontalAlignment="Stretch"
+                    FontSize="{DynamicResource FontSizeBody}"
+                    Theme="{StaticResource SidebarBtnTheme}"
+                    Click="VisualizerButton_OnClick">
+                <StackPanel Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <Path Width="16"
+                          Height="16"
+                          Stretch="Uniform" Data="{StaticResource IconEqualizer}" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                          Margin="0,0,8,0"
+                          VerticalAlignment="Center"/>
+                    <TextBlock Text="{DynamicResource L_Visualizer}"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
+
+            <!-- About -->
+            <Button Grid.Row="4"
                     HorizontalAlignment="Stretch"
                     FontSize="{DynamicResource FontSizeBody}"
                     Theme="{StaticResource SidebarBtnTheme}"
@@ -1226,7 +1245,7 @@
                                VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
-            <Button Grid.Row="4"
+            <Button Grid.Row="5"
                     HorizontalAlignment="Stretch"
                     FontSize="{DynamicResource FontSizeBody}"
                     Theme="{StaticResource SidebarBtnTheme}"
