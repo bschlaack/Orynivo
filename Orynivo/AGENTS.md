@@ -468,15 +468,27 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   or an error message (`Orynivo.Library.BackupUploader`). The scheduled and
   **Back up now** paths share `MainWindow.TryUploadBackupAsync`; the explicit
   **Export library** action still writes only the user-chosen local ZIP.
-- The desktop runs on Avalonia 12.1.2 with
-  `AvaloniaUseCompiledBindingsByDefault=false`, so `{Binding}` stays a reflection
-  binding. Avalonia 12 compiles bindings by default and then requires an explicit
-  `x:DataType` on every template and root; the existing views do not carry one yet.
-  Adopt compiled bindings per XAML file (adding the correct `x:DataType`, then
-  removing the switch) as separate, verified changes, and never flip the switch
-  back to `true` before every file has been converted. SkiaSharp moves with
-  Avalonia: use `SKSamplingOptions`/`SKFont` instead of the removed 2.88 text and
-  sampling APIs on `SKPaint`.
+- The desktop runs on Avalonia 12.1.2 with **compiled bindings enabled by default**;
+  do not add `AvaloniaUseCompiledBindingsByDefault=false` back. Every `DataTemplate`
+  and every item-binding scope needs an explicit `x:DataType`:
+  - Put the item type on the **column or template**, never on the `DataGrid` itself.
+    A grid-level directive also applies to the grid's own bindings (`ItemsSource`,
+    `IsVisible`), which then fail against the item type. `DataGridTemplateColumn` cell
+    templates do not inherit a grid-level directive, so they need their own.
+  - A view model that XAML binds must be a **top-level type**; a nested or private
+    type cannot be named in `x:DataType`. That is why `RadioStationViewModel`,
+    `PodcastViewModel`, `PodcastEpisodeViewModel`, `LyricLineViewModel`,
+    `DailyHistoryRow`, `MetadataProblemRow`, `MetadataRepairHeaderViewModel`,
+    `MetadataRepairPreviewRow`, `TrackInfoEntry`, and the three search-window result
+    view models live in their own files, and why the metadata dialog uses a named
+    header record instead of an anonymous type.
+  - Scopes that bind the nested `ContentRow` (`AlbumArtworkCardTemplate`, the artist
+    artwork card, the artist-info track table, and the podcast/album hero cards whose
+    `DataContext` is set to a row in code) use explicit `{ReflectionBinding}`. Move
+    `ContentRow` to a top-level type and drop those to `{Binding}` when it is
+    extracted; see `DEPENDENCY-MIGRATION.md`.
+  SkiaSharp moves with Avalonia: use `SKSamplingOptions`/`SKFont` instead of the
+  removed 2.88 text and sampling APIs on `SKPaint`.
 - Cross-device resume for remote Orynivo Server tracks lives in
   `MainWindow.CrossDeviceResume.cs`. The last audible position is published at
   most every 20 seconds and only through the authenticated, profile-scoped

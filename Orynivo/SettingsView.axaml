@@ -1,6 +1,7 @@
 <UserControl x:Class="Orynivo.SettingsView"
         xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:Orynivo"
         xmlns:controls="using:Orynivo.Controls"
         Background="{DynamicResource AppContentBrush}"
         Foreground="{DynamicResource AppPrimaryTextBrush}">
@@ -1111,19 +1112,24 @@
                               DoubleTapped="MetadataProblemsDataGrid_OnDoubleTapped">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="{DynamicResource L_SourceColumn}"
+                                                x:DataType="local:MetadataProblemRow"
                                                 Binding="{Binding Source}"
                                                 Width="120"/>
                             <DataGridTextColumn Header="{DynamicResource L_MetadataFolder}"
+                                                x:DataType="local:MetadataProblemRow"
                                                 Binding="{Binding Folder}"
                                                 Width="2*"/>
                             <DataGridTextColumn Header="{DynamicResource L_MetadataSeverity}"
+                                                x:DataType="local:MetadataProblemRow"
                                                 Binding="{Binding Severity}"
                                                 SortMemberPath="SeverityValue"
                                                 Width="110"/>
                             <DataGridTextColumn Header="{DynamicResource L_MetadataIssues}"
+                                                x:DataType="local:MetadataProblemRow"
                                                 Binding="{Binding Issues}"
                                                 Width="2*"/>
                             <DataGridTextColumn Header="{DynamicResource L_MetadataTrackCount}"
+                                                x:DataType="local:MetadataProblemRow"
                                                 Binding="{Binding TrackCount}"
                                                 Width="80"/>
                         </DataGrid.Columns>

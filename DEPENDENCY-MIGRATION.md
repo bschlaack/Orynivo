@@ -126,33 +126,58 @@ Still outstanding:
   equalizer profile dialogs, remote Orynivo Server and Plex playback, MCP and AI
   tool execution, cross-device resume, and the WebDAV backup upload.
 
-## Adopting compiled bindings
+## Completed: compiled bindings
 
-**Trigger:** a dedicated change per XAML file, with that file's bindings verified.
+Avalonia 12 compiles bindings by default, so every binding scope now carries an
+explicit `x:DataType` and `AvaloniaUseCompiledBindingsByDefault=false` is gone.
+The migration produced 232 compiler diagnostics across eight files and resolved
+them as follows:
+
+1. `DataTemplate`s and grid columns got the item type: `ContentRow` for the shared
+   cards, `RadioStationViewModel`/`PodcastViewModel`/`PodcastEpisodeViewModel` for
+   the catalogs, `DailyHistoryRow` for the history grid,
+   `MetadataProblemRow`/`MetadataRepairTrack`/`MetadataRepairPreviewRow` for the
+   metadata views, `LyricLineViewModel` for the lyrics list, `TrackInfoEntry` for
+   the track information dialog, `EqualizerProfile` and `OutputProfile` for the
+   transport pickers.
+2. The item type goes on the **column or template**, not on the `DataGrid` itself:
+   a grid-level directive also applies to the grid's own `ItemsSource`/`IsVisible`
+   bindings and breaks them, and `DataGridTemplateColumn` cell templates do not
+   inherit it.
+3. Ten view models moved out of their window or view into top-level types, because
+   XAML cannot name a nested type: `RadioStationViewModel`, `PodcastViewModel`,
+   `PodcastEpisodeViewModel`, `LyricLineViewModel` (out of `MainWindow`),
+   `DailyHistoryRow` (out of `DailyHistoryDialog`), `MetadataProblemRow` (out of
+   `SettingsView`), `MetadataRepairHeaderViewModel` and `MetadataRepairPreviewRow`
+   (out of `MetadataRepairDialog`, the former replacing an anonymous type),
+   `TrackInfoEntry` (out of `TrackInfoDialog`), and the three search-window result
+   view models. The helpers they call became `internal static`.
+4. `ContentRow` is still a nested private type, so the scopes that bind it
+   (`AlbumArtworkCardTemplate`, the artist artwork card, the artist-info track
+   table, and the podcast and album hero cards whose `DataContext` is assigned to a
+   row in code) use explicit `{ReflectionBinding}`. That is the one remaining
+   reflection-binding surface.
+
+Verification: clean Debug and Release builds with `--warnaserror` (0 errors, 0
+warnings) and `scripts/verify-all.ps1` green, with 570 tests passing.
+
+## Follow-up: extract `ContentRow`
+
+**Trigger:** a dedicated change, because it is the central UI row model.
 
 **Steps:**
 
-1. Add the correct `x:DataType` to each `DataTemplate` and to the root element
-   (`ContentRow` for the shared cards and table templates, the code-behind class
-   for windows and views).
-2. Give a type that XAML can reference to any template whose item type is a
-   private nested class; a private nested view model cannot be named in
-   `x:DataType`.
-3. Remove `AvaloniaUseCompiledBindingsByDefault=false` only after every file has
-   been converted.
-4. Re-check the templates that bind through `RelativeSource` to `ListBoxItem`
-   ancestors, and the templates whose item type has to be confirmed against the
-   owning grid's `ItemsSource`.
-
-The measured scope is 232 diagnostics across eight files: `MainWindow.axaml`
-(124), `DailyHistoryDialog.axaml` (42), `MetadataRepairDialog.axaml` (26),
-`SettingsView.axaml` (10), `TrackInfoDialog.axaml` (10),
-`ArtistImageSearchWindow.axaml` (8), `CoverSearchWindow.axaml` (6), and
-`LyricsSearchWindow.axaml` (6).
+1. Move `ContentRow` out of `MainWindow.xaml.cs` into its own top-level type with
+   English XML documentation for every member (77 members, of which 8 carry a
+   summary today).
+2. Replace the remaining `{ReflectionBinding}` occurrences with `{Binding}` and add
+   `x:DataType="local:ContentRow"` to the affected scopes.
+3. Re-check every `MainWindow` partial that touches the type; it is used only from
+   `MainWindow` partials today, so the move is contained.
 
 **Checks before merging:** `scripts/verify-all.ps1` green plus a manual pass over
-every converted view: the shared Tracks/Albums/Artists tables, the Dashboard, the
-Genre Cloud, the transport, the AI chat, and each converted dialog.
+the album artwork cards, the artist artwork cards, the artist-info track table, the
+podcast detail hero, and the album detail header.
 ## `Avalonia.Controls.DataGrid`
 
 `Avalonia.Controls.DataGrid` ships with the Avalonia 12 line (12.1.2) and is

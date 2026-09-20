@@ -1,6 +1,8 @@
 <Window x:Class="Orynivo.TrackInfoDialog"
+        x:DataType="local:TrackInfoDialog"
         xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:Orynivo"
         Title="{Binding DialogTitle}"
         Icon="avares://Orynivo/Assets/Orynivo.ico"
         Width="820"
@@ -47,7 +49,7 @@
                       VerticalScrollBarVisibility="Auto">
             <ItemsControl ItemsSource="{Binding Rows}">
                 <ItemsControl.ItemTemplate>
-                    <DataTemplate>
+                    <DataTemplate x:DataType="local:TrackInfoEntry">
                         <Border Classes="infoRow">
                             <Grid ColumnDefinitions="220,*">
                                 <TextBlock Classes="infoLabel" Text="{Binding Label}"/>

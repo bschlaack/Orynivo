@@ -7,6 +7,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Adopted Avalonia 12 compiled bindings for the whole desktop UI and removed
+  `AvaloniaUseCompiledBindingsByDefault=false`. Every template and item-binding
+  scope now carries an explicit `x:DataType`, which turned 232 previously unchecked
+  bindings into compile-time-checked ones. Ten view models moved out of their
+  window or view into top-level types because XAML cannot name a nested type
+  (`RadioStationViewModel`, `PodcastViewModel`, `PodcastEpisodeViewModel`,
+  `LyricLineViewModel`, `DailyHistoryRow`, `MetadataProblemRow`,
+  `MetadataRepairHeaderViewModel`, `MetadataRepairPreviewRow`, `TrackInfoEntry`,
+  and the three search-window result view models); the metadata review dialog now
+  uses a named header record instead of an anonymous type. The scopes that bind the
+  still-nested `ContentRow` keep explicit `{ReflectionBinding}` until that type is
+  extracted.
+
 - Hardened the profile-scoped test isolation. `AudioDatabase.ActiveProfileId` is
   process-wide `AsyncLocal` state, so every test that changes it now saves and
   restores the previous value; a leaked profile made profile-scoped queries

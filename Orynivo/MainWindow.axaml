@@ -1,6 +1,9 @@
 <Window x:Class="Orynivo.MainWindow"
         xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:Orynivo"
+        xmlns:lib="using:Orynivo.Library"
+        xmlns:audio="using:Orynivo.Audio"
         xmlns:controls="clr-namespace:Orynivo.Controls"
         xmlns:conv="using:Avalonia.Data.Converters"
         xmlns:ai="using:Orynivo.AI"
@@ -45,7 +48,7 @@
              support the same cover-change and favorite actions. -->
         <DataTemplate x:Key="AlbumArtworkCardTemplate">
             <Border Classes="motionCard"
-                    AutomationProperties.Name="{Binding Title}"
+                    AutomationProperties.Name="{ReflectionBinding Title}"
                     Width="180"
                     MinHeight="276"
                     Margin="8"
@@ -71,10 +74,10 @@
                             </ContextMenu>
                         </Border.ContextMenu>
                         <Grid>
-                            <controls:InitialsAvatar DisplayName="{Binding Title}"
+                            <controls:InitialsAvatar DisplayName="{ReflectionBinding Title}"
                                                      FontSize="{DynamicResource FontSizeDisplay}"
-                                                     IsVisible="{Binding Artwork, Converter={x:Static conv:ObjectConverters.IsNull}}"/>
-                            <Image Source="{Binding Artwork}"
+                                                     IsVisible="{ReflectionBinding Artwork, Converter={x:Static conv:ObjectConverters.IsNull}}"/>
+                            <Image Source="{ReflectionBinding Artwork}"
                                    Stretch="UniformToFill"/>
                             <Border Classes="coverOverlay"
                                     Background="#5F000000">
@@ -85,7 +88,7 @@
                                            FontSize="{DynamicResource FontSizeSubtitle}"
                                            Foreground="{DynamicResource AppAccentTextBrush}"/>
                             </Border>
-                            <Border IsVisible="{Binding Artwork, Converter={x:Static conv:ObjectConverters.IsNull}}"
+                            <Border IsVisible="{ReflectionBinding Artwork, Converter={x:Static conv:ObjectConverters.IsNull}}"
                                     VerticalAlignment="Bottom"
                                     Padding="0,7"
                                     Background="#59000000">
@@ -105,27 +108,27 @@
                             </Border>
                         </Grid>
                     </Border>
-                    <Button Content="{Binding Title}"
+                    <Button Content="{ReflectionBinding Title}"
                             Tag="{Binding}"
-                            ToolTip.Tip="{Binding Title}"
+                            ToolTip.Tip="{ReflectionBinding Title}"
                             Margin="0,10,0,0"
                             FontSize="{DynamicResource FontSizeCaption}"
                             FontWeight="SemiBold"
                             Theme="{DynamicResource EntityLinkButtonTheme}"
                             Click="AlbumLinkButton_OnClick"/>
-                    <Button Content="{Binding Artist}"
+                    <Button Content="{ReflectionBinding Artist}"
                             Tag="{Binding}"
                             Margin="0,3,0,0"
                             FontSize="{DynamicResource FontSizeMeta}"
                             Foreground="{DynamicResource AppSecondaryTextBrush}"
                             Theme="{DynamicResource EntityLinkButtonTheme}"
                             Click="ArtistLinkButton_OnClick"/>
-                    <TextBlock Text="{Binding Year}"
+                    <TextBlock Text="{ReflectionBinding Year}"
                                Margin="0,3,0,0"
                                FontSize="{DynamicResource FontSizeMeta}"
                                Foreground="{DynamicResource AppMutedTextBrush}"/>
                     <Grid Margin="0,2,0,0" VerticalAlignment="Center">
-                        <Button Content="{Binding FavoriteGlyph}"
+                        <Button Content="{ReflectionBinding FavoriteGlyph}"
                                 Tag="{Binding}"
                                 Width="28"
                                 Height="24"
@@ -151,8 +154,8 @@
                                 Background="{DynamicResource AppSurfaceHoverBrush}"
                                 BorderBrush="{DynamicResource AppAccentBrush}"
                                 BorderThickness="1"
-                                ToolTip.Tip="{Binding SourceName}">
-                            <TextBlock Text="{Binding SourceBadge}"
+                                ToolTip.Tip="{ReflectionBinding SourceName}">
+                            <TextBlock Text="{ReflectionBinding SourceBadge}"
                                        FontSize="10"
                                        FontWeight="SemiBold"
                                        HorizontalAlignment="Center"
@@ -1960,6 +1963,7 @@
 
                 <Grid Grid.Row="3" Margin="28,0,28,24">
                     <DataGrid x:Name="RadioStationsDataGrid"
+                              x:DataType="local:RadioStationViewModel"
                               Background="{DynamicResource AppContentBrush}"
                               BorderThickness="0"
                               RowHeight="54"
@@ -1975,7 +1979,7 @@
                         <DataGrid.Columns>
                             <DataGridTemplateColumn Width="70" SortMemberPath="Name">
                                 <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
+                                    <DataTemplate x:DataType="local:RadioStationViewModel">
                                         <Border Width="38"
                                                 Height="38"
                                                 CornerRadius="8"
@@ -2036,7 +2040,7 @@
                                                 Width="220"/>
                             <DataGridTemplateColumn Width="120" CanUserSort="False">
                                 <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
+                                    <DataTemplate x:DataType="local:RadioStationViewModel">
                                         <Button Content="{DynamicResource L_PlayRadio}"
                                                 Tag="{Binding}"
                                                 Padding="10,5"
@@ -2047,7 +2051,7 @@
                             </DataGridTemplateColumn>
                             <DataGridTemplateColumn Width="180" CanUserSort="False">
                                 <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
+                                    <DataTemplate x:DataType="local:RadioStationViewModel">
                                         <Button Content="{DynamicResource L_AddToOwnRadios}"
                                                 Tag="{Binding}"
                                                 Padding="10,5"
@@ -2230,6 +2234,7 @@
 
                 <Grid Grid.Row="2" Margin="28,0,28,24">
                     <DataGrid x:Name="PodcastsDataGrid"
+                              x:DataType="local:PodcastViewModel"
                               Background="{DynamicResource AppContentBrush}"
                               BorderThickness="0"
                               RowHeight="64"
@@ -2244,7 +2249,7 @@
                         <DataGrid.Columns>
                             <DataGridTemplateColumn Width="78" SortMemberPath="Name">
                                 <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
+                                    <DataTemplate x:DataType="local:PodcastViewModel">
                                         <Border Width="48"
                                                 Height="48"
                                                 CornerRadius="8"
@@ -2289,7 +2294,7 @@
                                                 Width="280"/>
                             <DataGridTemplateColumn Width="160" CanUserSort="False">
                                 <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
+                                    <DataTemplate x:DataType="local:PodcastViewModel">
                                         <Button Content="{DynamicResource L_ShowEpisodes}"
                                                 Tag="{Binding}"
                                                 Padding="10,5"
@@ -2300,7 +2305,7 @@
                             </DataGridTemplateColumn>
                             <DataGridTemplateColumn Width="180" CanUserSort="False">
                                 <DataGridTemplateColumn.CellTemplate>
-                                    <DataTemplate>
+                                    <DataTemplate x:DataType="local:PodcastViewModel">
                                         <Button Content="{DynamicResource L_AddToMyPodcasts}"
                                                 Tag="{Binding}"
                                                 Padding="10,5"
@@ -2394,6 +2399,7 @@
 
                     <Grid Grid.Row="1" Margin="28,0,28,24">
                         <DataGrid x:Name="PodcastEpisodesDataGrid"
+                                  x:DataType="local:PodcastEpisodeViewModel"
                                   Background="{DynamicResource AppContentBrush}"
                                   BorderThickness="0"
                                   RowHeight="54"
@@ -2475,24 +2481,24 @@
                             <Border.ContextMenu>
                                 <ContextMenu>
                                     <MenuItem Header="{DynamicResource L_DeleteCover}"
-                                              Tag="{Binding}"
+                                              Tag="{ReflectionBinding}"
                                               Click="DeleteCoverMenuItem_OnClick"/>
                                     <MenuItem Header="{DynamicResource L_ReassignCover}"
-                                              Tag="{Binding}"
+                                              Tag="{ReflectionBinding}"
                                               Click="ReassignCoverMenuItem_OnClick"/>
                                 </ContextMenu>
                             </Border.ContextMenu>
                             <Grid>
-                                <controls:InitialsAvatar DisplayName="{Binding Title}"
+                                <controls:InitialsAvatar DisplayName="{ReflectionBinding Title}"
                                                          FontSize="{DynamicResource FontSizeHero}"
-                                                         IsVisible="{Binding Artwork, Converter={x:Static conv:ObjectConverters.IsNull}}"/>
-                                <Image Source="{Binding Artwork}" Stretch="UniformToFill"/>
-                                <Border IsVisible="{Binding Artwork, Converter={x:Static conv:ObjectConverters.IsNull}}"
+                                                         IsVisible="{ReflectionBinding Artwork, Converter={x:Static conv:ObjectConverters.IsNull}}"/>
+                                <Image Source="{ReflectionBinding Artwork}" Stretch="UniformToFill"/>
+                                <Border IsVisible="{ReflectionBinding Artwork, Converter={x:Static conv:ObjectConverters.IsNull}}"
                                         VerticalAlignment="Bottom"
                                         Padding="0,10"
                                         Background="#59000000">
                                     <Button Content="{DynamicResource L_SearchCover}"
-                                            Tag="{Binding}"
+                                            Tag="{ReflectionBinding}"
                                             Padding="14,6"
                                             HorizontalAlignment="Center"
                                             Background="{DynamicResource AppAccentBrush}"
@@ -2508,8 +2514,8 @@
                             <StackPanel Orientation="Horizontal"
                                         VerticalAlignment="Center"
                                         Spacing="8">
-                                <Button Content="{Binding FavoriteGlyph}"
-                                        Tag="{Binding}"
+                                <Button Content="{ReflectionBinding FavoriteGlyph}"
+                                        Tag="{ReflectionBinding}"
                                         Width="40"
                                         Height="36"
                                         Padding="0"
@@ -2521,8 +2527,8 @@
                                         ToolTip.Tip="{DynamicResource L_MarkAsFavorite}"
                                         Theme="{StaticResource HeaderFilterButtonTheme}"
                                         Click="AlbumDetailFavoriteButton_OnClick"/>
-                                <Button Content="{Binding Title}"
-                                        Tag="{Binding}"
+                                <Button Content="{ReflectionBinding Title}"
+                                        Tag="{ReflectionBinding}"
                                         FontSize="{DynamicResource FontSizeDisplay}"
                                         FontWeight="SemiBold"
                                         Theme="{StaticResource EntityLinkButtonTheme}"
@@ -2532,14 +2538,14 @@
                                         Orientation="Horizontal"
                                         VerticalAlignment="Center"
                                         Spacing="8"
-                                        IsVisible="{Binding HasArtist}">
-                                <Button Content="{Binding Artist}"
-                                        Tag="{Binding}"
+                                        IsVisible="{ReflectionBinding HasArtist}">
+                                <Button Content="{ReflectionBinding Artist}"
+                                        Tag="{ReflectionBinding}"
                                         FontSize="{DynamicResource FontSizeSubtitle}"
                                         Foreground="{DynamicResource AppSecondaryTextBrush}"
                                         Theme="{StaticResource EntityLinkButtonTheme}"
                                         Click="ArtistLinkButton_OnClick"/>
-                                <Button Tag="{Binding}"
+                                <Button Tag="{ReflectionBinding}"
                                         Width="26"
                                         Height="26"
                                         Padding="0"
@@ -2574,7 +2580,7 @@
                                     </Viewbox>
                                 </Button>
                             </StackPanel>
-                            <TextBlock Text="{Binding Year}"
+                            <TextBlock Text="{ReflectionBinding Year}"
                                        Margin="0,8,0,0"
                                        FontSize="{DynamicResource FontSizeBodyStrong}"
                                        Foreground="{DynamicResource AppMutedTextBrush}"/>
@@ -2583,16 +2589,16 @@
                                         HorizontalAlignment="Left"
                                         Spacing="8">
                                 <Button Content="{DynamicResource L_SearchCover}"
-                                        Tag="{Binding}"
+                                        Tag="{ReflectionBinding}"
                                         Padding="14,7"
                                         Theme="{StaticResource HeaderFilterButtonTheme}"
                                         Click="SearchCoverButton_OnClick"/>
                                 <Button Content="{DynamicResource L_UploadCover}"
-                                        Tag="{Binding}"
+                                        Tag="{ReflectionBinding}"
                                         Padding="14,7"
                                         Theme="{StaticResource HeaderFilterButtonTheme}"
                                         Click="UploadCoverButton_OnClick"/>
-                                <Button Tag="{Binding}"
+                                <Button Tag="{ReflectionBinding}"
                                         Width="34"
                                         Height="34"
                                         Theme="{StaticResource TransportBtnTheme}"
@@ -2833,7 +2839,7 @@
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <Border Classes="motionCard"
-                                AutomationProperties.Name="{Binding Title}"
+                                AutomationProperties.Name="{ReflectionBinding Title}"
                                 Width="200"
                                 Height="256"
                                 Margin="8"
@@ -2850,10 +2856,10 @@
                                             CornerRadius="10"
                                             ClipToBounds="True">
                                         <Grid>
-                                            <controls:InitialsAvatar DisplayName="{Binding Title}"
+                                            <controls:InitialsAvatar DisplayName="{ReflectionBinding Title}"
                                                                      FontSize="{DynamicResource FontSizeDisplay}"
-                                                                     IsVisible="{Binding Artwork, Converter={x:Static conv:ObjectConverters.IsNull}}"/>
-                                            <Image Source="{Binding Artwork}"
+                                                                     IsVisible="{ReflectionBinding Artwork, Converter={x:Static conv:ObjectConverters.IsNull}}"/>
+                                            <Image Source="{ReflectionBinding Artwork}"
                                                    Stretch="UniformToFill"/>
                                             <Border Classes="coverOverlay"
                                                     Background="#52000000">
@@ -2866,7 +2872,7 @@
                                             </Border>
                                         </Grid>
                                     </Border>
-                                    <Button Content="{Binding Title}"
+                                    <Button Content="{ReflectionBinding Title}"
                                             Tag="{Binding}"
                                             Margin="0,10,0,0"
                                             FontSize="{DynamicResource FontSizeCaption}"
@@ -2875,7 +2881,7 @@
                                             Theme="{StaticResource EntityLinkButtonTheme}"
                                             Click="ArtistLinkButton_OnClick"/>
                                     <Grid Margin="0,4,0,0" VerticalAlignment="Center">
-                                        <Button Content="{Binding FavoriteGlyph}"
+                                        <Button Content="{ReflectionBinding FavoriteGlyph}"
                                                 Tag="{Binding}"
                                                 Width="28"
                                                 Height="24"
@@ -2901,8 +2907,8 @@
                                                 Background="{DynamicResource AppSurfaceHoverBrush}"
                                                 BorderBrush="{DynamicResource AppAccentBrush}"
                                                 BorderThickness="1"
-                                                ToolTip.Tip="{Binding SourceName}">
-                                            <TextBlock Text="{Binding SourceBadge}"
+                                                ToolTip.Tip="{ReflectionBinding SourceName}">
+                                            <TextBlock Text="{ReflectionBinding SourceBadge}"
                                                        FontSize="10"
                                                        FontWeight="SemiBold"
                                                        HorizontalAlignment="Center"
@@ -3102,6 +3108,7 @@
                     </Grid>
                     <Grid Grid.Row="1">
                         <ListBox x:Name="LyricsListBox"
+                                  x:DataType="local:LyricLineViewModel"
                                  Background="Transparent"
                                  BorderThickness="0"
                                  Padding="80,26,80,60"
@@ -3127,7 +3134,7 @@
                                 </ControlTheme>
                             </ListBox.ItemContainerTheme>
                             <ListBox.ItemTemplate>
-                                <DataTemplate>
+                                <DataTemplate x:DataType="local:LyricLineViewModel">
                                     <TextBlock Text="{Binding Text}"
                                                Padding="16,10"
                                                TextWrapping="Wrap"
@@ -3726,6 +3733,7 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <ComboBox x:Name="EqPickerComboBox"
+                                          x:DataType="audio:EqualizerProfile"
                                           Height="30"
                                           HorizontalAlignment="Stretch"
                                           DisplayMemberBinding="{Binding Name}"
@@ -3767,6 +3775,7 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <ComboBox x:Name="OutputPickerComboBox"
+                                      x:DataType="local:OutputProfile"
                                       Height="30"
                                       HorizontalAlignment="Stretch"
                                       DisplayMemberBinding="{Binding Name}"

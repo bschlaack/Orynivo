@@ -1,6 +1,6 @@
 # Orynivo Roadmap
 
-Items 1-31 are complete and listed for reference only.
+Items 1-32 are complete and listed for reference only.
 
 Each item is one commit and must follow the completion checklist in
 `AGENTS.md`: build every affected project, run the three test projects, update
@@ -317,3 +317,20 @@ report 0 errors and 0 warnings. A runtime pass is still outstanding and listed i
 `DEPENDENCY-MIGRATION.md`.
 
 **Commit**: `chore(avalonia): migrate the desktop to Avalonia 12`
+
+## 32. Adopt Avalonia 12 compiled bindings - `Done`
+
+**Design**
+
+- Every template and item-binding scope carries an explicit `x:DataType`;
+  `AvaloniaUseCompiledBindingsByDefault=false` is gone.
+- The item type goes on the column or template, never on the `DataGrid` itself.
+- Ten view models moved to top-level types because XAML cannot name a nested type;
+  the scopes that bind the still-nested `ContentRow` keep `{ReflectionBinding}`
+  until that type is extracted (recorded as a follow-up in
+  `DEPENDENCY-MIGRATION.md`).
+
+**Tests**: 570 tests green; clean Debug and Release builds with `--warnaserror`
+report 0 errors and 0 warnings.
+
+**Commit**: `refactor(xaml): adopt Avalonia 12 compiled bindings`

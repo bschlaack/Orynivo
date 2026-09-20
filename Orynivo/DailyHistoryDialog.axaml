@@ -1,6 +1,8 @@
 <Window x:Class="Orynivo.DailyHistoryDialog"
+        x:DataType="local:DailyHistoryDialog"
         xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:Orynivo"
         Title="{Binding DialogTitle}"
         Icon="avares://Orynivo/Assets/Orynivo.ico"
         Width="1040"
@@ -187,18 +189,20 @@
                       GridLinesVisibility="Horizontal">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="{DynamicResource L_PlayedAt}"
+                              x:DataType="local:DailyHistoryRow"
                                         Binding="{Binding PlayedAt}"
                                         SortMemberPath="PlayedAtSort"
                                         Tag="playedAt"
                                         Width="90"/>
                     <DataGridTextColumn Header="{DynamicResource L_MediaType}"
+                              x:DataType="local:DailyHistoryRow"
                                         Binding="{Binding MediaType}"
                                         SortMemberPath="MediaType"
                                         Tag="mediaType"
                                         Width="90"/>
                     <DataGridTemplateColumn Header="{DynamicResource L_Title}" SortMemberPath="Title" Tag="title" Width="2*">
                         <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
+                        <DataTemplate x:DataType="local:DailyHistoryRow">
                                 <Grid>
                                     <Button Classes="historylink"
                                             IsVisible="{Binding CanOpenTrack}"
@@ -217,7 +221,7 @@
                     </DataGridTemplateColumn>
                     <DataGridTemplateColumn Header="{DynamicResource L_Artist}" SortMemberPath="Artist" Tag="artist" Width="*">
                         <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
+                        <DataTemplate x:DataType="local:DailyHistoryRow">
                                 <Grid>
                                     <Button Classes="historylink"
                                             IsVisible="{Binding CanOpenArtist}"
@@ -236,7 +240,7 @@
                     </DataGridTemplateColumn>
                     <DataGridTemplateColumn Header="{DynamicResource L_Album}" SortMemberPath="Album" Tag="album" Width="*">
                         <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
+                        <DataTemplate x:DataType="local:DailyHistoryRow">
                                 <Grid>
                                     <Button Classes="historylink"
                                             IsVisible="{Binding CanOpenAlbum}"
@@ -254,11 +258,13 @@
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
                     <DataGridTextColumn Header="{DynamicResource L_ListenedDuration}"
+                              x:DataType="local:DailyHistoryRow"
                                         Binding="{Binding ListenedDuration}"
                                         SortMemberPath="ListenedDurationSort"
                                         Tag="listened"
                                         Width="100"/>
                     <DataGridTextColumn Header="{DynamicResource L_Duration}"
+                              x:DataType="local:DailyHistoryRow"
                                         Binding="{Binding TotalDuration}"
                                         SortMemberPath="TotalDurationSort"
                                         Tag="duration"

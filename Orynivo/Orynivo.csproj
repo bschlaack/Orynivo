@@ -9,13 +9,7 @@
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ImplicitUsings>enable</ImplicitUsings>
-    <!--
-      Avalonia 12 compiles bindings by default and then requires an explicit
-      x:DataType on every template and root. The existing views still use
-      reflection bindings, so keep that mode for now and adopt compiled bindings
-      per file as a separate, verified change; see DEPENDENCY-MIGRATION.md.
-    -->
-    <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+
     <AssemblyName>Orynivo</AssemblyName>
     <RootNamespace>Orynivo</RootNamespace>
     <Product>Orynivo</Product>

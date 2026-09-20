@@ -36,15 +36,6 @@ internal partial class SettingsView : UserControl
         public override string ToString() => Label;
     }
 
-    private sealed record MetadataProblemRow(
-        string Source,
-        string Folder,
-        LibraryDoctorSeverity SeverityValue,
-        string Severity,
-        string Issues,
-        int TrackCount,
-        IReadOnlySet<string> FindingCodes,
-        MetadataFolderCandidate? Candidate);
 
     private sealed record MissingArtistImageTarget(
         long ArtistId,
@@ -3516,3 +3507,26 @@ internal partial class SettingsView : UserControl
         return disabled;
     }
 }
+
+/// <summary>
+/// One metadata-review finding shown in the Settings analysis grid. It lives outside
+/// the view so XAML can name it in an <c>x:DataType</c> directive, which compiled
+/// bindings require (a nested private type cannot be referenced from XAML).
+/// </summary>
+/// <param name="Source">Display name of the library source.</param>
+/// <param name="Folder">Physical folder the finding belongs to.</param>
+/// <param name="SeverityValue">Severity used for sorting.</param>
+/// <param name="Severity">Localized severity label.</param>
+/// <param name="Issues">Localized list of detected issues.</param>
+/// <param name="TrackCount">Number of tracks in the folder.</param>
+/// <param name="FindingCodes">Stable finding codes used by the filters.</param>
+/// <param name="Candidate">Album candidate offered for the folder, when available.</param>
+internal sealed record MetadataProblemRow(
+    string Source,
+    string Folder,
+    LibraryDoctorSeverity SeverityValue,
+    string Severity,
+    string Issues,
+    int TrackCount,
+    IReadOnlySet<string> FindingCodes,
+    MetadataFolderCandidate? Candidate);
