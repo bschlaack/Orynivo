@@ -542,12 +542,20 @@ written here. No third-party visualizer code or preset bundle is linked.
   Milkdrop format has no per-preset texture block, so `tex_*` keys stay ignored, and the
   sampler constructs (`sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`,
   `GetPixel`) are HLSL and belong to 38d. Covered by 10 tests.
-- 38d HLSL `warp_*`/`comp_*` runtime - `Pending`: a CPU interpreter for the `ps_2_0` subset
-  (scalar and `float2`/`float3`/`float4` math, swizzles, `tex2D`, `lerp`, `saturate`, `frac`,
-  `dot`, `mul`, `if`/`for` blocks, and the sampler bindings), the `warp_N_*`/`comp_N_*`
-  sub-keys, and a bounded per-frame cost budget that degrades the resolution instead of
-  stalling playback.
-- 38e `.milk` compatibility and validation - `Pending`: `[presetNN]` sections, version and
+- 38d HLSL front end - `Done`: `ShaderLexer` and `ShaderToken` tokenize the `ps_2_0` subset
+  Milkdrop shaders use. Identifiers and keywords, numbers with their `f`/`h` suffixes,
+  single- and multi-character operators, swizzles, line and block comments, and exact source
+  positions are covered, and an unexpected character reports its offset through
+  `PresetExpressionException`. Covered by 10 tests.
+- 38e HLSL parser and interpreter - `Pending`: the recursive-descent parser and the AST for
+  declarations, statements, `if`/`else`, `for`, and `return`, then the `ps_2_0` interpreter
+  with scalar and `float2`/`float3`/`float4` math, swizzles, and the intrinsics (`tex2D`,
+  `lerp`, `saturate`, `frac`, `dot`, `mul`, `pow`, `abs`, `min`, `max`, and friends).
+- 38f Shader bindings and cost budget - `Pending`: the `warp_N_*` and `comp_N_*` preset keys
+  (enabled flag, per-frame and per-pixel blocks, and the shader source), the sampler bindings
+  (`sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, `GetPixel`,
+  and the texture bank), and a bounded per-frame cost budget that lowers the render resolution
+  instead of stalling playback.- 38e `.milk` compatibility and validation - `Pending`: `[presetNN]` sections, version and
   `nWaveMode` handling, tolerance for the remaining legacy keys, a corpus of real presets as
   regression fixtures, and the per-preset skip diagnostics.
 
