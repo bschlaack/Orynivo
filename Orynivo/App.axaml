@@ -101,11 +101,9 @@
             <StreamGeometry x:Key="IconArtist">M12,5 A3.5,3.5 0 1 0 12,12 A3.5,3.5 0 1 0 12,5 M5.5,20 C6.2,16.2 8.6,14.5 12,14.5 C15.4,14.5 17.8,16.2 18.5,20</StreamGeometry>
             <StreamGeometry x:Key="IconImageSearch">M4,6 L20,6 L20,18 L4,18 Z M7,15 L10,12 L12.2,14.2 L14.5,11.5 L18,15 M8,9.5 A1.3,1.3 0 1 0 8,12.1 A1.3,1.3 0 1 0 8,9.5</StreamGeometry>
             <StreamGeometry x:Key="IconDelete">M5,7 H19 M9,7 V4 H15 V7 M7,7 L8,20 H16 L17,7 M10,10 V17 M14,10 V17</StreamGeometry>
-            <!-- Transport glyphs shared by the main transport and the visualizer window -->
-    <StreamGeometry x:Key="IconPreviousTrack">M14,2 L8,8 L14,14 Z M8,2 L2,8 L8,14 Z</StreamGeometry>
-    <StreamGeometry x:Key="IconNextTrack">M2,2 L8,8 L2,14 Z M8,2 L14,8 L8,14 Z</StreamGeometry>
-    <StreamGeometry x:Key="IconPlayGlyph">M6,3 L17,10 L6,17 Z</StreamGeometry>
-    <StreamGeometry x:Key="IconPauseGlyph">M7,3 L10,3 L10,17 L7,17 Z M13,3 L16,3 L16,17 L13,17 Z</StreamGeometry>
+            <!-- Play and pause glyphs for the visualizer overlay, drawn in the transport's own coordinates -->
+    <StreamGeometry x:Key="IconPlayGlyph">M 8 4 L 17 10 L 8 16 Z</StreamGeometry>
+    <StreamGeometry x:Key="IconPauseGlyph">M 6 4 H 9 V 16 H 6 Z M 11 4 H 14 V 16 H 11 Z</StreamGeometry>
     <!-- Visualizer: three rising spectrum bars over a baseline -->
     <StreamGeometry x:Key="IconVisualizer">M5,19 L5,14 M10,19 L10,7 M15,19 L15,11 M20,19 L20,4 M3,21 L21,21</StreamGeometry>
     <StreamGeometry x:Key="IconAbout">F0 M12,2 A10,10 0 1 0 12,22 A10,10 0 1 0 12,2 Z M12,4 A8,8 0 1 0 12,20 A8,8 0 1 0 12,4 Z M11,7 H13 V9 H11 Z M11,10.5 H13 V17 H11 Z</StreamGeometry>

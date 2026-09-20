@@ -496,7 +496,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   renders correctly. The transport button **Visualisierung** opens the window (there is no
   sidebar entry); it overlays the current title and artist at the top and previous,
   play/pause, and next buttons at the bottom left, wired through `VisualizerTransport` to the
-  normal transport methods so playback can be driven from the fullscreen window.
+  normal transport methods so playback can be driven from the fullscreen window. Its overlay
+  buttons copy the transport bar's own geometry and sizes (36 px skip buttons with the
+  transport's 16 px glyphs, a 50 px play button with its 20 px glyph) instead of scaling a
+  generic path, because a stretched glyph does not sit optically centred in its circle.
   `VisualizerPresetLibrary` loads the built-in presets plus `.oryvis` and `.milk` files from
   `AppSettings.VisualizerPresetDirectory` (default: a `visualizer-presets` folder below the
   data root); a file that fails to parse is skipped and reported, never fatal, and preset

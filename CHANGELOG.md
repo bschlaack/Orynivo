@@ -70,7 +70,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - The visualizer overlays the current title and artist at the top and previous, play/pause,
   and next buttons at the bottom left, so playback can be driven without leaving the window.
   The buttons reuse the normal transport methods and the play/pause glyph follows the real
-  playback state.
+  playback state. They mirror the transport bar: 36 px previous/next with the transport's own
+  16 px skip glyphs and a 50 px play button with its 20 px glyph, so the icons sit centred
+  and the size relationship matches the player buttons.
 
 
 ## [0.45.0] - 2026-09-20

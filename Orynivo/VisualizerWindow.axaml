@@ -10,9 +10,9 @@
         Foreground="White">
     <Window.Styles>
         <Style Selector="Button.visualizerControl">
-            <Setter Property="Width" Value="46"/>
-            <Setter Property="Height" Value="46"/>
-            <Setter Property="CornerRadius" Value="23"/>
+            <Setter Property="Width" Value="36"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="CornerRadius" Value="18"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="Background" Value="#59000000"/>
             <Setter Property="Foreground" Value="White"/>
@@ -24,6 +24,20 @@
             <Setter Property="Background" Value="#8C000000"/>
         </Style>
         <Style Selector="Button.visualizerControl:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="#B3000000"/>
+        </Style>
+        <Style Selector="Button.visualizerControlPlay">
+            <Setter Property="Width" Value="50"/>
+            <Setter Property="Height" Value="50"/>
+            <Setter Property="CornerRadius" Value="25"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Background" Value="#8C000000"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.visualizerControlPlay:pointerover /template/ ContentPresenter">
             <Setter Property="Background" Value="#B3000000"/>
         </Style>
     </Window.Styles>
@@ -64,7 +78,7 @@
         </Border>
 
         <StackPanel Orientation="Horizontal"
-                    Spacing="10"
+                    Spacing="8"
                     HorizontalAlignment="Left"
                     VerticalAlignment="Bottom"
                     Margin="24">
@@ -73,34 +87,54 @@
                     AutomationProperties.Name="{DynamicResource L_TransportPrevious}"
                     ToolTip.Tip="{DynamicResource L_TransportPrevious}"
                     Click="PreviousTrackButton_OnClick">
-                <Path Width="18"
-                      Height="18"
-                      Stretch="Uniform"
-                      Data="{StaticResource IconPreviousTrack}"
-                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                <Grid Width="16"
+                      Height="16"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Center">
+                    <Rectangle Width="2"
+                               Height="12"
+                               HorizontalAlignment="Left"
+                               VerticalAlignment="Center"
+                               Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                    <Path Data="M 14 2 L 8 8 L 14 14 Z M 8 2 L 2 8 L 8 14 Z"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"
+                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                </Grid>
             </Button>
             <Button x:Name="PlayPauseButton"
-                    Classes="visualizerControl"
+                    Classes="visualizerControlPlay"
                     AutomationProperties.Name="{DynamicResource L_TransportPlayPause}"
                     ToolTip.Tip="{DynamicResource L_TransportPlayPause}"
                     Click="PlayPauseButton_OnClick">
-                <Path x:Name="PlayPauseIconPath"
-                      Width="18"
-                      Height="18"
-                      Stretch="Uniform"
-                      Data="{StaticResource IconPlayGlyph}"
-                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                <Canvas Width="20"
+                        Height="20"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center">
+                    <Path x:Name="PlayPauseIconPath"
+                          Data="{StaticResource IconPlayGlyph}"
+                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                </Canvas>
             </Button>
             <Button x:Name="NextTrackButton"
                     Classes="visualizerControl"
                     AutomationProperties.Name="{DynamicResource L_TransportNext}"
                     ToolTip.Tip="{DynamicResource L_TransportNext}"
                     Click="NextTrackButton_OnClick">
-                <Path Width="18"
-                      Height="18"
-                      Stretch="Uniform"
-                      Data="{StaticResource IconNextTrack}"
-                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                <Grid Width="16"
+                      Height="16"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Center">
+                    <Path Data="M 2 2 L 8 8 L 2 14 Z M 8 2 L 14 8 L 8 14 Z"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"
+                          Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                    <Rectangle Width="2"
+                               Height="12"
+                               HorizontalAlignment="Right"
+                               VerticalAlignment="Center"
+                               Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                </Grid>
             </Button>
         </StackPanel>
 
