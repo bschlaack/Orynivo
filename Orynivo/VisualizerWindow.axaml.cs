@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Threading;
+using Orynivo.Audio;
 using Orynivo.Localization;
 using Orynivo.Visualization;
 
@@ -26,9 +27,11 @@ public partial class VisualizerWindow : Window
     private readonly DispatcherTimer _timer;
     private readonly WriteableBitmap _bitmap;
     private readonly VisualizerPresetLibrary _library = new();
+    private readonly SilentAudioSource _silent = new();
     private PresetRenderer _renderer;
     private int _presetIndex;
     private DateTimeOffset _lastFrame = DateTimeOffset.UtcNow;
+    private DateTimeOffset _lastDiagnostics = DateTimeOffset.UtcNow;
 
     /// <summary>Initializes the window for the Avalonia designer.</summary>
     public VisualizerWindow()
@@ -133,8 +136,9 @@ public partial class VisualizerWindow : Window
         var delta = (now - _lastFrame).TotalSeconds;
         _lastFrame = now;
 
+        // Render even when nothing is playing, so the window never stays black.
         if (!VisualizerAudioHub.Shared.TryAnalyze(out var audio) || audio is null)
-            return;
+            audio = _silent;
 
         if (ReduceMotion)
             _renderer.RenderOverlayOnly(audio);
@@ -142,6 +146,35 @@ public partial class VisualizerWindow : Window
             _renderer.RenderFrame(audio, delta);
 
         Present();
+        LogDiagnostics();
+    }
+
+    /// <summary>
+    /// Writes one bounded diagnostic line per second so an empty window can be told apart
+    /// from a picture that never reaches the screen. Only counts and a brightness average
+    /// are recorded, never media names or paths.
+    /// </summary>
+    private void LogDiagnostics()
+    {
+        var now = DateTimeOffset.UtcNow;
+        if (now - _lastDiagnostics < TimeSpan.FromSeconds(1))
+            return;
+
+        _lastDiagnostics = now;
+        var pixels = _renderer.Output.Pixels;
+        var total = 0f;
+        var samples = 0;
+        for (var index = 0; index < pixels.Length; index += 64)
+        {
+            total += pixels[index] + pixels[index + 1] + pixels[index + 2];
+            samples += 3;
+        }
+
+        SeekDiagnostics.Log(
+            "visualizer",
+            $"frames={_renderer.FrameCount} audioFrames={VisualizerAudioHub.Shared.AnalyzedFrames} "
+            + $"reduceMotion={ReduceMotion} brightness={(samples == 0 ? 0f : total / samples):F4} "
+            + $"preset={_renderer.Preset.Name} userPresets={_library.Presets.Count - VisualizerPresets.BuiltIn.Count}");
     }
 
     private void Present()
@@ -169,6 +202,25 @@ public partial class VisualizerWindow : Window
                     stride);
             }
         }
+    }
+
+    /// <summary>Silent fallback so a preset renders before playback starts or while paused.</summary>
+    private sealed class SilentAudioSource : IVisualizerAudioSource
+    {
+        private readonly float[] _bands = new float[AudioSpectrumAnalyzer.BandCount];
+        private readonly float[] _waveform = new float[AudioSpectrumAnalyzer.WaveformPoints];
+
+        public ReadOnlySpan<float> Bands => _bands;
+
+        public ReadOnlySpan<float> Waveform => _waveform;
+
+        public float Bass => 0f;
+
+        public float Mid => 0f;
+
+        public float Treble => 0f;
+
+        public float Volume => 0f;
     }
 
     private void UpdatePresetLabel()

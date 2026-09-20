@@ -86,8 +86,9 @@ public sealed class PixelBuffer
     }
 
     /// <summary>
-    /// Samples a pixel at normalized coordinates with bilinear filtering and clamping at the
-    /// edges. This is the operation the feedback warp is built from.
+    /// Samples a pixel at normalized coordinates with bilinear filtering. Coordinates outside
+    /// the frame return transparent black instead of clamping to the edge, because a clamped
+    /// edge smears the border colour into long streaks when a preset zooms or warps outwards.
     /// </summary>
     /// <param name="u">Horizontal coordinate, where zero is the left edge and one the right.</param>
     /// <param name="v">Vertical coordinate, where zero is the top edge and one the bottom.</param>
@@ -97,8 +98,14 @@ public sealed class PixelBuffer
         if (destination.Length < 4)
             throw new ArgumentException("The destination must hold four channels.", nameof(destination));
 
-        var x = (Math.Clamp(u, 0f, 1f) * (Width - 1));
-        var y = (Math.Clamp(v, 0f, 1f) * (Height - 1));
+        if (u is < 0f or > 1f || v is < 0f or > 1f || float.IsNaN(u) || float.IsNaN(v))
+        {
+            destination[0] = destination[1] = destination[2] = destination[3] = 0f;
+            return;
+        }
+
+        var x = (u * (Width - 1));
+        var y = (v * (Height - 1));
         var x0 = (int)x;
         var y0 = (int)y;
         var x1 = Math.Min(x0 + 1, Width - 1);

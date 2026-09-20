@@ -62,17 +62,18 @@ public sealed class PixelBufferTests
         Assert.Equal(0.5f, sample[0], 5);
     }
 
-    /// <summary>Sampling outside the frame clamps to the edge.</summary>
+    /// <summary>Sampling outside the frame yields transparent black, so no edge smear appears.</summary>
     [Fact]
-    public void SampleBilinear_ClampsOutsideTheFrame()
+    public void SampleBilinear_ReturnsTransparentOutsideTheFrame()
     {
         var buffer = new PixelBuffer(2, 2);
         buffer.AddPixel(1, 1, 0.5f, 0.5f, 0.5f);
         var sample = new float[4];
 
         buffer.SampleBilinear(9f, 9f, sample);
+        buffer.SampleBilinear(-0.5f, 0.5f, sample);
 
-        Assert.Equal(0.5f, sample[0], 5);
+        Assert.Equal(0f, sample[0], 5);
     }
 
     /// <summary>Scaling fades the image.</summary>

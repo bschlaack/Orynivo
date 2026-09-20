@@ -52,6 +52,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 
 ### Fixed
+- The visualizer writes one bounded diagnostic line per second to the seek log (rendered
+  frames, analysed audio frames, reduce-motion state, average brightness, and the preset
+  name). It contains only counts, so an empty window can be told apart from a picture that
+  never reaches the screen without recording any media metadata.
+
+- Fixed the visualizer staying black when nothing was playing: it now renders with a silent
+  audio source, so a preset shows its picture before playback starts and while paused.
+- Fixed the long coloured streaks some presets produced: the feedback warp sampled outside
+  the frame by clamping to the edge, which smeared the border colour into a gradient.
+  Out-of-frame samples are transparent now.
+- Moved the visualizer from the sidebar to a fourth transport button next to the equalizer,
+  output, and output-lock buttons, with a new spectrum-bar icon in the same stroke style.
+
 
 ## [0.45.0] - 2026-09-20
 

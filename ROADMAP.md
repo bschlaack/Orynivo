@@ -474,6 +474,12 @@ overlays, and a composite stage.
   waveform that may move every point by writing `x` and `y`. A sixth built-in preset
   (`Orbit`) shows the feature. Covered by 7 tests.
 
+- 37g Visualizer follow-up - `Done`: the visualizer moved from the sidebar to a fourth
+  transport button with its own spectrum-bar icon; the window renders with a silent audio
+  source when nothing is playing so it never stays black; and the feedback warp no longer
+  clamps out-of-frame samples, which removes the coloured gradient streaks some presets
+  produced.
+
 **Tests**: 21 cases for phase 37a; each later phase adds its own.
 
 **Commit**: `feat(visualizer): add the audio analysis foundation`

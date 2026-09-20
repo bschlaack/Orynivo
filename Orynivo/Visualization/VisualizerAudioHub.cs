@@ -31,6 +31,9 @@ internal sealed class VisualizerAudioHub
     /// </summary>
     public bool IsActive { get; set; }
 
+    /// <summary>Gets the number of audio frames analysed since the hub was activated.</summary>
+    public long AnalyzedFrames { get; private set; }
+
     /// <summary>Publishes interleaved float PCM.</summary>
     /// <param name="interleavedStereo">Interleaved left/right samples.</param>
     /// <param name="sampleRate">Output sample rate in hertz.</param>
@@ -114,6 +117,7 @@ internal sealed class VisualizerAudioHub
             return false;
 
         _analyzer.Analyze(_analysisBuffer.AsSpan(0, frames * 2));
+        AnalyzedFrames += frames;
         source = _analyzer;
         return true;
     }
@@ -123,6 +127,7 @@ internal sealed class VisualizerAudioHub
     {
         _tap.Clear();
         _analyzer?.Reset();
+        AnalyzedFrames = 0;
     }
 
     /// <summary>Creates or replaces the analyzer when the output sample rate changes.</summary>
