@@ -8,7 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- The Infinite Mix profile editor now offers **Focus**, **Workout**, and
+- Last.fm scrobbling now also mirrors the transport favourite button: toggling a
+  track as favourite loves or unloves it on Last.fm through
+  `LastFmClient.SetTrackLovedAsync`. The call is best effort, never blocks
+  playback, and is skipped for items without an artist and title. The existing
+  "now playing" notification now also skips untagged items instead of sending a
+  request Last.fm would reject.- The Infinite Mix profile editor now offers **Focus**, **Workout**, and
   **Wind down** presets next to the mood selector. They pre-fill the mood,
   discovery level, history period, and weighting through the pure, tested
   `InfiniteMixPresets` mapping, which preserves the server selection, genre

@@ -478,7 +478,13 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   **Analyze audio features** action; it runs the local library through
   `AudioFeatureMaintenanceService` and requests bounded batches from each
   configured server, stays cancellable, and cancels on Settings deactivation.
-- The Infinite Mix profile editor offers Focus/Workout/Wind down presets through
+- Last.fm scrobbling mirrors the transport favourite button through
+  `LastFmScrobblingService.SetTrackLoved` and `LastFmClient.SetTrackLovedAsync`
+  (`track.love`/`track.unlove`, artist and track only). The call is best effort:
+  it never blocks playback, is skipped for items without an artist and title, and
+  is not queued while offline. `BuildLastFmTrack` is the single place that builds
+  the metadata for both now-playing and love, so an untagged item never produces
+  a request Last.fm rejects.- The Infinite Mix profile editor offers Focus/Workout/Wind down presets through
   the pure `Orynivo.InfiniteMixPresets.Apply`, which only pre-fills the mood,
   discovery level, history period, and weighting and must preserve the server
   selection, genre filters, feedback, and exclusions. Descriptor-based preset

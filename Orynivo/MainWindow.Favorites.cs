@@ -89,6 +89,8 @@ public partial class MainWindow : Window
             UpdateNowPlayingFavoriteButton();
             RefreshOrynivoFavoriteRows(favServer, favId, _currentTrackIsFavorite);
             _ = _orynivoClient.UpdateTrackFavoriteAsync(favServer, favId, _currentTrackIsFavorite);
+            if (BuildLastFmTrack() is { } remoteLastFmTrack)
+                _lastFmScrobbler.SetTrackLoved(remoteLastFmTrack, _currentTrackIsFavorite);
             return true;
         }
 
@@ -112,6 +114,9 @@ public partial class MainWindow : Window
             if (row is not null)
                 row.IsFavorite = _currentTrackIsFavorite;
         }
+
+        if (BuildLastFmTrack() is { } lastFmTrack)
+            _lastFmScrobbler.SetTrackLoved(lastFmTrack, _currentTrackIsFavorite);
         return true;
     }
 

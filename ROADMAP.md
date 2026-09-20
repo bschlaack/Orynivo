@@ -122,18 +122,18 @@ Steps:
   no acoustic descriptors; adding them would change the Core/Server payload
   contract. Revisit only together with that change.
 
-## 20. Report "now playing" and love tracks on Last.fm — `Todo`
+## 20. Report "now playing" and love tracks on Last.fm — `Done`
 
-**Design**
-
-- Extend `LastFmScrobblingService` with `track.updateNowPlaying` when playback
-  starts and a love/unlove action bound to the track favourite toggle.
-- Never block or fail playback; keep the session key in
-  `ApplicationCredentialStore` only.
-
-**Tests**: request signing and the scrobble/love rules in Core.
-
-**Commit**: `feat(scrobbling): report now playing and love tracks`
+- The "now playing" notification already existed; it now builds its metadata
+  through a single `BuildLastFmTrack` helper and skips untagged items instead of
+  sending a request Last.fm would reject.
+- Added `LastFmClient.SetTrackLovedAsync` (`track.love`/`track.unlove`, artist and
+  track only) and `LastFmScrobblingService.SetTrackLoved`, wired to the transport
+  favourite button for both local and Orynivo Server tracks. The call is best
+  effort, never blocks playback, and is not queued while offline.
+- The session key and API secret stay in `ApplicationCredentialStore` only.
+- 6 `Orynivo.Core.Tests` cases verify the signed love/unlove request, the error
+  response, and that an untagged item sends nothing.
 
 ## 21. Export the year in review as PDF — `Todo`
 

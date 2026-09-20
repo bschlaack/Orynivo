@@ -700,7 +700,9 @@ byte-range streaming without FFmpeg.
   playback and artist-information lookups are never blocked; the session key and
   the API secret are stored only in the encrypted per-user credential container.
   Scrobbling applies to local and Orynivo Server library tracks, and both the
-  scrobble threshold and the pending queue survive restarts.
+  scrobble threshold and the pending queue survive restarts. The favourite button
+  also mirrors the current track as loved or unloved on Last.fm, which is best
+  effort and never blocks playback.
 - Windows System Media Transport Controls integration with global media keys,
   play/pause/previous/next/stop and seek requests, system-overlay and lock-screen
   metadata, album art, playback state, and timeline synchronization
