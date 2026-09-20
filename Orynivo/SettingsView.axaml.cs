@@ -212,6 +212,30 @@ internal partial class SettingsView : UserControl
         PcmOutputBoostCheckBox.IsChecked = settings.PcmOutputBoostEnabled;
         _visualizerPresetDirectory = settings.VisualizerPresetDirectory ?? string.Empty;
         UpdateVisualizerPresetFolder();
+        var visualizerResolutionChoices = new[]
+        {
+            new SettingChoice<VisualizerResolution>(new VisualizerResolution(1280, 720), "1280 × 720"),
+            new SettingChoice<VisualizerResolution>(new VisualizerResolution(960, 540), "960 × 540"),
+            new SettingChoice<VisualizerResolution>(new VisualizerResolution(640, 360), "640 × 360"),
+            new SettingChoice<VisualizerResolution>(new VisualizerResolution(480, 270), "480 × 270"),
+            new SettingChoice<VisualizerResolution>(new VisualizerResolution(320, 180), "320 × 180")
+        };
+        VisualizerResolutionComboBox.ItemsSource = visualizerResolutionChoices;
+        VisualizerResolutionComboBox.SelectedItem = visualizerResolutionChoices
+            .FirstOrDefault(choice => choice.Value.Width == settings.VisualizerRenderWidth &&
+                                      choice.Value.Height == settings.VisualizerRenderHeight)
+            ?? visualizerResolutionChoices[3];
+        var visualizerFrameRateChoices = new[]
+        {
+            new SettingChoice<int>(120, "120"),
+            new SettingChoice<int>(60, "60"),
+            new SettingChoice<int>(30, "30"),
+            new SettingChoice<int>(24, "24")
+        };
+        VisualizerFrameRateComboBox.ItemsSource = visualizerFrameRateChoices;
+        VisualizerFrameRateComboBox.SelectedItem = visualizerFrameRateChoices
+            .FirstOrDefault(choice => choice.Value == Math.Clamp(settings.VisualizerFrameRate, 5, 240))
+            ?? visualizerFrameRateChoices[2];
         MaxOutputSampleRateComboBox.ItemsSource = maxOutputSampleRateChoices;
         MaxOutputSampleRateComboBox.SelectedItem = maxOutputSampleRateChoices
             .FirstOrDefault(choice => choice.Value == Math.Clamp(settings.MaxOutputSampleRateHz, 0, 768_000))
@@ -557,6 +581,22 @@ internal partial class SettingsView : UserControl
 
     /// <summary>Gets the configured visualizer preset folder, or an empty string for the default.</summary>
     public string VisualizerPresetDirectoryValue => _visualizerPresetDirectory;
+
+    /// <summary>Gets the configured visualizer frame width in pixels.</summary>
+    public int VisualizerRenderWidthValue =>
+        VisualizerResolutionComboBox.SelectedItem is SettingChoice<VisualizerResolution> choice
+            ? choice.Value.Width
+            : 480;
+
+    /// <summary>Gets the configured visualizer frame height in pixels.</summary>
+    public int VisualizerRenderHeightValue =>
+        VisualizerResolutionComboBox.SelectedItem is SettingChoice<VisualizerResolution> choice
+            ? choice.Value.Height
+            : 270;
+
+    /// <summary>Gets the configured visualizer target frame rate.</summary>
+    public int VisualizerFrameRateValue =>
+        VisualizerFrameRateComboBox.SelectedItem is SettingChoice<int> choice ? choice.Value : 30;
 
     /// <summary>Gets the configured maximum PCM output sample rate in hertz, or zero for automatic.</summary>
     public int MaxOutputSampleRateHz =>
@@ -1452,6 +1492,7 @@ internal partial class SettingsView : UserControl
         if (NavListBox.SelectedItem is not ListBoxItem { Tag: string tag })
             return;
         AudioDevicePanel.IsVisible             = tag == "AudioDevice";
+        VisualizerPanel.IsVisible              = tag == "Visualizer";
         LibraryPanel.IsVisible                 = tag == "Library";
         OrynivoServersSettingsPanel.IsVisible  = tag == "OrynivoServers";
         MetadataPanel.IsVisible                = tag == "Metadata";

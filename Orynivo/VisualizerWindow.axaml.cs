@@ -21,10 +21,10 @@ namespace Orynivo;
 /// </summary>
 public partial class VisualizerWindow : Window
 {
-    private const int RenderWidth = 480;
-    private const int RenderHeight = 270;
-    private static readonly TimeSpan FrameInterval = TimeSpan.FromMilliseconds(33);
     private static readonly TimeSpan ReducedMotionInterval = TimeSpan.FromSeconds(1);
+    private readonly int _renderWidth;
+    private readonly int _renderHeight;
+    private readonly TimeSpan _frameInterval;
 
     private readonly DispatcherTimer _timer;
     private readonly WriteableBitmap _bitmap;
@@ -39,38 +39,35 @@ public partial class VisualizerWindow : Window
 
     /// <summary>Initializes the window for the Avalonia designer.</summary>
     public VisualizerWindow()
-        : this(0, reduceMotion: false)
+        : this(0, new VisualizerRenderOptions(480, 270, 30, false, null))
     {
     }
 
     /// <summary>Creates the visualizer window.</summary>
     /// <param name="presetIndex">Index of the preset to start with.</param>
-    /// <param name="reduceMotion">
-    /// When <see langword="true"/> the picture shows a static spectrum instead of animating.
-    /// </param>
-    /// <param name="presetDirectory">
-    /// Folder to load user presets from, or <see langword="null"/> for the default folder.
-    /// </param>
+    /// <param name="options">Render resolution, frame rate, reduce-motion state, and preset folder.</param>
     /// <param name="transport">
     /// Callbacks into the main window so the overlay buttons drive the real playback, or
     /// <see langword="null"/> to hide them.
     /// </param>
     public VisualizerWindow(
         int presetIndex,
-        bool reduceMotion,
-        string? presetDirectory = null,
+        VisualizerRenderOptions options,
         VisualizerTransport? transport = null)
     {
         _transport = transport;
         _presetIndex = presetIndex;
-        _library.Reload(presetDirectory);
-        _renderer = new PresetRenderer(_library.At(_presetIndex), RenderWidth, RenderHeight);
+        _renderWidth = Math.Clamp(options.Width, 160, 3840);
+        _renderHeight = Math.Clamp(options.Height, 90, 2160);
+        _frameInterval = TimeSpan.FromMilliseconds(1000.0 / Math.Clamp(options.FrameRate, 5, 240));
+        _library.Reload(options.PresetDirectory);
+        _renderer = new PresetRenderer(_library.At(_presetIndex), _renderWidth, _renderHeight);
         _bitmap = new WriteableBitmap(
-            new Avalonia.PixelSize(RenderWidth, RenderHeight),
+            new Avalonia.PixelSize(_renderWidth, _renderHeight),
             new Avalonia.Vector(96, 96),
             PixelFormat.Bgra8888,
             AlphaFormat.Premul);
-        ReduceMotion = reduceMotion;
+        ReduceMotion = options.ReduceMotion;
 
         InitializeComponent();
         VisualizerImage.Source = _bitmap;
@@ -79,7 +76,7 @@ public partial class VisualizerWindow : Window
 
         _timer = new DispatcherTimer
         {
-            Interval = reduceMotion ? ReducedMotionInterval : FrameInterval
+            Interval = options.ReduceMotion ? ReducedMotionInterval : _frameInterval
         };
         _timer.Tick += (_, _) => RenderOnce();
         Opened += (_, _) =>
@@ -140,7 +137,7 @@ public partial class VisualizerWindow : Window
         var count = _library.Presets.Count;
         _presetIndex = ((index % count) + count) % count;
         var preset = _library.At(_presetIndex);
-        _renderer = new PresetRenderer(preset, RenderWidth, RenderHeight);
+        _renderer = new PresetRenderer(preset, _renderWidth, _renderHeight);
         VisualizerAudioHub.Shared.Clear();
         UpdatePresetLabel();
     }
@@ -224,19 +221,19 @@ public partial class VisualizerWindow : Window
     private void Present()
     {
         using var buffer = _bitmap.Lock();
-        var stride = RenderWidth * 4;
+        var stride = _renderWidth * 4;
         if (buffer.RowBytes == stride)
         {
             unsafe
             {
-                _renderer.Output.WriteBgra(new Span<byte>((void*)buffer.Address, stride * RenderHeight));
+                _renderer.Output.WriteBgra(new Span<byte>((void*)buffer.Address, stride * _renderHeight));
             }
         }
         else
         {
             // Padded rows: copy one row at a time so the padding stays untouched.
             var row = new byte[stride];
-            for (var y = 0; y < RenderHeight; y++)
+            for (var y = 0; y < _renderHeight; y++)
             {
                 _renderer.Output.WriteRowBgra(y, row);
                 System.Runtime.InteropServices.Marshal.Copy(

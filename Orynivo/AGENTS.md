@@ -499,7 +499,12 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   normal transport methods so playback can be driven from the fullscreen window. Its overlay
   buttons copy the transport bar's own geometry and sizes (36 px skip buttons with the
   transport's 16 px glyphs, a 50 px play button with its 20 px glyph) instead of scaling a
-  generic path, because a stretched glyph does not sit optically centred in its circle.
+  generic path, because a stretched glyph does not sit optically centred in its circle. The
+  overlay buttons are deliberately not focusable: the arrow keys switch presets, and a
+  focusable button would keep a focus ring after the key press. `AppSettings` stores the
+  render size (`VisualizerRenderWidth`/`VisualizerRenderHeight`), the target
+  `VisualizerFrameRate`, and the user preset folder; the **Visualisierung** settings section
+  edits all three, and the window clamps them to a sane range (160-3840 wide, 5-240 fps).
   `VisualizerPresetLibrary` loads the built-in presets plus `.oryvis` and `.milk` files from
   `AppSettings.VisualizerPresetDirectory` (default: a `visualizer-presets` folder below the
   data root); a file that fails to parse is skipped and reported, never fatal, and preset

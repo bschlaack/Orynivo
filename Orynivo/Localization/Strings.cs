@@ -1440,6 +1440,10 @@ public sealed record LocalizedStrings(
     public string Visualizer { get; init; } = "";
     public string VisualizerHint { get; init; } = "";
     public string VisualizerPresetLabel { get; init; } = "";
+    public string VisualizerResolution { get; init; } = "";
+    public string VisualizerResolutionHint { get; init; } = "";
+    public string VisualizerFrameRate { get; init; } = "";
+    public string VisualizerFrameRateHint { get; init; } = "";
     public string MaxOutputSampleRate { get; init; } = "";
     public string MaxOutputSampleRateHint { get; init; } = "";
     public string MaxOutputSampleRateAutomatic { get; init; } = "";

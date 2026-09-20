@@ -75,6 +75,15 @@ public sealed class AppSettings
     /// the per-user default folder.
     /// </summary>
     public string VisualizerPresetDirectory { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the width in pixels the visualizer renders at before scaling up.</summary>
+    public int VisualizerRenderWidth { get; set; } = 480;
+
+    /// <summary>Gets or sets the height in pixels the visualizer renders at before scaling up.</summary>
+    public int VisualizerRenderHeight { get; set; } = 270;
+
+    /// <summary>Gets or sets the visualizer target frame rate.</summary>
+    public int VisualizerFrameRate { get; set; } = 30;
     public bool PcmOutputBoostEnabled { get; set; }
     /// <summary>Gets or sets the fade duration used when advancing non-gapless queues, in seconds.</summary>
     public double NonGaplessCrossfadeSeconds { get; set; }

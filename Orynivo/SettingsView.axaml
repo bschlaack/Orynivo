@@ -249,6 +249,15 @@
                     <TextBlock Text="{DynamicResource L_OutputDevice}" VerticalAlignment="Center"/>
                 </StackPanel>
             </ListBoxItem>
+            <ListBoxItem Tag="Visualizer"
+                         FontSize="{DynamicResource FontSizeBody}"
+                         Theme="{StaticResource SettingsNavItemTheme}">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Path Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"
+                          Data="{StaticResource IconVisualizer}"/>
+                    <TextBlock Text="{DynamicResource L_Visualizer}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </ListBoxItem>
 
             <ListBoxItem IsHitTestVisible="False"
                          Focusable="False"
@@ -508,28 +517,6 @@
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"/>
 
-                    <TextBlock Text="{DynamicResource L_VisualizerPresetFolder}"
-                               FontSize="{DynamicResource FontSizeCaption}"
-                               Foreground="{DynamicResource AppMutedTextBrush}"
-                               Margin="0,14,0,4"/>
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button x:Name="VisualizerPresetFolderButton"
-                                Height="30"
-                                Padding="14,0"
-                                Theme="{StaticResource SettingsButtonTheme}"
-                                Content="{DynamicResource L_ChooseFolder}"
-                                Click="VisualizerPresetFolderButton_OnClick"/>
-                    </StackPanel>
-                    <TextBlock x:Name="VisualizerPresetFolderTextBlock"
-                               Margin="0,6,0,0"
-                               FontSize="{DynamicResource FontSizeMeta}"
-                               Foreground="{DynamicResource AppSecondaryTextBrush}"
-                               TextWrapping="Wrap"/>
-                    <TextBlock Text="{DynamicResource L_VisualizerPresetFolderHint}"
-                               FontSize="{DynamicResource FontSizeMeta}"
-                               Foreground="{DynamicResource AppMutedTextBrush}"
-                               TextWrapping="Wrap"
-                               Margin="0,4,0,0"/>
 
                     <TextBlock Text="{DynamicResource L_MaxOutputSampleRate}"
                                FontSize="{DynamicResource FontSizeCaption}"
@@ -775,6 +762,67 @@
                     </StackPanel>
                 </StackPanel>
 
+                <StackPanel x:Name="VisualizerPanel"
+                            IsVisible="False">
+                    <TextBlock Text="{DynamicResource L_Visualizer}"
+                               FontSize="{DynamicResource FontSizeBodyStrong}"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,4"/>
+                    <TextBlock Text="{DynamicResource L_VisualizerHint}"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,10"/>
+
+                    <TextBlock Text="{DynamicResource L_VisualizerResolution}"
+                               FontSize="{DynamicResource FontSizeCaption}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               Margin="0,0,0,4"/>
+                    <ComboBox x:Name="VisualizerResolutionComboBox"
+                              Height="30"
+                              HorizontalAlignment="Stretch"/>
+                    <TextBlock Text="{DynamicResource L_VisualizerResolutionHint}"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,4,0,0"/>
+
+                    <TextBlock Text="{DynamicResource L_VisualizerFrameRate}"
+                               FontSize="{DynamicResource FontSizeCaption}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               Margin="0,14,0,4"/>
+                    <ComboBox x:Name="VisualizerFrameRateComboBox"
+                              Height="30"
+                              HorizontalAlignment="Stretch"/>
+                    <TextBlock Text="{DynamicResource L_VisualizerFrameRateHint}"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,4,0,0"/>
+
+                    <TextBlock Text="{DynamicResource L_VisualizerPresetFolder}"
+                               FontSize="{DynamicResource FontSizeCaption}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               Margin="0,14,0,4"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button x:Name="VisualizerPresetFolderButton"
+                                Height="30"
+                                Padding="14,0"
+                                Theme="{StaticResource SettingsButtonTheme}"
+                                Content="{DynamicResource L_ChooseFolder}"
+                                Click="VisualizerPresetFolderButton_OnClick"/>
+                    </StackPanel>
+                    <TextBlock x:Name="VisualizerPresetFolderTextBlock"
+                               Margin="0,6,0,0"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppSecondaryTextBrush}"
+                               TextWrapping="Wrap"/>
+                    <TextBlock Text="{DynamicResource L_VisualizerPresetFolderHint}"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,4,0,0"/>
+                </StackPanel>
                 <StackPanel x:Name="LibraryPanel"
                             IsVisible="False">
                     <TextBlock Text="{DynamicResource L_Directories}"

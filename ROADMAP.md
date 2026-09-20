@@ -481,7 +481,9 @@ overlays, and a composite stage.
   produced. `Present()` also invalidates the image after writing the frame, which is what
   finally made the picture appear while audio played. The window overlays the current title
   and artist at the top and previous, play/pause, and next buttons at the bottom left, wired
-  to the normal transport methods.
+  to the normal transport methods. A **Visualisierung** settings section now exposes the
+  render resolution, the frame rate, and the user preset folder; the overlay buttons are not
+  focusable so the arrow keys no longer leave a focus ring on them.
 
 **Tests**: 21 cases for phase 37a; each later phase adds its own.
 

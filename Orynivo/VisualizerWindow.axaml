@@ -83,6 +83,7 @@
                     VerticalAlignment="Bottom"
                     Margin="24">
             <Button x:Name="PreviousTrackButton"
+                    Focusable="False"
                     Classes="visualizerControl"
                     AutomationProperties.Name="{DynamicResource L_TransportPrevious}"
                     ToolTip.Tip="{DynamicResource L_TransportPrevious}"
@@ -103,6 +104,7 @@
                 </Grid>
             </Button>
             <Button x:Name="PlayPauseButton"
+                    Focusable="False"
                     Classes="visualizerControlPlay"
                     AutomationProperties.Name="{DynamicResource L_TransportPlayPause}"
                     ToolTip.Tip="{DynamicResource L_TransportPlayPause}"
@@ -117,6 +119,7 @@
                 </Canvas>
             </Button>
             <Button x:Name="NextTrackButton"
+                    Focusable="False"
                     Classes="visualizerControl"
                     AutomationProperties.Name="{DynamicResource L_TransportNext}"
                     ToolTip.Tip="{DynamicResource L_TransportNext}"
