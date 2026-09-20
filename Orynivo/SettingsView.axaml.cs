@@ -15,6 +15,7 @@ using Orynivo.Audio;
 using Orynivo.Controls;
 using Orynivo.Library;
 using Orynivo.Localization;
+using Orynivo.Visualization;
 using Orynivo.Streaming;
 using Orynivo.Web;
 using Orynivo.Updates;
@@ -55,6 +56,7 @@ internal partial class SettingsView : UserControl
     private readonly SettingsStore _settingsStore = new();
     private readonly List<string> _libraryPaths = [];
     private string _scheduledBackupDirectory = string.Empty;
+    private string _visualizerPresetDirectory = string.Empty;
     private long _scheduledBackupLastRunUnix;
     private readonly List<PlexServerSettings> _plexServers = [];
     private readonly Dictionary<string, string> _plexTokens = [];
@@ -208,6 +210,8 @@ internal partial class SettingsView : UserControl
         DsdOverPcmCheckBox.IsChecked = settings.DsdOverPcmEnabled;
         AlwaysConvertDsdToPcmCheckBox.IsCheckedChanged += AlwaysConvertDsdToPcmCheckBox_OnIsCheckedChanged;
         PcmOutputBoostCheckBox.IsChecked = settings.PcmOutputBoostEnabled;
+        _visualizerPresetDirectory = settings.VisualizerPresetDirectory ?? string.Empty;
+        UpdateVisualizerPresetFolder();
         MaxOutputSampleRateComboBox.ItemsSource = maxOutputSampleRateChoices;
         MaxOutputSampleRateComboBox.SelectedItem = maxOutputSampleRateChoices
             .FirstOrDefault(choice => choice.Value == Math.Clamp(settings.MaxOutputSampleRateHz, 0, 768_000))
@@ -491,6 +495,26 @@ internal partial class SettingsView : UserControl
                 : LocalizationManager.Current.ScheduledBackupNever);
     }
 
+    private void UpdateVisualizerPresetFolder() =>
+        VisualizerPresetFolderTextBlock.Text = string.IsNullOrWhiteSpace(_visualizerPresetDirectory)
+            ? VisualizerPresetLibrary.DefaultDirectory
+            : _visualizerPresetDirectory;
+
+    private async void VisualizerPresetFolderButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (TopLevel.GetTopLevel(this) is not { } topLevel)
+            return;
+        var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = LocalizationManager.Current.VisualizerPresetFolder,
+            AllowMultiple = false
+        });
+        if (folders.Count == 0 || folders[0].TryGetLocalPath() is not { Length: > 0 } path)
+            return;
+        _visualizerPresetDirectory = path;
+        UpdateVisualizerPresetFolder();
+    }
+
     private async void ScheduledBackupFolderButton_OnClick(object? sender, RoutedEventArgs e)
     {
         if (TopLevel.GetTopLevel(this) is not { } topLevel)
@@ -530,6 +554,9 @@ internal partial class SettingsView : UserControl
     public bool DsdOverPcmEnabled => DsdOverPcmCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether PCM playback should receive the additional output boost.</summary>
     public bool PcmOutputBoostEnabled => PcmOutputBoostCheckBox.IsChecked == true;
+
+    /// <summary>Gets the configured visualizer preset folder, or an empty string for the default.</summary>
+    public string VisualizerPresetDirectoryValue => _visualizerPresetDirectory;
 
     /// <summary>Gets the configured maximum PCM output sample rate in hertz, or zero for automatic.</summary>
     public int MaxOutputSampleRateHz =>

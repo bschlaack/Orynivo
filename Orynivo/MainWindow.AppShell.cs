@@ -91,7 +91,7 @@ public partial class MainWindow : Window
     private void VisualizerButton_OnClick(object? sender, RoutedEventArgs e)
     {
         // Non-modal like the karaoke window: playback keeps running behind it.
-        var window = new VisualizerWindow(presetIndex: 0, reduceMotion: _settings.ReduceMotion);
+        var window = new VisualizerWindow(0, _settings.ReduceMotion, _settings.VisualizerPresetDirectory);
         window.Closed += (_, _) => _visualizerWindow = null;
         _visualizerWindow = window;
         window.Show(this);

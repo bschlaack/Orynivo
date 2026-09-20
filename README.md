@@ -1683,6 +1683,23 @@ accepted, the optional password is stored in the encrypted per-user credential
 store and never written to `settings.json`, and a failed upload leaves the local
 archive in place.
 
+## Visualizer
+
+**Visualisierung** in the sidebar opens a fullscreen music visualizer. It renders the playing
+audio through a Milkdrop-style preset engine at 480 x 270 and scales the frame up. Escape
+closes it, a click or Space switches the preset, the arrow keys step through them, and R
+resets the picture; the **Reduce motion** preference draws a static spectrum instead of
+animating.
+
+Presets are INI-style text with `per_frame_init`, `per_frame`, and `per_pixel` expression
+blocks plus `decay`, `zoom`, `warp`, `blur_level`, `wave_alpha`, and `wave_scale`. The
+supported expression subset is arithmetic, comparisons, logical operators, the ternary
+operator, `if(...)`, the usual math functions, `pi`, `rand(n)`, and `//` comments; unknown
+keys are ignored so third-party presets degrade instead of failing. Own presets go into the
+folder configured under **Preset folder** as `.oryvis` or `.milk` files (default: a
+`visualizer-presets` folder below the per-user data directory); a file that cannot be parsed
+is skipped and counted in the on-screen label. Five presets ship with the application.
+
 ## Maximum output sample rate
 
 Playback offers a **Maximum output sample rate** option (Automatic by default) that caps

@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- The visualizer now also loads user presets: `.oryvis` and `.milk` files from a folder
+  configured under **Preset folder** (default: a `visualizer-presets` folder below the
+  per-user data directory). Presets use the documented expression subset and unknown keys
+  are ignored, so third-party Milkdrop presets degrade instead of failing; a file that
+  cannot be parsed is skipped and counted in the on-screen preset label.
+
 - Added the music visualizer window. The sidebar entry **Visualisierung** opens a
   fullscreen window that renders the playing audio through the preset engine at 480 x 270
   and scales the frame up; Escape closes it, a click or Space switches the preset, the

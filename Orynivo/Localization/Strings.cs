@@ -1434,6 +1434,9 @@ public sealed record LocalizedStrings(
     public string ScheduledBackupFailed { get; init; } = "";
     /// <summary>Gets the status-bar format string after an automatic backup.</summary>
     public string ScheduledBackupDone { get; init; } = "";
+    public string VisualizerPresetFolder { get; init; } = "";
+    public string VisualizerPresetFolderHint { get; init; } = "";
+    public string VisualizerPresetRejected { get; init; } = "";
     public string Visualizer { get; init; } = "";
     public string VisualizerHint { get; init; } = "";
     public string VisualizerPresetLabel { get; init; } = "";

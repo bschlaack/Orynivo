@@ -488,6 +488,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   a closed visualizer costs nothing. Never render, analyse, or evaluate preset expressions on
   the audio thread, and keep the window's `ReduceMotion` path on
   `PresetRenderer.RenderOverlayOnly` so the reduce-motion preference is honoured.
+  `VisualizerPresetLibrary` loads the built-in presets plus `.oryvis` and `.milk` files from
+  `AppSettings.VisualizerPresetDirectory` (default: a `visualizer-presets` folder below the
+  data root); a file that fails to parse is skipped and reported, never fatal, and preset
+  files stay user data like equalizer profiles.
 - The desktop runs on Avalonia 12.1.2 with **compiled bindings enabled by default**;
   do not add `AvaloniaUseCompiledBindingsByDefault=false` back. Every `DataTemplate`
   and every item-binding scope needs an explicit `x:DataType`:

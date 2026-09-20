@@ -1,6 +1,6 @@
 # Orynivo Roadmap
 
-Items 1-36 are complete and listed for reference only. Item 37 is in progress.
+Items 1-37 are complete and listed for reference only.
 
 Each item is one commit and must follow the completion checklist in
 `AGENTS.md`: build every affected project, run the three test projects, update
@@ -398,7 +398,7 @@ parameter is restored.
 
 **Commit**: `fix(build): compile the non-Windows desktop in verify-all`
 
-## 37. Music visualizer with a Milkdrop-style preset engine - `In progress`
+## 37. Music visualizer with a Milkdrop-style preset engine - `Done`
 
 **Goal**
 
@@ -463,8 +463,10 @@ overlays, and a composite stage.
   the Windows WASAPI, ASIO, and Linux/macOS compatibility players through
   `VisualizerAudioHub` (inactive and therefore free while no window is open), five built-in
   presets, and three new strings in all seven languages.
-- 37e Presets and documentation - `Todo`: a handful of shipped presets, the preset folder
-  and settings, README, AGENTS, wiki, and CHANGELOG coverage.
+- 37e Presets and documentation - `Done`: five shipped presets, `VisualizerPresetLibrary`
+  loading `.oryvis` and `.milk` files from a configurable folder (broken files are skipped and
+  counted in the on-screen label), the **Preset folder** setting with a folder picker, and the
+  README, AGENTS, wiki, and CHANGELOG coverage.
 
 **Tests**: 21 cases for phase 37a; each later phase adds its own.
 

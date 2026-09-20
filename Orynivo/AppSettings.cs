@@ -69,6 +69,12 @@ public sealed class AppSettings
     /// reproduce cleanly.
     /// </summary>
     public int MaxOutputSampleRateHz { get; set; }
+
+    /// <summary>
+    /// Gets or sets the folder the visualizer loads user presets from. An empty value uses
+    /// the per-user default folder.
+    /// </summary>
+    public string VisualizerPresetDirectory { get; set; } = string.Empty;
     public bool PcmOutputBoostEnabled { get; set; }
     /// <summary>Gets or sets the fade duration used when advancing non-gapless queues, in seconds.</summary>
     public double NonGaplessCrossfadeSeconds { get; set; }

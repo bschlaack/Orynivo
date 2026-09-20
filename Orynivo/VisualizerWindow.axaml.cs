@@ -25,6 +25,7 @@ public partial class VisualizerWindow : Window
 
     private readonly DispatcherTimer _timer;
     private readonly WriteableBitmap _bitmap;
+    private readonly VisualizerPresetLibrary _library = new();
     private PresetRenderer _renderer;
     private int _presetIndex;
     private DateTimeOffset _lastFrame = DateTimeOffset.UtcNow;
@@ -36,14 +37,18 @@ public partial class VisualizerWindow : Window
     }
 
     /// <summary>Creates the visualizer window.</summary>
-    /// <param name="presetIndex">Index of the built-in preset to start with.</param>
+    /// <param name="presetIndex">Index of the preset to start with.</param>
     /// <param name="reduceMotion">
     /// When <see langword="true"/> the picture shows a static spectrum instead of animating.
     /// </param>
-    public VisualizerWindow(int presetIndex, bool reduceMotion)
+    /// <param name="presetDirectory">
+    /// Folder to load user presets from, or <see langword="null"/> for the default folder.
+    /// </param>
+    public VisualizerWindow(int presetIndex, bool reduceMotion, string? presetDirectory = null)
     {
         _presetIndex = presetIndex;
-        _renderer = new PresetRenderer(VisualizerPresets.At(_presetIndex), RenderWidth, RenderHeight);
+        _library.Reload(presetDirectory);
+        _renderer = new PresetRenderer(_library.At(_presetIndex), RenderWidth, RenderHeight);
         _bitmap = new WriteableBitmap(
             new Avalonia.PixelSize(RenderWidth, RenderHeight),
             new Avalonia.Vector(96, 96),
@@ -87,13 +92,13 @@ public partial class VisualizerWindow : Window
     /// <summary>Gets the index of the preset currently being rendered.</summary>
     public int PresetIndex => _presetIndex;
 
-    /// <summary>Selects a preset by index, wrapping around the built-in list.</summary>
+    /// <summary>Selects a preset by index, wrapping around the available presets.</summary>
     /// <param name="index">Requested preset index.</param>
     public void SelectPreset(int index)
     {
-        var count = VisualizerPresets.BuiltIn.Count;
+        var count = _library.Presets.Count;
         _presetIndex = ((index % count) + count) % count;
-        var preset = VisualizerPresets.At(_presetIndex);
+        var preset = _library.At(_presetIndex);
         _renderer = new PresetRenderer(preset, RenderWidth, RenderHeight);
         VisualizerAudioHub.Shared.Clear();
         UpdatePresetLabel();
@@ -168,9 +173,12 @@ public partial class VisualizerWindow : Window
 
     private void UpdatePresetLabel()
     {
-        PresetTextBlock.Text = string.Format(
+        var label = string.Format(
             CultureInfo.CurrentCulture,
             LocalizationManager.Current.VisualizerPresetLabel,
             _renderer.Preset.Name);
+        if (_library.RejectedFiles.Count > 0)
+            label = $"{label}  ·  {_library.RejectedFiles.Count} x {LocalizationManager.Current.VisualizerPresetRejected}";
+        PresetTextBlock.Text = label;
     }
 }
