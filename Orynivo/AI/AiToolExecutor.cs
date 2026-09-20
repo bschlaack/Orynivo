@@ -85,6 +85,8 @@ internal sealed class AiToolExecutor(McpTools tools)
                                            OptInt(args, "resultLimit"),
                                            ct),
             "get_play_history"      => tools.GetPlayHistoryAsync(Str(args, "date"), Int(args, "limit", 20), ct),
+            "get_year_in_review"    => tools.GetYearInReviewAsync(OptInt(args, "year"), Int(args, "topCount", 5), ct),
+            "get_track_key"         => tools.GetTrackKeyAsync(Str(args, "path") ?? "", ct),
             _                       => Task.FromResult($"Unknown tool: {name}")
         };
     }

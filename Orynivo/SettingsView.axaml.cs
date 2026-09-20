@@ -3391,6 +3391,8 @@ internal partial class SettingsView : UserControl
         ("get_current_lyrics", nameof(McpToolGetCurrentLyrics)),
         ("list_orynivo_servers", nameof(McpToolListOrynivoServers)),
         ("scan_orynivo_server", nameof(McpToolScanOrynivoServer)),
+        ("get_year_in_review",    nameof(McpToolGetYearInReview)),
+        ("get_track_key",         nameof(McpToolGetTrackKey)),
     ];
 
     /// <summary>Initialises each tool checkbox from the persisted disabled-tool set.</summary>
@@ -3429,6 +3431,8 @@ internal partial class SettingsView : UserControl
         McpToolGetCurrentLyrics.IsChecked    = !disabled.Contains("get_current_lyrics");
         McpToolListOrynivoServers.IsChecked  = !disabled.Contains("list_orynivo_servers");
         McpToolScanOrynivoServer.IsChecked   = !disabled.Contains("scan_orynivo_server");
+        McpToolGetYearInReview.IsChecked     = !disabled.Contains("get_year_in_review");
+        McpToolGetTrackKey.IsChecked         = !disabled.Contains("get_track_key");
     }
 
     /// <summary>Reads the checkbox states and returns the set of tool names that are disabled.</summary>
@@ -3468,6 +3472,8 @@ internal partial class SettingsView : UserControl
         if (McpToolGetCurrentLyrics.IsChecked    != true) disabled.Add("get_current_lyrics");
         if (McpToolListOrynivoServers.IsChecked  != true) disabled.Add("list_orynivo_servers");
         if (McpToolScanOrynivoServer.IsChecked   != true) disabled.Add("scan_orynivo_server");
+        if (McpToolGetYearInReview.IsChecked     != true) disabled.Add("get_year_in_review");
+        if (McpToolGetTrackKey.IsChecked         != true) disabled.Add("get_track_key");
         return disabled;
     }
 }

@@ -293,13 +293,13 @@ configuration.
 | State | `get_now_playing`, `get_queue`, `get_current_time` |
 | Playback | `play`, `pause_resume`, `next_track`, `previous_track`, `stop`, `seek`, `set_volume` |
 | Queue | `queue_append`, `queue_play_next`, `clear_queue`, `replace_queue` |
-| Library | `search_library` |
+| Library | `search_library`, `get_track_key` |
 | Favorites and discovery | `set_current_favorite`, `control_infinite_mix` |
 | Audio configuration | `list_output_profiles`, `select_output_profile`, `list_equalizer_profiles`, `configure_equalizer` |
 | Lyrics | `get_current_lyrics` |
 | Orynivo Server | `list_orynivo_servers`, `scan_orynivo_server` |
 | Playlists | `list_playlists`, `get_playlist_tracks`, `create_playlist`, `create_smart_playlist` |
-| History | `get_play_history` |
+| History | `get_play_history`, `get_year_in_review` |
 | Web | `search_web`, `fetch_page`, `fetch_page_as_markdown` |
 
 `search_library` accepts an optional free-text query plus a result category
@@ -379,7 +379,7 @@ mock server and headless Edge; it never controls the actual player.
 
 ### MCP Server
 
-The same 32 tools are available as an embedded **Model Context Protocol (MCP)**
+The same 34 tools are available as an embedded **Model Context Protocol (MCP)**
 HTTP/SSE server for external AI assistants such as
 [Claude Desktop](https://claude.ai/download). Enable it under
 **Settings → Integration → MCP Server**, choose a port (default **49200**),
@@ -388,7 +388,7 @@ and point your assistant at `http://localhost:49200/mcp`. It binds to
 opt-in setting that binds MCP to all interfaces and requires a generated bearer
 token in `Authorization: Bearer <token>` on every MCP request. Use HTTPS through
 a trusted reverse proxy or a VPN when the network is not fully trusted, because
-plain HTTP does not protect the token in transit. Each of the 32 tools has an individual enable/disable toggle
+plain HTTP does not protect the token in transit. Each of the 34 tools has an individual enable/disable toggle
 in Settings so you can limit what an external assistant is allowed to do. The
 web tools (`search_web`, `fetch_page`, `fetch_page_as_markdown`) route through
 the MCP server, not the model directly: searches use a configurable SearXNG
@@ -1545,7 +1545,7 @@ Orynivo/
 │   ├── Compatibility/       Linux compatibility types (direct ALSA, OpenAL, credential stores)
 │   ├── Controls/            Custom Avalonia controls and reusable table helpers
 │   ├── Localization/        Complete built-in resources for all seven languages
-│   ├── Mcp/                 Embedded MCP server, player bridge, and the 32 tools
+│   ├── Mcp/                 Embedded MCP server, player bridge, and the 34 tools
 │   ├── Remote/              Opt-in mobile web remote (service, page, and script)
 │   ├── Scrobbling/          Desktop scrobbling service and pending-scrobble store
 │   ├── Streaming/           Credential-store facades and the inactive Qobuz provider scaffold

@@ -223,8 +223,24 @@ internal static class AiToolDefinitions
             new JsonObject
             {
                 ["date"]  = Str("Optional date in yyyy-MM-dd format (e.g. 2025-06-01). Omit to get recent history."),
-                ["limit"] = Int("Maximum number of entries when no date is provided (1–100, default 20).")
-            })
+                ["limit"] = Int("Maximum number of entries when no date is provided (1-100, default 20).")
+            }),
+
+        Make("get_year_in_review",
+            "Returns the listening statistics for one calendar year: total listened time, active days, the monthly breakdown, and the leading genres, albums, and artists.",
+            new JsonObject
+            {
+                ["year"]     = Int("Four-digit calendar year. Omit for the current year."),
+                ["topCount"] = Int("Maximum entries per leading list (1-10, default 5).")
+            }),
+
+        Make("get_track_key",
+            "Returns the estimated musical key of a track as a Camelot wheel label such as 8A. Tracks whose key is unknown report that instead.",
+            new JsonObject
+            {
+                ["path"] = Str("Local file path or opaque orynivo:// track reference from search_library.")
+            },
+            ["path"])
     ];
 
     private static JsonObject Str(string description) =>

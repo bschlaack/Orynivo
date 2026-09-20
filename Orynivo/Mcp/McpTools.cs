@@ -1027,9 +1027,141 @@ public sealed class McpTools(McpPlayerBridge bridge)
         return sb.ToString().TrimEnd();
     }
 
+    /// <summary>Returns the aggregated listening statistics for one calendar year.</summary>
+    /// <param name="year">Four-digit calendar year, or <see langword="null"/> for the current year.</param>
+    /// <param name="topCount">Maximum entries per leading list.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A formatted Markdown summary, or an explanation when the year has no history.</returns>
+    [McpServerTool(Name = "get_year_in_review", ReadOnly = true, Idempotent = true)]
+    [Description("Returns the listening statistics for one calendar year: total listened time, active days, the monthly breakdown, and the leading genres, albums, and artists. Uses only the existing playback history.")]
+    public async Task<string> GetYearInReviewAsync(
+        [Description("Four-digit calendar year. Omit for the current year.")] int? year = null,
+        [Description("Maximum entries per leading list (1-10, default 5).")] int topCount = 5,
+        CancellationToken ct = default)
+    {
+        if (!bridge.IsToolEnabled("get_year_in_review")) return "Tool is disabled.";
+        topCount = Math.Clamp(topCount, 1, 10);
+        var targetYear = year ?? DateTime.Now.Year;
+
+        YearInReviewSummary? summary;
+        try
+        {
+            summary = await Task.Run(() =>
+            {
+                using var db = AudioDatabase.OpenDefault();
+                return db.GetYearInReview(targetYear, topCount);
+            }, ct);
+        }
+        catch
+        {
+            return $"Could not read the {targetYear} listening statistics.";
+        }
+
+        if (summary is null)
+            return "Use a four-digit year between 1900 and 9999.";
+        if (summary.TotalListeningSeconds <= 0)
+            return $"No listening history was recorded for {targetYear}.";
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine(CultureInfo.InvariantCulture, $"# {targetYear} in review");
+        sb.AppendLine(CultureInfo.InvariantCulture,
+            $"- Listened: {summary.TotalListeningSeconds / 3600d:0.0} hours across {summary.ActiveDays} active days");
+
+        var monthly = summary.MonthlySeconds
+            .Select((seconds, index) => (Month: index + 1, Seconds: seconds))
+            .Where(entry => entry.Seconds > 0)
+            .Select(entry => string.Create(
+                CultureInfo.InvariantCulture,
+                $"{CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedMonthName(entry.Month)} {entry.Seconds / 3600d:0.0}h"))
+            .ToList();
+        if (monthly.Count > 0)
+            sb.AppendLine(CultureInfo.InvariantCulture, $"- Monthly: {string.Join(", ", monthly)}");
+
+        AppendYearInReviewList(sb, "Top genres", summary.TopGenres.Select(entry => (entry.Genre, entry.Seconds)));
+        AppendYearInReviewList(
+            sb,
+            "Top albums",
+            summary.TopAlbums.Select(entry => ($"{entry.Title} — {entry.Artist}", entry.Seconds)));
+        AppendYearInReviewList(sb, "Top artists", summary.TopArtists.Select(entry => (entry.Name, entry.Seconds)));
+        return sb.ToString().TrimEnd();
+    }
+
+    /// <summary>Returns the estimated musical key of a local or Orynivo Server track.</summary>
+    /// <param name="path">Local file path or opaque <c>orynivo://</c> track reference.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The Camelot wheel label, or an explanation when no key was estimated.</returns>
+    [McpServerTool(Name = "get_track_key", ReadOnly = true, Idempotent = true)]
+    [Description("Returns the estimated musical key of a track as a Camelot wheel label such as 8A. Requires that the optional audio analysis already estimated a key; a flat or ambiguous track has none.")]
+    public async Task<string> GetTrackKeyAsync(
+        [Description("Local file path or opaque orynivo:// track reference from search_library.")] string path,
+        CancellationToken ct = default)
+    {
+        if (!bridge.IsToolEnabled("get_track_key")) return "Tool is disabled.";
+        if (string.IsNullOrWhiteSpace(path))
+            return "Provide a track path or reference.";
+
+        try
+        {
+            if (PlaylistReferences.TryParseTrack(path, out var serverId, out var trackId))
+            {
+                var server = (bridge.GetOrynivoServersFunc?.Invoke() ?? [])
+                    .FirstOrDefault(candidate => candidate.Id == serverId);
+                if (server is null)
+                    return "That server is not configured.";
+                using var client = new OrynivoServerClient();
+                var tracks = await client.GetTracksByIdsAsync(server, [trackId], ct);
+                var remote = tracks.FirstOrDefault();
+                if (remote is null)
+                    return "Track not found on that server.";
+                var remoteTitle = string.IsNullOrWhiteSpace(remote.Title) ? remote.FileName : remote.Title;
+                return string.IsNullOrWhiteSpace(remote.CamelotKey)
+                    ? $"{remoteTitle}: no key was estimated."
+                    : $"{remoteTitle}: {remote.CamelotKey}";
+            }
+
+            var local = await Task.Run(() =>
+            {
+                using var db = AudioDatabase.OpenDefault();
+                return db.GetTrackListByPaths([path]).FirstOrDefault();
+            }, ct);
+            if (local is null)
+                return "Track not found in the local library.";
+            var title = string.IsNullOrWhiteSpace(local.Title) ? local.FileName : local.Title;
+            return string.IsNullOrWhiteSpace(local.CamelotKey)
+                ? $"{title}: no key was estimated."
+                : $"{title}: {local.CamelotKey}";
+        }
+        catch
+        {
+            return "Could not read the track key.";
+        }
+    }
+
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
+
+    /// <summary>Appends one leading list of the year-in-review summary as Markdown bullets.</summary>
+    /// <param name="sb">Output builder.</param>
+    /// <param name="title">Section title.</param>
+    /// <param name="entries">Label and listened seconds pairs.</param>
+    private static void AppendYearInReviewList(
+        System.Text.StringBuilder sb,
+        string title,
+        IEnumerable<(string Label, double Seconds)> entries)
+    {
+        var items = entries
+            .Where(entry => !string.IsNullOrWhiteSpace(entry.Label))
+            .Select(entry => string.Create(
+                CultureInfo.InvariantCulture,
+                $"- {entry.Label}: {entry.Seconds / 3600d:0.0} hours"))
+            .ToList();
+        if (items.Count == 0)
+            return;
+        sb.AppendLine(CultureInfo.InvariantCulture, $"## {title}");
+        foreach (var item in items)
+            sb.AppendLine(item);
+    }
 
     private static string FormatState(PlayerState s)
     {

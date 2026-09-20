@@ -163,7 +163,8 @@ public sealed record OrynivoTrackInfo(
     string? MusicBrainzTrackId = null,
     long? MusicBrainzRatingFetchedAt = null,
     string? MusicBrainzGenres = null,
-    string? MusicBrainzTags = null);
+    string? MusicBrainzTags = null,
+    string? CamelotKey = null);
 
 /// <summary>Rating mutation sent to an Orynivo Server.</summary>
 /// <param name="UserRating">Optional personal zero-to-five-star rating.</param>
@@ -180,8 +181,7 @@ public sealed record OrynivoTrackRatingUpdate(
     int? MusicBrainzRatingVotes = null,
     long? MusicBrainzRatingFetchedAt = null,
     string? MusicBrainzGenres = null,
-    string? MusicBrainzTags = null,
-    string? CamelotKey = null);
+    string? MusicBrainzTags = null);
 
 
 /// <summary>Lightweight remote track entry used for folder-tree construction.</summary>

@@ -57,24 +57,29 @@ recommended next steps.
 - Not wired into the workflows; CI runs these steps itself. Both the success and
   the failure path were verified.
 
-## 17. ★ Expose the new features to MCP and AI Chat — `Todo`
+## 17. ★ Expose the new features to MCP and AI Chat — `In progress`
 
-None of the 32 tools knows the year-in-review summary, the estimated musical
-key, bulk favourite/rating updates, or similarity smart playlists.
+None of the 32 tools knew the year-in-review summary, the estimated musical key,
+bulk favourite/rating updates, or similarity smart playlists. Keep `McpTools`,
+`AiToolDefinitions`, `AiToolExecutor`, and the Settings tool checklist in exact
+parity (the parity script derives its expectation from `McpTools`, so it covers
+new tools automatically), keep the existing redaction rules, and update the tool
+count wherever it is stated (`AGENTS.md`, `README.md`, Settings `UniformGrid`
+rows, wiki `MCP-Tool-Reference.md`).
 
-**Design**
+Steps:
 
-- Add tools for the year summary, a track's Camelot key, bulk favourite/rating
-  updates, and creating a similarity smart playlist.
-- Keep `McpTools`, `AiToolDefinitions`, `AiToolExecutor`, and the Settings tool
-  checklist in exact parity and extend `scripts/verify-mcp-tool-parity.ps1`.
-- Keep the existing redaction rules: no `key=` URLs, no credentials.
-- Update the tool count everywhere it is stated (`AGENTS.md`, `README.md`,
-  Settings `UniformGrid` rows, wiki `MCP-Tool-Reference.md`).
-
-**Tests**: the parity script plus Core/pure helpers for any new aggregation.
-
-**Commit**: `feat(mcp): expose year in review, musical key, and bulk edits`
+- 17a Read-only tools — `Done`: `get_year_in_review` (listened hours, active
+  days, monthly breakdown, leading genres/albums/artists) and `get_track_key`
+  (Camelot label for a local path or an `orynivo://` reference). The tool count is
+  34. This also uncovered and fixed a real defect: `CamelotKey` had landed on the
+  rating-mutation DTO instead of `OrynivoTrackInfo`, so remote rows never showed
+  the key. Two Core tests guard the DTO.
+- 17b Mutating tools — `Todo`: `set_tracks_favorite`, `set_tracks_rating`, and
+  `create_similar_playlist`. They need new `McpPlayerBridge` delegates plus
+  path-based implementations that reuse the bulk-update and similarity-seed
+  logic, so the model can act on `search_library` results (local paths and
+  opaque `orynivo://` references) without ever seeing a credential.
 
 ## 18. Pick the similarity reference in the smart-playlist editor — `Todo`
 

@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Added two MCP and AI Chat tools: `get_year_in_review` returns the listening
+  statistics for one calendar year (listened hours, active days, the monthly
+  breakdown, and the leading genres, albums, and artists), and `get_track_key`
+  returns a track's estimated musical key as a Camelot wheel label. Both are
+  read-only, use only existing data, and respect the per-tool Settings toggles;
+  the tool count is now 34.
 - Added `scripts/verify-all.ps1`, which runs the same checks as CI on a local
   checkout in one command: the managed builds with `--warnaserror`, all three
   test projects, and both parity scripts. It stops at the first failure, prints a
@@ -15,6 +21,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Remote Orynivo Server tracks now really carry their estimated musical key.
+  `CamelotKey` had been added to the rating-mutation DTO instead of
+  `OrynivoTrackInfo`, so the remote catalog mapping never received it and the
+  Key column stayed empty for server rows. The track DTO now carries the field,
+  the catalog mapping forwards it, and a Core test guards the deserialization.
 - Hardened the Core test suite against intermittent failures. Every database test
   now creates its own temporary library through `CoreTestDatabase` and clears only
   that database's SQLite pool, instead of sharing one library file and calling the
