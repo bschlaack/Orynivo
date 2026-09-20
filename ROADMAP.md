@@ -221,7 +221,7 @@ Steps:
   `MainWindow.TryUploadBackupAsync`. 18 `Orynivo.Core.Tests` cases cover the URL
   rules and the upload request. S3 remains a deliberate follow-up.
 
-## 26. Reduce motion and keyboard navigation — `Todo`
+## 26. Reduce motion and keyboard navigation — `Done`
 
 **Design**
 

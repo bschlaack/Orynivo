@@ -468,6 +468,14 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   or an error message (`Orynivo.Library.BackupUploader`). The scheduled and
   **Back up now** paths share `MainWindow.TryUploadBackupAsync`; the explicit
   **Export library** action still writes only the user-chosen local ZIP.
+- Optional UI motion is governed by `AppSettings.ReduceMotion` through the pure,
+  tested `Orynivo.Controls.MotionPreferences` helper. The Genre Cloud, the
+  Dashboard cover stage, and `KaraokeWindow` must ask that helper instead of
+  building transitions or frame loops directly, and `KaraokeWindow.ReduceMotion`
+  is assigned from the saved setting when the window opens. The album and artist
+  artwork grids open the selected card on Enter or Space through
+  `ActivateArtworkCardAsync`, and transport controls keep an
+  `AutomationProperties.Name` that matches their localized tooltip.
 - Enhanced-LRC word timestamps (`<mm:ss.xx>`) are parsed by
   `LyricsService.ParseLrc` into `TimedLyricLine.Words`, which also strips the
   markers from the line text. `KaraokeWindow` renders such a line as one `Run` per

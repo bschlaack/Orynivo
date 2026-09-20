@@ -97,6 +97,38 @@ public partial class MainWindow : Window
             await HandleContentRowDoubleClickAsync(row);
     }
 
+    /// <summary>
+    /// Opens the focused album artwork card with Enter or Space so the grid is
+    /// usable without a pointer.
+    /// </summary>
+    /// <param name="sender">Event source.</param>
+    /// <param name="e">Key event arguments.</param>
+    private async void AlbumArtworkListBox_OnKeyDown(object? sender, Avalonia.Input.KeyEventArgs e) =>
+        await ActivateArtworkCardAsync(AlbumArtworkListBox, e);
+
+    /// <summary>
+    /// Opens the focused artist artwork card with Enter or Space so the grid is
+    /// usable without a pointer.
+    /// </summary>
+    /// <param name="sender">Event source.</param>
+    /// <param name="e">Key event arguments.</param>
+    private async void ArtistArtworkListBox_OnKeyDown(object? sender, Avalonia.Input.KeyEventArgs e) =>
+        await ActivateArtworkCardAsync(ArtistArtworkListBox, e);
+
+    /// <summary>Activates the selected card of an artwork grid for Enter and Space.</summary>
+    /// <param name="listBox">Artwork grid receiving the key.</param>
+    /// <param name="e">Key event arguments.</param>
+    private async Task ActivateArtworkCardAsync(ListBox listBox, Avalonia.Input.KeyEventArgs e)
+    {
+        if (e.Key is not (Avalonia.Input.Key.Enter or Avalonia.Input.Key.Space))
+            return;
+        if (listBox.SelectedItem is not ContentRow row)
+            return;
+
+        e.Handled = true;
+        await HandleContentRowDoubleClickAsync(row);
+    }
+
     private async void SearchTracksDataGrid_OnMouseDoubleClick(object? sender, Avalonia.Input.TappedEventArgs e)
     {
         if (FindAncestor<Button>(e.Source as Visual) is not null)

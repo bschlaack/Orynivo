@@ -8,6 +8,7 @@ using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Styling;
+using Orynivo.Controls;
 using Orynivo.Library;
 using Orynivo.Localization;
 
@@ -39,6 +40,12 @@ public partial class KaraokeWindow : Window
 
     private readonly IReadOnlyList<KaraokeLine> _lines;
     private readonly List<TextBlock> _slots = [];
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the line opacity and font-size
+    /// transitions are disabled by the user's reduce-motion preference.
+    /// </summary>
+    public bool ReduceMotion { get; set; }
     private int _activeIndex = -2;
     private int _activeWordIndex = -1;
 
@@ -110,21 +117,23 @@ public partial class KaraokeWindow : Window
 
     private void BuildSlots()
     {
-        var transitions = new Transitions
-        {
-            new DoubleTransition
+        var transitions = MotionPreferences.ResolveTransitions(
+            ReduceMotion,
+            new Transitions
             {
-                Property = OpacityProperty,
-                Duration = TimeSpan.FromMilliseconds(260),
-                Easing = new CubicEaseOut()
-            },
-            new DoubleTransition
-            {
-                Property = FontSizeProperty,
-                Duration = TimeSpan.FromMilliseconds(260),
-                Easing = new CubicEaseOut()
-            }
-        };
+                new DoubleTransition
+                {
+                    Property = OpacityProperty,
+                    Duration = TimeSpan.FromMilliseconds(260),
+                    Easing = new CubicEaseOut()
+                },
+                new DoubleTransition
+                {
+                    Property = FontSizeProperty,
+                    Duration = TimeSpan.FromMilliseconds(260),
+                    Easing = new CubicEaseOut()
+                }
+            });
         for (var slot = 0; slot < VisibleLines; slot++)
         {
             var block = new TextBlock

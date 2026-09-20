@@ -206,6 +206,12 @@ public sealed class AppSettings
     /// megabytes; zero or less keeps every downloaded episode.
     /// </summary>
     public int PodcastDownloadLimitMb { get; set; } = 2048;
+    /// <summary>
+    /// Gets or sets a value indicating whether optional UI motion (Genre Cloud,
+    /// Dashboard cover stage, and karaoke transitions) is disabled.
+    /// </summary>
+    public bool ReduceMotion { get; set; }
+
     /// <summary>Gets or sets the automatic library-backup schedule.</summary>
     public ScheduledBackupSettings ScheduledBackup { get; set; } = new();
     /// <summary>Gets or sets the optional cloud upload target for completed backups.</summary>

@@ -633,7 +633,7 @@ public partial class MainWindow : Window
             newDeck.RenderTransformOrigin = new RelativePoint(0.5, 0.5, RelativeUnit.Relative);
             viewport.Children.Add(newDeck);
 
-            const int frameCount = 15;
+            var frameCount = MotionPreferences.ResolveStepCount(_settings.ReduceMotion, 15);
             for (var frame = 1; frame <= frameCount; frame++)
             {
                 var progress = frame / (double)frameCount;

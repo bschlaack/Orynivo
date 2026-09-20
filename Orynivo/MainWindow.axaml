@@ -45,6 +45,7 @@
              support the same cover-change and favorite actions. -->
         <DataTemplate x:Key="AlbumArtworkCardTemplate">
             <Border Classes="motionCard"
+                    AutomationProperties.Name="{Binding Title}"
                     Width="180"
                     MinHeight="276"
                     Margin="8"
@@ -2782,6 +2783,7 @@
                      Background="{DynamicResource AppContentBrush}"
                      BorderThickness="0"
                      ItemTemplate="{StaticResource AlbumArtworkCardTemplate}"
+                     KeyDown="AlbumArtworkListBox_OnKeyDown"
                      DoubleTapped="AlbumArtworkListBox_OnMouseDoubleClick">
                 <ListBox.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -2809,6 +2811,7 @@
                      IsVisible="False"
                      Background="{DynamicResource AppContentBrush}"
                      BorderThickness="0"
+                     KeyDown="ArtistArtworkListBox_OnKeyDown"
                      DoubleTapped="ArtistArtworkListBox_OnMouseDoubleClick">
                 <ListBox.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -2830,6 +2833,7 @@
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <Border Classes="motionCard"
+                                AutomationProperties.Name="{Binding Title}"
                                 Width="200"
                                 Height="256"
                                 Margin="8"
@@ -3554,6 +3558,7 @@
                                 <TranslateTransform/>
                             </StackPanel.RenderTransform>
                             <Button x:Name="PreviousButton"
+                                    AutomationProperties.Name="{DynamicResource L_TransportPrevious}"
                                     Theme="{StaticResource TransportBtnTheme}"
                                     Margin="0,0,6,0" IsEnabled="False"
                                     Click="PreviousButton_OnClick">
@@ -3572,6 +3577,7 @@
                                 </Grid>
                             </Button>
                             <Button x:Name="PlayButton"
+                                    AutomationProperties.Name="{DynamicResource L_TransportPlayPause}"
                                     Theme="{StaticResource PlayBtnTheme}"
                                     Margin="6,0"
                                     Click="PlayButton_OnClick">
@@ -3585,6 +3591,7 @@
                                 </Canvas>
                             </Button>
                             <Button x:Name="NextButton"
+                                    AutomationProperties.Name="{DynamicResource L_TransportNext}"
                                     Theme="{StaticResource TransportBtnTheme}"
                                     Margin="6,0,0,0" IsEnabled="False"
                                     Click="NextButton_OnClick">
@@ -3607,6 +3614,7 @@
                                     Orientation="Horizontal"
                                     HorizontalAlignment="Left">
                             <Button x:Name="ArtistInfoButton"
+                                    AutomationProperties.Name="{DynamicResource L_ShowArtistInfo}"
                                     Theme="{StaticResource TransportBtnTheme}"
                                     Margin="6,0,0,0"
                                     IsEnabled="False"
@@ -3617,6 +3625,7 @@
                                       Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                             </Button>
                             <Button x:Name="LyricsButton"
+                                    AutomationProperties.Name="{DynamicResource L_ShowLyrics}"
                                     Theme="{StaticResource TransportBtnTheme}"
                                     Margin="6,0,0,0"
                                     IsEnabled="False"
@@ -3627,6 +3636,7 @@
                                       Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                             </Button>
                             <Button x:Name="NowPlayingFavoriteButton"
+                                    AutomationProperties.Name="{DynamicResource L_MarkAsFavorite}"
                                     Theme="{StaticResource TransportBtnTheme}"
                                     Margin="6,0,0,0"
                                     IsEnabled="False"
@@ -3641,6 +3651,7 @@
                                            FontSize="15"/>
                             </Button>
                             <Button x:Name="ShuffleButton"
+                                    AutomationProperties.Name="{DynamicResource L_Shuffle}"
                                     Theme="{StaticResource TransportBtnTheme}"
                                     Margin="6,0,0,0"
                                     ToolTip.Tip="{DynamicResource L_Shuffle}"
@@ -3777,6 +3788,7 @@
                               VerticalAlignment="Center"
                               Margin="0,0,10,0"/>
                         <Slider x:Name="VolumeSlider"
+                                AutomationProperties.Name="{DynamicResource L_TransportVolume}"
                                 Theme="{StaticResource DarkSliderTheme}"
                                 Width="100" Minimum="0" Maximum="1" Value="1"
                                 VerticalAlignment="Center"
@@ -3790,6 +3802,7 @@
                                 HorizontalAlignment="Center"
                                 Margin="0,6,0,0">
                         <Button x:Name="EqPickerButton"
+                                AutomationProperties.Name="{DynamicResource L_Equalizer}"
                                 Theme="{StaticResource TransportBtnTheme}"
                                 ToolTip.Tip="{DynamicResource L_Equalizer}"
                                 Click="EqPickerButton_OnClick">
@@ -3803,6 +3816,7 @@
                             </Viewbox>
                         </Button>
                         <Button x:Name="OutputPickerButton"
+                                AutomationProperties.Name="{DynamicResource L_OutputDevice}"
                                 Theme="{StaticResource TransportBtnTheme}"
                                 Margin="4,0,0,0"
                                 ToolTip.Tip="{DynamicResource L_OutputDevice}"
@@ -3820,6 +3834,7 @@
                             </Viewbox>
                         </Button>
                         <Button x:Name="OutputDeviceLockButton"
+                                AutomationProperties.Name="{DynamicResource L_ReleaseOutputDevice}"
                                 Theme="{StaticResource TransportBtnTheme}"
                                 Margin="4,0,0,0"
                                 ToolTip.Tip="{DynamicResource L_ReleaseOutputDevice}"
@@ -3842,4 +3857,5 @@
 
     </Grid>
 </Window>
+
 

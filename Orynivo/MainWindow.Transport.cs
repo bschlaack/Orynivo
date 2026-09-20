@@ -637,7 +637,10 @@ public partial class MainWindow : Window
 
         var window = new KaraokeWindow(
             [.. _lyricLines.Select(line => new KaraokeWindow.KaraokeLine(line.Text, line.Time) { Words = line.Words })],
-            LyricsBackgroundImage.Source);
+            LyricsBackgroundImage.Source)
+        {
+            ReduceMotion = _settings.ReduceMotion
+        };
         window.SetTrack(NowPlayingTitleBlock.Text, NowPlayingArtistBlock.Text);
         window.Closed += (_, _) => _karaokeWindow = null;
         _karaokeWindow = window;

@@ -1434,6 +1434,13 @@ public sealed record LocalizedStrings(
     public string ScheduledBackupFailed { get; init; } = "";
     /// <summary>Gets the status-bar format string after an automatic backup.</summary>
     public string ScheduledBackupDone { get; init; } = "";
+    public string TransportPrevious { get; init; } = "";
+    public string TransportPlayPause { get; init; } = "";
+    public string TransportNext { get; init; } = "";
+    public string TransportVolume { get; init; } = "";
+    public string ReduceMotion { get; init; } = "";
+    public string ReduceMotionHint { get; init; } = "";
+    public string ReduceMotionEnabled { get; init; } = "";
     public string BackupTarget { get; init; } = "";
     public string BackupTargetHint { get; init; } = "";
     public string BackupTargetEnabled { get; init; } = "";

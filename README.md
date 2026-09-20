@@ -1680,6 +1680,14 @@ accepted, the optional password is stored in the encrypted per-user credential
 store and never written to `settings.json`, and a failed upload leaves the local
 archive in place.
 
+## Accessibility
+
+- **Reduce motion** under Appearance disables the optional Genre Cloud,
+  Dashboard cover-stage, and karaoke animations.
+- The album and artist artwork grids open the selected card with Enter or Space,
+  and the transport controls (previous, play/pause, next, volume, artist info,
+  lyrics, favorite, shuffle, equalizer, and output) expose accessible names.
+
 ## Current Limitations
 
 - Linux output profiles include direct ALSA `hw:` endpoints and endpoints

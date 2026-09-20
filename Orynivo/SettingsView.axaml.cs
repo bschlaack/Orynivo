@@ -275,6 +275,7 @@ internal partial class SettingsView : UserControl
         ShowPodcastsItemCheckBox.IsChecked      = settings.ShowPodcastsItem;
         ShowQueueItemCheckBox.IsChecked         = settings.ShowQueueItem;
         ShowAiChatItemCheckBox.IsChecked        = settings.ShowAiChatItem;
+        ReduceMotionCheckBox.IsChecked          = settings.ReduceMotion;
         CheckForUpdatesOnStartupCheckBox.IsChecked = settings.CheckForUpdatesOnStartup;
         StartMaximizedCheckBox.IsChecked             = settings.StartMaximized;
         ShowLocalLibrarySectionCheckBox.IsChecked = settings.ShowLocalLibrarySection;
@@ -664,6 +665,9 @@ internal partial class SettingsView : UserControl
     public bool ShowQueueItem => ShowQueueItemCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether the AI Chat sidebar item should be visible.</summary>
     public bool ShowAiChatItem => ShowAiChatItemCheckBox.IsChecked == true;
+
+    /// <summary>Gets a value indicating whether optional UI motion is disabled.</summary>
+    public bool ReduceMotionValue => ReduceMotionCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether signed updates should be checked at application startup.</summary>
     public bool CheckForUpdatesOnStartup => CheckForUpdatesOnStartupCheckBox.IsChecked == true;
     /// <summary>Gets a value indicating whether the main window should start maximized.</summary>
