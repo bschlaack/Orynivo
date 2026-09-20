@@ -442,9 +442,13 @@ overlays, and a composite stage.
   `PcmVisualizationTap` in `Orynivo.Core/Audio`, covered by 21 tests (sine frequency
   detection, DC concentration, silence, band separation, decay and reset, ring-buffer
   overflow, oversized blocks, and clearing).
-- 37b Preset expression language - `Todo`: tokenizer, parser, compiler, and evaluation over
-  the audio frame, with tests for precedence, functions, conditionals, user variables, and
-  error reporting.
+- 37b Preset expression language - `Done`: `PresetLexer`, `PresetCompiler` (a precedence
+  parser that emits `System.Linq.Expressions` trees and JIT-compiles them into an
+  `Action<float[]>`), and the public `PresetProgram`/`PresetExpressionException` surface.
+  Supported: assignments, arithmetic, C-like remainder, comparisons, logical operators,
+  the ternary operator, `if(...)`, the usual math functions, `pi`, `rand(n)`, `//` comments,
+  and semicolon-separated statements. Unknown functions and malformed input report a
+  position. Covered by 22 tests.
 - 37c Render pipeline - `Todo`: framebuffer, feedback warp with bilinear sampling, blur,
   waveform and shape drawing, composite, and the preset runner, tested through deterministic
   frame statistics.

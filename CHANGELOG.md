@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Added the preset expression language for the upcoming music visualizer: a lexer and a
+  precedence parser that compiles Milkdrop-style expressions into JIT-compiled statements
+  over a plain slot array. Assignments, arithmetic, C-like remainder, comparisons, logical
+  operators, the ternary operator, `if(...)`, the usual math functions, `pi`, `rand(n)`,
+  and `//` comments are supported, and malformed input or an unknown function reports the
+  offending position. Covered by 22 tests.
+
 - Added the audio-analysis foundation for the upcoming music visualizer: a real-input
   radix-2 `Fft`, an `AudioSpectrumAnalyzer` that produces 64 smoothed logarithmic bands
   plus bass, mid, treble, and volume, and the lock-free `PcmVisualizationTap` that hands
