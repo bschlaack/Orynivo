@@ -574,11 +574,21 @@ written here. No third-party visualizer code or preset bundle is linked.
   plan. Walking the tree per pixel is the known cost limit; a JIT compiler for shaders is the
   follow-up if needed. Covered by 11 tests.- 38e `.milk` compatibility and validation - `Pending`: `[presetNN]` sections, version and
   `nWaveMode` handling, tolerance for the remaining legacy keys, a corpus of real presets as
-  regression fixtures, and the per-preset skip diagnostics.
+  regression fixtures, and the per-preset skip diagnostics. Every section of a multi-preset
+  `.milk` file becomes its own preset, the declared format version is reported but never gates
+  loading, and a skipped preset carries a reason naming the file or section. The regression
+  corpus is hand-written in the real format because third-party presets are licensed by their
+  authors and are never bundled; it covers a multi-section file, a shader, and a minimal preset.
+  Covered by 13 tests.
 
-- 38h `.milk` compatibility and validation - `Pending`: `[presetNN]` sections, version and
+- 38h `.milk` compatibility and validation - `Done`: `[presetNN]` sections, version and
   `nWaveMode` handling, tolerance for the remaining legacy keys, a corpus of real presets as
-  regression fixtures, and the per-preset skip diagnostics.
+  regression fixtures, and the per-preset skip diagnostics. Every section of a multi-preset
+  `.milk` file becomes its own preset, the declared format version is reported but never gates
+  loading, and a skipped preset carries a reason naming the file or section. The regression
+  corpus is hand-written in the real format because third-party presets are licensed by their
+  authors and are never bundled; it covers a multi-section file, a shader, and a minimal preset.
+  Covered by 13 tests.
 
 **Tests**: each phase adds its own; 38d additionally needs a shader-interpreter suite and a
 render comparison against hand-computed reference pixels.

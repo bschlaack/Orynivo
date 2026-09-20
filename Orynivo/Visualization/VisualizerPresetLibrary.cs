@@ -12,12 +12,19 @@ internal sealed class VisualizerPresetLibrary
 {
     private readonly List<VisualizerPreset> _presets = [];
     private readonly List<string> _rejected = [];
+    private readonly List<string> _rejectedReasons = [];
 
     /// <summary>Gets the available presets, built-ins first.</summary>
     public IReadOnlyList<VisualizerPreset> Presets => _presets;
 
     /// <summary>Gets the file names that could not be loaded.</summary>
     public IReadOnlyList<string> RejectedFiles => _rejected;
+
+    /// <summary>
+    /// Gets one diagnostic entry per skipped preset, naming the file or section and the reason it
+    /// failed. The entries stay local to the window and are never sent anywhere.
+    /// </summary>
+    public IReadOnlyList<string> RejectedReasons => _rejectedReasons;
 
     /// <summary>Returns the default preset folder below the per-user data directory.</summary>
     /// <returns>The absolute folder path.</returns>
@@ -47,12 +54,31 @@ internal sealed class VisualizerPresetLibrary
             {
                 try
                 {
-                    var preset = VisualizerPreset.Parse(File.ReadAllText(file), Path.GetFileNameWithoutExtension(file));
-                    _presets.Add(preset);
+                    var name = Path.GetFileNameWithoutExtension(file);
+                    // A .milk file usually holds several presets, one per [presetNN] section, so
+                    // every section becomes its own preset instead of only the last one surviving.
+                    var sections = VisualizerPreset.ParseSections(File.ReadAllText(file));
+                    for (var index = 0; index < sections.Count; index++)
+                    {
+                        var fallback = sections.Count > 1 ? $"{name} ({index + 1})" : name;
+                        try
+                        {
+                            _presets.Add(VisualizerPreset.Parse(sections[index], fallback));
+                        }
+                        catch (PresetExpressionException exception)
+                        {
+                            _rejected.Add(Path.GetFileName(file));
+                            var where = sections.Count > 1
+                                ? $"{Path.GetFileName(file)} section {index + 1}"
+                                : Path.GetFileName(file);
+                            _rejectedReasons.Add($"{where}: {exception.Message}");
+                        }
+                    }
                 }
                 catch (Exception exception) when (exception is PresetExpressionException or IOException or UnauthorizedAccessException)
                 {
                     _rejected.Add(Path.GetFileName(file));
+                    _rejectedReasons.Add($"{Path.GetFileName(file)}: {exception.Message}");
                 }
             }
         }

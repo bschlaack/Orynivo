@@ -24,6 +24,38 @@ public sealed class VisualizerPresetLibraryTests : IDisposable
         }
     }
 
+    /// <summary>Every section of a multi-preset .milk file becomes its own preset.</summary>
+    [Fact]
+    public void Reload_LoadsEverySectionOfAMilkFile()
+    {
+        File.WriteAllText(
+            Path.Combine(_directory, "two.milk"),
+            "[preset00]\nname=First\nper_pixel_1=x = -x;\n[preset01]\nname=Second\nper_pixel_1=y = -y;\n");
+        var library = new VisualizerPresetLibrary();
+
+        library.Reload(_directory);
+
+        var names = library.Presets.Select(preset => preset.Name).ToList();
+        Assert.Contains("First", names);
+        Assert.Contains("Second", names);
+        Assert.Empty(library.RejectedFiles);
+    }
+
+    /// <summary>A broken preset is skipped with the reason that made it fail.</summary>
+    [Fact]
+    public void Reload_ReportsWhyAPresetWasSkipped()
+    {
+        File.WriteAllText(Path.Combine(_directory, "broken.oryvis"), "name=Broken\nper_pixel_1=x = ;");
+        var library = new VisualizerPresetLibrary();
+
+        library.Reload(_directory);
+
+        Assert.Contains("broken.oryvis", library.RejectedFiles);
+        var reason = Assert.Single(library.RejectedReasons);
+        Assert.Contains("broken.oryvis", reason, StringComparison.Ordinal);
+        Assert.Contains("position", reason, StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <summary>Preset files are added after the built-ins.</summary>
     [Fact]
     public void Reload_AddsUserPresetsAfterTheBuiltIns()

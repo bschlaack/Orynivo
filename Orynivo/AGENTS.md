@@ -511,7 +511,8 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   reveal the overlay. Never replace that with a global pointer hook.
   `VisualizerPresetLibrary` loads the built-in presets plus `.oryvis` and `.milk` files from
   `AppSettings.VisualizerPresetDirectory` (default: a `visualizer-presets` folder below the
-  data root); a file that fails to parse is skipped and reported, never fatal, and preset
+  data root); every `[presetNN]` section of a `.milk` file becomes its own preset, a file that
+  fails to parse is skipped and reported with its reason through `RejectedReasons`, never fatal, and preset
   files stay user data like equalizer profiles. Preset stages share one slot layout, so a
   stage-local built-in such as `x` or `rad` is one slot that each stage seeds and reads back
   for itself: the per-pixel stage seeds it per pixel, a shape seeds it per shape and per

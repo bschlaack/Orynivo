@@ -507,9 +507,11 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
     {
         var source = sampler switch
         {
-            "sampler_fc_main" => _frameCopy,
+            // During a comp shader the frame copy holds the composited picture, which is what
+            // sampler_main means there; the faded warped frame stands in for the pre-warp one.
             "sampler_pc_main" => _previous,
-            _ => _samplerMainIsWarped ? _warped : _previous
+            "sampler_fc_main" => _samplerMainIsWarped ? _warped : _frameCopy,
+            _ => _samplerMainIsWarped ? _frameCopy : _previous
         };
         source.SampleBilinear(u, v, _sample);
         return ShaderValue.Vector(_sample[0], _sample[1], _sample[2], _sample[3], 4);
@@ -521,7 +523,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
         level = Math.Clamp(level, 1, 3);
         if (_blurLevel != level)
         {
-            _blurred.CopyFrom(_warped);
+            // Blur the same picture sampler_main currently refers to, so a comp shader blurs the
+            // composited frame instead of the pre-warp one.
+            _blurred.CopyFrom(_samplerMainIsWarped ? _frameCopy : _warped);
             for (var pass = 0; pass < level; pass++)
                 _blurred.Blur();
             _blurLevel = level;

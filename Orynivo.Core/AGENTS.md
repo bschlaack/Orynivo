@@ -53,7 +53,10 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   `VisualizerPreset` parses the numbered `warp_N`/`comp_N` keys with their `_enabled`,
   `_per_frame`, and `_per_pixel` companions, and the preset reader must keep the newlines inside
   a multi-line value because that is how Milkdrop stores shader source. A shader that fails to
-  parse is skipped, never fatal. `PresetRenderer` implements `IShaderSampler` and enforces
+  parse is skipped, never fatal. `VisualizerPreset.ParseSections` splits a `.milk` file at its
+  `[presetNN]` headers, so a file that holds several presets yields several presets; the declared
+  format version is reported but never gates loading, because Milkdrop versions its presets and
+  every version must stay usable. `PresetRenderer` implements `IShaderSampler` and enforces
   `ShaderTimeBudgetMilliseconds`: when a frame's shaders exceed the budget they are skipped until
   the periodic retry, so a heavy preset degrades instead of stalling playback. The interpreter
   walks the tree per pixel, which is the known cost limit; a JIT compiler for shaders is the

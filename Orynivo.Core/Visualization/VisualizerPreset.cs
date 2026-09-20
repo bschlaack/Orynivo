@@ -116,6 +116,44 @@ public sealed class VisualizerPreset
     /// <summary>Gets the enabled <c>comp_N</c> shaders, in preset order.</summary>
     public IReadOnlyList<VisualizerShader> CompShaders { get; }
 
+    /// <summary>
+    /// Gets the preset format version the file declares, or zero when it declares none. Milkdrop
+    /// versions its presets through <c>MILKDROP_PRESET_VERSION</c> or <c>PSVERSION</c>; every
+    /// version is accepted, and the value is only reported for diagnostics.
+    /// </summary>
+    public int Version { get; init; }
+
+    /// <summary>
+    /// Splits preset text into its sections. A Milkdrop <c>.milk</c> file usually holds several
+    /// presets, one per <c>[presetNN]</c> header; text before the first header forms a section of
+    /// its own, so a single-preset file yields exactly one entry.
+    /// </summary>
+    /// <param name="text">Preset file text.</param>
+    /// <returns>The sections in file order, each without its header.</returns>
+    public static IReadOnlyList<string> ParseSections(string? text)
+    {
+        var sections = new List<string>();
+        var current = new System.Text.StringBuilder();
+        foreach (var line in (text ?? string.Empty).Split('\n'))
+        {
+            var trimmed = line.TrimEnd();
+            if (trimmed.StartsWith('[') && trimmed.TrimStart().StartsWith('['))
+            {
+                if (current.ToString().Trim().Length > 0)
+                    sections.Add(current.ToString());
+                current.Clear();
+                continue;
+            }
+
+            current.Append(line).Append('\n');
+        }
+
+        if (current.ToString().Trim().Length > 0)
+            sections.Add(current.ToString());
+
+        return sections;
+    }
+
     /// <summary>Parses preset text.</summary>
     /// <param name="text">INI-style preset text.</param>
     /// <param name="fallbackName">Name used when the text carries none.</param>
@@ -169,7 +207,10 @@ public sealed class VisualizerPreset
             ParseWaves(values, layout),
             ParseDefaults(values),
             ParseShaders(values, layout, "warp"),
-            ParseShaders(values, layout, "comp"));
+            ParseShaders(values, layout, "comp"))
+        {
+            Version = ReadVersion(values)
+        };
     }
 
     /// <summary>Creates a preset from expression text without an INI wrapper, for tests and defaults.</summary>
@@ -347,6 +388,23 @@ public sealed class VisualizerPreset
         }
 
         return waves;
+    }
+
+    /// <summary>Reads the declared preset format version, or zero when the file carries none.</summary>
+    /// <param name="values">Parsed preset values.</param>
+    /// <returns>The declared version.</returns>
+    private static int ReadVersion(Dictionary<string, string> values)
+    {
+        foreach (var key in new[] { "MILKDROP_PRESET_VERSION", "PSVERSION", "preset_version", "version" })
+        {
+            if (values.TryGetValue(key, out var text) &&
+                int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var version))
+            {
+                return version;
+            }
+        }
+
+        return 0;
     }
 
     /// <summary>
