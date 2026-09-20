@@ -490,3 +490,53 @@ overlays, and a composite stage.
 **Tests**: 21 cases for phase 37a; each later phase adds its own.
 
 **Commit**: `feat(visualizer): add the audio analysis foundation`
+
+## 38 MilkDrop preset compatibility
+
+**Goal.** Run real `.milk` presets faithfully instead of only the documented subset. Today
+the engine parses `per_frame`, `per_pixel`, `shape_N_per_frame`, `shape_N_per_point`, and a
+waveform `per_point` program over a small variable set. A real preset additionally uses the
+`*_init` blocks, the complete stage order, the full MilkDrop variable set, four independent
+waveforms, borders, motion vectors, video echo, texture samplers, and `warp_*`/`comp_*`
+HLSL shaders.
+
+**Fidelity.** Phases 38a-38c and 38e bring the shader-free presets to the original's
+behaviour. Only 38d makes shader-carrying presets look right; without a GPU shader pipeline
+that phase is an approximation, not a bit-exact MilkDrop.
+
+**Strategy.** The shader runtime starts as a CPU interpreter for the `ps_2_0` subset the
+presets actually use. It needs no native dependency and can later be swapped for a GPU path
+without changing the preset model. A GPU implementation would require DXC, SPIR-V, and a
+Vulkan/OpenGL compute path, which the Avalonia render surface does not currently expose.
+
+**Licensing.** The engine, the generated noise textures, and every shipped preset stay
+written here. No third-party visualizer code or preset bundle is linked.
+
+**Phases**
+
+- 38a Full pipeline and block set - `Pending`: the `per_frame_init`, `per_pixel_init`,
+  `wave_N_init`, and `shape_N_init` blocks, the complete MilkDrop stage order (per-frame init
+  and update, warp, blur passes, per-pixel, composite, borders, motion vectors, waves, shapes,
+  video echo), and the full variable set (`zoom`, `zoomexp`, `rot`, `cx`, `cy`, `dx`, `dy`,
+  `warp`, `sx`, `sy`, `wave_*`, `ob_*`, `ib_*`, `mv_*`, `echo_*`, `q1`-`q32`, `blur1`-`blur3`,
+  `fDecay`, `fGammaAdj`, `darken_center`, `aspectx`/`aspecty`, `pixelsx`/`pixelsy`,
+  `monitor`, `frame`, `time`, `fps`, and the smoothed `*_att` bands).
+- 38b Waves, borders, motion vectors, video echo - `Pending`: all wave modes including
+  additive, dots, thick, and mystery, per-wave colour and position programs, outer and inner
+  borders, motion-vector grids, and the video-echo stage.
+- 38c Textures and `tex_` blocks - `Pending`: generated `noise_lq`/`noise_mq`/`noise_hq` and
+  `rand00`-`rand15` textures, the `sampler_main`, `sampler_pc_main`, and `sampler_fc_main`
+  sources, `GetBlur1`-`GetBlur3` and `GetPixel`, and the `tex_N_*` block parsing.
+- 38d HLSL `warp_*`/`comp_*` runtime - `Pending`: a CPU interpreter for the `ps_2_0` subset
+  (scalar and `float2`/`float3`/`float4` math, swizzles, `tex2D`, `lerp`, `saturate`, `frac`,
+  `dot`, `mul`, `if`/`for` blocks, and the sampler bindings), the `warp_N_*`/`comp_N_*`
+  sub-keys, and a bounded per-frame cost budget that degrades the resolution instead of
+  stalling playback.
+- 38e `.milk` compatibility and validation - `Pending`: `[presetNN]` sections, version and
+  `nWaveMode` handling, tolerance for the remaining legacy keys, a corpus of real presets as
+  regression fixtures, and the per-preset skip diagnostics.
+
+**Tests**: each phase adds its own; 38d additionally needs a shader-interpreter suite and a
+render comparison against hand-computed reference pixels.
+
+**Commit**: `feat(visualizer): extend the preset engine towards MilkDrop compatibility`
