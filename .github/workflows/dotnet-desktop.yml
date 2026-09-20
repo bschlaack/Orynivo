@@ -19,7 +19,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Verify MCP tool parity
         shell: pwsh
@@ -28,6 +28,10 @@ jobs:
       - name: Verify localization parity
         shell: pwsh
         run: ./scripts/verify-localization-parity.ps1
+
+      - name: Verify GitHub Actions pins
+        shell: pwsh
+        run: ./scripts/verify-github-actions-pins.ps1
 
   build:
     name: Build ${{ matrix.configuration }}
@@ -42,10 +46,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up .NET 8
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 8.0.x
 
@@ -104,7 +108,7 @@ jobs:
 
       - name: Upload Windows build
         if: matrix.configuration == 'Release'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: Orynivo-win-x64
           path: artifacts/Orynivo-win-x64

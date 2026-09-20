@@ -100,6 +100,11 @@ $steps.Add(@{
     Executable = 'pwsh'
     Arguments  = @('-NoProfile', '-File', 'scripts/verify-localization-parity.ps1')
 })
+$steps.Add(@{
+    Name       = 'Verify GitHub Actions pins'
+    Executable = 'pwsh'
+    Arguments  = @('-NoProfile', '-File', 'scripts/verify-github-actions-pins.ps1')
+})
 
 Push-Location $root
 try {
