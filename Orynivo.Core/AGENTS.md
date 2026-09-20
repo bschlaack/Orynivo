@@ -31,7 +31,12 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   `dx`/`dy`, `sx`/`sy`) with the per-pixel block on top, the blur passes, the decay fade, the
   centre darkening, the gamma adjustment, and the overlay. The per-pixel block sees the warped
   position in `x`/`y`, which is a deliberate deviation from Milkdrop offset semantics so the
-  built-in presets keep working; revisit it with the shader runtime in phase 38d.
+  built-in presets keep working; revisit it with the shader runtime in phase 38d. Numeric
+  preset keys are parsed into `VisualizerPreset.Defaults` and applied as the per-frame
+  starting values after the computed seeds, which is how Milkdrop presets carry most of their
+  settings; never drop that step or key-only presets lose their wave, border, and echo
+  parameters. The default wave mode is the single line (3), not the circular mode (0), because
+  every built-in preset and the legacy `per_point` contract assume a line.
 - Keep the project cross-platform `net10.0`; do not introduce Avalonia, Windows,
   DPAPI, WASAPI, ASIO, or other platform-specific dependencies.
 - Put shared library scanning, SQLite persistence, search, streaming models and

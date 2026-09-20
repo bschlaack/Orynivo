@@ -527,9 +527,14 @@ written here. No third-party visualizer code or preset bundle is linked.
   the warped sampling position in `x`/`y`, a documented deviation from Milkdrop offset
   semantics that keeps the built-in presets working until 38d revisits it. Covered by 16
   tests.
-- 38b Waves, borders, motion vectors, video echo - `Pending`: all wave modes including
+- 38b Waves, borders, motion vectors, video echo - `Done`: all wave modes including
   additive, dots, thick, and mystery, per-wave colour and position programs, outer and inner
-  borders, motion-vector grids, and the video-echo stage.
+  borders, motion-vector grids, and the video-echo stage. The circular, doubled, and
+  single-line modes honour dots, thick, additive, mystery, and the wave colour/position keys;
+  the four declared waveform slots are drawn; the outer and inner borders paint coloured
+  frames; the motion-vector grid is derived from the real motion field; and the video echo
+  blends a scaled, optionally flipped copy with its zoom, alpha, and orientation keys. Numeric
+  preset keys now seed the per-frame variables, so key-only presets work. Covered by 11 tests.
 - 38c Textures and `tex_` blocks - `Pending`: generated `noise_lq`/`noise_mq`/`noise_hq` and
   `rand00`-`rand15` textures, the `sampler_main`, `sampler_pc_main`, and `sampler_fc_main`
   sources, `GetBlur1`-`GetBlur3` and `GetPixel`, and the `tex_N_*` block parsing.

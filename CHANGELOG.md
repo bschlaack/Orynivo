@@ -7,6 +7,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -97,6 +106,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.45.0] - 2026-09-20
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -198,6 +216,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.44.0] - 2026-09-20
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -371,6 +398,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.43.1] - 2026-09-18
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -438,6 +474,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.43.0] - 2026-09-18
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -572,6 +617,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.42.0] - 2026-09-17
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -809,6 +863,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.41.7] - 2026-09-11
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -870,6 +933,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.41.5] - 2026-09-09
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -936,6 +1008,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.41.4] - 2026-09-08
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -1101,6 +1182,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.41.0] - 2026-09-05
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -1184,6 +1274,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.40.2] - 2026-09-05
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -1273,6 +1372,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.40.0] - 2026-09-05
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -1368,6 +1476,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.39.0] - 2026-09-04
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -1423,6 +1540,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   ## [0.38.0] - 2026-09-04
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -1499,6 +1625,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.37.4] - 2026-09-04
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -1528,6 +1663,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.37.3] - 2026-09-02
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -1553,6 +1697,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.37.2] - 2026-08-27
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -1609,6 +1762,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.37.1] - 2026-08-27
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -1756,6 +1918,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and are not exposed by the current classic RAOP backend.
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -1808,6 +1979,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.7] - 2026-08-25
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -1862,6 +2042,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.6] - 2026-08-25
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -1979,6 +2168,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.4] - 2026-08-12
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -2084,6 +2282,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.2] - 2026-08-10
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -2118,6 +2325,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.1] - 2026-08-10
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -2173,6 +2389,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.36.0] - 2026-08-10
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -2248,6 +2473,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.35.4] - 2026-08-10
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -2395,6 +2629,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.35.0] - 2026-08-03
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -2499,6 +2742,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.34.0] - 2026-08-02
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -2643,6 +2895,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.33.0] - 2026-08-01
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -2729,6 +2990,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.32.0] - 2026-08-01
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -2820,6 +3090,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.31.0] - 2026-08-01
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -2897,6 +3176,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.30.3] - 2026-07-30
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -2951,6 +3239,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.30.2] - 2026-07-29
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -2986,6 +3283,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.30.1] - 2026-07-28
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -3061,6 +3367,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.30.0] - 2026-07-28
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -3158,6 +3473,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.29.2] - 2026-07-27
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -3263,6 +3587,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.29.0] - 2026-07-26
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -3370,6 +3703,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.28.0] - 2026-07-25
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -3485,6 +3827,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.27.0] - 2026-07-15
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -3539,6 +3890,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.6] - 2026-07-15
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -3595,6 +3955,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.5] - 2026-07-15
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -3650,6 +4019,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.4] - 2026-07-15
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -3703,6 +4081,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.3] - 2026-07-15
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -3761,6 +4148,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.2] - 2026-07-15
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -3855,6 +4251,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.26.0] - 2026-07-15
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -3898,6 +4303,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.25.0] - 2026-07-15
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -4032,6 +4446,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.24.0] - 2026-07-08
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -4165,6 +4588,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.23.3] - 2026-07-05
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -4309,6 +4741,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.23.0] - 2026-07-05
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -4456,6 +4897,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.22.0] - 2026-07-04
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -4628,6 +5078,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.21.0] - 2026-07-04
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -4762,6 +5221,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.20.5] - 2026-07-01
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -4928,6 +5396,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.20.3] - 2026-06-30
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -5082,6 +5559,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.20.0] - 2026-06-29
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -5199,6 +5685,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.18.0] - 2026-06-28
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -5287,6 +5782,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.16.0] - 2026-06-28
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -5509,6 +6013,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.15.0] - 2026-06-27
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -5641,6 +6154,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.14.0] - 2026-06-26
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -5671,6 +6193,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.13.0] - 2026-06-26
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -5713,6 +6244,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.12.0] - 2026-06-26
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -5789,6 +6329,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.11.0] - 2026-06-25
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -5902,6 +6451,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.10.0] - 2026-06-22
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -6025,6 +6583,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.9.0] - 2026-06-21
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -6076,6 +6643,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.8.0] - 2026-06-21
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -6270,6 +6846,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.7.0] - 2026-06-21
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -6395,6 +6980,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.6.0] - 2026-06-19
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -6481,6 +7075,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   New NuGet packages: `Avalonia.Fonts.Inter`, `SkiaSharp`.
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,
@@ -6668,6 +7271,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   automatically.
 
 ### Added
+- Milkdrop preset keys now act as the per-frame starting values: every numeric key (including
+  the `nWaveMode`, `bWaveDots`, `bWaveThick`, `bAdditiveWaves`, `bDarkenCenter`,
+  `bMotionVectors`, and `nMotionVectorsX/Y` spellings) seeds the matching variable, so real
+  presets that carry their settings as keys instead of code work as written.
+- The visualizer draws the full Milkdrop wave and post-processing set: the circular, doubled,
+  and single-line wave modes with dots, thick, additive, mystery, and colour/position keys,
+  the four declared waveform slots, the outer and inner borders, a motion-vector grid derived
+  from the actual motion field, and the video echo with its zoom, alpha, and orientation.
+  Covered by 11 tests.
 - The preset engine now runs the full Milkdrop stage order. It parses the `per_frame_init`,
   `per_pixel_init`, `wave_0`-`wave_3` and `shape_N_init` blocks, registers the complete
   standard variable set (`bass_att`/`mid_att`/`treb_att`, `aspectx`/`aspecty`,

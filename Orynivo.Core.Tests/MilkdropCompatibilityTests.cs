@@ -229,6 +229,102 @@ public sealed class MilkdropCompatibilityTests
         return total / Math.Max(1, left.Length / 4);
     }
 
+    /// <summary>The circular wave modes draw a different picture than the line modes.</summary>
+    [Fact]
+    public void RenderFrame_CircularWaveModeChangesThePicture()
+    {
+        var line = RenderOverlay("wave_mode=3");
+        var circular = RenderOverlay("wave_mode=0");
+
+        Assert.True(MeanDifference(line, circular) > 0.001f);
+    }
+
+    /// <summary>Dots draw fewer pixels than a connected line.</summary>
+    [Fact]
+    public void RenderFrame_WaveDotsDrawLessThanALine()
+    {
+        var line = RenderOverlay(string.Empty);
+        var dots = RenderOverlay("wave_dots=1");
+
+        Assert.True(Mean(dots) < Mean(line));
+    }
+
+    /// <summary>A thick wave covers more rows than a thin one.</summary>
+    [Fact]
+    public void RenderFrame_ThickWaveDrawsMore()
+    {
+        var thin = RenderOverlay(string.Empty);
+        var thick = RenderOverlay("wave_thick=1");
+
+        Assert.True(Mean(thick) > Mean(thin));
+    }
+
+    /// <summary>The doubled modes mirror the wave around its centre.</summary>
+    [Fact]
+    public void RenderFrame_DoubledWaveModeMirrors()
+    {
+        var single = RenderOverlay("wave_mode=3");
+        var doubled = RenderOverlay("wave_mode=2");
+
+        Assert.True(Mean(doubled) > Mean(single));
+    }
+
+    /// <summary>A declared second waveform slot is drawn as well.</summary>
+    [Fact]
+    public void RenderFrame_DrawsDeclaredAdditionalWaves()
+    {
+        var single = RenderOverlay(string.Empty);
+        var twoWaves = RenderOverlay("wave_1_per_point_1=y = y + 0.4;");
+
+        Assert.True(MeanDifference(single, twoWaves) > 0.001f);
+    }
+
+    /// <summary>The outer border paints the frame edges.</summary>
+    [Fact]
+    public void RenderFrame_OuterBorderPaintsTheEdge()
+    {
+        var plain = RenderFeedback(string.Empty);
+        var bordered = RenderFeedback("ob_a=1\nob_r=1\nob_g=0\nob_b=0");
+
+        Assert.True(MeanDifference(plain, bordered) > 0.001f);
+    }
+
+    /// <summary>The inner border is inset, so it leaves the very corner alone.</summary>
+    [Fact]
+    public void RenderFrame_InnerBorderIsInset()
+    {
+        var preset = VisualizerPreset.Parse(
+            "decay = 1;\nper_frame_1=wave_a = 0; ib_a = 1; ib_g = 1; ib_r = 0; ib_b = 0;");
+        var renderer = new PresetRenderer(preset, 40, 40);
+        renderer.RenderFrame(new FakeAudio(), 1d / 60d);
+        renderer.RenderFrame(new FakeAudio(), 1d / 60d);
+
+        var pixels = renderer.Output.Pixels;
+        var corner = Luminance(pixels, (0 * 40) + 0);
+        var inset = Luminance(pixels, (2 * 40) + 2);
+        Assert.True(corner < inset);
+    }
+
+    /// <summary>The video echo blends a scaled copy of the frame back over itself.</summary>
+    [Fact]
+    public void RenderFrame_VideoEchoBlendsAScaledCopy()
+    {
+        var plain = RenderFeedback(string.Empty);
+        var echoed = RenderFeedback("echo_alpha=1\necho_zoom=2");
+
+        Assert.True(MeanDifference(plain, echoed) > 0.001f);
+    }
+
+    /// <summary>Motion vectors are only drawn when their length is set.</summary>
+    [Fact]
+    public void RenderFrame_MotionVectorsDrawWhenEnabled()
+    {
+        var plain = RenderFeedback("mv_l=0");
+        var vectors = RenderFeedback("mv_l=1");
+
+        Assert.True(MeanDifference(plain, vectors) > 0.0005f);
+    }
+
     /// <summary>A deterministic audio source with content on every band.</summary>
     private sealed class FakeAudio : IVisualizerAudioSource
     {

@@ -26,7 +26,8 @@ public sealed class VisualizerPreset
         float waveScale,
         PresetProgram wavePerPoint,
         IReadOnlyList<VisualizerShape> shapes,
-        IReadOnlyList<VisualizerWave> waves)
+        IReadOnlyList<VisualizerWave> waves,
+        IReadOnlyDictionary<string, float> defaults)
     {
         Name = name;
         Layout = layout;
@@ -43,6 +44,7 @@ public sealed class VisualizerPreset
         WavePerPoint = wavePerPoint;
         Shapes = shapes;
         Waves = waves;
+        Defaults = defaults;
     }
 
     /// <summary>Gets the preset name.</summary>
@@ -96,6 +98,14 @@ public sealed class VisualizerPreset
     /// </summary>
     public IReadOnlyList<VisualizerWave> Waves { get; }
 
+    /// <summary>
+    /// Gets the numeric preset keys as per-frame defaults, keyed by variable name. Milkdrop
+    /// presets carry most of their settings as keys such as <c>ob_r</c>, <c>nWaveMode</c>, or
+    /// <c>fVideoEchoAlpha</c>, so every key whose value is a number becomes the starting value
+    /// of the matching variable and the expression blocks can still override it per frame.
+    /// </summary>
+    public IReadOnlyDictionary<string, float> Defaults { get; }
+
     /// <summary>Parses preset text.</summary>
     /// <param name="text">INI-style preset text.</param>
     /// <param name="fallbackName">Name used when the text carries none.</param>
@@ -139,7 +149,8 @@ public sealed class VisualizerPreset
             Math.Clamp(ReadFloat(values, "wave_scale", 0.25f), 0f, 1f),
             PresetCompiler.Compile(Join(values, "per_point"), layout),
             ParseShapes(values, layout),
-            ParseWaves(values, layout));
+            ParseWaves(values, layout),
+            ParseDefaults(values));
     }
 
     /// <summary>Creates a preset from expression text without an INI wrapper, for tests and defaults.</summary>
@@ -166,7 +177,8 @@ public sealed class VisualizerPreset
             0.25f,
             PresetProgram.Empty,
             [],
-            ParseWaves(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase), layout));
+            ParseWaves(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase), layout),
+            new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase));
     }
 
     /// <summary>
@@ -213,6 +225,40 @@ public sealed class VisualizerPreset
         }
 
         return shapes;
+    }
+
+    /// <summary>Maps the Milkdrop key spellings onto the variable names the engine uses.</summary>
+    private static readonly Dictionary<string, string> KeyAliases = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["nWaveMode"] = "wave_mode",
+        ["bWaveDots"] = "wave_dots",
+        ["bWaveThick"] = "wave_thick",
+        ["bAdditiveWaves"] = "wave_additive",
+        ["bWaveBrighten"] = "wave_brighten",
+        ["bDarkenCenter"] = "darken_center",
+        ["bMotionVectors"] = "mv_l",
+        ["nMotionVectorsX"] = "mv_x",
+        ["nMotionVectorsY"] = "mv_y"
+    };
+
+    /// <summary>
+    /// Reads every numeric key as a per-frame default. Expression blocks never parse as a
+    /// number, so they are skipped, and a key without a matching variable is simply unused.
+    /// </summary>
+    /// <param name="values">Parsed preset values.</param>
+    /// <returns>The defaults keyed by variable name.</returns>
+    private static IReadOnlyDictionary<string, float> ParseDefaults(Dictionary<string, string> values)
+    {
+        var defaults = new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, text) in values)
+        {
+            if (!float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+                continue;
+
+            defaults[KeyAliases.TryGetValue(key, out var alias) ? alias : key] = value;
+        }
+
+        return defaults;
     }
 
     /// <summary>

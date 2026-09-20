@@ -44,12 +44,22 @@ public sealed class PresetRenderer : IVisualizerAudioSource
     private bool _initialized;
     private long _frame;
     private double _elapsed;
+    private readonly float[] _motionX = new float[MotionColumns * MotionRows];
+    private readonly float[] _motionY = new float[MotionColumns * MotionRows];
+    private readonly int[] _motionCount = new int[MotionColumns * MotionRows];
     private float _attBass;
     private float _attMid;
     private float _attTreble;
     private float _attVolume;
 
+    /// <summary>Motion-vector grid columns.</summary>
+    private const int MotionColumns = 8;
+
+    /// <summary>Motion-vector grid rows.</summary>
+    private const int MotionRows = 6;
+
     /// <summary>Creates a renderer for one preset.</summary>
+    
     /// <param name="preset">Preset to run.</param>
     /// <param name="width">Render width; the presenter scales the result up.</param>
     /// <param name="height">Render height.</param>
@@ -126,7 +136,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource
             _warped.Blur();
 
         _warped.Scale(decay);
+        ApplyVideoEcho();
         DarkenCenter();
+        DrawBorders();
         ApplyGamma();
         DrawOverlay();
         Composite();
@@ -163,6 +175,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource
         _initialized = false;
         _frame = 0;
         _elapsed = 0;
+        Array.Clear(_motionX);
+        Array.Clear(_motionY);
+        Array.Clear(_motionCount);
         _attBass = _attMid = _attTreble = _attVolume = 0f;
         Bass = Mid = Treble = Volume = 0f;
     }
@@ -214,7 +229,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource
         Write("blur2", 0f);
         Write("blur3", 0f);
         Write("darken_center", 0f);
-        Write("wave_mode", 0f);
+        Write("wave_mode", 3f);
         Write("wave_r", 1f);
         Write("wave_g", 1f);
         Write("wave_b", 1f);
@@ -240,6 +255,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource
         Write("fVideoEchoZoom", 1f);
         Write("fVideoEchoAlpha", 0f);
         Write("nVideoEchoOrientation", 0f);
+        // Preset keys are the per-frame starting values; the per-frame block may still override
+        // them, and they are restored on the next frame just like in Milkdrop.
+        foreach (var (name, value) in Preset.Defaults)
+            Write(name, value);
     }
 
     /// <summary>How many box-blur passes the preset asked for across <c>blur1</c> to <c>blur3</c>.</summary>
@@ -300,6 +319,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource
 
                 var sampleX = Read("x", warpedX);
                 var sampleY = Read("y", warpedY);
+                RecordMotion(normalizedX, normalizedY, sampleX, sampleY);
                 _previous.SampleBilinear((sampleX * 0.5f) + 0.5f, (sampleY * 0.5f) + 0.5f, _sample);
                 var offset = (((y * width) + x) * 4);
                 _warped.Pixels[offset] = _sample[0];
@@ -357,16 +377,33 @@ public sealed class PresetRenderer : IVisualizerAudioSource
     private void DrawOverlay()
     {
         _fresh.Clear();
-        DrawWaveform();
+        DrawWaves();
         DrawSpectrum();
+        DrawMotionVectors();
         DrawShapes();
     }
 
     /// <summary>
-    /// Draws the waveform, honouring the first waveform's per-point program. A preset that
-    /// declares no waveform still gets the default wave.
+    /// Draws the declared Milkdrop waveforms. The first slot is always drawn as the default
+    /// wave; the other three are drawn when a preset declares a program for them. Every wave
+    /// honours the global mode and its own per-point program.
     /// </summary>
-    private void DrawWaveform()
+    private void DrawWaves()
+    {
+        for (var index = 0; index < Preset.Waves.Count; index++)
+        {
+            var wave = Preset.Waves[index];
+            if (index > 0 && wave.Init.IsEmpty && wave.PerFrame.IsEmpty && wave.PerPoint.IsEmpty)
+                continue;
+
+            DrawWave(wave, index);
+        }
+    }
+
+    /// <summary>Draws one waveform with the global mode, colour, and modifiers.</summary>
+    /// <param name="wave">Waveform programs to run.</param>
+    /// <param name="index">Waveform slot, used to offset the default line.</param>
+    private void DrawWave(VisualizerWave wave, int index)
     {
         var waveform = Waveform;
         if (waveform.Length < 2)
@@ -375,25 +412,60 @@ public sealed class PresetRenderer : IVisualizerAudioSource
         var width = _fresh.Width;
         var height = _fresh.Height;
         var alpha = Math.Clamp(Read("wave_a", Preset.WaveAlpha), 0f, 1f);
+        if (alpha <= 0f)
+            return;
+
         var amplitude = height * Preset.WaveScale * 0.5f;
         var centre = height * Read("wave_y", 0.5f);
+        var centreX = Read("wave_x", 0.5f) * (width - 1);
         var red = Math.Clamp(Read("wave_r", 1f), 0f, 1f);
         var green = Math.Clamp(Read("wave_g", 1f), 0f, 1f);
         var blue = Math.Clamp(Read("wave_b", 1f), 0f, 1f);
-        var perPoint = Preset.Waves.Count > 0 ? Preset.Waves[0].PerPoint : Preset.WavePerPoint;
-        if (perPoint.IsEmpty && !Preset.WavePerPoint.IsEmpty)
+        var mystery = Read("wave_mystery", 0f);
+        var mode = (int)Math.Clamp(Read("wave_mode", 3f), 0f, 7f);
+        var circular = mode <= 1;
+        var doubled = mode is 2 or 6 or 7;
+        var dots = Read("wave_dots", 0f) >= 0.5f;
+        var thick = Read("wave_thick", 0f) >= 0.5f;
+        var additive = Read("wave_additive", 1f) >= 0.5f;
+        var perPoint = wave.PerPoint;
+        if (perPoint.IsEmpty && index == 0)
             perPoint = Preset.WavePerPoint;
 
+        // The default line of the second slot sits slightly lower so two slots stay visible.
+        var lineOffset = index == 0 ? 0f : (index - 1.5f) * height * 0.06f;
+        var radius = height * 0.35f;
         for (var column = 0; column < width; column++)
         {
             var t = width > 1 ? column / (float)(width - 1) : 0f;
             var point = (int)((long)column * (waveform.Length - 1) / Math.Max(1, width - 1));
             var sample = Math.Clamp(waveform[point], -1f, 1f);
 
-            var normalizedX = (t * 2f) - 1f;
-            var normalizedY = sample;
+            float x;
+            float y;
+            if (circular)
+            {
+                var angle = (t * 2f * MathF.PI) + mystery;
+                var currentRadius = radius + (sample * amplitude * 0.6f);
+                x = (width * 0.5f) + (MathF.Cos(angle) * currentRadius);
+                y = (height * 0.5f) + (MathF.Sin(angle) * currentRadius);
+            }
+            else
+            {
+                x = (t * (width - 1)) + ((centreX - ((width - 1) * 0.5f)) * 0.5f);
+                y = centre + (sample * amplitude) + lineOffset + (mystery * amplitude);
+            }
+
             if (!perPoint.IsEmpty)
             {
+                // A line wave keeps the documented sample-unit mapping, so y = -1 still means
+                // the top of the wave band; the circular modes work in frame coordinates.
+                var normalizedX = circular
+                    ? ((x / Math.Max(1f, width - 1)) * 2f) - 1f
+                    : (t * 2f) - 1f;
+                var normalizedY = circular
+                    ? ((y / Math.Max(1f, height - 1)) * 2f) - 1f
+                    : sample;
                 Write("t", t);
                 Write("i", column);
                 Write("sample", sample);
@@ -402,12 +474,195 @@ public sealed class PresetRenderer : IVisualizerAudioSource
                 perPoint.Execute(_slots);
                 normalizedX = Read("x", normalizedX);
                 normalizedY = Read("y", normalizedY);
+                if (circular)
+                {
+                    x = (normalizedX * 0.5f + 0.5f) * (width - 1);
+                    y = (normalizedY * 0.5f + 0.5f) * (height - 1);
+                }
+                else
+                {
+                    x = (normalizedX * 0.5f + 0.5f) * (width - 1);
+                    y = centre + (normalizedY * amplitude) + lineOffset + (mystery * amplitude);
+                }
             }
 
-            var x = (int)Math.Clamp((normalizedX * 0.5f + 0.5f) * (width - 1), 0f, width - 1);
-            var y = (int)Math.Clamp(centre + (normalizedY * amplitude), 0f, height - 1);
-            _fresh.AddPixel(x, y, alpha * red * 0.35f, alpha * green, alpha * blue);
-            _fresh.AddPixel(x, y + 1, alpha * red * 0.15f, alpha * green * 0.4f, alpha * blue * 0.5f);
+            var pixelX = (int)Math.Clamp(x, 0f, width - 1);
+            var pixelY = (int)Math.Clamp(y, 0f, height - 1);
+            if (dots)
+            {
+                PaintPixel(pixelX, pixelY, red, green, blue, alpha, additive);
+                if (thick)
+                    PaintPixel(pixelX, pixelY + 1, red, green, blue, alpha * 0.6f, additive);
+                continue;
+            }
+
+            PaintPixel(pixelX, pixelY, red, green, blue, alpha, additive);
+            PaintPixel(pixelX, pixelY + 1, red, green, blue, alpha * 0.45f, additive);
+            if (thick)
+            {
+                PaintPixel(pixelX, pixelY + 2, red, green, blue, alpha * 0.8f, additive);
+                PaintPixel(pixelX, pixelY + 3, red, green, blue, alpha * 0.5f, additive);
+            }
+
+            if (doubled)
+                PaintPixel(pixelX, (int)Math.Clamp((2 * centre) - pixelY, 0f, height - 1), red, green, blue, alpha, additive);
+        }
+    }
+
+    /// <summary>Records the motion field into the grid the motion-vector overlay draws.</summary>
+    /// <param name="pixelX">Pixel position in the range -1 to 1.</param>
+    /// <param name="pixelY">Pixel row in the range -1 to 1.</param>
+    /// <param name="sampleX">Sampled position in the range -1 to 1.</param>
+    /// <param name="sampleY">Sampled row in the range -1 to 1.</param>
+    private void RecordMotion(float pixelX, float pixelY, float sampleX, float sampleY)
+    {
+        var column = (int)Math.Clamp((pixelX * 0.5f + 0.5f) * (MotionColumns - 1), 0f, MotionColumns - 1);
+        var row = (int)Math.Clamp((pixelY * 0.5f + 0.5f) * (MotionRows - 1), 0f, MotionRows - 1);
+        var cell = (row * MotionColumns) + column;
+        _motionX[cell] += sampleX - pixelX;
+        _motionY[cell] += sampleY - pixelY;
+        _motionCount[cell]++;
+    }
+
+    /// <summary>Draws the recorded motion field as a grid of vectors.</summary>
+    private void DrawMotionVectors()
+    {
+        var length = Math.Clamp(Read("mv_l", 0f), 0f, 1f);
+        if (length <= 0f)
+            return;
+
+        var width = _fresh.Width;
+        var height = _fresh.Height;
+        for (var row = 0; row < MotionRows; row++)
+        {
+            for (var column = 0; column < MotionColumns; column++)
+            {
+                var cell = (row * MotionColumns) + column;
+                if (_motionCount[cell] == 0)
+                    continue;
+
+                var fromX = (column + 0.5f) / MotionColumns * (width - 1);
+                var fromY = (row + 0.5f) / MotionRows * (height - 1);
+                var deltaX = _motionX[cell] / _motionCount[cell] * width * length;
+                var deltaY = _motionY[cell] / _motionCount[cell] * height * length;
+                var steps = Math.Max(2, (int)MathF.Abs(deltaX));
+                for (var step = 0; step <= steps; step++)
+                {
+                    var t = step / (float)steps;
+                    PaintPixel(
+                        (int)Math.Clamp(fromX + (deltaX * t), 0f, width - 1),
+                        (int)Math.Clamp(fromY + (deltaY * t), 0f, height - 1),
+                        1f,
+                        1f,
+                        1f,
+                        length * 0.5f,
+                        additive: true);
+                }
+            }
+        }
+    }
+
+    /// <summary>Draws the outer and inner Milkdrop borders over the warped frame.</summary>
+    private void DrawBorders()
+    {
+        DrawBorderFrame(0f, 0.02f);
+        DrawBorderFrame(0.06f, 0.02f);
+    }
+
+    /// <summary>Draws one border frame with its own colour keys.</summary>
+    /// <param name="inset">Inset as a fraction of the smaller dimension.</param>
+    /// <param name="thickness">Frame thickness as a fraction of the smaller dimension.</param>
+    private void DrawBorderFrame(float inset, float thickness)
+    {
+        var prefix = inset > 0f ? "ib_" : "ob_";
+        var alpha = Math.Clamp(Read(prefix + "a", 0f), 0f, 1f);
+        if (alpha <= 0f)
+            return;
+
+        var red = Math.Clamp(Read(prefix + "r", 1f), 0f, 1f);
+        var green = Math.Clamp(Read(prefix + "g", 1f), 0f, 1f);
+        var blue = Math.Clamp(Read(prefix + "b", 1f), 0f, 1f);
+        var width = _warped.Width;
+        var height = _warped.Height;
+        var band = Math.Max(1, (int)(Math.Min(width, height) * thickness));
+        var margin = (int)(Math.Min(width, height) * inset);
+        for (var offset = 0; offset < band; offset++)
+        {
+            var left = margin + offset;
+            var top = margin + offset;
+            var right = width - 1 - margin - offset;
+            var bottom = height - 1 - margin - offset;
+            if (left > right || top > bottom)
+                break;
+
+            for (var x = left; x <= right; x++)
+            {
+                PaintWarped(x, top, red, green, blue, alpha);
+                PaintWarped(x, bottom, red, green, blue, alpha);
+            }
+
+            for (var y = top; y <= bottom; y++)
+            {
+                PaintWarped(left, y, red, green, blue, alpha);
+                PaintWarped(right, y, red, green, blue, alpha);
+            }
+        }
+    }
+
+    /// <summary>Blends one pixel into the warped frame.</summary>
+    private void PaintWarped(int x, int y, float red, float green, float blue, float alpha)
+    {
+        if (x < 0 || y < 0 || x >= _warped.Width || y >= _warped.Height)
+            return;
+
+        var offset = (((y * _warped.Width) + x) * 4);
+        _warped.Pixels[offset] = Math.Clamp((_warped.Pixels[offset] * (1f - alpha)) + (red * alpha), 0f, 1f);
+        _warped.Pixels[offset + 1] = Math.Clamp((_warped.Pixels[offset + 1] * (1f - alpha)) + (green * alpha), 0f, 1f);
+        _warped.Pixels[offset + 2] = Math.Clamp((_warped.Pixels[offset + 2] * (1f - alpha)) + (blue * alpha), 0f, 1f);
+    }
+
+    /// <summary>
+    /// Blends a scaled and optionally flipped copy of the frame back over itself. This is the
+    /// Milkdrop video-echo stage, driven by the <c>echo_*</c> keys.
+    /// </summary>
+    private void ApplyVideoEcho()
+    {
+        var alpha = Math.Clamp(Read("echo_alpha", Read("fVideoEchoAlpha", 0f)), 0f, 1f);
+        if (alpha <= 0f)
+            return;
+
+        var zoom = Math.Clamp(Read("echo_zoom", Read("fVideoEchoZoom", 1f)), 0.1f, 4f);
+        var orientation = (int)Math.Clamp(
+            Read("echo_orient", Read("nVideoEchoOrientation", 0f)),
+            0f,
+            3f);
+        var width = _warped.Width;
+        var height = _warped.Height;
+        _fresh.CopyFrom(_warped);
+        var source = _fresh.Pixels;
+        var target = _warped.Pixels;
+        for (var y = 0; y < height; y++)
+        {
+            var v = (y + 0.5f) / height;
+            for (var x = 0; x < width; x++)
+            {
+                var u = (x + 0.5f) / width;
+                var sampleU = ((u - 0.5f) / zoom) + 0.5f;
+                var sampleV = ((v - 0.5f) / zoom) + 0.5f;
+                if (orientation is 1 or 3)
+                    sampleU = 1f - sampleU;
+                if (orientation is 2 or 3)
+                    sampleV = 1f - sampleV;
+
+                if (sampleU < 0f || sampleU > 1f || sampleV < 0f || sampleV > 1f)
+                    continue;
+
+                _fresh.SampleBilinear(sampleU, sampleV, _sample);
+                var offset = (((y * width) + x) * 4);
+                target[offset] = Math.Clamp((target[offset] * (1f - alpha)) + (_sample[0] * alpha), 0f, 1f);
+                target[offset + 1] = Math.Clamp((target[offset + 1] * (1f - alpha)) + (_sample[1] * alpha), 0f, 1f);
+                target[offset + 2] = Math.Clamp((target[offset + 2] * (1f - alpha)) + (_sample[2] * alpha), 0f, 1f);
+            }
         }
     }
 
