@@ -236,6 +236,16 @@ public sealed record OrynivoFullSearchResult(
 /// <param name="FetchedAt">Unix-seconds timestamp of the last lyrics lookup, or <see langword="null"/>.</param>
 public sealed record OrynivoLyrics(string? PlainLyrics, string? SyncedLyrics, long? FetchedAt = null);
 
+/// <summary>
+/// Profile-scoped last playback position of a remote track, used to resume it on
+/// another device.
+/// </summary>
+/// <param name="PositionSeconds">
+/// Stored position in seconds, or <see langword="null"/> when the track was never
+/// played on another device.
+/// </param>
+public sealed record TrackPositionDto(double? PositionSeconds);
+
 /// <summary>Compact waveform peak data returned by a remote Orynivo Server.</summary>
 /// <param name="Version">Cache format version.</param>
 /// <param name="DurationSeconds">Logical track duration in seconds.</param>
@@ -1409,6 +1419,65 @@ public sealed class OrynivoServerClient : IDisposable
                 BuildUrl(server, $"/api/tracks/{trackId}/rating"))
             {
                 Content = JsonContent.Create(update, options: JsonOptions)
+            };
+            request.Headers.Add("X-Api-Key", server.ApiKey);
+            AddProfileHeader(request, server);
+            using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            return response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Reads the profile-scoped last playback position another device stored for a
+    /// remote track.
+    /// </summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="trackId">Server-side track identifier.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The stored position in seconds, or <see langword="null"/> when none exists.</returns>
+    public async Task<double?> GetTrackPositionAsync(
+        OrynivoServerSettings server,
+        long trackId,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var dto = await GetJsonAsync<TrackPositionDto>(
+                server, $"/api/tracks/{trackId}/position", cancellationToken).ConfigureAwait(false);
+            var position = dto?.PositionSeconds;
+            return position is double value && !double.IsNaN(value) && value > 0 ? value : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Stores the profile-scoped last playback position for a remote track.</summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="trackId">Server-side track identifier.</param>
+    /// <param name="positionSeconds">Position in seconds; zero clears the stored entry.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when the update was accepted.</returns>
+    public async Task<bool> SaveTrackPositionAsync(
+        OrynivoServerSettings server,
+        long trackId,
+        double positionSeconds,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(
+                HttpMethod.Put,
+                BuildUrl(server, $"/api/tracks/{trackId}/position"))
+            {
+                Content = JsonContent.Create(
+                    new { positionSeconds = Math.Max(0, positionSeconds) },
+                    options: JsonOptions)
             };
             request.Headers.Add("X-Api-Key", server.ApiKey);
             AddProfileHeader(request, server);

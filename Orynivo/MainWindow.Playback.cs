@@ -325,6 +325,8 @@ public partial class MainWindow : Window
             }
         }
         _lastPodcastProgressSave = DateTimeOffset.UtcNow;
+        if (podcastPlayback is null && _currentOrynivoTrackRow is { } remoteResumeRow)
+            _ = OfferRemoteResumeAsync(remoteResumeRow, initialPosition.TotalSeconds);
         PlayButton.IsEnabled   = false;
         PlayButton.IsEnabled   = true;
         SetPlayPauseIcon(isPlaying: true);

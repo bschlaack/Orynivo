@@ -147,6 +147,7 @@ public partial class MainWindow : Window
         }
         UpdateActiveLyric(_player.Position);
         _karaokeWindow?.UpdatePosition(_player.Position);
+        PublishRemoteTrackPosition(_player.Position);
         EnsureInfiniteMixQueue();
         MaybeStartNonGaplessFadeTransition(visiblePosition);
     }

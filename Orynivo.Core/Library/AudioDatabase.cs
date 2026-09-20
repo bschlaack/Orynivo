@@ -2673,6 +2673,61 @@ public sealed class AudioDatabase : IDisposable
         profile.ExecuteNonQuery();
     }
 
+    /// <summary>
+    /// Stores the last playback position of one track for the active profile so
+    /// another device can resume it. Values at or below zero clear the entry.
+    /// </summary>
+    /// <param name="trackId">Database track identifier.</param>
+    /// <param name="positionSeconds">Position in seconds.</param>
+    public void SaveProfileTrackPosition(long trackId, double positionSeconds)
+    {
+        if (double.IsNaN(positionSeconds) || double.IsInfinity(positionSeconds) || positionSeconds <= 0)
+        {
+            ClearProfileTrackPosition(trackId);
+            return;
+        }
+
+        using var command = _conn.CreateCommand();
+        command.CommandText = """
+            INSERT INTO profile_track_position(profile_id, track_id, position_seconds, updated_at)
+            VALUES ($profile, $id, $position, $updated)
+            ON CONFLICT(profile_id, track_id) DO UPDATE SET
+                position_seconds = excluded.position_seconds,
+                updated_at = excluded.updated_at;
+            """;
+        Add(command, "$profile", ActiveProfileId);
+        Add(command, "$id", trackId);
+        Add(command, "$position", positionSeconds);
+        Add(command, "$updated", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        command.ExecuteNonQuery();
+    }
+
+    /// <summary>Removes the stored playback position of one track for the active profile.</summary>
+    /// <param name="trackId">Database track identifier.</param>
+    public void ClearProfileTrackPosition(long trackId)
+    {
+        using var command = _conn.CreateCommand();
+        command.CommandText =
+            "DELETE FROM profile_track_position WHERE profile_id = $profile AND track_id = $id;";
+        Add(command, "$profile", ActiveProfileId);
+        Add(command, "$id", trackId);
+        command.ExecuteNonQuery();
+    }
+
+    /// <summary>Returns the stored playback position of one track for the active profile.</summary>
+    /// <param name="trackId">Database track identifier.</param>
+    /// <returns>The stored position in seconds, or <see langword="null"/> when none exists.</returns>
+    public double? GetProfileTrackPosition(long trackId)
+    {
+        using var command = _conn.CreateCommand();
+        command.CommandText =
+            "SELECT position_seconds FROM profile_track_position WHERE profile_id = $profile AND track_id = $id;";
+        Add(command, "$profile", ActiveProfileId);
+        Add(command, "$id", trackId);
+        var value = command.ExecuteScalar();
+        return value is null or DBNull ? null : Convert.ToDouble(value);
+    }
+
     /// <summary>Stores a personal favorite state for several tracks in one transaction.</summary>
     /// <param name="trackIds">Database track identifiers.</param>
     /// <param name="value">Requested favorite state.</param>
@@ -3417,6 +3472,15 @@ public sealed class AudioDatabase : IDisposable
                 is_favorite INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY(profile_id, album_id)
             );
+
+            CREATE TABLE IF NOT EXISTS profile_track_position (
+                profile_id TEXT NOT NULL,
+                track_id INTEGER NOT NULL REFERENCES tracks(id) ON DELETE CASCADE,
+                position_seconds REAL NOT NULL DEFAULT 0,
+                updated_at INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY(profile_id, track_id)
+            );
+
 
             CREATE TABLE IF NOT EXISTS play_history (
                 id               INTEGER PRIMARY KEY AUTOINCREMENT,

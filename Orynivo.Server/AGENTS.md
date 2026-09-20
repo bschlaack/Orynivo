@@ -97,6 +97,10 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
   runtime dependency.
 - Linux service data belongs under `ORYNIVO_DATA_DIR=/var/lib/orynivo-server`.
   Do not fall back to the service user's non-writable home directory.
+- `GET`/`PUT /api/tracks/{id}/position` store the cross-device resume position of a
+  track. They are profile-scoped through `AudioDatabase.ActiveProfileId` (set by
+  `ProfileContextMiddleware`), reject invalid positions with 400, and store only a
+  position and timestamp - never a stream URL, API key, or any other credential.
 - `BackupScheduleService` is the optional automatic server-side library backup. It
   must reuse the shared `Orynivo.Library.BackupRetention` decisions, derive its last
   run from the newest archive in the target folder (never persist extra state),

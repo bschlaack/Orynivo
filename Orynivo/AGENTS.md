@@ -468,6 +468,14 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   or an error message (`Orynivo.Library.BackupUploader`). The scheduled and
   **Back up now** paths share `MainWindow.TryUploadBackupAsync`; the explicit
   **Export library** action still writes only the user-chosen local ZIP.
+- Cross-device resume for remote Orynivo Server tracks lives in
+  `MainWindow.CrossDeviceResume.cs`. The last audible position is published at
+  most every 20 seconds and only through the authenticated, profile-scoped
+  `SaveTrackPositionAsync`, and the **Resume** transport action appears only when
+  the pure, tested `Orynivo.Library.CrossDeviceResume.ShouldOffer` accepts the
+  stored position. Never persist a credential-bearing stream URL for this, never
+  block playback on a publish or fetch failure, and clear the prompt when the
+  now-playing remote row changes.
 - Optional UI motion is governed by `AppSettings.ReduceMotion` through the pure,
   tested `Orynivo.Controls.MotionPreferences` helper. The Genre Cloud, the
   Dashboard cover stage, and `KaraokeWindow` must ask that helper instead of

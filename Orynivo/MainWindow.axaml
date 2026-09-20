@@ -3671,6 +3671,17 @@
                                     </Canvas>
                                 </Viewbox>
                             </Button>
+                            <Button x:Name="ResumePositionButton"
+                                    Theme="{StaticResource TransportBtnTheme}"
+                                    Margin="6,0,0,0"
+                                    IsVisible="False"
+                                    AutomationProperties.Name="{DynamicResource L_ResumeOnThisDevice}"
+                                    ToolTip.Tip="{DynamicResource L_ResumeOnThisDevice}"
+                                    Click="ResumePositionButton_OnClick">
+                                <Path Width="15" Height="15" Stretch="Uniform"
+                                      Data="{StaticResource IconPlay}"
+                                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                            </Button>
                         </StackPanel>
                     </Grid>
                     <Grid Grid.Row="1">

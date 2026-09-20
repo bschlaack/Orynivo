@@ -421,6 +421,8 @@ works directly in FFmpeg and browser URLs.
 | `POST /api/scan` | Trigger a full library scan |
 | `POST /api/scan/metadata` | Re-read metadata from every supported file, including timestamp-unchanged files |
 | `GET /api/library/backup` | Download a versioned ZIP backup of the server library and artwork caches |
+| `GET /api/tracks/{id}/position` | Read the profile-scoped cross-device resume position of a track |
+| `PUT /api/tracks/{id}/position` | Store the profile-scoped cross-device resume position of a track |
 | `PUT /api/library/backup` | Validate and restore a server library backup (maximum 2 GiB) |
 | `GET /api/scan` | Scan status with current root, processed/total counts, current file, last result, errors, and `LibraryChangedAt` for client cache invalidation |
 | `GET /api/artists` | All artists (id, name, favorite, biography/image flags) |
@@ -1679,6 +1681,14 @@ collection. Only plain `http`/`https` URLs without embedded credentials are
 accepted, the optional password is stored in the encrypted per-user credential
 store and never written to `settings.json`, and a failed upload leaves the local
 archive in place.
+
+## Cross-device resume
+
+Remote Orynivo Server tracks remember where you stopped. The client publishes the
+audible position at most every 20 seconds to the authenticated, profile-scoped
+`/api/tracks/{id}/position` endpoint, and starting that track on another device
+offers a **Resume** transport action when the stored position is meaningfully
+ahead. Only a position and timestamp are stored, never a stream URL or API key.
 
 ## Accessibility
 

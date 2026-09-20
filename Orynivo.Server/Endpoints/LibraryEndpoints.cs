@@ -288,6 +288,31 @@ public static class LibraryEndpoints
             return updated ? Results.Ok() : Results.NotFound();
         });
 
+        // Cross-device resume: the last playback position of a track, scoped to the
+        // authenticated profile so another device can continue where this one stopped.
+        api.MapGet("/tracks/{trackId:long}/position", (long trackId) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            if (db.GetTrackById(trackId) is null)
+                return Results.NotFound();
+            return Results.Ok(new TrackPositionDto(db.GetProfileTrackPosition(trackId)));
+        });
+
+        api.MapPut("/tracks/{trackId:long}/position", (long trackId, TrackPositionUpdateRequest request) =>
+        {
+            if (request.PositionSeconds is double position &&
+                (double.IsNaN(position) || double.IsInfinity(position) || position < 0))
+            {
+                return Results.BadRequest();
+            }
+
+            using var db = AudioDatabase.OpenDefault();
+            if (db.GetTrackById(trackId) is null)
+                return Results.NotFound();
+            db.SaveProfileTrackPosition(trackId, request.PositionSeconds ?? 0);
+            return Results.Ok();
+        });
+
         api.MapPut("/tracks/{trackId:long}/rating", (long trackId, TrackRatingUpdateRequest request) =>
         {
             using var db = AudioDatabase.OpenDefault();
@@ -959,6 +984,19 @@ public sealed record ArtistRenameResponse(ArtistRenameResult? Result, object? Ma
 public sealed record TrackLyricsUpdateRequest(
     string? PlainLyrics,
     string? SyncedLyrics);
+
+/// <summary>Response body for the profile-scoped cross-device playback position.</summary>
+/// <param name="PositionSeconds">
+/// Stored position in seconds, or <see langword="null"/> when the track was never
+/// played on another device.
+/// </param>
+public sealed record TrackPositionDto(double? PositionSeconds);
+
+/// <summary>Request body for storing a profile-scoped cross-device playback position.</summary>
+/// <param name="PositionSeconds">
+/// Position in seconds; zero or negative clears the stored entry.
+/// </param>
+public sealed record TrackPositionUpdateRequest(double? PositionSeconds);
 
 /// <summary>Request body for personal and cached MusicBrainz track ratings.</summary>
 /// <param name="UserRating">Optional personal zero-to-five-star rating.</param>

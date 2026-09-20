@@ -234,7 +234,7 @@ Steps:
 
 **Commit**: `feat(a11y): add reduce motion and keyboard navigation`
 
-## 27. Resume a track across devices — `Todo`
+## 27. Resume a track across devices — `Done`
 
 **Design**
 
