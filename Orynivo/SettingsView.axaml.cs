@@ -212,6 +212,7 @@ internal partial class SettingsView : UserControl
         PcmOutputBoostCheckBox.IsChecked = settings.PcmOutputBoostEnabled;
         _visualizerPresetDirectory = settings.VisualizerPresetDirectory ?? string.Empty;
         UpdateVisualizerPresetFolder();
+        VisualizerAlwaysShowOverlayCheckBox.IsChecked = settings.VisualizerAlwaysShowOverlay;
         var visualizerResolutionChoices = new[]
         {
             new SettingChoice<VisualizerResolution>(new VisualizerResolution(1280, 720), "1280 × 720"),
@@ -581,6 +582,9 @@ internal partial class SettingsView : UserControl
 
     /// <summary>Gets the configured visualizer preset folder, or an empty string for the default.</summary>
     public string VisualizerPresetDirectoryValue => _visualizerPresetDirectory;
+
+    /// <summary>Gets a value indicating whether the visualizer always shows its overlay.</summary>
+    public bool VisualizerAlwaysShowOverlay => VisualizerAlwaysShowOverlayCheckBox.IsChecked == true;
 
     /// <summary>Gets the configured visualizer frame width in pixels.</summary>
     public int VisualizerRenderWidthValue =>

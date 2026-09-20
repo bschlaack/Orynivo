@@ -99,6 +99,7 @@ public partial class MainWindow : Window
                 _settings.VisualizerRenderHeight,
                 _settings.VisualizerFrameRate,
                 _settings.ReduceMotion,
+                _settings.VisualizerAlwaysShowOverlay,
                 _settings.VisualizerPresetDirectory),
             new VisualizerTransport(
                 Previous: () => PreviousButton_OnClick(this, new RoutedEventArgs()),

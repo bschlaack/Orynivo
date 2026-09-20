@@ -76,6 +76,13 @@ public sealed class AppSettings
     /// </summary>
     public string VisualizerPresetDirectory { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Gets or sets a value indicating whether the visualizer always shows its title, hint,
+    /// and playback buttons. When <see langword="false"/> they appear only while the mouse
+    /// moves over the visualizer window.
+    /// </summary>
+    public bool VisualizerAlwaysShowOverlay { get; set; } = true;
+
     /// <summary>Gets or sets the width in pixels the visualizer renders at before scaling up.</summary>
     public int VisualizerRenderWidth { get; set; } = 480;
 

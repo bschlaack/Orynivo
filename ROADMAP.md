@@ -483,7 +483,9 @@ overlays, and a composite stage.
   and artist at the top and previous, play/pause, and next buttons at the bottom left, wired
   to the normal transport methods. A **Visualisierung** settings section now exposes the
   render resolution, the frame rate, and the user preset folder; the overlay buttons are not
-  focusable so the arrow keys no longer leave a focus ring on them.
+  focusable so the arrow keys no longer leave a focus ring on them. An **Always show text and
+  controls** toggle switches between a permanent overlay and one that follows mouse movement
+  over the window only.
 
 **Tests**: 21 cases for phase 37a; each later phase adds its own.
 

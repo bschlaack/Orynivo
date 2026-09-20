@@ -774,6 +774,16 @@
                                TextWrapping="Wrap"
                                Margin="0,0,0,10"/>
 
+                    <CheckBox x:Name="VisualizerAlwaysShowOverlayCheckBox"
+                              Theme="{StaticResource SettingsToggleTheme}"
+                              Content="{DynamicResource L_VisualizerOverlayAlways}"
+                              Margin="0,0,0,6"/>
+                    <TextBlock Text="{DynamicResource L_VisualizerOverlayAlwaysHint}"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,10"/>
+
                     <TextBlock Text="{DynamicResource L_VisualizerResolution}"
                                FontSize="{DynamicResource FontSizeCaption}"
                                Foreground="{DynamicResource AppMutedTextBrush}"

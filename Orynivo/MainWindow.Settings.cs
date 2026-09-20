@@ -795,6 +795,7 @@ public partial class MainWindow : Window
             _settings.PcmOutputBoostEnabled = window.PcmOutputBoostEnabled;
             _settings.MaxOutputSampleRateHz  = window.MaxOutputSampleRateHz;
             _settings.VisualizerPresetDirectory = window.VisualizerPresetDirectoryValue;
+            _settings.VisualizerAlwaysShowOverlay = window.VisualizerAlwaysShowOverlay;
             _settings.VisualizerRenderWidth = window.VisualizerRenderWidthValue;
             _settings.VisualizerRenderHeight = window.VisualizerRenderHeightValue;
             _settings.VisualizerFrameRate = window.VisualizerFrameRateValue;

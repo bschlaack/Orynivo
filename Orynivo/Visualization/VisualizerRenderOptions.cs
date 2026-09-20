@@ -10,6 +10,10 @@ namespace Orynivo.Visualization;
 /// <param name="ReduceMotion">
 /// When <see langword="true"/> the picture shows a static spectrum instead of animating.
 /// </param>
+/// <param name="AlwaysShowOverlay">
+/// When <see langword="true"/> the title, hint, and playback buttons are always visible;
+/// otherwise they appear only while the mouse moves over the visualizer.
+/// </param>
 /// <param name="PresetDirectory">
 /// Folder to load user presets from, or <see langword="null"/> for the default folder.
 /// </param>
@@ -18,6 +22,7 @@ public sealed record VisualizerRenderOptions(
     int Height,
     int FrameRate,
     bool ReduceMotion,
+    bool AlwaysShowOverlay,
     string? PresetDirectory);
 
 /// <summary>A selectable visualizer frame size.</summary>

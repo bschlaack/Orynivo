@@ -22,9 +22,12 @@ namespace Orynivo;
 public partial class VisualizerWindow : Window
 {
     private static readonly TimeSpan ReducedMotionInterval = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan OverlayIdleTimeout = TimeSpan.FromSeconds(3);
     private readonly int _renderWidth;
     private readonly int _renderHeight;
     private readonly TimeSpan _frameInterval;
+    private readonly bool _alwaysShowOverlay;
+    private DateTimeOffset _lastPointerActivity = DateTimeOffset.MinValue;
 
     private readonly DispatcherTimer _timer;
     private readonly WriteableBitmap _bitmap;
@@ -39,7 +42,7 @@ public partial class VisualizerWindow : Window
 
     /// <summary>Initializes the window for the Avalonia designer.</summary>
     public VisualizerWindow()
-        : this(0, new VisualizerRenderOptions(480, 270, 30, false, null))
+        : this(0, new VisualizerRenderOptions(480, 270, 30, false, true, null))
     {
     }
 
@@ -68,6 +71,7 @@ public partial class VisualizerWindow : Window
             PixelFormat.Bgra8888,
             AlphaFormat.Premul);
         ReduceMotion = options.ReduceMotion;
+        _alwaysShowOverlay = options.AlwaysShowOverlay;
 
         InitializeComponent();
         VisualizerImage.Source = _bitmap;
@@ -93,12 +97,21 @@ public partial class VisualizerWindow : Window
             VisualizerAudioHub.Shared.Clear();
         };
         KeyDown += OnKeyDown;
+        OverlayRoot.IsVisible = _alwaysShowOverlay;
+        if (!_alwaysShowOverlay)
+        {
+            // PointerMoved only fires while the pointer is over this window, so moving the
+            // mouse on another monitor never reveals the overlay.
+            PointerMoved += (_, _) => ShowOverlay();
+            PointerExited += (_, _) => _lastPointerActivity = DateTimeOffset.MinValue;
+        }
         PointerPressed += (_, e) =>
         {
             // A click on one of the overlay buttons must not also switch the preset.
             if (e.Source is Visual source && source.GetVisualAncestors().OfType<Button>().Any())
                 return;
             SelectPreset(_presetIndex + 1);
+            ShowOverlay();
         };
     }
 
@@ -182,6 +195,7 @@ public partial class VisualizerWindow : Window
 
         Present();
         UpdatePlayPauseIcon();
+        UpdateOverlayVisibility();
         if (_transport is { } transport)
         {
             var nowPlaying = transport.NowPlaying();
@@ -247,6 +261,23 @@ public partial class VisualizerWindow : Window
         // Writing the bitmap is not enough on its own: the image has to be invalidated so
         // the freshly written frame is actually painted.
         VisualizerImage.InvalidateVisual();
+    }
+
+    /// <summary>Reveals the overlay after pointer activity and restarts its idle timeout.</summary>
+    private void ShowOverlay()
+    {
+        _lastPointerActivity = DateTimeOffset.UtcNow;
+        if (!OverlayRoot.IsVisible)
+            OverlayRoot.IsVisible = true;
+    }
+
+    /// <summary>Hides the overlay again once the pointer has been idle for a while.</summary>
+    private void UpdateOverlayVisibility()
+    {
+        if (_alwaysShowOverlay || !OverlayRoot.IsVisible)
+            return;
+        if (DateTimeOffset.UtcNow - _lastPointerActivity > OverlayIdleTimeout)
+            OverlayRoot.IsVisible = false;
     }
 
     private void PreviousTrackButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) =>

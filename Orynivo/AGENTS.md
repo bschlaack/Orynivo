@@ -505,6 +505,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   render size (`VisualizerRenderWidth`/`VisualizerRenderHeight`), the target
   `VisualizerFrameRate`, and the user preset folder; the **Visualisierung** settings section
   edits all three, and the window clamps them to a sane range (160-3840 wide, 5-240 fps).
+  `VisualizerAlwaysShowOverlay` decides whether the overlay is permanent or appears on pointer
+  activity for three seconds; the reveal is driven by the window's own `PointerMoved`, which
+  only fires while the pointer is over it, so a mouse move on another monitor must never
+  reveal the overlay. Never replace that with a global pointer hook.
   `VisualizerPresetLibrary` loads the built-in presets plus `.oryvis` and `.milk` files from
   `AppSettings.VisualizerPresetDirectory` (default: a `visualizer-presets` folder below the
   data root); a file that fails to parse is skipped and reported, never fatal, and preset
