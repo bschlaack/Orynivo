@@ -4,9 +4,10 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.45.0] - 2026-09-20
 
 ### Added
+
 - Added a **Maximum output sample rate** option under Playback. It caps the PCM output
   rate for exclusive WASAPI and ASIO/cwASIO (Automatic keeps the previous behaviour of
   using the highest rate the device offers). It is useful when a driver advertises a rate
