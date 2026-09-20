@@ -72,6 +72,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Similarity smart playlists now resolve on an Orynivo Server instead of
@@ -137,6 +146,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Fixed a .NET 8 build break in `GenreCloudService` and
@@ -269,6 +287,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Editing a similarity smart playlist no longer drops its reference track. The
@@ -447,6 +474,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - The genre-cloud recommendation tie-break is now deterministic. It previously
@@ -498,6 +534,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Assigning local or remote album artwork now preserves the Dashboard's
@@ -555,6 +600,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Unified all six desktop languages as complete built-in resources (853 keys
@@ -605,6 +659,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Fixed a runtime language-switch issue where the dynamically created local
@@ -664,6 +727,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - The **Up Next** table now offers the same selectable track columns as
@@ -711,6 +783,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Similar-title and mood-mix actions now navigate directly to **Up Next**
@@ -749,6 +830,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Similar-title and mood-mix ranking now runs on a background thread, keeping
@@ -795,6 +885,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Fixed startup failure on existing databases whose `play_history` table did
@@ -870,6 +969,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Dashboard album artwork now refreshes immediately after a cover search or
@@ -913,6 +1021,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Opening metadata review uses a fast index-only analysis instead of opening
@@ -956,6 +1073,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Fixed smart playlists missing server tracks (including favorites) because the
@@ -1024,6 +1150,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Allowed authenticated artwork blob URLs in the remote's content security policy,
@@ -1148,6 +1283,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Fixed a Library Doctor database-column typo that closed Orynivo when metadata
@@ -1213,6 +1357,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Fixed combined artist-and-title library searches so terms can match across
@@ -1262,6 +1415,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 ## [0.37.0] - 2026-08-27
@@ -1314,6 +1476,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - AirPlay 2 receiver controls now drive Orynivo's transport instead of only
@@ -1441,6 +1612,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Artist and album artwork changes now invalidate the unified library view
@@ -1513,6 +1693,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Restarting Orynivo now restores every selectable sidebar content view rather
@@ -1556,6 +1745,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Infinite Mix no longer stalls after exhausting its first two 20-track
@@ -1610,6 +1808,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Orynivo Server ReplayGain maintenance now runs FFmpeg with one worker thread,
@@ -1661,6 +1868,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Fixed server scans with multiple library roots occasionally appearing stuck
@@ -1724,6 +1940,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Fixed the embedded Settings view at constrained window heights: long
@@ -1790,6 +2015,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Distinguished a completed MusicBrainz lookup with no community votes from a
@@ -1838,6 +2072,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Removed the Fluent DataGrid header's permanent empty sort-icon reservation,
@@ -1885,6 +2128,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Fixed unified artist details clearing their already rendered albums when the
@@ -1926,6 +2178,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Reworked the unified artist detail hero to match the album-detail layout:
@@ -2005,6 +2266,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Fixed Windows identifying Orynivo as an unknown application in the system
@@ -2048,6 +2318,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Fixed server-library backup downloads failing on Windows because the completed
@@ -2102,6 +2381,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Preserved an album's downloaded artwork and favorite flag when a full
@@ -2141,6 +2429,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Added the complete album title as a tooltip on shared artwork cards so
@@ -2193,6 +2490,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Prevented concurrent platform release jobs from creating duplicate GitHub
@@ -2265,6 +2571,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Enlarged the Infinite Mix profile dialog, made it resizable, and reserved a
@@ -2339,6 +2654,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Fixed Genre Cloud drill-downs reverting to all root genres when a connected
@@ -2413,6 +2737,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Fixed SEO image dimensions stretching the product screenshots and brand
@@ -2471,6 +2804,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Masked the Last.fm API key in Settings so it is no longer displayed as
@@ -2541,6 +2883,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Fixed Linux desktop updates being unavailable or attempting to treat the
@@ -2613,6 +2964,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Linux server release builds now normalize and validate packaged maintainer
@@ -2650,6 +3010,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Managed DEB server updates now retain the administrator's existing
@@ -2709,6 +3078,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Opening a local or Orynivo Server album from a unified artist view once again
@@ -2747,6 +3125,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - macOS now finds FFmpeg and FFprobe installed in common Homebrew, MacPorts,
@@ -2804,6 +3191,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Hidden the Steinberg ASIO and cwASIO subsystem badges on macOS and Linux,
@@ -2860,6 +3256,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Fixed the Arch Linux player package layout so `.PKGINFO` is stored at the
@@ -2949,6 +3354,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Linux now detects the extensionless `ffmpeg` and `ffprobe` executables for
@@ -3012,6 +3426,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Improved the startup update dialog's primary action contrast, spacing, and
@@ -3055,6 +3478,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Corrected Dashboard library totals to include tracks and albums from all
@@ -3104,6 +3536,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Placed Settings on/off switches immediately before their labels and aligned
@@ -3149,6 +3590,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Removed the standalone cyan scan-activity dot from the sidebar while retaining
@@ -3192,6 +3642,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Allowed signed server-update bundles up to the endpoint's verified one-GiB
@@ -3241,6 +3700,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Prevented publication of incomplete signed update manifests by waiting for
@@ -3285,6 +3753,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Enlarged the About window, placed its proportionally filled logo in a compact
@@ -3424,6 +3901,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Fixed the listening chart's Y-axis rendering: the filled path now includes an
@@ -3552,6 +4038,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Fixed dragging albums onto the "Up Next" sidebar item restarting the current
@@ -3611,6 +4106,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Reduced local and Orynivo Server artist rename work by updating only the
@@ -3660,6 +4164,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Fixed remote Orynivo Server artist information from the shared Artists view so
@@ -3710,6 +4223,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Reduced the Artist artwork-card height after adding the source badge so the
@@ -3793,6 +4315,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - The content loading skeleton now fully covers the content area (it spans the
@@ -3920,6 +4451,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Fixed manual MusicBrainz cover search failing on stylized album titles with
@@ -4090,6 +4630,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Fixed waveform transport seeking so pointer release is captured reliably, the
@@ -4221,6 +4770,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Fixed checkbox borders appearing near-black on the dark background: the app
@@ -4275,6 +4833,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Library watcher rescans now honour cancellation while waiting between locked
@@ -4365,6 +4932,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - The Dashboard genre statistics (Top genres and the per-day calendar genres) now
@@ -4416,6 +4992,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - The Linux Orynivo Server now reads and writes its editable configuration at
@@ -4458,6 +5043,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - The Linux Orynivo Server package no longer crashes on startup
@@ -4515,6 +5109,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Remote Orynivo Server folder view loading placeholder now uses the themed muted
@@ -4585,6 +5188,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Windows FFmpeg auto-download now resolves the current BtbN release asset via
@@ -4628,6 +5240,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - FFmpeg and FFprobe child processes now always receive a valid working
@@ -4667,6 +5288,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Automatic FFmpeg download on Windows now stores downloaded binaries in
@@ -4820,6 +5450,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Remote Orynivo Server (and other HTTP-streamed) tracks now start much faster.
@@ -4992,6 +5631,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - The Orynivo Server settings and remote directory browser dialogs now use
@@ -5106,6 +5754,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Fixed numbered circle labels on the equalizer frequency-response graph being
@@ -5175,6 +5832,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Switching the output profile via the transport quick-pick popup now resumes
@@ -5277,6 +5943,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Enabled the A–Z index in the Plex folder view. Available letters now come
@@ -5376,6 +6051,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 ## [0.8.0] - 2026-06-21
@@ -5429,6 +6113,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Preserved manual artist renames across watcher updates and later library
@@ -5507,6 +6200,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Fixed the application failing during startup because the lyrics
@@ -5562,6 +6264,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Added the theme-aware now-playing highlight to tracks in the Plex folder
@@ -5663,6 +6374,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Added a theme-aware background highlight for the currently audible item in
@@ -5742,6 +6462,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Fixed the table-header column chooser not opening on right-click and then
@@ -5814,6 +6543,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Restored visible text in Avalonia table/list navigation and restored vector
@@ -5934,6 +6672,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   archive so no extra state is stored, holds no credentials, and never includes
   audio files. Automatic archive naming moved into the shared
   `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
 ### Fixed
 
 - Plex folder playback now queues only the tracks on the selected file's

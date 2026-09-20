@@ -199,7 +199,7 @@ Steps:
 - Not included: pinning individual episodes so eviction can never remove them, and
   background prefetch of new episodes.
 
-## 25. Cloud backup targets and a server-side schedule — `In progress`
+## 25. Cloud backup targets and a server-side schedule — `Done`
 
 Steps:
 
@@ -211,12 +211,15 @@ Steps:
   no extra state is persisted, and the section holds no credentials. Automatic
   archive naming moved into the shared `Orynivo.Library.BackupNaming`, which the
   desktop now uses as well. 8 `Orynivo.Core.Tests` cases cover the naming.
-- 25b Cloud targets — `Todo`: a WebDAV (and later S3) upload target for manual and
-  scheduled backups, with pure URL building and remote retention selection, plus
-  the credential plumbing. It needs the encrypted
-  `ApplicationCredentialSnapshot` extended with the target password, so it is a
-  deliberate follow-up; credentials must never reach `settings.json` or
-  `appsettings.json`.
+- 25b WebDAV upload target — `Done`: `Orynivo.Library.BackupTargets` validates and
+  builds the target URL (plain `http`/`https`, no embedded credentials) and
+  `Orynivo.Library.BackupUploader` performs a bounded `PUT` with optional Basic
+  auth that never leaks credentials into a URL, a log, or an error message.
+  `ApplicationCredentialSnapshot.BackupTargetPassword` carries the password, so it
+  never reaches `settings.json`; Settings exposes enable, URL, sub-folder, user
+  name, and password, and the scheduled and **Back up now** paths share
+  `MainWindow.TryUploadBackupAsync`. 18 `Orynivo.Core.Tests` cases cover the URL
+  rules and the upload request. S3 remains a deliberate follow-up.
 
 ## 26. Reduce motion and keyboard navigation — `Todo`
 

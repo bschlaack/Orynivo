@@ -1434,6 +1434,15 @@ public sealed record LocalizedStrings(
     public string ScheduledBackupFailed { get; init; } = "";
     /// <summary>Gets the status-bar format string after an automatic backup.</summary>
     public string ScheduledBackupDone { get; init; } = "";
+    public string BackupTarget { get; init; } = "";
+    public string BackupTargetHint { get; init; } = "";
+    public string BackupTargetEnabled { get; init; } = "";
+    public string BackupTargetUrl { get; init; } = "";
+    public string BackupTargetDirectory { get; init; } = "";
+    public string BackupTargetUserName { get; init; } = "";
+    public string BackupTargetPassword { get; init; } = "";
+    public string BackupUploadDone { get; init; } = "";
+    public string BackupUploadFailed { get; init; } = "";
     /// <summary>Gets the fullscreen karaoke feature label.</summary>
     public string Karaoke { get; init; } = "";
     /// <summary>Gets the karaoke action tooltip.</summary>

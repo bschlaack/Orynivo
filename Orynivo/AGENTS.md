@@ -458,6 +458,16 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   credentials, only one run may be in flight at a time, and the backup folder is
   created on demand. Settings exposes the enable toggle, interval, retention,
   folder picker, **Back up now**, and the last successful run.
+- Completed backup archives can additionally be uploaded to a WebDAV
+  collection. `AppSettings.BackupTarget` holds the enable flag, URL, optional
+  sub-folder, and user name; the password is overlaid from
+  `ApplicationCredentialStore` and stays `[JsonIgnore]`. Only plain
+  `http`/`https` URLs without embedded credentials are accepted
+  (`Orynivo.Library.BackupTargets`), the upload itself is best effort and never
+  removes the local archive, and credentials must never appear in a URL, a log,
+  or an error message (`Orynivo.Library.BackupUploader`). The scheduled and
+  **Back up now** paths share `MainWindow.TryUploadBackupAsync`; the explicit
+  **Export library** action still writes only the user-chosen local ZIP.
 - Enhanced-LRC word timestamps (`<mm:ss.xx>`) are parsed by
   `LyricsService.ParseLrc` into `TimedLyricLine.Words`, which also strips the
   markers from the line text. `KaraokeWindow` renders such a line as one `Run` per

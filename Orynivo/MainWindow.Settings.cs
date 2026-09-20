@@ -850,6 +850,12 @@ public partial class MainWindow : Window
             _settings.ScheduledBackup.IntervalDays   = window.ScheduledBackupIntervalValue;
             _settings.ScheduledBackup.RetentionCount = window.ScheduledBackupRetentionValue;
             _settings.ScheduledBackup.Directory      = window.ScheduledBackupDirectoryValue;
+        _settings.BackupTarget ??= new BackupTargetSettings();
+        _settings.BackupTarget.Enabled         = window.BackupTargetEnabledValue;
+        _settings.BackupTarget.UploadUrl       = window.BackupTargetUrlValue;
+        _settings.BackupTarget.RemoteDirectory = window.BackupTargetDirectoryValue;
+        _settings.BackupTarget.UserName        = window.BackupTargetUserNameValue;
+        _settings.BackupTarget.Password        = window.BackupTargetPasswordValue;
             _settings.PodcastDownloadLimitMb  = window.PodcastDownloadLimitMbValue;
             _settings.ShowInternetRadioItem   = window.ShowInternetRadioItem;
             _settings.ShowPodcastsItem        = window.ShowPodcastsItem;

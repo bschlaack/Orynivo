@@ -1674,6 +1674,12 @@ toggle, an interval in days, how many backups to keep, and a backup folder
 immediately with **Back up now**. Orynivo writes the archive, removes older ones
 beyond the retention count, and shows the last successful run.
 
+**Cloud backup target** additionally uploads every completed archive to a WebDAV
+collection. Only plain `http`/`https` URLs without embedded credentials are
+accepted, the optional password is stored in the encrypted per-user credential
+store and never written to `settings.json`, and a failed upload leaves the local
+archive in place.
+
 ## Current Limitations
 
 - Linux output profiles include direct ALSA `hw:` endpoints and endpoints

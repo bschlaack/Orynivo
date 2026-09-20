@@ -341,6 +341,9 @@ internal sealed class ApplicationCredentialSnapshot
     public Dictionary<string, string> PlexTokens { get; set; } =
         new(StringComparer.Ordinal);
 
+    /// <summary>Gets or sets the optional WebDAV backup-target password.</summary>
+    public string BackupTargetPassword { get; set; } = string.Empty;
+
     /// <summary>Gets or sets generic streaming-provider credentials.</summary>
     public Dictionary<StreamingProvider, StreamingCredential> StreamingCredentials { get; set; } = [];
 }

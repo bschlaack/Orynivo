@@ -295,6 +295,12 @@ internal partial class SettingsView : UserControl
         ScheduledBackupEnabledCheckBox.IsChecked = settings.ScheduledBackup.Enabled;
         ScheduledBackupIntervalInput.Value = Math.Clamp(settings.ScheduledBackup.IntervalDays, 1, 365);
         ScheduledBackupRetentionInput.Value = Math.Clamp(settings.ScheduledBackup.RetentionCount, 1, 50);
+        settings.BackupTarget ??= new BackupTargetSettings();
+        BackupTargetEnabledCheckBox.IsChecked = settings.BackupTarget.Enabled;
+        BackupTargetUrlInput.Text = settings.BackupTarget.UploadUrl ?? string.Empty;
+        BackupTargetDirectoryInput.Text = settings.BackupTarget.RemoteDirectory ?? string.Empty;
+        BackupTargetUserNameInput.Text = settings.BackupTarget.UserName ?? string.Empty;
+        BackupTargetPasswordInput.Text = settings.BackupTarget.Password ?? string.Empty;
         PodcastDownloadLimitInput.Value = Math.Clamp(settings.PodcastDownloadLimitMb, 0, 102400);
         UpdateScheduledBackupStatus();
         _plexServers.AddRange((settings.PlexServers ?? []).Select(ClonePlexServer));
@@ -425,6 +431,21 @@ internal partial class SettingsView : UserControl
     /// <summary>Gets the configured number of backups kept before older ones are removed.</summary>
     public int ScheduledBackupRetentionValue =>
         (int)Math.Clamp(ScheduledBackupRetentionInput.Value ?? 3m, 1m, 50m);
+
+    /// <summary>Gets a value indicating whether completed backups are uploaded to the cloud target.</summary>
+    public bool BackupTargetEnabledValue => BackupTargetEnabledCheckBox.IsChecked == true;
+
+    /// <summary>Gets the configured WebDAV collection base URL.</summary>
+    public string BackupTargetUrlValue => BackupTargetUrlInput.Text?.Trim() ?? string.Empty;
+
+    /// <summary>Gets the configured sub-directory inside the WebDAV collection.</summary>
+    public string BackupTargetDirectoryValue => BackupTargetDirectoryInput.Text?.Trim() ?? string.Empty;
+
+    /// <summary>Gets the configured WebDAV user name.</summary>
+    public string BackupTargetUserNameValue => BackupTargetUserNameInput.Text?.Trim() ?? string.Empty;
+
+    /// <summary>Gets the configured WebDAV password.</summary>
+    public string BackupTargetPasswordValue => BackupTargetPasswordInput.Text ?? string.Empty;
 
     /// <summary>Gets the configured maximum podcast download cache size in megabytes.</summary>
     public int PodcastDownloadLimitMbValue =>
