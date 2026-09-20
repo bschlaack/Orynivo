@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+
 - Extracted `ContentRow` and `LogicalAlbumPart` from `MainWindow.xaml.cs` into
   top-level types with complete English XML documentation (69 members gained a
   summary). Every remaining `{ReflectionBinding}` in the views is now a
@@ -54,41 +55,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   compiled bindings with an explicit `x:DataType`; that conversion is recorded
   in `DEPENDENCY-MIGRATION.md`.
 
-
-- Added an optional automatic server-side library backup schedule. The
-  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
-  versioned library ZIP at most once per `IntervalDays` into its target folder and
-  removes archives beyond `RetentionCount`. It reuses the shared
-  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
-  archive so no extra state is stored, holds no credentials, and never includes
-  audio files. Automatic archive naming moved into the shared
-  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
-
-- Added an optional WebDAV upload target for completed library backups.
-  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
-  sub-folder, and user name, while the password lives only in the encrypted
-  credential store and stays out of `settings.json`. Only plain `http`/`https`
-  URLs without embedded credentials are accepted, the upload is best effort and
-  never removes the local archive, and credentials never reach a URL, a log, or
-  an error message. The scheduled and **Back up now** paths share the upload,
-  and Settings gained the corresponding fields under the backup schedule.
-
-- Added a **Reduce motion** option under Appearance that disables the optional
-  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
-  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
-  artwork grids can now be opened with Enter or Space in addition to a
-  double-click, and the transport controls (previous, play/pause, next, volume,
-  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
-  accessible names.
-
-- Added cross-device resume for remote Orynivo Server tracks. The server stores the
-  last playback position per profile and track (`profile_track_position`) through
-  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
-  publishes its audible position at most every 20 seconds and offers a **Resume**
-  transport action when another device left off meaningfully later. The decision
-  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
-  positions are stored, and no credential-bearing URL is ever persisted.
-
 - Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
   held back by Dependabot. It records the current pins, the trigger that unblocks
   each upgrade, the migration steps, and the checks required before merging, and
@@ -113,17 +79,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   receiving fixes. `Orynivo/Orynivo.csproj` also copies the Lucene `NOTICE.txt`
   from the `4.8.0-beta00018` directory it actually references; the path still
   named `beta00017`, so the license file was silently skipped.
-
-### Fixed
-
-- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
-  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
-  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
-  which made Dependabot abort with `Error processing actions/setup-dotnet
-  (RuntimeError)` / `No files changed!`. All 18 action references now use one
-  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
-  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
-  workflow reintroduces a mixed major.
 
 ## [0.44.0] - 2026-09-20
 
@@ -194,6 +149,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   sets the cache size limit in megabytes. Eviction removes the least recently used
   downloads first through the pure `PodcastDownloadCache.SelectForEviction`, and
   the most recently used episode is always kept.
+
+- Added an optional automatic server-side library backup schedule. The
+  `Orynivo:BackupSchedule` configuration section (disabled by default) writes a
+  versioned library ZIP at most once per `IntervalDays` into its target folder and
+  removes archives beyond `RetentionCount`. It reuses the shared
+  `Orynivo.Library.BackupRetention` decisions, derives its last run from the newest
+  archive so no extra state is stored, holds no credentials, and never includes
+  audio files. Automatic archive naming moved into the shared
+  `Orynivo.Library.BackupNaming` helper, which the desktop now uses too.
+
+- Added an optional WebDAV upload target for completed library backups.
+  `AppSettings.BackupTarget` stores the enable flag, WebDAV URL, optional
+  sub-folder, and user name, while the password lives only in the encrypted
+  credential store and stays out of `settings.json`. Only plain `http`/`https`
+  URLs without embedded credentials are accepted, the upload is best effort and
+  never removes the local archive, and credentials never reach a URL, a log, or
+  an error message. The scheduled and **Back up now** paths share the upload,
+  and Settings gained the corresponding fields under the backup schedule.
+
+- Added a **Reduce motion** option under Appearance that disables the optional
+  Genre Cloud, Dashboard cover-stage, and karaoke animations. The decision lives
+  in the pure `Orynivo.Controls.MotionPreferences` helper. The album and artist
+  artwork grids can now be opened with Enter or Space in addition to a
+  double-click, and the transport controls (previous, play/pause, next, volume,
+  artist info, lyrics, favorite, shuffle, equalizer, and output) expose
+  accessible names.
+
+- Added cross-device resume for remote Orynivo Server tracks. The server stores the
+  last playback position per profile and track (`profile_track_position`) through
+  the new authenticated `GET`/`PUT /api/tracks/{id}/position` endpoints; the client
+  publishes its audible position at most every 20 seconds and offers a **Resume**
+  transport action when another device left off meaningfully later. The decision
+  lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
+  positions are stored, and no credential-bearing URL is ever persisted.
+
 ### Fixed
 
 - Similarity smart playlists now resolve on an Orynivo Server instead of
@@ -214,6 +204,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   process-wide `SqliteConnection.ClearAllPools()`. `ArtistAttributionTests` no
   longer deletes a shared database between tests, so no test can observe another
   test's rows while xUnit runs classes in parallel.
+- Fixed the failing Dependabot GitHub Actions update. `dotnet-desktop.yml` still
+  pinned `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
+  `actions/upload-artifact@v6` while every other workflow used `@v7`/`@v6`/`@v7`,
+  which made Dependabot abort with `Error processing actions/setup-dotnet
+  (RuntimeError)` / `No files changed!`. All 18 action references now use one
+  version per action, and the new `scripts/verify-github-actions-pins.ps1` (wired
+  into `scripts/verify-all.ps1` and the CI verify job) fails the build when a
+  workflow reintroduces a mixed major.
 
 ## [0.43.1] - 2026-09-18
 
