@@ -449,9 +449,13 @@ overlays, and a composite stage.
   the ternary operator, `if(...)`, the usual math functions, `pi`, `rand(n)`, `//` comments,
   and semicolon-separated statements. Unknown functions and malformed input report a
   position. Covered by 22 tests.
-- 37c Render pipeline - `Todo`: framebuffer, feedback warp with bilinear sampling, blur,
-  waveform and shape drawing, composite, and the preset runner, tested through deterministic
-  frame statistics.
+- 37c Render pipeline - `Done`: `PixelBuffer` (float RGBA, bilinear sampling, box blur,
+  BGRA export), `VisualizerPreset` (INI parsing with a shared variable layout across the
+  per-frame and per-pixel stages), and `PresetRenderer` (per-frame init and update, the
+  per-pixel feedback warp, blur passes, decay, the waveform and spectrum overlay, and the
+  composite). Covered by 18 pixel-buffer and renderer tests plus 7 preset-parsing tests; the
+  warp and the per-frame decay override are asserted through deterministic frame statistics.
+  Custom shapes and a per-point waveform program remain for 37e.
 - 37d `VisualizerWindow` and wiring - `Todo`: fullscreen window, sidebar entry, preset
   switching, frame-rate cap, reduce-motion handling, the player taps, and localization for
   all seven languages.

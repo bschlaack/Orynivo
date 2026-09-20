@@ -11,6 +11,9 @@ public sealed class AudioSpectrumAnalyzer
     /// <summary>Number of logarithmic bands produced for every analyzed frame.</summary>
     public const int BandCount = 64;
 
+    /// <summary>Number of time-domain points kept for the waveform overlay.</summary>
+    public const int WaveformPoints = 256;
+
     private readonly int _sampleRate;
     private readonly int _fftSize;
     private readonly float[] _window;
@@ -19,6 +22,8 @@ public sealed class AudioSpectrumAnalyzer
     private readonly float[] _magnitudes;
     private readonly int[] _bandEdges;
     private readonly float[] _bands = new float[BandCount];
+    private readonly float[] _waveform = new float[WaveformPoints];
+    private readonly float[] _rawSamples;
 
     /// <summary>Creates an analyzer for one output sample rate.</summary>
     /// <param name="sampleRate">Output sample rate in hertz.</param>
@@ -37,6 +42,7 @@ public sealed class AudioSpectrumAnalyzer
             _window[index] = 0.5f * (1f - MathF.Cos(2f * MathF.PI * index / (fftSize - 1)));
 
         _scratch = new float[fftSize];
+        _rawSamples = new float[fftSize];
         _monoSamples = new float[fftSize];
         _magnitudes = new float[fftSize / 2];
         _bandEdges = BuildBandEdges(sampleRate, fftSize);
@@ -47,6 +53,12 @@ public sealed class AudioSpectrumAnalyzer
 
     /// <summary>Gets the current smoothed band levels, each between zero and one.</summary>
     public ReadOnlySpan<float> Bands => _bands;
+
+    /// <summary>
+    /// Gets the most recent mono samples, decimated to <see cref="WaveformPoints"/> points in
+    /// the range -1 to 1, for the visualizer waveform overlay.
+    /// </summary>
+    public ReadOnlySpan<float> Waveform => _waveform;
 
     /// <summary>Gets the current bass energy, between zero and one.</summary>
     public float Bass { get; private set; }
@@ -81,6 +93,7 @@ public sealed class AudioSpectrumAnalyzer
             _monoSamples[start + index] = (left + right) * 0.5f;
         }
 
+        _monoSamples.AsSpan(0, _fftSize).CopyTo(_rawSamples);
         for (var index = 0; index < _fftSize; index++)
             _monoSamples[index] *= _window[index];
 
@@ -100,6 +113,8 @@ public sealed class AudioSpectrumAnalyzer
             _bands[band] = Smooth(_bands[band], value);
         }
 
+        UpdateWaveform();
+
         var average = level / BandCount;
         Volume = Smooth(Volume, average);
         Bass = Smooth(Bass, Average(0, 16));
@@ -112,8 +127,23 @@ public sealed class AudioSpectrumAnalyzer
     public void Reset()
     {
         Array.Clear(_bands);
+        Array.Clear(_waveform);
         Bass = Mid = Treble = Volume = 0f;
         FrameCount = 0;
+    }
+
+    /// <summary>Decimates the analyzed mono block into the waveform overlay buffer.</summary>
+    private void UpdateWaveform()
+    {
+        var step = Math.Max(1, _fftSize / WaveformPoints);
+        for (var point = 0; point < WaveformPoints; point++)
+        {
+            var index = Math.Min(_fftSize - 1, point * step);
+            // The window applied for the FFT would flatten the ends, so re-read the plain
+            // mono samples instead by undoing the window is not possible; use the magnitudes
+            // of the raw samples kept in the scratch buffer region we control.
+            _waveform[point] = _rawSamples[index];
+        }
     }
 
     /// <summary>Applies a fast attack and a slow decay so bands do not flicker.</summary>

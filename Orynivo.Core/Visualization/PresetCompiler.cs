@@ -24,14 +24,20 @@ public static class PresetCompiler
     /// Statements separated by semicolons, or <see langword="null"/> or empty for a program
     /// that does nothing.
     /// </param>
+    /// <param name="layout">
+    /// Optional shared layout. Every program of one preset must compile against the same
+    /// layout so user variables carry from the per-frame into the per-pixel stage.
+    /// </param>
     /// <returns>The compiled program.</returns>
     /// <exception cref="PresetExpressionException">The source is not valid.</exception>
-    public static PresetProgram Compile(string? source)
+    public static PresetProgram Compile(string? source, PresetVariableLayout? layout = null)
     {
         if (string.IsNullOrWhiteSpace(source))
-            return PresetProgram.Empty;
+            return layout is null
+                ? PresetProgram.Empty
+                : new PresetProgram(layout, null);
 
-        var state = new CompileState();
+        var state = new CompileState(layout);
         var body = new List<Expression>();
         var lexer = new PresetLexer(source);
         var current = lexer.Next();
@@ -59,7 +65,7 @@ public static class PresetCompiler
 
         var block = Expression.Block(body);
         var lambda = Expression.Lambda<Action<float[]>>(block, state.Slots);
-        return new PresetProgram(state.Names, lambda.Compile());
+        return new PresetProgram(state.Layout, lambda.Compile());
     }
 
     /// <summary>Parses one statement, which is either an assignment or a bare expression.</summary>
@@ -365,25 +371,20 @@ public static class PresetCompiler
     /// <summary>Collects the slot layout while parsing.</summary>
     private sealed class CompileState
     {
+        /// <summary>Creates a compile state, optionally over a shared layout.</summary>
+        /// <param name="layout">Shared layout, or <see langword="null"/> for a private one.</param>
+        public CompileState(PresetVariableLayout? layout) => Layout = layout ?? new PresetVariableLayout();
+
         /// <summary>Gets the slot array parameter shared by every compiled statement.</summary>
         public ParameterExpression Slots { get; } = Expression.Parameter(typeof(float[]), "slots");
 
-        /// <summary>Gets the variable names in slot order.</summary>
-        public List<string> Names { get; } = [];
+        /// <summary>Gets the slot layout this program compiles against.</summary>
+        public PresetVariableLayout Layout { get; }
 
         /// <summary>Returns the slot expression for a variable, adding the slot on first use.</summary>
         /// <param name="name">Variable name.</param>
         /// <returns>An array access expression for the variable's slot.</returns>
-        public Expression Slot(string name)
-        {
-            var index = Names.IndexOf(name);
-            if (index < 0)
-            {
-                index = Names.Count;
-                Names.Add(name);
-            }
-
-            return Expression.ArrayAccess(Slots, Expression.Constant(index));
-        }
+        public Expression Slot(string name) =>
+            Expression.ArrayAccess(Slots, Expression.Constant(Layout.GetOrAdd(name)));
     }
 }

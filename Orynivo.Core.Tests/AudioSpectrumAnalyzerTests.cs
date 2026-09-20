@@ -81,6 +81,23 @@ public sealed class AudioSpectrumAnalyzerTests
         Assert.Equal(2, analyzer.FrameCount);
     }
 
+    /// <summary>The waveform overlay follows the analyzed samples.</summary>
+    [Fact]
+    public void Analyze_ExposesAWaveform()
+    {
+        var analyzer = new AudioSpectrumAnalyzer(SampleRate);
+
+        analyzer.Analyze(Tone(440f, 0.5f));
+
+        var waveform = analyzer.Waveform;
+        Assert.Equal(AudioSpectrumAnalyzer.WaveformPoints, waveform.Length);
+        Assert.All(waveform.ToArray(), value => Assert.InRange(value, -1f, 1f));
+        Assert.Contains(waveform.ToArray(), value => MathF.Abs(value) > 0.05f);
+
+        analyzer.Reset();
+        Assert.All(analyzer.Waveform.ToArray(), value => Assert.Equal(0f, value));
+    }
+
     /// <summary>An unusable configuration is rejected.</summary>
     [Fact]
     public void Constructor_RejectsUnusableArguments()

@@ -7,6 +7,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Added the visualizer render pipeline: `PixelBuffer` (float RGBA with bilinear sampling,
+  box blur, and a BGRA export), `VisualizerPreset` (INI parsing where every expression
+  block shares one variable layout, so `q1` carries from the per-frame into the per-pixel
+  stage), and `PresetRenderer` (per-frame init and update, the per-pixel feedback warp,
+  blur passes, decay, the waveform and spectrum overlay, and the composite). The audio
+  analyzer now also exposes a decimated waveform for the overlay. Covered by 25 tests; the
+  warp and the per-frame decay override are asserted through deterministic frame
+  statistics rather than by eye.
+
 - Added the preset expression language for the upcoming music visualizer: a lexer and a
   precedence parser that compiles Milkdrop-style expressions into JIT-compiled statements
   over a plain slot array. Assignments, arithmetic, C-like remainder, comparisons, logical
