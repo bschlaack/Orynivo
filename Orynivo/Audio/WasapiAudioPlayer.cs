@@ -141,7 +141,8 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
         string deviceId,
         bool equalizerEnabled = false,
         EqualizerProfile? equalizerProfile = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int maxOutputSampleRateHz = 0)
     {
         if (items.Count == 0)
             throw new ArgumentException("At least one playback item is required.", nameof(items));
@@ -155,7 +156,7 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
         var device = WasapiDeviceProvider.GetRenderDevice(deviceId);
         try
         {
-            var selectedFormat = ChooseExclusiveFormat(device, info);
+            var selectedFormat = ChooseExclusiveFormat(device, info, maxOutputSampleRateHz);
             info = info with { OutputSampleRate = selectedFormat.Format.SampleRate };
             var provider = new BufferedWaveProvider(selectedFormat.Format)
             {
@@ -206,13 +207,15 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
         string deviceId,
         bool equalizerEnabled = false,
         EqualizerProfile? equalizerProfile = null,
-        CancellationToken cancellationToken = default) =>
+        CancellationToken cancellationToken = default,
+        int maxOutputSampleRateHz = 0) =>
         CreateAsync(
             [new GaplessPlaybackItem(filePath, 1.0f)],
             deviceId,
             equalizerEnabled,
             equalizerProfile,
-            cancellationToken);
+            cancellationToken,
+            maxOutputSampleRateHz);
 
     /// <inheritdoc/>
     public void UpdateEqualizer(bool enabled, EqualizerProfile? profile)
@@ -807,10 +810,10 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
     /// </summary>
     /// <param name="info">Probed source information.</param>
     /// <returns>The distinct candidate rates in probe order.</returns>
-    internal static IReadOnlyList<int> OrderCandidateSampleRates(AudioFileInfo info)
+    internal static IReadOnlyList<int> OrderCandidateSampleRates(AudioFileInfo info, int maxSampleRateHz = 0)
     {
         var sourceSampleRate = Math.Max(info.SourceSampleRate, info.OutputSampleRate);
-        return (info.IsDsd && info.SourceSampleRate > 0
+        var ordered = (info.IsDsd && info.SourceSampleRate > 0
                 ? StandardSampleRates
                     .Where(rate => rate <= info.OutputSampleRate && info.SourceSampleRate % rate == 0)
                     .OrderByDescending(static rate => rate)
@@ -825,11 +828,17 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
                 .ThenBy(rate => rate > sourceSampleRate ? rate : int.MaxValue))
             .Distinct()
             .ToArray();
+        // A configured cap only reorders: rates inside the cap come first so a driver that
+        // advertises an unusable maximum rate can be kept out of reach, while playback still
+        // has a fallback when the device supports nothing at or below the cap.
+        return maxSampleRateHz > 0
+            ? [.. ordered.Where(rate => rate <= maxSampleRateHz), .. ordered.Where(rate => rate > maxSampleRateHz)]
+            : ordered;
     }
 
-    private static WasapiSelectedFormat ChooseExclusiveFormat(MMDevice device, AudioFileInfo info)
+    private static WasapiSelectedFormat ChooseExclusiveFormat(MMDevice device, AudioFileInfo info, int maxSampleRateHz)
     {
-        var sampleRates = OrderCandidateSampleRates(info);
+        var sampleRates = OrderCandidateSampleRates(info, maxSampleRateHz);
 
         foreach (var sampleRate in sampleRates)
         {

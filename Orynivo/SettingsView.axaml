@@ -508,6 +508,19 @@
                                Foreground="{DynamicResource AppMutedTextBrush}"
                                TextWrapping="Wrap"/>
 
+                    <TextBlock Text="{DynamicResource L_MaxOutputSampleRate}"
+                               FontSize="{DynamicResource FontSizeCaption}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               Margin="0,14,0,4"/>
+                    <ComboBox x:Name="MaxOutputSampleRateComboBox"
+                              Height="30"
+                              HorizontalAlignment="Stretch"/>
+                    <TextBlock Text="{DynamicResource L_MaxOutputSampleRateHint}"
+                               FontSize="{DynamicResource FontSizeMeta}"
+                               Foreground="{DynamicResource AppMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,4,0,0"/>
+
                     <TextBlock Text="{DynamicResource L_NonGaplessCrossfade}"
                                FontSize="{DynamicResource FontSizeCaption}"
                                FontWeight="SemiBold"

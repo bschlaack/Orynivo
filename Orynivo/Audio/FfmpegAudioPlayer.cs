@@ -138,7 +138,8 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
         string driverName,
         bool equalizerEnabled = false,
         EqualizerProfile? equalizerProfile = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int maxOutputSampleRateHz = 0)
     {
         if (items.Count == 0)
             throw new ArgumentException("At least one playback item is required.", nameof(items));
@@ -157,8 +158,11 @@ public sealed class FfmpegAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
             .ToArray();
         if (supportedSampleRates.Length > 0)
         {
+            var ceiling = maxOutputSampleRateHz > 0
+                ? Math.Min(info.OutputSampleRate, maxOutputSampleRateHz)
+                : info.OutputSampleRate;
             var outputSampleRate = supportedSampleRates
-                .Where(rate => rate <= info.OutputSampleRate)
+                .Where(rate => rate <= ceiling)
                 .DefaultIfEmpty(supportedSampleRates.Min())
                 .Max();
             info = info with { OutputSampleRate = outputSampleRate };

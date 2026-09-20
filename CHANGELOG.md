@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Added a **Maximum output sample rate** option under Playback. It caps the PCM output
+  rate for exclusive WASAPI and ASIO/cwASIO (Automatic keeps the previous behaviour of
+  using the highest rate the device offers). It is useful when a driver advertises a rate
+  it cannot reproduce cleanly - a Sound BlasterX AE-5 in Direct Mode reports 384 kHz that
+  way. A cap only reorders the candidates, so playback still falls back to an above-cap
+  rate when the device supports nothing at or below it.
+
 
 - Extracted `ContentRow` and `LogicalAlbumPart` from `MainWindow.xaml.cs` into
   top-level types with complete English XML documentation (69 members gained a

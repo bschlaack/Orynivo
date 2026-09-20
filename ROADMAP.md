@@ -1,6 +1,6 @@
 # Orynivo Roadmap
 
-Items 1-34 are complete and listed for reference only.
+Items 1-35 are complete and listed for reference only.
 
 Each item is one commit and must follow the completion checklist in
 `AGENTS.md`: build every affected project, run the three test projects, update
@@ -365,3 +365,19 @@ report 0 errors and 0 warnings.
 fractional-rate ordering, DSD128, the PCM ordering, and uniqueness.
 
 **Commit**: `fix(playback): keep DSD-to-PCM on an exact rate division`
+
+## 35. Add a maximum output sample rate setting - `Done`
+
+**Design**
+
+- `AppSettings.MaxOutputSampleRateHz` (zero = automatic) caps the PCM output rate for
+  exclusive WASAPI and ASIO/cwASIO, so a driver that advertises an unusable maximum rate
+  can be kept out of reach.
+- The WASAPI cap only reorders the candidate rates; playback still falls back to a rate
+  above the cap when the device supports nothing at or below it.
+- Settings > Playback offers Automatic plus the standard rates.
+
+**Tests**: three more cases in `WasapiSampleRateSelectionTests` cover the cap, the
+fallback when the cap excludes every rate, and the DSD preference under a cap.
+
+**Commit**: `feat(playback): add a maximum output sample rate setting`

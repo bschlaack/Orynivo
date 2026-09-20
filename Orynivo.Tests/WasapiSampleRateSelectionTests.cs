@@ -65,6 +65,57 @@ public sealed class WasapiSampleRateSelectionTests
         Assert.Equal(expectedFirst, rates[0]);
     }
 
+    /// <summary>A configured cap moves every rate above it to the end of the order.</summary>
+    [Fact]
+    public void OrderCandidateSampleRates_HonoursTheMaximumOutputRate()
+    {
+        var info = new AudioFileInfo(
+            "flac",
+            192_000,
+            2,
+            192_000,
+            IsDsd: false,
+            "flac",
+            TimeSpan.FromMinutes(1));
+
+        var rates = WasapiAudioPlayer.OrderCandidateSampleRates(info, maxSampleRateHz: 96_000).ToList();
+
+        Assert.Equal(96_000, rates[0]);
+        Assert.True(rates.IndexOf(96_000) < rates.IndexOf(192_000));
+        Assert.All(rates.TakeWhile(rate => rate <= 96_000), rate => Assert.True(rate <= 96_000));
+    }
+
+    /// <summary>A cap that excludes everything still leaves a fallback order.</summary>
+    [Fact]
+    public void OrderCandidateSampleRates_KeepsAFallbackBelowTheCap()
+    {
+        var info = new AudioFileInfo(
+            "flac",
+            192_000,
+            2,
+            192_000,
+            IsDsd: false,
+            "flac",
+            TimeSpan.FromMinutes(1));
+
+        var rates = WasapiAudioPlayer.OrderCandidateSampleRates(info, maxSampleRateHz: 8_000);
+
+        Assert.NotEmpty(rates);
+        Assert.Equal(8_000, rates[0]);
+    }
+
+    /// <summary>The DSD preference still applies under a cap.</summary>
+    [Fact]
+    public void OrderCandidateSampleRates_CapsDsdDivisions()
+    {
+        var info = Dsd(sourceSampleRate: 5_644_800, hint: 176_400);
+
+        var rates = WasapiAudioPlayer.OrderCandidateSampleRates(info, maxSampleRateHz: 96_000).ToList();
+
+        Assert.Equal(88_200, rates[0]);
+        Assert.True(rates.IndexOf(88_200) < rates.IndexOf(176_400));
+    }
+
     /// <summary>Every offered rate is positive and appears once.</summary>
     [Fact]
     public void OrderCandidateSampleRates_IsDistinctAndPositive()

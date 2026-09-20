@@ -468,6 +468,11 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   or an error message (`Orynivo.Library.BackupUploader`). The scheduled and
   **Back up now** paths share `MainWindow.TryUploadBackupAsync`; the explicit
   **Export library** action still writes only the user-chosen local ZIP.
+- `AppSettings.MaxOutputSampleRateHz` caps the PCM output rate for exclusive WASAPI and
+  ASIO/cwASIO; zero means automatic. Both players must honour it, the WASAPI cap only
+  reorders the candidates (never removes them) so a device that supports nothing at or
+  below the cap still plays, and the Settings control lists automatic plus the standard
+  rates.
 - A DSD source reports its 1-bit rate (352800 for DSD64), so its PCM conversion target
   must stay an exact division of that rate. `WasapiAudioPlayer.OrderCandidateSampleRates`
   prefers such a division that does not exceed the conversion hint, and both probes report

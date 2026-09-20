@@ -1683,6 +1683,15 @@ accepted, the optional password is stored in the encrypted per-user credential
 store and never written to `settings.json`, and a failed upload leaves the local
 archive in place.
 
+## Maximum output sample rate
+
+Playback offers a **Maximum output sample rate** option (Automatic by default) that caps
+the PCM output rate for exclusive WASAPI and ASIO/cwASIO. Automatic keeps the previous
+behaviour of using the highest rate the device offers; a cap is useful when a driver
+advertises a rate it cannot reproduce cleanly, such as a Sound BlasterX AE-5 in Direct
+Mode reporting 384 kHz. A cap only reorders the candidates, so playback still falls back
+to a higher rate when the device supports nothing at or below the cap.
+
 ## Cross-device resume
 
 Remote Orynivo Server tracks remember where you stopped. The client publishes the
