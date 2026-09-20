@@ -911,7 +911,9 @@ byte-range streaming without FFmpeg.
   match count while criteria are changed, including unified local/server counts
   and server-side counts when the connected Orynivo Server supports them, and it
   shows every stored criterion — including the reference track of a similarity
-  smart playlist, whose minimum similarity score stays editable.
+  smart playlist, whose minimum similarity score stays editable. The reference can
+  be replaced with **Choose reference track**, which searches the local library and
+  every configured Orynivo Server, or removed entirely.
 - UTF-8 M3U8 import and export for regular playlists, including relative local
   paths, retained missing-file entries, and HTTP/HTTPS streams; credentialed
   Plex URLs are excluded

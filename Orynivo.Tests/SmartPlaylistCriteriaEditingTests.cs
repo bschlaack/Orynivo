@@ -88,4 +88,54 @@ public sealed class SmartPlaylistCriteriaEditingTests
         Assert.Null(resolved.SourceKey);
         Assert.Null(resolved.TrackId);
     }
+
+    /// <summary>A picked reference replaces the loaded one.</summary>
+    [Fact]
+    public void ResolveSimilarityReference_PickedReferenceReplacesLoadedOne()
+    {
+        var initial = new SmartPlaylistCriteria
+        {
+            SimilaritySourceKey = "local",
+            SimilarityTrackId = 42
+        };
+
+        var resolved = SmartPlaylistCriteriaEditing.ResolveSimilarityReference(
+            initial,
+            false,
+            0.3,
+            ("server:abc", 7));
+
+        Assert.Equal("server:abc", resolved.SourceKey);
+        Assert.Equal(7, resolved.TrackId);
+        Assert.Equal(0.3, resolved.MinimumScore);
+    }
+
+    /// <summary>A picked reference also applies when the loaded criteria had none.</summary>
+    [Fact]
+    public void ResolveSimilarityReference_PickedReferenceAppliesWithoutLoadedOne()
+    {
+        var resolved = SmartPlaylistCriteriaEditing.ResolveSimilarityReference(
+            new SmartPlaylistCriteria(),
+            false,
+            null,
+            ("local", 11));
+
+        Assert.Equal("local", resolved.SourceKey);
+        Assert.Equal(11, resolved.TrackId);
+    }
+
+    /// <summary>An explicit removal wins over a previously picked reference.</summary>
+    [Fact]
+    public void ResolveSimilarityReference_ClearedReferenceWinsOverPick()
+    {
+        var resolved = SmartPlaylistCriteriaEditing.ResolveSimilarityReference(
+            new SmartPlaylistCriteria { SimilaritySourceKey = "local", SimilarityTrackId = 1 },
+            true,
+            0.5,
+            ("local", 11));
+
+        Assert.Null(resolved.SourceKey);
+        Assert.Null(resolved.TrackId);
+        Assert.Null(resolved.MinimumScore);
+    }
 }

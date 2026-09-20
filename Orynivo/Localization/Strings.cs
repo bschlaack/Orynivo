@@ -1350,6 +1350,20 @@ public sealed record LocalizedStrings(
     public string AiChatToolResultFallback { get; init; } = "";
     /// <summary>Gets the option for automatically accepting Fanart.tv artist-image results.</summary>
     public string AutoAcceptFanartTvImages { get; init; } = "";
+    /// <summary>Gets the smart-playlist editor action that opens the reference-track picker.</summary>
+    public string ChooseReferenceTrack { get; init; } = "";
+    /// <summary>Gets the reference-track picker search label.</summary>
+    public string ReferenceTrackSearchLabel { get; init; } = "";
+    /// <summary>Gets the reference-track picker search watermark.</summary>
+    public string ReferenceTrackSearchWatermark { get; init; } = "";
+    /// <summary>Gets the reference-track picker minimum-query hint.</summary>
+    public string ReferenceTrackSearchHint { get; init; } = "";
+    /// <summary>Gets the reference-track picker search-in-progress message.</summary>
+    public string ReferenceTrackSearching { get; init; } = "";
+    /// <summary>Gets the reference-track picker empty-result message.</summary>
+    public string ReferenceTrackNotFound { get; init; } = "";
+    /// <summary>Gets the reference-track picker confirmation action.</summary>
+    public string UseReferenceTrack { get; init; } = "";
     /// <summary>Gets the scheduled-backup settings section label.</summary>
     public string ScheduledBackup { get; init; } = "";
     /// <summary>Gets the explanation of the scheduled-backup feature.</summary>

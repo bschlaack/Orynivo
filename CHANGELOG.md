@@ -8,7 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- Added five MCP and AI Chat tools. Read-only: `get_year_in_review` returns the
+- The smart-playlist editor can now replace the similarity reference track.
+  **Choose reference track** opens a small search dialog over the local library
+  and every configured Orynivo Server and applies the selection together with the
+  minimum similarity score; the readable label and **Remove reference** stay.
+  Criteria building keeps using the pure `SmartPlaylistCriteriaEditing` helper,
+  which gained a picked-reference override.- Added five MCP and AI Chat tools. Read-only: `get_year_in_review` returns the
   listening statistics for one calendar year (listened hours, active days, the
   monthly breakdown, and the leading genres, albums, and artists), and
   `get_track_key` returns a track's estimated musical key as a Camelot wheel

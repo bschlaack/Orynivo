@@ -478,7 +478,12 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   **Analyze audio features** action; it runs the local library through
   `AudioFeatureMaintenanceService` and requests bounded batches from each
   configured server, stays cancellable, and cancels on Settings deactivation.
-- The smart-playlist editor (`SmartPlaylistDialog`) must show every stored
+- `ReferenceTrackPickerDialog` is the shared search dialog for picking a similarity
+  reference track. It never touches the database or the network itself: the caller
+  supplies the search through `Search` (the editor receives it via
+  `ReferenceTrackPicker`), and `MainWindow.SearchReferenceTracksAsync` queries the
+  local index plus every configured Orynivo Server, returning only credential-free
+  `local`/`server:<id>` identities.- The smart-playlist editor (`SmartPlaylistDialog`) must show every stored
   criterion and must never drop a criterion it cannot rebuild from its own input
   fields. The similarity reference is displayed with a readable track label
   (track title and artist for local references, server name for remote ones) and

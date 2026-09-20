@@ -294,7 +294,7 @@
                         BorderThickness="1"
                         CornerRadius="10">
                     <StackPanel Spacing="8">
-                        <Grid ColumnDefinitions="*,Auto">
+                        <Grid ColumnDefinitions="*,Auto,Auto">
                             <StackPanel Grid.Column="0" Spacing="4">
                                 <TextBlock Text="{DynamicResource L_SmartPlaylistSimilarityReference}"
                                            FontSize="{DynamicResource FontSizeCaption}"
@@ -304,9 +304,17 @@
                                            FontSize="{DynamicResource FontSizeBody}"
                                            Foreground="{DynamicResource AppPrimaryTextBrush}"/>
                             </StackPanel>
-                            <Button x:Name="ClearSimilarityReferenceButton"
+                            <Button x:Name="ChooseSimilarityReferenceButton"
                                     Grid.Column="1"
                                     Margin="12,0,0,0"
+                                    Padding="12,5"
+                                    VerticalAlignment="Center"
+                                    Theme="{StaticResource SmartPlaylistButtonTheme}"
+                                    Content="{DynamicResource L_ChooseReferenceTrack}"
+                                    Click="ChooseSimilarityReferenceButton_OnClick"/>
+                            <Button x:Name="ClearSimilarityReferenceButton"
+                                    Grid.Column="2"
+                                    Margin="8,0,0,0"
                                     Padding="12,5"
                                     VerticalAlignment="Center"
                                     Theme="{StaticResource SmartPlaylistButtonTheme}"

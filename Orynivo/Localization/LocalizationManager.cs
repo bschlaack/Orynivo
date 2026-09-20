@@ -271,6 +271,13 @@ public static class LocalizationManager
         resources["L_ArtistImageSuggestionTitle"] = Current.ArtistImageSuggestionTitle;
         resources["L_ArtistImageSuggestionHint"] = Current.ArtistImageSuggestionHint;
         resources["L_AutoAcceptFanartTvImages"] = Current.AutoAcceptFanartTvImages;
+        resources["L_ChooseReferenceTrack"] = Current.ChooseReferenceTrack;
+        resources["L_ReferenceTrackSearchLabel"] = Current.ReferenceTrackSearchLabel;
+        resources["L_ReferenceTrackSearchWatermark"] = Current.ReferenceTrackSearchWatermark;
+        resources["L_ReferenceTrackSearchHint"] = Current.ReferenceTrackSearchHint;
+        resources["L_ReferenceTrackSearching"] = Current.ReferenceTrackSearching;
+        resources["L_ReferenceTrackNotFound"] = Current.ReferenceTrackNotFound;
+        resources["L_UseReferenceTrack"] = Current.UseReferenceTrack;
         resources["L_ScheduledBackup"] = Current.ScheduledBackup;
         resources["L_ScheduledBackupHint"] = Current.ScheduledBackupHint;
         resources["L_ScheduledBackupEnabled"] = Current.ScheduledBackupEnabled;
@@ -654,6 +661,13 @@ public static class LocalizationManager
         "Ein unerwarteter Fehler ist aufgetreten. Der Fehlerbericht konnte nicht gespeichert werden. Orynivo wird beendet.")
     {
         AutoAcceptFanartTvImages = "Fanart.tv-Funde automatisch übernehmen",
+        ChooseReferenceTrack = "Referenztitel wählen…",
+        ReferenceTrackSearchLabel = "Nach einem Titel suchen",
+        ReferenceTrackSearchWatermark = "Interpret, Album oder Titel",
+        ReferenceTrackSearchHint = "Mindestens zwei Zeichen eingeben.",
+        ReferenceTrackSearching = "Suche läuft…",
+        ReferenceTrackNotFound = "Keine passenden Titel gefunden.",
+        UseReferenceTrack = "Diesen Titel verwenden",
         ScheduledBackup = "Automatische Backups",
         ScheduledBackupHint = "Erstellt die Bibliothek regelmäßig als ZIP-Archiv und entfernt ältere Backups automatisch. Audiodateien sind nicht enthalten.",
         ScheduledBackupEnabled = "Backups automatisch erstellen",
@@ -1465,6 +1479,13 @@ public static class LocalizationManager
         "An unexpected error occurred. The crash report could not be saved. Orynivo will now close.")
     {
         AutoAcceptFanartTvImages = "Automatically accept Fanart.tv results",
+        ChooseReferenceTrack = "Choose reference track…",
+        ReferenceTrackSearchLabel = "Search for a track",
+        ReferenceTrackSearchWatermark = "Artist, album, or title",
+        ReferenceTrackSearchHint = "Type at least two characters.",
+        ReferenceTrackSearching = "Searching…",
+        ReferenceTrackNotFound = "No matching tracks.",
+        UseReferenceTrack = "Use this track",
         ScheduledBackup = "Scheduled backups",
         ScheduledBackupHint = "Creates the library as a ZIP archive on a schedule and removes older backups automatically. Audio files are not included.",
         ScheduledBackupEnabled = "Create backups automatically",
@@ -2259,6 +2280,13 @@ public static class LocalizationManager
         "Une erreur inattendue s’est produite. Le rapport n’a pas pu être enregistré. Orynivo va maintenant se fermer.")
     {
         AutoAcceptFanartTvImages = "Accepter automatiquement les résultats Fanart.tv",
+        ChooseReferenceTrack = "Choisir la piste de référence…",
+        ReferenceTrackSearchLabel = "Rechercher une piste",
+        ReferenceTrackSearchWatermark = "Artiste, album ou titre",
+        ReferenceTrackSearchHint = "Saisissez au moins deux caractères.",
+        ReferenceTrackSearching = "Recherche…",
+        ReferenceTrackNotFound = "Aucune piste correspondante.",
+        UseReferenceTrack = "Utiliser cette piste",
         ScheduledBackup = "Sauvegardes planifiées",
         ScheduledBackupHint = "Crée régulièrement la bibliothèque sous forme d'archive ZIP et supprime automatiquement les sauvegardes plus anciennes. Les fichiers audio ne sont pas inclus.",
         ScheduledBackupEnabled = "Créer les sauvegardes automatiquement",
@@ -3050,6 +3078,13 @@ public static class LocalizationManager
         "Se produjo un error inesperado. No se pudo guardar el informe. Orynivo se cerrará ahora.")
     {
         AutoAcceptFanartTvImages = "Aceptar automáticamente los resultados de Fanart.tv",
+        ChooseReferenceTrack = "Elegir pista de referencia…",
+        ReferenceTrackSearchLabel = "Buscar una pista",
+        ReferenceTrackSearchWatermark = "Artista, álbum o título",
+        ReferenceTrackSearchHint = "Escribe al menos dos caracteres.",
+        ReferenceTrackSearching = "Buscando…",
+        ReferenceTrackNotFound = "No se encontraron pistas.",
+        UseReferenceTrack = "Usar esta pista",
         ScheduledBackup = "Copias programadas",
         ScheduledBackupHint = "Crea la biblioteca como archivo ZIP de forma periódica y elimina automáticamente las copias más antiguas. Los archivos de audio no se incluyen.",
         ScheduledBackupEnabled = "Crear copias automáticamente",
@@ -4621,6 +4656,13 @@ private static readonly LocalizedStrings Russian = new(
         AiChatEmptyResponse = "Модель вернула пустой ответ.",
         AiChatToolResultFallback = "После вызова инструмента модель не вернула окончательный ответ. Результат инструмента:",
         AutoAcceptFanartTvImages = "Автоматически принимать результаты Fanart.tv",
+        ChooseReferenceTrack = "Выбрать опорный трек…",
+        ReferenceTrackSearchLabel = "Поиск трека",
+        ReferenceTrackSearchWatermark = "Исполнитель, альбом или название",
+        ReferenceTrackSearchHint = "Введите не менее двух символов.",
+        ReferenceTrackSearching = "Поиск…",
+        ReferenceTrackNotFound = "Подходящих треков не найдено.",
+        UseReferenceTrack = "Использовать этот трек",
         ScheduledBackup = "Автоматические резервные копии",
         ScheduledBackupHint = "Регулярно создаёт библиотеку в виде ZIP-архива и автоматически удаляет старые копии. Аудиофайлы не включаются.",
         ScheduledBackupEnabled = "Создавать копии автоматически",
@@ -5567,6 +5609,13 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "模型返回了空响应。",
         AiChatToolResultFallback = "调用工具后，模型未返回最终答复。工具结果：",
         AutoAcceptFanartTvImages = "自动接受 Fanart.tv 的结果",
+        ChooseReferenceTrack = "选择参考曲目…",
+        ReferenceTrackSearchLabel = "搜索曲目",
+        ReferenceTrackSearchWatermark = "艺术家、专辑或标题",
+        ReferenceTrackSearchHint = "请输入至少两个字符。",
+        ReferenceTrackSearching = "正在搜索…",
+        ReferenceTrackNotFound = "未找到匹配的曲目。",
+        UseReferenceTrack = "使用此曲目",
         ScheduledBackup = "计划备份",
         ScheduledBackupHint = "定期将资料库创建为 ZIP 存档并自动删除较旧的备份。不包含音频文件。",
         ScheduledBackupEnabled = "自动创建备份",
@@ -6512,6 +6561,13 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "मॉडल ने खाली उत्तर दिया।",
         AiChatToolResultFallback = "टूल कॉल के बाद मॉडल ने अंतिम उत्तर नहीं दिया। टूल परिणाम:",
         AutoAcceptFanartTvImages = "Fanart.tv परिणाम स्वतः स्वीकार करें",
+        ChooseReferenceTrack = "संदर्भ ट्रैक चुनें…",
+        ReferenceTrackSearchLabel = "ट्रैक खोजें",
+        ReferenceTrackSearchWatermark = "कलाकार, एल्बम या शीर्षक",
+        ReferenceTrackSearchHint = "कम से कम दो अक्षर दर्ज करें।",
+        ReferenceTrackSearching = "खोज जारी है…",
+        ReferenceTrackNotFound = "कोई मेल खाता ट्रैक नहीं मिला।",
+        UseReferenceTrack = "इस ट्रैक का उपयोग करें",
         ScheduledBackup = "निर्धारित बैकअप",
         ScheduledBackupHint = "निर्धारित समय पर लाइब्रेरी को ZIP संग्रह के रूप में बनाता है और पुराने बैकअप स्वतः हटाता है। ऑडियो फ़ाइलें शामिल नहीं हैं।",
         ScheduledBackupEnabled = "बैकअप स्वतः बनाएँ",

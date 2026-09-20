@@ -84,7 +84,7 @@ Steps:
   The tool count is 37, and two `Orynivo.Tests` cases validate every AI tool
   schema (types, descriptions, and required names).
 
-## 18. Pick the similarity reference in the smart-playlist editor — `In progress`
+## 18. Pick the similarity reference in the smart-playlist editor — `Done`
 
 The reference can currently only be set from the track context menu.
 
@@ -99,12 +99,14 @@ Steps:
   resolves to nothing, because vectors are provider-local. Three
   `Orynivo.Server.Tests` cases cover the helper, the empty plain-resolve result,
   and criteria without a reference.
-- 18b Reference picker in the editor — `Todo`: add a **Choose reference track**
-  action to the similarity panel in `SmartPlaylistDialog` that opens a small
-  search dialog (local library plus configured Orynivo Servers) and replaces
-  `SimilaritySourceKey`/`SimilarityTrackId`, keeping the readable label and
-  **Remove reference**. Criteria building stays in
-  `SmartPlaylistCriteriaEditing`.
+- 18b Reference picker in the editor — `Done`: the similarity panel gained
+  **Choose reference track**, which opens `ReferenceTrackPickerDialog` (search
+  over the local index plus every configured Orynivo Server) and applies the
+  selection together with the minimum score. The dialog never touches the database
+  or the network itself; `MainWindow` supplies the search. The pure
+  `SmartPlaylistCriteriaEditing.ResolveSimilarityReference` gained a
+  picked-reference override (explicit removal still wins), covered by three more
+  `Orynivo.Tests` cases.
 
 ## 19. Offer activity presets in the Infinite Mix profile — `Todo`
 
