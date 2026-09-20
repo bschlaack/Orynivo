@@ -490,7 +490,13 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   `PresetRenderer.RenderOverlayOnly` so the reduce-motion preference is honoured. The window
   renders with a silent audio source when nothing is playing, so it never stays black, and
   `PixelBuffer.SampleBilinear` returns transparent black outside the frame: clamping to the
-  edge smeared the border colour into long gradients when a preset warped outwards.
+  edge smeared the border colour into long gradients when a preset warped outwards. Writing
+  the frame into the bitmap is not enough to make it visible: `Present()` must also call
+  `InvalidateVisual()` on the image, otherwise the window stays black even though every frame
+  renders correctly. The transport button **Visualisierung** opens the window (there is no
+  sidebar entry); it overlays the current title and artist at the top and previous,
+  play/pause, and next buttons at the bottom left, wired through `VisualizerTransport` to the
+  normal transport methods so playback can be driven from the fullscreen window.
   `VisualizerPresetLibrary` loads the built-in presets plus `.oryvis` and `.milk` files from
   `AppSettings.VisualizerPresetDirectory` (default: a `visualizer-presets` folder below the
   data root); a file that fails to parse is skipped and reported, never fatal, and preset

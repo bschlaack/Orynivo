@@ -8,12 +8,52 @@
         WindowState="FullScreen"
         Background="Black"
         Foreground="White">
+    <Window.Styles>
+        <Style Selector="Button.visualizerControl">
+            <Setter Property="Width" Value="46"/>
+            <Setter Property="Height" Value="46"/>
+            <Setter Property="CornerRadius" Value="23"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Background" Value="#59000000"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.visualizerControl:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#8C000000"/>
+        </Style>
+        <Style Selector="Button.visualizerControl:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="#B3000000"/>
+        </Style>
+    </Window.Styles>
     <Grid>
         <Image x:Name="VisualizerImage"
                Stretch="Fill"
                RenderOptions.BitmapInterpolationMode="HighQuality"/>
+
+        <Border HorizontalAlignment="Left"
+                VerticalAlignment="Top"
+                Margin="24"
+                Padding="16,10"
+                CornerRadius="12"
+                Background="#66000000">
+            <StackPanel Spacing="2">
+                <TextBlock x:Name="NowPlayingTitleTextBlock"
+                           FontSize="{DynamicResource FontSizeBodyStrong}"
+                           FontWeight="SemiBold"
+                           TextTrimming="CharacterEllipsis"
+                           MaxWidth="560"/>
+                <TextBlock x:Name="NowPlayingArtistTextBlock"
+                           FontSize="{DynamicResource FontSizeMeta}"
+                           Opacity="0.8"
+                           TextTrimming="CharacterEllipsis"
+                           MaxWidth="560"/>
+            </StackPanel>
+        </Border>
+
         <Border x:Name="PresetBadge"
-                HorizontalAlignment="Left"
+                HorizontalAlignment="Right"
                 VerticalAlignment="Top"
                 Margin="24"
                 Padding="12,6"
@@ -22,10 +62,52 @@
             <TextBlock x:Name="PresetTextBlock"
                        FontSize="{DynamicResource FontSizeBody}"/>
         </Border>
+
+        <StackPanel Orientation="Horizontal"
+                    Spacing="10"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Bottom"
+                    Margin="24">
+            <Button x:Name="PreviousTrackButton"
+                    Classes="visualizerControl"
+                    AutomationProperties.Name="{DynamicResource L_TransportPrevious}"
+                    ToolTip.Tip="{DynamicResource L_TransportPrevious}"
+                    Click="PreviousTrackButton_OnClick">
+                <Path Width="18"
+                      Height="18"
+                      Stretch="Uniform"
+                      Data="{StaticResource IconPreviousTrack}"
+                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+            </Button>
+            <Button x:Name="PlayPauseButton"
+                    Classes="visualizerControl"
+                    AutomationProperties.Name="{DynamicResource L_TransportPlayPause}"
+                    ToolTip.Tip="{DynamicResource L_TransportPlayPause}"
+                    Click="PlayPauseButton_OnClick">
+                <Path x:Name="PlayPauseIconPath"
+                      Width="18"
+                      Height="18"
+                      Stretch="Uniform"
+                      Data="{StaticResource IconPlayGlyph}"
+                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+            </Button>
+            <Button x:Name="NextTrackButton"
+                    Classes="visualizerControl"
+                    AutomationProperties.Name="{DynamicResource L_TransportNext}"
+                    ToolTip.Tip="{DynamicResource L_TransportNext}"
+                    Click="NextTrackButton_OnClick">
+                <Path Width="18"
+                      Height="18"
+                      Stretch="Uniform"
+                      Data="{StaticResource IconNextTrack}"
+                      Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+            </Button>
+        </StackPanel>
+
         <TextBlock x:Name="HintTextBlock"
-                   HorizontalAlignment="Center"
+                   HorizontalAlignment="Right"
                    VerticalAlignment="Bottom"
-                   Margin="0,0,0,28"
+                   Margin="24,0,24,30"
                    Opacity="0.65"
                    FontSize="{DynamicResource FontSizeMeta}"/>
     </Grid>

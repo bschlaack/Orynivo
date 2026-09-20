@@ -33,6 +33,7 @@ using Orynivo.Audio;
 using Orynivo.Controls;
 using Orynivo.Library;
 using Orynivo.Localization;
+using Orynivo.Visualization;
 using Orynivo.Streaming;
 using Windows.Media;
 
@@ -91,7 +92,16 @@ public partial class MainWindow : Window
     private void VisualizerButton_OnClick(object? sender, RoutedEventArgs e)
     {
         // Non-modal like the karaoke window: playback keeps running behind it.
-        var window = new VisualizerWindow(0, _settings.ReduceMotion, _settings.VisualizerPresetDirectory);
+        var window = new VisualizerWindow(
+            0,
+            _settings.ReduceMotion,
+            _settings.VisualizerPresetDirectory,
+            new VisualizerTransport(
+                Previous: () => PreviousButton_OnClick(this, new RoutedEventArgs()),
+                PlayPause: () => PlayButton_OnClick(this, new RoutedEventArgs()),
+                Next: () => NextButton_OnClick(this, new RoutedEventArgs()),
+                IsPlaying: () => _isPlaying,
+                NowPlaying: () => (NowPlayingTitleBlock.Text, NowPlayingArtistBlock.Text)));
         window.Closed += (_, _) => _visualizerWindow = null;
         _visualizerWindow = window;
         window.Show(this);

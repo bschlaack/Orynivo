@@ -19,7 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   are ignored, so third-party Milkdrop presets degrade instead of failing; a file that
   cannot be parsed is skipped and counted in the on-screen preset label.
 
-- Added the music visualizer window. The sidebar entry **Visualisierung** opens a
+- Added the music visualizer window. The transport button **Visualisierung** opens a
   fullscreen window that renders the playing audio through the preset engine at 480 x 270
   and scales the frame up; Escape closes it, a click or Space switches the preset, the
   arrow keys step through them, and R resets the picture. The **Reduce motion** preference
@@ -64,6 +64,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Out-of-frame samples are transparent now.
 - Moved the visualizer from the sidebar to a fourth transport button next to the equalizer,
   output, and output-lock buttons, with a new spectrum-bar icon in the same stroke style.
+- Fixed the visualizer window staying black while audio played: writing the frame into the
+  bitmap is not enough on its own, the image now also invalidates itself so the freshly
+  written picture is actually painted.
+- The visualizer overlays the current title and artist at the top and previous, play/pause,
+  and next buttons at the bottom left, so playback can be driven without leaving the window.
+  The buttons reuse the normal transport methods and the play/pause glyph follows the real
+  playback state.
 
 
 ## [0.45.0] - 2026-09-20

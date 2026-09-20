@@ -478,7 +478,10 @@ overlays, and a composite stage.
   transport button with its own spectrum-bar icon; the window renders with a silent audio
   source when nothing is playing so it never stays black; and the feedback warp no longer
   clamps out-of-frame samples, which removes the coloured gradient streaks some presets
-  produced.
+  produced. `Present()` also invalidates the image after writing the frame, which is what
+  finally made the picture appear while audio played. The window overlays the current title
+  and artist at the top and previous, play/pause, and next buttons at the bottom left, wired
+  to the normal transport methods.
 
 **Tests**: 21 cases for phase 37a; each later phase adds its own.
 

@@ -1,5 +1,7 @@
 using System.Globalization;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.VisualTree;
 using Avalonia.Input;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
@@ -30,6 +32,8 @@ public partial class VisualizerWindow : Window
     private readonly SilentAudioSource _silent = new();
     private PresetRenderer _renderer;
     private int _presetIndex;
+    private VisualizerTransport? _transport;
+    private bool _isPlaying = true;
     private DateTimeOffset _lastFrame = DateTimeOffset.UtcNow;
     private DateTimeOffset _lastDiagnostics = DateTimeOffset.UtcNow;
 
@@ -47,8 +51,17 @@ public partial class VisualizerWindow : Window
     /// <param name="presetDirectory">
     /// Folder to load user presets from, or <see langword="null"/> for the default folder.
     /// </param>
-    public VisualizerWindow(int presetIndex, bool reduceMotion, string? presetDirectory = null)
+    /// <param name="transport">
+    /// Callbacks into the main window so the overlay buttons drive the real playback, or
+    /// <see langword="null"/> to hide them.
+    /// </param>
+    public VisualizerWindow(
+        int presetIndex,
+        bool reduceMotion,
+        string? presetDirectory = null,
+        VisualizerTransport? transport = null)
     {
+        _transport = transport;
         _presetIndex = presetIndex;
         _library.Reload(presetDirectory);
         _renderer = new PresetRenderer(_library.At(_presetIndex), RenderWidth, RenderHeight);
@@ -83,7 +96,13 @@ public partial class VisualizerWindow : Window
             VisualizerAudioHub.Shared.Clear();
         };
         KeyDown += OnKeyDown;
-        PointerPressed += (_, _) => SelectPreset(_presetIndex + 1);
+        PointerPressed += (_, e) =>
+        {
+            // A click on one of the overlay buttons must not also switch the preset.
+            if (e.Source is Visual source && source.GetVisualAncestors().OfType<Button>().Any())
+                return;
+            SelectPreset(_presetIndex + 1);
+        };
     }
 
     /// <summary>
@@ -94,6 +113,25 @@ public partial class VisualizerWindow : Window
 
     /// <summary>Gets the index of the preset currently being rendered.</summary>
     public int PresetIndex => _presetIndex;
+
+    /// <summary>
+    /// Shows the current track above the picture. Called from the render loop so the overlay
+    /// follows track changes without an extra subscription.
+    /// </summary>
+    /// <param name="title">Track title.</param>
+    /// <param name="artist">Track artist.</param>
+    private void SetTrack(string? title, string? artist)
+    {
+        title ??= string.Empty;
+        artist ??= string.Empty;
+        if (NowPlayingTitleTextBlock.Text != title)
+            NowPlayingTitleTextBlock.Text = title;
+        if (NowPlayingArtistTextBlock.Text != artist)
+        {
+            NowPlayingArtistTextBlock.Text = artist;
+            NowPlayingArtistTextBlock.IsVisible = artist.Length > 0;
+        }
+    }
 
     /// <summary>Selects a preset by index, wrapping around the available presets.</summary>
     /// <param name="index">Requested preset index.</param>
@@ -146,6 +184,12 @@ public partial class VisualizerWindow : Window
             _renderer.RenderFrame(audio, delta);
 
         Present();
+        UpdatePlayPauseIcon();
+        if (_transport is { } transport)
+        {
+            var nowPlaying = transport.NowPlaying();
+            SetTrack(nowPlaying.Title, nowPlaying.Artist);
+        }
         LogDiagnostics();
     }
 
@@ -202,6 +246,32 @@ public partial class VisualizerWindow : Window
                     stride);
             }
         }
+
+        // Writing the bitmap is not enough on its own: the image has to be invalidated so
+        // the freshly written frame is actually painted.
+        VisualizerImage.InvalidateVisual();
+    }
+
+    private void PreviousTrackButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) =>
+        _transport?.Previous();
+
+    private void PlayPauseButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        _isPlaying = !_isPlaying;
+        UpdatePlayPauseIcon();
+        _transport?.PlayPause();
+    }
+
+    private void NextTrackButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) =>
+        _transport?.Next();
+
+    private void UpdatePlayPauseIcon()
+    {
+        if (_transport is { IsPlaying: { } isPlaying })
+            _isPlaying = isPlaying();
+
+        PlayPauseIconPath.Data = (Avalonia.Media.Geometry?)this.FindResource(
+            _isPlaying ? "IconPauseGlyph" : "IconPlayGlyph");
     }
 
     /// <summary>Silent fallback so a preset renders before playback starts or while paused.</summary>
