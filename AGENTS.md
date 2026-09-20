@@ -195,6 +195,12 @@ three test projects.
 builds with `--warnaserror`, all three test projects, and both parity scripts)
 and stops at the first failure; CI still runs these steps itself. Use it before
 declaring work complete.
+Every test that changes the process-wide playback profile through
+`AudioDatabase.SetActiveProfile` must save `AudioDatabase.ActiveProfileId` first and
+restore it in a `finally`. `ActiveProfileId` is process-wide `AsyncLocal` state, so
+a leaked profile makes unrelated profile-scoped queries (playback history, the
+year-in-review summary, cross-device positions) silently return nothing, and the
+resulting failure looks like a query bug instead of a test-isolation bug.
 Every test that opens a library database must use
 `Orynivo.Core.Tests.CoreTestDatabase`, which owns a unique temporary directory
 per test and clears only that database's SQLite pool on disposal. Never call

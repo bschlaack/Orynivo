@@ -7,6 +7,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Hardened the profile-scoped test isolation. `AudioDatabase.ActiveProfileId` is
+  process-wide `AsyncLocal` state, so every test that changes it now saves and
+  restores the previous value; a leaked profile made profile-scoped queries
+  (playback history, year-in-review summary, cross-device positions) silently
+  return nothing, which looked like a query bug. `YearInReviewTests` additionally
+  pins the profile, proves that history rows written through a separate SQLite
+  connection are visible through the `AudioDatabase` connection before the year
+  query runs, and reports the active profile and visible row count on failure.
+  This addresses the intermittent failure of
+  `GetYearInReview_ExcludesOtherYears` that could not be reproduced on demand.
+
 - Migrated the desktop from Avalonia 11.3 to **Avalonia 12.1.2** and SkiaSharp
   2.88.9 to **3.119.4** (`Avalonia.Skia` 12.1.2 depends on that line).
   `Avalonia.Controls.DataGrid` moved with the other packages - the earlier "no
