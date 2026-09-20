@@ -1,6 +1,6 @@
 # Orynivo Roadmap
 
-Items 1-35 are complete and listed for reference only.
+Items 1-36 are complete and listed for reference only.
 
 Each item is one commit and must follow the completion checklist in
 `AGENTS.md`: build every affected project, run the three test projects, update
@@ -381,3 +381,19 @@ fractional-rate ordering, DSD128, the PCM ordering, and uniqueness.
 fallback when the cap excludes every rate, and the DSD preference under a cap.
 
 **Commit**: `feat(playback): add a maximum output sample rate setting`
+
+## 36. Fix the Linux and macOS desktop builds - `Done`
+
+**Design**
+
+- The new maximum-output-rate parameter reached the Windows `WasapiAudioPlayer` but not
+  the `Compatibility/Linux` replacement that the non-Windows targets compile, so Linux and
+  macOS failed with `CS1501: No overload for CreateAsync takes 6 arguments` while Windows
+  stayed green. The compatibility player now accepts and honours the cap.
+- `scripts/verify-all.ps1` gained a non-Windows desktop compile (`-p:OS=Unix`), so this
+  class of platform-specific call-site mismatch is caught locally instead of only by CI.
+
+**Tests**: the new verify step fails on the reverted change and passes again once the
+parameter is restored.
+
+**Commit**: `fix(build): compile the non-Windows desktop in verify-all`

@@ -100,13 +100,19 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
     /// <param name="equalizerEnabled">Whether the supplied equalizer profile is active.</param>
     /// <param name="equalizerProfile">Equalizer profile applied to PCM samples.</param>
     /// <param name="cancellationToken">Cancellation token for startup.</param>
+    /// <param name="maxOutputSampleRateHz">
+    /// Configured maximum PCM output rate in hertz, or zero for automatic. The shared
+    /// Linux and macOS output paths honour it as well, so the option behaves the same on
+    /// every platform.
+    /// </param>
     /// <returns>The player and technical information for the first track.</returns>
     public static async Task<(WasapiAudioPlayer AudioPlayer, AudioFileInfo Info)> CreateAsync(
         IReadOnlyList<GaplessPlaybackItem> items,
         string deviceId,
         bool equalizerEnabled = false,
         EqualizerProfile? equalizerProfile = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int maxOutputSampleRateHz = 0)
     {
         if (items.Count == 0)
             throw new ArgumentException("At least one playback item is required.", nameof(items));
@@ -115,6 +121,8 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
                    ?? await ProbeAsync(items[0].PlaybackPath, cancellationToken).ConfigureAwait(false);
         info = ApplyKnownDuration(items[0], info);
         var sourceRate = NormalizePcmRate(info.OutputSampleRate);
+        if (maxOutputSampleRateHz > 0)
+            sourceRate = Math.Min(sourceRate, maxOutputSampleRateHz);
 
         if (deviceId.StartsWith("alsa:", StringComparison.Ordinal))
         {
@@ -194,19 +202,24 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
     /// <param name="equalizerEnabled">Whether equalization is active.</param>
     /// <param name="equalizerProfile">Equalizer profile.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="maxOutputSampleRateHz">
+    /// Configured maximum PCM output rate in hertz, or zero for automatic.
+    /// </param>
     /// <returns>The player and technical information.</returns>
     public static Task<(WasapiAudioPlayer AudioPlayer, AudioFileInfo Info)> CreateAsync(
         string filePath,
         string deviceId,
         bool equalizerEnabled = false,
         EqualizerProfile? equalizerProfile = null,
-        CancellationToken cancellationToken = default) =>
+        CancellationToken cancellationToken = default,
+        int maxOutputSampleRateHz = 0) =>
         CreateAsync(
             [new GaplessPlaybackItem(filePath, 1.0f)],
             deviceId,
             equalizerEnabled,
             equalizerProfile,
-            cancellationToken);
+            cancellationToken,
+            maxOutputSampleRateHz);
 
     /// <inheritdoc/>
     public void UpdateEqualizer(bool enabled, EqualizerProfile? profile) =>

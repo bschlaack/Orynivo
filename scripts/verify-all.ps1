@@ -80,6 +80,22 @@ if (-not $SkipBuild) {
             )
         })
     }
+
+    # The desktop swaps in Compatibility/Linux implementations for several Windows types,
+    # so a Windows-only local build cannot see a broken Linux or macOS call site. Overriding
+    # the OS property compiles that variant on any host; this caught a CreateAsync overload
+    # mismatch that only the CI Linux and macOS jobs had reported.
+    $steps.Add(@{
+        Name       = "Build Orynivo (Linux/macOS compile, $Configuration)"
+        Executable = 'dotnet'
+        Arguments  = @(
+            'build', 'Orynivo/Orynivo.csproj',
+            '-p:OS=Unix',
+            '--configuration', $Configuration,
+            '--warnaserror',
+            '--verbosity', 'minimal'
+        )
+    })
 }
 if (-not $SkipTests) {
     foreach ($project in 'Orynivo.Core.Tests', 'Orynivo.Tests', 'Orynivo.Server.Tests') {

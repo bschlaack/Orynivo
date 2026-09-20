@@ -193,6 +193,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   positions are stored, and no credential-bearing URL is ever persisted.
 
 ### Fixed
+- Fixed the Linux and macOS desktop builds, which failed with `CS1501: No overload for
+  CreateAsync takes 6 arguments`. The maximum-output-rate option reached the Windows
+  player but not the `Compatibility/Linux` replacement that the non-Windows targets
+  compile instead, so only the CI Linux and macOS jobs saw the mismatch. That
+  compatibility player now accepts and honours the same cap.
+- `scripts/verify-all.ps1` compiles the non-Windows desktop variant as well, by building
+  `Orynivo/Orynivo.csproj` with `-p:OS=Unix`. A Windows-only local build cannot see a
+  broken Linux or macOS call site, which is why this failure reached CI in the first
+  place; the new step caught the same mismatch when it was reintroduced deliberately.
+
 - Fixed DSD-to-PCM playback over exclusive WASAPI, which played nothing but very loud
   crackling on a Sound BlasterX AE-5. The WASAPI format chooser handed the raw DSD rate
   to its ordering (`Math.Max(source, hint)`), so a DSD source preferred the highest rate

@@ -192,9 +192,12 @@ Do not move shared behavior into a UI-only class when a `Orynivo.Core` type can
 own it and stay cross-platform testable. The Windows build workflow runs all
 three test projects.
 `scripts/verify-all.ps1` runs the same checks locally in one command (managed
-builds with `--warnaserror`, all three test projects, and both parity scripts)
-and stops at the first failure; CI still runs these steps itself. Use it before
-declaring work complete.
+builds with `--warnaserror`, the non-Windows desktop compile via `-p:OS=Unix`,
+all three test projects, and the three parity scripts) and stops at the first
+failure; CI still runs these steps itself. The non-Windows compile matters because
+the desktop swaps in `Compatibility/Linux` implementations for several Windows
+types, so a Windows-only local build cannot see a broken Linux or macOS call site.
+Use it before declaring work complete.
 Every test that changes the process-wide playback profile through
 `AudioDatabase.SetActiveProfile` must save `AudioDatabase.ActiveProfileId` first and
 restore it in a `finally`. `ActiveProfileId` is process-wide `AsyncLocal` state, so
