@@ -8,6 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Added `scripts/verify-all.ps1`, which runs the same checks as CI on a local
+  checkout in one command: the managed builds with `--warnaserror`, all three
+  test projects, and both parity scripts. It stops at the first failure, prints a
+  compact summary, and supports `-Configuration`, `-SkipBuild`, and `-SkipTests`.
+
 ### Fixed
 
 - Hardened the Core test suite against intermittent failures. Every database test

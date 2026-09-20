@@ -1322,6 +1322,14 @@ profile-context middleware without starting the web host. Every database test
 creates its own temporary library, so the suite is safe to run in parallel and
 never touches your real library data.
 
+`scripts/verify-all.ps1` runs the same checks as CI in one command: the managed
+builds with `--warnaserror`, all three test projects, and both parity scripts. It
+stops at the first failure and prints a compact summary.
+
+```bash
+pwsh -NoProfile -File scripts/verify-all.ps1
+```
+
 ### Orynivo Server
 
 The server has no native dependencies and builds on any platform:

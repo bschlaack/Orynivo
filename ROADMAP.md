@@ -45,20 +45,17 @@ recommended next steps.
 - `TestEnvironment`'s module initializer remains the safety net for the whole run.
 - Verified with ten consecutive green suite runs (337 tests).
 
-## 16. ★ Add `scripts/verify-all.ps1` — `Todo`
+## 16. ★ Add `scripts/verify-all.ps1` — `Done`
 
-A single local command that mirrors CI exactly.
-
-**Design**
-
-- Build `Orynivo.Core`, `Orynivo.Server`, and `Orynivo` with `--warnaserror`.
-- Run all three test projects and both parity scripts.
-- Fail fast, print a compact summary, and exit non-zero on the first failure.
-- Do not wire it into the workflows; CI already runs these steps separately.
-
-**Tests**: the script itself is the verification.
-
-**Commit**: `chore(scripts): add a local CI parity verification script`
+- Runs the managed builds for `Orynivo.Core`, `Orynivo.Server`, and `Orynivo`
+  with `--warnaserror`, all three test projects, and both parity scripts.
+- Stops at the first failure, prints the failing output tail, then a compact
+  summary naming the steps that were skipped, and exits non-zero.
+- Supports `-Configuration Debug|Release`, `-SkipBuild`, and `-SkipTests`; it
+  deliberately does not force the native-bridge properties the Windows workflow
+  sets, so a local build keeps its own defaults.
+- Not wired into the workflows; CI runs these steps itself. Both the success and
+  the failure path were verified.
 
 ## 17. ★ Expose the new features to MCP and AI Chat — `Todo`
 

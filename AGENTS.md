@@ -191,6 +191,10 @@ covers pure desktop helpers that do not require a running Avalonia UI;
 Do not move shared behavior into a UI-only class when a `Orynivo.Core` type can
 own it and stay cross-platform testable. The Windows build workflow runs all
 three test projects.
+`scripts/verify-all.ps1` runs the same checks locally in one command (managed
+builds with `--warnaserror`, all three test projects, and both parity scripts)
+and stops at the first failure; CI still runs these steps itself. Use it before
+declaring work complete.
 Every test that opens a library database must use
 `Orynivo.Core.Tests.CoreTestDatabase`, which owns a unique temporary directory
 per test and clears only that database's SQLite pool on disposal. Never call
