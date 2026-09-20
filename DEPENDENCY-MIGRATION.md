@@ -102,15 +102,29 @@ Avalonia moved from 11.3.22 to **12.1.2** in one commit, together with SkiaSharp
 Verification: clean Debug and Release builds with `--warnaserror` (0 errors,
 0 warnings) and `scripts/verify-all.ps1` green, with 570 tests passing.
 
-**Still to verify manually.** The migration is proven by build and test only. A
-runtime pass is outstanding for: startup and window/title-bar decorations,
-playback and the transport, the shared Tracks/Albums/Artists tables (theming,
-column chooser, column reordering, A-Z index), drag and drop into Up Next, the
-Dashboard and its stage animation, the Genre Cloud background mosaic, the AI chat
-clipboard copy, every dialog, and macOS rendering. Avalonia 12 changes the
-EGL/OpenGL handling on Linux and macOS, so the documented
-OpenGL-first/software-second macOS workaround must be re-checked rather than
-assumed to still apply.
+**Runtime verification.** A Windows smoke test of the Release build in
+`Orynivo/bin/Release/net10.0-windows10.0.19041.0` found no obvious defects. That
+build was confirmed to carry `Avalonia*` 12.1.2, `Avalonia.Controls.DataGrid`
+12.1.2, `SkiaSharp` 3.119.4, and `Microsoft.Data.Sqlite` 10.0.12, so it exercises
+both this migration and the .NET 10 one.
+
+The pass covered the library tables, playback and the transport, the Dashboard
+(including the cover stage), the Genre Cloud (including the background mosaic), the
+search and detail views, Settings, and the AI chat, on Windows.
+
+Still outstanding:
+
+- The Linux and macOS builds, including direct ALSA and OpenAL PCM output, native
+  DSD/DoP, and MPRIS.
+- Native ASIO and cwASIO playback on Windows (the Steinberg bridge is not part of
+  the CI artifact).
+- macOS rendering. Avalonia 12 changes the EGL/OpenGL handling, so the documented
+  OpenGL-first/software-second workaround must be re-checked rather than assumed to
+  still apply.
+- Features a general pass does not reach: drag and drop into Up Next, the
+  year-in-review PNG and PDF export, the fullscreen karaoke view, the output and
+  equalizer profile dialogs, remote Orynivo Server and Plex playback, MCP and AI
+  tool execution, cross-device resume, and the WebDAV backup upload.
 
 ## Adopting compiled bindings
 
