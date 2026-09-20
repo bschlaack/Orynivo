@@ -243,7 +243,11 @@ SkiaSharp.NativeAssets.Linux 2.88.9, so raising SkiaSharp or
 SkiaSharp.NativeAssets.* in `Orynivo.Core`/`Orynivo.Server` would make Avalonia
 render through an incompatible managed/native Skia (and 3.x/4.x removed
 `SKFilterQuality`). Revisit both pins together when Avalonia ships a
-SkiaSharp 3/4-based release.
+SkiaSharp 3/4-based release. The deliberate migration triggers, steps, and
+required checks for every held-back line are recorded in
+[`DEPENDENCY-MIGRATION.md`](DEPENDENCY-MIGRATION.md); keep that record and the
+Dependabot `ignore` list in agreement, and never merge an ignored major upgrade
+without following the recorded plan.
 All GitHub-hosted CI and release workflows use Node.js 24-compatible action
 generations (`actions/checkout@v6`, `actions/setup-dotnet@v5`, and
 `softprops/action-gh-release@v3` where applicable); do not reintroduce their

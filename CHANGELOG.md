@@ -97,6 +97,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Similarity smart playlists now resolve on an Orynivo Server instead of
@@ -186,6 +191,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -343,6 +353,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -547,6 +562,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - The genre-cloud recommendation tie-break is now deterministic. It previously
@@ -622,6 +642,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -705,6 +730,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Unified all six desktop languages as complete built-in resources (853 keys
@@ -779,6 +809,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -864,6 +899,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - The **Up Next** table now offers the same selectable track columns as
@@ -936,6 +976,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Similar-title and mood-mix actions now navigate directly to **Up Next**
@@ -998,6 +1043,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -1069,6 +1119,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -1170,6 +1225,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Dashboard album artwork now refreshes immediately after a cover search or
@@ -1238,6 +1298,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Opening metadata review uses a fast index-only analysis instead of opening
@@ -1305,6 +1370,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -1398,6 +1468,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -1548,6 +1623,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Fixed a Library Doctor database-column typo that closed Orynivo when metadata
@@ -1638,6 +1718,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Fixed combined artist-and-title library searches so terms can match across
@@ -1711,6 +1796,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -1788,6 +1878,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -1941,6 +2036,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Artist and album artwork changes now invalidate the unified library view
@@ -2038,6 +2138,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Restarting Orynivo now restores every selectable sidebar content view rather
@@ -2105,6 +2210,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -2185,6 +2295,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Orynivo Server ReplayGain maintenance now runs FFmpeg with one worker thread,
@@ -2260,6 +2375,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -2348,6 +2468,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -2440,6 +2565,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Distinguished a completed MusicBrainz lookup with no community votes from a
@@ -2513,6 +2643,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Removed the Fluent DataGrid header's permanent empty sort-icon reservation,
@@ -2585,6 +2720,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Fixed unified artist details clearing their already rendered albums when the
@@ -2650,6 +2790,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -2755,6 +2900,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Fixed Windows identifying Orynivo as an unknown application in the system
@@ -2822,6 +2972,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -2902,6 +3057,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Preserved an album's downloaded artwork and favorite flag when a full
@@ -2965,6 +3125,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -3042,6 +3207,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -3139,6 +3309,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -3239,6 +3414,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Fixed Genre Cloud drill-downs reverting to all root genres when a connected
@@ -3338,6 +3518,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Fixed SEO image dimensions stretching the product screenshots and brand
@@ -3420,6 +3605,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -3515,6 +3705,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -3613,6 +3808,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Linux server release builds now normalize and validate packaged maintainer
@@ -3674,6 +3874,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -3759,6 +3964,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Opening a local or Orynivo Server album from a unified artist view once again
@@ -3821,6 +4031,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -3904,6 +4119,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Hidden the Steinberg ASIO and cwASIO subsystem badges on macOS and Linux,
@@ -3984,6 +4204,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -4099,6 +4324,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Linux now detects the extensionless `ffmpeg` and `ffprobe` executables for
@@ -4187,6 +4417,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Improved the startup update dialog's primary action contrast, spacing, and
@@ -4254,6 +4489,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -4329,6 +4569,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Placed Settings on/off switches immediately before their labels and aligned
@@ -4399,6 +4644,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Removed the standalone cyan scan-activity dot from the sidebar while retaining
@@ -4466,6 +4716,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -4541,6 +4796,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Prevented publication of incomplete signed update manifests by waiting for
@@ -4609,6 +4869,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -4774,6 +5039,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Fixed the listening chart's Y-axis rendering: the filled path now includes an
@@ -4927,6 +5197,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Fixed dragging albums onto the "Up Next" sidebar item restarting the current
@@ -5011,6 +5286,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Reduced local and Orynivo Server artist rename work by updating only the
@@ -5084,6 +5364,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -5159,6 +5444,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -5267,6 +5557,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -5419,6 +5714,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -5615,6 +5915,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Fixed waveform transport seeking so pointer release is captured reliably, the
@@ -5771,6 +6076,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Fixed checkbox borders appearing near-black on the dark background: the app
@@ -5849,6 +6159,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -5965,6 +6280,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - The Dashboard genre statistics (Top genres and the per-day calendar genres) now
@@ -6041,6 +6361,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - The Linux Orynivo Server now reads and writes its editable configuration at
@@ -6107,6 +6432,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -6189,6 +6519,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -6285,6 +6620,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Windows FFmpeg auto-download now resolves the current BtbN release asset via
@@ -6353,6 +6693,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - FFmpeg and FFprobe child processes now always receive a valid working
@@ -6416,6 +6761,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -6594,6 +6944,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -6792,6 +7147,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - The Orynivo Server settings and remote directory browser dialogs now use
@@ -6931,6 +7291,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Fixed numbered circle labels on the equalizer frequency-response graph being
@@ -7024,6 +7389,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -7152,6 +7522,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Enabled the A–Z index in the Plex folder view. Available letters now come
@@ -7276,6 +7651,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 ## [0.8.0] - 2026-06-21
@@ -7353,6 +7733,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -7457,6 +7842,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Fixed the application failing during startup because the lyrics
@@ -7536,6 +7926,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -7663,6 +8058,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Added a theme-aware background highlight for the currently audible item in
@@ -7767,6 +8167,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
 
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
+
 ### Fixed
 
 - Fixed the table-header column chooser not opening on right-click and then
@@ -7863,6 +8268,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 
@@ -8008,6 +8418,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   transport action when another device left off meaningfully later. The decision
   lives in the pure `Orynivo.Library.CrossDeviceResume` helper, only profile-scoped
   positions are stored, and no credential-bearing URL is ever persisted.
+
+- Added `DEPENDENCY-MIGRATION.md`, the decision record for every dependency line
+  held back by Dependabot. It records the current pins, the trigger that unblocks
+  each upgrade, the migration steps, and the checks required before merging, and
+  is referenced from `AGENTS.md` next to the Dependabot rules.
 
 ### Fixed
 

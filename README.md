@@ -1698,6 +1698,13 @@ ahead. Only a position and timestamp are stored, never a stream URL or API key.
   and the transport controls (previous, play/pause, next, volume, artist info,
   lyrics, favorite, shuffle, equalizer, and output) expose accessible names.
 
+## Dependency migration
+
+`.github/dependabot.yml` deliberately ignores major upgrades that need a reviewed
+migration instead of an automatic bump. The triggers, steps, and required checks
+for each held-back line are recorded in
+[`DEPENDENCY-MIGRATION.md`](DEPENDENCY-MIGRATION.md).
+
 ## Current Limitations
 
 - Linux output profiles include direct ALSA `hw:` endpoints and endpoints

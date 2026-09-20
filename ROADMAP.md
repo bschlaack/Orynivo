@@ -1,6 +1,6 @@
 # Orynivo Roadmap
 
-Items 1–14 are complete and listed for reference only. Items 15+ are open work.
+Items 1-28 are complete and listed for reference only.
 
 Each item is one commit and must follow the completion checklist in
 `AGENTS.md`: build every affected project, run the three test projects, update
@@ -9,8 +9,7 @@ English XML docs, add every new visible string to all seven languages, and run
 `scripts/verify-localization-parity.ps1` (plus
 `scripts/verify-mcp-tool-parity.ps1` for MCP/AI changes).
 
-Status values: `Todo`, `In progress`, `Blocked`, `Done`. Items marked ★ are the
-recommended next steps.
+Status values: `Todo`, `In progress`, `Blocked`, `Done`.
 
 ## Completed (1–14)
 
@@ -247,7 +246,7 @@ Steps:
 
 **Commit**: `feat(playback): resume a track across devices`
 
-## 28. Record the dependency migration plan — `Todo`
+## 28. Record the dependency migration plan — `Done`
 
 **Design**
 
