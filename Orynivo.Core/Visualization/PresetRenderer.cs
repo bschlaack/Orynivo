@@ -25,12 +25,13 @@ public interface IVisualizerAudioSource
 }
 
 /// <summary>
-/// Runs one preset frame by frame. The stages follow Milkdrop: a one-time initialisation,
-/// the per-frame block that also adjusts <c>decay</c>, <c>zoom</c>, and <c>warp</c>, the
-/// per-pixel block that chooses where the previous frame is sampled from, optional blur
-/// passes, the feedback fade, and finally the freshly drawn waveform and spectrum on top.
-/// Everything runs on the calling thread and only touches this renderer's own buffers, so a
-/// visualization can never interfere with audio output.
+/// Runs one preset frame by frame through the Milkdrop stage order: the one-time
+/// initialisation blocks, the per-frame block that also adjusts the motion parameters, the
+/// per-pixel block that chooses where the previous frame is sampled from, the blur passes,
+/// the feedback fade with the centre darkening and gamma, and finally the freshly drawn
+/// waveforms, spectrum, and shapes on top. Everything runs on the calling thread and only
+/// touches this renderer's own buffers, so a visualization can never interfere with audio
+/// output.
 /// </summary>
 public sealed class PresetRenderer : IVisualizerAudioSource
 {
@@ -43,6 +44,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource
     private bool _initialized;
     private long _frame;
     private double _elapsed;
+    private float _attBass;
+    private float _attMid;
+    private float _attTreble;
+    private float _attVolume;
 
     /// <summary>Creates a renderer for one preset.</summary>
     /// <param name="preset">Preset to run.</param>
@@ -96,24 +101,33 @@ public sealed class PresetRenderer : IVisualizerAudioSource
         Treble = audio.Treble;
         Volume = audio.Volume;
         _elapsed += Math.Clamp(deltaSeconds, 0d, 0.25d);
+        SmoothBands();
 
         SeedFrameVariables();
         if (!_initialized)
         {
             Preset.PerFrameInit.Execute(_slots);
+            Preset.PerPixelInit.Execute(_slots);
+            foreach (var wave in Preset.Waves)
+                wave.Init.Execute(_slots);
+            foreach (var shape in Preset.Shapes)
+                shape.Init.Execute(_slots);
             _initialized = true;
         }
 
         Preset.PerFrame.Execute(_slots);
+        foreach (var wave in Preset.Waves)
+            wave.PerFrame.Execute(_slots);
 
         var decay = Math.Clamp(Read("decay", Preset.Decay), 0f, 1f);
-        var zoom = Math.Max(0.05f, Read("zoom", Preset.Zoom));
         Warp();
 
-        for (var pass = 0; pass < Preset.BlurLevel; pass++)
+        for (var pass = 0; pass < BlurPasses(); pass++)
             _warped.Blur();
 
         _warped.Scale(decay);
+        DarkenCenter();
+        ApplyGamma();
         DrawOverlay();
         Composite();
         _previous.CopyFrom(_fresh);
@@ -149,28 +163,114 @@ public sealed class PresetRenderer : IVisualizerAudioSource
         _initialized = false;
         _frame = 0;
         _elapsed = 0;
+        _attBass = _attMid = _attTreble = _attVolume = 0f;
         Bass = Mid = Treble = Volume = 0f;
     }
 
-    /// <summary>Seeds the built-in variables a preset expects for this frame.</summary>
+    /// <summary>Keeps the smoothed <c>*_att</c> bands the presets read alongside the raw bands.</summary>
+    private void SmoothBands()
+    {
+        _attBass = (_attBass * 0.8f) + (Bass * 0.2f);
+        _attMid = (_attMid * 0.8f) + (Mid * 0.2f);
+        _attTreble = (_attTreble * 0.8f) + (Treble * 0.2f);
+        _attVolume = (_attVolume * 0.8f) + (Volume * 0.2f);
+    }
+
+    /// <summary>Seeds the standard variables a preset expects for this frame.</summary>
     private void SeedFrameVariables()
     {
+        var width = _previous.Width;
+        var height = _previous.Height;
         Write("time", (float)_elapsed);
         Write("fps", _frame > 0 ? 1f / Math.Max(0.001f, (float)(_elapsed / Math.Max(1, _frame))) : 0f);
         Write("frame", _frame);
+        Write("monitor", 1f);
         Write("bass", Bass);
         Write("mid", Mid);
         Write("treb", Treble);
         Write("vol", Volume);
+        Write("bass_att", _attBass);
+        Write("mid_att", _attMid);
+        Write("treb_att", _attTreble);
+        Write("aspectx", height > 0 ? width / (float)height : 1f);
+        Write("aspecty", 1f);
+        Write("pixelsx", width);
+        Write("pixelsy", height);
+        // The per-frame defaults a preset can override before the warp reads them back.
         Write("decay", Preset.Decay);
+        Write("fDecay", Preset.Decay);
+        Write("fGammaAdj", 1f);
         Write("zoom", Preset.Zoom);
+        Write("zoomexp", 1f);
+        Write("rot", 0f);
+        Write("cx", 0f);
+        Write("cy", 0f);
+        Write("dx", 0f);
+        Write("dy", 0f);
         Write("warp", Preset.Warp);
+        Write("sx", 1f);
+        Write("sy", 1f);
+        Write("blur1", Preset.BlurLevel);
+        Write("blur2", 0f);
+        Write("blur3", 0f);
+        Write("darken_center", 0f);
+        Write("wave_mode", 0f);
+        Write("wave_r", 1f);
+        Write("wave_g", 1f);
+        Write("wave_b", 1f);
+        Write("wave_a", Preset.WaveAlpha);
+        Write("wave_x", 0.5f);
+        Write("wave_y", 0.5f);
+        Write("wave_mystery", 0f);
+        Write("wave_dots", 0f);
+        Write("wave_thick", 0f);
+        Write("wave_additive", 1f);
+        Write("wave_brighten", 0f);
+        Write("ob_r", 0f);
+        Write("ob_g", 0f);
+        Write("ob_b", 0f);
+        Write("ob_a", 0f);
+        Write("ib_r", 0f);
+        Write("ib_g", 0f);
+        Write("ib_b", 0f);
+        Write("ib_a", 0f);
+        Write("echo_zoom", 1f);
+        Write("echo_alpha", 0f);
+        Write("echo_orient", 0f);
+        Write("fVideoEchoZoom", 1f);
+        Write("fVideoEchoAlpha", 0f);
+        Write("nVideoEchoOrientation", 0f);
     }
 
-    /// <summary>Warps the previous frame through the per-pixel block into the warped buffer.</summary>
+    /// <summary>How many box-blur passes the preset asked for across <c>blur1</c> to <c>blur3</c>.</summary>
+    /// <returns>The bounded pass count.</returns>
+    private int BlurPasses()
+    {
+        var passes = (int)Math.Clamp(Read("blur1", Preset.BlurLevel), 0f, 3f) +
+                     (int)Math.Clamp(Read("blur2", 0f), 0f, 3f) +
+                     (int)Math.Clamp(Read("blur3", 0f), 0f, 3f);
+        return Math.Clamp(passes, 0, 8);
+    }
+
+    /// <summary>
+    /// Warps the previous frame into the warped buffer. The built-in motion parameters run
+    /// first, then the preset's per-pixel block sees that warped position in <c>x</c>, <c>y</c>,
+    /// <c>rad</c>, and <c>ang</c> and may offset or replace it before the sample is taken.
+    /// </summary>
     private void Warp()
     {
-        var zoom = Math.Max(0.05f, Read("zoom", Preset.Zoom));
+        var zoom = Math.Max(0.01f, Read("zoom", Preset.Zoom));
+        var zoomExp = Read("zoomexp", 1f);
+        var rotation = Read("rot", 0f);
+        var centreX = Read("cx", 0f);
+        var centreY = Read("cy", 0f);
+        var offsetX = Read("dx", 0f);
+        var offsetY = Read("dy", 0f);
+        var stretchX = Read("sx", 1f);
+        var stretchY = Read("sy", 1f);
+        var cosRotation = MathF.Cos(rotation);
+        var sinRotation = MathF.Sin(rotation);
+
         var width = _warped.Width;
         var height = _warped.Height;
         for (var y = 0; y < height; y++)
@@ -179,14 +279,27 @@ public sealed class PresetRenderer : IVisualizerAudioSource
             for (var x = 0; x < width; x++)
             {
                 var normalizedX = width > 1 ? (x / (float)(width - 1) * 2f) - 1f : 0f;
-                Write("x", normalizedX);
-                Write("y", normalizedY);
-                Write("rad", MathF.Sqrt((normalizedX * normalizedX) + (normalizedY * normalizedY)));
-                Write("ang", MathF.Atan2(normalizedY, normalizedX));
+
+                // Centre, stretch, rotate, and zoom the sampling position.
+                var warpedX = (normalizedX - centreX) * stretchX;
+                var warpedY = (normalizedY - centreY) * stretchY;
+                var rotatedX = (warpedX * cosRotation) - (warpedY * sinRotation);
+                var rotatedY = (warpedX * sinRotation) + (warpedY * cosRotation);
+                var radius = MathF.Sqrt((rotatedX * rotatedX) + (rotatedY * rotatedY));
+                var pixelZoom = zoomExp == 1f
+                    ? zoom
+                    : MathF.Pow(zoom, 1f + (zoomExp * radius * 2f));
+                warpedX = (rotatedX * pixelZoom) + centreX + offsetX;
+                warpedY = (rotatedY * pixelZoom) + centreY + offsetY;
+
+                Write("x", warpedX);
+                Write("y", warpedY);
+                Write("rad", radius);
+                Write("ang", MathF.Atan2(rotatedY, rotatedX));
                 Preset.PerPixel.Execute(_slots);
 
-                var sampleX = Read("x", normalizedX) * zoom;
-                var sampleY = Read("y", normalizedY) * zoom;
+                var sampleX = Read("x", warpedX);
+                var sampleY = Read("y", warpedY);
                 _previous.SampleBilinear((sampleX * 0.5f) + 0.5f, (sampleY * 0.5f) + 0.5f, _sample);
                 var offset = (((y * width) + x) * 4);
                 _warped.Pixels[offset] = _sample[0];
@@ -194,6 +307,49 @@ public sealed class PresetRenderer : IVisualizerAudioSource
                 _warped.Pixels[offset + 2] = _sample[2];
                 _warped.Pixels[offset + 3] = _sample[3];
             }
+        }
+    }
+
+    /// <summary>Darkens the centre of the frame by the amount the preset asked for.</summary>
+    private void DarkenCenter()
+    {
+        var amount = Math.Clamp(Read("darken_center", 0f), 0f, 1f);
+        if (amount <= 0f)
+            return;
+
+        var width = _warped.Width;
+        var height = _warped.Height;
+        var pixels = _warped.Pixels;
+        for (var y = 0; y < height; y++)
+        {
+            var normalizedY = height > 1 ? (y / (float)(height - 1) * 2f) - 1f : 0f;
+            for (var x = 0; x < width; x++)
+            {
+                var normalizedX = width > 1 ? (x / (float)(width - 1) * 2f) - 1f : 0f;
+                var distance = MathF.Sqrt((normalizedX * normalizedX) + (normalizedY * normalizedY));
+                var factor = 1f - (amount * Math.Clamp(1f - distance, 0f, 1f));
+                var offset = (((y * width) + x) * 4);
+                pixels[offset] *= factor;
+                pixels[offset + 1] *= factor;
+                pixels[offset + 2] *= factor;
+            }
+        }
+    }
+
+    /// <summary>Applies the preset's gamma adjustment to the warped frame.</summary>
+    private void ApplyGamma()
+    {
+        var gamma = Read("fGammaAdj", 1f);
+        if (MathF.Abs(gamma - 1f) < 0.001f)
+            return;
+
+        gamma = Math.Clamp(gamma, 0.1f, 10f);
+        var pixels = _warped.Pixels;
+        for (var index = 0; index < pixels.Length; index += 4)
+        {
+            pixels[index] = MathF.Pow(Math.Clamp(pixels[index], 0f, 1f), gamma);
+            pixels[index + 1] = MathF.Pow(Math.Clamp(pixels[index + 1], 0f, 1f), gamma);
+            pixels[index + 2] = MathF.Pow(Math.Clamp(pixels[index + 2], 0f, 1f), gamma);
         }
     }
 
@@ -206,7 +362,10 @@ public sealed class PresetRenderer : IVisualizerAudioSource
         DrawShapes();
     }
 
-    /// <summary>Draws the waveform, honouring a preset's per-point program.</summary>
+    /// <summary>
+    /// Draws the waveform, honouring the first waveform's per-point program. A preset that
+    /// declares no waveform still gets the default wave.
+    /// </summary>
     private void DrawWaveform()
     {
         var waveform = Waveform;
@@ -215,10 +374,15 @@ public sealed class PresetRenderer : IVisualizerAudioSource
 
         var width = _fresh.Width;
         var height = _fresh.Height;
-        var alpha = Preset.WaveAlpha;
+        var alpha = Math.Clamp(Read("wave_a", Preset.WaveAlpha), 0f, 1f);
         var amplitude = height * Preset.WaveScale * 0.5f;
-        var centre = height * 0.5f;
-        var perPoint = Preset.WavePerPoint;
+        var centre = height * Read("wave_y", 0.5f);
+        var red = Math.Clamp(Read("wave_r", 1f), 0f, 1f);
+        var green = Math.Clamp(Read("wave_g", 1f), 0f, 1f);
+        var blue = Math.Clamp(Read("wave_b", 1f), 0f, 1f);
+        var perPoint = Preset.Waves.Count > 0 ? Preset.Waves[0].PerPoint : Preset.WavePerPoint;
+        if (perPoint.IsEmpty && !Preset.WavePerPoint.IsEmpty)
+            perPoint = Preset.WavePerPoint;
 
         for (var column = 0; column < width; column++)
         {
@@ -242,8 +406,8 @@ public sealed class PresetRenderer : IVisualizerAudioSource
 
             var x = (int)Math.Clamp((normalizedX * 0.5f + 0.5f) * (width - 1), 0f, width - 1);
             var y = (int)Math.Clamp(centre + (normalizedY * amplitude), 0f, height - 1);
-            _fresh.AddPixel(x, y, alpha * 0.35f, alpha, alpha);
-            _fresh.AddPixel(x, y + 1, alpha * 0.15f, alpha * 0.4f, alpha * 0.5f);
+            _fresh.AddPixel(x, y, alpha * red * 0.35f, alpha * green, alpha * blue);
+            _fresh.AddPixel(x, y + 1, alpha * red * 0.15f, alpha * green * 0.4f, alpha * blue * 0.5f);
         }
     }
 
@@ -466,6 +630,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource
         Write("b", shape.Blue);
         Write("a", shape.Alpha);
     }
+
     /// <summary>Adds the freshly drawn overlay on top of the faded feedback image.</summary>
     private void Composite()
     {
@@ -478,6 +643,11 @@ public sealed class PresetRenderer : IVisualizerAudioSource
             pixels[index + 3] = 1f;
         }
     }
+
+    /// <summary>Reads a variable of the shared slot layout, for diagnostics and tests.</summary>
+    /// <param name="name">Variable name.</param>
+    /// <returns>The current value, or zero when the layout does not contain the name.</returns>
+    public float ReadVariable(string name) => Read(name, 0f);
 
     private float Read(string name, float fallback)
     {

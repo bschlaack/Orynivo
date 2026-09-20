@@ -23,7 +23,15 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   never block or wait (drop the oldest samples instead), `AudioSpectrumAnalyzer`
   owns windowing, FFT, band grouping, and smoothing, and `Fft` stays a pure,
   allocation-free transform. Never evaluate preset expressions or render frames
-  on the audio thread.
+  on the audio thread. `PresetVariableLayout.RegisterStandardVariables` is the single place
+  that declares the Milkdrop variable set, so every expression block of a preset shares one
+  slot layout and `q1`-`q32` keep their value between the per-frame and per-pixel stages. The
+  renderer runs the stages in Milkdrop order: the init blocks once, the per-frame block and
+  the four waveform per-frame blocks, the motion warp (`zoom`, `zoomexp`, `rot`, `cx`/`cy`,
+  `dx`/`dy`, `sx`/`sy`) with the per-pixel block on top, the blur passes, the decay fade, the
+  centre darkening, the gamma adjustment, and the overlay. The per-pixel block sees the warped
+  position in `x`/`y`, which is a deliberate deviation from Milkdrop offset semantics so the
+  built-in presets keep working; revisit it with the shader runtime in phase 38d.
 - Keep the project cross-platform `net10.0`; do not introduce Avalonia, Windows,
   DPAPI, WASAPI, ASIO, or other platform-specific dependencies.
 - Put shared library scanning, SQLite persistence, search, streaming models and

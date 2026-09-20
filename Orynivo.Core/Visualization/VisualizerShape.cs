@@ -23,6 +23,7 @@ public sealed class VisualizerShape
     /// <param name="borderBlue">Default border blue.</param>
     /// <param name="borderAlpha">Default border opacity.</param>
     /// <param name="additive">Whether the shape is added instead of alpha-blended.</param>
+    /// <param name="init">One-time initialisation program, or an empty program.</param>
     /// <param name="perFrame">Per-frame program, or an empty program.</param>
     /// <param name="perPoint">Per-vertex program, or an empty program.</param>
     public VisualizerShape(
@@ -40,6 +41,7 @@ public sealed class VisualizerShape
         float borderBlue,
         float borderAlpha,
         bool additive,
+        PresetProgram init,
         PresetProgram perFrame,
         PresetProgram perPoint)
     {
@@ -57,6 +59,7 @@ public sealed class VisualizerShape
         BorderBlue = borderBlue;
         BorderAlpha = borderAlpha;
         Additive = additive;
+        Init = init ?? PresetProgram.Empty;
         PerFrame = perFrame ?? PresetProgram.Empty;
         PerPoint = perPoint ?? PresetProgram.Empty;
     }
@@ -102,6 +105,9 @@ public sealed class VisualizerShape
 
     /// <summary>Gets a value indicating whether the shape is added instead of alpha-blended.</summary>
     public bool Additive { get; }
+
+    /// <summary>Gets the one-time initialisation program of this shape.</summary>
+    public PresetProgram Init { get; }
 
     /// <summary>Gets the per-frame program that may override the placement and colours.</summary>
     public PresetProgram PerFrame { get; }

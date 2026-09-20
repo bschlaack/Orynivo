@@ -22,6 +22,43 @@ public sealed class PresetVariableLayout
     public int IndexOf(string name) =>
         name is not null && _slots.TryGetValue(name, out var slot) ? slot : -1;
 
+    /// <summary>
+    /// Registers the standard Milkdrop variable set up front, so the renderer can always write
+    /// every variable a preset may read and user variables such as <c>q1</c> keep their value
+    /// between stages. Presets do not have to mention any of them.
+    /// </summary>
+    /// <param name="layout">Layout to extend.</param>
+    /// <returns>The same layout for chaining.</returns>
+    public static PresetVariableLayout RegisterStandardVariables(PresetVariableLayout layout)
+    {
+        ArgumentNullException.ThrowIfNull(layout);
+        string[] names =
+        [
+            "time", "fps", "frame", "monitor",
+            "bass", "mid", "treb", "vol", "bass_att", "mid_att", "treb_att",
+            "aspectx", "aspecty", "pixelsx", "pixelsy",
+            "decay", "fDecay", "fGammaAdj", "fWarpAmount", "fWaveAlpha", "fWaveScale",
+            "zoom", "zoomexp", "rot", "cx", "cy", "dx", "dy", "warp", "sx", "sy",
+            "blur1", "blur2", "blur3", "darken_center",
+            "wave_mode", "wave_r", "wave_g", "wave_b", "wave_a", "wave_x", "wave_y",
+            "wave_mystery", "wave_dots", "wave_thick", "wave_additive", "wave_brighten",
+            "ob_r", "ob_g", "ob_b", "ob_a", "ib_r", "ib_g", "ib_b", "ib_a",
+            "mv_x", "mv_y", "mv_dx", "mv_dy", "mv_l",
+            "echo_zoom", "echo_alpha", "echo_orient",
+            "fVideoEchoZoom", "fVideoEchoAlpha", "nVideoEchoOrientation",
+            "x", "y", "rad", "ang"
+        ];
+        foreach (var name in names)
+            layout.GetOrAdd(name);
+
+        for (var index = 1; index <= 32; index++)
+            layout.GetOrAdd("q" + index.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        for (var index = 1; index <= 8; index++)
+            layout.GetOrAdd("b" + index.ToString(System.Globalization.CultureInfo.InvariantCulture));
+
+        return layout;
+    }
+
     /// <summary>Returns the slot of a variable, allocating one on first use.</summary>
     /// <param name="name">Variable name.</param>
     /// <returns>The slot index.</returns>

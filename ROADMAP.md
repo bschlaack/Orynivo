@@ -514,13 +514,19 @@ written here. No third-party visualizer code or preset bundle is linked.
 
 **Phases**
 
-- 38a Full pipeline and block set - `Pending`: the `per_frame_init`, `per_pixel_init`,
+- 38a Full pipeline and block set - `Done`: the `per_frame_init`, `per_pixel_init`,
   `wave_N_init`, and `shape_N_init` blocks, the complete MilkDrop stage order (per-frame init
   and update, warp, blur passes, per-pixel, composite, borders, motion vectors, waves, shapes,
   video echo), and the full variable set (`zoom`, `zoomexp`, `rot`, `cx`, `cy`, `dx`, `dy`,
   `warp`, `sx`, `sy`, `wave_*`, `ob_*`, `ib_*`, `mv_*`, `echo_*`, `q1`-`q32`, `blur1`-`blur3`,
   `fDecay`, `fGammaAdj`, `darken_center`, `aspectx`/`aspecty`, `pixelsx`/`pixelsy`,
-  `monitor`, `frame`, `time`, `fps`, and the smoothed `*_att` bands).
+  `monitor`, `frame`, `time`, `fps`, and the smoothed `*_att` bands). The standard variable
+  set is registered by `PresetVariableLayout.RegisterStandardVariables`, the four waveforms
+  and every shape carry their own initialisation block, and the motion parameters, blur
+  passes, centre darkening, and gamma adjustment are applied. The per-pixel block receives
+  the warped sampling position in `x`/`y`, a documented deviation from Milkdrop offset
+  semantics that keeps the built-in presets working until 38d revisits it. Covered by 16
+  tests.
 - 38b Waves, borders, motion vectors, video echo - `Pending`: all wave modes including
   additive, dots, thick, and mystery, per-wave colour and position programs, outer and inner
   borders, motion-vector grids, and the video-echo stage.

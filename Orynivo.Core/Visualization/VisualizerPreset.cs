@@ -16,6 +16,7 @@ public sealed class VisualizerPreset
         PresetVariableLayout layout,
         PresetProgram perFrameInit,
         PresetProgram perFrame,
+        PresetProgram perPixelInit,
         PresetProgram perPixel,
         float decay,
         float zoom,
@@ -24,12 +25,14 @@ public sealed class VisualizerPreset
         float waveAlpha,
         float waveScale,
         PresetProgram wavePerPoint,
-        IReadOnlyList<VisualizerShape> shapes)
+        IReadOnlyList<VisualizerShape> shapes,
+        IReadOnlyList<VisualizerWave> waves)
     {
         Name = name;
         Layout = layout;
         PerFrameInit = perFrameInit;
         PerFrame = perFrame;
+        PerPixelInit = perPixelInit;
         PerPixel = perPixel;
         Decay = decay;
         Zoom = zoom;
@@ -39,6 +42,7 @@ public sealed class VisualizerPreset
         WaveScale = waveScale;
         WavePerPoint = wavePerPoint;
         Shapes = shapes;
+        Waves = waves;
     }
 
     /// <summary>Gets the preset name.</summary>
@@ -52,6 +56,9 @@ public sealed class VisualizerPreset
 
     /// <summary>Gets the per-frame block that runs before the warp.</summary>
     public PresetProgram PerFrame { get; }
+
+    /// <summary>Gets the one-time per-pixel initialisation block.</summary>
+    public PresetProgram PerPixelInit { get; }
 
     /// <summary>Gets the per-pixel block that chooses the sampling position.</summary>
     public PresetProgram PerPixel { get; }
@@ -83,6 +90,12 @@ public sealed class VisualizerPreset
     /// <summary>Gets the custom shapes drawn over the warped frame, in draw order.</summary>
     public IReadOnlyList<VisualizerShape> Shapes { get; }
 
+    /// <summary>
+    /// Gets the four Milkdrop waveforms. The renderer draws them in order and honours each
+    /// waveform own initialisation, per-frame, and per-point blocks.
+    /// </summary>
+    public IReadOnlyList<VisualizerWave> Waves { get; }
+
     /// <summary>Parses preset text.</summary>
     /// <param name="text">INI-style preset text.</param>
     /// <param name="fallbackName">Name used when the text carries none.</param>
@@ -109,18 +122,14 @@ public sealed class VisualizerPreset
                 name = value;
         }
 
-        var layout = new PresetVariableLayout();
-        // Register the parameters up front so the renderer can always write them, even when a
-        // preset never mentions them in its own code.
-        layout.GetOrAdd("decay");
-        layout.GetOrAdd("zoom");
-        layout.GetOrAdd("warp");
+        var layout = PresetVariableLayout.RegisterStandardVariables(new PresetVariableLayout());
 
         return new VisualizerPreset(
             name,
             layout,
             PresetCompiler.Compile(Join(values, "per_frame_init"), layout),
             PresetCompiler.Compile(Join(values, "per_frame"), layout),
+            PresetCompiler.Compile(Join(values, "per_pixel_init"), layout),
             PresetCompiler.Compile(Join(values, "per_pixel"), layout),
             Math.Clamp(ReadFloat(values, "decay", 0.96f), 0f, 1f),
             Math.Max(0.05f, ReadFloat(values, "zoom", 1f)),
@@ -129,7 +138,8 @@ public sealed class VisualizerPreset
             Math.Clamp(ReadFloat(values, "wave_alpha", 0.8f), 0f, 1f),
             Math.Clamp(ReadFloat(values, "wave_scale", 0.25f), 0f, 1f),
             PresetCompiler.Compile(Join(values, "per_point"), layout),
-            ParseShapes(values, layout));
+            ParseShapes(values, layout),
+            ParseWaves(values, layout));
     }
 
     /// <summary>Creates a preset from expression text without an INI wrapper, for tests and defaults.</summary>
@@ -140,15 +150,13 @@ public sealed class VisualizerPreset
     /// <returns>The preset.</returns>
     public static VisualizerPreset Create(string name, string? perFrame, string? perPixel, float decay = 0.96f)
     {
-        var layout = new PresetVariableLayout();
-        layout.GetOrAdd("decay");
-        layout.GetOrAdd("zoom");
-        layout.GetOrAdd("warp");
+        var layout = PresetVariableLayout.RegisterStandardVariables(new PresetVariableLayout());
         return new VisualizerPreset(
             name,
             layout,
             PresetProgram.Empty,
             PresetCompiler.Compile(perFrame, layout),
+            PresetProgram.Empty,
             PresetCompiler.Compile(perPixel, layout),
             Math.Clamp(decay, 0f, 1f),
             1f,
@@ -157,7 +165,8 @@ public sealed class VisualizerPreset
             0.8f,
             0.25f,
             PresetProgram.Empty,
-            []);
+            [],
+            ParseWaves(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase), layout));
     }
 
     /// <summary>
@@ -198,11 +207,36 @@ public sealed class VisualizerPreset
                 Math.Clamp(ReadShape(values, prefix, "border_b", 1f), 0f, 1f),
                 Math.Clamp(ReadShape(values, prefix, "border_a", 1f), 0f, 1f),
                 ReadShape(values, prefix, "additive", 0f) >= 0.5f,
+                PresetCompiler.Compile(Join(values, prefix + "init"), layout),
                 PresetCompiler.Compile(Join(values, prefix + "per_frame"), layout),
                 PresetCompiler.Compile(Join(values, prefix + "per_point"), layout)));
         }
 
         return shapes;
+    }
+
+    /// <summary>
+    /// Parses the four Milkdrop waveforms. Every waveform always exists so the renderer can
+    /// draw the default wave without a preset declaring one.
+    /// </summary>
+    /// <param name="values">Parsed preset values.</param>
+    /// <param name="layout">Shared slot layout.</param>
+    /// <returns>The four waveform programs.</returns>
+    private static IReadOnlyList<VisualizerWave> ParseWaves(
+        Dictionary<string, string> values,
+        PresetVariableLayout layout)
+    {
+        var waves = new List<VisualizerWave>(4);
+        for (var index = 0; index < 4; index++)
+        {
+            var prefix = $"wave_{index}_";
+            waves.Add(new VisualizerWave(
+                PresetCompiler.Compile(Join(values, prefix + "init"), layout),
+                PresetCompiler.Compile(Join(values, prefix + "per_frame"), layout),
+                PresetCompiler.Compile(Join(values, prefix + "per_point"), layout)));
+        }
+
+        return waves;
     }
 
     /// <summary>Reads one shape key, falling back to its default.</summary>
