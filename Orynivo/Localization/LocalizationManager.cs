@@ -271,6 +271,11 @@ public static class LocalizationManager
         resources["L_ArtistImageSuggestionTitle"] = Current.ArtistImageSuggestionTitle;
         resources["L_ArtistImageSuggestionHint"] = Current.ArtistImageSuggestionHint;
         resources["L_AutoAcceptFanartTvImages"] = Current.AutoAcceptFanartTvImages;
+        resources["L_InfiniteMixPresets"] = Current.InfiniteMixPresets;
+        resources["L_InfiniteMixPresetFocus"] = Current.InfiniteMixPresetFocus;
+        resources["L_InfiniteMixPresetWorkout"] = Current.InfiniteMixPresetWorkout;
+        resources["L_InfiniteMixPresetWindDown"] = Current.InfiniteMixPresetWindDown;
+        resources["L_InfiniteMixPresetsHint"] = Current.InfiniteMixPresetsHint;
         resources["L_ChooseReferenceTrack"] = Current.ChooseReferenceTrack;
         resources["L_ReferenceTrackSearchLabel"] = Current.ReferenceTrackSearchLabel;
         resources["L_ReferenceTrackSearchWatermark"] = Current.ReferenceTrackSearchWatermark;
@@ -661,6 +666,11 @@ public static class LocalizationManager
         "Ein unerwarteter Fehler ist aufgetreten. Der Fehlerbericht konnte nicht gespeichert werden. Orynivo wird beendet.")
     {
         AutoAcceptFanartTvImages = "Fanart.tv-Funde automatisch übernehmen",
+        InfiniteMixPresets = "Vorlagen",
+        InfiniteMixPresetFocus = "Fokus",
+        InfiniteMixPresetWorkout = "Training",
+        InfiniteMixPresetWindDown = "Entspannen",
+        InfiniteMixPresetsHint = "Vorlagen setzen Stimmung, Entdeckungsgrad, Zeitraum und Gewichtung; danach kannst du alles anpassen.",
         ChooseReferenceTrack = "Referenztitel wählen…",
         ReferenceTrackSearchLabel = "Nach einem Titel suchen",
         ReferenceTrackSearchWatermark = "Interpret, Album oder Titel",
@@ -1479,6 +1489,11 @@ public static class LocalizationManager
         "An unexpected error occurred. The crash report could not be saved. Orynivo will now close.")
     {
         AutoAcceptFanartTvImages = "Automatically accept Fanart.tv results",
+        InfiniteMixPresets = "Presets",
+        InfiniteMixPresetFocus = "Focus",
+        InfiniteMixPresetWorkout = "Workout",
+        InfiniteMixPresetWindDown = "Wind down",
+        InfiniteMixPresetsHint = "Presets set the mood, discovery level, history period, and weighting; adjust them afterwards as needed.",
         ChooseReferenceTrack = "Choose reference track…",
         ReferenceTrackSearchLabel = "Search for a track",
         ReferenceTrackSearchWatermark = "Artist, album, or title",
@@ -2280,6 +2295,11 @@ public static class LocalizationManager
         "Une erreur inattendue s’est produite. Le rapport n’a pas pu être enregistré. Orynivo va maintenant se fermer.")
     {
         AutoAcceptFanartTvImages = "Accepter automatiquement les résultats Fanart.tv",
+        InfiniteMixPresets = "Préréglages",
+        InfiniteMixPresetFocus = "Concentration",
+        InfiniteMixPresetWorkout = "Entraînement",
+        InfiniteMixPresetWindDown = "Détente",
+        InfiniteMixPresetsHint = "Les préréglages définissent l'ambiance, le niveau de découverte, la période et la pondération ; ajustez-les ensuite si besoin.",
         ChooseReferenceTrack = "Choisir la piste de référence…",
         ReferenceTrackSearchLabel = "Rechercher une piste",
         ReferenceTrackSearchWatermark = "Artiste, album ou titre",
@@ -3078,6 +3098,11 @@ public static class LocalizationManager
         "Se produjo un error inesperado. No se pudo guardar el informe. Orynivo se cerrará ahora.")
     {
         AutoAcceptFanartTvImages = "Aceptar automáticamente los resultados de Fanart.tv",
+        InfiniteMixPresets = "Ajustes predefinidos",
+        InfiniteMixPresetFocus = "Concentración",
+        InfiniteMixPresetWorkout = "Entrenamiento",
+        InfiniteMixPresetWindDown = "Relajación",
+        InfiniteMixPresetsHint = "Los ajustes predefinidos fijan el estado de ánimo, el nivel de descubrimiento, el periodo y la ponderación; ajústalos después si quieres.",
         ChooseReferenceTrack = "Elegir pista de referencia…",
         ReferenceTrackSearchLabel = "Buscar una pista",
         ReferenceTrackSearchWatermark = "Artista, álbum o título",
@@ -4656,6 +4681,11 @@ private static readonly LocalizedStrings Russian = new(
         AiChatEmptyResponse = "Модель вернула пустой ответ.",
         AiChatToolResultFallback = "После вызова инструмента модель не вернула окончательный ответ. Результат инструмента:",
         AutoAcceptFanartTvImages = "Автоматически принимать результаты Fanart.tv",
+        InfiniteMixPresets = "Пресеты",
+        InfiniteMixPresetFocus = "Сосредоточение",
+        InfiniteMixPresetWorkout = "Тренировка",
+        InfiniteMixPresetWindDown = "Расслабление",
+        InfiniteMixPresetsHint = "Пресеты задают настроение, уровень открытий, период и веса; после этого их можно изменить.",
         ChooseReferenceTrack = "Выбрать опорный трек…",
         ReferenceTrackSearchLabel = "Поиск трека",
         ReferenceTrackSearchWatermark = "Исполнитель, альбом или название",
@@ -5609,6 +5639,11 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "模型返回了空响应。",
         AiChatToolResultFallback = "调用工具后，模型未返回最终答复。工具结果：",
         AutoAcceptFanartTvImages = "自动接受 Fanart.tv 的结果",
+        InfiniteMixPresets = "预设",
+        InfiniteMixPresetFocus = "专注",
+        InfiniteMixPresetWorkout = "锻炼",
+        InfiniteMixPresetWindDown = "放松",
+        InfiniteMixPresetsHint = "预设会设置心情、探索程度、历史区间和权重；之后可随时调整。",
         ChooseReferenceTrack = "选择参考曲目…",
         ReferenceTrackSearchLabel = "搜索曲目",
         ReferenceTrackSearchWatermark = "艺术家、专辑或标题",
@@ -6561,6 +6596,11 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "मॉडल ने खाली उत्तर दिया।",
         AiChatToolResultFallback = "टूल कॉल के बाद मॉडल ने अंतिम उत्तर नहीं दिया। टूल परिणाम:",
         AutoAcceptFanartTvImages = "Fanart.tv परिणाम स्वतः स्वीकार करें",
+        InfiniteMixPresets = "प्रीसेट",
+        InfiniteMixPresetFocus = "एकाग्रता",
+        InfiniteMixPresetWorkout = "वर्कआउट",
+        InfiniteMixPresetWindDown = "आराम",
+        InfiniteMixPresetsHint = "प्रीसेट मूड, खोज स्तर, इतिहास अवधि और भार निर्धारित करते हैं; बाद में आप इन्हें बदल सकते हैं।",
         ChooseReferenceTrack = "संदर्भ ट्रैक चुनें…",
         ReferenceTrackSearchLabel = "ट्रैक खोजें",
         ReferenceTrackSearchWatermark = "कलाकार, एल्बम या शीर्षक",

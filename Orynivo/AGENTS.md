@@ -478,7 +478,13 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   **Analyze audio features** action; it runs the local library through
   `AudioFeatureMaintenanceService` and requests bounded batches from each
   configured server, stays cancellable, and cancels on Settings deactivation.
-- `ReferenceTrackPickerDialog` is the shared search dialog for picking a similarity
+- The Infinite Mix profile editor offers Focus/Workout/Wind down presets through
+  the pure `Orynivo.InfiniteMixPresets.Apply`, which only pre-fills the mood,
+  discovery level, history period, and weighting and must preserve the server
+  selection, genre filters, feedback, and exclusions. Descriptor-based preset
+  scoring stays in the context-menu activity mix (`SimilarityFeatureService.RankPreset`);
+  the Infinite Mix profile itself remains metadata-based because the genre-cloud
+  candidate payload carries no acoustic descriptors.- `ReferenceTrackPickerDialog` is the shared search dialog for picking a similarity
   reference track. It never touches the database or the network itself: the caller
   supplies the search through `Search` (the editor receives it via
   `ReferenceTrackPicker`), and `MainWindow.SearchReferenceTracksAsync` queries the

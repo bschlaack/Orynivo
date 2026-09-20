@@ -1077,7 +1077,9 @@ Genre Cloud level. Before
 starting, its compact profile editor selects a calm, balanced, or energetic
 mood; familiar-to-adventurous discovery level; 3, 7, 30, or 90-day history
 period; local and individual Orynivo Server sources; favorite and rarely-played
-weighting; and optional included or excluded genres. Initial creation shows a
+weighting; and optional included or excluded genres. **Focus**, **Workout**, and
+**Wind down** presets pre-fill those fields as a starting point and can be
+adjusted afterwards. Initial creation shows a
 blocking progress overlay so the start action cannot be mistaken for an
 unresponsive button. The first 20 tracks are added to Up next; another batch is
 prepared automatically in the background when five tracks remain. Existing

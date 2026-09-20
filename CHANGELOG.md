@@ -8,7 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
-- The smart-playlist editor can now replace the similarity reference track.
+- The Infinite Mix profile editor now offers **Focus**, **Workout**, and
+  **Wind down** presets next to the mood selector. They pre-fill the mood,
+  discovery level, history period, and weighting through the pure, tested
+  `InfiniteMixPresets` mapping, which preserves the server selection, genre
+  filters, feedback, and exclusions, and never modifies the profile it is based
+  on.- The smart-playlist editor can now replace the similarity reference track.
   **Choose reference track** opens a small search dialog over the local library
   and every configured Orynivo Server and applies the selection together with the
   minimum similarity score; the readable label and **Remove reference** stay.

@@ -108,19 +108,19 @@ Steps:
   picked-reference override (explicit removal still wins), covered by three more
   `Orynivo.Tests` cases.
 
-## 19. Offer activity presets in the Infinite Mix profile — `Todo`
+## 19. Offer activity presets in the Infinite Mix profile — `Done`
 
-Focus/Workout/Wind down are currently only a context-menu quick start.
-
-**Design**
-
-- Add the three presets to `InfiniteMixDialog` next to the mood selector and map
-  them onto the persisted profile fields.
-- Reuse `SimilarityFeatureService.RankPreset` and the shared queue path.
-
-**Tests**: the preset-to-profile mapping as a pure helper.
-
-**Commit**: `feat(infinite-mix): offer activity presets in the profile dialog`
+- `InfiniteMixDialog` gained **Focus**, **Workout**, and **Wind down** presets next
+  to the mood selector. They pre-fill the mood, discovery level, history period,
+  and weighting through the pure `Orynivo.InfiniteMixPresets.Apply`, which
+  preserves the server selection, genre filters, feedback, and exclusions and
+  never modifies the profile it is based on. Every field stays editable
+  afterwards. 6 `Orynivo.Tests` cases.
+- Deliberate boundary: the presets do **not** add descriptor scoring to Infinite
+  Mix. `SimilarityFeatureService.RankPreset` (item 9) remains the
+  descriptor-based activity mix, because the genre-cloud candidate payload carries
+  no acoustic descriptors; adding them would change the Core/Server payload
+  contract. Revisit only together with that change.
 
 ## 20. Report "now playing" and love tracks on Last.fm — `Todo`
 

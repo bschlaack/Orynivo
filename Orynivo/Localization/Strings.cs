@@ -1350,6 +1350,16 @@ public sealed record LocalizedStrings(
     public string AiChatToolResultFallback { get; init; } = "";
     /// <summary>Gets the option for automatically accepting Fanart.tv artist-image results.</summary>
     public string AutoAcceptFanartTvImages { get; init; } = "";
+    /// <summary>Gets the label of the Infinite Mix preset row.</summary>
+    public string InfiniteMixPresets { get; init; } = "";
+    /// <summary>Gets the focus preset label.</summary>
+    public string InfiniteMixPresetFocus { get; init; } = "";
+    /// <summary>Gets the workout preset label.</summary>
+    public string InfiniteMixPresetWorkout { get; init; } = "";
+    /// <summary>Gets the wind-down preset label.</summary>
+    public string InfiniteMixPresetWindDown { get; init; } = "";
+    /// <summary>Gets the explanation of what the presets change.</summary>
+    public string InfiniteMixPresetsHint { get; init; } = "";
     /// <summary>Gets the smart-playlist editor action that opens the reference-track picker.</summary>
     public string ChooseReferenceTrack { get; init; } = "";
     /// <summary>Gets the reference-track picker search label.</summary>
