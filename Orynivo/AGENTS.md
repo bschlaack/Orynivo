@@ -453,6 +453,13 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   credentials, only one run may be in flight at a time, and the backup folder is
   created on demand. Settings exposes the enable toggle, interval, retention,
   folder picker, **Back up now**, and the last successful run.
+- Enhanced-LRC word timestamps (`<mm:ss.xx>`) are parsed by
+  `LyricsService.ParseLrc` into `TimedLyricLine.Words`, which also strips the
+  markers from the line text. `KaraokeWindow` renders such a line as one `Run` per
+  word and repaints only the active slot when the word changes, so the surrounding
+  opacity/font-size transitions keep animating. Plain synchronized lines keep the
+  line-level highlight through `LyricLineSelector`, which is also the word-level
+  selector.
 - The lyrics view's **Karaoke** action opens `KaraokeWindow` fullscreen. It shows
   a fixed window of synchronized lines around the active one, emphasizes the
   active line, and animates opacity and font size through `Transitions`; the

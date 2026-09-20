@@ -147,18 +147,18 @@ Steps:
 - 6 `Orynivo.Tests` cases cover the layout model and 2 more verify that a real
   PDF document is written, including the empty-summary case.
 
-## 22. Word-level karaoke highlighting — `Todo`
+## 22. Word-level karaoke highlighting — `Done`
 
-**Design**
-
-- Parse enhanced LRC word timestamps (`<mm:ss.xx>`) in `LyricsService` and
-  highlight the active word in `KaraokeWindow`.
-- Keep `LyricLineSelector` as the line-level fallback for plain synchronized
-  lyrics.
-
-**Tests**: enhanced-LRC parsing and word selection (pure).
-
-**Commit**: `feat(lyrics): highlight words in the karaoke view`
+- `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words` and strips the markers from the line text, which also
+  fixes markers leaking into the displayed lyrics.
+- `KaraokeWindow` renders an enhanced line as one `Run` per word, emphasizes the
+  active word, keeps sung words in the accent colour, and repaints only the active
+  slot when the word changes so the surrounding transitions keep animating. Plain
+  synchronized lines keep the line-level highlight; `LyricLineSelector` serves as
+  both the line and word selector.
+- 10 `Orynivo.Core.Tests` cases cover the parser (plain, enhanced, mixed, ordering,
+  markers-only, missing timestamps) and the word-level selection.
 
 ## 23. Bulk genre editing — `Todo`
 

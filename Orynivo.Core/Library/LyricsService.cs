@@ -31,7 +31,22 @@ public sealed record LyricsSearchResult(
 /// <summary>A single timestamped line from an LRC lyrics file.</summary>
 /// <param name="Time">Playback offset of the line.</param>
 /// <param name="Text">Lyric text for this line.</param>
-public sealed record TimedLyricLine(TimeSpan Time, string Text);
+/// <summary>One word of an enhanced-LRC line with its own start time.</summary>
+/// <param name="Time">Word start time.</param>
+/// <param name="Text">Word text without its marker.</param>
+public sealed record TimedLyricWord(TimeSpan Time, string Text);
+
+/// <summary>One timestamped lyric line.</summary>
+/// <param name="Time">Line start time.</param>
+/// <param name="Text">Line text with every timestamp marker removed.</param>
+public sealed record TimedLyricLine(TimeSpan Time, string Text)
+{
+    /// <summary>
+    /// Gets the word-level timings of an enhanced-LRC line, or an empty list for a
+    /// plain synchronized line.
+    /// </summary>
+    public IReadOnlyList<TimedLyricWord> Words { get; init; } = [];
+}
 
 /// <summary>
 /// Client for the LRCLIB lyrics API supporting automatic download, manual search, and LRC parsing.
@@ -155,10 +170,13 @@ public static partial class LyricsService
     }
 
     /// <summary>
-    /// Parses an LRC-formatted string into a list of timestamped lyric lines sorted by time.
-    /// Returns an empty list when <paramref name="lyrics"/> is null or whitespace.
+    /// Parses an LRC-formatted string into a list of timestamped lyric lines sorted
+    /// by time. Enhanced-LRC word markers (<c>&lt;mm:ss.xx&gt;</c>) are removed from
+    /// the line text and exposed as <see cref="TimedLyricLine.Words"/>. Returns an
+    /// empty list when <paramref name="lyrics"/> is null or whitespace.
     /// </summary>
     /// <param name="lyrics">LRC content with <c>[mm:ss.xx]</c> timestamp tags.</param>
+    /// <returns>The parsed lines ordered by start time.</returns>
     public static IReadOnlyList<TimedLyricLine> ParseLrc(string? lyrics)
     {
         if (string.IsNullOrWhiteSpace(lyrics))
@@ -171,28 +189,69 @@ public static partial class LyricsService
             if (matches.Count == 0)
                 continue;
 
-            var text = TimestampRegex().Replace(rawLine, string.Empty).Trim();
+            var (text, words) = ParseLineContent(TimestampRegex().Replace(rawLine, string.Empty).Trim());
             foreach (Match match in matches)
             {
-                if (!int.TryParse(match.Groups["minutes"].Value, out var minutes) ||
-                    !double.TryParse(
-                        match.Groups["seconds"].Value,
-                        NumberStyles.AllowDecimalPoint,
-                        CultureInfo.InvariantCulture,
-                        out var seconds))
-                {
+                if (!TryParseTimestamp(match, out var time))
                     continue;
-                }
 
-                result.Add(new TimedLyricLine(
-                    TimeSpan.FromMinutes(minutes) + TimeSpan.FromSeconds(seconds),
-                    text));
+                result.Add(new TimedLyricLine(time, text) { Words = words });
             }
         }
 
         return result
             .OrderBy(line => line.Time)
             .ToList();
+    }
+
+    /// <summary>
+    /// Splits an enhanced-LRC line into its word timings and the plain line text. A
+    /// line without word markers keeps its text unchanged and reports no words.
+    /// </summary>
+    /// <param name="content">Line content with the line timestamp already removed.</param>
+    /// <returns>The plain line text and the word timings.</returns>
+    private static (string Text, IReadOnlyList<TimedLyricWord> Words) ParseLineContent(string content)
+    {
+        var markers = WordTimestampRegex().Matches(content);
+        var text = WordTimestampRegex().Replace(content, string.Empty);
+        text = string.Join(' ', text.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        if (markers.Count == 0)
+            return (text, []);
+
+        var words = new List<TimedLyricWord>(markers.Count);
+        for (var index = 0; index < markers.Count; index++)
+        {
+            var match = markers[index];
+            var start = match.Index + match.Length;
+            var end = index + 1 < markers.Count ? markers[index + 1].Index : content.Length;
+            var word = content[start..end].Trim();
+            if (word.Length == 0 || !TryParseTimestamp(match, out var time))
+                continue;
+            words.Add(new TimedLyricWord(time, word));
+        }
+
+        return words.Count == 0 ? (text, []) : (text, words);
+    }
+
+    /// <summary>Parses the <c>minutes</c> and <c>seconds</c> groups of a timestamp match.</summary>
+    /// <param name="match">Timestamp match with <c>minutes</c> and <c>seconds</c> groups.</param>
+    /// <param name="time">Parsed timestamp when the groups are valid.</param>
+    /// <returns><see langword="true"/> when the timestamp could be parsed.</returns>
+    private static bool TryParseTimestamp(Match match, out TimeSpan time)
+    {
+        time = default;
+        if (!int.TryParse(match.Groups["minutes"].Value, out var minutes) ||
+            !double.TryParse(
+                match.Groups["seconds"].Value,
+                NumberStyles.AllowDecimalPoint,
+                CultureInfo.InvariantCulture,
+                out var seconds))
+        {
+            return false;
+        }
+
+        time = TimeSpan.FromMinutes(minutes) + TimeSpan.FromSeconds(seconds);
+        return true;
     }
 
     private static HttpClient CreateClient()
@@ -208,6 +267,9 @@ public static partial class LyricsService
 
     [GeneratedRegex(@"\[(?<minutes>\d+):(?<seconds>\d{1,2}(?:\.\d{1,3})?)\]")]
     private static partial Regex TimestampRegex();
+
+    [GeneratedRegex(@"<(?<minutes>\d+):(?<seconds>\d{1,2}(?:\.\d{1,3})?)>")]
+    private static partial Regex WordTimestampRegex();
 
     private sealed record LrclibResponse(
         bool Instrumental,

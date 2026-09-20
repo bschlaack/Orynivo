@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Diagnostics;
 using System.Globalization;
 using System.Net.Http;
@@ -683,14 +683,18 @@ public partial class MainWindow : Window
     {
         private bool _isActive;
 
-        public LyricLineViewModel(string text, TimeSpan? time)
+        public LyricLineViewModel(string text, TimeSpan? time, IReadOnlyList<TimedLyricWord>? words = null)
         {
             Text = text;
             Time = time;
+            Words = words ?? [];
         }
 
         public string Text { get; }
         public TimeSpan? Time { get; }
+
+        /// <summary>Gets the word-level timings of an enhanced-LRC line; empty for plain lines.</summary>
+        public IReadOnlyList<TimedLyricWord> Words { get; }
         public bool IsActive
         {
             get => _isActive;

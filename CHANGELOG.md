@@ -42,6 +42,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   test projects, and both parity scripts. It stops at the first failure, prints a
   compact summary, and supports `-Configuration`, `-SkipBuild`, and `-SkipTests`.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Similarity smart playlists now resolve on an Orynivo Server instead of
@@ -77,6 +85,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   tokens) are never exposed; only local files and credential-free URLs are
   published. macOS remains unaffected.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Fixed a .NET 8 build break in `GenreCloudService` and
@@ -179,6 +195,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   favorite state into the client-side profile container and update their rating
   through the server API. All seven interface languages are included.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Editing a similarity smart playlist no longer drops its reference track. The
@@ -327,6 +351,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   rounding, invariant point formatting, the clamped-control-point smoothing
   invariant, and the fingerprint's average-threshold bit selection.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - The genre-cloud recommendation tie-break is now deterministic. It previously
@@ -348,6 +380,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.41.8] - 2026-09-16
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Assigning local or remote album artwork now preserves the Dashboard's
@@ -375,6 +415,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.41.6] - 2026-09-10
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Unified all six desktop languages as complete built-in resources (853 keys
@@ -395,6 +443,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Chinese under `Orynivo/Localization/Overrides`; missing entries continue to
   use the reviewed built-in fallback.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Fixed a runtime language-switch issue where the dynamically created local
@@ -424,6 +480,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Next**. The modal lists the physical file path first, followed by all
   metadata represented by the selectable track columns.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - The **Up Next** table now offers the same selectable track columns as
@@ -441,6 +505,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.41.3] - 2026-09-05
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Similar-title and mood-mix actions now navigate directly to **Up Next**
@@ -449,6 +521,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.41.2] - 2026-09-05
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Similar-title and mood-mix ranking now runs on a background thread, keeping
@@ -465,6 +545,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.41.1] - 2026-09-05
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Fixed startup failure on existing databases whose `play_history` table did
@@ -510,6 +598,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   server profile and merged back on other clients, keeping profile-based
   recommendations consistent across devices.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Dashboard album artwork now refreshes immediately after a cover search or
@@ -523,6 +619,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   read-only server reports from local corrections, and shows phase progress,
   elapsed time and measured phase-local remaining-time estimates.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Opening metadata review uses a fast index-only analysis instead of opening
@@ -536,6 +640,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.40.1] - 2026-09-05
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Fixed smart playlists missing server tracks (including favorites) because the
@@ -574,6 +686,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the local catalog and configured servers; tracks retain the same safe
   play-now, play-next, and append actions.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Allowed authenticated artwork blob URLs in the remote's content security policy,
@@ -668,6 +788,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Conservatively matched artist-name spelling
   variants are now included as guided-review findings without automatic merges.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Fixed a Library Doctor database-column typo that closed Orynivo when metadata
@@ -703,6 +831,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Orynivo Server discovery and library scans. A build-time parity check now
   keeps the MCP surface, AI schema, dispatcher, and Settings checklist aligned.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Fixed combined artist-and-title library searches so terms can match across
@@ -722,6 +858,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   chooser routes setup questions to Discussions and security reports to private
   security advisories.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 ## [0.37.0] - 2026-08-27
@@ -744,6 +888,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Native `shk` and payload encryption now use the first 32 bytes of the
   transient pairing secret, independently from the event-channel HKDF keys.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - AirPlay 2 receiver controls now drive Orynivo's transport instead of only
@@ -841,6 +993,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   images are copied only to sources without artwork, and manually protected
   artist images are never overwritten.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Artist and album artwork changes now invalidate the unified library view
@@ -883,6 +1043,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   remote server library versions invalidate it immediately, while listening
   statistics and recently played rows remain freshly queried.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Restarting Orynivo now restores every selectable sidebar content view rather
@@ -896,6 +1064,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.36.5] - 2026-08-12
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Infinite Mix no longer stalls after exhausting its first two 20-track
@@ -920,6 +1096,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   table now also exposes the complete shared track-column chooser from its
   header context menu and persists its own visibility, order, and widths.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Orynivo Server ReplayGain maintenance now runs FFmpeg with one worker thread,
@@ -941,6 +1125,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.36.3] - 2026-08-11
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Fixed server scans with multiple library roots occasionally appearing stuck
@@ -974,6 +1166,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and can reacquire the device and resume from that position without restarting
   Orynivo.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Fixed the embedded Settings view at constrained window heights: long
@@ -1010,6 +1210,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and take priority. Unresolved metadata matches are retried after 90 days
   instead of being requested repeatedly.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Distinguished a completed MusicBrainz lookup with no community votes from a
@@ -1028,6 +1236,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   search action when artwork is missing, plus the same favorite control and
   local/Orynivo Server source badge as the main Albums artwork view.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Removed the Fluent DataGrid header's permanent empty sort-icon reservation,
@@ -1045,6 +1261,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.35.2] - 2026-08-03
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Fixed unified artist details clearing their already rendered albums when the
@@ -1056,6 +1280,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.35.1] - 2026-08-03
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Reworked the unified artist detail hero to match the album-detail layout:
@@ -1105,6 +1337,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   The Appearance section now keeps the cache-clear action beside the background
   selector and persists a 0–100% tile-visibility slider, defaulting to 50%.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Fixed Windows identifying Orynivo as an unknown application in the system
@@ -1118,6 +1358,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.34.1] - 2026-08-02
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Fixed server-library backup downloads failing on Windows because the completed
@@ -1142,6 +1390,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   servers reject the unsupported operation instead of silently running a
   normal scan.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Preserved an album's downloaded artwork and favorite flag when a full
@@ -1151,6 +1407,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.33.2] - 2026-08-02
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Added the complete album title as a tooltip on shared artwork cards so
@@ -1173,6 +1437,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.33.1] - 2026-08-01
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Prevented concurrent platform release jobs from creating duplicate GitHub
@@ -1215,6 +1487,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   current Genre Cloud and Infinite Mix behavior, usage, server integration, and
   local cache/data-location documentation.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Enlarged the Infinite Mix profile dialog, made it resizable, and reserved a
@@ -1259,6 +1539,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   remain readable. Genre recommendations can now switch between the playable
   track table and a source-aware album artwork grid.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Fixed Genre Cloud drill-downs reverting to all root genres when a connected
@@ -1303,6 +1591,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   canonical and hreflang metadata, an XML sitemap, complete social metadata,
   SoftwareApplication structured data, and optimized screenshot assets.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Fixed SEO image dimensions stretching the product screenshots and brand
@@ -1331,6 +1627,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   same provider order as batch discovery: Fanart.tv first when a key is
   configured, then Wikimedia Commons when Fanart.tv has no usable result.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Masked the Last.fm API key in Settings so it is no longer displayed as
@@ -1371,6 +1675,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   numbering, and MusicBrainz IDs as library-only overrides that survive scans
   without modifying audio-file tags.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Fixed Linux desktop updates being unavailable or attempting to treat the
@@ -1413,6 +1725,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `actions/checkout@v6`, `actions/setup-dotnet@v5`, and
   `softprops/action-gh-release@v3`.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Linux server release builds now normalize and validate packaged maintainer
@@ -1420,6 +1740,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.29.3] - 2026-07-28
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Managed DEB server updates now retain the administrator's existing
@@ -1449,6 +1777,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Existing libraries receive a one-time attribution metadata refresh during
   their next scan.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Opening a local or Orynivo Server album from a unified artist view once again
@@ -1457,6 +1793,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.29.1] - 2026-07-26
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - macOS now finds FFmpeg and FFprobe installed in common Homebrew, MacPorts,
@@ -1484,6 +1828,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   verify the manifest signature and package SHA-256 digest, and open the
   verified package in the macOS Installer.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Hidden the Steinberg ASIO and cwASIO subsystem badges on macOS and Linux,
@@ -1510,6 +1862,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.28.1] - 2026-07-25
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Fixed the Arch Linux player package layout so `.PKGINFO` is stored at the
@@ -1569,6 +1929,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   streaming secrets remain process-local instead of being written without
   Windows DPAPI protection.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Linux now detects the extensionless `ffmpeg` and `ffprobe` executables for
@@ -1602,6 +1970,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and boundaries. Library-only chapter-title corrections persist across scans
   without modifying the MKA file.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Improved the startup update dialog's primary action contrast, spacing, and
@@ -1615,6 +1991,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   client method for compact aggregate Dashboard counts without transferring
   complete track or album rows.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Corrected Dashboard library totals to include tracks and albums from all
@@ -1634,6 +2018,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   startup update notification to launch the existing verified update flow
   directly.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Placed Settings on/off switches immediately before their labels and aligned
@@ -1649,6 +2041,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   embedded ReplayGain tags are still imported and manual calculation remains
   available.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Removed the standalone cyan scan-activity dot from the sidebar while retaining
@@ -1662,6 +2062,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   update-enabled Orynivo Server before launching the Windows installer; failed
   servers are named and the user can explicitly continue the desktop update.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Allowed signed server-update bundles up to the endpoint's verified one-GiB
@@ -1681,6 +2089,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   manifest in the background at application startup and notifies the user when
   a newer Windows version is available.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Prevented publication of incomplete signed update manifests by waiting for
@@ -1695,6 +2111,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and favorite vector icons used by navigation, while retaining each tile's
   colored circular badge.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Enlarged the About window, placed its proportionally filled logo in a compact
@@ -1804,6 +2228,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Tightened the four hero counter tiles to compact fixed-width cards and aligned
   their icon badges to the left like the reference layout.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Fixed the listening chart's Y-axis rendering: the filled path now includes an
@@ -1902,6 +2334,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Updated the README to reflect current queue, smart-playlist, dashboard, MCP,
   remote Orynivo Server, and cwASIO/native-DSD capabilities.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Fixed dragging albums onto the "Up Next" sidebar item restarting the current
@@ -1931,6 +2371,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Restyled the favorite heart with a warmer Orynivo-specific color and adjusted
   glyph across tables, artwork cards, album headers, and the transport bar.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Reduced local and Orynivo Server artist rename work by updating only the
@@ -1950,6 +2398,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.23.2] - 2026-07-05
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Fixed remote Orynivo Server artist information from the shared Artists view so
@@ -1970,6 +2426,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.23.1] - 2026-07-05
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Reduced the Artist artwork-card height after adding the source badge so the
@@ -2023,6 +2487,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   source column directly beside it. Source tooltips use theme-aware foreground
   and background colors.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - The content loading skeleton now fully covers the content area (it spans the
@@ -2120,6 +2592,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   radio, podcasts, and DSD sources when they are converted to PCM; native DSD
   output remains bit-perfect and unchanged.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Fixed manual MusicBrainz cover search failing on stylized album titles with
@@ -2260,6 +2740,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   chat and to external MCP clients, and has its own enable/disable toggle in
   Settings → Integration → MCP Server (bringing the tool count to 20).
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Fixed waveform transport seeking so pointer release is captured reliably, the
@@ -2361,6 +2849,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Settings, and pending checks are cancelled when the list is rebuilt or Settings
   is closed.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Fixed checkbox borders appearing near-black on the dark background: the app
@@ -2385,6 +2881,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Album and artist artwork cards now use theme-aware placeholder backgrounds,
   subtle borders, clipped covers, and a calmer asymmetric card shape.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Library watcher rescans now honour cancellation while waiting between locked
@@ -2445,6 +2949,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   accent-bordered card style (`#6C63FF`, `CornerRadius="0,24,0,24"`) as the
   library headline/intro card, for both local and remote search results.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - The Dashboard genre statistics (Top genres and the per-day calendar genres) now
@@ -2466,6 +2978,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.20.2] - 2026-06-29
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - The Linux Orynivo Server now reads and writes its editable configuration at
@@ -2478,6 +2998,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.20.1] - 2026-06-29
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - The Linux Orynivo Server package no longer crashes on startup
@@ -2505,6 +3033,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (cached playback URLs embed it) and client-side favourites are re-applied after
   loading so toggling a favourite is never masked by stale cached flags.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Remote Orynivo Server folder view loading placeholder now uses the themed muted
@@ -2545,6 +3081,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.19.0] - 2026-06-28
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Windows FFmpeg auto-download now resolves the current BtbN release asset via
@@ -2558,6 +3102,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   libraries so track/album/folder context menus use the same playlist actions
   while persisting entries to the correct local database or remote server.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - FFmpeg and FFprobe child processes now always receive a valid working
@@ -2567,6 +3119,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.17.0] - 2026-06-28
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Automatic FFmpeg download on Windows now stores downloaded binaries in
@@ -2690,6 +3250,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Library > Orynivo Server entry instead of Settings > Streaming services or
   the local directories page.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Remote Orynivo Server (and other HTTP-streamed) tracks now start much faster.
@@ -2832,6 +3400,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   Appearance.  API keys are stored in `settings.json` (the same policy as
   the embedded AI chat key).
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - The Orynivo Server settings and remote directory browser dialogs now use
@@ -2916,6 +3492,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   the AI assistant knows the capability is unavailable; the active set is
   persisted in `AppSettings.DisabledMcpTools`.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Fixed numbered circle labels on the equalizer frequency-response graph being
@@ -2955,6 +3539,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (`OutputProfile`, `OutputProfileDialog`, `AppSettings.OutputProfiles`,
   `AppSettings.SelectedOutputProfileName`, `SettingsStore.NormalizeOutputProfiles`)
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Switching the output profile via the transport quick-pick popup now resumes
@@ -3027,6 +3619,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   per-profile import and editing, and confirmed deletion. Existing single-EQ
   settings migrate automatically into the profile list.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Enabled the A–Z index in the Plex folder view. Available letters now come
@@ -3096,6 +3696,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   ASIO PCM and exclusive WASAPI playback seek into the shared source file and
   stop at each track's CUE boundary without creating split files.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 ## [0.8.0] - 2026-06-21
@@ -3119,6 +3727,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   card now spans the available content width, with the favorite action directly
   before the album title and the cover/playlist actions aligned side by side.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Preserved manual artist renames across watcher updates and later library
@@ -3167,6 +3783,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.7.2] - 2026-06-21
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Fixed the application failing during startup because the lyrics
@@ -3192,6 +3816,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.7.1] - 2026-06-21
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Added the theme-aware now-playing highlight to tracks in the Plex folder
@@ -3263,6 +3895,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Matched the album detail header to the shared radio, podcast, and library
   card design with the accent-colored border and asymmetric rounded corners.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Added a theme-aware background highlight for the currently audible item in
@@ -3312,6 +3952,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   French, and Spanish when DSD is being converted to PCM, including the active
   PCM output sample rate.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Fixed the table-header column chooser not opening on right-click and then
@@ -3354,6 +4002,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   screen. If the download fails, a warning dialog is displayed and the application
   starts without audio playback capability.
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Restored visible text in Avalonia table/list navigation and restored vector
@@ -3444,6 +4100,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.4.0] - 2026-06-15
 
+- The karaoke view now highlights the active word of enhanced-LRC lyrics.
+  `LyricsService.ParseLrc` extracts `<mm:ss.xx>` word timestamps into
+  `TimedLyricLine.Words`, and `KaraokeWindow` emphasizes the active word while
+  already-sung words keep the accent colour. Plain synchronized lines keep the
+  line-level highlight, so nothing changes for ordinary LRC files.
+- Fixed enhanced-LRC word markers leaking into the displayed lyrics text: they are
+  now stripped from the line text instead of appearing as literal `<00:12.00>`
+  fragments.
 ### Fixed
 
 - Plex folder playback now queues only the tracks on the selected file's
