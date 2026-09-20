@@ -49,6 +49,41 @@ internal static class VisualizerPresets
             wave_scale=0.35
             """),
         VisualizerPreset.Parse("""
+            name=Orbit
+            decay=0.92
+            blur_level=1
+            wave_alpha=0.5
+            wave_scale=0.18
+            per_frame_1=q1 = time * 0.6;
+            per_point_1=y = sample * (0.5 + bass);
+            shape_0_sides=6
+            shape_0_x=0
+            shape_0_y=0
+            shape_0_rad=0.18
+            shape_0_r=0.15
+            shape_0_g=0.9
+            shape_0_b=1
+            shape_0_a=0.35
+            shape_0_border_r=1
+            shape_0_border_g=1
+            shape_0_border_b=1
+            shape_0_border_a=0.9
+            shape_0_per_frame_1=x = cos(q1) * 0.45;
+            shape_0_per_frame_2=y = sin(q1) * 0.45;
+            shape_0_per_frame_3=rad = 0.12 + bass * 0.25;
+            shape_1_sides=3
+            shape_1_x=0
+            shape_1_y=0
+            shape_1_rad=0.06
+            shape_1_r=1
+            shape_1_g=0.4
+            shape_1_b=0.1
+            shape_1_a=0.8
+            shape_1_border_a=0
+            shape_1_per_frame_1=x = cos(q1 + pi) * 0.45;
+            shape_1_per_frame_2=y = sin(q1 + pi) * 0.45;
+            """),
+        VisualizerPreset.Parse("""
             name=Kaleidoscope
             decay=0.92
             blur_level=1

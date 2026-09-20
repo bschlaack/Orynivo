@@ -1692,7 +1692,10 @@ resets the picture; the **Reduce motion** preference draws a static spectrum ins
 animating.
 
 Presets are INI-style text with `per_frame_init`, `per_frame`, and `per_pixel` expression
-blocks plus `decay`, `zoom`, `warp`, `blur_level`, `wave_alpha`, and `wave_scale`. The
+blocks plus `decay`, `zoom`, `warp`, `blur_level`, `wave_alpha`, and `wave_scale`. A
+`per_point` block may move every waveform point, and `shape_N_*` keys (`sides`, `x`, `y`,
+`rad`, `ang`, fill and border colours, `additive`) add regular polygons with their own
+`per_frame` and `per_point` programs. The
 supported expression subset is arithmetic, comparisons, logical operators, the ternary
 operator, `if(...)`, the usual math functions, `pi`, `rand(n)`, and `//` comments; unknown
 keys are ignored so third-party presets degrade instead of failing. Own presets go into the

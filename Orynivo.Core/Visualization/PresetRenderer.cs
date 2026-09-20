@@ -197,50 +197,275 @@ public sealed class PresetRenderer : IVisualizerAudioSource
         }
     }
 
-    /// <summary>Draws the waveform and the spectrum bars into the fresh buffer.</summary>
+    /// <summary>Draws the waveform, the spectrum bars, and the custom shapes into the fresh buffer.</summary>
     private void DrawOverlay()
     {
         _fresh.Clear();
+        DrawWaveform();
+        DrawSpectrum();
+        DrawShapes();
+    }
+
+    /// <summary>Draws the waveform, honouring a preset's per-point program.</summary>
+    private void DrawWaveform()
+    {
+        var waveform = Waveform;
+        if (waveform.Length < 2)
+            return;
+
         var width = _fresh.Width;
         var height = _fresh.Height;
         var alpha = Preset.WaveAlpha;
+        var amplitude = height * Preset.WaveScale * 0.5f;
+        var centre = height * 0.5f;
+        var perPoint = Preset.WavePerPoint;
 
-        var waveform = Waveform;
-        if (waveform.Length > 1)
+        for (var column = 0; column < width; column++)
         {
-            var centre = height * 0.5f;
-            var amplitude = height * Preset.WaveScale * 0.5f;
-            for (var x = 0; x < width; x++)
+            var t = width > 1 ? column / (float)(width - 1) : 0f;
+            var point = (int)((long)column * (waveform.Length - 1) / Math.Max(1, width - 1));
+            var sample = Math.Clamp(waveform[point], -1f, 1f);
+
+            var normalizedX = (t * 2f) - 1f;
+            var normalizedY = sample;
+            if (!perPoint.IsEmpty)
             {
-                var point = (int)((long)x * (waveform.Length - 1) / Math.Max(1, width - 1));
-                var value = Math.Clamp(waveform[point], -1f, 1f);
-                var y = (int)Math.Clamp(centre + (value * amplitude), 0f, height - 1);
-                _fresh.AddPixel(x, y, alpha * 0.35f, alpha, alpha);
-                _fresh.AddPixel(x, y + 1, alpha * 0.15f, alpha * 0.4f, alpha * 0.5f);
+                Write("t", t);
+                Write("i", column);
+                Write("sample", sample);
+                Write("x", normalizedX);
+                Write("y", normalizedY);
+                perPoint.Execute(_slots);
+                normalizedX = Read("x", normalizedX);
+                normalizedY = Read("y", normalizedY);
             }
-        }
 
+            var x = (int)Math.Clamp((normalizedX * 0.5f + 0.5f) * (width - 1), 0f, width - 1);
+            var y = (int)Math.Clamp(centre + (normalizedY * amplitude), 0f, height - 1);
+            _fresh.AddPixel(x, y, alpha * 0.35f, alpha, alpha);
+            _fresh.AddPixel(x, y + 1, alpha * 0.15f, alpha * 0.4f, alpha * 0.5f);
+        }
+    }
+
+    /// <summary>Draws the spectrum bars.</summary>
+    private void DrawSpectrum()
+    {
         var bands = Bands;
-        if (bands.Length > 0)
+        if (bands.Length == 0)
+            return;
+
+        var width = _fresh.Width;
+        var height = _fresh.Height;
+        var alpha = Preset.WaveAlpha;
+        var barWidth = Math.Max(1, width / bands.Length);
+        for (var band = 0; band < bands.Length; band++)
         {
-            var barWidth = Math.Max(1, width / bands.Length);
-            for (var band = 0; band < bands.Length; band++)
+            var barHeight = (int)Math.Clamp(bands[band] * height * 0.6f, 0f, height - 1);
+            for (var row = 0; row < barHeight; row++)
             {
-                var barHeight = (int)Math.Clamp(bands[band] * height * 0.6f, 0f, height - 1);
-                for (var row = 0; row < barHeight; row++)
+                var y = height - 1 - row;
+                for (var column = 0; column < barWidth; column++)
                 {
-                    var y = height - 1 - row;
-                    for (var column = 0; column < barWidth; column++)
-                    {
-                        var x = (band * barWidth) + column;
-                        if (x < width)
-                            _fresh.AddPixel(x, y, alpha * 0.25f, alpha * 0.6f, alpha);
-                    }
+                    var x = (band * barWidth) + column;
+                    if (x < width)
+                        _fresh.AddPixel(x, y, alpha * 0.25f, alpha * 0.6f, alpha);
                 }
             }
         }
     }
 
+    /// <summary>Draws every custom shape of the preset.</summary>
+    private void DrawShapes()
+    {
+        foreach (var shape in Preset.Shapes)
+        {
+            SeedShape(shape);
+            shape.PerFrame.Execute(_slots);
+
+            var centreX = Read("x", shape.X);
+            var centreY = Read("y", shape.Y);
+            var radius = Math.Max(0f, Read("rad", shape.Radius));
+            var angle = Read("ang", shape.Angle);
+            var sides = (int)Math.Clamp(Read("sides", shape.Sides), 0f, 64f);
+            var red = Math.Clamp(Read("r", shape.Red), 0f, 1f);
+            var green = Math.Clamp(Read("g", shape.Green), 0f, 1f);
+            var blue = Math.Clamp(Read("b", shape.Blue), 0f, 1f);
+            var alpha = Math.Clamp(Read("a", shape.Alpha), 0f, 1f);
+
+            var vertices = BuildVertices(shape, sides, centreX, centreY, radius, angle);
+            FillPolygon(vertices, red, green, blue, alpha, shape.Additive);
+            DrawPolygonBorder(vertices, shape);
+        }
+    }
+
+    /// <summary>Builds the vertex list of a shape, running its per-point program.</summary>
+    /// <param name="shape">Shape being drawn.</param>
+    /// <param name="sides">Vertex count; below three draws a circle approximation.</param>
+    /// <param name="centreX">Centre column in the range -1 to 1.</param>
+    /// <param name="centreY">Centre row in the range -1 to 1.</param>
+    /// <param name="radius">Radius in the range 0 to 1.</param>
+    /// <param name="angle">Base rotation in radians.</param>
+    /// <returns>Vertex positions in the range -1 to 1.</returns>
+    private (float X, float Y)[] BuildVertices(
+        VisualizerShape shape,
+        int sides,
+        float centreX,
+        float centreY,
+        float radius,
+        float angle)
+    {
+        var count = sides >= 3 ? sides : 24;
+        var vertices = new (float X, float Y)[count];
+        for (var index = 0; index < count; index++)
+        {
+            var t = index / (float)count;
+            var vertexAngle = angle + (t * 2f * MathF.PI);
+            var x = centreX + (MathF.Cos(vertexAngle) * radius);
+            var y = centreY + (MathF.Sin(vertexAngle) * radius);
+
+            if (!shape.PerPoint.IsEmpty)
+            {
+                Write("t", t);
+                Write("i", index);
+                Write("x", x);
+                Write("y", y);
+                Write("rad", radius);
+                Write("ang", vertexAngle);
+                Write("sides", sides);
+                Write("r", shape.Red);
+                Write("g", shape.Green);
+                Write("b", shape.Blue);
+                Write("a", shape.Alpha);
+                shape.PerPoint.Execute(_slots);
+                x = Read("x", x);
+                y = Read("y", y);
+            }
+
+            vertices[index] = (x, y);
+        }
+
+        return vertices;
+    }
+
+    /// <summary>Fills a convex polygon with a scanline pass.</summary>
+    private void FillPolygon(
+        (float X, float Y)[] vertices,
+        float red,
+        float green,
+        float blue,
+        float alpha,
+        bool additive)
+    {
+        if (vertices.Length < 3 || alpha <= 0f)
+            return;
+
+        var width = _fresh.Width;
+        var height = _fresh.Height;
+        for (var row = 0; row < height; row++)
+        {
+            var y = height > 1 ? (row / (float)(height - 1) * 2f) - 1f : 0f;
+            var minimum = float.MaxValue;
+            var maximum = float.MinValue;
+            for (var index = 0; index < vertices.Length; index++)
+            {
+                var a = vertices[index];
+                var b = vertices[(index + 1) % vertices.Length];
+                if ((a.Y > y) == (b.Y > y))
+                    continue;
+
+                var x = a.X + ((y - a.Y) * (b.X - a.X) / (b.Y - a.Y));
+                minimum = Math.Min(minimum, x);
+                maximum = Math.Max(maximum, x);
+            }
+
+            if (minimum > maximum)
+                continue;
+
+            var from = (int)Math.Clamp((minimum * 0.5f + 0.5f) * (width - 1), 0f, width - 1);
+            var to = (int)Math.Clamp((maximum * 0.5f + 0.5f) * (width - 1), 0f, width - 1);
+            for (var column = from; column <= to; column++)
+                PaintPixel(column, row, red, green, blue, alpha, additive);
+        }
+    }
+
+    /// <summary>Draws the border of a shape with its border colour.</summary>
+    /// <param name="vertices">Vertex positions in the range -1 to 1.</param>
+    /// <param name="shape">Shape whose border colour is used.</param>
+    private void DrawPolygonBorder((float X, float Y)[] vertices, VisualizerShape shape)
+    {
+        if (vertices.Length < 2 || shape.BorderAlpha <= 0f)
+            return;
+
+        var width = _fresh.Width;
+        var height = _fresh.Height;
+        for (var index = 0; index < vertices.Length; index++)
+        {
+            var a = vertices[index];
+            var b = vertices[(index + 1) % vertices.Length];
+            var steps = Math.Max(2, (int)(MathF.Abs(b.X - a.X) * width));
+            for (var step = 0; step <= steps; step++)
+            {
+                var t = step / (float)steps;
+                var x = a.X + ((b.X - a.X) * t);
+                var y = a.Y + ((b.Y - a.Y) * t);
+                var column = (int)Math.Clamp((x * 0.5f + 0.5f) * (width - 1), 0f, width - 1);
+                var row = (int)Math.Clamp((y * 0.5f + 0.5f) * (height - 1), 0f, height - 1);
+                PaintPixel(
+                    column,
+                    row,
+                    shape.BorderRed,
+                    shape.BorderGreen,
+                    shape.BorderBlue,
+                    shape.BorderAlpha,
+                    shape.Additive);
+            }
+        }
+    }
+
+    /// <summary>Writes one overlay pixel, either adding it or replacing the pixel.</summary>
+    private void PaintPixel(
+        int x,
+        int y,
+        float red,
+        float green,
+        float blue,
+        float alpha,
+        bool additive)
+    {
+        if (x < 0 || y < 0 || x >= _fresh.Width || y >= _fresh.Height)
+            return;
+
+        var offset = (((y * _fresh.Width) + x) * 4);
+        if (additive)
+        {
+            _fresh.Pixels[offset] = Math.Clamp(_fresh.Pixels[offset] + (red * alpha), 0f, 1f);
+            _fresh.Pixels[offset + 1] = Math.Clamp(_fresh.Pixels[offset + 1] + (green * alpha), 0f, 1f);
+            _fresh.Pixels[offset + 2] = Math.Clamp(_fresh.Pixels[offset + 2] + (blue * alpha), 0f, 1f);
+        }
+        else
+        {
+            _fresh.Pixels[offset] = Math.Clamp((_fresh.Pixels[offset] * (1f - alpha)) + (red * alpha), 0f, 1f);
+            _fresh.Pixels[offset + 1] = Math.Clamp((_fresh.Pixels[offset + 1] * (1f - alpha)) + (green * alpha), 0f, 1f);
+            _fresh.Pixels[offset + 2] = Math.Clamp((_fresh.Pixels[offset + 2] * (1f - alpha)) + (blue * alpha), 0f, 1f);
+        }
+
+        _fresh.Pixels[offset + 3] = 1f;
+    }
+
+    /// <summary>Seeds a shape's default values into the shared slots.</summary>
+    /// <param name="shape">Shape about to be drawn.</param>
+    private void SeedShape(VisualizerShape shape)
+    {
+        Write("sides", shape.Sides);
+        Write("x", shape.X);
+        Write("y", shape.Y);
+        Write("rad", shape.Radius);
+        Write("ang", shape.Angle);
+        Write("r", shape.Red);
+        Write("g", shape.Green);
+        Write("b", shape.Blue);
+        Write("a", shape.Alpha);
+    }
     /// <summary>Adds the freshly drawn overlay on top of the faded feedback image.</summary>
     private void Composite()
     {

@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Added custom shapes and a per-point waveform to the visualizer presets. `shape_N_*` keys
+  describe a regular polygon (`sides`, `x`, `y`, `rad`, `ang`, fill and border colours,
+  `additive`) with optional per-shape `per_frame` and `per_point` programs, and a preset's
+  `per_point` block may move every waveform point. A sixth preset (`Orbit`) demonstrates
+  both. Covered by 7 tests.
+
 - The visualizer now also loads user presets: `.oryvis` and `.milk` files from a folder
   configured under **Preset folder** (default: a `visualizer-presets` folder below the
   per-user data directory). Presets use the documented expression subset and unknown keys

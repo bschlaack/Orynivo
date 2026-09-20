@@ -491,7 +491,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   `VisualizerPresetLibrary` loads the built-in presets plus `.oryvis` and `.milk` files from
   `AppSettings.VisualizerPresetDirectory` (default: a `visualizer-presets` folder below the
   data root); a file that fails to parse is skipped and reported, never fatal, and preset
-  files stay user data like equalizer profiles.
+  files stay user data like equalizer profiles. Preset stages share one slot layout, so a
+  stage-local built-in such as `x` or `rad` is one slot that each stage seeds and reads back
+  for itself: the per-pixel stage seeds it per pixel, a shape seeds it per shape and per
+  vertex. Never let a stage assume another stage's value is still in place.
 - The desktop runs on Avalonia 12.1.2 with **compiled bindings enabled by default**;
   do not add `AvaloniaUseCompiledBindingsByDefault=false` back. Every `DataTemplate`
   and every item-binding scope needs an explicit `x:DataType`:

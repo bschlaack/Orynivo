@@ -22,7 +22,9 @@ public sealed class VisualizerPreset
         float warp,
         int blurLevel,
         float waveAlpha,
-        float waveScale)
+        float waveScale,
+        PresetProgram wavePerPoint,
+        IReadOnlyList<VisualizerShape> shapes)
     {
         Name = name;
         Layout = layout;
@@ -35,6 +37,8 @@ public sealed class VisualizerPreset
         BlurLevel = blurLevel;
         WaveAlpha = waveAlpha;
         WaveScale = waveScale;
+        WavePerPoint = wavePerPoint;
+        Shapes = shapes;
     }
 
     /// <summary>Gets the preset name.</summary>
@@ -69,6 +73,15 @@ public sealed class VisualizerPreset
 
     /// <summary>Gets the waveform height as a fraction of the frame.</summary>
     public float WaveScale { get; }
+
+    /// <summary>
+    /// Gets the per-point program of the waveform. It may move every point by writing
+    /// <c>x</c> and <c>y</c>, which default to the plain waveform line.
+    /// </summary>
+    public PresetProgram WavePerPoint { get; }
+
+    /// <summary>Gets the custom shapes drawn over the warped frame, in draw order.</summary>
+    public IReadOnlyList<VisualizerShape> Shapes { get; }
 
     /// <summary>Parses preset text.</summary>
     /// <param name="text">INI-style preset text.</param>
@@ -114,7 +127,9 @@ public sealed class VisualizerPreset
             ReadFloat(values, "warp", 1f),
             (int)Math.Clamp(ReadFloat(values, "blur_level", 0f), 0f, 4f),
             Math.Clamp(ReadFloat(values, "wave_alpha", 0.8f), 0f, 1f),
-            Math.Clamp(ReadFloat(values, "wave_scale", 0.25f), 0f, 1f));
+            Math.Clamp(ReadFloat(values, "wave_scale", 0.25f), 0f, 1f),
+            PresetCompiler.Compile(Join(values, "per_point"), layout),
+            ParseShapes(values, layout));
     }
 
     /// <summary>Creates a preset from expression text without an INI wrapper, for tests and defaults.</summary>
@@ -140,8 +155,71 @@ public sealed class VisualizerPreset
             1f,
             0,
             0.8f,
-            0.25f);
+            0.25f,
+            PresetProgram.Empty,
+            []);
     }
+
+    /// <summary>
+    /// Parses the <c>shape_N_*</c> keys. Numbered shapes are read in order until the first
+    /// gap, which is how Milkdrop presets declare them.
+    /// </summary>
+    /// <param name="values">Parsed preset values.</param>
+    /// <param name="layout">Shared slot layout.</param>
+    /// <returns>The declared shapes.</returns>
+    private static IReadOnlyList<VisualizerShape> ParseShapes(
+        Dictionary<string, string> values,
+        PresetVariableLayout layout)
+    {
+        var shapes = new List<VisualizerShape>();
+        for (var index = 0; index < 32; index++)
+        {
+            var prefix = $"shape_{index}_";
+            var hasAny = values.Keys.Any(key => key.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+            if (!hasAny)
+            {
+                if (index == 0)
+                    continue;
+                break;
+            }
+
+            shapes.Add(new VisualizerShape(
+                (int)Math.Clamp(ReadShape(values, prefix, "sides", 4f), 0f, 64f),
+                ReadShape(values, prefix, "x", 0f),
+                ReadShape(values, prefix, "y", 0f),
+                Math.Max(0f, ReadShape(values, prefix, "rad", 0.2f)),
+                ReadShape(values, prefix, "ang", 0f),
+                Math.Clamp(ReadShape(values, prefix, "r", 1f), 0f, 1f),
+                Math.Clamp(ReadShape(values, prefix, "g", 1f), 0f, 1f),
+                Math.Clamp(ReadShape(values, prefix, "b", 1f), 0f, 1f),
+                Math.Clamp(ReadShape(values, prefix, "a", 0.5f), 0f, 1f),
+                Math.Clamp(ReadShape(values, prefix, "border_r", 1f), 0f, 1f),
+                Math.Clamp(ReadShape(values, prefix, "border_g", 1f), 0f, 1f),
+                Math.Clamp(ReadShape(values, prefix, "border_b", 1f), 0f, 1f),
+                Math.Clamp(ReadShape(values, prefix, "border_a", 1f), 0f, 1f),
+                ReadShape(values, prefix, "additive", 0f) >= 0.5f,
+                PresetCompiler.Compile(Join(values, prefix + "per_frame"), layout),
+                PresetCompiler.Compile(Join(values, prefix + "per_point"), layout)));
+        }
+
+        return shapes;
+    }
+
+    /// <summary>Reads one shape key, falling back to its default.</summary>
+    /// <param name="values">Parsed preset values.</param>
+    /// <param name="prefix">Shape key prefix.</param>
+    /// <param name="key">Key name without the prefix.</param>
+    /// <param name="fallback">Default value.</param>
+    /// <returns>The parsed value.</returns>
+    private static float ReadShape(
+        Dictionary<string, string> values,
+        string prefix,
+        string key,
+        float fallback) =>
+        values.TryGetValue(prefix + key, out var text) &&
+        float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
+            ? value
+            : fallback;
 
     /// <summary>Joins the numbered continuations of one expression block.</summary>
     /// <param name="values">Parsed preset values.</param>

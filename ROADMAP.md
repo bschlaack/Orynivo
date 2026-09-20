@@ -468,6 +468,12 @@ overlays, and a composite stage.
   counted in the on-screen label), the **Preset folder** setting with a folder picker, and the
   README, AGENTS, wiki, and CHANGELOG coverage.
 
+- 37f Custom shapes and the per-point waveform - `Done`: `shape_N_*` keys (`sides`, `x`, `y`,
+  `rad`, `ang`, `r`/`g`/`b`/`a`, `border_*`, `additive`) with per-shape `per_frame` and
+  `per_point` programs, a scanline fill and a border pass, and a `per_point` program for the
+  waveform that may move every point by writing `x` and `y`. A sixth built-in preset
+  (`Orbit`) shows the feature. Covered by 7 tests.
+
 **Tests**: 21 cases for phase 37a; each later phase adds its own.
 
 **Commit**: `feat(visualizer): add the audio analysis foundation`
