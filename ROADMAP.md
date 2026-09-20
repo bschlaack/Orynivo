@@ -572,14 +572,7 @@ written here. No third-party visualizer code or preset bundle is linked.
   smoothed bands, the frame counters, and the aspect ratio. The budget skips the shaders for a
   while instead of lowering the resolution, which is the documented deviation from the original
   plan. Walking the tree per pixel is the known cost limit; a JIT compiler for shaders is the
-  follow-up if needed. Covered by 11 tests.- 38e `.milk` compatibility and validation - `Pending`: `[presetNN]` sections, version and
-  `nWaveMode` handling, tolerance for the remaining legacy keys, a corpus of real presets as
-  regression fixtures, and the per-preset skip diagnostics. Every section of a multi-preset
-  `.milk` file becomes its own preset, the declared format version is reported but never gates
-  loading, and a skipped preset carries a reason naming the file or section. The regression
-  corpus is hand-written in the real format because third-party presets are licensed by their
-  authors and are never bundled; it covers a multi-section file, a shader, and a minimal preset.
-  Covered by 13 tests.
+  follow-up if needed. Covered by 11 tests.
 
 - 38h `.milk` compatibility and validation - `Done`: `[presetNN]` sections, version and
   `nWaveMode` handling, tolerance for the remaining legacy keys, a corpus of real presets as
@@ -594,3 +587,65 @@ written here. No third-party visualizer code or preset bundle is linked.
 render comparison against hand-computed reference pixels.
 
 **Commit**: `feat(visualizer): extend the preset engine towards MilkDrop compatibility`
+
+## 39 Visualizer render performance
+
+**Goal.** The preset engine renders on the CPU, single-threaded, and on the UI thread, so it
+pays for that with a low render resolution and a coarse, upscaled picture. Make the existing
+CPU path fast enough first, then move the work to the GPU in section 40.
+
+**Starting point.** The frame is a float RGBA `PixelBuffer` at 480 x 270 by default. Every
+stage is a separate full-frame pass (warp with bilinear sampling, blur passes, decay, centre
+darkening, gamma, video echo, composite, comp shaders), the HLSL runtime walks its syntax tree
+per pixel, and `VisualizerWindow` drives the loop from a `DispatcherTimer`, so a heavy frame
+stalls the interface as well. Only the presentation is GPU work: the finished frame is uploaded
+to a `WriteableBitmap` that Skia scales up.
+
+**Phases**
+
+- 39a Render measurement - `Pending`: per-stage timings (warp, blur, shader, overlay, composite,
+  present) reported per preset and per resolution, surfaced in the window's diagnostic line and
+  asserted in tests as bounded ratios rather than absolute times. Every later phase must show
+  its gain here instead of by eye.
+- 39b Off the UI thread - `Pending`: move the render loop off the Avalonia dispatcher into a
+  background loop that presents by marshalling only the bitmap invalidation, so a heavy frame can
+  no longer stall the interface. Keep shutdown, preset switching, reduce-motion, and the overlay
+  idle timer correct.
+- 39c Parallel full-frame passes - `Pending`: split warp, blur, decay, gamma, darken, echo, and
+  composite across cores by row ranges with no order dependence, a bounded worker count, and
+  results that do not depend on the split.
+- 39d Allocation-free hot path - `Pending`: reuse every frame buffer and temporary, remove
+  per-frame allocations and delegate churn from the pixel loops, and prove it with an allocation
+  check around a rendered frame.
+- 39e JIT-compiled shaders - `Pending`: compile the parsed shader tree to
+  `System.Linq.Expressions` through the existing preset compiler machinery instead of walking it
+  per pixel, keep the interpreter as the validation and fallback path, and compare both against
+  the same reference frames.
+- 39f Sharper defaults - `Pending`: raise the default render resolution and frame rate to what
+  the measured cost allows, keep the existing settings ranges, and document the recommended
+  values in README and the wiki.
+
+## 40 Visualizer GPU pipeline
+
+**Goal.** Run the preset engine on the GPU so fullscreen resolution and high frame rates become
+affordable. This is a project of its own and must keep the CPU path as the fallback.
+
+**Phases**
+
+- 40a Render-surface decision - `Pending`: evaluate Avalonia's Skia surface (SKSL and
+  `SKRuntimeEffect`) against an own OpenGL/Vulkan surface (for example Silk.NET), pick one, and
+  record the decision, its risks, and the fallback rule in `DEPENDENCY-MIGRATION.md`.
+- 40b Shader translation - `Pending`: translate the HLSL subset, or the preset expressions, into
+  the chosen GPU shading language, reusing `ShaderParser`; a shader that cannot be translated
+  keeps the CPU path for that preset instead of failing.
+- 40c GPU passes - `Pending`: warp, blur, video echo, borders, and composite as GPU passes with
+  the waveform and spectrum uploaded as small textures and no per-frame readback.
+- 40d Platform, packaging, and CI - `Pending`: native dependencies for Windows, Linux, and macOS,
+  packaging, the signed release manifest, and the CI build matrix.
+- 40e Cutover and validation - `Pending`: the GPU path becomes the default where it is available,
+  the CPU path stays the fallback, and a comparison harness validates both against the same
+  reference frames.
+
+**Tests**: each phase adds its own; 39a is the prerequisite for claiming any speed-up.
+
+**Commit**: `perf(visualizer): add render measurement` (39a), then one commit per phase
