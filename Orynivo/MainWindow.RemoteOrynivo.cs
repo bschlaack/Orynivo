@@ -183,7 +183,7 @@ public partial class MainWindow : Window
     private static string GetOrynivoFavoriteKey(string serverId, string entityType, long id)
         => $"{serverId}:{entityType}:{id}";
 
-    private static string GetServerSourceKey(string serverId) => $"server:{serverId}";
+    internal static string GetServerSourceKey(string serverId) => $"server:{serverId}";
 
     private bool IsOrynivoFavorite(OrynivoServerSettings server, string entityType, long id)
         => ActiveUserProfile.OrynivoServerFavorites.Contains(GetOrynivoFavoriteKey(server.Id, entityType, id));

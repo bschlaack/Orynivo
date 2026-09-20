@@ -482,11 +482,9 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
     `MetadataRepairPreviewRow`, `TrackInfoEntry`, and the three search-window result
     view models live in their own files, and why the metadata dialog uses a named
     header record instead of an anonymous type.
-  - Scopes that bind the nested `ContentRow` (`AlbumArtworkCardTemplate`, the artist
-    artwork card, the artist-info track table, and the podcast/album hero cards whose
-    `DataContext` is set to a row in code) use explicit `{ReflectionBinding}`. Move
-    `ContentRow` to a top-level type and drop those to `{Binding}` when it is
-    extracted; see `DEPENDENCY-MIGRATION.md`.
+  - `ContentRow` and `LogicalAlbumPart` are top-level types too; there is no
+    `{ReflectionBinding}` left in the views. Keep it that way: a row model bound from
+    XAML must never move back into `MainWindow`.
   SkiaSharp moves with Avalonia: use `SKSamplingOptions`/`SKFont` instead of the
   removed 2.88 text and sampling APIs on `SKPaint`.
 - Cross-device resume for remote Orynivo Server tracks lives in

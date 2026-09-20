@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Extracted `ContentRow` and `LogicalAlbumPart` from `MainWindow.xaml.cs` into
+  top-level types with complete English XML documentation (69 members gained a
+  summary). Every remaining `{ReflectionBinding}` in the views is now a
+  compile-time-checked `{Binding}` with `x:DataType="local:ContentRow"`, so no
+  reflection binding is left in the XAML.
+
 - Adopted Avalonia 12 compiled bindings for the whole desktop UI and removed
   `AvaloniaUseCompiledBindingsByDefault=false`. Every template and item-binding
   scope now carries an explicit `x:DataType`, which turned 232 previously unchecked

@@ -155,29 +155,27 @@ them as follows:
 4. `ContentRow` is still a nested private type, so the scopes that bind it
    (`AlbumArtworkCardTemplate`, the artist artwork card, the artist-info track
    table, and the podcast and album hero cards whose `DataContext` is assigned to a
-   row in code) use explicit `{ReflectionBinding}`. That is the one remaining
-   reflection-binding surface.
+   row in code) used explicit `{ReflectionBinding}`; they were converted when
+   `ContentRow` was extracted.
 
 Verification: clean Debug and Release builds with `--warnaserror` (0 errors, 0
 warnings) and `scripts/verify-all.ps1` green, with 570 tests passing.
 
-## Follow-up: extract `ContentRow`
+## Completed: `ContentRow` extraction
 
-**Trigger:** a dedicated change, because it is the central UI row model.
+`ContentRow` (287 lines, 77 members) and its `LogicalAlbumPart` companion moved out of
+`MainWindow.xaml.cs` into `ContentRow.cs` and `LogicalAlbumPart.cs` as top-level
+`internal` types, with English XML documentation for every member; 69 members gained
+a summary. `MainWindow.LocalSourceKey` and `MainWindow.GetServerSourceKey` became
+`internal static` so the row model can still build its source key and badge.
 
-**Steps:**
+The scopes that bind a row (`AlbumArtworkCardTemplate`, the `AlbumDetailHeader` whose
+`DataContext` is assigned in code, and the artist artwork card) now carry
+`x:DataType="local:ContentRow"`, and every `{ReflectionBinding}` in the views is back
+to `{Binding}`. There is no reflection binding left in the XAML.
 
-1. Move `ContentRow` out of `MainWindow.xaml.cs` into its own top-level type with
-   English XML documentation for every member (77 members, of which 8 carry a
-   summary today).
-2. Replace the remaining `{ReflectionBinding}` occurrences with `{Binding}` and add
-   `x:DataType="local:ContentRow"` to the affected scopes.
-3. Re-check every `MainWindow` partial that touches the type; it is used only from
-   `MainWindow` partials today, so the move is contained.
-
-**Checks before merging:** `scripts/verify-all.ps1` green plus a manual pass over
-the album artwork cards, the artist artwork cards, the artist-info track table, the
-podcast detail hero, and the album detail header.
+Verification: clean Debug and Release builds with `--warnaserror` (0 errors, 0
+warnings) and `scripts/verify-all.ps1` green, with 570 tests passing.
 ## `Avalonia.Controls.DataGrid`
 
 `Avalonia.Controls.DataGrid` ships with the Avalonia 12 line (12.1.2) and is

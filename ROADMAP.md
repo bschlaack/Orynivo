@@ -1,6 +1,6 @@
 # Orynivo Roadmap
 
-Items 1-32 are complete and listed for reference only.
+Items 1-33 are complete and listed for reference only.
 
 Each item is one commit and must follow the completion checklist in
 `AGENTS.md`: build every affected project, run the three test projects, update
@@ -334,3 +334,18 @@ report 0 errors and 0 warnings. A runtime pass is still outstanding and listed i
 report 0 errors and 0 warnings.
 
 **Commit**: `refactor(xaml): adopt Avalonia 12 compiled bindings`
+
+## 33. Extract `ContentRow` and finish compiled bindings - `Done`
+
+**Design**
+
+- `ContentRow` (287 lines, 77 members) and `LogicalAlbumPart` moved out of
+  `MainWindow.xaml.cs` into top-level `internal` types with full XML docs.
+- `LocalSourceKey` and `GetServerSourceKey` became `internal static`.
+- The three row scopes carry `x:DataType="local:ContentRow"`; no
+  `{ReflectionBinding}` remains in the views.
+
+**Tests**: 570 tests green; clean Debug and Release builds with `--warnaserror`
+report 0 errors and 0 warnings.
+
+**Commit**: `refactor(ui): extract the ContentRow row model`
