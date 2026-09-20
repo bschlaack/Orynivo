@@ -4,6 +4,19 @@ All notable changes to Orynivo are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+- Added the audio-analysis foundation for the upcoming music visualizer: a real-input
+  radix-2 `Fft`, an `AudioSpectrumAnalyzer` that produces 64 smoothed logarithmic bands
+  plus bass, mid, treble, and volume, and the lock-free `PcmVisualizationTap` that hands
+  processed PCM from the audio pump to a visualizer without ever blocking playback.
+  21 tests cover sine-frequency detection, direct-current concentration, silence, band
+  separation, decay and reset, ring-buffer overflow, oversized blocks, and clearing.
+
+
+### Fixed
+
 ## [0.45.0] - 2026-09-20
 
 ### Added

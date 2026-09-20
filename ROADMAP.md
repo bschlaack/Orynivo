@@ -1,6 +1,6 @@
 # Orynivo Roadmap
 
-Items 1-36 are complete and listed for reference only.
+Items 1-36 are complete and listed for reference only. Item 37 is in progress.
 
 Each item is one commit and must follow the completion checklist in
 `AGENTS.md`: build every affected project, run the three test projects, update
@@ -397,3 +397,63 @@ fallback when the cap excludes every rate, and the DSD preference under a cap.
 parameter is restored.
 
 **Commit**: `fix(build): compile the non-Windows desktop in verify-all`
+
+## 37. Music visualizer with a Milkdrop-style preset engine - `In progress`
+
+**Goal**
+
+A fullscreen visualizer window that reacts to the playing music, driven by text presets in
+the spirit of Winamp's Milkdrop and AVS: per-frame and per-pixel expressions over the audio
+spectrum, a feedback warp of the previous frame, blur passes, waveform and custom-shape
+overlays, and a composite stage.
+
+**Design**
+
+- **Audio tap.** Players publish their processed PCM (after volume, ReplayGain, EQ, and
+  crossfeed, so the picture matches what is audible) into the lock-free
+  `PcmVisualizationTap`. The audio thread only copies and never waits: when the visualizer
+  falls behind, the oldest samples are dropped. Native ASIO/cwASIO DSD produces no PCM, so
+  those sources need a separate lightweight analysis or simply leave the picture still.
+- **Analysis.** `AudioSpectrumAnalyzer` applies a Hann window, the real-input `Fft`, a
+  logarithmic 64-band grouping, and a fast-attack/slow-decay smoothing, and derives
+  `bass`, `mid`, `treble`, and `volume` in the range zero to one. This is the entire
+  preset-visible audio input.
+- **Preset language.** A tokenizer, Pratt parser, and compiler for the Milkdrop expression
+  subset: arithmetic, comparisons, `? :`, `if`, the usual `sin/cos/sqrt/pow/abs/floor/...`
+  functions, per-frame and per-pixel built-ins, and user variables. Statements are
+  assignments; loops, arrays, and shaders are deliberately out of scope. Presets are INI
+  text with `per_frame_init`, `per_frame`, `per_pixel`, `wave`, `shape`, and `comp` keys;
+  unknown keys are ignored so third-party Milkdrop presets degrade gracefully.
+- **Render pipeline.** The stages run into a low-resolution framebuffer (roughly 480 x 270)
+  that is scaled up with bilinear filtering, which is what gives the classic soft feedback
+  look and keeps CPU rendering viable: the per-pixel displacement map warps the previous
+  frame, blur passes soften it, the waveform and custom shapes are drawn on top, and the
+  composite stage blends them with the preset's alpha. Scanline evaluation runs in parallel.
+- **Presentation.** `VisualizerWindow` follows the karaoke window: fullscreen, closes on
+  Escape or a click, preset switching with the keyboard and a click, a bounded frame-rate
+  cap, and `AppSettings.ReduceMotion` honoured by falling back to a static spectrum.
+- **Licensing.** `projectM` and the original Milkdrop are GPL/other-licensed, so no third
+  party visualizer code or preset bundle is linked; the engine and every shipped preset are
+  written here. Presets are user files, like equalizer profiles.
+
+**Phases**
+
+- 37a Audio analysis foundation - `Done`: `Fft`, `AudioSpectrumAnalyzer`, and
+  `PcmVisualizationTap` in `Orynivo.Core/Audio`, covered by 21 tests (sine frequency
+  detection, DC concentration, silence, band separation, decay and reset, ring-buffer
+  overflow, oversized blocks, and clearing).
+- 37b Preset expression language - `Todo`: tokenizer, parser, compiler, and evaluation over
+  the audio frame, with tests for precedence, functions, conditionals, user variables, and
+  error reporting.
+- 37c Render pipeline - `Todo`: framebuffer, feedback warp with bilinear sampling, blur,
+  waveform and shape drawing, composite, and the preset runner, tested through deterministic
+  frame statistics.
+- 37d `VisualizerWindow` and wiring - `Todo`: fullscreen window, sidebar entry, preset
+  switching, frame-rate cap, reduce-motion handling, the player taps, and localization for
+  all seven languages.
+- 37e Presets and documentation - `Todo`: a handful of shipped presets, the preset folder
+  and settings, README, AGENTS, wiki, and CHANGELOG coverage.
+
+**Tests**: 21 cases for phase 37a; each later phase adds its own.
+
+**Commit**: `feat(visualizer): add the audio analysis foundation`

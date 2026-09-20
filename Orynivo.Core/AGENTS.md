@@ -18,6 +18,12 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   Preserve punctuation-aware query fallbacks. The transport regression harness
   is `scripts/CoverSearchSmoke` (offline by default; `--live` is opt-in).
 
+- The music visualizer analyses audio through `Orynivo.Core/Audio`:
+  `PcmVisualizationTap` is the lock-free hand-off from the audio pump and must
+  never block or wait (drop the oldest samples instead), `AudioSpectrumAnalyzer`
+  owns windowing, FFT, band grouping, and smoothing, and `Fft` stays a pure,
+  allocation-free transform. Never evaluate preset expressions or render frames
+  on the audio thread.
 - Keep the project cross-platform `net10.0`; do not introduce Avalonia, Windows,
   DPAPI, WASAPI, ASIO, or other platform-specific dependencies.
 - Put shared library scanning, SQLite persistence, search, streaming models and
