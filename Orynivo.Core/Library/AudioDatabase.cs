@@ -427,6 +427,7 @@ public sealed class AudioDatabase : IDisposable
     private Dictionary<string, (long Id, string Name)>? _artistsByComparisonKey;
     private Dictionary<long, string>? _artistNamesById;
     private Dictionary<string, string>? _trackTitleOverrides;
+    private Dictionary<string, string>? _trackGenreOverrides;
     private Dictionary<string, TrackMetadataOverride>? _trackMetadataOverrides;
 
     /// <summary>Gets the profile identifier used for newly recorded personal state.</summary>
@@ -598,6 +599,8 @@ public sealed class AudioDatabase : IDisposable
             ApplyTrackMetadataOverride(track, metadataOverride);
         if (GetTrackTitleOverrides().TryGetValue(track.Path, out var titleOverride))
             track.Title = titleOverride;
+        if (GetTrackGenreOverrides().TryGetValue(track.Path, out var genreOverride))
+            track.Genre = genreOverride;
         track.Title = TrimToNull(track.Title);
         track.SortTitle = TrimToNull(track.SortTitle);
         track.Artist = ArtistNameNormalizer.NormalizeDisplayName(track.Artist);
@@ -786,6 +789,27 @@ public sealed class AudioDatabase : IDisposable
             overrides.Remove(path);
         else
             overrides[path] = title;
+    }
+
+    /// <summary>
+    /// Returns the library-only genre overrides keyed by stable track path. They
+    /// are reapplied by every <see cref="Upsert"/> so a scan cannot restore the
+    /// embedded genre, and source media files are never modified.
+    /// </summary>
+    /// <returns>Path to genre overrides.</returns>
+    private Dictionary<string, string> GetTrackGenreOverrides()
+    {
+        if (_trackGenreOverrides is not null)
+            return _trackGenreOverrides;
+
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        using var command = _conn.CreateCommand();
+        command.CommandText = "SELECT path, genre FROM track_genre_overrides;";
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+            result[reader.GetString(0)] = reader.GetString(1);
+        _trackGenreOverrides = result;
+        return result;
     }
 
     private Dictionary<string, string> GetTrackTitleOverrides()
@@ -2747,6 +2771,88 @@ public sealed class AudioDatabase : IDisposable
         return ids.Count;
     }
 
+    /// <summary>
+    /// Sets the genre of several tracks in one transaction. The value is stored as a
+    /// library-only override keyed by stable track path, so later scans reapply it
+    /// and the source media files are never modified. An empty value removes the
+    /// override and clears the stored genre, so the next scan restores the embedded
+    /// value.
+    /// </summary>
+    /// <param name="trackIds">Database track identifiers.</param>
+    /// <param name="genre">Replacement genre, or <see langword="null"/>/empty to clear it.</param>
+    /// <returns>The number of distinct track identifiers processed.</returns>
+    public int SetTrackGenres(IReadOnlyCollection<long> trackIds, string? genre)
+    {
+        ArgumentNullException.ThrowIfNull(trackIds);
+        var ids = trackIds.Distinct().ToList();
+        if (ids.Count == 0)
+            return 0;
+
+        var trimmed = TrimToNull(genre);
+        using var transaction = _conn.BeginTransaction();
+
+        // Resolve the stable paths first: the override is keyed by path so it also
+        // covers virtual cue:// and mka://chapter/ tracks.
+        var paths = new List<(long Id, string Path)>(ids.Count);
+        using (var lookup = _conn.CreateCommand())
+        {
+            lookup.Transaction = transaction;
+            lookup.CommandText = "SELECT path FROM tracks WHERE id = $id;";
+            var idParameter = lookup.Parameters.AddWithValue("$id", 0L);
+            foreach (var trackId in ids)
+            {
+                idParameter.Value = trackId;
+                if (lookup.ExecuteScalar() is string path)
+                    paths.Add((trackId, path));
+            }
+        }
+
+        using (var overrideCommand = _conn.CreateCommand())
+        {
+            overrideCommand.Transaction = transaction;
+            overrideCommand.CommandText = trimmed is null
+                ? "DELETE FROM track_genre_overrides WHERE path = $path;"
+                : """
+                    INSERT INTO track_genre_overrides(path, genre)
+                    VALUES ($path, $genre)
+                    ON CONFLICT(path) DO UPDATE SET genre = excluded.genre;
+                    """;
+            if (trimmed is not null)
+                Add(overrideCommand, "$genre", trimmed);
+            var pathParameter = overrideCommand.Parameters.AddWithValue("$path", string.Empty);
+            foreach (var (_, path) in paths)
+            {
+                pathParameter.Value = path;
+                overrideCommand.ExecuteNonQuery();
+            }
+        }
+
+        using (var tracks = _conn.CreateCommand())
+        {
+            tracks.Transaction = transaction;
+            tracks.CommandText = "UPDATE tracks SET genre = $genre WHERE id = $id;";
+            Add(tracks, "$genre", trimmed);
+            var idParameter = tracks.Parameters.AddWithValue("$id", 0L);
+            foreach (var (id, _) in paths)
+            {
+                idParameter.Value = id;
+                tracks.ExecuteNonQuery();
+            }
+        }
+
+        transaction.Commit();
+
+        var overrides = GetTrackGenreOverrides();
+        foreach (var (_, path) in paths)
+        {
+            if (trimmed is null)
+                overrides.Remove(path);
+            else
+                overrides[path] = trimmed;
+        }
+        return paths.Count;
+    }
+
     /// <summary>Gets personal and cached community rating data for a track.</summary>
     /// <param name="trackId">Database track identifier.</param>
     /// <returns>The stored rating data, or <see langword="null"/> when the track does not exist.</returns>
@@ -3346,6 +3452,12 @@ public sealed class AudioDatabase : IDisposable
                 path  TEXT PRIMARY KEY,
                 title TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS track_genre_overrides (
+                path  TEXT PRIMARY KEY,
+                genre TEXT NOT NULL
+            );
+
 
             CREATE TABLE IF NOT EXISTS track_metadata_overrides (
                 path TEXT PRIMARY KEY,

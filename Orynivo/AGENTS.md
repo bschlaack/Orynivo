@@ -437,6 +437,10 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   result is complete, unless a proven virtualized/paged strategy is used.
 - Use shared typography, brushes, vector icons, control themes, loading helpers,
   and context-menu patterns from the existing application resources.
+- The bulk action bar also offers a genre field, applied through
+  `AudioDatabase.SetTrackGenres`. It is library-only and never rewrites media
+  files; selected Orynivo Server rows are skipped and reported, because only the
+  owning server can persist their genre.
 - The shared content table supports multi-selection for track rows. Selecting
   more than one local or Orynivo Server track in a Tracks view reveals the bulk
   action bar (`BulkEditBar`) with **Mark as favorite**, **Remove favorite**, and

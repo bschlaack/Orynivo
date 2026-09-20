@@ -1350,6 +1350,16 @@ public sealed record LocalizedStrings(
     public string AiChatToolResultFallback { get; init; } = "";
     /// <summary>Gets the option for automatically accepting Fanart.tv artist-image results.</summary>
     public string AutoAcceptFanartTvImages { get; init; } = "";
+    /// <summary>Gets the bulk genre input watermark.</summary>
+    public string BulkGenre { get; init; } = "";
+    /// <summary>Gets the bulk genre input tooltip.</summary>
+    public string BulkGenreTooltip { get; init; } = "";
+    /// <summary>Gets the bulk genre apply action.</summary>
+    public string BulkGenreApply { get; init; } = "";
+    /// <summary>Gets the bulk genre confirmation format string.</summary>
+    public string BulkGenreUpdated { get; init; } = "";
+    /// <summary>Gets the message reporting that remote tracks were skipped.</summary>
+    public string BulkGenreLocalOnly { get; init; } = "";
     /// <summary>Gets the action that exports the current view as a PDF document.</summary>
     public string SaveAsPdf { get; init; } = "";
     /// <summary>Gets the confirmation format string after exporting the PDF.</summary>

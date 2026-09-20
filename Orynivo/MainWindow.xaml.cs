@@ -420,7 +420,19 @@ public partial class MainWindow : Window
         public string? Year        { get; init; }
         public string? TrackNumber { get; init; }
         public string? DiscNumber  { get; init; }
-        public string? Genre       { get; init; }
+        private string? _genre;
+        /// <summary>Gets or sets the displayed genre so bulk edits refresh the row in place.</summary>
+        public string? Genre
+        {
+            get => _genre;
+            set
+            {
+                if (string.Equals(_genre, value, StringComparison.Ordinal))
+                    return;
+                _genre = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Genre)));
+            }
+        }
         public string? Bitrate     { get; init; }
         public string? SampleRate  { get; init; }
         public int?    SampleRateHz { get; init; }

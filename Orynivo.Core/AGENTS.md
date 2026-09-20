@@ -31,6 +31,12 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
 - Chaptered MKA containers use FFprobe-derived stable `mka://chapter/` virtual
   paths and the existing segment columns; unchaptered MKA files remain ordinary
   tracks. Each probe uses bounded analysis and a 30-second timeout.
+- Library-only genre corrections live in `track_genre_overrides` (keyed by stable
+  track path, so `cue://` and `mka://chapter/` tracks are covered) and are
+  reapplied by every `AudioDatabase.Upsert`. `SetTrackGenres` updates several
+  tracks in one transaction and writes the override at the same time; an empty
+  value removes it so the next scan restores the embedded genre. Never write these
+  corrections into media files.
 - Library-only title corrections live in `track_title_overrides` and must be
   applied by every `AudioDatabase.Upsert`; never write these corrections back to
   the source media.

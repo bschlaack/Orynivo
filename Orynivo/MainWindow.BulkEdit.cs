@@ -214,6 +214,56 @@ public partial class MainWindow
         }
     }
 
+    /// <summary>Applies the entered genre to every selected local track.</summary>
+    /// <param name="sender">The genre apply action.</param>
+    /// <param name="e">Click details.</param>
+    private async void BulkGenreApplyButton_OnClick(object? sender, RoutedEventArgs e)
+        => await ApplyBulkGenreAsync();
+
+    /// <summary>
+    /// Stores the entered genre as a library-only override for every selected local
+    /// track. Source media files are never modified, and remote tracks are reported
+    /// because only the owning server could persist their genre.
+    /// </summary>
+    /// <returns>A task representing the local update.</returns>
+    private async Task ApplyBulkGenreAsync()
+    {
+        var rows = GetSelectedTrackRows();
+        if (rows.Count == 0)
+            return;
+
+        var localRows = rows.Where(row => row.OrynivoServer is null).ToList();
+        var remoteCount = rows.Count - localRows.Count;
+        var genre = BulkGenreTextBox.Text?.Trim();
+        var changed = 0;
+
+        if (localRows.Count > 0)
+        {
+            var localIds = localRows.Select(row => row.Id!.Value).ToList();
+            changed = await Task.Run(() =>
+            {
+                using var db = AudioDatabase.OpenDefault();
+                return db.SetTrackGenres(localIds, genre);
+            }).ConfigureAwait(true);
+
+            var applied = string.IsNullOrWhiteSpace(genre) ? null : genre;
+            foreach (var row in localRows)
+                row.Genre = applied;
+            InvalidateUnifiedLibraryViewCache();
+        }
+
+        StatusTextBlock.Text = remoteCount == 0
+            ? string.Format(
+                CultureInfo.CurrentCulture,
+                LocalizationManager.Current.BulkGenreUpdated,
+                changed)
+            : string.Format(
+                CultureInfo.CurrentCulture,
+                LocalizationManager.Current.BulkGenreLocalOnly,
+                changed,
+                remoteCount);
+    }
+
     /// <summary>
     /// Applies a favorite state to library tracks addressed by playback path or
     /// opaque <c>orynivo://</c> reference. Used by the MCP and AI Chat tools so a

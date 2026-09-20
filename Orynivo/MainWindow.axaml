@@ -1550,6 +1550,21 @@
                                       BorderBrush="{DynamicResource AppHeaderBorderBrush}"
                                       ToolTip.Tip="{DynamicResource L_BulkRating}"
                                       SelectionChanged="BulkRatingComboBox_OnSelectionChanged"/>
+                            <TextBox x:Name="BulkGenreTextBox"
+                                     Width="170"
+                                     Height="30"
+                                     VerticalAlignment="Center"
+                                     Background="{DynamicResource AppInputBrush}"
+                                     Foreground="{DynamicResource AppPrimaryTextBrush}"
+                                     BorderBrush="{DynamicResource AppHeaderBorderBrush}"
+                                     Watermark="{DynamicResource L_BulkGenre}"
+                                     ToolTip.Tip="{DynamicResource L_BulkGenreTooltip}"/>
+                            <Button x:Name="BulkGenreApplyButton"
+                                    Padding="12,5"
+                                    VerticalAlignment="Center"
+                                    Theme="{StaticResource HeaderFilterButtonTheme}"
+                                    Content="{DynamicResource L_BulkGenreApply}"
+                                    Click="BulkGenreApplyButton_OnClick"/>
                         </StackPanel>
                 </Grid>
             </Border>

@@ -271,6 +271,11 @@ public static class LocalizationManager
         resources["L_ArtistImageSuggestionTitle"] = Current.ArtistImageSuggestionTitle;
         resources["L_ArtistImageSuggestionHint"] = Current.ArtistImageSuggestionHint;
         resources["L_AutoAcceptFanartTvImages"] = Current.AutoAcceptFanartTvImages;
+        resources["L_BulkGenre"] = Current.BulkGenre;
+        resources["L_BulkGenreTooltip"] = Current.BulkGenreTooltip;
+        resources["L_BulkGenreApply"] = Current.BulkGenreApply;
+        resources["L_BulkGenreUpdated"] = Current.BulkGenreUpdated;
+        resources["L_BulkGenreLocalOnly"] = Current.BulkGenreLocalOnly;
         resources["L_SaveAsPdf"] = Current.SaveAsPdf;
         resources["L_YearInReviewPdfSaved"] = Current.YearInReviewPdfSaved;
         resources["L_YearInReviewPdfFailed"] = Current.YearInReviewPdfFailed;
@@ -669,6 +674,11 @@ public static class LocalizationManager
         "Ein unerwarteter Fehler ist aufgetreten. Der Fehlerbericht konnte nicht gespeichert werden. Orynivo wird beendet.")
     {
         AutoAcceptFanartTvImages = "Fanart.tv-Funde automatisch übernehmen",
+        BulkGenre = "Genre",
+        BulkGenreTooltip = "Genre für die ausgewählten lokalen Titel setzen (nur Bibliothek, Dateien bleiben unverändert)",
+        BulkGenreApply = "Genre anwenden",
+        BulkGenreUpdated = "Genre für {0} Titel aktualisiert.",
+        BulkGenreLocalOnly = "Genre für {0} Titel aktualisiert. {1} Server-Titel übersprungen – deren Genre gehört dem jeweiligen Server.",
         SaveAsPdf = "Als PDF speichern…",
         YearInReviewPdfSaved = "PDF gespeichert: {0}",
         YearInReviewPdfFailed = "Das PDF konnte nicht gespeichert werden.",
@@ -1495,6 +1505,11 @@ public static class LocalizationManager
         "An unexpected error occurred. The crash report could not be saved. Orynivo will now close.")
     {
         AutoAcceptFanartTvImages = "Automatically accept Fanart.tv results",
+        BulkGenre = "Genre",
+        BulkGenreTooltip = "Set the genre for the selected local tracks (library only, files stay unchanged)",
+        BulkGenreApply = "Apply genre",
+        BulkGenreUpdated = "Updated the genre of {0} track(s).",
+        BulkGenreLocalOnly = "Updated the genre of {0} track(s). {1} server track(s) skipped because their genre belongs to that server.",
         SaveAsPdf = "Save as PDF…",
         YearInReviewPdfSaved = "PDF saved: {0}",
         YearInReviewPdfFailed = "Could not save the PDF.",
@@ -2304,6 +2319,11 @@ public static class LocalizationManager
         "Une erreur inattendue s’est produite. Le rapport n’a pas pu être enregistré. Orynivo va maintenant se fermer.")
     {
         AutoAcceptFanartTvImages = "Accepter automatiquement les résultats Fanart.tv",
+        BulkGenre = "Genre",
+        BulkGenreTooltip = "Définir le genre des pistes locales sélectionnées (bibliothèque uniquement, fichiers inchangés)",
+        BulkGenreApply = "Appliquer le genre",
+        BulkGenreUpdated = "Genre mis à jour pour {0} piste(s).",
+        BulkGenreLocalOnly = "Genre mis à jour pour {0} piste(s). {1} piste(s) de serveur ignorée(s), leur genre appartenant au serveur.",
         SaveAsPdf = "Enregistrer au format PDF…",
         YearInReviewPdfSaved = "PDF enregistré : {0}",
         YearInReviewPdfFailed = "Impossible d'enregistrer le PDF.",
@@ -3110,6 +3130,11 @@ public static class LocalizationManager
         "Se produjo un error inesperado. No se pudo guardar el informe. Orynivo se cerrará ahora.")
     {
         AutoAcceptFanartTvImages = "Aceptar automáticamente los resultados de Fanart.tv",
+        BulkGenre = "Género",
+        BulkGenreTooltip = "Define el género de las pistas locales seleccionadas (solo biblioteca, los archivos no cambian)",
+        BulkGenreApply = "Aplicar género",
+        BulkGenreUpdated = "Género actualizado para {0} pista(s).",
+        BulkGenreLocalOnly = "Género actualizado para {0} pista(s). {1} pista(s) del servidor omitida(s) porque su género pertenece al servidor.",
         SaveAsPdf = "Guardar como PDF…",
         YearInReviewPdfSaved = "PDF guardado: {0}",
         YearInReviewPdfFailed = "No se pudo guardar el PDF.",
@@ -4696,6 +4721,11 @@ private static readonly LocalizedStrings Russian = new(
         AiChatEmptyResponse = "Модель вернула пустой ответ.",
         AiChatToolResultFallback = "После вызова инструмента модель не вернула окончательный ответ. Результат инструмента:",
         AutoAcceptFanartTvImages = "Автоматически принимать результаты Fanart.tv",
+        BulkGenre = "Жанр",
+        BulkGenreTooltip = "Задать жанр для выбранных локальных треков (только библиотека, файлы не изменяются)",
+        BulkGenreApply = "Применить жанр",
+        BulkGenreUpdated = "Жанр обновлён для {0} треков.",
+        BulkGenreLocalOnly = "Жанр обновлён для {0} треков. Пропущено серверных треков: {1} — их жанр принадлежит серверу.",
         SaveAsPdf = "Сохранить как PDF…",
         YearInReviewPdfSaved = "PDF сохранён: {0}",
         YearInReviewPdfFailed = "Не удалось сохранить PDF.",
@@ -5657,6 +5687,11 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "模型返回了空响应。",
         AiChatToolResultFallback = "调用工具后，模型未返回最终答复。工具结果：",
         AutoAcceptFanartTvImages = "自动接受 Fanart.tv 的结果",
+        BulkGenre = "流派",
+        BulkGenreTooltip = "为所选本地曲目设置流派（仅资料库，文件不变）",
+        BulkGenreApply = "应用流派",
+        BulkGenreUpdated = "已更新 {0} 首曲目的流派。",
+        BulkGenreLocalOnly = "已更新 {0} 首曲目的流派。已跳过 {1} 首服务器曲目，其流派属于该服务器。",
         SaveAsPdf = "保存为 PDF…",
         YearInReviewPdfSaved = "PDF 已保存：{0}",
         YearInReviewPdfFailed = "无法保存 PDF。",
@@ -6617,6 +6652,11 @@ private static readonly LocalizedStrings ChineseSimplified = new(
         AiChatEmptyResponse = "मॉडल ने खाली उत्तर दिया।",
         AiChatToolResultFallback = "टूल कॉल के बाद मॉडल ने अंतिम उत्तर नहीं दिया। टूल परिणाम:",
         AutoAcceptFanartTvImages = "Fanart.tv परिणाम स्वतः स्वीकार करें",
+        BulkGenre = "शैली",
+        BulkGenreTooltip = "चयनित स्थानीय ट्रैक के लिए शैली सेट करें (केवल लाइब्रेरी, फ़ाइलें अपरिवर्तित)",
+        BulkGenreApply = "शैली लागू करें",
+        BulkGenreUpdated = "{0} ट्रैक की शैली अपडेट की।",
+        BulkGenreLocalOnly = "{0} ट्रैक की शैली अपडेट की। {1} सर्वर ट्रैक छोड़े गए क्योंकि उनकी शैली उस सर्वर की है।",
         SaveAsPdf = "PDF के रूप में सहेजें…",
         YearInReviewPdfSaved = "PDF सहेजा गया: {0}",
         YearInReviewPdfFailed = "PDF सहेजा नहीं जा सका।",

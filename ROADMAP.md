@@ -160,21 +160,27 @@ Steps:
 - 10 `Orynivo.Core.Tests` cases cover the parser (plain, enhanced, mixed, ordering,
   markers-only, missing timestamps) and the word-level selection.
 
-## 23. Bulk genre editing — `Todo`
+## 23. Bulk genre editing — `In progress`
 
-Deliberately excluded from item 7 because it may write media tags.
+**Decision**: library-only overrides, not media tags. The project's established
+rule is that media files are never rewritten (`track_title_overrides`,
+`track_metadata_overrides`, "corrections affect only the library"), so genre
+editing follows the same pattern and needs no confirmation or backup machinery.
 
-**Design**
+Steps:
 
-- Decide explicitly between library-only overrides (like
-  `track_title_overrides`) and rewriting media tags.
-- If tags are written, require an explicit confirmation, create a backup first,
-  and report per-file failures; never write implicitly during a scan.
-- Reuse the transactional bulk-update plumbing from item 7.
-
-**Tests**: the chosen storage path, including a mixed local/remote selection.
-
-**Commit**: `feat(library): add bulk genre editing`
+- 23a Local tracks — `Done`: `track_genre_overrides` (keyed by stable track path,
+  so `cue://` and `mka://chapter/` tracks are covered) is reapplied by every
+  `AudioDatabase.Upsert`; `SetTrackGenres` updates several tracks in one
+  transaction and writes the override at the same time; an empty value removes it
+  so the next scan restores the embedded genre. The bulk action bar gained a genre
+  field and updates the selected rows in place. 5 `Orynivo.Core.Tests` cases cover
+  the rescan, the clear path, multiple tracks, duplicates, and the empty
+  selection.
+- 23b Server-owned tracks — `Todo`: an authenticated server endpoint plus client
+  wiring so selected Orynivo Server rows can store their genre on the owning
+  server (which already has the same override mechanism through Core). Until then
+  the action reports how many server tracks were skipped.
 
 ## 24. Download podcast episodes for offline playback — `Todo`
 
