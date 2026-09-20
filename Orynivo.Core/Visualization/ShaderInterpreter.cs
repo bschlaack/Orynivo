@@ -13,6 +13,19 @@ public interface IShaderSampler
     /// <param name="v">Vertical coordinate.</param>
     /// <returns>The sampled colour.</returns>
     ShaderValue Sample(string sampler, float u, float v);
+
+    /// <summary>Samples one of the progressively blurred copies of the frame.</summary>
+    /// <param name="level">Blur level from one to three.</param>
+    /// <param name="u">Horizontal coordinate.</param>
+    /// <param name="v">Vertical coordinate.</param>
+    /// <returns>The sampled colour.</returns>
+    ShaderValue SampleBlur(int level, float u, float v);
+
+    /// <summary>Reads one pixel of the frame by integer coordinate.</summary>
+    /// <param name="x">Column index.</param>
+    /// <param name="y">Row index.</param>
+    /// <returns>The pixel colour.</returns>
+    ShaderValue SamplePixel(int x, int y);
 }
 
 /// <summary>
@@ -328,6 +341,10 @@ public sealed class ShaderInterpreter
             "mul" => ComponentWise(arguments[0], arguments[1], (a, b) => a * b),
             "smoothstep" => Smoothstep(arguments[0], arguments[1], arguments[2]),
             "tex2D" or "tex2Dlod" => Sample(call, arguments),
+            "GetBlur1" => SampleBlur(call, arguments, 1),
+            "GetBlur2" => SampleBlur(call, arguments, 2),
+            "GetBlur3" => SampleBlur(call, arguments, 3),
+            "GetPixel" => SamplePixel(call, arguments),
             _ => throw new PresetExpressionException($"Unknown shader function '{name}'.", call.Position)
         };
     }
@@ -347,6 +364,31 @@ public sealed class ShaderInterpreter
         var u = arguments[1].X;
         var v = arguments.Length >= 3 ? arguments[2].X : arguments[1].Y;
         return _sampler.Sample(name, u, v);
+    }
+
+    /// <summary>Samples a blurred copy of the frame.</summary>
+    /// <param name="call">Call node, used for the error position.</param>
+    /// <param name="arguments">Evaluated arguments; the first pair is the coordinate.</param>
+    /// <param name="level">Blur level from one to three.</param>
+    /// <returns>The sampled colour.</returns>
+    private ShaderValue SampleBlur(ShaderNode call, ShaderValue[] arguments, int level)
+    {
+        if (_sampler is null || arguments.Length < 1)
+            throw new PresetExpressionException("The shader sampled a texture without a sampler.", call.Position);
+
+        return _sampler.SampleBlur(level, arguments[0].X, arguments[0].Y);
+    }
+
+    /// <summary>Reads one frame pixel by integer coordinate.</summary>
+    /// <param name="call">Call node, used for the error position.</param>
+    /// <param name="arguments">Evaluated arguments; the first pair is the coordinate.</param>
+    /// <returns>The pixel colour.</returns>
+    private ShaderValue SamplePixel(ShaderNode call, ShaderValue[] arguments)
+    {
+        if (_sampler is null || arguments.Length < 2)
+            throw new PresetExpressionException("The shader sampled a texture without a sampler.", call.Position);
+
+        return _sampler.SamplePixel((int)arguments[0].X, (int)arguments[1].X);
     }
 
     /// <summary>Builds a vector from a constructor call.</summary>

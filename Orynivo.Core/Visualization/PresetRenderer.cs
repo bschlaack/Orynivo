@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Orynivo.Audio;
 
 namespace Orynivo.Visualization;
@@ -33,11 +34,20 @@ public interface IVisualizerAudioSource
 /// touches this renderer's own buffers, so a visualization can never interfere with audio
 /// output.
 /// </summary>
-public sealed class PresetRenderer : IVisualizerAudioSource
+public sealed class PresetRenderer : IVisualizerAudioSource, IShaderSampler
 {
     private readonly PixelBuffer _previous;
     private readonly PixelBuffer _warped;
     private readonly PixelBuffer _fresh;
+    private readonly PixelBuffer _frameCopy;
+    private readonly PixelBuffer _blurred;
+    private readonly Stopwatch _shaderClock = new();
+    private readonly List<(ShaderInterpreter Interpreter, VisualizerShader Shader)> _warpShaders = [];
+    private readonly List<(ShaderInterpreter Interpreter, VisualizerShader Shader)> _compShaders = [];
+    private bool _shadersSkipped;
+    private int _framesSinceSkip;
+    private int _blurLevel;
+    private bool _samplerMainIsWarped;
     private readonly float[] _slots;
     private readonly float[] _sample = new float[4];
     private IVisualizerAudioSource? _audio;
@@ -69,7 +79,13 @@ public sealed class PresetRenderer : IVisualizerAudioSource
         _previous = new PixelBuffer(width, height);
         _warped = new PixelBuffer(width, height);
         _fresh = new PixelBuffer(width, height);
+        _frameCopy = new PixelBuffer(width, height);
+        _blurred = new PixelBuffer(width, height);
         _slots = new float[preset.Layout.Count];
+        foreach (var shader in preset.WarpShaders)
+            _warpShaders.Add((new ShaderInterpreter(shader.Program, this), shader));
+        foreach (var shader in preset.CompShaders)
+            _compShaders.Add((new ShaderInterpreter(shader.Program, this), shader));
     }
 
     /// <summary>Gets the preset being rendered.</summary>
@@ -80,6 +96,22 @@ public sealed class PresetRenderer : IVisualizerAudioSource
 
     /// <summary>Gets the number of rendered frames.</summary>
     public long FrameCount => _frame;
+
+    /// <summary>
+    /// Gets or sets how long the shaders may take per frame, in milliseconds. A frame that
+    /// exceeds the budget disables the shaders for a while, so a heavy preset keeps a smooth
+    /// picture instead of stalling playback.
+    /// </summary>
+    public double ShaderTimeBudgetMilliseconds { get; set; } = 20d;
+
+    /// <summary>Gets how long the shaders took on the last rendered frame, in milliseconds.</summary>
+    public double LastShaderMilliseconds { get; private set; }
+
+    /// <summary>Gets a value indicating whether the shaders are currently being skipped.</summary>
+    public bool ShadersSkipped => _shadersSkipped;
+
+    /// <summary>Gets a value indicating whether the preset carries any shader.</summary>
+    public bool HasShaders => _warpShaders.Count > 0 || _compShaders.Count > 0;
 
     /// <summary>Gets the band levels of the last rendered frame.</summary>
     public ReadOnlySpan<float> Bands => _audio is null ? default : _audio.Bands;
@@ -130,7 +162,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource
             wave.PerFrame.Execute(_slots);
 
         var decay = Math.Clamp(Read("decay", Preset.Decay), 0f, 1f);
-        Warp();
+        var useShaders = BeginShaderFrame();
+        _shaderClock.Restart();
+        Warp(useShaders);
 
         for (var pass = 0; pass < BlurPasses(); pass++)
             _warped.Blur();
@@ -142,6 +176,9 @@ public sealed class PresetRenderer : IVisualizerAudioSource
         ApplyGamma();
         DrawOverlay();
         Composite();
+        if (useShaders)
+            ApplyCompShaders();
+        MeasureShaderTime();
         _previous.CopyFrom(_fresh);
         _frame++;
     }
@@ -170,6 +207,11 @@ public sealed class PresetRenderer : IVisualizerAudioSource
         _previous.Clear();
         _warped.Clear();
         _fresh.Clear();
+        _frameCopy.Clear();
+        _blurred.Clear();
+        _blurLevel = 0;
+        _shadersSkipped = false;
+        _framesSinceSkip = 0;
         Array.Clear(_slots);
         _audio = null;
         _initialized = false;
@@ -276,7 +318,7 @@ public sealed class PresetRenderer : IVisualizerAudioSource
     /// first, then the preset's per-pixel block sees that warped position in <c>x</c>, <c>y</c>,
     /// <c>rad</c>, and <c>ang</c> and may offset or replace it before the sample is taken.
     /// </summary>
-    private void Warp()
+    private void Warp(bool useShaders)
     {
         var zoom = Math.Max(0.01f, Read("zoom", Preset.Zoom));
         var zoomExp = Read("zoomexp", 1f);
@@ -320,7 +362,17 @@ public sealed class PresetRenderer : IVisualizerAudioSource
                 var sampleX = Read("x", warpedX);
                 var sampleY = Read("y", warpedY);
                 RecordMotion(normalizedX, normalizedY, sampleX, sampleY);
-                _previous.SampleBilinear((sampleX * 0.5f) + 0.5f, (sampleY * 0.5f) + 0.5f, _sample);
+                var sampleU = (sampleX * 0.5f) + 0.5f;
+                var sampleV = (sampleY * 0.5f) + 0.5f;
+                if (useShaders)
+                {
+                    RunWarpShaders(sampleU, sampleV, (normalizedX * 0.5f) + 0.5f, (normalizedY * 0.5f) + 0.5f);
+                }
+                else
+                {
+                    _previous.SampleBilinear(sampleU, sampleV, _sample);
+                }
+
                 var offset = (((y * width) + x) * 4);
                 _warped.Pixels[offset] = _sample[0];
                 _warped.Pixels[offset + 1] = _sample[1];
@@ -328,6 +380,169 @@ public sealed class PresetRenderer : IVisualizerAudioSource
                 _warped.Pixels[offset + 3] = _sample[3];
             }
         }
+    }
+
+    /// <summary>Decides whether the shaders run on this frame, honouring the time budget.</summary>
+    /// <returns><see langword="true"/> when the shaders should run.</returns>
+    private bool BeginShaderFrame()
+    {
+        if (!HasShaders)
+            return false;
+
+        if (!_shadersSkipped)
+            return true;
+
+        // Retry periodically so a preset that became affordable is picked up again.
+        if (++_framesSinceSkip < 120)
+            return false;
+
+        _framesSinceSkip = 0;
+        _shadersSkipped = false;
+        return true;
+    }
+
+    /// <summary>Measures the shader cost of this frame and skips them when they exceed the budget.</summary>
+    private void MeasureShaderTime()
+    {
+        if (!HasShaders)
+        {
+            LastShaderMilliseconds = 0d;
+            return;
+        }
+
+        _shaderClock.Stop();
+        LastShaderMilliseconds = _shaderClock.Elapsed.TotalMilliseconds;
+        if (LastShaderMilliseconds > ShaderTimeBudgetMilliseconds)
+            _shadersSkipped = true;
+    }
+
+    /// <summary>Runs the warp shaders for one pixel and stores the resulting colour.</summary>
+    /// <param name="u">Sampling coordinate of the current pixel.</param>
+    /// <param name="v">Sampling row of the current pixel.</param>
+    /// <param name="originalU">Coordinate of the pixel itself.</param>
+    /// <param name="originalV">Row of the pixel itself.</param>
+    private void RunWarpShaders(float u, float v, float originalU, float originalV)
+    {
+        _samplerMainIsWarped = false;
+        foreach (var (interpreter, shader) in _warpShaders)
+        {
+            shader.PerFrame.Execute(_slots);
+            BindShaderVariables(interpreter, u, v, originalU, originalV);
+            var colour = interpreter.Run();
+            _sample[0] = colour.X;
+            _sample[1] = colour.Y;
+            _sample[2] = colour.Z;
+            _sample[3] = 1f;
+        }
+
+        if (_warpShaders.Count == 0)
+            _previous.SampleBilinear(u, v, _sample);
+    }
+
+    /// <summary>Runs the comp shaders over the composited frame.</summary>
+    private void ApplyCompShaders()
+    {
+        if (_compShaders.Count == 0)
+            return;
+
+        var width = _fresh.Width;
+        var height = _fresh.Height;
+        _frameCopy.CopyFrom(_fresh);
+        _samplerMainIsWarped = true;
+        for (var y = 0; y < height; y++)
+        {
+            var normalizedY = height > 1 ? (y / (float)(height - 1) * 2f) - 1f : 0f;
+            var v = (y + 0.5f) / height;
+            for (var x = 0; x < width; x++)
+            {
+                var normalizedX = width > 1 ? (x / (float)(width - 1) * 2f) - 1f : 0f;
+                var u = (x + 0.5f) / width;
+                foreach (var (interpreter, shader) in _compShaders)
+                {
+                    shader.PerPixel.Execute(_slots);
+                    BindShaderVariables(interpreter, u, v, u, v);
+                    var colour = interpreter.Run();
+                    var offset = (((y * width) + x) * 4);
+                    _fresh.Pixels[offset] = Math.Clamp(colour.X, 0f, 1f);
+                    _fresh.Pixels[offset + 1] = Math.Clamp(colour.Y, 0f, 1f);
+                    _fresh.Pixels[offset + 2] = Math.Clamp(colour.Z, 0f, 1f);
+                }
+            }
+        }
+    }
+
+    /// <summary>Writes the variables every shader can read for this pixel.</summary>
+    /// <param name="interpreter">Shader about to run.</param>
+    /// <param name="u">Sampling coordinate in the range zero to one.</param>
+    /// <param name="v">Sampling row in the range zero to one.</param>
+    /// <param name="originalU">Coordinate of the pixel itself.</param>
+    /// <param name="originalV">Row of the pixel itself.</param>
+    private void BindShaderVariables(ShaderInterpreter interpreter, float u, float v, float originalU, float originalV)
+    {
+        var width = _previous.Width;
+        var height = _previous.Height;
+        interpreter.SetVariable("uv", ShaderValue.Vector(u, v, 0f, 0f, 2));
+        interpreter.SetVariable("uv_orig", ShaderValue.Vector(originalU, originalV, 0f, 0f, 2));
+        interpreter.SetVariable("texsize", ShaderValue.Vector(width, height, 1f / Math.Max(1, width), 1f / Math.Max(1, height), 4));
+        interpreter.SetVariable("time", Read("time", 0f));
+        interpreter.SetVariable("frame", Read("frame", 0f));
+        interpreter.SetVariable("fps", Read("fps", 0f));
+        interpreter.SetVariable("bass", Bass);
+        interpreter.SetVariable("mid", Mid);
+        interpreter.SetVariable("treb", Treble);
+        interpreter.SetVariable("vol", Volume);
+        interpreter.SetVariable("bass_att", Read("bass_att", 0f));
+        interpreter.SetVariable("mid_att", Read("mid_att", 0f));
+        interpreter.SetVariable("treb_att", Read("treb_att", 0f));
+        interpreter.SetVariable("aspectx", Read("aspectx", 1f));
+        interpreter.SetVariable("aspecty", Read("aspecty", 1f));
+        var x = (u * 2f) - 1f;
+        var y = (v * 2f) - 1f;
+        interpreter.SetVariable("rad", MathF.Sqrt((x * x) + (y * y)));
+        interpreter.SetVariable("ang", MathF.Atan2(y, x));
+    }
+
+    /// <inheritdoc/>
+    public ShaderValue Sample(string sampler, float u, float v)
+    {
+        var source = sampler switch
+        {
+            "sampler_fc_main" => _frameCopy,
+            "sampler_pc_main" => _previous,
+            _ => _samplerMainIsWarped ? _warped : _previous
+        };
+        source.SampleBilinear(u, v, _sample);
+        return ShaderValue.Vector(_sample[0], _sample[1], _sample[2], _sample[3], 4);
+    }
+
+    /// <inheritdoc/>
+    public ShaderValue SampleBlur(int level, float u, float v)
+    {
+        level = Math.Clamp(level, 1, 3);
+        if (_blurLevel != level)
+        {
+            _blurred.CopyFrom(_warped);
+            for (var pass = 0; pass < level; pass++)
+                _blurred.Blur();
+            _blurLevel = level;
+        }
+
+        _blurred.SampleBilinear(u, v, _sample);
+        return ShaderValue.Vector(_sample[0], _sample[1], _sample[2], _sample[3], 4);
+    }
+
+    /// <inheritdoc/>
+    public ShaderValue SamplePixel(int x, int y)
+    {
+        var column = Math.Clamp(x, 0, _warped.Width - 1);
+        var row = Math.Clamp(y, 0, _warped.Height - 1);
+        var offset = (((row * _warped.Width) + column) * 4);
+        return ShaderValue.Vector(
+            _warped.Pixels[offset],
+            _warped.Pixels[offset + 1],
+            _warped.Pixels[offset + 2],
+            _warped.Pixels[offset + 3],
+            4);
     }
 
     /// <summary>Darkens the centre of the frame by the amount the preset asked for.</summary>

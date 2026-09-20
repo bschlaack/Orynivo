@@ -561,11 +561,18 @@ written here. No third-party visualizer code or preset bundle is linked.
   `tan`). Sampling is bound through `IShaderSampler` so the interpreter carries no render state,
   division by zero yields zero, and a loop budget of 4096 iterations plus a call depth limit of
   32 bound a runaway shader. Covered by 14 tests.
-- 38g Shader bindings and cost budget - `Pending`: the `warp_N_*` and `comp_N_*` preset keys
+- 38g Shader bindings and cost budget - `Done`: the `warp_N_*` and `comp_N_*` preset keys
   (enabled flag, per-frame and per-pixel blocks, and the shader source), the sampler bindings
   (`sampler_main`, `sampler_pc_main`, `sampler_fc_main`, `GetBlur1`-`GetBlur3`, `GetPixel`,
   and the texture bank), and a bounded per-frame cost budget that lowers the render resolution
-  instead of stalling playback.- 38e `.milk` compatibility and validation - `Pending`: `[presetNN]` sections, version and
+  instead of stalling playback. The preset reader keeps the newlines inside a multi-line value
+  so shader source survives, a shader that fails to parse is skipped rather than fatal, and the
+  renderer implements `IShaderSampler` for `sampler_main`, `sampler_pc_main`, `sampler_fc_main`,
+  `GetBlur1`-`GetBlur3`, and `GetPixel` while binding `uv`, `uv_orig`, `texsize`, the audio and
+  smoothed bands, the frame counters, and the aspect ratio. The budget skips the shaders for a
+  while instead of lowering the resolution, which is the documented deviation from the original
+  plan. Walking the tree per pixel is the known cost limit; a JIT compiler for shaders is the
+  follow-up if needed. Covered by 11 tests.- 38e `.milk` compatibility and validation - `Pending`: `[presetNN]` sections, version and
   `nWaveMode` handling, tolerance for the remaining legacy keys, a corpus of real presets as
   regression fixtures, and the per-preset skip diagnostics.
 

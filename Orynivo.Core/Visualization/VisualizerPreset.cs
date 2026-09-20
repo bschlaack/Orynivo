@@ -27,7 +27,9 @@ public sealed class VisualizerPreset
         PresetProgram wavePerPoint,
         IReadOnlyList<VisualizerShape> shapes,
         IReadOnlyList<VisualizerWave> waves,
-        IReadOnlyDictionary<string, float> defaults)
+        IReadOnlyDictionary<string, float> defaults,
+        IReadOnlyList<VisualizerShader> warpShaders,
+        IReadOnlyList<VisualizerShader> compShaders)
     {
         Name = name;
         Layout = layout;
@@ -45,6 +47,8 @@ public sealed class VisualizerPreset
         Shapes = shapes;
         Waves = waves;
         Defaults = defaults;
+        WarpShaders = warpShaders;
+        CompShaders = compShaders;
     }
 
     /// <summary>Gets the preset name.</summary>
@@ -106,6 +110,12 @@ public sealed class VisualizerPreset
     /// </summary>
     public IReadOnlyDictionary<string, float> Defaults { get; }
 
+    /// <summary>Gets the enabled <c>warp_N</c> shaders, in preset order.</summary>
+    public IReadOnlyList<VisualizerShader> WarpShaders { get; }
+
+    /// <summary>Gets the enabled <c>comp_N</c> shaders, in preset order.</summary>
+    public IReadOnlyList<VisualizerShader> CompShaders { get; }
+
     /// <summary>Parses preset text.</summary>
     /// <param name="text">INI-style preset text.</param>
     /// <param name="fallbackName">Name used when the text carries none.</param>
@@ -115,9 +125,10 @@ public sealed class VisualizerPreset
     {
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var name = fallbackName ?? "Preset";
-        foreach (var line in (text ?? string.Empty).Split('\n'))
+        var lines = (text ?? string.Empty).Split('\n');
+        for (var lineIndex = 0; lineIndex < lines.Length; lineIndex++)
         {
-            var trimmed = line.Trim();
+            var trimmed = lines[lineIndex].Trim();
             if (trimmed.Length == 0 || trimmed.StartsWith('[') || trimmed.StartsWith("//", StringComparison.Ordinal))
                 continue;
 
@@ -126,10 +137,16 @@ public sealed class VisualizerPreset
                 continue;
 
             var key = trimmed[..separator].Trim();
-            var value = trimmed[(separator + 1)..].Trim();
-            values[key] = value;
-            if (string.Equals(key, "name", StringComparison.OrdinalIgnoreCase) && value.Length > 0)
-                name = value;
+            var value = new System.Text.StringBuilder(trimmed[(separator + 1)..].Trim());
+            // A value continues over the following lines until one looks like a new key. Milkdrop
+            // stores shader source this way, so the newlines have to survive.
+            while (lineIndex + 1 < lines.Length && !LooksLikeKey(lines[lineIndex + 1]))
+                value.Append('\n').Append(lines[++lineIndex].TrimEnd());
+
+            var valueText = value.ToString();
+            values[key] = valueText;
+            if (string.Equals(key, "name", StringComparison.OrdinalIgnoreCase) && valueText.Length > 0)
+                name = valueText;
         }
 
         var layout = PresetVariableLayout.RegisterStandardVariables(new PresetVariableLayout());
@@ -150,7 +167,9 @@ public sealed class VisualizerPreset
             PresetCompiler.Compile(Join(values, "per_point"), layout),
             ParseShapes(values, layout),
             ParseWaves(values, layout),
-            ParseDefaults(values));
+            ParseDefaults(values),
+            ParseShaders(values, layout, "warp"),
+            ParseShaders(values, layout, "comp"));
     }
 
     /// <summary>Creates a preset from expression text without an INI wrapper, for tests and defaults.</summary>
@@ -178,7 +197,52 @@ public sealed class VisualizerPreset
             PresetProgram.Empty,
             [],
             ParseWaves(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase), layout),
-            new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase));
+            new Dictionary<string, float>(StringComparer.OrdinalIgnoreCase),
+            [],
+            []);
+    }
+
+    /// <summary>
+    /// Parses the numbered warp and comp shaders. A shader whose source does not parse is
+    /// skipped, so one broken shader degrades a preset instead of rejecting it.
+    /// </summary>
+    /// <param name="values">Parsed preset values.</param>
+    /// <param name="layout">Shared slot layout.</param>
+    /// <param name="prefix">Either <c>warp</c> or <c>comp</c>.</param>
+    /// <returns>The enabled shaders, in preset order.</returns>
+    private static IReadOnlyList<VisualizerShader> ParseShaders(
+        Dictionary<string, string> values,
+        PresetVariableLayout layout,
+        string prefix)
+    {
+        var shaders = new List<VisualizerShader>();
+        for (var index = 1; index <= 16; index++)
+        {
+            var key = $"{prefix}_{index}";
+            if (!values.TryGetValue(key, out var source) || string.IsNullOrWhiteSpace(source))
+                continue;
+
+            if (ReadShape(values, key + "_", "enabled", 1f) < 0.5f)
+                continue;
+
+            ShaderNode program;
+            try
+            {
+                program = ShaderParser.Parse(source);
+            }
+            catch (PresetExpressionException)
+            {
+                continue;
+            }
+
+            shaders.Add(new VisualizerShader(
+                index,
+                program,
+                PresetCompiler.Compile(Join(values, key + "_per_frame"), layout),
+                PresetCompiler.Compile(Join(values, key + "_per_pixel"), layout)));
+        }
+
+        return shaders;
     }
 
     /// <summary>
@@ -283,6 +347,31 @@ public sealed class VisualizerPreset
         }
 
         return waves;
+    }
+
+    /// <summary>
+    /// Reports whether a line starts a new key. A key begins at column zero and is followed by an
+    /// equals sign, which is how Milkdrop itself decides where a multi-line value ends.
+    /// </summary>
+    /// <param name="line">Line to test.</param>
+    /// <returns><see langword="true"/> when the line starts a key.</returns>
+    private static bool LooksLikeKey(string line)
+    {
+        if (line.Length == 0 || char.IsWhiteSpace(line[0]) || line[0] == '[')
+            return false;
+
+        var separator = line.IndexOf('=');
+        if (separator <= 0)
+            return false;
+
+        for (var index = 0; index < separator; index++)
+        {
+            var character = line[index];
+            if (!char.IsLetterOrDigit(character) && character != '_')
+                return false;
+        }
+
+        return true;
     }
 
     /// <summary>Reads one shape key, falling back to its default.</summary>

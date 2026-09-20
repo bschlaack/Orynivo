@@ -195,5 +195,13 @@ public sealed class ShaderInterpreterTests
             LastV = v;
             return ShaderValue.Vector(0.5f, 0.25f, 0.75f, 1f, 4);
         }
+
+        /// <inheritdoc/>
+        public ShaderValue SampleBlur(int level, float u, float v) =>
+            ShaderValue.Vector(0.1f * level, 0f, 0f, 1f, 4);
+
+        /// <inheritdoc/>
+        public ShaderValue SamplePixel(int x, int y) =>
+            ShaderValue.Vector(x, y, 0f, 1f, 4);
     }
 }

@@ -49,7 +49,15 @@ This file applies to `Orynivo.Core/` and supplements `../AGENTS.md`.
   and the `warp_N_*`/`comp_N_*` bindings with the per-frame cost budget come last.
   `ShaderInterpreter` keeps its variables in a plain dictionary the caller seeds and reads back,
   samples only through `IShaderSampler`, and guards itself with a loop budget and a call depth
-  limit; keep both, because a runaway shader must never stall a frame. Keep the
+  limit; keep both, because a runaway shader must never stall a frame.
+  `VisualizerPreset` parses the numbered `warp_N`/`comp_N` keys with their `_enabled`,
+  `_per_frame`, and `_per_pixel` companions, and the preset reader must keep the newlines inside
+  a multi-line value because that is how Milkdrop stores shader source. A shader that fails to
+  parse is skipped, never fatal. `PresetRenderer` implements `IShaderSampler` and enforces
+  `ShaderTimeBudgetMilliseconds`: when a frame's shaders exceed the budget they are skipped until
+  the periodic retry, so a heavy preset degrades instead of stalling playback. The interpreter
+  walks the tree per pixel, which is the known cost limit; a JIT compiler for shaders is the
+  documented follow-up if the CPU cost proves too high. Keep the
   interpreter off the audio thread and bound its per-frame cost so a heavy shader degrades the
   render resolution instead of stalling playback.
 - Keep the project cross-platform `net10.0`; do not introduce Avalonia, Windows,
