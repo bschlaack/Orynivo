@@ -185,6 +185,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   positions are stored, and no credential-bearing URL is ever persisted.
 
 ### Fixed
+- Fixed DSD-to-PCM playback over exclusive WASAPI, which played nothing but very loud
+  crackling on a Sound BlasterX AE-5. The WASAPI format chooser handed the raw DSD rate
+  to its ordering (`Math.Max(source, hint)`), so a DSD source preferred the highest rate
+  the driver reported. On a Sound BlasterX AE-5 that is 384 kHz, a fractional division of
+  the DSD rate (5644800/384000 = 14.7 for DSD128), and that driver reports its
+  exclusive-format set inconsistently between queries, so the same build can pick 192 kHz
+  in one run and 384 kHz in the next. It now prefers an exact division of
+  the DSD rate that does not exceed the conversion hint, matching what the ASIO path
+  already did, and the WASAPI probe reports the same 176400 Hz hint as the FFmpeg player.
+  On that device the conversion now runs at 88200 Hz (5644800/64 for DSD128). The probe
+  order is extracted into the pure `WasapiAudioPlayer.OrderCandidateSampleRates` and
+  covered by seven tests.
+
 
 - Similarity smart playlists now resolve on an Orynivo Server instead of
   returning an empty list. `/api/playlists/{id}/resolve` and

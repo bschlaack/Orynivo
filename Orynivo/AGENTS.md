@@ -468,6 +468,15 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   or an error message (`Orynivo.Library.BackupUploader`). The scheduled and
   **Back up now** paths share `MainWindow.TryUploadBackupAsync`; the explicit
   **Export library** action still writes only the user-chosen local ZIP.
+- A DSD source reports its 1-bit rate (352800 for DSD64), so its PCM conversion target
+  must stay an exact division of that rate. `WasapiAudioPlayer.OrderCandidateSampleRates`
+  prefers such a division that does not exceed the conversion hint, and both probes report
+  the same 176400 Hz hint for DSD. Never let the exclusive-format chooser fall back to the
+  device's maximum rate for DSD: a fractional ratio resampled DSD into pure noise on a
+  Sound BlasterX AE-5. The device's reported exclusive-format set is not stable between
+  queries: the same AE-5 reported 192 kHz and 384 kHz as supported in one run and neither
+  in another, under .NET 8 and .NET 10 alike. Never make the DSD conversion depend on that
+  answer alone.
 - The desktop runs on Avalonia 12.1.2 with **compiled bindings enabled by default**;
   do not add `AvaloniaUseCompiledBindingsByDefault=false` back. Every `DataTemplate`
   and every item-binding scope needs an explicit `x:DataType`:

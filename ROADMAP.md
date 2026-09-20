@@ -1,6 +1,6 @@
 # Orynivo Roadmap
 
-Items 1-33 are complete and listed for reference only.
+Items 1-34 are complete and listed for reference only.
 
 Each item is one commit and must follow the completion checklist in
 `AGENTS.md`: build every affected project, run the three test projects, update
@@ -349,3 +349,19 @@ report 0 errors and 0 warnings.
 report 0 errors and 0 warnings.
 
 **Commit**: `refactor(ui): extract the ContentRow row model`
+
+## 34. Fix DSD-to-PCM playback over exclusive WASAPI - `Done`
+
+**Design**
+
+- The WASAPI format chooser ordered candidates from `Math.Max(SourceSampleRate,
+  OutputSampleRate)`, so a DSD source preferred the device's highest supported rate
+  (384 kHz, a fractional division of the DSD rate). DSD now prefers an exact division
+  of its rate that does not exceed the conversion hint, matching the ASIO path, and the
+  WASAPI probe reports the same 176400 Hz hint as the FFmpeg player.
+- The probe order is extracted into the pure `WasapiAudioPlayer.OrderCandidateSampleRates`.
+
+**Tests**: seven new cases in `Orynivo.Tests` cover the DSD division order, the
+fractional-rate ordering, DSD128, the PCM ordering, and uniqueness.
+
+**Commit**: `fix(playback): keep DSD-to-PCM on an exact rate division`

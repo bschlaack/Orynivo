@@ -759,11 +759,22 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
             codec,
             rate,
             channels,
-            NormalizePcmRate(rate),
+            // A DSD source reports its 1-bit rate (for example 352800 for DSD64). The PCM
+            // conversion target has to stay a clean division of that rate, so mirror the
+            // hint the FFmpeg player uses instead of handing the raw DSD rate to the
+            // exclusive-format chooser.
+            isDsd ? DsdPcmRateHint : NormalizePcmRate(rate),
             isDsd,
             Path.GetExtension(filePath).TrimStart('.').ToLowerInvariant(),
             TimeSpan.FromSeconds(duration));
     }
+
+    /// <summary>
+    /// Preferred PCM output rate for a DSD source in hertz. It is the DSD rate divided by
+    /// sixteen, which is the conventional DSD64 conversion target and an exact division of
+    /// every DSD rate in use.
+    /// </summary>
+    private const int DsdPcmRateHint = 176_400;
 
     private static int NormalizePcmRate(int sampleRate) =>
         sampleRate is >= 8_000 and <= 768_000 ? sampleRate : 192_000;
@@ -778,22 +789,47 @@ public sealed class WasapiAudioPlayer : IGaplessAudioPlayer, IEqualizerAudioPlay
             : 0;
     }
 
+    /// <summary>Sample rates offered to the exclusive-mode format probe, in probe order.</summary>
+    private static readonly int[] StandardSampleRates =
+    [
+        8_000, 11_025, 12_000, 16_000, 22_050, 24_000, 32_000,
+        44_100, 48_000, 88_200, 96_000, 176_400, 192_000,
+        352_800, 384_000, 705_600, 768_000
+    ];
+
+    /// <summary>
+    /// Orders the sample rates offered to the exclusive-mode format probe. A DSD source
+    /// prefers an exact division of its rate that does not exceed the conversion hint,
+    /// because picking the device's maximum rate instead resamples DSD by a fractional
+    /// ratio and, on some drivers, plays nothing but noise. The general ordering prefers
+    /// the highest rate the source can fill, then the lowest rate above it, and is used for
+    /// PCM sources and as the fallback when no exact DSD division is supported.
+    /// </summary>
+    /// <param name="info">Probed source information.</param>
+    /// <returns>The distinct candidate rates in probe order.</returns>
+    internal static IReadOnlyList<int> OrderCandidateSampleRates(AudioFileInfo info)
+    {
+        var sourceSampleRate = Math.Max(info.SourceSampleRate, info.OutputSampleRate);
+        return (info.IsDsd && info.SourceSampleRate > 0
+                ? StandardSampleRates
+                    .Where(rate => rate <= info.OutputSampleRate && info.SourceSampleRate % rate == 0)
+                    .OrderByDescending(static rate => rate)
+                    .Cast<int>()
+                : [])
+            .Concat(StandardSampleRates
+                .Append(info.OutputSampleRate)
+                .Where(static rate => rate > 0)
+                .Distinct()
+                .OrderBy(rate => rate <= sourceSampleRate ? 0 : 1)
+                .ThenByDescending(rate => rate <= sourceSampleRate ? rate : 0)
+                .ThenBy(rate => rate > sourceSampleRate ? rate : int.MaxValue))
+            .Distinct()
+            .ToArray();
+    }
+
     private static WasapiSelectedFormat ChooseExclusiveFormat(MMDevice device, AudioFileInfo info)
     {
-        int[] standardSampleRates =
-        [
-            8_000, 11_025, 12_000, 16_000, 22_050, 24_000, 32_000,
-            44_100, 48_000, 88_200, 96_000, 176_400, 192_000,
-            352_800, 384_000, 705_600, 768_000
-        ];
-        var sourceSampleRate = Math.Max(info.SourceSampleRate, info.OutputSampleRate);
-        var sampleRates = standardSampleRates
-            .Append(info.OutputSampleRate)
-            .Where(static rate => rate > 0)
-            .Distinct()
-            .OrderBy(rate => rate <= sourceSampleRate ? 0 : 1)
-            .ThenByDescending(rate => rate <= sourceSampleRate ? rate : 0)
-            .ThenBy(rate => rate > sourceSampleRate ? rate : int.MaxValue);
+        var sampleRates = OrderCandidateSampleRates(info);
 
         foreach (var sampleRate in sampleRates)
         {
