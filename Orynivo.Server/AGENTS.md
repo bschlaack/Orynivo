@@ -88,6 +88,11 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
   The authenticated `/api/history/sync` GET/POST routes exchange bounded,
   deduplicated playback-history rows for the active profile only. They must
   never expose API keys, credentials, or unrestricted filesystem data.
+- `PUT /api/tracks/{id}/genre` stores a library-only genre override through
+  `AudioDatabase.SetTrackGenres` and refreshes that track's Lucene document. An
+  empty or missing value clears the override so the next scan restores the
+  embedded genre. The endpoint must never rewrite the media file, and older
+  clients that do not call it are unaffected.
 - Keep `SkiaSharp.NativeAssets.Linux.NoDependencies`; do not add an ImageMagick
   runtime dependency.
 - Linux service data belongs under `ORYNIVO_DATA_DIR=/var/lib/orynivo-server`.

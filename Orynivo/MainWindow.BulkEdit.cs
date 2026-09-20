@@ -233,9 +233,12 @@ public partial class MainWindow
             return;
 
         var localRows = rows.Where(row => row.OrynivoServer is null).ToList();
-        var remoteCount = rows.Count - localRows.Count;
-        var genre = BulkGenreTextBox.Text?.Trim();
+        var remoteRows = rows.Where(row => row.OrynivoServer is not null).ToList();
+        var applied = string.IsNullOrWhiteSpace(BulkGenreTextBox.Text)
+            ? null
+            : BulkGenreTextBox.Text!.Trim();
         var changed = 0;
+        var failed = 0;
 
         if (localRows.Count > 0)
         {
@@ -243,25 +246,40 @@ public partial class MainWindow
             changed = await Task.Run(() =>
             {
                 using var db = AudioDatabase.OpenDefault();
-                return db.SetTrackGenres(localIds, genre);
+                return db.SetTrackGenres(localIds, applied);
             }).ConfigureAwait(true);
 
-            var applied = string.IsNullOrWhiteSpace(genre) ? null : genre;
             foreach (var row in localRows)
                 row.Genre = applied;
             InvalidateUnifiedLibraryViewCache();
         }
 
-        StatusTextBlock.Text = remoteCount == 0
+        // A server track stores its genre on the owning server, which records the
+        // same library-only override and never rewrites the media file.
+        foreach (var row in remoteRows)
+        {
+            if (await _orynivoClient.UpdateTrackGenreAsync(row.OrynivoServer!, row.Id!.Value, applied)
+                    .ConfigureAwait(true))
+            {
+                changed++;
+                row.Genre = applied;
+            }
+            else
+            {
+                failed++;
+            }
+        }
+
+        StatusTextBlock.Text = failed == 0
             ? string.Format(
                 CultureInfo.CurrentCulture,
                 LocalizationManager.Current.BulkGenreUpdated,
                 changed)
             : string.Format(
                 CultureInfo.CurrentCulture,
-                LocalizationManager.Current.BulkGenreLocalOnly,
+                LocalizationManager.Current.BulkGenrePartiallyFailed,
                 changed,
-                remoteCount);
+                failed);
     }
 
     /// <summary>

@@ -457,6 +457,14 @@ public sealed class OrynivoServerClient : IDisposable
         _maintenanceHttp = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
     }
 
+    /// <summary>Initialises a client over a supplied HTTP client, used by tests.</summary>
+    /// <param name="http">HTTP client used for catalog and streaming requests.</param>
+    internal OrynivoServerClient(HttpClient http)
+    {
+        _http = http;
+        _maintenanceHttp = http;
+    }
+
     // ------------------------------------------------------------------
     // Connection test
     // ------------------------------------------------------------------
@@ -1427,6 +1435,39 @@ public sealed class OrynivoServerClient : IDisposable
                 BuildUrl(server, $"/api/tracks/{trackId}/favorite"))
             {
                 Content = JsonContent.Create(new { isFavorite }, options: JsonOptions)
+            };
+            request.Headers.Add("X-Api-Key", server.ApiKey);
+            AddProfileHeader(request, server);
+            using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>
+    /// Stores the library-only genre of a server track. The server records it as an
+    /// override and never rewrites the media file.
+    /// </summary>
+    /// <param name="server">Server connection settings.</param>
+    /// <param name="trackId">Server-side track identifier.</param>
+    /// <param name="genre">Replacement genre, or <see langword="null"/> to clear it.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns><see langword="true"/> when the server accepted the update.</returns>
+    public async Task<bool> UpdateTrackGenreAsync(
+        OrynivoServerSettings server,
+        long trackId,
+        string? genre,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(
+                HttpMethod.Put,
+                BuildUrl(server, $"/api/tracks/{trackId}/genre"))
+            {
+                // Send an explicit empty value so clearing never depends on the
+                // serializer's null handling; the server trims it to a clear.
+                Content = JsonContent.Create(new { genre = genre ?? string.Empty }, options: JsonOptions)
             };
             request.Headers.Add("X-Api-Key", server.ApiKey);
             AddProfileHeader(request, server);

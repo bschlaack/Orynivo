@@ -160,7 +160,7 @@ Steps:
 - 10 `Orynivo.Core.Tests` cases cover the parser (plain, enhanced, mixed, ordering,
   markers-only, missing timestamps) and the word-level selection.
 
-## 23. Bulk genre editing — `In progress`
+## 23. Bulk genre editing — `Done`
 
 **Decision**: library-only overrides, not media tags. The project's established
 rule is that media files are never rewritten (`track_title_overrides`,
@@ -177,10 +177,13 @@ Steps:
   field and updates the selected rows in place. 5 `Orynivo.Core.Tests` cases cover
   the rescan, the clear path, multiple tracks, duplicates, and the empty
   selection.
-- 23b Server-owned tracks — `Todo`: an authenticated server endpoint plus client
-  wiring so selected Orynivo Server rows can store their genre on the owning
-  server (which already has the same override mechanism through Core). Until then
-  the action reports how many server tracks were skipped.
+- 23b Server-owned tracks — `Done`: `PUT /api/tracks/{id}/genre` stores the same
+  library-only override through `AudioDatabase.SetTrackGenres` and refreshes the
+  track's Lucene document; `OrynivoServerClient.UpdateTrackGenreAsync` sends it
+  (an explicit empty value clears the override), and the bulk action updates
+  remote rows in place and reports per-selection failures. 3
+  `Orynivo.Core.Tests` cases cover the request path, the clear value, and a
+  rejected response.
 
 ## 24. Download podcast episodes for offline playback — `Todo`
 

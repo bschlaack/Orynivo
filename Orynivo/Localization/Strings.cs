@@ -1358,8 +1358,8 @@ public sealed record LocalizedStrings(
     public string BulkGenreApply { get; init; } = "";
     /// <summary>Gets the bulk genre confirmation format string.</summary>
     public string BulkGenreUpdated { get; init; } = "";
-    /// <summary>Gets the message reporting that remote tracks were skipped.</summary>
-    public string BulkGenreLocalOnly { get; init; } = "";
+    /// <summary>Gets the bulk genre partial-failure format string.</summary>
+    public string BulkGenrePartiallyFailed { get; init; } = "";
     /// <summary>Gets the action that exports the current view as a PDF document.</summary>
     public string SaveAsPdf { get; init; } = "";
     /// <summary>Gets the confirmation format string after exporting the PDF.</summary>

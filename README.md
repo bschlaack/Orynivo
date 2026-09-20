@@ -443,6 +443,7 @@ works directly in FFmpeg and browser URLs.
 | `GET /api/library/summary` | Aggregate album, track, artist, and favorite counts without materializing library rows |
 | `GET /api/library/doctor` | Compact read-only Library Doctor folder findings; `inspectFiles=false` skips physical file reads/hashing (omitting it retains full checks) |
 | `POST /api/tracks/by-ids` | Track rows for a list of track IDs (facet-filtered results) |
+| `PUT /api/tracks/{id}/genre` | Store the library-only genre override for one track; an empty value clears it. Media files are never rewritten |
 | `GET /api/folders/tracks` | Lightweight track rows plus playback metadata for building a server library folder tree |
 | `GET /api/artwork/album/{id}?size=96` | Album artwork thumbnail or original image |
 | `PUT /api/artwork/album/{id}` | Store raw client-selected album artwork bytes on the server |

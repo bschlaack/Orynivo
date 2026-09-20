@@ -329,6 +329,18 @@ public static class LibraryEndpoints
             return Results.Ok(new { trackId, request.IsFavorite });
         });
 
+        api.MapPut("/tracks/{trackId:long}/genre", (long trackId, TrackGenreUpdateRequest request) =>
+        {
+            using var db = AudioDatabase.OpenDefault();
+            if (db.GetTrackById(trackId) is null)
+                return Results.NotFound();
+            // Library-only override: the server never rewrites the media file.
+            db.SetTrackGenres([trackId], request.Genre);
+            if (db.GetTrackById(trackId) is { } updatedTrack)
+                TrackSearchIndex.UpdateMany([updatedTrack]);
+            return Results.Ok(new { trackId, request.Genre });
+        });
+
         api.MapGet("/history/sync", (int limit = 500) =>
         {
             using var db = AudioDatabase.OpenDefault();
@@ -967,6 +979,13 @@ public sealed record TrackRatingUpdateRequest(
 
 /// <summary>Request body for a profile-scoped server track favorite.</summary>
 public sealed record FavoriteUpdateRequest(bool IsFavorite);
+
+/// <summary>Library-only genre update sent by an authenticated client.</summary>
+/// <param name="Genre">
+/// Replacement genre, or <see langword="null"/>/empty to clear the override so the
+/// next scan restores the embedded value.
+/// </param>
+public sealed record TrackGenreUpdateRequest(string? Genre);
 
 /// <summary>Request body for creating a regular server playlist.</summary>
 /// <param name="Name">Playlist display name.</param>
