@@ -69,7 +69,7 @@ Avalonia desktop music library with:
 - Real-time DSF/DFF-to-PCM conversion through `ffmpeg` for WASAPI playback
 
 The desktop project builds on Windows, Linux, and macOS. Windows retains the complete
-WASAPI/ASIO playback implementation. The current Linux `net8.0` build supports
+WASAPI/ASIO playback implementation. The current Linux `net10.0` build supports
 PCM playback through selectable direct ALSA hardware and OpenAL output devices
 in addition to the
 library and network/UI feature set; it excludes Windows audio, endpoint-volume,
@@ -90,7 +90,7 @@ separate output types even though both retain the persisted
 routing discriminator: `alsa:` identifies direct ALSA; every other Linux device
 ID uses OpenAL. Existing profiles must be classified from that ID.
 
-macOS desktop builds target `net8.0` for `osx-arm64` and `osx-x64`. PCM
+macOS desktop builds target `net10.0` for `osx-arm64` and `osx-x64`. PCM
 playback uses Apple's system OpenAL framework. FFmpeg/FFprobe discovery checks
 the application and per-user cache, inherited `PATH`, and conventional Homebrew,
 MacPorts, pkgsrc, Fink, and per-user binary directories because Finder-launched
@@ -107,7 +107,7 @@ must never invoke a privileged installer command directly.
 
 ## Orynivo.Core
 
-`Orynivo.Core` is a `net8.0` class library with no platform-specific dependencies.
+`Orynivo.Core` is a `net10.0` class library with no platform-specific dependencies.
 It holds everything needed to scan, store, index, and serve the music library:
 
 **Orynivo.Core/Library/**: `AudioDatabase`, `LibraryScanner`, `LibraryWatcherService`,
@@ -178,7 +178,7 @@ limited compatibility types described above for the Linux target.
 
 ```powershell
 .\build.ps1
-.\Orynivo\bin\Debug\net8.0-windows10.0.19041.0\Orynivo.exe
+.\Orynivo\bin\Debug\net10.0-windows10.0.19041.0\Orynivo.exe
 ```
 
 Run the managed unit tests with
@@ -229,12 +229,12 @@ on every push and pull request, so MCP tool parity and the seven-language
 desktop/website/mobile localization coverage cannot silently drift. Keep these
 scripts passing; do not remove the job. `.github/dependabot.yml` tracks NuGet and
 GitHub Actions updates weekly, but ignores NuGet upgrades that cannot build on
-the pinned toolchain: Avalonia **major** updates (12 requires a newer SDK than the
-`net8.0` the desktop targets and has breaking API changes) plus major upgrades of
-Microsoft.Data.Sqlite and Microsoft.NET.Test.Sdk. Migrate those deliberately
-instead of merging an automatic bump, and migrate to **.NET 10 LTS** rather than
-.NET 9: .NET 9 is already in security-only maintenance and reaches end of support
-on the same day as .NET 8 (10 November 2026). Avalonia **minor** updates within
+the pinned toolchain: Avalonia **major** updates (Avalonia 12 has breaking API
+changes) plus major upgrades of Microsoft.Data.Sqlite and Microsoft.NET.Test.Sdk.
+Migrate those deliberately instead of merging an automatic bump. The projects
+target **.NET 10 LTS**; do not move to .NET 9, which is already in security-only
+maintenance and reaches end of support on 10 November 2026, the same day as .NET 8.
+Avalonia **minor** updates within
 11.3 are allowed again because the drag-and-drop code now uses
 `IDataTransfer`/`DataTransfer`/`DragDrop.DoDragDropAsync`; note that
 `Avalonia.Controls.DataGrid` is in upstream maintenance mode and has no release
@@ -281,7 +281,7 @@ missing package metadata.
 
 ## Orynivo.Server
 
-`Orynivo.Server` is a `net8.0` ASP.NET Core Minimal API server that exposes
+`Orynivo.Server` is a `net10.0` ASP.NET Core Minimal API server that exposes
 the local music library over the network. It references `Orynivo.Core` and has
 no Windows-specific dependencies; it runs on Windows, Linux, and macOS.
 The server project references `SkiaSharp.NativeAssets.Linux.NoDependencies` so
@@ -1810,7 +1810,7 @@ fallback or allow client-provided commands/paths to reach the helper.
 
 ## Known Technical Details
 
-- Target platform: `net8.0-windows10.0.19041.0`, x64
+- Target platform: `net10.0-windows10.0.19041.0`, x64
 - Windows SMTC integration is created opportunistically at main-window startup.
   API or metadata failures must remain silent and must never prevent playback.
   Global commands dispatch onto Avalonia's UI thread and reuse Orynivo's normal

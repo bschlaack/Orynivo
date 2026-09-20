@@ -3,8 +3,8 @@
   <PropertyGroup>
     <OutputType Condition="'$(OS)' == 'Windows_NT'">WinExe</OutputType>
     <OutputType Condition="'$(OS)' != 'Windows_NT'">Exe</OutputType>
-    <TargetFramework Condition="'$(OS)' == 'Windows_NT'">net8.0-windows10.0.19041.0</TargetFramework>
-    <TargetFramework Condition="'$(OS)' != 'Windows_NT'">net8.0</TargetFramework>
+    <TargetFramework Condition="'$(OS)' == 'Windows_NT'">net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetFramework Condition="'$(OS)' != 'Windows_NT'">net10.0</TargetFramework>
     <NoWarn Condition="'$(OS)' != 'Windows_NT'">$(NoWarn);CS0067</NoWarn>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -99,7 +99,7 @@
     <None Include="..\THIRD_PARTY_NOTICES.md" Link="THIRD_PARTY_NOTICES.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="..\licenses\**\*" Link="licenses\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="..\third_party\cwasio\LICENSE" Link="licenses\cwASIO-MIT.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <None Include="$(NuGetPackageRoot)lucene.net\4.8.0-beta00017\NOTICE.txt" Link="licenses\Lucene.NET-NOTICE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('$(NuGetPackageRoot)lucene.net\4.8.0-beta00017\NOTICE.txt')" />
+    <None Include="$(NuGetPackageRoot)lucene.net\4.8.0-beta00018\NOTICE.txt" Link="licenses\Lucene.NET-NOTICE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('$(NuGetPackageRoot)lucene.net\4.8.0-beta00018\NOTICE.txt')" />
     <None Include="$(NuGetPackageRoot)skiasharp\2.88.9\THIRD-PARTY-NOTICES.txt" Link="licenses\SkiaSharp-THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('$(NuGetPackageRoot)skiasharp\2.88.9\THIRD-PARTY-NOTICES.txt')" />
   </ItemGroup>
 

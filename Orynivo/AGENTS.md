@@ -9,8 +9,8 @@ This file applies to the Windows, Linux, and macOS Avalonia desktop client under
   changes require `CHANGELOG.md` and usually `README.md`; architectural or
   behavioral changes require this file or the root `AGENTS.md` to be updated.
 - Build with `dotnet build Orynivo/Orynivo.csproj` after client changes. Linux
-  and macOS compile the `net8.0` compatibility build; Windows continues to
-  target `net8.0-windows10.0.19041.0`.
+  and macOS compile the `net10.0` compatibility build; Windows continues to
+  target `net10.0-windows10.0.19041.0`.
 - New visible text must use `LocalizationManager` and exist in German, English,
   French, Spanish, Russian, Simplified Chinese, and Hindi.
 - `ApplicationCredentialStore` is the only persistent client credential

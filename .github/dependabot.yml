@@ -9,13 +9,11 @@ updates:
       prefix: "deps(nuget)"
     ignore:
       # Major upgrades need a deliberate migration instead of an automatic bump.
-      # Avalonia 12 requires a newer SDK than the net8.0 the desktop targets and
-      # has breaking API changes; the Microsoft.* 9/10 and test-SDK 18 lines
-      # likewise target newer runtimes. The migration target is .NET 10 LTS, not
-      # .NET 9: .NET 9 is already in security-only maintenance and reaches end of
-      # support on the same day as .NET 8. Keep Dependabot on the minor/patch line
-      # and review majors by hand. The triggers, steps, and required checks live
-      # in DEPENDENCY-MIGRATION.md.
+      # Avalonia 12 has breaking API changes; the Microsoft.Data.Sqlite and
+      # test-SDK major lines also need review. The projects target .NET 10 LTS
+      # (not .NET 9, which is already in security-only maintenance). Keep
+      # Dependabot on the minor/patch line and review majors by hand. The
+      # triggers, steps, and required checks live in DEPENDENCY-MIGRATION.md.
       #
       # Avalonia minor updates within 11.3 are allowed: the drag-and-drop code
       # uses IDataTransfer/DataTransfer/DragDrop.DoDragDropAsync, so the 11.3

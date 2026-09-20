@@ -191,13 +191,13 @@ standalone logo.
 
 The desktop project selects its target from the build host:
 
-- Windows builds target `net8.0-windows10.0.19041.0` and include the existing
+- Windows builds target `net10.0-windows10.0.19041.0` and include the existing
   WASAPI/ASIO integrations.
-- Linux builds target `net8.0`; PCM audio is rendered through direct ALSA or
+- Linux builds target `net10.0`; PCM audio is rendered through direct ALSA or
   OpenAL. The Windows endpoint-volume integration is replaced by a
   compatibility service, and system-media integration is provided by MPRIS 2
   (`org.mpris.MediaPlayer2.orynivo`) for desktop media keys and panels.
-- macOS builds target `net8.0`; PCM audio is rendered through Apple's system
+- macOS builds target `net10.0`; PCM audio is rendered through Apple's system
   OpenAL framework. Windows audio, endpoint-volume, and SMTC integrations are
   replaced by compatibility services, and native DSD output is not currently
   available.
@@ -209,7 +209,7 @@ The desktop project selects its target from the build host:
 - The Linux target pins Tmds.DBus.Protocol 0.92.0 so D-Bus observer cleanup
   remains non-blocking while Avalonia's UI dispatcher is shutting down.
 
-Build the Linux desktop with .NET 8:
+Build the Linux desktop with .NET 10:
 
 ```bash
 dotnet restore Orynivo/Orynivo.csproj
@@ -1159,7 +1159,7 @@ bit depths are converted by `ffmpeg`.
 ### Windows player
 
 - Windows 10 or Windows 11, x64
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) (for building)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (for building)
 - [FFmpeg](https://ffmpeg.org/) — downloaded automatically on first start if not
   already present. To use a specific build, place `ffmpeg.exe` and `ffprobe.exe`
   in `PATH`, next to `Orynivo.exe`, or in `%LOCALAPPDATA%\Orynivo\ffmpeg`.
@@ -1200,14 +1200,14 @@ the Steinberg ASIO SDK nor a platform-specific Orynivo bridge is required.
 - No ASIO, cwASIO, ALSA, or native DSD support
 
 Tagged releases provide self-contained PKG installers and portable app bundles,
-so the .NET runtime is not required. Development builds require the .NET 8 SDK.
+so the .NET runtime is not required. Development builds require the .NET 10 SDK.
 The signed update mechanism selects and verifies the PKG matching the running
 architecture before opening the normal macOS Installer.
 
 ### Orynivo Server
 
 - Linux, macOS, or Windows; x64 or ARM64
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) (for building;
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (for building;
   not required when using a self-contained release package)
 - [FFmpeg](https://ffmpeg.org/) — recommended for CUE-sheet track transcoding
   (Debian/Ubuntu: `apt install ffmpeg`; Fedora/Rocky: install from RPM Fusion)
@@ -1226,7 +1226,7 @@ Download the latest builds from [Releases](https://github.com/bschlaack/Orynivo/
 | `Orynivo-{version}-win-x64-Setup.exe` | Installer — Start Menu entry and uninstaller |
 | `Orynivo-{version}-win-x64-Portable.zip` | Portable — extract anywhere and run `Orynivo.exe` |
 
-Both packages are self-contained (.NET 8 bundled, no prerequisites).
+Both packages are self-contained (.NET 10 bundled, no prerequisites).
 
 ### Linux player
 
@@ -1286,7 +1286,7 @@ privileged installation command itself.
 | `orynivo-server-{version}-1.x86_64.rpm` | Fedora / Rocky / RHEL (x86-64) |
 | `orynivo-server-{version}-1.aarch64.rpm` | Fedora / Rocky / RHEL (ARM64) |
 
-All packages are self-contained (.NET 8 bundled). See the
+All packages are self-contained (.NET 10 bundled). See the
 [Server section](#orynivo-server) for post-install setup.
 
 ## Build
@@ -1481,7 +1481,7 @@ only from the development branch are intentionally ignored.
 ## Run
 
 ```powershell
-.\Orynivo\bin\Debug\net8.0-windows10.0.19041.0\Orynivo.exe
+.\Orynivo\bin\Debug\net10.0-windows10.0.19041.0\Orynivo.exe
 ```
 
 Library directories and the desired output device can then be configured in
@@ -1556,7 +1556,7 @@ Orynivo/
 │   ├── AsioBridge/          Steinberg ASIO bridge
 │   └── CwAsioBridge/        cwASIO bridge
 ├── third_party/cwasio/      Vendored cwASIO sources under the MIT License
-├── Orynivo.Core/            Cross-platform library (net8.0, no platform dependencies)
+├── Orynivo.Core/            Cross-platform library (net10.0, no platform dependencies)
 │   ├── Audio/               FFmpeg decoder, acoustic analysis, ReplayGain, equalizer, crossfeed
 │   ├── Library/             SQLite database, scanner, watcher, Lucene search, backups, models
 │   ├── Scrobbling/          Last.fm request signing, scrobble rules, and HTTP client
@@ -1575,7 +1575,7 @@ Orynivo/
 │   ├── Scrobbling/          Desktop scrobbling service and pending-scrobble store
 │   ├── Streaming/           Credential-store facades and the inactive Qobuz provider scaffold
 │   └── MainWindow.*.cs      Main window, split into domain-sized partials
-├── Orynivo.Server/          Cross-platform headless server (net8.0, ASP.NET Core)
+├── Orynivo.Server/          Cross-platform headless server (net10.0, ASP.NET Core)
 │   ├── Endpoints/           Core, library, streaming, configuration, backup, and update routes
 │   ├── Middleware/          API key and user-profile authentication
 │   ├── Services/            Hosted library scan, watcher, and audio-feature maintenance

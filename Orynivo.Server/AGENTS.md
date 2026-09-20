@@ -11,7 +11,7 @@ This file applies to `Orynivo.Server/` and supplements `../AGENTS.md`.
 
 ## Server Invariants
 
-- Keep the server cross-platform `net8.0` and free of Windows-only dependencies.
+- Keep the server cross-platform `net10.0` and free of Windows-only dependencies.
 - Every endpoint except `/api/health` requires the configured API key through
   `X-Api-Key` or `?key=`. Do not log or expose the key.
 - `ApiKeyMiddleware` and `ProfileContextMiddleware` must stay independently

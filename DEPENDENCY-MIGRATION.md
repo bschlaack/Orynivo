@@ -11,8 +11,8 @@ before the pin is raised.
 
 ## Toolchain support window
 
-The desktop targets `net8.0`. Per the Microsoft .NET support policy, the relevant
-lines are:
+The solution targets `net10.0`. Per the Microsoft .NET support policy, the
+relevant lines are:
 
 | Version | Type | Phase | End of support |
 | --- | --- | --- | --- |
@@ -20,11 +20,11 @@ lines are:
 | .NET 9 | STS | Maintenance (security fixes only) | 10 November 2026 |
 | .NET 8 | LTS | Maintenance (security fixes only) | 10 November 2026 |
 
-**Target `net10.0`, not `net9.0`.** .NET 9 is already in its security-only
+**Target `net10.0`, not `net9.0`.** .NET 9 was already in its security-only
 maintenance phase and reaches end of support on the same day as .NET 8, so moving
-to it would be a dead end. The next LTS release is the only sensible destination.
-The `net8.0` line this repository currently uses stops receiving fixes on
-10 November 2026, so the migration below is time-boxed rather than optional.
+to it would have been a dead end. The .NET 10 migration is complete (see below);
+the previous `net8.0` line stops receiving fixes on 10 November 2026, so staying
+there was not an option.
 
 Re-check these dates against the .NET support policy before planning the work; the
 table is a snapshot, not a permanent fact.
@@ -33,53 +33,64 @@ table is a snapshot, not a permanent fact.
 
 | Dependency | Current | Pinned because | Blocked by |
 | --- | --- | --- | --- |
-| .NET runtime and SDK | `net8.0` / `net8.0-windows10.0.19041.0` | The Avalonia line in use needs the .NET 8 toolchain | The .NET 10 LTS migration (see below) |
-| Avalonia | `11.3.22` (`Avalonia`, `Avalonia.Desktop`, `Avalonia.Fonts.Inter`) | Avalonia 12 needs a newer SDK than `net8.0` and has breaking API changes | The .NET 10 LTS migration (see below) |
+| .NET runtime and SDK | `net10.0` / `net10.0-windows10.0.19041.0` (SDK 10.0.401) | LTS with support until 14 November 2028 | None |
+| Avalonia | `11.3.22` | Avalonia 12 has breaking API changes | The Avalonia 12 migration (see below) |
 | `Avalonia.Themes.Fluent`, `Avalonia.Controls.DataGrid`, `Avalonia.Diagnostics` | `11.3.13` | `Avalonia.Controls.DataGrid` is in upstream maintenance mode and has no release beyond 11.3.13 | No upstream release is planned; evaluate the successor controls |
 | SkiaSharp | `2.88.9` (`Orynivo.Core`, plus `SkiaSharp.NativeAssets.Linux.NoDependencies` in `Orynivo.Server`) | `Avalonia.Skia` 11.3 depends on SkiaSharp `2.88.9` | An Avalonia release on a SkiaSharp 3/4 line |
-| `Microsoft.Data.Sqlite` | `9.0.20` | The `10.x` line targets a newer runtime than `net8.0` | The .NET 10 LTS migration |
-| `Microsoft.NET.Test.Sdk` | `17.14.1` | The `18.x` line targets a newer toolchain | A deliberate evaluation with all three test projects |
+| `Microsoft.Data.Sqlite` | `10.0.12` | Matches the .NET 10 toolchain | None (major upgrades still need review) |
+| `Microsoft.NET.Test.Sdk` | `18.10.1` | Matches the .NET 10 toolchain | None (major upgrades still need review) |
 | `Tmds.DBus.Protocol` | `0.95.1` | Linux-only; `0.92.0` is the documented floor | None (minor/patch updates are welcome) |
 
 Target frameworks today: `Orynivo` and `Orynivo.Tests` use
-`net8.0-windows10.0.19041.0` on Windows and `net8.0` elsewhere;
+`net10.0-windows10.0.19041.0` on Windows and `net10.0` elsewhere;
 `Orynivo.Core`, `Orynivo.Server`, `Orynivo.Core.Tests`, and
-`Orynivo.Server.Tests` use `net8.0`.
+`Orynivo.Server.Tests` use `net10.0`. `global.json` pins SDK `10.0.100` with
+`rollForward: latestFeature`, so any installed `10.0.x` SDK satisfies it.
 
-## Moving to .NET 10 LTS and Avalonia 12
+## Completed: the .NET 10 LTS migration
 
-**Trigger:** the .NET 10 SDK (LTS) available on every build and release runner,
-plus an Avalonia 12 release whose breaking changes are documented. Confirm the
-exact minimum .NET version Avalonia 12 requires in its release notes before
-choosing the SDK; the repository's Dependabot rules only record that it is newer
-than .NET 8.
+The projects now target `net10.0` / `net10.0-windows10.0.19041.0` on the .NET 10
+LTS line. What changed:
+
+1. `global.json` pins SDK `10.0.100` with `rollForward: latestFeature`, so any
+   installed `10.0.x` SDK satisfies it.
+2. Every `TargetFramework` moved in one commit. A mixed set does not build,
+   because the desktop project would reference a `net10.0` `Orynivo.Core` from a
+   `net8.0` target.
+3. `Microsoft.Data.Sqlite` moved to `10.0.12`, `Microsoft.AspNetCore.TestHost` to
+   `10.0.12`, and `Microsoft.NET.Test.Sdk` to `18.10.1`.
+4. Every workflow pins `dotnet-version: 10.0.x`.
+5. `Orynivo/Orynivo.csproj` now copies the Lucene `NOTICE.txt` from the
+   `4.8.0-beta00018` package directory it actually references; the path still
+   named `beta00017`, so the license file was silently skipped.
+
+Verification: `scripts/verify-all.ps1` green in Debug and Release with
+`--warnaserror`, and 570 tests passing on `net10.0`
+(`Orynivo.Core.Tests` 427, `Orynivo.Tests` 105, `Orynivo.Server.Tests` 38).
+
+## Moving to Avalonia 12
+
+**Trigger:** an Avalonia 12 release whose breaking changes are documented. The SDK
+prerequisite is already satisfied by the .NET 10 migration. Confirm the exact
+minimum .NET version Avalonia 12 requires in its release notes before starting.
 
 **Steps:**
 
-1. Install and pin the .NET 10 SDK in `.github/workflows/dotnet-desktop.yml`,
-   `.github/workflows/release.yml`, `.github/workflows/server-release.yml`, and
-   `.github/workflows/player-linux-release.yml`; drop the .NET 8 SDK once no
-   project targets `net8.0` any more.
-2. Change every `TargetFramework` together. A mixed `net8.0`/`net10.0` set makes
-   the `Orynivo` desktop project reference a `net10.0` `Orynivo.Core` from a
-   `net8.0` target, which does not build.
-3. Bump every Avalonia package in one commit, including
+1. Bump every Avalonia package in one commit, including
    `Avalonia.Controls.DataGrid` (see below), and keep them on one version.
-4. Check which SkiaSharp line Avalonia 12 pulls in. If it moved to 3.x/4.x, fold
+2. Check which SkiaSharp line Avalonia 12 pulls in. If it moved to 3.x/4.x, fold
    the SkiaSharp migration into the same commit (see below).
-5. Work through the Avalonia 12 breaking changes. The areas that historically
+3. Work through the Avalonia 12 breaking changes. The areas that historically
    needed work here are drag and drop (`IDataTransfer`/`DataTransfer`), the
    `DataGrid` theming and `ControlTheme` templates, `Popup`/`Flyout` placement,
    `Transitions` and `RenderTransform` animation APIs, and the Skia render
    interface.
-6. Re-check the `App.axaml` control themes, the transport and table styles, the
+4. Re-check the `App.axaml` control themes, the transport and table styles, the
    `VirtualizingWrapPanel`, and the macOS `AvaloniaNativePlatformOptions`
    rendering mode. Avalonia 12 changes the EGL/OpenGL handling on Linux and macOS,
    so the documented OpenGL-first/software-second macOS workaround must be
    re-evaluated rather than carried over blindly.
-7. Fold in the `Microsoft.Data.Sqlite` and `Microsoft.NET.Test.Sdk` lines that are
-   currently pinned only because they need a newer runtime.
-8. Update `AGENTS.md`, `README.md`, `CHANGELOG.md`, and this file.
+5. Update `AGENTS.md`, `README.md`, `CHANGELOG.md`, and this file.
 
 **Checks before merging:** `scripts/verify-all.ps1` green; a manual pass over
 playback, the library tables, drag and drop into Up Next, the Dashboard, the
@@ -142,13 +153,13 @@ export on Windows and Linux.
 
 ## `Microsoft.Data.Sqlite` and the test SDK
 
-**Trigger:** a deliberate decision to move the toolchain forward, normally
-together with the .NET 10 LTS migration.
+**Trigger:** a deliberate decision to move the toolchain forward. Both lines
+already match the .NET 10 toolchain, so only a major bump remains.
 
 **Steps:**
 
-1. Evaluate the newer line against `net8.0` first; if it requires a newer
-   runtime, fold it into the .NET 10 migration.
+1. Evaluate the newer line against `net10.0` first; a line that needs an even
+   newer runtime has to wait for the next LTS migration.
 2. Bump `Microsoft.Data.Sqlite` in `Orynivo.Core` and re-run every database test
    through `Orynivo.Core.Tests.CoreTestDatabase`.
 3. Bump `Microsoft.NET.Test.Sdk` in all three test projects together and re-run

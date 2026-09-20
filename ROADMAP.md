@@ -1,6 +1,6 @@
 # Orynivo Roadmap
 
-Items 1-29 are complete and listed for reference only.
+Items 1-30 are complete and listed for reference only.
 
 Each item is one commit and must follow the completion checklist in
 `AGENTS.md`: build every affected project, run the three test projects, update
@@ -276,3 +276,22 @@ Steps:
 **Tests**: none; documentation only.
 
 **Commit**: `docs: correct the dependency migration target to .NET 10 LTS`
+
+## 30. Migrate the solution to .NET 10 LTS - `Done`
+
+**Design**
+
+- All six projects target `net10.0` / `net10.0-windows10.0.19041.0`;
+  `global.json` pins SDK `10.0.100` with `rollForward: latestFeature`; every
+  workflow pins `dotnet-version: 10.0.x`.
+- `Microsoft.Data.Sqlite` 10.0.12, `Microsoft.AspNetCore.TestHost` 10.0.12, and
+  `Microsoft.NET.Test.Sdk` 18.10.1 match the new toolchain.
+- Avalonia stays on 11.3 for now; the Avalonia 12 migration is a separate step
+  recorded in `DEPENDENCY-MIGRATION.md`.
+- Drive-by license fix: `Orynivo.csproj` copies the Lucene `NOTICE.txt` from the
+  `4.8.0-beta00018` directory it actually references.
+
+**Tests**: the existing 570 tests (Core 427, Desktop 105, Server 38) run on
+`net10.0`; `scripts/verify-all.ps1` is green in Debug and Release.
+
+**Commit**: `chore(dotnet): migrate the solution to .NET 10 LTS`
